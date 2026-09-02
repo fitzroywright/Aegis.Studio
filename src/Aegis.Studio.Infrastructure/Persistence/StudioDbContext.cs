@@ -31,6 +31,7 @@ public sealed class StudioDbContext : DbContext, IUnitOfWork
     {
         modelBuilder.Entity<Booking>().HasKey(item => item.Id);
         modelBuilder.Entity<Booking>().HasIndex(item => item.Reference).IsUnique();
+        modelBuilder.Entity<Booking>().HasIndex(item => item.AccessToken).IsUnique();
         modelBuilder.Entity<ServiceOffering>().HasKey(item => item.Id);
         modelBuilder.Entity<Photographer>().HasKey(item => item.Id);
         modelBuilder.Entity<AvailabilityRule>().HasKey(item => item.Id);
