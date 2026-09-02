@@ -25,10 +25,34 @@ public sealed class TaskService
         return task;
     }
 
+    public async Task StartAsync(Guid taskId, CancellationToken cancellationToken)
+    {
+        StudioTask task = await GetTaskAsync(taskId, cancellationToken);
+        task.Start();
+        await SaveAndSyncAsync(task, cancellationToken);
+    }
+
+    public async Task AssignAsync(Guid taskId, string? userId, CancellationToken cancellationToken)
+    {
+        StudioTask task = await GetTaskAsync(taskId, cancellationToken);
+        task.AssignTo(userId);
+        await SaveAndSyncAsync(task, cancellationToken);
+    }
+
     public async Task CompleteAsync(Guid taskId, CancellationToken cancellationToken)
     {
-        StudioTask task = await taskRepository.GetAsync(taskId, cancellationToken) ?? throw new InvalidOperationException("Task was not found.");
+        StudioTask task = await GetTaskAsync(taskId, cancellationToken);
         task.Complete();
+        await SaveAndSyncAsync(task, cancellationToken);
+    }
+
+    private async Task<StudioTask> GetTaskAsync(Guid taskId, CancellationToken cancellationToken)
+    {
+        return await taskRepository.GetAsync(taskId, cancellationToken) ?? throw new InvalidOperationException("Task was not found.");
+    }
+
+    private async Task SaveAndSyncAsync(StudioTask task, CancellationToken cancellationToken)
+    {
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await taskSyncProvider.UpsertAsync(task, cancellationToken);
     }
