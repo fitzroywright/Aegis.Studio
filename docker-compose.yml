@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: aegis_studio
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: local-development-only
+    ports:
+      - "5432:5432"
+    volumes:
+      - studio-postgres:/var/lib/postgresql/data
+  web:
+    build:
+      context: .
+      dockerfile: src/Aegis.Studio.Web/Dockerfile
+    environment:
+      ConnectionStrings__Studio: Host=postgres;Port=5432;Database=aegis_studio;Username=aegis;Password=local-development-only
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+  service:
+    build:
+      context: .
+      dockerfile: src/Aegis.Studio.Service/Dockerfile
+    environment:
+      ConnectionStrings__Studio: Host=postgres;Port=5432;Database=aegis_studio;Username=aegis;Password=local-development-only
+    depends_on:
+      - postgres
+volumes:
+  studio-postgres:
