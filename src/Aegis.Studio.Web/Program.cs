@@ -1,10 +1,14 @@
 using Aegis.Studio.Application.Abstractions;
 using Aegis.Studio.Application.Bookings;
 using Aegis.Studio.Application.Communications;
+using Aegis.Studio.Application.Customers;
+using Aegis.Studio.Application.Notifications;
 using Aegis.Studio.Application.Operations;
+using Aegis.Studio.Application.Tasks;
 using Aegis.Studio.Application.Workspaces;
 using Aegis.Studio.Domain.Communications;
 using Aegis.Studio.Domain.Operations;
+using Aegis.Studio.Domain.Tasks;
 using Aegis.Studio.Domain.Workspaces;
 using Aegis.Studio.Infrastructure;
 using Aegis.Studio.Infrastructure.Persistence;
@@ -12,8 +16,12 @@ using Aegis.Studio.Infrastructure.Persistence;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddStudioInfrastructure(builder.Configuration);
 builder.Services.AddScoped<AvailabilityService>();
+builder.Services.AddScoped<BookingLifecycleService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<BookingManagementService>();
+builder.Services.AddScoped<CustomerService>();
+builder.Services.AddScoped<TaskService>();
+builder.Services.AddScoped<NotificationScheduler>();
 builder.Services.AddScoped<CommunicationService>();
 builder.Services.AddScoped<WorkspaceAccessService>();
 builder.Services.AddScoped<WorkspaceDashboardService>();
@@ -32,12 +40,25 @@ using (IServiceScope scope = app.Services.CreateScope())
 }
 
 app.MapGet("/api/catalog", async (IStudioCatalogRepository catalog, ICommunicationRepository communications, CancellationToken cancellationToken) => Results.Ok(new { services = await catalog.GetServicesAsync(cancellationToken), photographers = await catalog.GetPhotographersAsync(cancellationToken), workspaces = await communications.GetWorkspacesAsync(cancellationToken) }));
+app.MapGet("/api/availability", async (Guid serviceId, DateTimeOffset startUtc, AvailabilityService availability, IStudioCatalogRepository catalog, CancellationToken cancellationToken) =>
+{
+    ServiceOffering? service = await catalog.GetServiceAsync(serviceId, cancellationToken);
+    if (service is null) return Results.NotFound();
+    IReadOnlyList<Photographer> photographers = await availability.GetAvailablePhotographersAsync(service, startUtc, cancellationToken);
+    return Results.Ok(photographers);
+});
+
 app.MapGet("/api/bookings", async (IBookingRepository repository, CancellationToken cancellationToken) => Results.Ok(await repository.GetUpcomingAsync(cancellationToken)));
 app.MapGet("/api/bookings/{bookingId:guid}", async (Guid bookingId, IBookingRepository repository, CancellationToken cancellationToken) => (await repository.GetAsync(bookingId, cancellationToken)) is { } booking ? Results.Ok(booking) : Results.NotFound());
 app.MapPost("/api/bookings", async (CreateBookingRequest request, BookingService service, CancellationToken cancellationToken) => Results.Ok(await service.CreateAsync(request, cancellationToken)));
 app.MapPost("/api/bookings/{bookingId:guid}/reschedule", async (Guid bookingId, RescheduleBookingRequest request, BookingManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.RescheduleAsync(bookingId, request, cancellationToken)));
 app.MapPost("/api/bookings/{bookingId:guid}/cancel", async (Guid bookingId, BookingManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.CancelAsync(bookingId, cancellationToken)));
 app.MapPost("/api/bookings/{bookingId:guid}/complete", async (Guid bookingId, BookingManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.CompleteAsync(bookingId, cancellationToken)));
+
+app.MapGet("/api/customers", async (string? search, ICustomerRepository repository, CancellationToken cancellationToken) => Results.Ok(await repository.SearchAsync(search, cancellationToken)));
+app.MapGet("/api/workspaces/{workspaceId:guid}/tasks", async (Guid workspaceId, ITaskRepository repository, CancellationToken cancellationToken) => Results.Ok(await repository.GetForWorkspaceAsync(workspaceId, cancellationToken)));
+app.MapPost("/api/tasks/{taskId:guid}/complete", async (Guid taskId, TaskService service, CancellationToken cancellationToken) => { await service.CompleteAsync(taskId, cancellationToken); return Results.NoContent(); });
+app.MapGet("/api/workspaces/{workspaceId:guid}/notifications", async (Guid workspaceId, INotificationRepository repository, CancellationToken cancellationToken) => Results.Ok(await repository.GetForWorkspaceAsync(workspaceId, cancellationToken)));
 
 app.MapGet("/api/workspaces", async (ICommunicationRepository repository, CancellationToken cancellationToken) => Results.Ok(await repository.GetWorkspacesAsync(cancellationToken)));
 app.MapGet("/api/workspaces/{workspaceId:guid}/dashboard", async (Guid workspaceId, WorkspaceDashboardService service, CancellationToken cancellationToken) => Results.Ok(await service.GetAsync(workspaceId, cancellationToken)));
@@ -58,7 +79,7 @@ app.MapPost("/api/dev/inbound", async (InboundMailItem request, CommunicationSer
 app.MapPost("/api/operations/evaluate-escalations", async (EscalationService service, CancellationToken cancellationToken) => Results.Ok(new { created = await service.EvaluateAsync(TimeSpan.FromMinutes(30), TimeSpan.FromHours(2), cancellationToken) }));
 
 app.MapHealthChecks("/diagnostics/health");
-app.MapGet("/diagnostics/starfleet", () => Results.Ok(new { level = "GREEN", application = "Aegis.Studio", checks = new[] { "web", "database", "communications-hub", "workspace-routing", "booking-management", "escalations" }, utc = DateTimeOffset.UtcNow }));
+app.MapGet("/diagnostics/starfleet", (IHostEnvironment environment) => Results.Ok(new { level = "GREEN", application = "Aegis.Studio", environment = environment.EnvironmentName, checks = new[] { "web", "database", "communications-hub", "workspace-routing", "booking-management", "availability", "customers", "tasks", "notifications", "calendar-provider", "escalations" }, utc = DateTimeOffset.UtcNow }));
 app.Run();
 
 public sealed record ReplyRequest(string Body);
