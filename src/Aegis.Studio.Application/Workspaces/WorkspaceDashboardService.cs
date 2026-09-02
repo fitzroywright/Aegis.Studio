@@ -1,5 +1,6 @@
 using Aegis.Studio.Application.Abstractions;
 using Aegis.Studio.Application.Communications;
+using Aegis.Studio.Domain.Communications;
 
 namespace Aegis.Studio.Application.Workspaces;
 
