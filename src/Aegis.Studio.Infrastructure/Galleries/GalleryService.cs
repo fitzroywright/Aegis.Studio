@@ -1,0 +1,22 @@
+using Aegis.Studio.Application.Abstractions;
+using Aegis.Studio.Domain.Galleries;
+using Aegis.Studio.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace Aegis.Studio.Infrastructure.Galleries;
+
+public sealed class GalleryService
+{
+    private readonly StudioDbContext dbContext; private readonly IMediaStorage storage;
+    public GalleryService(StudioDbContext dbContext, IMediaStorage storage) { this.dbContext = dbContext; this.storage = storage; }
+    public async Task<IReadOnlyList<Gallery>> GetGalleriesAsync(CancellationToken ct) => await dbContext.Galleries.OrderByDescending(x => x.CreatedUtc).ToListAsync(ct);
+    public async Task<IReadOnlyList<MediaAsset>> GetMediaAsync(Guid galleryId, CancellationToken ct) => await dbContext.MediaAssets.Where(x => x.GalleryId == galleryId).OrderByDescending(x => x.UpdatedUtc).ToListAsync(ct);
+    public async Task<Gallery> CreateAsync(string name, GalleryKind kind, Guid workspaceId, Guid? bookingId, Guid? customerId, CancellationToken ct) { Gallery gallery = new(name, kind, workspaceId, bookingId, customerId); dbContext.Galleries.Add(gallery); await dbContext.SaveChangesAsync(ct); return gallery; }
+    public async Task<MediaAsset> UploadAsync(Guid galleryId, string fileName, string contentType, long sizeBytes, Stream content, string userId, CancellationToken ct) { string key = await storage.SaveAsync(fileName, content, ct); MediaAsset asset = new(galleryId, fileName, contentType, sizeBytes, key, userId); dbContext.MediaAssets.Add(asset); dbContext.MediaActivities.Add(new MediaActivity(asset.Id, userId, "Uploaded", fileName)); await dbContext.SaveChangesAsync(ct); return asset; }
+    public async Task MoveAsync(Guid mediaId, Guid galleryId, string userId, CancellationToken ct) { MediaAsset asset = await FindAsync(mediaId, ct); asset.MoveTo(galleryId); dbContext.MediaActivities.Add(new MediaActivity(asset.Id, userId, "Transferred", $"Moved to gallery {galleryId}")); await dbContext.SaveChangesAsync(ct); }
+    public async Task<ProductionAssignment> AssignAsync(Guid mediaId, Guid workspaceId, string assignedTo, string activity, string userId, CancellationToken ct) { MediaAsset asset = await FindAsync(mediaId, ct); ProductionAssignment assignment = new(asset.Id, workspaceId, assignedTo, activity); dbContext.ProductionAssignments.Add(assignment); dbContext.MediaActivities.Add(new MediaActivity(asset.Id, userId, "Production assigned", $"{activity} -> {assignedTo}")); await dbContext.SaveChangesAsync(ct); return assignment; }
+    public async Task<PrintJob> SchedulePrintAsync(Guid mediaId, Guid workspaceId, string requestedBy, int quantity, string specification, DateTimeOffset scheduledUtc, CancellationToken ct) { MediaAsset asset = await FindAsync(mediaId, ct); PrintJob job = new(asset.Id, workspaceId, requestedBy, quantity, specification, scheduledUtc); dbContext.PrintJobs.Add(job); dbContext.MediaActivities.Add(new MediaActivity(asset.Id, requestedBy, "Print scheduled", $"{quantity} x {specification}")); await dbContext.SaveChangesAsync(ct); return job; }
+    public async Task<object> GetActivityAsync(Guid mediaId, CancellationToken ct) { MediaAsset asset = await FindAsync(mediaId, ct); return new { asset, history = await dbContext.MediaActivities.Where(x => x.MediaAssetId == mediaId).OrderByDescending(x => x.CreatedUtc).ToListAsync(ct), work = await dbContext.ProductionAssignments.Where(x => x.MediaAssetId == mediaId).OrderByDescending(x => x.StartedUtc).ToListAsync(ct), prints = await dbContext.PrintJobs.Where(x => x.MediaAssetId == mediaId).OrderByDescending(x => x.CreatedUtc).ToListAsync(ct) }; }
+    public async Task<(MediaAsset Asset, Stream Content)> DownloadAsync(Guid mediaId, string userId, CancellationToken ct) { MediaAsset asset = await FindAsync(mediaId, ct); dbContext.MediaActivities.Add(new MediaActivity(asset.Id, userId, "Downloaded", asset.FileName)); await dbContext.SaveChangesAsync(ct); return (asset, await storage.OpenReadAsync(asset.StorageKey, ct)); }
+    private async Task<MediaAsset> FindAsync(Guid id, CancellationToken ct) => await dbContext.MediaAssets.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new InvalidOperationException("Media asset was not found.");
+}
