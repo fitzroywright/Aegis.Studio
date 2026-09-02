@@ -32,8 +32,13 @@ public sealed class StudioDbContext : DbContext, IUnitOfWork
         modelBuilder.Entity<CommunicationMessage>().Property(item => item.Body).HasColumnType("text");
     }
 
-    public async Task SaveChangesAsync(CancellationToken cancellationToken)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await base.SaveChangesAsync(cancellationToken);
+        return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    async Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken)
+    {
+        await SaveChangesAsync(cancellationToken);
     }
 }
