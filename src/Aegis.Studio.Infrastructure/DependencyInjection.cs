@@ -27,12 +27,23 @@ public static class DependencyInjection
     private static void AddDatabase(IServiceCollection services, IConfiguration configuration)
     {
         string provider = configuration["Database:Provider"] ?? "Sqlite";
-        string connectionString = configuration.GetConnectionString("Studio") ?? "Data Source=aegis-studio.db";
+        string connectionString = configuration.GetConnectionString("Studio") ?? GetDefaultSqliteConnectionString();
+
         if (provider.Equals("PostgreSql", StringComparison.OrdinalIgnoreCase))
         {
             services.AddDbContext<StudioDbContext>(options => options.UseNpgsql(connectionString));
             return;
         }
+
         services.AddDbContext<StudioDbContext>(options => options.UseSqlite(connectionString));
+    }
+
+    private static string GetDefaultSqliteConnectionString()
+    {
+        string localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string studioData = Path.Combine(localData, "Aegis.Studio");
+        Directory.CreateDirectory(studioData);
+        string databasePath = Path.Combine(studioData, "aegis-studio.db");
+        return $"Data Source={databasePath}";
     }
 }
