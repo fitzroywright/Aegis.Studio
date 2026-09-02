@@ -22,39 +22,26 @@ public sealed class DatabaseInitializer
 
     private async Task SeedCatalogAsync(CancellationToken cancellationToken)
     {
-        if (await dbContext.Workspaces.AnyAsync(cancellationToken))
-        {
-            return;
-        }
+        await EnsureWorkspaceAsync("Weddings", "weddings", "weddings@bryans.com", cancellationToken);
+        await EnsureWorkspaceAsync("Graduation Photos", "graduations", "graduations@bryans.com", cancellationToken);
+        await EnsureWorkspaceAsync("Portraits", "portraits", "portraits@bryans.com", cancellationToken);
+        await EnsureWorkspaceAsync("ID Photos", "idphotos", "idphotos@bryans.com", cancellationToken);
+        await EnsureWorkspaceAsync("Corporate & Events", "corporate", "corporate@bryans.com", cancellationToken);
 
-        Workspace weddings = new("Weddings", "weddings", "weddings@bryans.com");
-        Workspace graduations = new("Graduation Photos", "graduations", "graduations@bryans.com");
-        Workspace portraits = new("Portraits", "portraits", "portraits@bryans.com");
-        Workspace idPhotos = new("ID Photos", "idphotos", "idphotos@bryans.com");
-        Workspace corporate = new("Corporate & Events", "corporate", "corporate@bryans.com");
+        Photographer ryan = await EnsurePhotographerAsync("Ryan Bryan", "ryan@bryans.com", cancellationToken);
+        Photographer michelle = await EnsurePhotographerAsync("Michelle Grant", "michelle@bryans.com", cancellationToken);
+        Photographer andre = await EnsurePhotographerAsync("Andre Campbell", "andre@bryans.com", cancellationToken);
 
-        Photographer ryan = new("Ryan Bryan", "ryan@bryans.com");
-        Photographer michelle = new("Michelle Grant", "michelle@bryans.com");
-        Photographer andre = new("Andre Campbell", "andre@bryans.com");
+        await EnsureServiceAsync("Wedding Photography", 240, 30, cancellationToken);
+        await EnsureServiceAsync("Engagement Session", 90, 15, cancellationToken);
+        await EnsureServiceAsync("Portrait Session", 60, 15, cancellationToken);
+        await EnsureServiceAsync("Graduation Photography", 90, 15, cancellationToken);
+        await EnsureServiceAsync("Corporate Event Coverage", 180, 30, cancellationToken);
+        await EnsureServiceAsync("ID & Passport Photos", 30, 5, cancellationToken);
 
-        ServiceOffering wedding = new("Wedding Photography", 240, 30);
-        ServiceOffering engagement = new("Engagement Session", 90, 15);
-        ServiceOffering portrait = new("Portrait Session", 60, 15);
-        ServiceOffering graduation = new("Graduation Photography", 90, 15);
-        ServiceOffering corporateEvent = new("Corporate Event Coverage", 180, 30);
-        ServiceOffering idPhoto = new("ID & Passport Photos", 30, 5);
-
-        dbContext.Workspaces.AddRange(weddings, graduations, portraits, idPhotos, corporate);
-        dbContext.Photographers.AddRange(ryan, michelle, andre);
-        dbContext.ServiceOfferings.AddRange(wedding, engagement, portrait, graduation, corporateEvent, idPhoto);
-
-        foreach (Photographer photographer in new[] { ryan, michelle, andre })
-        {
-            foreach (DayOfWeek day in new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday })
-            {
-                dbContext.AvailabilityRules.Add(new AvailabilityRule(photographer.Id, day, new TimeOnly(9, 0), new TimeOnly(18, 0)));
-            }
-        }
+        await EnsureAvailabilityAsync(ryan, cancellationToken);
+        await EnsureAvailabilityAsync(michelle, cancellationToken);
+        await EnsureAvailabilityAsync(andre, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -172,6 +159,51 @@ public sealed class DatabaseInitializer
             (MessageDirection.Outbound, corporate.PublicEmailAddress, "Yes. With a prepared room and a firm arrival schedule, one morning is practical. We recommend photographing the full group first and then moving into individual portraits."));
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureWorkspaceAsync(string name, string slug, string publicEmailAddress, CancellationToken cancellationToken)
+    {
+        bool exists = await dbContext.Workspaces.AnyAsync(item => item.Slug == slug, cancellationToken);
+        if (!exists)
+        {
+            dbContext.Workspaces.Add(new Workspace(name, slug, publicEmailAddress));
+        }
+    }
+
+    private async Task<Photographer> EnsurePhotographerAsync(string name, string notificationEmail, CancellationToken cancellationToken)
+    {
+        Photographer? photographer = await dbContext.Photographers.SingleOrDefaultAsync(item => item.NotificationEmail == notificationEmail, cancellationToken);
+        if (photographer is not null)
+        {
+            return photographer;
+        }
+
+        photographer = new Photographer(name, notificationEmail);
+        dbContext.Photographers.Add(photographer);
+        return photographer;
+    }
+
+    private async Task EnsureServiceAsync(string name, int durationMinutes, int bufferMinutes, CancellationToken cancellationToken)
+    {
+        bool exists = await dbContext.ServiceOfferings.AnyAsync(item => item.Name == name, cancellationToken);
+        if (!exists)
+        {
+            dbContext.ServiceOfferings.Add(new ServiceOffering(name, durationMinutes, bufferMinutes));
+        }
+    }
+
+    private async Task EnsureAvailabilityAsync(Photographer photographer, CancellationToken cancellationToken)
+    {
+        bool hasRules = await dbContext.AvailabilityRules.AnyAsync(item => item.PhotographerId == photographer.Id, cancellationToken);
+        if (hasRules)
+        {
+            return;
+        }
+
+        foreach (DayOfWeek day in new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday })
+        {
+            dbContext.AvailabilityRules.Add(new AvailabilityRule(photographer.Id, day, new TimeOnly(9, 0), new TimeOnly(18, 0)));
+        }
     }
 
     private Booking AddBooking(Workspace workspace, ServiceOffering service, Photographer photographer, string name, string email, string phone, int daysFromNow, int hour, int durationHours)
