@@ -1,1 +1,75 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workspaces</title><link rel="stylesheet" href="site.css"></head><body><header><h1>Workspaces</h1><nav><a href="/">Book</a><a href="/workspaces.html">Workspaces</a></nav></header><main class="workspace-grid"><aside class="card"><h2>Workspaces</h2><div id="workspaces"></div></aside><section class="card"><h2>Inbox</h2><div id="conversations"></div></section><section class="card"><h2>Conversation</h2><div id="messages"></div><form id="replyForm"><textarea id="replyBody" placeholder="Reply to customer"></textarea><button>Reply</button></form></section></main><script src="workspaces.js"></script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Workspace Communications</title>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header>
+  <div><h1>Workspace Communications</h1><span class="subtitle">Aegis Communications Hub</span></div>
+  <nav><a href="/">Booking</a><a href="/workspaces.html">Workspaces</a></nav>
+</header>
+<main class="communications-shell">
+  <aside class="workspace-rail panel">
+    <h2>Workspaces</h2>
+    <div id="workspaces" class="stack"></div>
+    <hr>
+    <h3>Folders</h3>
+    <div id="folders" class="stack folders">
+      <button data-folder="Inbox" class="active">Inbox</button>
+      <button data-folder="Open">Open</button>
+      <button data-folder="Waiting">Waiting</button>
+      <button data-folder="Sent">Sent</button>
+      <button data-folder="Resolved">Resolved</button>
+      <button data-folder="Archived">Archived</button>
+    </div>
+  </aside>
+
+  <section class="conversation-list panel">
+    <div class="list-toolbar">
+      <div><h2 id="listTitle">Inbox</h2><span id="workspaceName" class="muted"></span></div>
+      <input id="searchBox" type="search" placeholder="Search conversations">
+    </div>
+    <div id="conversations" class="conversation-items empty-state">Select a Workspace.</div>
+  </section>
+
+  <section class="thread-panel panel">
+    <div id="threadEmpty" class="empty-state">Select a conversation to read and reply.</div>
+    <div id="threadView" hidden>
+      <div class="thread-header">
+        <div>
+          <h2 id="threadSubject"></h2>
+          <div id="threadMeta" class="muted"></div>
+        </div>
+        <div class="thread-actions">
+          <input id="assignee" placeholder="Assign to">
+          <button id="assignButton" class="secondary">Assign</button>
+          <select id="statusSelect">
+            <option value="1">Open</option>
+            <option value="2">Waiting for Customer</option>
+            <option value="3">Resolved</option>
+            <option value="4">Closed</option>
+          </select>
+          <button id="statusButton" class="secondary">Update</button>
+        </div>
+      </div>
+      <div id="messages" class="message-thread"></div>
+      <div class="composer-tabs">
+        <button id="replyTab" class="active">Reply</button>
+        <button id="noteTab" class="secondary">Internal Note</button>
+      </div>
+      <form id="composerForm" class="composer">
+        <textarea id="composerBody" placeholder="Write a reply..."></textarea>
+        <div class="composer-footer">
+          <span id="composerHint" class="muted">Reply will be sent from the Workspace address.</span>
+          <button id="sendButton">Send Reply</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+<script src="workspaces.js"></script>
+</body>
+</html>

@@ -28,7 +28,9 @@ public sealed class StudioDbContext : DbContext, IUnitOfWork
         modelBuilder.Entity<Workspace>().HasKey(item => item.Id);
         modelBuilder.Entity<Workspace>().HasIndex(item => item.PublicEmailAddress).IsUnique();
         modelBuilder.Entity<Conversation>().HasKey(item => item.Id);
+        modelBuilder.Entity<Conversation>().HasIndex(item => new { item.WorkspaceId, item.LastActivityUtc });
         modelBuilder.Entity<CommunicationMessage>().HasKey(item => item.Id);
+        modelBuilder.Entity<CommunicationMessage>().HasIndex(item => new { item.ConversationId, item.CreatedUtc });
         modelBuilder.Entity<CommunicationMessage>().Property(item => item.Body).HasColumnType("text");
     }
 
