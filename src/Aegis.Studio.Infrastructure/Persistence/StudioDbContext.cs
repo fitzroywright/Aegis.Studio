@@ -1,7 +1,10 @@
 using Aegis.Studio.Application.Abstractions;
 using Aegis.Studio.Domain.Bookings;
 using Aegis.Studio.Domain.Communications;
+using Aegis.Studio.Domain.Customers;
+using Aegis.Studio.Domain.Notifications;
 using Aegis.Studio.Domain.Operations;
+using Aegis.Studio.Domain.Tasks;
 using Aegis.Studio.Domain.Workspaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +23,9 @@ public sealed class StudioDbContext : DbContext, IUnitOfWork
     public DbSet<CommunicationMessage> CommunicationMessages => Set<CommunicationMessage>();
     public DbSet<WorkspaceMember> WorkspaceMembers => Set<WorkspaceMember>();
     public DbSet<OperationalAlert> OperationalAlerts => Set<OperationalAlert>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<StudioTask> StudioTasks => Set<StudioTask>();
+    public DbSet<NotificationJob> NotificationJobs => Set<NotificationJob>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,6 +45,13 @@ public sealed class StudioDbContext : DbContext, IUnitOfWork
         modelBuilder.Entity<WorkspaceMember>().HasIndex(item => new { item.WorkspaceId, item.UserId }).IsUnique();
         modelBuilder.Entity<OperationalAlert>().HasKey(item => item.Id);
         modelBuilder.Entity<OperationalAlert>().HasIndex(item => new { item.WorkspaceId, item.IsAcknowledged });
+        modelBuilder.Entity<Customer>().HasKey(item => item.Id);
+        modelBuilder.Entity<Customer>().HasIndex(item => item.Email).IsUnique();
+        modelBuilder.Entity<StudioTask>().HasKey(item => item.Id);
+        modelBuilder.Entity<StudioTask>().HasIndex(item => new { item.WorkspaceId, item.Status, item.DueUtc });
+        modelBuilder.Entity<NotificationJob>().HasKey(item => item.Id);
+        modelBuilder.Entity<NotificationJob>().HasIndex(item => new { item.Status, item.DueUtc });
+        modelBuilder.Entity<NotificationJob>().Property(item => item.Body).HasColumnType("text");
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => await base.SaveChangesAsync(cancellationToken);
