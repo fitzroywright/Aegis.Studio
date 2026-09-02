@@ -85,7 +85,18 @@ public sealed class StudioRepository : IBookingRepository, IStudioCatalogReposit
 
     public async Task<IReadOnlyList<Conversation>> GetUnansweredAsync(DateTimeOffset olderThanUtc, CancellationToken cancellationToken)
     {
-        return await dbContext.Conversations.Where(item => item.Status != ConversationStatus.Closed && item.Status != ConversationStatus.Resolved && item.Status != ConversationStatus.WaitingForCustomer && item.LastCustomerMessageUtc != null && item.LastCustomerMessageUtc <= olderThanUtc && (item.LastStaffResponseUtc == null || item.LastStaffResponseUtc < item.LastCustomerMessageUtc)).ToListAsync(cancellationToken);
+        List<Conversation> candidates = await dbContext.Conversations
+            .AsNoTracking()
+            .Where(item => item.Status != ConversationStatus.Closed &&
+                           item.Status != ConversationStatus.Resolved &&
+                           item.Status != ConversationStatus.WaitingForCustomer &&
+                           item.LastCustomerMessageUtc != null)
+            .ToListAsync(cancellationToken);
+
+        return candidates
+            .Where(item => item.LastCustomerMessageUtc <= olderThanUtc &&
+                           (item.LastStaffResponseUtc == null || item.LastStaffResponseUtc < item.LastCustomerMessageUtc))
+            .ToList();
     }
 
     public async Task<bool> HasOpenEscalationAsync(Guid conversationId, string kind, CancellationToken cancellationToken) => await dbContext.OperationalAlerts.AnyAsync(item => item.ConversationId == conversationId && item.Kind == kind && !item.IsAcknowledged, cancellationToken);
