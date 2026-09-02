@@ -20,6 +20,7 @@ public sealed class StudioRepository : IBookingRepository, IStudioCatalogReposit
     public async Task AddAsync(Booking booking, CancellationToken cancellationToken) => await dbContext.Bookings.AddAsync(booking, cancellationToken);
     public async Task<Booking?> GetAsync(Guid bookingId, CancellationToken cancellationToken) => await dbContext.Bookings.SingleOrDefaultAsync(item => item.Id == bookingId, cancellationToken);
     public async Task<Booking?> FindByReferenceAsync(string reference, CancellationToken cancellationToken) => await dbContext.Bookings.SingleOrDefaultAsync(item => item.Reference == reference, cancellationToken);
+    public async Task<Booking?> FindByAccessTokenAsync(string accessToken, CancellationToken cancellationToken) => await dbContext.Bookings.SingleOrDefaultAsync(item => item.AccessToken == accessToken, cancellationToken);
 
     public async Task<Booking?> FindActiveByClientAsync(Guid workspaceId, string clientEmail, CancellationToken cancellationToken)
     {
@@ -85,28 +86,16 @@ public sealed class StudioRepository : IBookingRepository, IStudioCatalogReposit
 
     public async Task<IReadOnlyList<Conversation>> GetUnansweredAsync(DateTimeOffset olderThanUtc, CancellationToken cancellationToken)
     {
-        List<Conversation> candidates = await dbContext.Conversations
-            .AsNoTracking()
-            .Where(item => item.Status != ConversationStatus.Closed &&
-                           item.Status != ConversationStatus.Resolved &&
-                           item.Status != ConversationStatus.WaitingForCustomer &&
-                           item.LastCustomerMessageUtc != null)
-            .ToListAsync(cancellationToken);
-
-        return candidates
-            .Where(item => item.LastCustomerMessageUtc <= olderThanUtc &&
-                           (item.LastStaffResponseUtc == null || item.LastStaffResponseUtc < item.LastCustomerMessageUtc))
-            .ToList();
+        List<Conversation> candidates = await dbContext.Conversations.AsNoTracking().Where(item => item.Status != ConversationStatus.Closed && item.Status != ConversationStatus.Resolved && item.Status != ConversationStatus.WaitingForCustomer && item.LastCustomerMessageUtc != null).ToListAsync(cancellationToken);
+        return candidates.Where(item => item.LastCustomerMessageUtc <= olderThanUtc && (item.LastStaffResponseUtc == null || item.LastStaffResponseUtc < item.LastCustomerMessageUtc)).ToList();
     }
 
     public async Task<bool> HasOpenEscalationAsync(Guid conversationId, string kind, CancellationToken cancellationToken) => await dbContext.OperationalAlerts.AnyAsync(item => item.ConversationId == conversationId && item.Kind == kind && !item.IsAcknowledged, cancellationToken);
     public async Task AddConversationAsync(Conversation conversation, CancellationToken cancellationToken) => await dbContext.Conversations.AddAsync(conversation, cancellationToken);
     public async Task AddMessageAsync(CommunicationMessage message, CancellationToken cancellationToken) => await dbContext.CommunicationMessages.AddAsync(message, cancellationToken);
-
     public async Task<IReadOnlyList<WorkspaceMember>> GetMembersAsync(Guid workspaceId, CancellationToken cancellationToken) => await dbContext.WorkspaceMembers.AsNoTracking().Where(item => item.WorkspaceId == workspaceId && item.IsActive).OrderBy(item => item.DisplayName).ToListAsync(cancellationToken);
     public async Task<WorkspaceMember?> GetMembershipAsync(Guid workspaceId, string userId, CancellationToken cancellationToken) => await dbContext.WorkspaceMembers.AsNoTracking().SingleOrDefaultAsync(item => item.WorkspaceId == workspaceId && item.UserId == userId && item.IsActive, cancellationToken);
     public async Task AddMemberAsync(WorkspaceMember member, CancellationToken cancellationToken) => await dbContext.WorkspaceMembers.AddAsync(member, cancellationToken);
-
     public async Task AddAlertAsync(OperationalAlert alert, CancellationToken cancellationToken) => await dbContext.OperationalAlerts.AddAsync(alert, cancellationToken);
     public async Task<IReadOnlyList<OperationalAlert>> GetOpenAlertsAsync(Guid workspaceId, CancellationToken cancellationToken) => await dbContext.OperationalAlerts.AsNoTracking().Where(item => item.WorkspaceId == workspaceId && !item.IsAcknowledged).OrderByDescending(item => item.CreatedUtc).ToListAsync(cancellationToken);
     public async Task<OperationalAlert?> GetAlertAsync(Guid id, CancellationToken cancellationToken) => await dbContext.OperationalAlerts.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
