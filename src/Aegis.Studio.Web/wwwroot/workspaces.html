@@ -6,75 +6,17 @@
   <meta name="theme-color" content="#171411">
   <title>Workspaces | Bryan Studios</title>
   <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="bryans-demo.css">
 </head>
 <body class="workspace-page">
 <header class="workspace-header">
-  <a class="brand-lockup inverse" href="/">
-    <span class="brand-name">BRYAN STUDIOS</span>
-    <span class="brand-est">WORKSPACES</span>
-  </a>
-  <div class="workspace-header-context">
-    <span class="workspace-product">Studio Operations</span>
-    <nav><a href="/">Booking</a><a class="active" href="/workspaces.html">Workspaces</a></nav>
-  </div>
+  <a class="brand-lockup inverse" href="/"><span class="brand-name">BRYAN STUDIOS</span><span class="brand-est">WORKSPACES</span></a>
+  <div class="workspace-header-context"><span class="workspace-product">Studio Operations</span><nav><a href="/">Booking</a><a class="active" href="/workspaces.html">Workspaces</a></nav></div>
 </header>
-
 <main class="communications-shell">
-  <aside class="workspace-rail panel">
-    <div class="rail-heading"><span class="eyebrow light">Operations</span><h2>Workspaces</h2></div>
-    <div id="workspaces" class="stack workspace-stack"></div>
-    <div class="rail-rule"></div>
-    <span class="rail-label">Conversations</span>
-    <div id="folders" class="stack folders">
-      <button data-folder="Inbox" class="active"><span>Inbox</span></button>
-      <button data-folder="Open"><span>Open</span></button>
-      <button data-folder="Waiting"><span>Waiting</span></button>
-      <button data-folder="Sent"><span>Sent</span></button>
-      <button data-folder="Resolved"><span>Resolved</span></button>
-      <button data-folder="Archived"><span>Archived</span></button>
-    </div>
-    <div class="rail-footer"><span class="status-dot"></span><span>Studio systems online</span></div>
-  </aside>
-
-  <section class="conversation-list panel">
-    <div class="list-toolbar">
-      <div><span class="eyebrow">Communications</span><h2 id="listTitle">Inbox</h2><span id="workspaceName" class="muted"></span></div>
-      <input id="searchBox" type="search" placeholder="Search conversations">
-    </div>
-    <div id="conversations" class="conversation-items empty-state">Select a Workspace.</div>
-  </section>
-
-  <section class="thread-panel panel">
-    <div id="threadEmpty" class="empty-state thread-placeholder"><div class="monogram">BS</div><strong>Select a conversation</strong><span>Customer history, booking context and replies will appear here.</span></div>
-    <div id="threadView" hidden>
-      <div class="thread-header">
-        <div class="thread-title"><span class="eyebrow">Customer conversation</span><h2 id="threadSubject"></h2><div id="threadMeta" class="muted"></div></div>
-        <div class="thread-actions">
-          <input id="assignee" placeholder="Assign to">
-          <button id="assignButton" class="secondary">Assign</button>
-          <select id="statusSelect">
-            <option value="1">Open</option>
-            <option value="2">Waiting for Customer</option>
-            <option value="3">Resolved</option>
-            <option value="4">Closed</option>
-          </select>
-          <button id="statusButton" class="secondary">Update</button>
-        </div>
-      </div>
-      <div id="messages" class="message-thread"></div>
-      <div class="composer-tabs">
-        <button id="replyTab" class="active">Reply</button>
-        <button id="noteTab" class="secondary">Internal Note</button>
-      </div>
-      <form id="composerForm" class="composer">
-        <textarea id="composerBody" placeholder="Write a reply..."></textarea>
-        <div class="composer-footer">
-          <span id="composerHint" class="muted">Reply will be sent from the Workspace address.</span>
-          <button id="sendButton" class="primary-action">Send Reply <span aria-hidden="true">→</span></button>
-        </div>
-      </form>
-    </div>
-  </section>
+  <aside class="workspace-rail panel"><div class="rail-heading"><span class="eyebrow light">Operations</span><h2>Workspaces</h2></div><div id="workspaces" class="stack workspace-stack"></div><div class="rail-rule"></div><span class="rail-label">Conversations</span><div id="folders" class="stack folders"><button data-folder="Inbox" class="active"><span>Inbox</span></button><button data-folder="Open"><span>Open</span></button><button data-folder="Waiting"><span>Waiting</span></button><button data-folder="Sent"><span>Sent</span></button><button data-folder="Resolved"><span>Resolved</span></button><button data-folder="Archived"><span>Archived</span></button></div><div class="rail-footer"><span class="status-dot"></span><span>Studio systems online</span></div></aside>
+  <section class="conversation-list panel"><div class="list-toolbar"><div><span class="eyebrow">Communications</span><h2 id="listTitle">Inbox</h2><span id="workspaceName" class="muted"></span></div><input id="searchBox" type="search" placeholder="Search conversations"></div><div id="conversations" class="conversation-items empty-state">Select a Workspace.</div></section>
+  <section class="thread-panel panel"><div id="threadEmpty" class="empty-state thread-placeholder"><div class="monogram">BS</div><strong>Select a conversation</strong><span>Customer history, booking context and replies will appear here.</span></div><div id="threadView" hidden><div class="thread-header"><div class="thread-title"><span class="eyebrow">Customer conversation</span><h2 id="threadSubject"></h2><div id="threadMeta" class="muted"></div></div><div class="thread-actions"><input id="assignee" placeholder="Assign to"><button id="assignButton" class="secondary">Assign</button><select id="statusSelect"><option value="1">Open</option><option value="2">Waiting for Customer</option><option value="3">Resolved</option><option value="4">Closed</option></select><button id="statusButton" class="secondary">Update</button></div></div><div id="messages" class="message-thread"></div><div class="composer-tabs"><button id="replyTab" class="active">Reply</button><button id="noteTab" class="secondary">Internal Note</button></div><form id="composerForm" class="composer"><textarea id="composerBody" placeholder="Write a reply..."></textarea><div class="composer-footer"><span id="composerHint" class="muted">Reply will be sent from the Workspace address.</span><button id="sendButton" class="primary-action">Send Reply <span aria-hidden="true">→</span></button></div></form></div></section>
 </main>
 <script src="workspaces.js"></script>
 </body>
