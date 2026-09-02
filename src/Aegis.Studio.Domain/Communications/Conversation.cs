@@ -17,6 +17,7 @@ public sealed class Conversation
         IsUnread = true;
         CreatedUtc = DateTimeOffset.UtcNow;
         LastActivityUtc = CreatedUtc;
+        LastCustomerMessageUtc = CreatedUtc;
     }
 
     public Guid Id { get; private set; }
@@ -29,12 +30,15 @@ public sealed class Conversation
     public string? AssignedUserId { get; private set; }
     public DateTimeOffset CreatedUtc { get; private set; }
     public DateTimeOffset LastActivityUtc { get; private set; }
+    public DateTimeOffset? LastCustomerMessageUtc { get; private set; }
+    public DateTimeOffset? LastStaffResponseUtc { get; private set; }
 
     public void ReceiveInbound()
     {
         LastActivityUtc = DateTimeOffset.UtcNow;
+        LastCustomerMessageUtc = LastActivityUtc;
         IsUnread = true;
-        if (Status == ConversationStatus.New || Status == ConversationStatus.WaitingForCustomer)
+        if (Status != ConversationStatus.Closed)
         {
             Status = ConversationStatus.Open;
         }
@@ -43,47 +47,21 @@ public sealed class Conversation
     public void MarkRead()
     {
         IsUnread = false;
-        if (Status == ConversationStatus.New)
-        {
-            Status = ConversationStatus.Open;
-        }
+        if (Status == ConversationStatus.New) Status = ConversationStatus.Open;
     }
 
     public void MarkWaitingForCustomer()
     {
         LastActivityUtc = DateTimeOffset.UtcNow;
+        LastStaffResponseUtc = LastActivityUtc;
         IsUnread = false;
         Status = ConversationStatus.WaitingForCustomer;
     }
 
-    public void Resolve()
-    {
-        LastActivityUtc = DateTimeOffset.UtcNow;
-        IsUnread = false;
-        Status = ConversationStatus.Resolved;
-    }
-
-    public void Close()
-    {
-        LastActivityUtc = DateTimeOffset.UtcNow;
-        IsUnread = false;
-        Status = ConversationStatus.Closed;
-    }
-
-    public void Reopen()
-    {
-        LastActivityUtc = DateTimeOffset.UtcNow;
-        Status = ConversationStatus.Open;
-    }
-
-    public void AssignTo(string? userId)
-    {
-        AssignedUserId = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim();
-        LastActivityUtc = DateTimeOffset.UtcNow;
-    }
-
-    public void Touch()
-    {
-        LastActivityUtc = DateTimeOffset.UtcNow;
-    }
+    public void Resolve() { LastActivityUtc = DateTimeOffset.UtcNow; IsUnread = false; Status = ConversationStatus.Resolved; }
+    public void Close() { LastActivityUtc = DateTimeOffset.UtcNow; IsUnread = false; Status = ConversationStatus.Closed; }
+    public void Reopen() { LastActivityUtc = DateTimeOffset.UtcNow; Status = ConversationStatus.Open; }
+    public void AssignTo(string? userId) { AssignedUserId = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim(); LastActivityUtc = DateTimeOffset.UtcNow; }
+    public void Touch() => LastActivityUtc = DateTimeOffset.UtcNow;
+    public void LinkBooking(Guid bookingId) => BookingId = bookingId;
 }

@@ -16,6 +16,8 @@ public static class DependencyInjection
         services.AddScoped<IBookingRepository>(provider => provider.GetRequiredService<StudioRepository>());
         services.AddScoped<IStudioCatalogRepository>(provider => provider.GetRequiredService<StudioRepository>());
         services.AddScoped<ICommunicationRepository>(provider => provider.GetRequiredService<StudioRepository>());
+        services.AddScoped<IWorkspaceRepository>(provider => provider.GetRequiredService<StudioRepository>());
+        services.AddScoped<IOperationsRepository>(provider => provider.GetRequiredService<StudioRepository>());
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<StudioDbContext>());
         services.AddSingleton<IOutboundMailProvider, LoggingOutboundMailProvider>();
         services.AddSingleton<IInboundMailProvider, NoOpInboundMailProvider>();
@@ -26,13 +28,11 @@ public static class DependencyInjection
     {
         string provider = configuration["Database:Provider"] ?? "Sqlite";
         string connectionString = configuration.GetConnectionString("Studio") ?? "Data Source=aegis-studio.db";
-
         if (provider.Equals("PostgreSql", StringComparison.OrdinalIgnoreCase))
         {
             services.AddDbContext<StudioDbContext>(options => options.UseNpgsql(connectionString));
             return;
         }
-
         services.AddDbContext<StudioDbContext>(options => options.UseSqlite(connectionString));
     }
 }

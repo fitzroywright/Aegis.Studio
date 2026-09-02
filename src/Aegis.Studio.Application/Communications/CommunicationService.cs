@@ -1,28 +1,32 @@
+using System.Text.RegularExpressions;
 using Aegis.Studio.Application.Abstractions;
+using Aegis.Studio.Domain.Bookings;
 using Aegis.Studio.Domain.Communications;
 
 namespace Aegis.Studio.Application.Communications;
 
-public sealed class CommunicationService
+public sealed partial class CommunicationService
 {
     private readonly ICommunicationRepository communicationRepository;
+    private readonly IBookingRepository bookingRepository;
     private readonly IOutboundMailProvider outboundMailProvider;
     private readonly IUnitOfWork unitOfWork;
 
-    public CommunicationService(ICommunicationRepository communicationRepository, IOutboundMailProvider outboundMailProvider, IUnitOfWork unitOfWork)
+    public CommunicationService(ICommunicationRepository communicationRepository, IBookingRepository bookingRepository, IOutboundMailProvider outboundMailProvider, IUnitOfWork unitOfWork)
     {
         this.communicationRepository = communicationRepository;
+        this.bookingRepository = bookingRepository;
         this.outboundMailProvider = outboundMailProvider;
         this.unitOfWork = unitOfWork;
     }
 
     public async Task<Conversation> RouteInboundAsync(InboundMailItem inboundMail, CancellationToken cancellationToken)
     {
-        Workspace workspace = await communicationRepository.GetWorkspaceByRecipientAsync(inboundMail.OriginalRecipientAddress, cancellationToken)
-            ?? throw new InvalidOperationException($"No Workspace is configured for {inboundMail.OriginalRecipientAddress}.");
-
-        Conversation? existingConversation = await communicationRepository.FindActiveConversationAsync(workspace.Id, inboundMail.FromAddress, NormalizeSubject(inboundMail.Subject), cancellationToken);
-        Conversation conversation = existingConversation ?? new Conversation(workspace.Id, null, inboundMail.FromAddress, NormalizeSubject(inboundMail.Subject));
+        Workspace workspace = await communicationRepository.GetWorkspaceByRecipientAsync(inboundMail.OriginalRecipientAddress, cancellationToken) ?? throw new InvalidOperationException($"No Workspace is configured for {inboundMail.OriginalRecipientAddress}.");
+        string normalizedSubject = NormalizeSubject(inboundMail.Subject);
+        Booking? booking = await FindBookingAsync(workspace.Id, inboundMail.FromAddress, inboundMail.Subject, cancellationToken);
+        Conversation? existingConversation = await communicationRepository.FindActiveConversationAsync(workspace.Id, inboundMail.FromAddress, normalizedSubject, cancellationToken);
+        Conversation conversation = existingConversation ?? new Conversation(workspace.Id, booking?.Id, inboundMail.FromAddress, normalizedSubject);
         if (existingConversation is null)
         {
             await communicationRepository.AddConversationAsync(conversation, cancellationToken);
@@ -30,6 +34,10 @@ public sealed class CommunicationService
         else
         {
             conversation.ReceiveInbound();
+            if (conversation.BookingId is null && booking is not null)
+            {
+                conversation.LinkBooking(booking.Id);
+            }
         }
 
         CommunicationMessage message = new(conversation.Id, MessageDirection.Inbound, inboundMail.FromAddress, workspace.PublicEmailAddress, inboundMail.Subject, inboundMail.Body, inboundMail.InternetMessageId);
@@ -43,7 +51,6 @@ public sealed class CommunicationService
         Conversation conversation = await GetConversationAsync(conversationId, cancellationToken);
         Workspace workspace = await GetWorkspaceAsync(conversation.WorkspaceId, cancellationToken);
         string subject = conversation.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? conversation.Subject : $"Re: {conversation.Subject}";
-
         await outboundMailProvider.SendAsync(workspace.PublicEmailAddress, conversation.ClientEmail, subject, body, cancellationToken);
         CommunicationMessage message = new(conversation.Id, MessageDirection.Outbound, workspace.PublicEmailAddress, conversation.ClientEmail, subject, body);
         conversation.MarkWaitingForCustomer();
@@ -77,25 +84,10 @@ public sealed class CommunicationService
     public async Task SetStatusAsync(Guid conversationId, ConversationStatus status, CancellationToken cancellationToken)
     {
         Conversation conversation = await GetConversationAsync(conversationId, cancellationToken);
-        switch (status)
-        {
-            case ConversationStatus.New:
-            case ConversationStatus.Open:
-                conversation.Reopen();
-                break;
-            case ConversationStatus.WaitingForCustomer:
-                conversation.MarkWaitingForCustomer();
-                break;
-            case ConversationStatus.Resolved:
-                conversation.Resolve();
-                break;
-            case ConversationStatus.Closed:
-                conversation.Close();
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(status));
-        }
-
+        if (status == ConversationStatus.WaitingForCustomer) conversation.MarkWaitingForCustomer();
+        else if (status == ConversationStatus.Resolved) conversation.Resolve();
+        else if (status == ConversationStatus.Closed) conversation.Close();
+        else conversation.Reopen();
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
@@ -105,26 +97,34 @@ public sealed class CommunicationService
         return new ConversationDetails(conversation.Id, conversation.WorkspaceId, conversation.BookingId, conversation.ClientEmail, conversation.Subject, conversation.Status, conversation.IsUnread, conversation.AssignedUserId, conversation.CreatedUtc, conversation.LastActivityUtc);
     }
 
-    private async Task<Conversation> GetConversationAsync(Guid conversationId, CancellationToken cancellationToken)
+    private async Task<Booking?> FindBookingAsync(Guid workspaceId, string clientEmail, string subject, CancellationToken cancellationToken)
     {
-        return await communicationRepository.GetConversationAsync(conversationId, cancellationToken) ?? throw new InvalidOperationException("Conversation was not found.");
+        Match match = BookingReferenceRegex().Match(subject);
+        if (match.Success)
+        {
+            Booking? byReference = await bookingRepository.FindByReferenceAsync(match.Value.ToUpperInvariant(), cancellationToken);
+            if (byReference is not null)
+            {
+                return byReference;
+            }
+        }
+
+        return await bookingRepository.FindActiveByClientAsync(workspaceId, clientEmail, cancellationToken);
     }
 
-    private async Task<Workspace> GetWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken)
-    {
-        IReadOnlyList<Workspace> workspaces = await communicationRepository.GetWorkspacesAsync(cancellationToken);
-        return workspaces.Single(item => item.Id == workspaceId);
-    }
+    private async Task<Conversation> GetConversationAsync(Guid conversationId, CancellationToken cancellationToken) => await communicationRepository.GetConversationAsync(conversationId, cancellationToken) ?? throw new InvalidOperationException("Conversation was not found.");
+    private async Task<Workspace> GetWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken) => (await communicationRepository.GetWorkspacesAsync(cancellationToken)).Single(item => item.Id == workspaceId);
 
     private static string NormalizeSubject(string subject)
     {
         string normalized = subject.Trim();
         while (normalized.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) || normalized.StartsWith("Fwd:", StringComparison.OrdinalIgnoreCase))
         {
-            int separatorIndex = normalized.IndexOf(':');
-            normalized = normalized[(separatorIndex + 1)..].Trim();
+            normalized = normalized[(normalized.IndexOf(':') + 1)..].Trim();
         }
-
         return normalized;
     }
+
+    [GeneratedRegex("BK-\\d{8}-\\d{4}", RegexOptions.IgnoreCase)]
+    private static partial Regex BookingReferenceRegex();
 }

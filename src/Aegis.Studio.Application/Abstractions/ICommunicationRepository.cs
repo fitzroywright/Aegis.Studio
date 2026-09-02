@@ -11,6 +11,8 @@ public interface ICommunicationRepository
     Task<Conversation?> FindActiveConversationAsync(Guid workspaceId, string clientEmail, string subject, CancellationToken cancellationToken);
     Task<IReadOnlyList<ConversationSummary>> GetWorkspaceConversationsAsync(Guid workspaceId, ConversationFolder folder, string? search, CancellationToken cancellationToken);
     Task<IReadOnlyList<CommunicationMessage>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Conversation>> GetUnansweredAsync(DateTimeOffset olderThanUtc, CancellationToken cancellationToken);
+    Task<bool> HasOpenEscalationAsync(Guid conversationId, string kind, CancellationToken cancellationToken);
     Task AddConversationAsync(Conversation conversation, CancellationToken cancellationToken);
     Task AddMessageAsync(CommunicationMessage message, CancellationToken cancellationToken);
 }

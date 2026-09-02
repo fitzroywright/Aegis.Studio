@@ -14,11 +14,11 @@ public sealed class AvailabilityService
         this.catalogRepository = catalogRepository;
     }
 
-    public async Task<bool> IsAvailableAsync(Guid photographerId, ServiceOffering service, DateTimeOffset startUtc, CancellationToken cancellationToken)
+    public async Task<bool> IsAvailableAsync(Guid photographerId, ServiceOffering service, DateTimeOffset startUtc, CancellationToken cancellationToken, Guid? excludedBookingId = null)
     {
         DateTimeOffset endUtc = startUtc.AddMinutes(service.DurationMinutes + service.BufferMinutes);
         IReadOnlyList<Booking> bookings = await bookingRepository.GetForPhotographerAsync(photographerId, startUtc.Date, startUtc.Date.AddDays(1), cancellationToken);
-        bool overlaps = bookings.Any(booking => booking.Status != BookingStatus.Cancelled && startUtc < booking.EndUtc.AddMinutes(service.BufferMinutes) && endUtc > booking.StartUtc);
+        bool overlaps = bookings.Any(booking => booking.Id != excludedBookingId && booking.Status != BookingStatus.Cancelled && startUtc < booking.EndUtc.AddMinutes(service.BufferMinutes) && endUtc > booking.StartUtc);
         return !overlaps;
     }
 }

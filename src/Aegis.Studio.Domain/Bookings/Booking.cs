@@ -14,12 +14,13 @@ public sealed class Booking
         ServiceOfferingId = serviceOfferingId;
         PhotographerId = photographerId;
         ClientName = clientName.Trim();
-        ClientEmail = clientEmail.Trim();
+        ClientEmail = clientEmail.Trim().ToLowerInvariant();
         ClientPhone = clientPhone.Trim();
         StartUtc = startUtc;
         EndUtc = endUtc;
         Status = BookingStatus.Confirmed;
         CreatedUtc = DateTimeOffset.UtcNow;
+        UpdatedUtc = CreatedUtc;
     }
 
     public Guid Id { get; private set; }
@@ -34,15 +35,26 @@ public sealed class Booking
     public DateTimeOffset EndUtc { get; private set; }
     public BookingStatus Status { get; private set; }
     public DateTimeOffset CreatedUtc { get; private set; }
+    public DateTimeOffset UpdatedUtc { get; private set; }
 
     public void Cancel()
     {
         Status = BookingStatus.Cancelled;
+        UpdatedUtc = DateTimeOffset.UtcNow;
     }
 
-    public void Reschedule(DateTimeOffset startUtc, DateTimeOffset endUtc)
+    public void Complete()
+    {
+        Status = BookingStatus.Completed;
+        UpdatedUtc = DateTimeOffset.UtcNow;
+    }
+
+    public void Reschedule(DateTimeOffset startUtc, DateTimeOffset endUtc, Guid photographerId)
     {
         StartUtc = startUtc;
         EndUtc = endUtc;
+        PhotographerId = photographerId;
+        Status = BookingStatus.Confirmed;
+        UpdatedUtc = DateTimeOffset.UtcNow;
     }
 }
