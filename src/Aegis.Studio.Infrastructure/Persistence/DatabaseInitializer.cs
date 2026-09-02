@@ -11,11 +11,33 @@ public sealed class DatabaseInitializer
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
+        await using FileStream initializationLock = await AcquireInitializationLockAsync(cancellationToken);
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         await SeedCatalogAsync(cancellationToken);
         await SeedDemoCommunicationsAsync(cancellationToken);
         DemoOperationsSeeder operationsSeeder = new(dbContext);
         await operationsSeeder.SeedAsync(cancellationToken);
+    }
+
+    private static async Task<FileStream> AcquireInitializationLockAsync(CancellationToken cancellationToken)
+    {
+        string localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string studioData = Path.Combine(localData, "Aegis.Studio");
+        Directory.CreateDirectory(studioData);
+        string lockPath = Path.Combine(studioData, "database-initialization.lock");
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException)
+            {
+                await Task.Delay(100, cancellationToken);
+            }
+        }
     }
 
     private async Task SeedCatalogAsync(CancellationToken cancellationToken)
