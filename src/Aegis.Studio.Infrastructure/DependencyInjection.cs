@@ -1,5 +1,7 @@
 using Aegis.Studio.Application.Abstractions;
+using Aegis.Studio.Infrastructure.Integrations;
 using Aegis.Studio.Infrastructure.Mail;
+using Aegis.Studio.Infrastructure.Notifications;
 using Aegis.Studio.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -18,9 +20,16 @@ public static class DependencyInjection
         services.AddScoped<ICommunicationRepository>(provider => provider.GetRequiredService<StudioRepository>());
         services.AddScoped<IWorkspaceRepository>(provider => provider.GetRequiredService<StudioRepository>());
         services.AddScoped<IOperationsRepository>(provider => provider.GetRequiredService<StudioRepository>());
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<StudioDbContext>());
         services.AddSingleton<IOutboundMailProvider, LoggingOutboundMailProvider>();
         services.AddSingleton<IInboundMailProvider, NoOpInboundMailProvider>();
+        services.AddSingleton<ICalendarProvider, DisabledCalendarProvider>();
+        services.AddSingleton<ITaskSyncProvider, DisabledTaskSyncProvider>();
+        services.AddSingleton<IContactSyncProvider, DisabledContactSyncProvider>();
+        services.AddSingleton<INotificationChannel, DisabledNotificationChannel>();
         return services;
     }
 
