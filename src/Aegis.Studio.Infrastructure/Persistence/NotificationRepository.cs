@@ -19,6 +19,11 @@ public sealed class NotificationRepository : INotificationRepository
         return pending.Where(item => item.DueUtc <= dueUtc).OrderBy(item => item.DueUtc).Take(100).ToList();
     }
 
-    public async Task<IReadOnlyList<NotificationJob>> GetForWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken) => await dbContext.NotificationJobs.AsNoTracking().Where(item => item.WorkspaceId == workspaceId).OrderByDescending(item => item.CreatedUtc).Take(200).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<NotificationJob>> GetForWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken)
+    {
+        List<NotificationJob> notifications = await dbContext.NotificationJobs.AsNoTracking().Where(item => item.WorkspaceId == workspaceId).ToListAsync(cancellationToken);
+        return notifications.OrderByDescending(item => item.CreatedUtc).Take(200).ToList();
+    }
+
     public async Task AddAsync(NotificationJob notification, CancellationToken cancellationToken) => await dbContext.NotificationJobs.AddAsync(notification, cancellationToken);
 }
