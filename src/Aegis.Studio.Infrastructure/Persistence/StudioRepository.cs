@@ -24,7 +24,20 @@ public sealed class StudioRepository : IBookingRepository, IStudioCatalogReposit
     public async Task<IReadOnlyList<Photographer>> GetPhotographersAsync(CancellationToken cancellationToken) => await dbContext.Photographers.AsNoTracking().Where(item => item.IsActive).OrderBy(item => item.Name).ToListAsync(cancellationToken);
     public async Task<IReadOnlyList<AvailabilityRule>> GetAvailabilityRulesAsync(Guid photographerId, DayOfWeek dayOfWeek, CancellationToken cancellationToken) => await dbContext.AvailabilityRules.AsNoTracking().Where(item => item.PhotographerId == photographerId && item.DayOfWeek == dayOfWeek).ToListAsync(cancellationToken);
     public async Task<IReadOnlyList<Booking>> GetForPhotographerAsync(Guid photographerId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken) => await dbContext.Bookings.AsNoTracking().Where(item => item.PhotographerId == photographerId && item.StartUtc < toUtc && item.EndUtc > fromUtc).ToListAsync(cancellationToken);
-    public async Task<IReadOnlyList<Booking>> GetUpcomingAsync(CancellationToken cancellationToken) => await dbContext.Bookings.AsNoTracking().Where(item => item.StartUtc >= DateTimeOffset.UtcNow && item.Status != BookingStatus.Cancelled).OrderBy(item => item.StartUtc).Take(100).ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Booking>> GetUpcomingAsync(CancellationToken cancellationToken)
+    {
+        List<Booking> bookings = await dbContext.Bookings
+            .AsNoTracking()
+            .Where(item => item.StartUtc >= DateTimeOffset.UtcNow && item.Status != BookingStatus.Cancelled)
+            .ToListAsync(cancellationToken);
+
+        return bookings
+            .OrderBy(item => item.StartUtc)
+            .Take(100)
+            .ToList();
+    }
+
     public async Task<Workspace?> GetWorkspaceByRecipientAsync(string recipientAddress, CancellationToken cancellationToken) => await dbContext.Workspaces.SingleOrDefaultAsync(item => item.PublicEmailAddress == recipientAddress.ToLower(), cancellationToken);
     public async Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(CancellationToken cancellationToken) => await dbContext.Workspaces.AsNoTracking().Where(item => item.IsActive).OrderBy(item => item.Name).ToListAsync(cancellationToken);
     public async Task<Conversation?> GetConversationAsync(Guid conversationId, CancellationToken cancellationToken) => await dbContext.Conversations.SingleOrDefaultAsync(item => item.Id == conversationId, cancellationToken);
@@ -32,10 +45,13 @@ public sealed class StudioRepository : IBookingRepository, IStudioCatalogReposit
     public async Task<Conversation?> FindActiveConversationAsync(Guid workspaceId, string clientEmail, string subject, CancellationToken cancellationToken)
     {
         string normalizedEmail = clientEmail.Trim().ToLowerInvariant();
-        return await dbContext.Conversations
+        List<Conversation> conversations = await dbContext.Conversations
             .Where(item => item.WorkspaceId == workspaceId && item.ClientEmail == normalizedEmail && item.Subject == subject && item.Status != ConversationStatus.Closed)
+            .ToListAsync(cancellationToken);
+
+        return conversations
             .OrderByDescending(item => item.LastActivityUtc)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefault();
     }
 
     public async Task<IReadOnlyList<ConversationSummary>> GetWorkspaceConversationsAsync(Guid workspaceId, ConversationFolder folder, string? search, CancellationToken cancellationToken)
@@ -48,11 +64,24 @@ public sealed class StudioRepository : IBookingRepository, IStudioCatalogReposit
             query = query.Where(item => item.Subject.ToLower().Contains(term) || item.ClientEmail.ToLower().Contains(term) || (item.AssignedUserId != null && item.AssignedUserId.ToLower().Contains(term)));
         }
 
-        List<Conversation> conversations = await query.OrderByDescending(item => item.LastActivityUtc).Take(200).ToListAsync(cancellationToken);
+        List<Conversation> filteredConversations = await query.ToListAsync(cancellationToken);
+        List<Conversation> conversations = filteredConversations
+            .OrderByDescending(item => item.LastActivityUtc)
+            .Take(200)
+            .ToList();
+
         List<ConversationSummary> summaries = new();
         foreach (Conversation conversation in conversations)
         {
-            CommunicationMessage? lastMessage = await dbContext.CommunicationMessages.AsNoTracking().Where(item => item.ConversationId == conversation.Id).OrderByDescending(item => item.CreatedUtc).FirstOrDefaultAsync(cancellationToken);
+            List<CommunicationMessage> messages = await dbContext.CommunicationMessages
+                .AsNoTracking()
+                .Where(item => item.ConversationId == conversation.Id)
+                .ToListAsync(cancellationToken);
+
+            CommunicationMessage? lastMessage = messages
+                .OrderByDescending(item => item.CreatedUtc)
+                .FirstOrDefault();
+
             string preview = lastMessage?.Body ?? string.Empty;
             if (preview.Length > 120)
             {
@@ -65,7 +94,17 @@ public sealed class StudioRepository : IBookingRepository, IStudioCatalogReposit
         return summaries;
     }
 
-    public async Task<IReadOnlyList<CommunicationMessage>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken) => await dbContext.CommunicationMessages.AsNoTracking().Where(item => item.ConversationId == conversationId).OrderBy(item => item.CreatedUtc).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<CommunicationMessage>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken)
+    {
+        List<CommunicationMessage> messages = await dbContext.CommunicationMessages
+            .AsNoTracking()
+            .Where(item => item.ConversationId == conversationId)
+            .ToListAsync(cancellationToken);
+
+        return messages
+            .OrderBy(item => item.CreatedUtc)
+            .ToList();
+    }
 
     private IQueryable<Conversation> ApplyFolder(IQueryable<Conversation> query, ConversationFolder folder)
     {
