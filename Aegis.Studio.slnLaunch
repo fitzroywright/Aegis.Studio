@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Aegis.Studio Web + Service",
+    "Projects": [
+      {
+        "Path": "src\\Aegis.Studio.Web\\Aegis.Studio.Web.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\Aegis.Studio.Service\\Aegis.Studio.Service.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]
