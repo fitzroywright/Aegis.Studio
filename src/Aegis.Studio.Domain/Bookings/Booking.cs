@@ -10,6 +10,7 @@ public sealed class Booking
     {
         Id = Guid.NewGuid();
         Reference = $"BK-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(1000, 9999)}";
+        AccessToken = Convert.ToHexString(Guid.NewGuid().ToByteArray()).ToLowerInvariant();
         WorkspaceId = workspaceId;
         ServiceOfferingId = serviceOfferingId;
         PhotographerId = photographerId;
@@ -25,6 +26,7 @@ public sealed class Booking
 
     public Guid Id { get; private set; }
     public string Reference { get; private set; } = string.Empty;
+    public string AccessToken { get; private set; } = string.Empty;
     public Guid WorkspaceId { get; private set; }
     public Guid ServiceOfferingId { get; private set; }
     public Guid? PhotographerId { get; private set; }
