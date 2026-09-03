@@ -1,5 +1,7 @@
 using System.Security.Claims;
-using Aegis.Studio.Application.Abstractions;
+using Common.Security.Abstractions;
+using Common.Security.Models;
+using Common.Security.Services.Functions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
@@ -72,20 +74,34 @@ public static class StaffAuthenticationExtensions
         return app;
     }
 
-    private static async Task<IResult> LoginAsync(LoginRequest request, IWindowsCredentialValidator validator, HttpContext context, CancellationToken cancellationToken)
+    private static async Task<IResult> LoginAsync(LoginRequest request, IAuthenticator authenticator, HttpContext context, CancellationToken cancellationToken)
     {
-        WindowsCredentialValidationResult validation = await validator.ValidateAsync(request.UserName, request.Password, cancellationToken);
-        if (!validation.Succeeded)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrEmpty(request.Password))
         {
-            return Results.Json(new { error = validation.Error }, statusCode: StatusCodes.Status401Unauthorized);
+            return Results.Json(new { error = "Windows username and password are required." }, statusCode: StatusCodes.Status401Unauthorized);
         }
 
+        AuthenticationResult authentication = authenticator.Authenticate(request.UserName, request.Password);
+        if (!authentication.IsAuthenticated)
+        {
+            return Results.Json(new { error = "The Windows username or password is incorrect, or Windows authentication is unavailable." }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        string userName = UserNameNormalizer.GetUserNameWithoutDomain(request.UserName);
+        string displayName = authentication.UserInfo?.DisplayName ?? userName;
         List<Claim> claims =
         [
-            new Claim(ClaimTypes.Name, validation.UserName),
-            new Claim("windows_username", validation.UserName),
-            new Claim("display_name", validation.DisplayName)
+            new Claim(ClaimTypes.Name, userName),
+            new Claim("windows_username", userName),
+            new Claim("display_name", displayName)
         ];
+
+        if (authentication.IsAdministrative)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Administrator"));
+        }
+
         ClaimsIdentity identity = new(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         ClaimsPrincipal principal = new(identity);
         AuthenticationProperties properties = new()
@@ -94,7 +110,7 @@ public static class StaffAuthenticationExtensions
             AllowRefresh = true
         };
         await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, properties);
-        return Results.Ok(new { userName = validation.UserName, displayName = validation.DisplayName });
+        return Results.Ok(new { userName, displayName });
     }
 
     private static async Task<IResult> LogoutAsync(HttpContext context)
