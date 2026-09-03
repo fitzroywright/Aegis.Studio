@@ -14,13 +14,19 @@ using Aegis.Studio.Domain.Workspaces;
 using Aegis.Studio.Infrastructure;
 using Aegis.Studio.Infrastructure.Galleries;
 using Aegis.Studio.Infrastructure.Persistence;
+using Aegis.Studio.Web.Authentication;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddStudioInfrastructure(builder.Configuration);
+builder.Services.AddStudioStaffAuthentication();
 builder.Services.AddScoped<AvailabilityService>(); builder.Services.AddScoped<BookingLifecycleService>(); builder.Services.AddScoped<BookingService>(); builder.Services.AddScoped<BookingManagementService>(); builder.Services.AddScoped<BookingSelfServiceService>(); builder.Services.AddScoped<CustomerService>(); builder.Services.AddScoped<TaskService>(); builder.Services.AddScoped<NotificationScheduler>(); builder.Services.AddScoped<CommunicationService>(); builder.Services.AddScoped<WorkspaceAccessService>(); builder.Services.AddScoped<WorkspaceDashboardService>(); builder.Services.AddScoped<EscalationService>(); builder.Services.AddScoped<StudioOperationsService>(); builder.Services.AddScoped<GalleryService>(); builder.Services.AddScoped<DatabaseInitializer>();
 builder.Services.AddHealthChecks().AddDbContextCheck<StudioDbContext>("database");
-WebApplication app = builder.Build(); app.UseDefaultFiles(); app.UseStaticFiles();
+WebApplication app = builder.Build();
+app.UseStudioStaffAuthentication();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 using (IServiceScope scope = app.Services.CreateScope()) { DatabaseInitializer initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>(); await initializer.InitializeAsync(CancellationToken.None); }
+app.MapStudioAuthenticationEndpoints();
 app.MapGet("/api/catalog", async (IStudioCatalogRepository catalog, ICommunicationRepository communications, CancellationToken ct) => Results.Ok(new { services = await catalog.GetServicesAsync(ct), photographers = await catalog.GetPhotographersAsync(ct), workspaces = await communications.GetWorkspacesAsync(ct) }));
 app.MapGet("/api/availability", async (Guid serviceId, DateTimeOffset startUtc, AvailabilityService availability, IStudioCatalogRepository catalog, CancellationToken ct) => { ServiceOffering? service = await catalog.GetServiceAsync(serviceId, ct); return service is null ? Results.NotFound() : Results.Ok(await availability.GetAvailablePhotographersAsync(service, startUtc, ct)); });
 app.MapGet("/api/bookings", async (IBookingRepository repository, CancellationToken ct) => Results.Ok(await repository.GetUpcomingAsync(ct)));
@@ -67,6 +73,6 @@ app.MapPost("/api/media/{mediaId:guid}/move", async (Guid mediaId, MoveMediaRequ
 app.MapPost("/api/media/{mediaId:guid}/assign", async (Guid mediaId, AssignMediaRequest request, GalleryService service, CancellationToken ct) => Results.Ok(await service.AssignAsync(mediaId, request.WorkspaceId, request.AssignedTo, request.Activity, request.UserId, ct)));
 app.MapPost("/api/media/{mediaId:guid}/prints", async (Guid mediaId, SchedulePrintRequest request, GalleryService service, CancellationToken ct) => Results.Ok(await service.SchedulePrintAsync(mediaId, request.WorkspaceId, request.RequestedBy, request.Quantity, request.Specification, request.ScheduledUtc, ct)));
 app.MapHealthChecks("/diagnostics/health");
-app.MapGet("/diagnostics/starfleet", (IHostEnvironment environment) => Results.Ok(new { level = "YELLOW", application = "Aegis.Studio", environment = environment.EnvironmentName, coreReady = true, microsoft365Configured = false, checks = new[] { "web:ready", "database:ready", "booking-management:ready", "customer-self-service:ready", "availability:ready", "workspaces:ready", "customers:ready", "tasks:ready", "gallery:ready", "production-workflow:ready", "print-queue:ready", "local-media-storage:ready", "notification-queue:ready", "calendar-provider:disabled", "external-mail:disabled", "microsoft-365:pending" }, utc = DateTimeOffset.UtcNow }));
+app.MapGet("/diagnostics/starfleet", (IHostEnvironment environment) => Results.Ok(new { level = "YELLOW", application = "Aegis.Studio", environment = environment.EnvironmentName, coreReady = true, microsoft365Configured = false, windowsAuthenticationRequired = true, checks = new[] { "web:ready", "database:ready", "booking-management:ready", "customer-self-service:ready", "availability:ready", "workspaces:ready", "windows-authentication:configured-at-deployment", "customers:ready", "tasks:ready", "gallery:ready", "production-workflow:ready", "print-queue:ready", "local-media-storage:ready", "notification-queue:ready", "calendar-provider:disabled", "external-mail:disabled", "microsoft-365:pending" }, utc = DateTimeOffset.UtcNow }));
 app.Run();
 public sealed record ReplyRequest(string Body); public sealed record AddWorkspaceMemberRequest(string UserId, string DisplayName, WorkspaceRole Role); public sealed record AssignTaskRequest(string? UserId); public sealed record CreateGalleryRequest(string Name, GalleryKind Kind, Guid WorkspaceId, Guid? BookingId, Guid? CustomerId); public sealed record MoveMediaRequest(Guid GalleryId, string UserId); public sealed record AssignMediaRequest(Guid WorkspaceId, string AssignedTo, string Activity, string UserId); public sealed record SchedulePrintRequest(Guid WorkspaceId, string RequestedBy, int Quantity, string Specification, DateTimeOffset ScheduledUtc);
