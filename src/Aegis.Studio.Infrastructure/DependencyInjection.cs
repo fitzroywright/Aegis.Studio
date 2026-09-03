@@ -15,10 +15,20 @@ namespace Aegis.Studio.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddStudioInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddStudioInfrastructure
+    (
+          this IServiceCollection services
+        , IConfiguration configuration
+        , bool includeStaffAuthentication = true
+    )
     {
         AddDatabase(services, configuration);
-        AddAuthentication(services, configuration);
+
+        if (includeStaffAuthentication)
+        {
+            AddAuthentication(services, configuration);
+        }
+
         services.AddScoped<StudioRepository>();
         services.AddScoped<IBookingRepository>(provider => provider.GetRequiredService<StudioRepository>());
         services.AddScoped<IStudioCatalogRepository>(provider => provider.GetRequiredService<StudioRepository>());
