@@ -63,8 +63,8 @@ public static class StaffAuthenticationExtensions
 
     public static WebApplication MapStudioAuthenticationEndpoints(this WebApplication app)
     {
-        app.MapPost("/api/auth/login", LoginAsync);
-        app.MapPost("/api/auth/logout", LogoutAsync);
+        app.MapPost("/api/auth/login", (Delegate)LoginAsync);
+        app.MapPost("/api/auth/logout", (Delegate)LogoutAsync);
         app.MapGet("/api/auth/me", (ClaimsPrincipal user) => Results.Ok(new
         {
             authenticated = user.Identity?.IsAuthenticated == true,
