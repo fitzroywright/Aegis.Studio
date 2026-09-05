@@ -35,12 +35,39 @@ public sealed class InboundMailWorker : BackgroundService
     {
         using IServiceScope scope = scopeFactory.CreateScope();
         IInboundMailProvider provider = scope.ServiceProvider.GetRequiredService<IInboundMailProvider>();
-        CommunicationService service = scope.ServiceProvider.GetRequiredService<CommunicationService>();
+        InboundMailRouter router = scope.ServiceProvider.GetRequiredService<InboundMailRouter>();
         IReadOnlyList<InboundMailItem> messages = await provider.GetUnreadAsync(cancellationToken);
+
         foreach (InboundMailItem message in messages)
         {
-            await service.RouteInboundAsync(message, cancellationToken);
-            await provider.MarkProcessedAsync(message.ProviderMessageId, cancellationToken);
+            try
+            {
+                InboundMailRouteResult result = await router.RouteAsync(message, cancellationToken);
+                await provider.MarkProcessedAsync(message.ProviderMessageId, cancellationToken);
+
+                logger.LogInformation
+                (
+                    "Inbound email {ProviderMessageId} from {ClientEmail} to {RecipientAddress} routed to workspace {WorkspaceName} ({WorkspaceId}), conversation {ConversationId}, booking {BookingId}.",
+                    message.ProviderMessageId,
+                    result.ClientEmail,
+                    result.RecipientAddress,
+                    result.WorkspaceName,
+                    result.WorkspaceId,
+                    result.ConversationId,
+                    result.BookingId
+                );
+            }
+            catch (Exception exception)
+            {
+                logger.LogError
+                (
+                    exception,
+                    "Inbound email {ProviderMessageId} from {FromAddress} to {RecipientAddress} could not be routed. The message remains unprocessed for retry.",
+                    message.ProviderMessageId,
+                    message.FromAddress,
+                    message.OriginalRecipientAddress
+                );
+            }
         }
     }
 }
