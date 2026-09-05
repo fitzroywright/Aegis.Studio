@@ -15,6 +15,7 @@ builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<BookingManagementService>();
 builder.Services.AddScoped<BookingLifecycleService>();
 builder.Services.AddScoped<CommunicationService>();
+builder.Services.AddScoped<InboundMailRouter>();
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<NotificationScheduler>();
