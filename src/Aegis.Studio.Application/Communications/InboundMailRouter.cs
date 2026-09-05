@@ -5,6 +5,8 @@ namespace Aegis.Studio.Application.Communications;
 
 public sealed class InboundMailRouter
 {
+    private const string GeneralWorkspaceSlug = "general";
+
     private readonly ICommunicationRepository communicationRepository;
     private readonly CommunicationService communicationService;
 
@@ -16,15 +18,8 @@ public sealed class InboundMailRouter
 
     public async Task<InboundMailRouteResult> RouteAsync(InboundMailItem inboundMail, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(inboundMail.OriginalRecipientAddress))
-        {
-            throw new InvalidOperationException("Inbound message does not contain the original recipient address required for workspace routing.");
-        }
-
-        Workspace workspace = await communicationRepository.GetWorkspaceByRecipientAsync(inboundMail.OriginalRecipientAddress, cancellationToken)
-            ?? throw new InvalidOperationException($"No workspace is configured for recipient {inboundMail.OriginalRecipientAddress}.");
-
-        Conversation conversation = await communicationService.RouteInboundAsync(inboundMail, cancellationToken);
+        Workspace workspace = await ResolveWorkspaceAsync(inboundMail.OriginalRecipientAddress, cancellationToken);
+        Conversation conversation = await communicationService.RouteInboundAsync(inboundMail, workspace, cancellationToken);
 
         return new InboundMailRouteResult
         (
@@ -36,5 +31,21 @@ public sealed class InboundMailRouter
             conversation.ClientEmail,
             conversation.Subject
         );
+    }
+
+    private async Task<Workspace> ResolveWorkspaceAsync(string? originalRecipientAddress, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(originalRecipientAddress))
+        {
+            Workspace? mappedWorkspace = await communicationRepository.GetWorkspaceByRecipientAsync(originalRecipientAddress, cancellationToken);
+            if (mappedWorkspace is not null)
+            {
+                return mappedWorkspace;
+            }
+        }
+
+        IReadOnlyList<Workspace> workspaces = await communicationRepository.GetWorkspacesAsync(cancellationToken);
+        Workspace? generalWorkspace = workspaces.SingleOrDefault(item => item.Slug.Equals(GeneralWorkspaceSlug, StringComparison.OrdinalIgnoreCase));
+        return generalWorkspace ?? throw new InvalidOperationException("No General workspace is configured for unroutable inbound mail.");
     }
 }
