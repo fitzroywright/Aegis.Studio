@@ -22,6 +22,7 @@ builder.Services.AddScoped<NotificationScheduler>();
 builder.Services.AddScoped<NotificationDispatcher>();
 builder.Services.AddScoped<EscalationService>();
 builder.Services.AddScoped<DatabaseInitializer>();
+builder.Services.AddScoped<GeneralWorkspaceSeeder>();
 builder.Services.AddHostedService<InboundMailWorker>();
 builder.Services.AddHostedService<EscalationWorker>();
 builder.Services.AddHostedService<NotificationWorker>();
@@ -32,6 +33,9 @@ using (IServiceScope scope = host.Services.CreateScope())
 {
     DatabaseInitializer initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
     await initializer.InitializeAsync(CancellationToken.None);
+
+    GeneralWorkspaceSeeder generalWorkspaceSeeder = scope.ServiceProvider.GetRequiredService<GeneralWorkspaceSeeder>();
+    await generalWorkspaceSeeder.SeedAsync(CancellationToken.None);
 }
 
 await host.RunAsync();
