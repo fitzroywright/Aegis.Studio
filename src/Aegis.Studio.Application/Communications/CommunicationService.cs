@@ -22,7 +22,14 @@ public sealed partial class CommunicationService
 
     public async Task<Conversation> RouteInboundAsync(InboundMailItem inboundMail, CancellationToken cancellationToken)
     {
-        Workspace workspace = await communicationRepository.GetWorkspaceByRecipientAsync(inboundMail.OriginalRecipientAddress, cancellationToken) ?? throw new InvalidOperationException($"No Workspace is configured for {inboundMail.OriginalRecipientAddress}.");
+        Workspace workspace = await communicationRepository.GetWorkspaceByRecipientAsync(inboundMail.OriginalRecipientAddress, cancellationToken)
+            ?? throw new InvalidOperationException($"No Workspace is configured for {inboundMail.OriginalRecipientAddress}.");
+
+        return await RouteInboundAsync(inboundMail, workspace, cancellationToken);
+    }
+
+    public async Task<Conversation> RouteInboundAsync(InboundMailItem inboundMail, Workspace workspace, CancellationToken cancellationToken)
+    {
         string normalizedSubject = NormalizeSubject(inboundMail.Subject);
         Booking? booking = await FindBookingAsync(workspace.Id, inboundMail.FromAddress, inboundMail.Subject, cancellationToken);
         Conversation? existingConversation = await communicationRepository.FindActiveConversationAsync(workspace.Id, inboundMail.FromAddress, normalizedSubject, cancellationToken);
