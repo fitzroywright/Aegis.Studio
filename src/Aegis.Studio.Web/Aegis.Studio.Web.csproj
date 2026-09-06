@@ -3,6 +3,7 @@
     <ProjectReference Include="../Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
     <ProjectReference Include="../Aegis.Studio.Domain/Aegis.Studio.Domain.csproj" />
     <ProjectReference Include="../Aegis.Studio.Infrastructure/Aegis.Studio.Infrastructure.csproj" />
+    <ProjectReference Include="../Aegis.Pos.Core/Aegis.Pos.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Common.Security" Version="1.0.0" />
