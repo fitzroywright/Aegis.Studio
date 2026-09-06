@@ -4,6 +4,10 @@ namespace Aegis.Studio.Domain.Bookings;
 
 public sealed class Booking : Entity
 {
+    public Booking(Guid id) : base(id)
+    {
+    }
+
     public Guid JobId { get; set; }
     public Guid WorkspaceId { get; set; }
     public string ClientName { get; set; } = string.Empty;
