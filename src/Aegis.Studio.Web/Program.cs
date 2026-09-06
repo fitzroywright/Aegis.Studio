@@ -19,6 +19,18 @@ app.MapGet("/api/conversations/{id:guid}", (Guid id, DemoStore store) =>
     DemoConversation? conversation = store.GetConversation(id);
     return conversation is null ? Results.NotFound() : Results.Ok(conversation);
 });
+app.MapPost("/api/interactions", (IncomingInteractionRequest request, DemoStore store) =>
+{
+    if (string.IsNullOrWhiteSpace(request.ContactName) ||
+        string.IsNullOrWhiteSpace(request.ContactAddress) ||
+        string.IsNullOrWhiteSpace(request.Subject) ||
+        string.IsNullOrWhiteSpace(request.Body))
+    {
+        return Results.BadRequest(new { error = "Contact, address, subject and message are required." });
+    }
+
+    return Results.Created("/api/conversations", store.ReceiveInteraction(request));
+});
 app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, DemoStore store) =>
 {
     if (string.IsNullOrWhiteSpace(request.Body))
