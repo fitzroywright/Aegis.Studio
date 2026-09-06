@@ -21,7 +21,7 @@ app.MapPost("/stub/bookings", async (HttpRequest request, IHttpClientFactory cli
 app.MapPost("/stub/bookings/{bookingId:guid}/payments", async (Guid bookingId, HttpRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
     object? payload = await request.ReadFromJsonAsync<object>(cancellationToken);
-    HttpResponseMessage response = await clients.CreateClient("Aegis").PostAsJsonAsync($"/api/bookings/{bookingId}/payments", payload, cancellationToken);
+    HttpResponseMessage response = await clients.CreateClient("Aegis").PostAsJsonAsync($"/api/bookings/{bookingId}/payment-confirmations", payload, cancellationToken);
     string body = await response.Content.ReadAsStringAsync(cancellationToken);
     return Results.Content(body, response.Content.Headers.ContentType?.ToString() ?? "application/json", statusCode: (int)response.StatusCode);
 });
