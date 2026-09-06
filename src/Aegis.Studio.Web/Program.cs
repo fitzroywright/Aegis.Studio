@@ -1,10 +1,13 @@
+using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Web.Demo;
+using Aegis.Studio.Web.Email;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
 builder.Services.AddSingleton<DemoStore>();
 builder.Services.AddSingleton<AttachmentStore>();
+builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
 
 WebApplication app = builder.Build();
 
@@ -32,6 +35,42 @@ app.MapPost("/api/interactions", (IncomingInteractionRequest request, DemoStore 
 
     return Results.Created("/api/conversations", store.ReceiveInteraction(request));
 });
+
+app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter router, DemoStore store) =>
+{
+    if (string.IsNullOrWhiteSpace(email.MessageId) ||
+        string.IsNullOrWhiteSpace(email.FromAddress) ||
+        email.ToAddresses.Count == 0 ||
+        string.IsNullOrWhiteSpace(email.Subject) ||
+        string.IsNullOrWhiteSpace(email.Body))
+    {
+        return Results.BadRequest(new { error = "Message id, sender, recipient, subject and body are required." });
+    }
+
+    EmailRouteResult route = router.Route(email);
+    if (!route.IsRouted)
+    {
+        return Results.UnprocessableEntity(new
+        {
+            routed = false,
+            route.FailureReason,
+            recipients = email.ToAddresses
+        });
+    }
+
+    EmailIngestResult result = store.ReceiveEmail(email, route);
+    return Results.Ok(new
+    {
+        routed = true,
+        workspaceId = route.WorkspaceId,
+        workspaceName = route.WorkspaceName,
+        matchedAddress = route.MatchedAddress,
+        conversationId = result.Conversation.Id,
+        result.CreatedConversation,
+        result.WasDuplicate
+    });
+});
+
 app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, DemoStore store) =>
 {
     if (string.IsNullOrWhiteSpace(request.Body))
