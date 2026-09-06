@@ -18,14 +18,14 @@ public sealed class InboundEmailWorker : BackgroundService
         IInboundEmailRouter router,
         DemoStore store,
         UnroutedEmailStore unroutedStore,
-        GraphEmailDeltaStateStore deltaStateStore,
+        IWebHostEnvironment environment,
         ILogger<InboundEmailWorker> logger)
     {
         this.graphClient = graphClient;
         this.router = router;
         this.store = store;
         this.unroutedStore = unroutedStore;
-        this.deltaStateStore = deltaStateStore;
+        deltaStateStore = new GraphEmailDeltaStateStore(environment);
         this.logger = logger;
     }
 
