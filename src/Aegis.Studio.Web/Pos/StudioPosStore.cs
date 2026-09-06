@@ -45,20 +45,21 @@ public sealed class StudioPosStore
         Sale sale = sales[saleId];
         if (sale.Status == SaleStatus.Completed)
         {
+            EnsureFinancialEventPosted(sale, studio);
             return sale;
+        }
+        if (sale.Status == SaleStatus.Voided)
+        {
+            throw new InvalidOperationException("A voided sale cannot be completed.");
         }
 
         Tender[] tenders = request.Tenders.Select(x => Tender.Create(x.Kind, x.Amount, x.Reference)).ToArray();
-        sale.Submit(DateTimeOffset.UtcNow);
-        sale.Complete(tenders, DateTimeOffset.UtcNow, cashierUserId, request.TerminalId ?? "StudioWeb");
-
-        if (postedFinancialEvents.TryAdd(sale.Id, 0))
+        if (sale.Status == SaleStatus.Draft)
         {
-            Guid jobId = Guid.Parse(sale.ReferenceId);
-            string tenderSummary = string.Join(", ", sale.Tenders.Select(x => $"{x.Kind} {x.Amount:N2}"));
-            studio.AddFinancialEvent(jobId, new AddFinancialEventRequest("POS Sale", sale.Total, $"Sale {sale.Id}: {tenderSummary}"));
+            sale.Submit(DateTimeOffset.UtcNow);
         }
-
+        sale.Complete(tenders, DateTimeOffset.UtcNow, cashierUserId, request.TerminalId ?? "StudioWeb");
+        EnsureFinancialEventPosted(sale, studio);
         return sale;
     }
 
@@ -80,6 +81,18 @@ public sealed class StudioPosStore
         Guid jobId = Guid.Parse(sale.ReferenceId);
         studio.AddFinancialEvent(jobId, new AddFinancialEventRequest("POS Refund", -refund.Total, $"Refund {refund.Id}: {refund.Reason}"));
         return sale;
+    }
+
+    private void EnsureFinancialEventPosted(Sale sale, DemoStore studio)
+    {
+        if (!postedFinancialEvents.TryAdd(sale.Id, 0))
+        {
+            return;
+        }
+
+        Guid jobId = Guid.Parse(sale.ReferenceId);
+        string tenderSummary = string.Join(", ", sale.Tenders.Select(x => $"{x.Kind} {x.Amount:N2}"));
+        studio.AddFinancialEvent(jobId, new AddFinancialEventRequest("POS Sale", sale.Total, $"Sale {sale.Id}: {tenderSummary}"));
     }
 }
 
