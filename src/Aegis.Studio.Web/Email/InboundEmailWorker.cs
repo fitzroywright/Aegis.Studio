@@ -10,6 +10,7 @@ public sealed class InboundEmailWorker : BackgroundService
     private readonly IInboundEmailRouter router;
     private readonly DemoStore store;
     private readonly UnroutedEmailStore unroutedStore;
+    private readonly OutboundEmailStore outboundStore;
     private readonly GraphEmailDeltaStateStore deltaStateStore;
     private readonly ILogger<InboundEmailWorker> logger;
 
@@ -18,6 +19,7 @@ public sealed class InboundEmailWorker : BackgroundService
         IInboundEmailRouter router,
         DemoStore store,
         UnroutedEmailStore unroutedStore,
+        OutboundEmailStore outboundStore,
         IWebHostEnvironment environment,
         ILogger<InboundEmailWorker> logger)
     {
@@ -25,6 +27,7 @@ public sealed class InboundEmailWorker : BackgroundService
         this.router = router;
         this.store = store;
         this.unroutedStore = unroutedStore;
+        this.outboundStore = outboundStore;
         deltaStateStore = new GraphEmailDeltaStateStore(environment);
         this.logger = logger;
     }
@@ -51,17 +54,11 @@ public sealed class InboundEmailWorker : BackgroundService
                     EmailRouteResult route = router.Route(email);
                     if (!route.IsRouted)
                     {
-                        UnroutedEmail captured = unroutedStore.Capture(
-                            email,
-                            route.FailureReason ?? "No route was resolved.");
-
+                        UnroutedEmail captured = unroutedStore.Capture(email, route.FailureReason ?? "No route was resolved.");
                         logger.LogWarning(
                             "Inbound email {MessageId} from {Sender} needs routing review. Review item {ReviewId}. To: {To}; Cc: {Cc}",
-                            email.MessageId,
-                            email.FromAddress,
-                            captured.Id,
-                            string.Join(", ", email.ToAddresses),
-                            string.Join(", ", email.CcAddresses));
+                            email.MessageId, email.FromAddress, captured.Id,
+                            string.Join(", ", email.ToAddresses), string.Join(", ", email.CcAddresses));
                         continue;
                     }
 
@@ -71,12 +68,14 @@ public sealed class InboundEmailWorker : BackgroundService
                         continue;
                     }
 
+                    if (result.CreatedConversation)
+                    {
+                        outboundStore.QueueAcknowledgement(result.Conversation, route.WorkspaceName ?? "Aegis Studio");
+                    }
+
                     logger.LogInformation(
                         "Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}",
-                        email.MessageId,
-                        route.WorkspaceName,
-                        result.Conversation.Id,
-                        result.CreatedConversation);
+                        email.MessageId, route.WorkspaceName, result.Conversation.Id, result.CreatedConversation);
                 }
 
                 if (!string.IsNullOrWhiteSpace(batch.DeltaLink))
