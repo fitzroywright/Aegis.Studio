@@ -1,10 +1,18 @@
 using Aegis.Studio.Application.EmailRouting;
+using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Demo;
 using Aegis.Studio.Web.Email;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+MicrosoftGraphEmailOptions graphEmailOptions = builder.Configuration
+    .GetSection("MicrosoftGraphEmail")
+    .Get<MicrosoftGraphEmailOptions>() ?? new MicrosoftGraphEmailOptions();
+
 builder.Services.AddHealthChecks();
+builder.Services.AddSingleton(graphEmailOptions);
+builder.Services.AddSingleton<MicrosoftGraphEmailClient>();
+builder.Services.AddHostedService<InboundEmailWorker>();
 builder.Services.AddSingleton<DemoStore>();
 builder.Services.AddSingleton<AttachmentStore>();
 builder.Services.AddSingleton<OutboundEmailStore>();
@@ -16,6 +24,12 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapHealthChecks("/health");
+app.MapGet("/api/email/status", (MicrosoftGraphEmailClient graphClient) => Results.Ok(new
+{
+    configured = graphClient.IsConfigured,
+    pollSeconds = (int)graphClient.PollInterval.TotalSeconds,
+    mode = graphClient.IsConfigured ? "Microsoft Graph" : "Manual/Test"
+}));
 
 app.MapGet("/api/workspaces", (DemoStore store) => Results.Ok(store.GetWorkspaces()));
 app.MapGet("/api/conversations", (Guid? workspaceId, DemoStore store) => Results.Ok(store.GetConversations(workspaceId)));
