@@ -22,16 +22,14 @@ public sealed class BookingStore
 
     public Booking Create(CreateBookingIntakeRequest request, DemoStore store)
     {
-        if (!string.IsNullOrWhiteSpace(request.ExternalBookingId) &&
-            externalIds.TryGetValue(request.ExternalBookingId.Trim(), out Guid existingId))
+        if (!string.IsNullOrWhiteSpace(request.ExternalBookingId) && externalIds.TryGetValue(request.ExternalBookingId.Trim(), out Guid existingId))
         {
             return bookings[existingId];
         }
 
         DemoJob job = store.CreateBookingJob(request);
-        Booking booking = new()
+        Booking booking = new(Guid.NewGuid())
         {
-            Id = Guid.NewGuid(),
             JobId = job.Id,
             WorkspaceId = job.WorkspaceId,
             ClientName = request.ClientName.Trim(),
@@ -66,16 +64,14 @@ public sealed class BookingStore
 
     public ExternalPaymentConfirmation RecordPayment(Guid bookingId, RecordPaymentConfirmationRequest request)
     {
-        ExternalPaymentConfirmation? duplicate = payments.Values.FirstOrDefault(x =>
-            string.Equals(x.Reference, request.Reference, StringComparison.OrdinalIgnoreCase));
+        ExternalPaymentConfirmation? duplicate = payments.Values.FirstOrDefault(x => string.Equals(x.Reference, request.Reference, StringComparison.OrdinalIgnoreCase));
         if (duplicate is not null)
         {
             return duplicate;
         }
 
-        ExternalPaymentConfirmation payment = new()
+        ExternalPaymentConfirmation payment = new(Guid.NewGuid())
         {
-            Id = Guid.NewGuid(),
             BookingId = bookingId,
             Amount = request.Amount,
             Currency = request.Currency.Trim().ToUpperInvariant(),
@@ -100,26 +96,6 @@ public sealed class BookingStore
     }
 }
 
-public sealed record CreateBookingIntakeRequest(
-    Guid? WorkspaceId,
-    string? Destination,
-    string ClientName,
-    string ClientEmail,
-    string? ClientPhone,
-    string SessionType,
-    DateTimeOffset StartsAt,
-    DateTimeOffset EndsAt,
-    string? Location,
-    string? Notes,
-    string? Source,
-    string? ExternalBookingId);
-
+public sealed record CreateBookingIntakeRequest(Guid? WorkspaceId, string? Destination, string ClientName, string ClientEmail, string? ClientPhone, string SessionType, DateTimeOffset StartsAt, DateTimeOffset EndsAt, string? Location, string? Notes, string? Source, string? ExternalBookingId);
 public sealed record UpdateBookingStatusRequest(BookingStatus Status);
-
-public sealed record RecordPaymentConfirmationRequest(
-    decimal Amount,
-    string Currency,
-    string Reference,
-    string Provider,
-    string? Source,
-    DateTimeOffset ConfirmedAt);
+public sealed record RecordPaymentConfirmationRequest(decimal Amount, string Currency, string Reference, string Provider, string? Source, DateTimeOffset ConfirmedAt);
