@@ -112,7 +112,7 @@ public sealed class MicrosoftGraphEmailClient
         int pageSize = Math.Clamp(options.PageSize, 1, 100);
         string mailbox = Uri.EscapeDataString(options.Mailbox);
         return $"https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/inbox/messages" +
-            $"?$select=id,conversationId,subject,receivedDateTime,from,toRecipients,bodyPreview" +
+            $"?$select=id,conversationId,subject,receivedDateTime,from,toRecipients,ccRecipients,bodyPreview,internetMessageHeaders" +
             $"&$orderby=receivedDateTime asc&$top={pageSize}";
     }
 
@@ -120,7 +120,7 @@ public sealed class MicrosoftGraphEmailClient
     {
         return !string.IsNullOrWhiteSpace(message.Id) &&
             !string.IsNullOrWhiteSpace(message.From?.EmailAddress?.Address) &&
-            message.ToRecipients.Count > 0 &&
+            (message.ToRecipients.Count > 0 || message.CcRecipients.Count > 0) &&
             !string.IsNullOrWhiteSpace(message.Subject) &&
             !string.IsNullOrWhiteSpace(message.BodyPreview);
     }
@@ -128,11 +128,15 @@ public sealed class MicrosoftGraphEmailClient
     private static InboundEmail ToInboundEmail(GraphMessage message)
     {
         GraphEmailAddress sender = message.From!.EmailAddress!;
-        IReadOnlyCollection<string> recipients = message.ToRecipients
-            .Select(x => x.EmailAddress?.Address)
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Select(x => x!)
-            .ToList();
+        IReadOnlyCollection<string> toRecipients = ExtractAddresses(message.ToRecipients);
+        IReadOnlyCollection<string> ccRecipients = ExtractAddresses(message.CcRecipients);
+        IReadOnlyDictionary<string, string> headers = message.InternetMessageHeaders
+            .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+            .GroupBy(x => x.Name!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Last().Value ?? string.Empty,
+                StringComparer.OrdinalIgnoreCase);
 
         string senderAddress = sender.Address!;
         string senderName = string.IsNullOrWhiteSpace(sender.Name) ? senderAddress : sender.Name;
@@ -142,10 +146,21 @@ public sealed class MicrosoftGraphEmailClient
             message.ConversationId,
             senderName,
             senderAddress,
-            recipients,
+            toRecipients,
+            ccRecipients,
+            headers,
             message.Subject!,
             message.BodyPreview!,
             message.ReceivedDateTime ?? DateTimeOffset.UtcNow);
+    }
+
+    private static IReadOnlyCollection<string> ExtractAddresses(IEnumerable<GraphRecipient> recipients)
+    {
+        return recipients
+            .Select(x => x.EmailAddress?.Address)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .ToList();
     }
 
     private sealed class GraphTokenResponse
@@ -180,8 +195,23 @@ public sealed class MicrosoftGraphEmailClient
         [JsonPropertyName("toRecipients")]
         public List<GraphRecipient> ToRecipients { get; init; } = new();
 
+        [JsonPropertyName("ccRecipients")]
+        public List<GraphRecipient> CcRecipients { get; init; } = new();
+
+        [JsonPropertyName("internetMessageHeaders")]
+        public List<GraphInternetMessageHeader> InternetMessageHeaders { get; init; } = new();
+
         [JsonPropertyName("bodyPreview")]
         public string? BodyPreview { get; init; }
+    }
+
+    private sealed class GraphInternetMessageHeader
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; init; }
+
+        [JsonPropertyName("value")]
+        public string? Value { get; init; }
     }
 
     private sealed record GraphSendMailRequest(
