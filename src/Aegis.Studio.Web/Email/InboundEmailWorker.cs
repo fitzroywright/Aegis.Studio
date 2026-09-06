@@ -1,6 +1,6 @@
 using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Infrastructure.Email;
-using Aegis.Studio.Web.Demo;
+using Aegis.Studio.Web.Operations;
 
 namespace Aegis.Studio.Web.Email;
 
@@ -8,7 +8,7 @@ public sealed class InboundEmailWorker : BackgroundService
 {
     private readonly MicrosoftGraphEmailClient graphClient;
     private readonly IInboundEmailRouter router;
-    private readonly DemoStore store;
+    private readonly StudioStore store;
     private readonly UnroutedEmailStore unroutedStore;
     private readonly OutboundEmailStore outboundStore;
     private readonly GraphEmailDeltaStateStore deltaStateStore;
@@ -17,7 +17,7 @@ public sealed class InboundEmailWorker : BackgroundService
     public InboundEmailWorker(
         MicrosoftGraphEmailClient graphClient,
         IInboundEmailRouter router,
-        DemoStore store,
+        StudioStore store,
         UnroutedEmailStore unroutedStore,
         OutboundEmailStore outboundStore,
         GraphEmailDeltaStateStore deltaStateStore,
