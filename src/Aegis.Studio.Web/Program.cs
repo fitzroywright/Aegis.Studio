@@ -1,7 +1,13 @@
 using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Infrastructure.Email;
+using Aegis.Studio.Web.Authentication;
 using Aegis.Studio.Web.Demo;
 using Aegis.Studio.Web.Email;
+using Common.Security.Abstractions;
+using Common.Security.Authenticators;
+using Common.Security.Options;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -9,7 +15,45 @@ MicrosoftGraphEmailOptions graphEmailOptions = builder.Configuration
     .GetSection("MicrosoftGraphEmail")
     .Get<MicrosoftGraphEmailOptions>() ?? new MicrosoftGraphEmailOptions();
 
+ActiveDirectoryAuthenticationOptions activeDirectoryOptions = builder.Configuration
+    .GetSection("Authentication:ActiveDirectory")
+    .Get<ActiveDirectoryAuthenticationOptions>()
+    ?? throw new InvalidOperationException("Authentication:ActiveDirectory must be configured.");
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "Aegis.Studio.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.LoginPath = "/login";
+        options.AccessDeniedPath = "/login";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+        options.Events.OnRedirectToLogin = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api"))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return Task.CompletedTask;
+            }
+
+            context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
 builder.Services.AddHealthChecks();
+builder.Services.AddSingleton(activeDirectoryOptions);
+builder.Services.AddSingleton<IAuthenticator, ActiveDirectory>();
 builder.Services.AddSingleton(graphEmailOptions);
 builder.Services.AddSingleton<MicrosoftGraphEmailClient>();
 builder.Services.AddHostedService<InboundEmailWorker>();
@@ -22,10 +66,38 @@ builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
 
 WebApplication app = builder.Build();
 
-app.UseDefaultFiles();
+app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    bool isApplicationDocument = context.Request.Path == "/" ||
+        context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase);
+
+    if (isApplicationDocument && context.User.Identity?.IsAuthenticated != true)
+    {
+        context.Response.Redirect("/login");
+        return;
+    }
+
+    await next();
+});
+app.UseAuthorization();
 app.UseStaticFiles();
 
-app.MapHealthChecks("/health");
+app.MapGet("/login", (IWebHostEnvironment environment) =>
+    Results.File(
+        Path.Combine(environment.WebRootPath, "login.html"),
+        "text/html; charset=utf-8"))
+    .AllowAnonymous();
+
+app.MapGet("/", (IWebHostEnvironment environment) =>
+    Results.File(
+        Path.Combine(environment.WebRootPath, "index.html"),
+        "text/html; charset=utf-8"))
+    .RequireAuthorization();
+
+app.MapStudioAuthentication();
+app.MapHealthChecks("/health").AllowAnonymous();
+
 app.MapGet("/api/email/status", (
     MicrosoftGraphEmailClient graphClient,
     MicrosoftGraphEmailOptions options,
@@ -274,6 +346,6 @@ app.MapPost("/api/jobs/{id:guid}/financial-events", (Guid id, AddFinancialEventR
 });
 app.MapGet("/api/accounts/summary", (DemoStore store) => Results.Ok(store.GetAccountsSummary()));
 
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("index.html").RequireAuthorization();
 
 app.Run();
