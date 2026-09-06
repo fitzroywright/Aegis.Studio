@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Aegis Studio</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><strong>AEGIS</strong><span>STUDIO</span></div>
+    <div class="top-actions"><span>Bryan's Studio</span><span class="avatar">FW</span></div>
+  </header>
+  <div class="shell">
+    <aside class="rail">
+      <button class="brand-button active" data-view="conversations">Work</button>
+      <button class="brand-button" data-view="jobs">Jobs</button>
+      <button class="brand-button" data-view="production">Production</button>
+      <button class="brand-button" data-view="accounts">Accounts</button>
+      <button class="brand-button" data-view="management">Management</button>
+    </aside>
+    <aside class="workspaces">
+      <div class="section-title">WORKSPACES</div>
+      <div id="workspaceList"></div>
+    </aside>
+    <main>
+      <section id="conversationView" class="three-pane">
+        <div class="list-pane">
+          <div class="pane-heading"><div><h2 id="workspaceTitle">Work</h2><p>Requests and conversations</p></div><button id="allButton">All</button></div>
+          <div id="conversationList"></div>
+        </div>
+        <div id="detailPane" class="detail-pane empty"><div class="empty-state"><h2>Select a conversation</h2><p>Customer messages, internal discussion and job context live together here.</p></div></div>
+      </section>
+      <section id="genericView" class="generic hidden"></section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
