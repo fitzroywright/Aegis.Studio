@@ -17,6 +17,7 @@ builder.Services.AddHostedService<OutboundEmailWorker>();
 builder.Services.AddSingleton<DemoStore>();
 builder.Services.AddSingleton<AttachmentStore>();
 builder.Services.AddSingleton<OutboundEmailStore>();
+builder.Services.AddSingleton<UnroutedEmailStore>();
 builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
 
 WebApplication app = builder.Build();
@@ -25,11 +26,16 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapHealthChecks("/health");
-app.MapGet("/api/email/status", (MicrosoftGraphEmailClient graphClient) => Results.Ok(new
+app.MapGet("/api/email/status", (
+    MicrosoftGraphEmailClient graphClient,
+    MicrosoftGraphEmailOptions options,
+    UnroutedEmailStore unrouted) => Results.Ok(new
 {
     configured = graphClient.IsConfigured,
+    collectionMailbox = options.Mailbox,
     pollSeconds = (int)graphClient.PollInterval.TotalSeconds,
-    mode = graphClient.IsConfigured ? "Microsoft Graph" : "Manual/Test"
+    mode = graphClient.IsConfigured ? "Microsoft Graph" : "Manual/Test",
+    unroutedCount = unrouted.GetOpen().Count
 }));
 
 app.MapGet("/api/workspaces", (DemoStore store) => Results.Ok(store.GetWorkspaces()));
@@ -52,25 +58,39 @@ app.MapPost("/api/interactions", (IncomingInteractionRequest request, DemoStore 
     return Results.Created("/api/conversations", store.ReceiveInteraction(request));
 });
 
-app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter router, DemoStore store) =>
+app.MapPost("/api/email/inbound", (
+    InboundEmail email,
+    IInboundEmailRouter router,
+    DemoStore store,
+    UnroutedEmailStore unrouted) =>
 {
+    bool hasRoutingEvidence = email.ToAddresses.Count > 0 ||
+        email.CcAddresses.Count > 0 ||
+        email.InternetHeaders.ContainsKey("X-Aegis-Route");
+
     if (string.IsNullOrWhiteSpace(email.MessageId) ||
         string.IsNullOrWhiteSpace(email.FromAddress) ||
-        email.ToAddresses.Count == 0 ||
+        !hasRoutingEvidence ||
         string.IsNullOrWhiteSpace(email.Subject) ||
         string.IsNullOrWhiteSpace(email.Body))
     {
-        return Results.BadRequest(new { error = "Message id, sender, recipient, subject and body are required." });
+        return Results.BadRequest(new { error = "Message id, sender, routing evidence, subject and body are required." });
     }
 
     EmailRouteResult route = router.Route(email);
     if (!route.IsRouted)
     {
+        UnroutedEmail reviewItem = unrouted.Capture(
+            email,
+            route.FailureReason ?? "No route was resolved.");
+
         return Results.UnprocessableEntity(new
         {
             routed = false,
+            reviewId = reviewItem.Id,
             route.FailureReason,
-            recipients = email.ToAddresses
+            to = email.ToAddresses,
+            cc = email.CcAddresses
         });
     }
 
@@ -81,6 +101,50 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
         workspaceId = route.WorkspaceId,
         workspaceName = route.WorkspaceName,
         matchedAddress = route.MatchedAddress,
+        conversationId = result.Conversation.Id,
+        result.CreatedConversation,
+        result.WasDuplicate
+    });
+});
+
+app.MapGet("/api/email/unrouted", (UnroutedEmailStore unrouted) => Results.Ok(unrouted.GetOpen()));
+app.MapGet("/api/email/unrouted/{id:guid}", (Guid id, UnroutedEmailStore unrouted) =>
+{
+    UnroutedEmail? item = unrouted.Get(id);
+    return item is null ? Results.NotFound() : Results.Ok(item);
+});
+app.MapPost("/api/email/unrouted/{id:guid}/route", (
+    Guid id,
+    ResolveUnroutedEmailRequest request,
+    UnroutedEmailStore unrouted,
+    DemoStore store) =>
+{
+    UnroutedEmail? item = unrouted.Get(id);
+    if (item is null || item.ResolvedAt.HasValue)
+    {
+        return Results.NotFound();
+    }
+
+    DemoWorkspace? workspace = store.GetWorkspaces().FirstOrDefault(x => x.Id == request.WorkspaceId);
+    if (workspace is null)
+    {
+        return Results.BadRequest(new { error = "The selected workspace does not exist." });
+    }
+
+    EmailRouteResult manualRoute = new(
+        true,
+        workspace.Id,
+        workspace.Name,
+        null,
+        null);
+    EmailIngestResult result = store.ReceiveEmail(item.ToInboundEmail(), manualRoute);
+    unrouted.MarkResolved(item.Id, workspace.Id, workspace.Name);
+
+    return Results.Ok(new
+    {
+        routed = true,
+        workspaceId = workspace.Id,
+        workspaceName = workspace.Name,
         conversationId = result.Conversation.Id,
         result.CreatedConversation,
         result.WasDuplicate
