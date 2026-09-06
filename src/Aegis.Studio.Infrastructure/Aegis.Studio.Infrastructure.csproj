@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
+    <ProjectReference Include="../Aegis.Studio.Domain/Aegis.Studio.Domain.csproj" />
+  </ItemGroup>
+</Project>

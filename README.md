@@ -1,5 +1,27 @@
 # Aegis.Studio
 
-Private development repository for the Bryan's Studio booking platform.
+Aegis.Studio is the operations platform for Bryan's Studio.
 
-Application development is performed on feature branches and merged through pull requests.
+The core model is deliberately **not email-first**. External systems and channels are paths into Aegis. A request can arrive by email, phone, walk-in, chat, WhatsApp, portal, or another future channel. Aegis resolves the contact, routes the interaction to a workspace, creates or appends to a conversation, and lets staff decide whether that conversation should be linked to a job.
+
+## Core flow
+
+`Channel -> Workspace -> Contact -> Conversation -> optional Job -> Production -> Financials -> Delivery/Gallery`
+
+A conversation is never destroyed when a job is created. It remains the communication history and is linked to the job. Jobs can also be created directly for walk-ins, telephone work, repeat customers, and internal work.
+
+## Department lenses
+
+The same underlying data is presented differently to each team:
+
+- Front desk / sales: new requests, active conversations, quotes, bookings, deposits.
+- Photographers: assigned shoots, call times, locations, shot lists, uploads, expenses.
+- Production: work queues, original assets, editing, approvals, print/delivery stages.
+- Accounting: deposits, balances, payments, refunds, expenses, reconciliation.
+- Management: workload, conversion, revenue, bottlenecks, overdue work, profitability.
+
+## Repository direction
+
+This rebuild starts with the domain and conversation/job boundary. Microsoft 365 is an email transport and identity/integration provider, not the organizing model for the application. Common.Security will be integrated at the application boundary rather than duplicated here.
+
+Development branch: `rebuild/studio-operations-platform`.
