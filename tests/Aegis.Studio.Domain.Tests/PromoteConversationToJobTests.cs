@@ -2,6 +2,8 @@ using Aegis.Studio.Application.Conversations;
 using Aegis.Studio.Domain.Conversations;
 using Aegis.Studio.Domain.Jobs;
 
+using Xunit;
+
 namespace Aegis.Studio.Domain.Tests;
 
 public sealed class PromoteConversationToJobTests
