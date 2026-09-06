@@ -20,7 +20,7 @@ public sealed class InboundEmailWorker : BackgroundService
         DemoStore store,
         UnroutedEmailStore unroutedStore,
         OutboundEmailStore outboundStore,
-        IWebHostEnvironment environment,
+        GraphEmailDeltaStateStore deltaStateStore,
         ILogger<InboundEmailWorker> logger)
     {
         this.graphClient = graphClient;
@@ -28,7 +28,7 @@ public sealed class InboundEmailWorker : BackgroundService
         this.store = store;
         this.unroutedStore = unroutedStore;
         this.outboundStore = outboundStore;
-        deltaStateStore = new GraphEmailDeltaStateStore(environment);
+        this.deltaStateStore = deltaStateStore;
         this.logger = logger;
     }
 
@@ -55,10 +55,7 @@ public sealed class InboundEmailWorker : BackgroundService
                     if (!route.IsRouted)
                     {
                         UnroutedEmail captured = unroutedStore.Capture(email, route.FailureReason ?? "No route was resolved.");
-                        logger.LogWarning(
-                            "Inbound email {MessageId} from {Sender} needs routing review. Review item {ReviewId}. To: {To}; Cc: {Cc}",
-                            email.MessageId, email.FromAddress, captured.Id,
-                            string.Join(", ", email.ToAddresses), string.Join(", ", email.CcAddresses));
+                        logger.LogWarning("Inbound email {MessageId} from {Sender} needs routing review. Review item {ReviewId}. To: {To}; Cc: {Cc}", email.MessageId, email.FromAddress, captured.Id, string.Join(", ", email.ToAddresses), string.Join(", ", email.CcAddresses));
                         continue;
                     }
 
@@ -73,9 +70,7 @@ public sealed class InboundEmailWorker : BackgroundService
                         outboundStore.QueueAcknowledgement(result.Conversation, route.WorkspaceName ?? "Aegis Studio");
                     }
 
-                    logger.LogInformation(
-                        "Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}",
-                        email.MessageId, route.WorkspaceName, result.Conversation.Id, result.CreatedConversation);
+                    logger.LogInformation("Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}", email.MessageId, route.WorkspaceName, result.Conversation.Id, result.CreatedConversation);
                 }
 
                 if (!string.IsNullOrWhiteSpace(batch.DeltaLink))
