@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aegis Booking Stub</title>
+<style>body{font-family:Segoe UI,Arial,sans-serif;max-width:1050px;margin:32px auto;padding:0 20px;background:#f6f7f9;color:#1f2937}main{display:grid;grid-template-columns:1fr 1fr;gap:24px}.panel{background:white;border:1px solid #ddd;border-radius:12px;padding:22px}label{display:block;margin:10px 0 4px;font-weight:600}input,select,textarea,button{box-sizing:border-box;width:100%;padding:10px;font:inherit}textarea{min-height:80px}button{margin-top:16px;cursor:pointer;font-weight:700}pre{white-space:pre-wrap;word-break:break-word;background:#111827;color:#e5e7eb;padding:16px;border-radius:8px;min-height:180px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.muted{color:#6b7280}@media(max-width:800px){main{grid-template-columns:1fr}}</style>
+</head>
+<body>
+<h1>Aegis Booking Stub</h1><p class="muted">Unauthenticated customer-site simulator. Times entered here are local browser time and are sent to Aegis as UTC.</p>
+<main><section class="panel"><h2>Create booking</h2><form id="bookingForm">
+<label>Name</label><input id="clientName" value="Alicia Campbell" required>
+<div class="row"><div><label>Email</label><input id="clientEmail" type="email" value="alicia@example.com" required></div><div><label>Phone</label><input id="clientPhone" value="+1-876-555-0101"></div></div>
+<label>Session</label><select id="sessionType"><option>Wedding Photography</option><option>Family Portrait Session</option><option>Graduation Portrait Session</option><option>Passport and ID Photos</option><option>Corporate Headshots</option></select>
+<div class="row"><div><label>Starts</label><input id="startsAt" type="datetime-local" required></div><div><label>Ends</label><input id="endsAt" type="datetime-local" required></div></div>
+<label>Location</label><input id="location" value="Bryan's Studio">
+<label>Notes</label><textarea id="notes">Booking initiated from the public-site stub.</textarea>
+<label>External booking ID</label><input id="externalBookingId">
+<button>Create booking</button></form>
+<hr><h2>Send payment confirmation</h2><form id="paymentForm"><label>Booking ID</label><input id="paymentBookingId" required><div class="row"><div><label>Amount</label><input id="amount" type="number" value="25000"></div><div><label>Currency</label><input id="currency" value="JMD"></div></div><label>Reference</label><input id="reference"><label>Provider</label><input id="provider" value="Stub Website Checkout"><button>Send payment confirmation</button></form></section>
+<section class="panel"><h2>Aegis response</h2><p>Last booking ID: <b id="lastBookingId">None</b></p><button id="refreshButton" type="button">Refresh booking</button><pre id="response">Submit a booking to see the exact Aegis response here.</pre></section></main>
+<script>
+const output=document.getElementById('response');const bookingId=document.getElementById('lastBookingId');
+const pad=n=>String(n).padStart(2,'0');const localInput=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const start=new Date(Date.now()+86400000);start.setHours(14,0,0,0);const end=new Date(start.getTime()+3600000);startsAt.value=localInput(start);endsAt.value=localInput(end);externalBookingId.value='STUB-'+Date.now();reference.value='STUBPAY-'+Date.now();
+async function call(url,options){output.textContent='Waiting for Aegis...';try{const r=await fetch(url,options);const text=await r.text();let value;try{value=JSON.parse(text)}catch{value=text}output.textContent=`HTTP ${r.status}\n\n`+(typeof value==='string'?value:JSON.stringify(value,null,2));return {ok:r.ok,value};}catch(e){output.textContent='Request failed:\n'+e;return {ok:false};}}
+bookingForm.onsubmit=async e=>{e.preventDefault();const payload={workspaceId:null,destination:sessionType.value,clientName:clientName.value,clientEmail:clientEmail.value,clientPhone:clientPhone.value,sessionType:sessionType.value,startsAt:new Date(startsAt.value).toISOString(),endsAt:new Date(endsAt.value).toISOString(),location:location.value,notes:notes.value,source:'Online',externalBookingId:externalBookingId.value};const result=await call('/stub/bookings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(result.ok&&result.value?.id){bookingId.textContent=result.value.id;paymentBookingId.value=result.value.id;}};
+paymentForm.onsubmit=async e=>{e.preventDefault();await call(`/stub/bookings/${paymentBookingId.value}/payments`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:Number(amount.value),currency:currency.value,reference:reference.value,provider:provider.value,source:'ExternalSite',confirmedAt:new Date().toISOString()})});};
+refreshButton.onclick=()=>{const id=paymentBookingId.value||bookingId.textContent;if(id&&id!=='None')call('/stub/bookings/'+id);};
+</script></body></html>
