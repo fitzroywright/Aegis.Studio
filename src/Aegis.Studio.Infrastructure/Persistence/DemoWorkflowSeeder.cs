@@ -106,10 +106,13 @@ public sealed class DemoWorkflowSeeder
 
     private async Task<Booking> EnsureBookingAsync(Workspace workspace, ServiceOffering service, Photographer photographer, CancellationToken cancellationToken)
     {
-        Booking? existing = await dbContext.Bookings
+        List<Booking> candidates = await dbContext.Bookings
             .Where(x => x.WorkspaceId == workspace.Id && x.ClientEmail == "danielle.morgan@example.com")
+            .ToListAsync(cancellationToken);
+
+        Booking? existing = candidates
             .OrderByDescending(x => x.CreatedUtc)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefault();
 
         if (existing is not null)
         {
