@@ -48,6 +48,40 @@ public sealed class MicrosoftGraphEmailClient
             .ToList();
     }
 
+    public async Task SendEmailAsync(
+        string fromAddress,
+        string toAddress,
+        string subject,
+        string body,
+        CancellationToken cancellationToken)
+    {
+        if (!options.IsConfigured)
+        {
+            throw new InvalidOperationException("Microsoft Graph email is not configured.");
+        }
+
+        string accessToken = await GetAccessTokenAsync(cancellationToken);
+        string sender = Uri.EscapeDataString(fromAddress);
+        string url = $"https://graph.microsoft.com/v1.0/users/{sender}/sendMail";
+
+        GraphSendMailRequest payload = new(
+            new GraphSendMessage(
+                subject,
+                new GraphBody("Text", body),
+                new List<GraphRecipient>
+                {
+                    new() { EmailAddress = new GraphEmailAddress { Address = toAddress } }
+                }),
+            false);
+
+        using HttpRequestMessage request = new(HttpMethod.Post, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Content = JsonContent.Create(payload);
+
+        using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
         string tenantId = Uri.EscapeDataString(options.TenantId);
@@ -148,6 +182,19 @@ public sealed class MicrosoftGraphEmailClient
         [JsonPropertyName("bodyPreview")]
         public string? BodyPreview { get; init; }
     }
+
+    private sealed record GraphSendMailRequest(
+        [property: JsonPropertyName("message")] GraphSendMessage Message,
+        [property: JsonPropertyName("saveToSentItems")] bool SaveToSentItems);
+
+    private sealed record GraphSendMessage(
+        [property: JsonPropertyName("subject")] string Subject,
+        [property: JsonPropertyName("body")] GraphBody Body,
+        [property: JsonPropertyName("toRecipients")] List<GraphRecipient> ToRecipients);
+
+    private sealed record GraphBody(
+        [property: JsonPropertyName("contentType")] string ContentType,
+        [property: JsonPropertyName("content")] string Content);
 
     private sealed class GraphRecipient
     {
