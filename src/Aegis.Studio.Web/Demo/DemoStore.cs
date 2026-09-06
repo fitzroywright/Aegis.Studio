@@ -32,9 +32,9 @@ public sealed class DemoStore
     {
         return new List<DemoWorkspace>
         {
-            new(WeddingsWorkspaceId, "Weddings", "weddings@bryans.com", conversations.Values.Count(x => x.WorkspaceId == WeddingsWorkspaceId && !x.IsClosed)),
-            new(SchoolsWorkspaceId, "Schools & IDs", "ids@bryans.com", conversations.Values.Count(x => x.WorkspaceId == SchoolsWorkspaceId && !x.IsClosed)),
-            new(PortraitsWorkspaceId, "Portraits", "portraits@bryans.com", conversations.Values.Count(x => x.WorkspaceId == PortraitsWorkspaceId && !x.IsClosed))
+            new(WeddingsWorkspaceId, "Weddings", "weddings@bryanstudiosltd.com", conversations.Values.Count(x => x.WorkspaceId == WeddingsWorkspaceId && !x.IsClosed)),
+            new(SchoolsWorkspaceId, "Schools & IDs", "ids@bryanstudiosltd.com", conversations.Values.Count(x => x.WorkspaceId == SchoolsWorkspaceId && !x.IsClosed)),
+            new(PortraitsWorkspaceId, "Portraits", "portraits@bryanstudiosltd.com", conversations.Values.Count(x => x.WorkspaceId == PortraitsWorkspaceId && !x.IsClosed))
         };
     }
 
