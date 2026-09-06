@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
@@ -22,30 +23,62 @@ public sealed class MicrosoftGraphEmailClient
 
     public TimeSpan PollInterval => TimeSpan.FromSeconds(Math.Max(5, options.PollSeconds));
 
-    public async Task<IReadOnlyList<InboundEmail>> GetInboxMessagesAsync(CancellationToken cancellationToken)
+    public async Task<GraphInboxDeltaBatch> GetInboxChangesAsync(
+        string? deltaLink,
+        CancellationToken cancellationToken)
     {
         if (!options.IsConfigured)
         {
-            return Array.Empty<InboundEmail>();
+            return new GraphInboxDeltaBatch(Array.Empty<InboundEmail>(), deltaLink);
         }
 
         string accessToken = await GetAccessTokenAsync(cancellationToken);
-        using HttpRequestMessage request = new(HttpMethod.Get, BuildMessagesUrl());
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        string? nextUrl = string.IsNullOrWhiteSpace(deltaLink)
+            ? BuildInitialDeltaUrl()
+            : deltaLink;
+        string? completedDeltaLink = deltaLink;
+        List<InboundEmail> messages = new();
 
-        using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        GraphMessagePage? page = await response.Content.ReadFromJsonAsync<GraphMessagePage>(cancellationToken: cancellationToken);
-        if (page?.Value is null)
+        while (!string.IsNullOrWhiteSpace(nextUrl))
         {
-            return Array.Empty<InboundEmail>();
+            using HttpRequestMessage request = new(HttpMethod.Get, nextUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.Gone && !string.IsNullOrWhiteSpace(deltaLink))
+            {
+                throw new GraphDeltaTokenExpiredException();
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            GraphMessageDeltaPage? page = await response.Content.ReadFromJsonAsync<GraphMessageDeltaPage>(
+                cancellationToken: cancellationToken);
+            if (page is null)
+            {
+                throw new InvalidOperationException("Microsoft Graph returned an empty delta response.");
+            }
+
+            messages.AddRange(page.Value
+                .Where(message => message.Removed is null)
+                .Where(IsUsable)
+                .Select(ToInboundEmail));
+
+            if (!string.IsNullOrWhiteSpace(page.NextLink))
+            {
+                nextUrl = page.NextLink;
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(page.DeltaLink))
+            {
+                completedDeltaLink = page.DeltaLink;
+            }
+
+            nextUrl = null;
         }
 
-        return page.Value
-            .Where(IsUsable)
-            .Select(ToInboundEmail)
-            .ToList();
+        return new GraphInboxDeltaBatch(messages, completedDeltaLink);
     }
 
     public async Task SendEmailAsync(
@@ -108,13 +141,13 @@ public sealed class MicrosoftGraphEmailClient
         return accessToken;
     }
 
-    private string BuildMessagesUrl()
+    private string BuildInitialDeltaUrl()
     {
         int pageSize = Math.Clamp(options.PageSize, 1, 100);
         string mailbox = Uri.EscapeDataString(options.Mailbox);
-        return $"https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/inbox/messages" +
+        return $"https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/inbox/messages/delta" +
             $"?$select=id,conversationId,subject,receivedDateTime,from,toRecipients,ccRecipients,bodyPreview,internetMessageHeaders" +
-            $"&$orderby=receivedDateTime asc&$top={pageSize}";
+            $"&$top={pageSize}";
     }
 
     private static bool IsUsable(GraphMessage message)
@@ -170,10 +203,16 @@ public sealed class MicrosoftGraphEmailClient
         public string? AccessToken { get; init; }
     }
 
-    private sealed class GraphMessagePage
+    private sealed class GraphMessageDeltaPage
     {
         [JsonPropertyName("value")]
         public List<GraphMessage> Value { get; init; } = new();
+
+        [JsonPropertyName("@odata.nextLink")]
+        public string? NextLink { get; init; }
+
+        [JsonPropertyName("@odata.deltaLink")]
+        public string? DeltaLink { get; init; }
     }
 
     private sealed class GraphMessage
@@ -204,6 +243,9 @@ public sealed class MicrosoftGraphEmailClient
 
         [JsonPropertyName("bodyPreview")]
         public string? BodyPreview { get; init; }
+
+        [JsonPropertyName("@removed")]
+        public object? Removed { get; init; }
     }
 
     private sealed class GraphInternetMessageHeader
@@ -242,5 +284,17 @@ public sealed class MicrosoftGraphEmailClient
 
         [JsonPropertyName("address")]
         public string? Address { get; init; }
+    }
+}
+
+public sealed record GraphInboxDeltaBatch(
+    IReadOnlyList<InboundEmail> Messages,
+    string? DeltaLink);
+
+public sealed class GraphDeltaTokenExpiredException : Exception
+{
+    public GraphDeltaTokenExpiredException()
+        : base("The Microsoft Graph delta token expired and a fresh synchronization is required.")
+    {
     }
 }
