@@ -1,4 +1,4 @@
-using Aegis.Studio.Web.Demo;
+using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 
 namespace Aegis.Studio.Web.Email;
@@ -17,10 +17,10 @@ public sealed class OutboundEmailStore
             .ToDictionary(x => x.WorkspaceId, x => x.Address, EqualityComparer<Guid>.Default);
     }
 
-    public OutboundEmail Queue(DemoConversation conversation, string body)
+    public OutboundEmail Queue(StudioConversation conversation, string body)
         => QueueMessage(conversation, body, conversation.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? conversation.Subject : "Re: " + conversation.Subject);
 
-    public OutboundEmail? QueueAcknowledgement(DemoConversation conversation, string workspaceName)
+    public OutboundEmail? QueueAcknowledgement(StudioConversation conversation, string workspaceName)
     {
         bool alreadyQueued = persistence.GetAll<OutboundEmail>(Collection).Any(x => x.ConversationId == conversation.Id && string.Equals(x.Kind, "Acknowledgement", StringComparison.OrdinalIgnoreCase));
         if (alreadyQueued)
@@ -49,7 +49,7 @@ public sealed class OutboundEmailStore
         return sent;
     }
 
-    private OutboundEmail QueueMessage(DemoConversation conversation, string body, string subject, string kind = "Reply")
+    private OutboundEmail QueueMessage(StudioConversation conversation, string body, string subject, string kind = "Reply")
     {
         if (!workspaceAddresses.TryGetValue(conversation.WorkspaceId, out string? fromAddress) || string.IsNullOrWhiteSpace(fromAddress))
         {
