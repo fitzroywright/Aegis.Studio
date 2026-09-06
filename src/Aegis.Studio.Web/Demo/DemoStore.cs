@@ -7,8 +7,8 @@ namespace Aegis.Studio.Web.Demo;
 public sealed class DemoStore
 {
     private static readonly Guid WeddingsWorkspaceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    private static readonly Guid SchoolsWorkspaceId = Guid.Parse("44444444-4444-4444-4444-444444444444");
-    private static readonly Guid PortraitsWorkspaceId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+    private static readonly Guid IdPhotosWorkspaceId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private static readonly Guid GraduationsWorkspaceId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
     private readonly ConcurrentDictionary<Guid, DemoConversation> conversations = new();
     private readonly ConcurrentDictionary<Guid, DemoJob> jobs = new();
@@ -33,8 +33,8 @@ public sealed class DemoStore
         return new List<DemoWorkspace>
         {
             new(WeddingsWorkspaceId, "Weddings", "weddings@bryanstudiosltd.com", conversations.Values.Count(x => x.WorkspaceId == WeddingsWorkspaceId && !x.IsClosed)),
-            new(SchoolsWorkspaceId, "Schools & IDs", "ids@bryanstudiosltd.com", conversations.Values.Count(x => x.WorkspaceId == SchoolsWorkspaceId && !x.IsClosed)),
-            new(PortraitsWorkspaceId, "Portraits", "portraits@bryanstudiosltd.com", conversations.Values.Count(x => x.WorkspaceId == PortraitsWorkspaceId && !x.IsClosed))
+            new(IdPhotosWorkspaceId, "ID Photos", "idphotos@bryanstudiosltd.com", conversations.Values.Count(x => x.WorkspaceId == IdPhotosWorkspaceId && !x.IsClosed)),
+            new(GraduationsWorkspaceId, "Graduations", "graduations@bryanstudiosltd.com", conversations.Values.Count(x => x.WorkspaceId == GraduationsWorkspaceId && !x.IsClosed))
         };
     }
 
@@ -302,9 +302,9 @@ public sealed class DemoStore
             });
         conversations[wedding.Id] = wedding;
 
-        DemoConversation school = new(
+        DemoConversation idPhoto = new(
             Guid.Parse("33333333-3333-3333-3333-333333333333"),
-            SchoolsWorkspaceId,
+            IdPhotosWorkspaceId,
             "Grade 11 ID photo correction",
             "St. Catherine Academy",
             "office@example.edu",
@@ -315,7 +315,7 @@ public sealed class DemoStore
             {
                 new(Guid.NewGuid(), "School Office", "External", "One student's surname is incorrect on the ID proof. Can production correct it before printing?", DateTimeOffset.UtcNow.AddHours(-1))
             });
-        conversations[school.Id] = school;
+        conversations[idPhoto.Id] = idPhoto;
     }
 
     private static DateTimeOffset GetLastActivity(DemoConversation conversation)
@@ -338,10 +338,10 @@ public sealed class DemoStore
 
         if (value.Contains("id", StringComparison.Ordinal) || value.Contains("school", StringComparison.Ordinal))
         {
-            return SchoolsWorkspaceId;
+            return IdPhotosWorkspaceId;
         }
 
-        return PortraitsWorkspaceId;
+        return GraduationsWorkspaceId;
     }
 
     private static string NormaliseChannel(string? channel)
