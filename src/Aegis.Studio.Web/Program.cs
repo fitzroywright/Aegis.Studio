@@ -7,6 +7,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHealthChecks();
 builder.Services.AddSingleton<DemoStore>();
 builder.Services.AddSingleton<AttachmentStore>();
+builder.Services.AddSingleton<OutboundEmailStore>();
 builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
 
 WebApplication app = builder.Build();
@@ -71,7 +72,18 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
     });
 });
 
-app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, DemoStore store) =>
+app.MapGet("/api/email/outbox", (OutboundEmailStore outbox) => Results.Ok(outbox.GetPending()));
+app.MapPost("/api/email/outbox/{id:guid}/sent", (Guid id, MarkOutboundSentRequest request, OutboundEmailStore outbox) =>
+{
+    OutboundEmail? message = outbox.MarkSent(id, request.ProviderMessageId);
+    return message is null ? Results.NotFound() : Results.Ok(message);
+});
+
+app.MapPost("/api/conversations/{id:guid}/messages", (
+    Guid id,
+    AddMessageRequest request,
+    DemoStore store,
+    OutboundEmailStore outbox) =>
 {
     if (string.IsNullOrWhiteSpace(request.Body))
     {
@@ -79,7 +91,19 @@ app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest
     }
 
     DemoConversation? conversation = store.GetConversation(id);
-    return conversation is null ? Results.NotFound() : Results.Ok(store.AddMessage(id, request));
+    if (conversation is null)
+    {
+        return Results.NotFound();
+    }
+
+    DemoConversation updated = store.AddMessage(id, request);
+    OutboundEmail? queuedEmail = request.IsInternal ? null : outbox.Queue(updated, request.Body);
+
+    return Results.Ok(new
+    {
+        conversation = updated,
+        outboundEmail = queuedEmail
+    });
 });
 app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest request, DemoStore store) =>
 {
