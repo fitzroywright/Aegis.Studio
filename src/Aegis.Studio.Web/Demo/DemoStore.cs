@@ -269,7 +269,7 @@ public sealed class DemoStore
 
     private static string NormaliseChannel(string? channel)
     {
-        string value = channel?.Trim();
+        string? value = channel?.Trim();
         return string.IsNullOrWhiteSpace(value) ? "Manual" : value;
     }
 }
