@@ -9,7 +9,7 @@
 <body>
   <header class="topbar">
     <div><strong>AEGIS</strong><span>STUDIO</span></div>
-    <div class="top-actions"><span>Bryan's Studio</span><span class="avatar">FW</span></div>
+    <div class="top-actions"><button id="newRequestButton">+ New Request</button><span>Bryan's Studio</span><span class="avatar">FW</span></div>
   </header>
   <div class="shell">
     <aside class="rail">
@@ -34,6 +34,19 @@
       <section id="genericView" class="generic hidden"></section>
     </main>
   </div>
+  <dialog id="newRequestDialog">
+    <form id="newRequestForm" method="dialog" class="request-form">
+      <h2>New Request</h2>
+      <p>Use this for a phone call, walk-in, WhatsApp message or any request that did not arrive automatically.</p>
+      <label>Workspace<select id="requestWorkspace" required></select></label>
+      <label>Channel<select id="requestChannel"><option>Phone</option><option>Walk-in</option><option>WhatsApp</option><option>Email</option><option>Manual</option></select></label>
+      <label>Customer / organization<input id="requestContactName" required></label>
+      <label>Contact detail<input id="requestContactAddress" placeholder="Phone, email or WhatsApp" required></label>
+      <label>What are they asking for?<input id="requestSubject" required></label>
+      <label>Details<textarea id="requestBody" required></textarea></label>
+      <div class="dialog-actions"><button type="button" id="cancelRequest">Cancel</button><button type="submit" class="primary">Create Request</button></div>
+    </form>
+  </dialog>
   <script src="/app.js"></script>
 </body>
 </html>
