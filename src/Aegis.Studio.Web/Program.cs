@@ -51,7 +51,29 @@ app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest requ
     DemoConversation? conversation = store.GetConversation(id);
     return conversation is null ? Results.NotFound() : Results.Ok(store.CreateJob(id, request));
 });
+
 app.MapGet("/api/jobs", (DemoStore store) => Results.Ok(store.GetJobs()));
+app.MapGet("/api/jobs/{id:guid}", (Guid id, DemoStore store) =>
+{
+    DemoJob? job = store.GetJob(id);
+    return job is null ? Results.NotFound() : Results.Ok(job);
+});
+app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, DemoStore store) =>
+{
+    DemoJob? job = store.GetJob(id);
+    return job is null ? Results.NotFound() : Results.Ok(store.UpdateJob(id, request));
+});
+app.MapPost("/api/jobs/{id:guid}/financial-events", (Guid id, AddFinancialEventRequest request, DemoStore store) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Kind) || request.Amount == 0)
+    {
+        return Results.BadRequest(new { error = "Financial event type and non-zero amount are required." });
+    }
+
+    DemoJob? job = store.GetJob(id);
+    return job is null ? Results.NotFound() : Results.Ok(store.AddFinancialEvent(id, request));
+});
+app.MapGet("/api/accounts/summary", (DemoStore store) => Results.Ok(store.GetAccountsSummary()));
 
 app.MapFallbackToFile("index.html");
 
