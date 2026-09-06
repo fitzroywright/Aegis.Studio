@@ -102,7 +102,9 @@ public sealed class DemoStore
             conversation.ContactName,
             "New",
             request.EventDate,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            null,
+            new List<DemoFinancialEvent>());
 
         jobs[job.Id] = job;
         conversations[conversationId] = conversation with { JobId = job.Id };
@@ -113,6 +115,49 @@ public sealed class DemoStore
     public IReadOnlyList<DemoJob> GetJobs()
     {
         return jobs.Values.OrderByDescending(x => x.CreatedAt).ToList();
+    }
+
+    public DemoJob? GetJob(Guid id)
+    {
+        jobs.TryGetValue(id, out DemoJob? job);
+        return job;
+    }
+
+    public DemoJob UpdateJob(Guid id, UpdateJobRequest request)
+    {
+        DemoJob current = jobs[id];
+        DemoJob updated = current with
+        {
+            Status = string.IsNullOrWhiteSpace(request.Status) ? current.Status : request.Status.Trim(),
+            AssignedTo = string.IsNullOrWhiteSpace(request.AssignedTo) ? current.AssignedTo : request.AssignedTo.Trim(),
+            EventDate = request.EventDate ?? current.EventDate
+        };
+        jobs[id] = updated;
+        Save();
+        return updated;
+    }
+
+    public DemoJob AddFinancialEvent(Guid id, AddFinancialEventRequest request)
+    {
+        DemoJob current = jobs[id];
+        List<DemoFinancialEvent> events = current.FinancialEvents?.ToList() ?? new List<DemoFinancialEvent>();
+        events.Add(new DemoFinancialEvent(
+            Guid.NewGuid(),
+            request.Kind.Trim(),
+            request.Amount,
+            request.Note?.Trim(),
+            DateTimeOffset.UtcNow));
+        DemoJob updated = current with { FinancialEvents = events };
+        jobs[id] = updated;
+        Save();
+        return updated;
+    }
+
+    public AccountsSummary GetAccountsSummary()
+    {
+        decimal total = jobs.Values.Sum(x => x.FinancialEvents?.Sum(e => e.Amount) ?? 0m);
+        int jobsWithActivity = jobs.Values.Count(x => (x.FinancialEvents?.Count ?? 0) > 0);
+        return new AccountsSummary(total, jobsWithActivity, jobs.Count);
     }
 
     private bool Load()
@@ -138,7 +183,7 @@ public sealed class DemoStore
 
             foreach (DemoJob job in state.Jobs)
             {
-                jobs[job.Id] = job;
+                jobs[job.Id] = job with { FinancialEvents = job.FinancialEvents ?? new List<DemoFinancialEvent>() };
             }
 
             return true;
@@ -252,7 +297,11 @@ public sealed record DemoJob(
     string ClientName,
     string Status,
     DateOnly? EventDate,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? AssignedTo = null,
+    List<DemoFinancialEvent>? FinancialEvents = null);
+
+public sealed record DemoFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt);
 
 public sealed record DemoState(List<DemoConversation> Conversations, List<DemoJob> Jobs);
 
@@ -268,3 +317,9 @@ public sealed record IncomingInteractionRequest(
 public sealed record AddMessageRequest(string Body, bool IsInternal);
 
 public sealed record CreateJobRequest(string Title, DateOnly? EventDate);
+
+public sealed record UpdateJobRequest(string? Status, string? AssignedTo, DateOnly? EventDate);
+
+public sealed record AddFinancialEventRequest(string Kind, decimal Amount, string? Note);
+
+public sealed record AccountsSummary(decimal RecordedAmount, int JobsWithFinancialActivity, int TotalJobs);
