@@ -9,17 +9,20 @@ public sealed class InboundEmailWorker : BackgroundService
     private readonly MicrosoftGraphEmailClient graphClient;
     private readonly IInboundEmailRouter router;
     private readonly DemoStore store;
+    private readonly UnroutedEmailStore unroutedStore;
     private readonly ILogger<InboundEmailWorker> logger;
 
     public InboundEmailWorker(
         MicrosoftGraphEmailClient graphClient,
         IInboundEmailRouter router,
         DemoStore store,
+        UnroutedEmailStore unroutedStore,
         ILogger<InboundEmailWorker> logger)
     {
         this.graphClient = graphClient;
         this.router = router;
         this.store = store;
+        this.unroutedStore = unroutedStore;
         this.logger = logger;
     }
 
@@ -31,7 +34,7 @@ public sealed class InboundEmailWorker : BackgroundService
             return;
         }
 
-        logger.LogInformation("Microsoft Graph email ingestion started.");
+        logger.LogInformation("Microsoft Graph email ingestion started for the AegisHub collection mailbox.");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -43,11 +46,17 @@ public sealed class InboundEmailWorker : BackgroundService
                     EmailRouteResult route = router.Route(email);
                     if (!route.IsRouted)
                     {
+                        UnroutedEmail captured = unroutedStore.Capture(
+                            email,
+                            route.FailureReason ?? "No route was resolved.");
+
                         logger.LogWarning(
-                            "Inbound email {MessageId} from {Sender} could not be routed. Recipients: {Recipients}",
+                            "Inbound email {MessageId} from {Sender} needs routing review. Review item {ReviewId}. To: {To}; Cc: {Cc}",
                             email.MessageId,
                             email.FromAddress,
-                            string.Join(", ", email.ToAddresses));
+                            captured.Id,
+                            string.Join(", ", email.ToAddresses),
+                            string.Join(", ", email.CcAddresses));
                         continue;
                     }
 
