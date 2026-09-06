@@ -4,6 +4,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
 builder.Services.AddSingleton<DemoStore>();
+builder.Services.AddSingleton<AttachmentStore>();
 
 WebApplication app = builder.Build();
 
@@ -50,6 +51,60 @@ app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest requ
 
     DemoConversation? conversation = store.GetConversation(id);
     return conversation is null ? Results.NotFound() : Results.Ok(store.CreateJob(id, request));
+});
+
+app.MapGet("/api/conversations/{id:guid}/attachments", (Guid id, DemoStore store, AttachmentStore attachments) =>
+{
+    return store.GetConversation(id) is null
+        ? Results.NotFound()
+        : Results.Ok(attachments.GetForConversation(id));
+});
+
+app.MapPost("/api/conversations/{id:guid}/attachments", async (
+    Guid id,
+    IFormFile file,
+    string? visibility,
+    DemoStore store,
+    AttachmentStore attachments,
+    CancellationToken cancellationToken) =>
+{
+    if (store.GetConversation(id) is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (file.Length == 0)
+    {
+        return Results.BadRequest(new { error = "The attachment is empty." });
+    }
+
+    const long maximumAttachmentSize = 100L * 1024L * 1024L;
+    if (file.Length > maximumAttachmentSize)
+    {
+        return Results.BadRequest(new { error = "Attachments are currently limited to 100 MB." });
+    }
+
+    DemoAttachment attachment = await attachments.AddAsync(
+        id,
+        file,
+        visibility ?? "External",
+        cancellationToken);
+
+    return Results.Created($"/api/attachments/{attachment.Id}", attachment);
+}).DisableAntiforgery();
+
+app.MapGet("/api/attachments/{id:guid}", (Guid id, AttachmentStore attachments) =>
+{
+    DemoAttachment? attachment = attachments.Get(id);
+    if (attachment is null)
+    {
+        return Results.NotFound();
+    }
+
+    string path = attachments.GetPhysicalPath(attachment);
+    return File.Exists(path)
+        ? Results.File(path, attachment.ContentType, attachment.FileName)
+        : Results.NotFound();
 });
 
 app.MapGet("/api/jobs", (DemoStore store) => Results.Ok(store.GetJobs()));
