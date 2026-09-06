@@ -1,41 +1,27 @@
-using System.Collections.Concurrent;
-using System.Text.Json;
+using Aegis.Studio.Web.Persistence;
 
 namespace Aegis.Studio.Web.Demo;
 
 public sealed class AttachmentStore
 {
-    private readonly ConcurrentDictionary<Guid, DemoAttachment> attachments = new();
-    private readonly object persistenceLock = new();
+    private const string Collection = "attachments";
+    private readonly PostgresDocumentStore persistence;
     private readonly string attachmentDirectory;
-    private readonly string metadataFile;
 
-    public AttachmentStore(IWebHostEnvironment environment)
+    public AttachmentStore(IWebHostEnvironment environment, PostgresDocumentStore persistence)
     {
+        this.persistence = persistence;
         string dataDirectory = Path.Combine(environment.ContentRootPath, "App_Data");
         attachmentDirectory = Path.Combine(dataDirectory, "attachments");
-        metadataFile = Path.Combine(dataDirectory, "attachments.json");
-
         Directory.CreateDirectory(attachmentDirectory);
-        Load();
     }
 
     public IReadOnlyList<DemoAttachment> GetForConversation(Guid conversationId)
-    {
-        return attachments.Values
-            .Where(x => x.ConversationId == conversationId)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToList();
-    }
+        => persistence.GetAll<DemoAttachment>(Collection).Where(x => x.ConversationId == conversationId).OrderByDescending(x => x.CreatedAt).ToList();
 
-    public async Task<DemoAttachment> AddAsync(
-        Guid conversationId,
-        IFormFile file,
-        string visibility,
-        CancellationToken cancellationToken)
+    public async Task<DemoAttachment> AddAsync(Guid conversationId, IFormFile file, string visibility, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(file);
-
         string originalName = Path.GetFileName(file.FileName);
         string extension = Path.GetExtension(originalName);
         Guid id = Guid.NewGuid();
@@ -47,79 +33,17 @@ public sealed class AttachmentStore
             await file.CopyToAsync(stream, cancellationToken);
         }
 
-        DemoAttachment attachment = new(
-            id,
-            conversationId,
-            originalName,
-            storedName,
+        DemoAttachment attachment = new(id, conversationId, originalName, storedName,
             string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
             file.Length,
             string.Equals(visibility, "Internal", StringComparison.OrdinalIgnoreCase) ? "Internal" : "External",
             DateTimeOffset.UtcNow);
-
-        attachments[id] = attachment;
-        Save();
+        persistence.Upsert(Collection, attachment.Id, attachment);
         return attachment;
     }
 
-    public DemoAttachment? Get(Guid id)
-    {
-        attachments.TryGetValue(id, out DemoAttachment? attachment);
-        return attachment;
-    }
-
-    public string GetPhysicalPath(DemoAttachment attachment)
-    {
-        return Path.Combine(attachmentDirectory, attachment.StoredName);
-    }
-
-    private void Load()
-    {
-        if (!File.Exists(metadataFile))
-        {
-            return;
-        }
-
-        try
-        {
-            string json = File.ReadAllText(metadataFile);
-            List<DemoAttachment>? stored = JsonSerializer.Deserialize<List<DemoAttachment>>(json);
-            if (stored is null)
-            {
-                return;
-            }
-
-            foreach (DemoAttachment attachment in stored)
-            {
-                attachments[attachment.Id] = attachment;
-            }
-        }
-        catch (JsonException)
-        {
-            // A corrupt demo metadata file must not prevent the application from starting.
-        }
-    }
-
-    private void Save()
-    {
-        lock (persistenceLock)
-        {
-            string json = JsonSerializer.Serialize(
-                attachments.Values.OrderBy(x => x.CreatedAt).ToList(),
-                new JsonSerializerOptions { WriteIndented = true });
-            string temporaryFile = metadataFile + ".tmp";
-            File.WriteAllText(temporaryFile, json);
-            File.Move(temporaryFile, metadataFile, true);
-        }
-    }
+    public DemoAttachment? Get(Guid id) => persistence.Get<DemoAttachment>(Collection, id);
+    public string GetPhysicalPath(DemoAttachment attachment) => Path.Combine(attachmentDirectory, attachment.StoredName);
 }
 
-public sealed record DemoAttachment(
-    Guid Id,
-    Guid ConversationId,
-    string FileName,
-    string StoredName,
-    string ContentType,
-    long Size,
-    string Visibility,
-    DateTimeOffset CreatedAt);
+public sealed record DemoAttachment(Guid Id, Guid ConversationId, string FileName, string StoredName, string ContentType, long Size, string Visibility, DateTimeOffset CreatedAt);
