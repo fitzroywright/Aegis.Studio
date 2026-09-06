@@ -29,7 +29,8 @@ public sealed class OutboundEmailStore
 
     public OutboundEmail Queue(DemoConversation conversation, string body)
     {
-        if (!workspaceAddresses.TryGetValue(conversation.WorkspaceId, out string fromAddress))
+        if (!workspaceAddresses.TryGetValue(conversation.WorkspaceId, out string? fromAddress) ||
+            string.IsNullOrWhiteSpace(fromAddress))
         {
             throw new InvalidOperationException("The conversation workspace has no outbound email identity configured.");
         }
