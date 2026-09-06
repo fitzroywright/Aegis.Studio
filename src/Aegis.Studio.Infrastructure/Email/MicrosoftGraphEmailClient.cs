@@ -61,13 +61,14 @@ public sealed class MicrosoftGraphEmailClient
         }
 
         string accessToken = await GetAccessTokenAsync(cancellationToken);
-        string sender = Uri.EscapeDataString(fromAddress);
-        string url = $"https://graph.microsoft.com/v1.0/users/{sender}/sendMail";
+        string sendingMailbox = Uri.EscapeDataString(options.Mailbox);
+        string url = $"https://graph.microsoft.com/v1.0/users/{sendingMailbox}/sendMail";
 
         GraphSendMailRequest payload = new(
             new GraphSendMessage(
                 subject,
                 new GraphBody("Text", body),
+                new GraphRecipient { EmailAddress = new GraphEmailAddress { Address = fromAddress } },
                 new List<GraphRecipient>
                 {
                     new() { EmailAddress = new GraphEmailAddress { Address = toAddress } }
@@ -190,6 +191,7 @@ public sealed class MicrosoftGraphEmailClient
     private sealed record GraphSendMessage(
         [property: JsonPropertyName("subject")] string Subject,
         [property: JsonPropertyName("body")] GraphBody Body,
+        [property: JsonPropertyName("from")] GraphRecipient From,
         [property: JsonPropertyName("toRecipients")] List<GraphRecipient> ToRecipients);
 
     private sealed record GraphBody(
