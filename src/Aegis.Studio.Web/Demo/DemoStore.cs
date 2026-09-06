@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using Aegis.Studio.Application.EmailRouting;
 
 namespace Aegis.Studio.Web.Demo;
@@ -11,15 +10,10 @@ public sealed class DemoStore
     private static readonly Guid GraduationsWorkspaceId = Guid.Parse("55555555-5555-5555-5555-555555555555");
     private readonly ConcurrentDictionary<Guid, DemoConversation> conversations = new();
     private readonly ConcurrentDictionary<Guid, DemoJob> jobs = new();
-    private readonly object persistenceLock = new();
-    private readonly string dataFile;
 
-    public DemoStore(IWebHostEnvironment environment)
+    public DemoStore()
     {
-        string dataDirectory = Path.Combine(environment.ContentRootPath, "App_Data");
-        Directory.CreateDirectory(dataDirectory);
-        dataFile = Path.Combine(dataDirectory, "studio-demo.json");
-        if (!Load()) { Seed(); Save(); }
+        Seed();
     }
 
     public IReadOnlyList<DemoWorkspace> GetWorkspaces() => new List<DemoWorkspace>
@@ -45,7 +39,8 @@ public sealed class DemoStore
         Guid workspaceId = ResolveWorkspace(request.WorkspaceId, request.Destination);
         DemoConversation conversation = new(Guid.NewGuid(), workspaceId, request.Subject.Trim(), request.ContactName.Trim(), request.ContactAddress.Trim(), NormaliseChannel(request.Channel), false, null,
             new List<DemoMessage> { new(Guid.NewGuid(), request.ContactName.Trim(), "External", request.Body.Trim(), DateTimeOffset.UtcNow) });
-        conversations[conversation.Id] = conversation; Save(); return conversation;
+        conversations[conversation.Id] = conversation;
+        return conversation;
     }
 
     public EmailIngestResult ReceiveEmail(InboundEmail email, EmailRouteResult route)
@@ -55,16 +50,17 @@ public sealed class DemoStore
         if (duplicate is not null) return new EmailIngestResult(duplicate, false, true);
         DemoConversation? existing = FindConversationForEmail(email, route.WorkspaceId.Value);
         DemoMessage message = new(Guid.NewGuid(), email.FromName.Trim(), "External", email.Body.Trim(), email.ReceivedAt, email.MessageId);
-        if (existing is not null) { existing.Messages.Add(message); Save(); return new EmailIngestResult(existing, false, false); }
+        if (existing is not null) { existing.Messages.Add(message); return new EmailIngestResult(existing, false, false); }
         DemoConversation conversation = new(Guid.NewGuid(), route.WorkspaceId.Value, email.Subject.Trim(), email.FromName.Trim(), email.FromAddress.Trim(), "Email", false, null, new List<DemoMessage> { message }, NormaliseThreadId(email.ThreadId));
-        conversations[conversation.Id] = conversation; Save(); return new EmailIngestResult(conversation, true, false);
+        conversations[conversation.Id] = conversation;
+        return new EmailIngestResult(conversation, true, false);
     }
 
     public DemoConversation AddMessage(Guid id, AddMessageRequest request)
     {
         DemoConversation conversation = conversations[id];
         conversation.Messages.Add(new DemoMessage(Guid.NewGuid(), request.IsInternal ? "Aegis Staff" : "Bryan's Studio", request.IsInternal ? "Internal" : "External", request.Body.Trim(), DateTimeOffset.UtcNow));
-        Save(); return conversation;
+        return conversation;
     }
 
     public DemoJob CreateJob(Guid conversationId, CreateJobRequest request)
@@ -72,7 +68,9 @@ public sealed class DemoStore
         DemoConversation conversation = conversations[conversationId];
         if (conversation.JobId.HasValue && jobs.TryGetValue(conversation.JobId.Value, out DemoJob? existing)) return existing;
         DemoJob job = new(Guid.NewGuid(), conversation.WorkspaceId, conversation.Id, request.Title.Trim(), conversation.ContactName, "New", request.EventDate, DateTimeOffset.UtcNow, null, new List<DemoFinancialEvent>());
-        jobs[job.Id] = job; conversations[conversationId] = conversation with { JobId = job.Id }; Save(); return job;
+        jobs[job.Id] = job;
+        conversations[conversationId] = conversation with { JobId = job.Id };
+        return job;
     }
 
     public DemoJob CreateBookingJob(CreateBookingIntakeRequest request)
@@ -85,21 +83,26 @@ public sealed class DemoStore
             new List<DemoMessage> { new(Guid.NewGuid(), request.ClientName.Trim(), "External", note, DateTimeOffset.UtcNow) });
         conversations[conversation.Id] = conversation;
         DemoJob job = new(Guid.NewGuid(), workspaceId, conversation.Id, request.SessionType.Trim(), request.ClientName.Trim(), "New", DateOnly.FromDateTime(request.StartsAt.DateTime), DateTimeOffset.UtcNow, null, new List<DemoFinancialEvent>());
-        jobs[job.Id] = job; conversations[conversation.Id] = conversation with { JobId = job.Id }; Save(); return job;
+        jobs[job.Id] = job;
+        conversations[conversation.Id] = conversation with { JobId = job.Id };
+        return job;
     }
 
     public DemoJob UpdateJob(Guid id, UpdateJobRequest request)
     {
         DemoJob current = jobs[id];
         DemoJob updated = current with { Status = string.IsNullOrWhiteSpace(request.Status) ? current.Status : request.Status.Trim(), AssignedTo = string.IsNullOrWhiteSpace(request.AssignedTo) ? current.AssignedTo : request.AssignedTo.Trim(), EventDate = request.EventDate ?? current.EventDate };
-        jobs[id] = updated; Save(); return updated;
+        jobs[id] = updated;
+        return updated;
     }
 
     public DemoJob AddFinancialEvent(Guid id, AddFinancialEventRequest request)
     {
         DemoJob current = jobs[id]; List<DemoFinancialEvent> events = current.FinancialEvents?.ToList() ?? new();
         events.Add(new DemoFinancialEvent(Guid.NewGuid(), request.Kind.Trim(), request.Amount, request.Note?.Trim(), DateTimeOffset.UtcNow));
-        DemoJob updated = current with { FinancialEvents = events }; jobs[id] = updated; Save(); return updated;
+        DemoJob updated = current with { FinancialEvents = events };
+        jobs[id] = updated;
+        return updated;
     }
 
     public AccountsSummary GetAccountsSummary() => new(jobs.Values.Sum(x => x.FinancialEvents?.Sum(e => e.Amount) ?? 0m), jobs.Values.Count(x => (x.FinancialEvents?.Count ?? 0) > 0), jobs.Count);
@@ -112,16 +115,12 @@ public sealed class DemoStore
         return conversations.Values.Where(x => x.WorkspaceId == workspaceId && string.Equals(x.ContactAddress, email.FromAddress, StringComparison.OrdinalIgnoreCase)).FirstOrDefault(x => string.Equals(NormaliseSubject(x.Subject), subject, StringComparison.OrdinalIgnoreCase));
     }
 
-    private bool Load()
-    {
-        if (!File.Exists(dataFile)) return false;
-        try { DemoState? state = JsonSerializer.Deserialize<DemoState>(File.ReadAllText(dataFile)); if (state is null) return false; foreach (DemoConversation x in state.Conversations) conversations[x.Id] = x; foreach (DemoJob x in state.Jobs) jobs[x.Id] = x with { FinancialEvents = x.FinancialEvents ?? new() }; return true; } catch (JsonException) { return false; }
-    }
-    private void Save() { lock (persistenceLock) { DemoState state = new(conversations.Values.ToList(), jobs.Values.ToList()); string temp = dataFile + ".tmp"; File.WriteAllText(temp, JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true })); File.Move(temp, dataFile, true); } }
     private void Seed()
     {
-        DemoConversation wedding = new(Guid.Parse("22222222-2222-2222-2222-222222222222"), WeddingsWorkspaceId, "Johnson Wedding - October 18", "Marsha Johnson", "marsha.johnson@example.com", "Email", false, null, new List<DemoMessage> { new(Guid.NewGuid(), "Marsha Johnson", "External", "Hi Bryan's, I would like pricing and availability for our wedding on October 18.", DateTimeOffset.UtcNow.AddHours(-4)) }); conversations[wedding.Id] = wedding;
+        DemoConversation wedding = new(Guid.Parse("22222222-2222-2222-2222-222222222222"), WeddingsWorkspaceId, "Johnson Wedding - October 18", "Marsha Johnson", "marsha.johnson@example.com", "Email", false, null, new List<DemoMessage> { new(Guid.NewGuid(), "Marsha Johnson", "External", "Hi Bryan's, I would like pricing and availability for our wedding on October 18.", DateTimeOffset.UtcNow.AddHours(-4)) });
+        conversations[wedding.Id] = wedding;
     }
+
     private static DateTimeOffset GetLastActivity(DemoConversation c) => c.Messages.Count == 0 ? DateTimeOffset.MinValue : c.Messages.Max(x => x.CreatedAt);
     private static Guid ResolveWorkspace(Guid? id, string? destination) { if (id.HasValue) return id.Value; string value = destination?.Trim().ToLowerInvariant() ?? string.Empty; if (value.Contains("wedding")) return WeddingsWorkspaceId; if (value.Contains("id") || value.Contains("school")) return IdPhotosWorkspaceId; return GraduationsWorkspaceId; }
     private static string NormaliseChannel(string? channel) => string.IsNullOrWhiteSpace(channel) ? "Manual" : channel.Trim();
@@ -134,7 +133,6 @@ public sealed record DemoConversation(Guid Id, Guid WorkspaceId, string Subject,
 public sealed record DemoMessage(Guid Id, string Author, string Visibility, string Body, DateTimeOffset CreatedAt, string? ExternalMessageId = null);
 public sealed record DemoJob(Guid Id, Guid WorkspaceId, Guid ConversationId, string Title, string ClientName, string Status, DateOnly? EventDate, DateTimeOffset CreatedAt, string? AssignedTo = null, List<DemoFinancialEvent>? FinancialEvents = null);
 public sealed record DemoFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt);
-public sealed record DemoState(List<DemoConversation> Conversations, List<DemoJob> Jobs);
 public sealed record EmailIngestResult(DemoConversation Conversation, bool CreatedConversation, bool WasDuplicate);
 public sealed record IncomingInteractionRequest(Guid? WorkspaceId, string? Destination, string ContactName, string ContactAddress, string Subject, string Body, string? Channel);
 public sealed record AddMessageRequest(string Body, bool IsInternal);
