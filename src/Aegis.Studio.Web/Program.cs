@@ -1,9 +1,11 @@
+using Aegis.Pos.Core;
 using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Domain.Bookings;
 using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Authentication;
 using Aegis.Studio.Web.Demo;
 using Aegis.Studio.Web.Email;
+using Aegis.Studio.Web.Pos;
 using Common.Security.Abstractions;
 using Common.Security.Authenticators;
 using Common.Security.Options;
@@ -15,7 +17,7 @@ MicrosoftGraphEmailOptions graphEmailOptions = builder.Configuration.GetSection(
 ActiveDirectoryAuthenticationOptions activeDirectoryOptions = builder.Configuration.GetSection("Authentication:ActiveDirectory").Get<ActiveDirectoryAuthenticationOptions>() ?? throw new InvalidOperationException("Authentication:ActiveDirectory must be configured.");
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => { options.Cookie.Name = "Aegis.Studio.Auth"; options.Cookie.HttpOnly = true; options.Cookie.SameSite = SameSiteMode.Strict; options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; options.LoginPath = "/login"; options.AccessDeniedPath = "/login"; options.ExpireTimeSpan = TimeSpan.FromHours(8); options.SlidingExpiration = true; options.Events.OnRedirectToLogin = context => { if (context.Request.Path.StartsWithSegments("/api")) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; } context.Response.Redirect(context.RedirectUri); return Task.CompletedTask; }; });
 builder.Services.AddAuthorization(options => { options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build(); });
-builder.Services.AddHealthChecks(); builder.Services.AddSingleton(activeDirectoryOptions); builder.Services.AddSingleton<IAuthenticator, ActiveDirectory>(); builder.Services.AddSingleton(graphEmailOptions); builder.Services.AddSingleton<MicrosoftGraphEmailClient>(); builder.Services.AddHostedService<InboundEmailWorker>(); builder.Services.AddHostedService<OutboundEmailWorker>(); builder.Services.AddSingleton<DemoStore>(); builder.Services.AddSingleton<BookingStore>(); builder.Services.AddSingleton<AttachmentStore>(); builder.Services.AddSingleton<OutboundEmailStore>(); builder.Services.AddSingleton<UnroutedEmailStore>(); builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
+builder.Services.AddHealthChecks(); builder.Services.AddSingleton(activeDirectoryOptions); builder.Services.AddSingleton<IAuthenticator, ActiveDirectory>(); builder.Services.AddSingleton(graphEmailOptions); builder.Services.AddSingleton<MicrosoftGraphEmailClient>(); builder.Services.AddHostedService<InboundEmailWorker>(); builder.Services.AddHostedService<OutboundEmailWorker>(); builder.Services.AddSingleton<DemoStore>(); builder.Services.AddSingleton<BookingStore>(); builder.Services.AddSingleton<StudioPosStore>(); builder.Services.AddSingleton<AttachmentStore>(); builder.Services.AddSingleton<OutboundEmailStore>(); builder.Services.AddSingleton<UnroutedEmailStore>(); builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
 WebApplication app = builder.Build();
 app.UseAuthentication(); app.Use(async (context, next) => { bool document = context.Request.Path == "/" || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase); if (document && context.User.Identity?.IsAuthenticated != true) { context.Response.Redirect("/login"); return; } await next(); }); app.UseAuthorization(); app.UseStaticFiles();
 app.MapGet("/login", (IWebHostEnvironment e) => Results.File(Path.Combine(e.WebRootPath, "login.html"), "text/html; charset=utf-8")).AllowAnonymous();
@@ -38,6 +40,33 @@ app.MapGet("/api/bookings/{id:guid}", (Guid id, BookingStore store) => store.Get
 app.MapPost("/api/bookings", (CreateBookingIntakeRequest request, BookingStore bookings, DemoStore studio) => { if (string.IsNullOrWhiteSpace(request.ClientName) || string.IsNullOrWhiteSpace(request.SessionType) || request.EndsAt <= request.StartsAt) return Results.BadRequest(new { error = "Client name, session type and a valid time range are required." }); Booking booking = bookings.Create(request, studio); return Results.Created($"/api/bookings/{booking.Id}", new { booking, job = studio.GetJob(booking.JobId) }); });
 app.MapPut("/api/bookings/{id:guid}/status", (Guid id, UpdateBookingStatusRequest request, BookingStore store) => store.Get(id) is null ? Results.NotFound() : Results.Ok(store.UpdateStatus(id, request.Status)));
 app.MapPost("/api/bookings/{id:guid}/payment-confirmations", (Guid id, RecordPaymentConfirmationRequest request, BookingStore store, DemoStore studio) => { Booking? booking = store.Get(id); if (booking is null) return Results.NotFound(); if (request.Amount <= 0 || string.IsNullOrWhiteSpace(request.Currency) || string.IsNullOrWhiteSpace(request.Reference) || string.IsNullOrWhiteSpace(request.Provider)) return Results.BadRequest(new { error = "Positive amount, currency, payment reference and provider are required." }); return Results.Ok(store.RecordPayment(id, request, studio)); });
+
+app.MapGet("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, DemoStore studio, StudioPosStore pos) => studio.GetJob(jobId) is null ? Results.NotFound() : Results.Ok(pos.GetForJob(jobId)));
+app.MapPost("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, CreateStudioSaleRequest request, DemoStore studio, StudioPosStore pos) =>
+{
+    if (studio.GetJob(jobId) is null) return Results.NotFound();
+    if (request.Lines is null || request.Lines.Count == 0 || request.Lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.UnitPrice < 0m || x.Quantity <= 0)) return Results.BadRequest(new { error = "At least one valid sale line is required." });
+    try { Sale sale = pos.Create(jobId, request, studio); return Results.Created($"/api/pos/sales/{sale.Id}", sale); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
+app.MapGet("/api/pos/sales/{saleId:guid}", (Guid saleId, StudioPosStore pos) => pos.Get(saleId) is Sale sale ? Results.Ok(sale) : Results.NotFound());
+app.MapPost("/api/pos/sales/{saleId:guid}/complete", (Guid saleId, CompleteStudioSaleRequest request, HttpContext context, DemoStore studio, StudioPosStore pos) =>
+{
+    if (pos.Get(saleId) is null) return Results.NotFound();
+    string userId = context.User.Identity?.Name ?? "Aegis.Studio";
+    try { return Results.Ok(pos.Complete(saleId, request, studio, userId)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
+app.MapPost("/api/pos/sales/{saleId:guid}/void", (Guid saleId, VoidStudioSaleRequest request, HttpContext context, StudioPosStore pos) =>
+{
+    if (pos.Get(saleId) is null) return Results.NotFound();
+    if (string.IsNullOrWhiteSpace(request.Reason)) return Results.BadRequest(new { error = "Void reason is required." });
+    try { return Results.Ok(pos.Void(saleId, context.User.Identity?.Name ?? "Aegis.Studio", request.Reason)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
+app.MapPost("/api/pos/sales/{saleId:guid}/refunds", (Guid saleId, RefundStudioSaleRequest request, DemoStore studio, StudioPosStore pos) =>
+{
+    if (pos.Get(saleId) is null) return Results.NotFound();
+    try { return Results.Ok(pos.Refund(saleId, request, studio)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
+app.MapGet("/api/pos/device-agent", (IConfiguration configuration) => Results.Ok(new { baseUrl = configuration["PosDeviceAgent:BaseUrl"] ?? "https://localhost:7399" }));
 
 app.MapGet("/api/conversations/{id:guid}/attachments", (Guid id, DemoStore store, AttachmentStore attachments) => store.GetConversation(id) is null ? Results.NotFound() : Results.Ok(attachments.GetForConversation(id)));
 app.MapPost("/api/conversations/{id:guid}/attachments", async (Guid id, IFormFile file, string? visibility, DemoStore store, AttachmentStore attachments, CancellationToken token) => { if (store.GetConversation(id) is null) return Results.NotFound(); if (file.Length == 0 || file.Length > 100L * 1024L * 1024L) return Results.BadRequest(new { error = "Attachment must be between 1 byte and 100 MB." }); DemoAttachment attachment = await attachments.AddAsync(id, file, visibility ?? "External", token); return Results.Created($"/api/attachments/{attachment.Id}", attachment); }).DisableAntiforgery();
