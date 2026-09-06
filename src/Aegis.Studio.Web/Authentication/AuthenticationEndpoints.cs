@@ -27,9 +27,10 @@ public static class AuthenticationEndpoints
             }
 
             string userName = request.UserName.Trim();
-            string displayName = string.IsNullOrWhiteSpace(result.UserInfo?.DisplayName)
+            string? directoryDisplayName = result.UserInfo?.DisplayName;
+            string displayName = string.IsNullOrWhiteSpace(directoryDisplayName)
                 ? userName
-                : result.UserInfo.DisplayName;
+                : directoryDisplayName!;
 
             List<Claim> claims =
             [
