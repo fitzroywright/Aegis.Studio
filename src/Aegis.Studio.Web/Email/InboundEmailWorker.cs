@@ -10,6 +10,7 @@ public sealed class InboundEmailWorker : BackgroundService
     private readonly IInboundEmailRouter router;
     private readonly DemoStore store;
     private readonly UnroutedEmailStore unroutedStore;
+    private readonly GraphEmailDeltaStateStore deltaStateStore;
     private readonly ILogger<InboundEmailWorker> logger;
 
     public InboundEmailWorker(
@@ -17,12 +18,14 @@ public sealed class InboundEmailWorker : BackgroundService
         IInboundEmailRouter router,
         DemoStore store,
         UnroutedEmailStore unroutedStore,
+        GraphEmailDeltaStateStore deltaStateStore,
         ILogger<InboundEmailWorker> logger)
     {
         this.graphClient = graphClient;
         this.router = router;
         this.store = store;
         this.unroutedStore = unroutedStore;
+        this.deltaStateStore = deltaStateStore;
         this.logger = logger;
     }
 
@@ -40,8 +43,10 @@ public sealed class InboundEmailWorker : BackgroundService
         {
             try
             {
-                IReadOnlyList<InboundEmail> messages = await graphClient.GetInboxMessagesAsync(stoppingToken);
-                foreach (InboundEmail email in messages)
+                string? deltaLink = deltaStateStore.GetDeltaLink();
+                GraphInboxDeltaBatch batch = await graphClient.GetInboxChangesAsync(deltaLink, stoppingToken);
+
+                foreach (InboundEmail email in batch.Messages)
                 {
                     EmailRouteResult route = router.Route(email);
                     if (!route.IsRouted)
@@ -73,6 +78,16 @@ public sealed class InboundEmailWorker : BackgroundService
                         result.Conversation.Id,
                         result.CreatedConversation);
                 }
+
+                if (!string.IsNullOrWhiteSpace(batch.DeltaLink))
+                {
+                    deltaStateStore.SaveDeltaLink(batch.DeltaLink);
+                }
+            }
+            catch (GraphDeltaTokenExpiredException)
+            {
+                logger.LogWarning("Microsoft Graph delta checkpoint expired. Clearing it so the next cycle can establish a fresh checkpoint.");
+                deltaStateStore.Clear();
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
