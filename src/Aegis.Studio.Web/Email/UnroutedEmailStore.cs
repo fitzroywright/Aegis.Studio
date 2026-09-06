@@ -1,159 +1,56 @@
-using System.Text.Json;
 using Aegis.Studio.Application.EmailRouting;
+using Aegis.Studio.Web.Persistence;
 
 namespace Aegis.Studio.Web.Email;
 
 public sealed class UnroutedEmailStore
 {
-    private readonly object syncRoot = new();
-    private readonly string dataFile;
-    private readonly List<UnroutedEmail> items = new();
+    private const string Collection = "unrouted-email";
+    private readonly PostgresDocumentStore persistence;
 
-    public UnroutedEmailStore(IWebHostEnvironment environment)
+    public UnroutedEmailStore(PostgresDocumentStore persistence)
     {
-        string dataDirectory = Path.Combine(environment.ContentRootPath, "App_Data");
-        Directory.CreateDirectory(dataDirectory);
-        dataFile = Path.Combine(dataDirectory, "unrouted-email.json");
-        Load();
+        this.persistence = persistence;
     }
 
     public IReadOnlyList<UnroutedEmail> GetOpen()
-    {
-        lock (syncRoot)
-        {
-            return items
-                .Where(x => !x.ResolvedAt.HasValue)
-                .OrderByDescending(x => x.ReceivedAt)
-                .ToList();
-        }
-    }
+        => persistence.GetAll<UnroutedEmail>(Collection).Where(x => !x.ResolvedAt.HasValue).OrderByDescending(x => x.ReceivedAt).ToList();
 
     public UnroutedEmail Capture(InboundEmail email, string reason)
     {
-        lock (syncRoot)
+        UnroutedEmail? existing = persistence.GetAll<UnroutedEmail>(Collection)
+            .FirstOrDefault(x => string.Equals(x.ProviderMessageId, email.MessageId, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
         {
-            UnroutedEmail? existing = items.FirstOrDefault(x =>
-                string.Equals(x.ProviderMessageId, email.MessageId, StringComparison.OrdinalIgnoreCase));
-            if (existing is not null)
-            {
-                return existing;
-            }
-
-            UnroutedEmail item = new(
-                Guid.NewGuid(),
-                email.MessageId,
-                email.ThreadId,
-                email.FromName,
-                email.FromAddress,
-                email.ToAddresses.ToList(),
-                email.CcAddresses.ToList(),
-                new Dictionary<string, string>(email.InternetHeaders, StringComparer.OrdinalIgnoreCase),
-                email.Subject,
-                email.Body,
-                email.ReceivedAt,
-                reason,
-                null,
-                null,
-                null);
-
-            items.Add(item);
-            Save();
-            return item;
+            return existing;
         }
+
+        UnroutedEmail item = new(Guid.NewGuid(), email.MessageId, email.ThreadId, email.FromName, email.FromAddress,
+            email.ToAddresses.ToList(), email.CcAddresses.ToList(), new Dictionary<string, string>(email.InternetHeaders, StringComparer.OrdinalIgnoreCase),
+            email.Subject, email.Body, email.ReceivedAt.ToUniversalTime(), reason, null, null, null);
+        persistence.Upsert(Collection, item.Id, item);
+        return item;
     }
 
-    public UnroutedEmail? Get(Guid id)
-    {
-        lock (syncRoot)
-        {
-            return items.FirstOrDefault(x => x.Id == id);
-        }
-    }
+    public UnroutedEmail? Get(Guid id) => persistence.Get<UnroutedEmail>(Collection, id);
 
     public UnroutedEmail? MarkResolved(Guid id, Guid workspaceId, string workspaceName)
     {
-        lock (syncRoot)
+        UnroutedEmail? current = Get(id);
+        if (current is null)
         {
-            int index = items.FindIndex(x => x.Id == id);
-            if (index < 0)
-            {
-                return null;
-            }
-
-            UnroutedEmail current = items[index];
-            UnroutedEmail updated = current with
-            {
-                ResolvedAt = DateTimeOffset.UtcNow,
-                ResolvedWorkspaceId = workspaceId,
-                ResolvedWorkspaceName = workspaceName
-            };
-            items[index] = updated;
-            Save();
-            return updated;
-        }
-    }
-
-    private void Load()
-    {
-        if (!File.Exists(dataFile))
-        {
-            return;
+            return null;
         }
 
-        try
-        {
-            string json = File.ReadAllText(dataFile);
-            List<UnroutedEmail>? loaded = JsonSerializer.Deserialize<List<UnroutedEmail>>(json);
-            if (loaded is not null)
-            {
-                items.AddRange(loaded);
-            }
-        }
-        catch (JsonException)
-        {
-        }
-    }
-
-    private void Save()
-    {
-        string json = JsonSerializer.Serialize(items, new JsonSerializerOptions { WriteIndented = true });
-        string temporaryFile = dataFile + ".tmp";
-        File.WriteAllText(temporaryFile, json);
-        File.Move(temporaryFile, dataFile, true);
+        UnroutedEmail updated = current with { ResolvedAt = DateTimeOffset.UtcNow, ResolvedWorkspaceId = workspaceId, ResolvedWorkspaceName = workspaceName };
+        persistence.Upsert(Collection, updated.Id, updated);
+        return updated;
     }
 }
 
-public sealed record UnroutedEmail(
-    Guid Id,
-    string ProviderMessageId,
-    string? ThreadId,
-    string FromName,
-    string FromAddress,
-    List<string> ToAddresses,
-    List<string> CcAddresses,
-    Dictionary<string, string> InternetHeaders,
-    string Subject,
-    string Body,
-    DateTimeOffset ReceivedAt,
-    string FailureReason,
-    DateTimeOffset? ResolvedAt,
-    Guid? ResolvedWorkspaceId,
-    string? ResolvedWorkspaceName)
+public sealed record UnroutedEmail(Guid Id, string ProviderMessageId, string? ThreadId, string FromName, string FromAddress, List<string> ToAddresses, List<string> CcAddresses, Dictionary<string, string> InternetHeaders, string Subject, string Body, DateTimeOffset ReceivedAt, string FailureReason, DateTimeOffset? ResolvedAt, Guid? ResolvedWorkspaceId, string? ResolvedWorkspaceName)
 {
-    public InboundEmail ToInboundEmail()
-    {
-        return new InboundEmail(
-            ProviderMessageId,
-            ThreadId,
-            FromName,
-            FromAddress,
-            ToAddresses,
-            CcAddresses,
-            InternetHeaders,
-            Subject,
-            Body,
-            ReceivedAt);
-    }
+    public InboundEmail ToInboundEmail() => new(ProviderMessageId, ThreadId, FromName, FromAddress, ToAddresses, CcAddresses, InternetHeaders, Subject, Body, ReceivedAt);
 }
 
 public sealed record ResolveUnroutedEmailRequest(Guid WorkspaceId);
