@@ -4,6 +4,10 @@ namespace Aegis.Studio.Domain.Bookings;
 
 public sealed class ExternalPaymentConfirmation : Entity
 {
+    public ExternalPaymentConfirmation(Guid id) : base(id)
+    {
+    }
+
     public Guid BookingId { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; } = "JMD";
