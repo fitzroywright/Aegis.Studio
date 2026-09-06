@@ -1,0 +1,32 @@
+{
+  "jobReference": "WED-1047",
+  "title": "Morgan Wedding",
+  "workspace": "Weddings",
+  "customerName": "Danielle Morgan",
+  "customerEmail": "danielle.morgan@example.com",
+  "eventDate": "2026-11-14T15:00:00-05:00",
+  "photographer": "Ryan Bryan",
+  "packageName": "Wedding Premium",
+  "currency": "JMD",
+  "total": 120000,
+  "deposit": 30000,
+  "finalPayment": 90000,
+  "balance": 0,
+  "register": "Front Desk Register 1",
+  "accountingBatch": "STUDIO-2026-11-15-01",
+  "accountingStatus": "Ready for Peachtree",
+  "stages": [
+    "Inquiry",
+    "Job Created",
+    "Deposit Paid",
+    "Booked",
+    "Shoot Complete",
+    "Images Uploaded",
+    "Production",
+    "Proofing",
+    "Approved",
+    "Print",
+    "Final Payment",
+    "Accounting"
+  ]
+}
