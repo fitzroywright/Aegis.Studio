@@ -1,5 +1,5 @@
 using Aegis.Pos.Core;
-using Aegis.Studio.Web.Demo;
+using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 
 namespace Aegis.Studio.Web.Pos;
@@ -27,7 +27,7 @@ public sealed class StudioPosStore
         return snapshot is null ? null : Rehydrate(snapshot);
     }
 
-    public Sale Create(Guid jobId, CreateStudioSaleRequest request, DemoStore studio)
+    public Sale Create(Guid jobId, CreateStudioSaleRequest request, StudioStore studio)
     {
         if (studio.GetJob(jobId) is null)
         {
@@ -47,7 +47,7 @@ public sealed class StudioPosStore
         return sale;
     }
 
-    public Sale Complete(Guid saleId, CompleteStudioSaleRequest request, DemoStore studio, string cashierUserId)
+    public Sale Complete(Guid saleId, CompleteStudioSaleRequest request, StudioStore studio, string cashierUserId)
     {
         PersistedSale snapshot = persistence.Get<PersistedSale>(SalesCollection, saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
@@ -81,7 +81,7 @@ public sealed class StudioPosStore
         return sale;
     }
 
-    public Sale Refund(Guid saleId, RefundStudioSaleRequest request, DemoStore studio)
+    public Sale Refund(Guid saleId, RefundStudioSaleRequest request, StudioStore studio)
     {
         PersistedSale snapshot = persistence.Get<PersistedSale>(SalesCollection, saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
@@ -96,7 +96,7 @@ public sealed class StudioPosStore
         return sale;
     }
 
-    private void EnsureFinancialEventPosted(Sale sale, PersistedSale snapshot, DemoStore studio)
+    private void EnsureFinancialEventPosted(Sale sale, PersistedSale snapshot, StudioStore studio)
     {
         if (snapshot.FinancialEventPosted)
         {
