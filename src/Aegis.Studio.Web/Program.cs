@@ -97,7 +97,9 @@ app.MapPost("/api/conversations/{id:guid}/messages", (
     }
 
     DemoConversation updated = store.AddMessage(id, request);
-    OutboundEmail? queuedEmail = request.IsInternal ? null : outbox.Queue(updated, request.Body);
+    bool shouldQueueEmail = !request.IsInternal &&
+        string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase);
+    OutboundEmail? queuedEmail = shouldQueueEmail ? outbox.Queue(updated, request.Body) : null;
 
     return Results.Ok(new
     {
