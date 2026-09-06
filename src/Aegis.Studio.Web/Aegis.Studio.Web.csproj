@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>Aegis.Studio.Web-Development</UserSecretsId>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
     <ProjectReference Include="../Aegis.Studio.Domain/Aegis.Studio.Domain.csproj" />
