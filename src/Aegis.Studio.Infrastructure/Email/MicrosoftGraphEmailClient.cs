@@ -99,12 +99,13 @@ public sealed class MicrosoftGraphEmailClient
         response.EnsureSuccessStatusCode();
 
         GraphTokenResponse? token = await response.Content.ReadFromJsonAsync<GraphTokenResponse>(cancellationToken: cancellationToken);
-        if (string.IsNullOrWhiteSpace(token?.AccessToken))
+        string? accessToken = token?.AccessToken;
+        if (string.IsNullOrWhiteSpace(accessToken))
         {
             throw new InvalidOperationException("Microsoft Graph did not return an access token.");
         }
 
-        return token.AccessToken;
+        return accessToken;
     }
 
     private string BuildMessagesUrl()
@@ -139,7 +140,7 @@ public sealed class MicrosoftGraphEmailClient
                 StringComparer.OrdinalIgnoreCase);
 
         string senderAddress = sender.Address!;
-        string senderName = string.IsNullOrWhiteSpace(sender.Name) ? senderAddress : sender.Name;
+        string senderName = string.IsNullOrWhiteSpace(sender.Name) ? senderAddress : sender.Name!;
 
         return new InboundEmail(
             message.Id!,
