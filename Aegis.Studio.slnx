@@ -3,5 +3,6 @@
   <Project Path="src/Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
   <Project Path="src/Aegis.Studio.Infrastructure/Aegis.Studio.Infrastructure.csproj" />
   <Project Path="src/Aegis.Studio.Web/Aegis.Studio.Web.csproj" />
+  <Project Path="src/Aegis.Studio.BookingStub/Aegis.Studio.BookingStub.csproj" />
   <Project Path="tests/Aegis.Studio.Domain.Tests/Aegis.Studio.Domain.Tests.csproj" />
 </Solution>
