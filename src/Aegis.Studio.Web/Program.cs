@@ -13,6 +13,7 @@ builder.Services.AddHealthChecks();
 builder.Services.AddSingleton(graphEmailOptions);
 builder.Services.AddSingleton<MicrosoftGraphEmailClient>();
 builder.Services.AddHostedService<InboundEmailWorker>();
+builder.Services.AddHostedService<OutboundEmailWorker>();
 builder.Services.AddSingleton<DemoStore>();
 builder.Services.AddSingleton<AttachmentStore>();
 builder.Services.AddSingleton<OutboundEmailStore>();
