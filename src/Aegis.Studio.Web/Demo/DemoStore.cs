@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Aegis.Studio.Application.EmailRouting;
 
 namespace Aegis.Studio.Web.Demo;
 
@@ -74,6 +75,57 @@ public sealed class DemoStore
         conversations[conversation.Id] = conversation;
         Save();
         return conversation;
+    }
+
+    public EmailIngestResult ReceiveEmail(InboundEmail email, EmailRouteResult route)
+    {
+        if (!route.IsRouted || !route.WorkspaceId.HasValue)
+        {
+            throw new InvalidOperationException("An email must be routed before it can be ingested.");
+        }
+
+        DemoConversation? duplicate = conversations.Values.FirstOrDefault(x =>
+            x.Messages.Any(message => string.Equals(
+                message.ExternalMessageId,
+                email.MessageId,
+                StringComparison.OrdinalIgnoreCase)));
+
+        if (duplicate is not null)
+        {
+            return new EmailIngestResult(duplicate, false, true);
+        }
+
+        DemoConversation? existing = FindConversationForEmail(email, route.WorkspaceId.Value);
+        DemoMessage message = new(
+            Guid.NewGuid(),
+            email.FromName.Trim(),
+            "External",
+            email.Body.Trim(),
+            email.ReceivedAt,
+            email.MessageId);
+
+        if (existing is not null)
+        {
+            existing.Messages.Add(message);
+            Save();
+            return new EmailIngestResult(existing, false, false);
+        }
+
+        DemoConversation conversation = new(
+            Guid.NewGuid(),
+            route.WorkspaceId.Value,
+            email.Subject.Trim(),
+            email.FromName.Trim(),
+            email.FromAddress.Trim(),
+            "Email",
+            false,
+            null,
+            new List<DemoMessage> { message },
+            NormaliseThreadId(email.ThreadId));
+
+        conversations[conversation.Id] = conversation;
+        Save();
+        return new EmailIngestResult(conversation, true, false);
     }
 
     public DemoConversation AddMessage(Guid id, AddMessageRequest request)
@@ -158,6 +210,31 @@ public sealed class DemoStore
         decimal total = jobs.Values.Sum(x => x.FinancialEvents?.Sum(e => e.Amount) ?? 0m);
         int jobsWithActivity = jobs.Values.Count(x => (x.FinancialEvents?.Count ?? 0) > 0);
         return new AccountsSummary(total, jobsWithActivity, jobs.Count);
+    }
+
+    private DemoConversation? FindConversationForEmail(InboundEmail email, Guid workspaceId)
+    {
+        string? threadId = NormaliseThreadId(email.ThreadId);
+        if (threadId is not null)
+        {
+            DemoConversation? threaded = conversations.Values.FirstOrDefault(x =>
+                x.WorkspaceId == workspaceId &&
+                string.Equals(x.ExternalThreadId, threadId, StringComparison.OrdinalIgnoreCase));
+
+            if (threaded is not null)
+            {
+                return threaded;
+            }
+        }
+
+        string normalisedSubject = NormaliseSubject(email.Subject);
+        return conversations.Values
+            .Where(x => x.WorkspaceId == workspaceId)
+            .Where(x => string.Equals(x.ContactAddress, email.FromAddress, StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(x => string.Equals(
+                NormaliseSubject(x.Subject),
+                normalisedSubject,
+                StringComparison.OrdinalIgnoreCase));
     }
 
     private bool Load()
@@ -272,6 +349,25 @@ public sealed class DemoStore
         string? value = channel?.Trim();
         return string.IsNullOrWhiteSpace(value) ? "Manual" : value;
     }
+
+    private static string? NormaliseThreadId(string? threadId)
+    {
+        return string.IsNullOrWhiteSpace(threadId) ? null : threadId.Trim();
+    }
+
+    private static string NormaliseSubject(string subject)
+    {
+        string value = subject.Trim();
+        while (value.StartsWith("RE:", StringComparison.OrdinalIgnoreCase) ||
+               value.StartsWith("FW:", StringComparison.OrdinalIgnoreCase) ||
+               value.StartsWith("FWD:", StringComparison.OrdinalIgnoreCase))
+        {
+            int separator = value.IndexOf(':');
+            value = value[(separator + 1)..].Trim();
+        }
+
+        return value;
+    }
 }
 
 public sealed record DemoWorkspace(Guid Id, string Name, string Address, int OpenCount);
@@ -285,9 +381,16 @@ public sealed record DemoConversation(
     string Channel,
     bool IsClosed,
     Guid? JobId,
-    List<DemoMessage> Messages);
+    List<DemoMessage> Messages,
+    string? ExternalThreadId = null);
 
-public sealed record DemoMessage(Guid Id, string Author, string Visibility, string Body, DateTimeOffset CreatedAt);
+public sealed record DemoMessage(
+    Guid Id,
+    string Author,
+    string Visibility,
+    string Body,
+    DateTimeOffset CreatedAt,
+    string? ExternalMessageId = null);
 
 public sealed record DemoJob(
     Guid Id,
@@ -304,6 +407,8 @@ public sealed record DemoJob(
 public sealed record DemoFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt);
 
 public sealed record DemoState(List<DemoConversation> Conversations, List<DemoJob> Jobs);
+
+public sealed record EmailIngestResult(DemoConversation Conversation, bool CreatedConversation, bool WasDuplicate);
 
 public sealed record IncomingInteractionRequest(
     Guid? WorkspaceId,
