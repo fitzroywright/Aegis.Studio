@@ -2,8 +2,72 @@ const baseOpenConversation = openConversation;
 
 openConversation = async function(id) {
     await baseOpenConversation(id);
+    await tightenConversationExperience(id);
     await renderAttachments(id);
 };
+
+async function tightenConversationExperience(conversationId) {
+    const conversation = await json('/api/conversations/' + conversationId);
+    const workspace = workspaceCache.find(item => item.id === conversation.workspaceId);
+    const composer = document.querySelector('.composer');
+    const sendButton = composer?.querySelector('button.primary');
+    const toggle = document.getElementById('internalToggle');
+
+    if (composer && sendButton && toggle) {
+        const identity = document.createElement('div');
+        identity.className = 'reply-identity';
+        identity.innerHTML = `<strong id="replyTarget">Reply to ${esc(conversation.contactName)}</strong><small id="replyRoute">From ${esc(workspace?.address || 'workspace mailbox')} to ${esc(conversation.contactAddress)}</small>`;
+        composer.insertBefore(identity, composer.firstChild);
+
+        const refreshReplyLabel = () => {
+            const internal = toggle.checked;
+            sendButton.textContent = internal ? 'Add internal note' : `Reply to ${conversation.contactName}`;
+            document.getElementById('replyTarget').textContent = internal ? 'Internal note' : `Reply to ${conversation.contactName}`;
+            document.getElementById('replyRoute').textContent = internal
+                ? 'Visible only to Aegis staff'
+                : `From ${workspace?.address || 'workspace mailbox'} to ${conversation.contactAddress}`;
+        };
+        toggle.addEventListener('change', refreshReplyLabel);
+        refreshReplyLabel();
+    }
+
+    document.querySelectorAll('.message.external p').forEach(paragraph => collapseQuotedHistory(paragraph));
+}
+
+function collapseQuotedHistory(paragraph) {
+    const text = paragraph.textContent || '';
+    const markers = [
+        '\nFrom:',
+        '\n-----Original Message-----',
+        '\nOn ',
+        '\n________________________________',
+        '\n> '
+    ];
+    let splitAt = -1;
+    for (const marker of markers) {
+        const candidate = text.indexOf(marker);
+        if (candidate > 0 && (splitAt < 0 || candidate < splitAt)) {
+            splitAt = candidate;
+        }
+    }
+
+    if (splitAt < 0) {
+        return;
+    }
+
+    const current = text.slice(0, splitAt).trim();
+    const quoted = text.slice(splitAt).trim();
+    paragraph.textContent = current;
+
+    const details = document.createElement('details');
+    details.className = 'quoted-history';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Show previous email';
+    const body = document.createElement('pre');
+    body.textContent = quoted;
+    details.append(summary, body);
+    paragraph.after(details);
+}
 
 async function renderAttachments(conversationId) {
     const attachments = await json('/api/conversations/' + conversationId + '/attachments');
@@ -18,7 +82,7 @@ async function renderAttachments(conversationId) {
         <div class="attachment-header">
             <div>
                 <h3>Attachments</h3>
-                <p>Files stay with the conversation and will remain linked when it becomes a job.</p>
+                <p>Files stay with the conversation and remain linked when it becomes a job.</p>
             </div>
             <label class="action attachment-upload-button">
                 Add file
