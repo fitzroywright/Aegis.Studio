@@ -3,4 +3,7 @@
     <ProjectReference Include="../Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
     <ProjectReference Include="../Aegis.Studio.Infrastructure/Aegis.Studio.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Common.Security" Version="1.0.0" />
+  </ItemGroup>
 </Project>
