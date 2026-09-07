@@ -26,6 +26,7 @@ public static class WorkspaceAccessEndpoints
         app.MapLegacyMailboxImport();
         app.MapStudioWorkflowAutomation();
         app.MapStudioGalleries();
+        app.MapStudioGalleryInternalFiles();
 
         app.MapGet("/api/workspace-access", (ClaimsPrincipal user, StudioDatabase database, WorkspaceStore workspaces) =>
         {
