@@ -2,8 +2,8 @@ using System.Diagnostics;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Bookings;
-using Aegis.Studio.Web.Email;
 using Aegis.Studio.Web.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
@@ -58,7 +58,7 @@ public static class StudioProductionHardening
                 context.Response.Headers["X-RateLimit-Remaining"] = decision.Remaining.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (!decision.Allowed)
                 {
-                    context.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling((decision.ResetsAtUtc - DateTimeOffset.UtcNow).TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    context.Response.Headers["Retry-After"] = Math.Max(1, (int)Math.Ceiling((decision.ResetsAtUtc - DateTimeOffset.UtcNow).TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
                     context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
                     await context.Response.WriteAsJsonAsync(new { error = "Too many requests. Try again shortly.", correlationId });
                     return;
@@ -319,7 +319,7 @@ public sealed class ProductionAuditStore
         command.Parameters.AddWithValue(context.Request.Path.Value ?? string.Empty);
         command.Parameters.AddWithValue(context.Response.StatusCode);
         command.Parameters.AddWithValue(durationMilliseconds);
-        command.Parameters.AddWithValue((object?)clientKey ?? DBNull.Value);
+        command.Parameters.AddWithValue(clientKey);
         command.Parameters.AddWithValue((object?)failureType ?? DBNull.Value);
         command.ExecuteNonQuery();
     }
