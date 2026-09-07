@@ -1,3 +1,10 @@
+if (!document.querySelector('link[href="/management.css"]')) {
+    const managementStyles = document.createElement('link');
+    managementStyles.rel = 'stylesheet';
+    managementStyles.href = '/management.css';
+    document.head.appendChild(managementStyles);
+}
+
 showManagement = async function() {
     activateNavigation('management');
     conversationView.classList.add('hidden');
