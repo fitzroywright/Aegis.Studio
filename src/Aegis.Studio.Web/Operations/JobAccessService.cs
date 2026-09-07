@@ -10,11 +10,12 @@ public sealed class JobAccessService
     private readonly WorkspaceAccessService workspaceAccess;
     private readonly GlobalOperationalRoleStore globalRoles;
 
-    public JobAccessService(StudioDatabase database, GlobalOperationalRoleStore globalRoles)
+    public JobAccessService(StudioDatabase database)
     {
         this.database = database;
-        this.globalRoles = globalRoles;
         workspaceAccess = new WorkspaceAccessService(database);
+        globalRoles = new GlobalOperationalRoleStore(database);
+        globalRoles.EnsureSchema();
     }
 
     public bool HasPermission(ClaimsPrincipal user, Guid jobId, string permission)
