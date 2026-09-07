@@ -33,6 +33,7 @@ public static class WorkspaceAccessEndpoints
         app.MapStudioWorkflowOperations();
         app.MapStudioGalleries();
         app.MapStudioClientGalleryAccess();
+        app.MapStudioGallerySelectionAdmin();
         app.MapStudioGalleryInternalFiles();
         app.MapStudioManagementAccountsPortal();
         app.MapStudioEscalations();
