@@ -51,10 +51,20 @@
 
             let members = [];
             if (canManage) members = await json(`/api/jobs/${id}/members`);
+            let roleControls = '';
+            if (canManage) {
+                try {
+                    const me = await json('/api/auth/me');
+                    if (me?.user?.isAdministrator === true) {
+                        const roles = (await json('/api/security/roles')).filter(x => x.scope === 'Job' && x.isActive);
+                        if (roles.length) roleControls = `<h3>Assign reusable role</h3><div class="pos-entry"><label>User name<input id="jobRoleUser"></label><label>Role<select id="jobRoleSelect">${roles.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></label><button class="primary" onclick="assignJobRole('${id}')">Assign role</button></div>`;
+                    }
+                } catch (error) { console.warn('Unable to load reusable job roles', error); }
+            }
             document.getElementById('jobAccessBody').innerHTML = `
                 ${canManage ? `<div>${members.length ? members.map(member => renderMember(id, member, canNotify)).join('') : '<p class="muted">No explicit job members yet. Workspace permissions still apply.</p>'}</div>
                 <h3>Add or update job member</h3>
-                <div class="pos-entry"><label>User name<input id="jobMemberUser"></label><label>Display name<input id="jobMemberDisplay"></label><label>Preset<select id="jobMemberPreset"><option value="viewer">Viewer</option><option value="contributor">Contributor</option><option value="staff">Job staff</option><option value="manager">Job manager</option><option value="admin">Job admin</option></select></label><label><input type="checkbox" id="jobMemberInherit" checked> Inherit workspace permissions</label><button class="primary" onclick="saveJobMember('${id}')">Save member</button></div>` : '<p class="muted">You can notify explicit job members, but cannot change membership.</p>'}`;
+                <div class="pos-entry"><label>User name<input id="jobMemberUser"></label><label>Display name<input id="jobMemberDisplay"></label><label>Preset<select id="jobMemberPreset"><option value="viewer">Viewer</option><option value="contributor">Contributor</option><option value="staff">Job staff</option><option value="manager">Job manager</option><option value="admin">Job admin</option></select></label><label><input type="checkbox" id="jobMemberInherit" checked> Inherit workspace permissions</label><button class="primary" onclick="saveJobMember('${id}')">Save member</button></div>${roleControls}` : '<p class="muted">You can notify explicit job members, but cannot change membership.</p>'}`;
         } catch (error) {
             console.warn('Unable to load job access', error);
         }
@@ -72,6 +82,13 @@
         const permissions = preset(document.getElementById('jobMemberPreset').value);
         const inheritWorkspacePermissions = document.getElementById('jobMemberInherit').checked;
         await put(jobId,userName,displayName,inheritWorkspacePermissions,permissions);
+        await window.openJob(jobId);
+    };
+
+    window.assignJobRole = async function(jobId) {
+        const userName = document.getElementById('jobRoleUser').value.trim(); if (!userName) return alert('User name is required.');
+        const roleId = document.getElementById('jobRoleSelect').value;
+        await json(`/api/security/jobs/${jobId}/members/${encodeURIComponent(userName)}/role/${roleId}`, {method:'PUT'});
         await window.openJob(jobId);
     };
 
