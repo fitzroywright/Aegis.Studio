@@ -100,6 +100,8 @@ public sealed class StudioFeatureDatabase
             alter table studio_attachments add column if not exists uploaded_by text null;
             alter table studio_attachments add column if not exists storage_status text not null default 'Stored';
             create unique index if not exists ux_studio_attachments_stored_name on studio_attachments(stored_name);
+
+            alter table studio_user_profiles add column if not exists theme_name text not null default 'studio-default';
             """;
 
         await using NpgsqlCommand command = dataSource.CreateCommand(sql);
