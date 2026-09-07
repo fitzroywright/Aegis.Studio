@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
+using Aegis.Studio.Web.Email;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Persistence;
 
@@ -14,15 +15,14 @@ public static class WorkspaceAccessEndpoints
     {
         lock (registrationLock)
         {
-            if (registrations.TryGetValue(app, out _))
-            {
-                return;
-            }
-
+            if (registrations.TryGetValue(app, out _)) return;
             registrations.Add(app, new object());
         }
 
         app.UseMiddleware<WorkspaceAuthorizationMiddleware>();
+        app.MapStudioSecurityAdministration();
+        app.MapLegacyMailboxImport();
+        app.MapStudioWorkflowAutomation();
 
         app.MapGet("/api/workspace-access", (ClaimsPrincipal user, StudioDatabase database, WorkspaceStore workspaces) =>
         {
