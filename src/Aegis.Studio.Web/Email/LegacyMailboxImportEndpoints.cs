@@ -55,9 +55,15 @@ public sealed class LegacyMailboxImporter
     {
         ProviderSettings provider = ProviderSettings.Resolve(request.Provider);
         if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Secret)) throw new InvalidOperationException("Mailbox user name and credential are required.");
+
         string userName = request.UserName.Trim();
         string credential = request.Secret;
-        string authenticationMode = string.IsNullOrWhiteSpace(request.AuthenticationMode) ? provider.DefaultAuthenticationMode : request.AuthenticationMode.Trim();
+        string? requestedAuthenticationMode = request.AuthenticationMode;
+        string authenticationMode = string.IsNullOrWhiteSpace(requestedAuthenticationMode)
+            ? provider.DefaultAuthenticationMode
+            : requestedAuthenticationMode.Trim();
+        string? requestedFolder = request.Folder;
+
         int maximum = Math.Clamp(request.MaximumMessages ?? 5000, 1, 50000);
         int imported = 0; int duplicates = 0; int attachmentCount = 0; int failed = 0;
         using ImapClient client = new();
@@ -75,7 +81,9 @@ public sealed class LegacyMailboxImporter
             throw new InvalidOperationException("AuthenticationMode must be OAuth2 or AppPassword.");
         }
 
-        IMailFolder folder = string.IsNullOrWhiteSpace(request.Folder) ? client.Inbox : await client.GetFolderAsync(request.Folder.Trim(), cancellationToken);
+        IMailFolder folder = string.IsNullOrWhiteSpace(requestedFolder)
+            ? client.Inbox
+            : await client.GetFolderAsync(requestedFolder.Trim(), cancellationToken);
         await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
         SearchQuery query = SearchQuery.All;
         if (request.FromUtc.HasValue) query = query.And(SearchQuery.DeliveredAfter(request.FromUtc.Value.UtcDateTime));
@@ -89,7 +97,8 @@ public sealed class LegacyMailboxImporter
                 MimeMessage message = await folder.GetMessageAsync(id, cancellationToken);
                 MailboxAddress? sender = message.From.Mailboxes.FirstOrDefault();
                 string senderAddress = sender?.Address ?? userName;
-                string senderName = string.IsNullOrWhiteSpace(sender?.Name) ? senderAddress : sender.Name;
+                string? senderDisplayName = sender?.Name;
+                string senderName = string.IsNullOrWhiteSpace(senderDisplayName) ? senderAddress : senderDisplayName;
                 string messageId = string.IsNullOrWhiteSpace(message.MessageId) ? $"legacy-{provider.Name}-{id.Id}@import.local" : message.MessageId;
                 string body = message.TextBody ?? message.HtmlBody ?? string.Empty;
                 IReadOnlyDictionary<string, string> headers = message.Headers
