@@ -82,10 +82,20 @@ public sealed class BookingStore
     {
         if (Get(id) is null) throw new KeyNotFoundException("Booking was not found.");
         using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "update studio_bookings set status=$2 where id=$1";
-        command.Parameters.AddWithValue(id); command.Parameters.AddWithValue((int)status); command.ExecuteNonQuery();
-        schedule.UpdateBookingStatus(id, status.ToString());
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
+        using (NpgsqlCommand command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "update studio_bookings set status=$2 where id=$1";
+            command.Parameters.AddWithValue(id); command.Parameters.AddWithValue((int)status); command.ExecuteNonQuery();
+        }
+        using (NpgsqlCommand command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "update studio_schedule_entries set status=$2 where booking_id=$1";
+            command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(status.ToString()); command.ExecuteNonQuery();
+        }
+        transaction.Commit();
         return Get(id)!;
     }
 
