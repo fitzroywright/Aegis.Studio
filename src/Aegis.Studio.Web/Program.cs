@@ -56,7 +56,6 @@ builder.Services.AddHostedService<OutboundEmailWorker>();
 
 WebApplication app = builder.Build();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
-app.Services.GetRequiredService<WorkspaceStore>().EnsureBootstrapWorkspaces();
 
 app.UseAuthentication();
 app.Use(async (context, next) => { bool document = context.Request.Path == "/" || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase); if (document && context.User.Identity?.IsAuthenticated != true) { context.Response.Redirect("/login"); return; } await next(); });
