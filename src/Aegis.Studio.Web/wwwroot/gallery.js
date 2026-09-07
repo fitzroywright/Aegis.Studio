@@ -42,7 +42,7 @@ async function openWorkspaceGallery(workspaceId, workspaceName) {
             <h2>Images</h2>
             <div class="gallery-admin-grid">${items.length ? items.map(item => `
                 <article class="gallery-admin-card">
-                    <img src="/public/galleries/${gallery.publicToken}/items/${item.id}/thumbnail" alt="${esc(item.caption || item.fileName)}" onclick="previewGalleryItem('${gallery.publicToken}','${item.id}')">
+                    <img src="/api/workspaces/${workspaceId}/gallery/items/${item.id}/thumbnail" alt="${esc(item.caption || item.fileName)}" onclick="previewGalleryItem('${workspaceId}','${item.id}')">
                     <div><b>${esc(item.fileName)}</b><small>${item.isVisible ? 'Visible' : 'Hidden'} · order ${item.sortOrder}</small></div>
                     <div class="job-actions"><button class="action" onclick="editGalleryItem('${workspaceId}','${item.id}','${esc(item.caption || '')}',${item.sortOrder},${item.isVisible},'${esc(workspaceName)}')">Edit</button><button class="action" onclick="deleteGalleryItem('${workspaceId}','${item.id}','${esc(workspaceName)}')">Delete</button></div>
                 </article>`).join('') : '<p class="muted">No images yet.</p>'}</div>
@@ -93,6 +93,6 @@ async function unpublishWorkspaceGallery(workspaceId, workspaceName) {
     await openWorkspaceGallery(workspaceId, workspaceName);
 }
 
-function previewGalleryItem(token, itemId) {
-    window.open(`/public/galleries/${token}/items/${itemId}/preview`, '_blank', 'noopener');
+function previewGalleryItem(workspaceId, itemId) {
+    window.open(`/api/workspaces/${workspaceId}/gallery/items/${itemId}/preview`, '_blank', 'noopener');
 }
