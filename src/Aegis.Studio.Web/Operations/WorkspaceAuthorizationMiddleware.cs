@@ -21,71 +21,87 @@ public sealed class WorkspaceAuthorizationMiddleware
             return;
         }
 
-        WorkspaceAccessService access = new(database);
-        (Guid? workspaceId, string? permission) = await ResolveRequirementAsync(context, database);
-        if (!workspaceId.HasValue || string.IsNullOrWhiteSpace(permission))
+        WorkspaceAccessService workspaceAccess = new(database);
+        JobAccessService jobAccess = new(database);
+        AccessRequirement requirement = await ResolveRequirementAsync(context, database);
+        if (requirement.WorkspaceId is null && requirement.JobId is null)
         {
             await next(context);
             return;
         }
 
-        if (!access.HasPermission(context.User, workspaceId.Value, permission))
+        bool allowed = false;
+        if (requirement.JobId.HasValue && !string.IsNullOrWhiteSpace(requirement.JobPermission))
+        {
+            allowed = jobAccess.HasPermission(context.User, requirement.JobId.Value, requirement.JobPermission);
+        }
+
+        if (!allowed && requirement.WorkspaceId.HasValue && !string.IsNullOrWhiteSpace(requirement.WorkspacePermission))
+        {
+            allowed = workspaceAccess.HasPermission(context.User, requirement.WorkspaceId.Value, requirement.WorkspacePermission);
+        }
+
+        if (!allowed)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await context.Response.WriteAsJsonAsync(new { error = $"Workspace permission '{permission}' is required." });
+            await context.Response.WriteAsJsonAsync(new { error = "You do not have the required workspace or job permission." });
             return;
         }
 
         await next(context);
     }
 
-    private static async Task<(Guid?, string?)> ResolveRequirementAsync(HttpContext context, StudioDatabase database)
+    private static async Task<AccessRequirement> ResolveRequirementAsync(HttpContext context, StudioDatabase database)
     {
         string path = context.Request.Path.Value ?? string.Empty;
         string method = context.Request.Method;
 
-        if (path.Equals("/api/conversations", StringComparison.OrdinalIgnoreCase) && method == "GET" && Guid.TryParse(context.Request.Query["workspaceId"], out Guid listWorkspace)) return (listWorkspace, "View");
+        if (path.Equals("/api/conversations", StringComparison.OrdinalIgnoreCase) && method == "GET" && Guid.TryParse(context.Request.Query["workspaceId"], out Guid listWorkspace))
+            return new AccessRequirement(listWorkspace,null,"View",null);
+
         if (path.Equals("/api/interactions", StringComparison.OrdinalIgnoreCase) && method == "POST")
-        {
-            Guid? id = await ReadWorkspaceIdFromJsonBody(context);
-            return (id, "ReplyRequester");
-        }
+            return new AccessRequirement(await ReadWorkspaceIdFromJsonBody(context),null,"ReplyRequester",null);
 
         string[] segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length >= 3 && segments[1].Equals("conversations", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(segments[2], out Guid conversationId))
         {
-            Guid? workspaceId = ResolveConversationWorkspace(database, conversationId);
-            if (segments.Length >= 4 && segments[3].Equals("messages", StringComparison.OrdinalIgnoreCase) && method == "POST") return (workspaceId, "ReplyRequester");
-            if (segments.Length >= 4 && segments[3].Equals("jobs", StringComparison.OrdinalIgnoreCase) && method == "POST") return (workspaceId, "CreateJob");
-            if (segments.Length >= 4 && segments[3].Equals("attachments", StringComparison.OrdinalIgnoreCase)) return (workspaceId, method == "POST" ? "AddAttachments" : "ViewAttachments");
-            return (workspaceId, "View");
+            (Guid? workspaceId, Guid? jobId) = ResolveConversation(database, conversationId);
+            if (segments.Length >= 4 && segments[3].Equals("messages", StringComparison.OrdinalIgnoreCase) && method == "POST") return new(workspaceId,jobId,"ReplyRequester","ReplyRequester");
+            if (segments.Length >= 4 && segments[3].Equals("jobs", StringComparison.OrdinalIgnoreCase) && method == "POST") return new(workspaceId,jobId,"CreateJob",null);
+            if (segments.Length >= 4 && segments[3].Equals("attachments", StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobId,method == "POST" ? "AddAttachments" : "ViewAttachments",method == "POST" ? "AddAttachments" : "ViewAttachments");
+            return new(workspaceId,jobId,"View","ViewConversation");
         }
 
-        if (segments.Length >= 3 && segments[1].Equals("jobs", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(segments[2], out Guid jobId))
+        if (segments.Length >= 3 && segments[1].Equals("jobs", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(segments[2], out Guid jobIdFromPath))
         {
-            Guid? workspaceId = ResolveJobWorkspace(database, jobId);
-            if (segments.Length >= 4 && segments[3].Equals("financial-events", StringComparison.OrdinalIgnoreCase)) return (workspaceId, "EditJob");
-            if (segments.Length >= 4 && segments[3].Equals("pos", StringComparison.OrdinalIgnoreCase)) return (workspaceId, "EditJob");
-            return (workspaceId, method == "GET" ? "View" : "EditJob");
+            Guid? workspaceId = ResolveJobWorkspace(database, jobIdFromPath);
+            if (segments.Length >= 4 && segments[3].Equals("financial-events", StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobIdFromPath,"EditJob","RecordFinancialActivity");
+            if (segments.Length >= 4 && segments[3].Equals("pos", StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobIdFromPath,"EditJob",method == "GET" ? "ViewPosTransactions" : "UsePos");
+            if (segments.Length >= 4 && segments[3].Equals("members", StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobIdFromPath,"ManageMembers","ManageJobMembers");
+            if (segments.Length >= 4 && segments[3].Equals("notifications", StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobIdFromPath,"NotifyMembers","NotifyJobMembers");
+            if (segments.Length >= 4 && segments[3].Equals("access", StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobIdFromPath,"View","AccessJob");
+            return new(workspaceId,jobIdFromPath,method == "GET" ? "View" : "EditJob",method == "GET" ? "ViewJob" : "EditJob");
         }
 
         if (segments.Length >= 3 && segments[1].Equals("workspaces", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(segments[2], out Guid workspaceRouteId))
         {
-            if (segments.Length >= 4 && segments[3].Equals("members", StringComparison.OrdinalIgnoreCase)) return (workspaceRouteId, "ManageMembers");
-            if (segments.Length >= 4 && segments[3].Equals("notifications", StringComparison.OrdinalIgnoreCase)) return (workspaceRouteId, "NotifyMembers");
-            return (workspaceRouteId, "AccessWorkspace");
+            if (segments.Length >= 4 && segments[3].Equals("members", StringComparison.OrdinalIgnoreCase)) return new(workspaceRouteId,null,"ManageMembers",null);
+            if (segments.Length >= 4 && segments[3].Equals("notifications", StringComparison.OrdinalIgnoreCase)) return new(workspaceRouteId,null,"NotifyMembers",null);
+            return new(workspaceRouteId,null,"AccessWorkspace",null);
         }
 
-        return (null, null);
+        return new(null,null,null,null);
     }
 
-    private static Guid? ResolveConversationWorkspace(StudioDatabase database, Guid conversationId)
+    private static (Guid? WorkspaceId, Guid? JobId) ResolveConversation(StudioDatabase database, Guid conversationId)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select workspace_id from studio_conversations where id=$1";
+        command.CommandText = "select workspace_id,job_id from studio_conversations where id=$1";
         command.Parameters.AddWithValue(conversationId);
-        return command.ExecuteScalar() is Guid id ? id : null;
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        if (!reader.Read()) return (null,null);
+        return (reader.GetGuid(0),reader.IsDBNull(1) ? null : reader.GetGuid(1));
     }
 
     private static Guid? ResolveJobWorkspace(StudioDatabase database, Guid jobId)
@@ -106,4 +122,6 @@ public sealed class WorkspaceAuthorizationMiddleware
         if (document.RootElement.TryGetProperty("workspaceId", out JsonElement value) && value.ValueKind == JsonValueKind.String && Guid.TryParse(value.GetString(), out Guid id)) return id;
         return null;
     }
+
+    private sealed record AccessRequirement(Guid? WorkspaceId,Guid? JobId,string? WorkspacePermission,string? JobPermission);
 }
