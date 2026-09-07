@@ -14,5 +14,6 @@
     <PackageReference Include="Common.Security" Version="1.0.0" />
     <PackageReference Include="Npgsql" Version="10.0.0" />
     <PackageReference Include="MailKit" Version="4.17.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
   </ItemGroup>
 </Project>
