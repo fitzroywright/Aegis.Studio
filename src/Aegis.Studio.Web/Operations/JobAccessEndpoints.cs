@@ -7,8 +7,6 @@ public static class JobAccessEndpoints
 {
     public static void MapJobAccess(this WebApplication app)
     {
-        app.MapGlobalOperationalRoles();
-
         app.MapGet("/api/jobs/{jobId:guid}/access", (Guid jobId, ClaimsPrincipal user, JobAccessService access) =>
         {
             if (access.GetWorkspaceId(jobId) is null) return Results.NotFound();
@@ -45,14 +43,20 @@ public static class JobAccessEndpoints
 
         app.MapPut("/api/jobs/{jobId:guid}/members/{userName}", (Guid jobId, string userName, JobMemberRequest request, ClaimsPrincipal user, JobAccessService access) =>
         {
-            if (!access.HasPermission(user, jobId, "ManageJobMembers") && !access.HasPermission(user, jobId, "AdminJob")) return Results.Forbid();
+            JobPermissionSet caller = access.GetPermissions(user, jobId);
+            if (!user.IsInRole("Administrator") && !caller.ManageJobMembers && !caller.AdminJob) return Results.Forbid();
+            JobPermissionSet requested = request.Permissions ?? JobPermissionSet.Viewer;
+            if (!user.IsInRole("Administrator") && !PermissionsWithin(requested, caller)) return Results.Forbid();
             JobMemberRequest normalized = request with { UserName = userName };
             return Results.Ok(access.SaveMember(jobId, normalized));
         }).RequireAuthorization();
 
         app.MapDelete("/api/jobs/{jobId:guid}/members/{userName}", (Guid jobId, string userName, ClaimsPrincipal user, JobAccessService access) =>
         {
-            if (!access.HasPermission(user, jobId, "ManageJobMembers") && !access.HasPermission(user, jobId, "AdminJob")) return Results.Forbid();
+            JobPermissionSet caller = access.GetPermissions(user, jobId);
+            if (!user.IsInRole("Administrator") && !caller.ManageJobMembers && !caller.AdminJob) return Results.Forbid();
+            JobMember? target = access.GetMembers(jobId).FirstOrDefault(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
+            if (target is not null && !user.IsInRole("Administrator") && !PermissionsWithin(target.Permissions, caller)) return Results.Forbid();
             access.RemoveMember(jobId, userName);
             return Results.NoContent();
         }).RequireAuthorization();
@@ -85,6 +89,27 @@ public static class JobAccessEndpoints
             catch (KeyNotFoundException) { return Results.NotFound(); }
         }).RequireAuthorization();
     }
+
+    public static bool PermissionsWithin(JobPermissionSet requested, JobPermissionSet caller)
+        => (!requested.AccessJob || caller.AccessJob)
+        && (!requested.ViewJob || caller.ViewJob)
+        && (!requested.ViewConversation || caller.ViewConversation)
+        && (!requested.ReplyRequester || caller.ReplyRequester)
+        && (!requested.ViewAttachments || caller.ViewAttachments)
+        && (!requested.AddAttachments || caller.AddAttachments)
+        && (!requested.EditJob || caller.EditJob)
+        && (!requested.ChangeStatus || caller.ChangeStatus)
+        && (!requested.AssignStaff || caller.AssignStaff)
+        && (!requested.ManageSchedule || caller.ManageSchedule)
+        && (!requested.ManageProduction || caller.ManageProduction)
+        && (!requested.ViewFinancials || caller.ViewFinancials)
+        && (!requested.RecordFinancialActivity || caller.RecordFinancialActivity)
+        && (!requested.UsePos || caller.UsePos)
+        && (!requested.ViewPosTransactions || caller.ViewPosTransactions)
+        && (!requested.RefundVoidPos || caller.RefundVoidPos)
+        && (!requested.NotifyJobMembers || caller.NotifyJobMembers)
+        && (!requested.ManageJobMembers || caller.ManageJobMembers)
+        && (!requested.AdminJob || caller.AdminJob);
 }
 
 public sealed record JobMemberNotificationRequest(string UserName,string Subject,string Body);
