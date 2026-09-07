@@ -36,7 +36,7 @@ public static class SameOriginWriteProtection
 
     public static bool IsSameOrigin(HttpRequest request)
     {
-        string originText = request.Headers.Origin.ToString();
+        string originText = request.Headers["Origin"].ToString();
         if (!string.IsNullOrWhiteSpace(originText)
             && Uri.TryCreate(originText, UriKind.Absolute, out Uri? origin))
         {
