@@ -8,10 +8,12 @@ public sealed class JobAccessService
 {
     private readonly StudioDatabase database;
     private readonly WorkspaceAccessService workspaceAccess;
+    private readonly GlobalOperationalRoleStore globalRoles;
 
-    public JobAccessService(StudioDatabase database)
+    public JobAccessService(StudioDatabase database, GlobalOperationalRoleStore globalRoles)
     {
         this.database = database;
+        this.globalRoles = globalRoles;
         workspaceAccess = new WorkspaceAccessService(database);
     }
 
@@ -28,10 +30,12 @@ public sealed class JobAccessService
             return JobPermissionSet.Full;
         }
 
+        JobPermissionSet global = FromGlobalOperationalRole(user);
         Guid? workspaceId = GetWorkspaceId(jobId);
         JobPermissionSet inherited = workspaceId.HasValue
             ? FromWorkspace(workspaceAccess.GetPermissions(user, workspaceId.Value))
             : JobPermissionSet.None;
+        inherited = Union(inherited, global);
 
         string userName = GetUserName(user);
         JobMember? member = GetMembers(jobId).FirstOrDefault(x => x.IsActive && string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
@@ -45,12 +49,12 @@ public sealed class JobAccessService
             return JobPermissionSet.Full;
         }
 
-        return member.InheritWorkspacePermissions ? Union(inherited, member.Permissions) : member.Permissions;
+        return member.InheritWorkspacePermissions ? Union(inherited, member.Permissions) : Union(global, member.Permissions);
     }
 
     public IReadOnlyList<Guid> GetAccessibleJobIds(ClaimsPrincipal user)
     {
-        if (user.IsInRole("Administrator"))
+        if (user.IsInRole("Administrator") || globalRoles.HasPermission(user, "ViewAllJobs"))
         {
             using NpgsqlConnection connection = database.OpenConnection();
             using NpgsqlCommand command = connection.CreateCommand();
@@ -159,6 +163,42 @@ public sealed class JobAccessService
         command.CommandText = "select workspace_id from studio_jobs where id=$1";
         command.Parameters.AddWithValue(jobId);
         return command.ExecuteScalar() is Guid id ? id : null;
+    }
+
+    private JobPermissionSet FromGlobalOperationalRole(ClaimsPrincipal user)
+    {
+        bool viewAllJobs = globalRoles.HasPermission(user, "ViewAllJobs");
+        bool reply = globalRoles.HasPermission(user, "ReplyToClients");
+        bool notify = globalRoles.HasPermission(user, "NotifyJobMembers");
+        bool billing = globalRoles.HasPermission(user, "Billing");
+        bool viewAttachments = globalRoles.HasPermission(user, "ViewClientAttachments");
+        bool addAttachments = globalRoles.HasPermission(user, "AddClientAttachments");
+
+        if (!viewAllJobs && !reply && !notify && !billing && !viewAttachments && !addAttachments)
+        {
+            return JobPermissionSet.None;
+        }
+
+        return new JobPermissionSet(
+            viewAllJobs,
+            viewAllJobs,
+            viewAllJobs || reply,
+            reply,
+            viewAttachments,
+            addAttachments,
+            false,
+            false,
+            false,
+            false,
+            false,
+            billing,
+            billing,
+            billing,
+            billing,
+            false,
+            notify,
+            false,
+            false);
     }
 
     private static JobPermissionSet FromWorkspace(WorkspacePermissionSet p)
