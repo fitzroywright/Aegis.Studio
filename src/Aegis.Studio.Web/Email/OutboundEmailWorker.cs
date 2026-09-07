@@ -20,14 +20,29 @@ public sealed class OutboundEmailWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!graphClient.IsConfigured)
-        {
-            logger.LogInformation("Microsoft Graph outbound email is disabled or not configured.");
-            return;
-        }
-
+        bool configurationWarningLogged = false;
         while (!stoppingToken.IsCancellationRequested)
         {
+            if (!graphClient.IsConfigured)
+            {
+                if (!configurationWarningLogged)
+                {
+                    logger.LogWarning("Microsoft Graph outbound email is waiting for configuration. Pending messages will remain queued.");
+                    configurationWarningLogged = true;
+                }
+
+                try
+                {
+                    await Task.Delay(graphClient.PollInterval, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                continue;
+            }
+
+            configurationWarningLogged = false;
             try
             {
                 IReadOnlyList<OutboundEmail> pending = outbox.GetPending();
@@ -69,7 +84,14 @@ public sealed class OutboundEmailWorker : BackgroundService
                 logger.LogError(exception, "Outbound email processing cycle failed.");
             }
 
-            await Task.Delay(graphClient.PollInterval, stoppingToken);
+            try
+            {
+                await Task.Delay(graphClient.PollInterval, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
     }
 }
