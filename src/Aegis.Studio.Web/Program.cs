@@ -43,6 +43,8 @@ builder.Services.AddSingleton<IAuthenticator, ActiveDirectory>();
 builder.Services.AddSingleton(graphEmailOptions);
 builder.Services.AddSingleton<MicrosoftGraphEmailClient>();
 builder.Services.AddSingleton<WorkspaceStore>();
+builder.Services.AddSingleton<WorkspaceAccessService>();
+builder.Services.AddSingleton<JobAccessService>();
 builder.Services.AddSingleton<StudioStore>();
 builder.Services.AddSingleton<BookingStore>();
 builder.Services.AddSingleton<BookingApiAuthenticator>();
@@ -76,6 +78,8 @@ app.MapStudioUserProfiles();
 app.MapStudioNotifications();
 app.MapStudioScheduling();
 app.MapStudioProduction();
+app.MapWorkspaceAccess();
+app.MapJobAccess();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapStudioPosHardening();
 
@@ -92,16 +96,32 @@ app.MapGet("/api/email/status", (MicrosoftGraphEmailClient client, MicrosoftGrap
 }));
 app.MapGet("/api/booking-security/status", (BookingApiAuthenticator authentication) => Results.Ok(authentication.GetStatus())).RequireAuthorization();
 
-app.MapGet("/api/workspaces", (StudioStore store) => Results.Ok(store.GetWorkspaces()));
+app.MapGet("/api/workspaces", (ClaimsPrincipal user, StudioStore store, WorkspaceAccessService access) =>
+{
+    HashSet<Guid> allowed = access.GetAccessibleWorkspaceIds(user).ToHashSet();
+    return Results.Ok(store.GetWorkspaces().Where(x => allowed.Contains(x.Id)));
+});
 RouteGroupBuilder workspaceAdmin = app.MapGroup("/api/admin/workspaces").RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
 workspaceAdmin.MapGet("/", (WorkspaceStore store) => Results.Ok(store.GetAll(true)));
 workspaceAdmin.MapPost("/", (SaveWorkspaceRequest request, WorkspaceStore store) => string.IsNullOrWhiteSpace(request.Name) ? Results.BadRequest(new { error = "Workspace name is required." }) : Results.Created("/api/admin/workspaces", store.Create(request)));
 workspaceAdmin.MapPut("/{id:guid}", (Guid id, SaveWorkspaceRequest request, WorkspaceStore store) => { try { return Results.Ok(store.Update(id, request)); } catch (KeyNotFoundException) { return Results.NotFound(); } });
 
-app.MapGet("/api/conversations", (Guid? workspaceId, StudioStore store) => Results.Ok(store.GetConversations(workspaceId)));
-app.MapGet("/api/conversations/{id:guid}", (Guid id, StudioStore store) => store.GetConversation(id) is StudioConversation value ? Results.Ok(value) : Results.NotFound());
-app.MapPost("/api/interactions", (IncomingInteractionRequest request, StudioStore store, NotificationService notifications) =>
+app.MapGet("/api/conversations", (Guid? workspaceId, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService access) =>
 {
+    if (workspaceId.HasValue && !access.HasPermission(user, workspaceId.Value, "View")) return Results.Forbid();
+    HashSet<Guid> allowed = access.GetAccessibleWorkspaceIds(user).ToHashSet();
+    return Results.Ok(store.GetConversations(workspaceId).Where(x => allowed.Contains(x.WorkspaceId)));
+});
+app.MapGet("/api/conversations/{id:guid}", (Guid id, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess) =>
+{
+    StudioConversation? value = store.GetConversation(id);
+    if (value is null) return Results.NotFound();
+    bool allowed = workspaceAccess.HasPermission(user, value.WorkspaceId, "View") || (value.JobId.HasValue && jobAccess.HasPermission(user, value.JobId.Value, "ViewConversation"));
+    return allowed ? Results.Ok(value) : Results.Forbid();
+});
+app.MapPost("/api/interactions", (IncomingInteractionRequest request, ClaimsPrincipal user, StudioStore store, NotificationService notifications, WorkspaceAccessService access) =>
+{
+    if (request.WorkspaceId.HasValue && !access.HasPermission(user, request.WorkspaceId.Value, "ReplyRequester")) return Results.Forbid();
     if (string.IsNullOrWhiteSpace(request.ContactName) || string.IsNullOrWhiteSpace(request.ContactAddress) || string.IsNullOrWhiteSpace(request.Subject) || string.IsNullOrWhiteSpace(request.Body)) return Results.BadRequest(new { error = "Contact, address, subject and message are required." });
     try { StudioConversation conversation = store.ReceiveInteraction(request); notifications.PublishToAll("WorkspaceMessage", $"New request: {conversation.Subject}", $"{conversation.ContactName} sent a new {conversation.Channel} request.", "Conversation", conversation.Id.ToString("D")); return Results.Created("/api/conversations", conversation); }
     catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
@@ -118,24 +138,47 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
 });
 app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen()));
 app.MapGet("/api/email/outbox", (OutboundEmailStore store) => Results.Ok(store.GetPending()));
-app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, ClaimsPrincipal user, StudioStore store, OutboundEmailStore outbox, NotificationService notifications) =>
+app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, ClaimsPrincipal user, StudioStore store, OutboundEmailStore outbox, NotificationService notifications, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess) =>
 {
     if (string.IsNullOrWhiteSpace(request.Body)) return Results.BadRequest(new { error = "Message body is required." });
     StudioConversation? current = store.GetConversation(id); if (current is null) return Results.NotFound();
+    bool allowed = workspaceAccess.HasPermission(user, current.WorkspaceId, "ReplyRequester") || (current.JobId.HasValue && jobAccess.HasPermission(user, current.JobId.Value, "ReplyRequester"));
+    if (!allowed) return Results.Forbid();
     StudioConversation updated = store.AddMessage(id, request, user);
     OutboundEmail? email = !request.IsInternal && string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase) ? outbox.Queue(updated, request.Body) : null;
     if (request.IsInternal) notifications.PublishToAll("Mention", $"Internal note: {updated.Subject}", request.Body, "Conversation", id.ToString("D"));
     return Results.Ok(new { conversation = updated, outboundEmail = email });
 });
-app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest request, StudioStore store) => string.IsNullOrWhiteSpace(request.Title) ? Results.BadRequest(new { error = "Job title is required." }) : store.GetConversation(id) is null ? Results.NotFound() : Results.Ok(store.CreateJob(id, request)));
-app.MapGet("/api/jobs", (StudioStore store) => Results.Ok(store.GetJobs()));
-app.MapGet("/api/jobs/{id:guid}", (Guid id, StudioStore store) => store.GetJob(id) is StudioJob job ? Results.Ok(job) : Results.NotFound());
-app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, StudioStore store, NotificationService notifications) =>
+app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest request, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService access) =>
+{
+    StudioConversation? conversation = store.GetConversation(id);
+    if (conversation is null) return Results.NotFound();
+    if (!access.HasPermission(user, conversation.WorkspaceId, "CreateJob")) return Results.Forbid();
+    return string.IsNullOrWhiteSpace(request.Title) ? Results.BadRequest(new { error = "Job title is required." }) : Results.Ok(store.CreateJob(id, request));
+});
+app.MapGet("/api/jobs", (ClaimsPrincipal user, StudioStore store, JobAccessService access) =>
+{
+    HashSet<Guid> allowed = access.GetAccessibleJobIds(user).ToHashSet();
+    return Results.Ok(store.GetJobs().Where(x => allowed.Contains(x.Id)));
+});
+app.MapGet("/api/jobs/{id:guid}", (Guid id, ClaimsPrincipal user, StudioStore store, JobAccessService access) =>
+{
+    if (!access.HasPermission(user, id, "ViewJob")) return Results.Forbid();
+    return store.GetJob(id) is StudioJob job ? Results.Ok(job) : Results.NotFound();
+});
+app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrincipal user, StudioStore store, NotificationService notifications, JobAccessService access) =>
 {
     StudioJob? before = store.GetJob(id); if (before is null) return Results.NotFound();
+    if (!access.HasPermission(user, id, "EditJob")) return Results.Forbid();
+    if (!string.IsNullOrWhiteSpace(request.Status) && !string.Equals(before.Status, request.Status, StringComparison.OrdinalIgnoreCase) && !access.HasPermission(user, id, "ChangeStatus")) return Results.Forbid();
+    if (!string.IsNullOrWhiteSpace(request.AssignedTo) && !string.Equals(before.AssignedTo, request.AssignedTo, StringComparison.OrdinalIgnoreCase) && !access.HasPermission(user, id, "AssignStaff")) return Results.Forbid();
     StudioJob updated = store.UpdateJob(id, request);
     if (!string.Equals(before.Status, updated.Status, StringComparison.OrdinalIgnoreCase)) notifications.PublishToAll("JobStatusChanged", $"Job status: {updated.Title}", $"{before.Status} → {updated.Status}", "Job", id.ToString("D"));
-    if (!string.Equals(before.AssignedTo, updated.AssignedTo, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(updated.AssignedTo)) notifications.PublishToUser(updated.AssignedTo, "JobAssigned", $"Job assigned: {updated.Title}", $"You were assigned to {updated.Title} for {updated.ClientName}.", "Job", id.ToString("D"));
+    if (!string.Equals(before.AssignedTo, updated.AssignedTo, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(updated.AssignedTo))
+    {
+        access.EnsureAssignedMember(id, updated.AssignedTo);
+        notifications.PublishToUser(updated.AssignedTo, "JobAssigned", $"Job assigned: {updated.Title}", $"You were assigned to {updated.Title} for {updated.ClientName}.", "Job", id.ToString("D"));
+    }
     return Results.Ok(updated);
 });
 
@@ -160,22 +203,59 @@ app.MapPost("/api/bookings/{id:guid}/payment-confirmations", (Guid id, RecordPay
     ExternalPaymentConfirmation payment = store.RecordPayment(id, request, studio); notifications.PublishToAll("PaymentChanged", $"Payment received: {booking.ClientName}", $"{payment.Currency} {payment.Amount:N2} via {payment.Provider}.", "Booking", id.ToString("D")); return Results.Ok(payment);
 }).AllowAnonymous();
 
-app.MapGet("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, StudioStore studio, StudioPosStore pos) => studio.GetJob(jobId) is null ? Results.NotFound() : Results.Ok(pos.GetForJob(jobId)));
-app.MapPost("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, CreateStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos) => { if (studio.GetJob(jobId) is null) return Results.NotFound(); if (request.Lines is null || request.Lines.Count == 0 || request.Lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.UnitPrice < 0m || x.Quantity <= 0)) return Results.BadRequest(new { error = "At least one valid sale line is required." }); try { Sale sale = pos.Create(jobId, request, studio, context.User.Identity?.Name ?? "Studio"); return Results.Created($"/api/pos/sales/{sale.Id}", sale); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
+app.MapGet("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, ClaimsPrincipal user, StudioStore studio, StudioPosStore pos, JobAccessService access) =>
+{
+    if (studio.GetJob(jobId) is null) return Results.NotFound();
+    if (!access.HasPermission(user, jobId, "ViewPosTransactions")) return Results.Forbid();
+    return Results.Ok(pos.GetForJob(jobId));
+});
+app.MapPost("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, CreateStudioSaleRequest request, ClaimsPrincipal user, HttpContext context, StudioStore studio, StudioPosStore pos, JobAccessService access) =>
+{
+    if (studio.GetJob(jobId) is null) return Results.NotFound();
+    if (!access.HasPermission(user, jobId, "UsePos")) return Results.Forbid();
+    if (request.Lines is null || request.Lines.Count == 0 || request.Lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.UnitPrice < 0m || x.Quantity <= 0)) return Results.BadRequest(new { error = "At least one valid sale line is required." });
+    try { Sale sale = pos.Create(jobId, request, studio, context.User.Identity?.Name ?? "Studio"); return Results.Created($"/api/pos/sales/{sale.Id}", sale); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
 app.MapGet("/api/pos/sales/{saleId:guid}", (Guid saleId, StudioPosStore pos) => pos.Get(saleId) is Sale sale ? Results.Ok(sale) : Results.NotFound());
 app.MapPost("/api/pos/sales/{saleId:guid}/complete", (Guid saleId, CompleteStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos) => { if (pos.Get(saleId) is null) return Results.NotFound(); string userId = context.User.Identity?.Name ?? "Studio"; try { return Results.Ok(pos.Complete(saleId, request, studio, userId)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
-app.MapPost("/api/pos/sales/{saleId:guid}/void", (Guid saleId, VoidStudioSaleRequest request, HttpContext context, StudioPosStore pos) => { if (pos.Get(saleId) is null) return Results.NotFound(); if (string.IsNullOrWhiteSpace(request.Reason)) return Results.BadRequest(new { error = "Void reason is required." }); try { return Results.Ok(pos.Void(saleId, context.User.Identity?.Name ?? "Studio", request.Reason)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
-app.MapPost("/api/pos/sales/{saleId:guid}/refunds", (Guid saleId, RefundStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos) => { if (pos.Get(saleId) is null) return Results.NotFound(); try { return Results.Ok(pos.Refund(saleId, request, studio, context.User.Identity?.Name ?? "Studio")); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
+app.MapPost("/api/pos/sales/{saleId:guid}/void", (Guid saleId, VoidStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos, ClaimsPrincipal user, JobAccessService access) =>
+{
+    Sale? sale = pos.Get(saleId); if (sale is null) return Results.NotFound();
+    if (!Guid.TryParse(sale.ReferenceId, out Guid jobId) || !access.HasPermission(user, jobId, "RefundVoidPos")) return Results.Forbid();
+    if (string.IsNullOrWhiteSpace(request.Reason)) return Results.BadRequest(new { error = "Void reason is required." });
+    try { return Results.Ok(pos.Void(saleId, context.User.Identity?.Name ?? "Studio", request.Reason)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
+app.MapPost("/api/pos/sales/{saleId:guid}/refunds", (Guid saleId, RefundStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos, ClaimsPrincipal user, JobAccessService access) =>
+{
+    Sale? sale = pos.Get(saleId); if (sale is null) return Results.NotFound();
+    if (!Guid.TryParse(sale.ReferenceId, out Guid jobId) || !access.HasPermission(user, jobId, "RefundVoidPos")) return Results.Forbid();
+    try { return Results.Ok(pos.Refund(saleId, request, studio, context.User.Identity?.Name ?? "Studio")); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
+});
 app.MapGet("/api/pos/device-agent", (IConfiguration configuration) => Results.Ok(new { baseUrl = configuration["PosDeviceAgent:BaseUrl"] ?? "https://localhost:7399" }));
 
-app.MapGet("/api/conversations/{id:guid}/attachments", (Guid id, StudioStore store, AttachmentStore attachments) => store.GetConversation(id) is null ? Results.NotFound() : Results.Ok(attachments.GetForConversation(id)));
-app.MapPost("/api/conversations/{id:guid}/attachments", async (Guid id, IFormFile file, string? visibility, ClaimsPrincipal user, StudioStore store, AttachmentStore attachments, CancellationToken token) =>
+app.MapGet("/api/conversations/{id:guid}/attachments", (Guid id, ClaimsPrincipal user, StudioStore store, AttachmentStore attachments, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess) =>
 {
-    if (store.GetConversation(id) is null) return Results.NotFound();
+    StudioConversation? conversation = store.GetConversation(id); if (conversation is null) return Results.NotFound();
+    bool allowed = workspaceAccess.HasPermission(user, conversation.WorkspaceId, "ViewAttachments") || (conversation.JobId.HasValue && jobAccess.HasPermission(user, conversation.JobId.Value, "ViewAttachments"));
+    return allowed ? Results.Ok(attachments.GetForConversation(id)) : Results.Forbid();
+});
+app.MapPost("/api/conversations/{id:guid}/attachments", async (Guid id, IFormFile file, string? visibility, ClaimsPrincipal user, StudioStore store, AttachmentStore attachments, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, CancellationToken token) =>
+{
+    StudioConversation? conversation = store.GetConversation(id); if (conversation is null) return Results.NotFound();
+    bool allowed = workspaceAccess.HasPermission(user, conversation.WorkspaceId, "AddAttachments") || (conversation.JobId.HasValue && jobAccess.HasPermission(user, conversation.JobId.Value, "AddAttachments"));
+    if (!allowed) return Results.Forbid();
     try { StudioAttachment attachment = await attachments.AddAsync(id, file, visibility ?? "External", user.Identity?.Name ?? "Unknown", token); return Results.Created($"/api/attachments/{attachment.Id}", attachment); }
     catch (InvalidOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
 }).DisableAntiforgery();
-app.MapGet("/api/attachments/{id:guid}", (Guid id, AttachmentStore attachments) => { StudioAttachment? attachment = attachments.Get(id); if (attachment is null) return Results.NotFound(); string path = attachments.GetPhysicalPath(attachment); return File.Exists(path) ? Results.File(path, attachment.ContentType, attachment.FileName, enableRangeProcessing: true) : Results.NotFound(); });
+app.MapGet("/api/attachments/{id:guid}", (Guid id, ClaimsPrincipal user, AttachmentStore attachments, StudioStore store, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess) =>
+{
+    StudioAttachment? attachment = attachments.Get(id); if (attachment is null) return Results.NotFound();
+    StudioConversation? conversation = store.GetConversation(attachment.ConversationId); if (conversation is null) return Results.NotFound();
+    bool allowed = workspaceAccess.HasPermission(user, conversation.WorkspaceId, "ViewAttachments") || (conversation.JobId.HasValue && jobAccess.HasPermission(user, conversation.JobId.Value, "ViewAttachments"));
+    if (!allowed) return Results.Forbid();
+    string path = attachments.GetPhysicalPath(attachment);
+    return File.Exists(path) ? Results.File(path, attachment.ContentType, attachment.FileName, enableRangeProcessing: true) : Results.NotFound();
+});
 
 app.MapGet("/api/accounts/summary", (StudioStore store) => Results.Ok(store.GetAccountsSummary()));
 app.MapFallbackToFile("index.html").RequireAuthorization();
