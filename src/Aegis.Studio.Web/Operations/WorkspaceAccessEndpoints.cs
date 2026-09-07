@@ -8,13 +8,13 @@ public static class WorkspaceAccessEndpoints
 {
     public static void MapWorkspaceAccess(this WebApplication app)
     {
+        app.UseMiddleware<WorkspaceAuthorizationMiddleware>();
+
         app.MapGet("/api/workspace-access", (ClaimsPrincipal user, StudioDatabase database, WorkspaceStore workspaces) =>
         {
             WorkspaceAccessService access = new(database);
             IReadOnlyList<Guid> ids = access.GetAccessibleWorkspaceIds(user);
-            IReadOnlyList<StudioWorkspaceDefinition> values = workspaces.GetAll()
-                .Where(x => ids.Contains(x.Id))
-                .ToList();
+            IReadOnlyList<StudioWorkspaceDefinition> values = workspaces.GetAll().Where(x => ids.Contains(x.Id)).ToList();
             return Results.Ok(values.Select(x => new { workspace = x, permissions = access.GetPermissions(user, x.Id) }));
         }).RequireAuthorization();
 
