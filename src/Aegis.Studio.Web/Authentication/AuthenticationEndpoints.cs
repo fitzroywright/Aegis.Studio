@@ -29,21 +29,16 @@ public static class AuthenticationEndpoints
 
             string userName = request.UserName.Trim();
             string? directoryDisplayName = result.UserInfo?.DisplayName;
-            string displayName = string.IsNullOrWhiteSpace(directoryDisplayName)
-                ? userName
-                : directoryDisplayName!;
-
+            string displayName = string.IsNullOrWhiteSpace(directoryDisplayName) ? userName : directoryDisplayName!;
             List<Claim> claims =
             [
                 new Claim(ClaimTypes.NameIdentifier, userName),
                 new Claim(ClaimTypes.Name, displayName),
                 new Claim("login_name", userName)
             ];
-
             AddOptionalClaim(claims, ClaimTypes.Email, result.UserInfo?.Mail);
             AddOptionalClaim(claims, "department", result.UserInfo?.Department);
             AddOptionalClaim(claims, "title", result.UserInfo?.Title);
-
             if (result.IsAdministrative)
             {
                 claims.Add(new Claim(ClaimTypes.Role, "Administrator"));
@@ -51,57 +46,14 @@ public static class AuthenticationEndpoints
 
             ClaimsIdentity identity = new(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             ClaimsPrincipal principal = new(identity);
-            AuthenticationProperties properties = new()
-            {
-                IsPersistent = false,
-                AllowRefresh = true
-            };
-
-            await httpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                principal,
-                properties);
-
+            await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = false, AllowRefresh = true });
             return Results.Ok(CreateCurrentUser(principal));
         }).AllowAnonymous();
 
         app.MapGet("/api/auth/me", (ClaimsPrincipal user, UserProfileStore profiles) =>
         {
             StudioUserProfile profile = profiles.GetOrCreate(user);
-            return Results.Ok(new
-            {
-                user = CreateCurrentUser(user),
-                profile
-            });
-        }).RequireAuthorization();
-
-        app.MapGet("/api/profile", (ClaimsPrincipal user, UserProfileStore profiles) =>
-            Results.Ok(profiles.GetOrCreate(user)))
-            .RequireAuthorization();
-
-        app.MapPut("/api/profile/messaging", (ClaimsPrincipal user, UserMessagingPreferences request, UserProfileStore profiles) =>
-            Results.Ok(profiles.UpdatePreferences(user, request)))
-            .RequireAuthorization();
-
-        app.MapGet("/api/admin/users/profiles", (ClaimsPrincipal user, UserProfileStore profiles) =>
-        {
-            if (!user.IsInRole("Administrator"))
-            {
-                return Results.Forbid();
-            }
-
-            return Results.Ok(profiles.GetAll());
-        }).RequireAuthorization();
-
-        app.MapPut("/api/admin/users/{userName}/messaging", (string userName, ClaimsPrincipal user, UserMessagingPreferences request, UserProfileStore profiles) =>
-        {
-            if (!user.IsInRole("Administrator"))
-            {
-                return Results.Forbid();
-            }
-
-            StudioUserProfile? updated = profiles.UpdateAsAdministrator(userName, request);
-            return updated is null ? Results.NotFound() : Results.Ok(updated);
+            return Results.Ok(new { user = CreateCurrentUser(user), profile });
         }).RequireAuthorization();
 
         app.MapPost("/api/auth/logout", async (HttpContext httpContext) =>
@@ -112,8 +64,7 @@ public static class AuthenticationEndpoints
     }
 
     private static object CreateCurrentUser(ClaimsPrincipal user)
-    {
-        return new
+        => new
         {
             userName = user.FindFirstValue("login_name") ?? user.Identity?.Name ?? string.Empty,
             displayName = user.Identity?.Name ?? string.Empty,
@@ -122,14 +73,10 @@ public static class AuthenticationEndpoints
             title = user.FindFirstValue("title"),
             isAdministrator = user.IsInRole("Administrator")
         };
-    }
 
     private static void AddOptionalClaim(List<Claim> claims, string claimType, string? value)
     {
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            claims.Add(new Claim(claimType, value));
-        }
+        if (!string.IsNullOrWhiteSpace(value)) claims.Add(new Claim(claimType, value));
     }
 }
 
