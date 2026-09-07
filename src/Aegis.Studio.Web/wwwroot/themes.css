@@ -1,0 +1,154 @@
+:root{
+  --theme-bg:#f4f6f8;
+  --theme-surface:#ffffff;
+  --theme-surface-2:#f7f8fa;
+  --theme-border:#dfe3e8;
+  --theme-text:#172033;
+  --theme-muted:#778195;
+  --theme-header:#101827;
+  --theme-rail:#182234;
+  --theme-rail-active:#27354b;
+  --theme-accent:#182d4c;
+  --theme-accent-soft:#eef4fb;
+  --theme-internal:#fff6d9;
+  --theme-internal-border:#f0df9d;
+  --theme-radius:9px;
+  --theme-shadow:0 12px 30px rgba(15,23,42,.10);
+}
+
+body[data-theme="office-light"]{
+  --theme-bg:#f5f5f5;
+  --theme-surface:#ffffff;
+  --theme-surface-2:#fafafa;
+  --theme-border:#d8d8d8;
+  --theme-text:#252525;
+  --theme-muted:#6a6a6a;
+  --theme-header:#ffffff;
+  --theme-rail:#f2f2f2;
+  --theme-rail-active:#e2eaf4;
+  --theme-accent:#2b579a;
+  --theme-accent-soft:#eaf2fb;
+  --theme-internal:#fff4ce;
+  --theme-internal-border:#e7cf71;
+  --theme-radius:4px;
+  --theme-shadow:0 8px 24px rgba(0,0,0,.08);
+}
+
+body[data-theme="fluent-dark"]{
+  --theme-bg:#111318;
+  --theme-surface:#1b1f27;
+  --theme-surface-2:#151922;
+  --theme-border:#323844;
+  --theme-text:#f2f5f8;
+  --theme-muted:#a7b0bd;
+  --theme-header:#0c0f14;
+  --theme-rail:#121722;
+  --theme-rail-active:#29364d;
+  --theme-accent:#6aa7ff;
+  --theme-accent-soft:#1d2d43;
+  --theme-internal:#3b3215;
+  --theme-internal-border:#6d5b21;
+  --theme-radius:10px;
+  --theme-shadow:0 16px 36px rgba(0,0,0,.35);
+}
+
+body[data-theme="mid-century"]{
+  --theme-bg:#efe8d8;
+  --theme-surface:#fffaf0;
+  --theme-surface-2:#f2e5cd;
+  --theme-border:#c8aa7c;
+  --theme-text:#2b332f;
+  --theme-muted:#6b675e;
+  --theme-header:#294d45;
+  --theme-rail:#d76d4a;
+  --theme-rail-active:#a84e36;
+  --theme-accent:#1f6c64;
+  --theme-accent-soft:#d9e7df;
+  --theme-internal:#f3d79b;
+  --theme-internal-border:#d2aa5b;
+  --theme-radius:2px;
+  --theme-shadow:8px 8px 0 rgba(65,54,41,.12);
+}
+
+body[data-theme="steel"]{
+  --theme-bg:#e9edf0;
+  --theme-surface:#f8fafb;
+  --theme-surface-2:#dde4e9;
+  --theme-border:#aeb9c2;
+  --theme-text:#17232c;
+  --theme-muted:#65727d;
+  --theme-header:#26343e;
+  --theme-rail:#354651;
+  --theme-rail-active:#4d6370;
+  --theme-accent:#4c6f82;
+  --theme-accent-soft:#dce7ec;
+  --theme-internal:#edf0d2;
+  --theme-internal-border:#c3c99b;
+  --theme-radius:3px;
+  --theme-shadow:0 10px 20px rgba(29,44,54,.15);
+}
+
+body[data-theme="sakura"]{
+  --theme-bg:#fff7f8;
+  --theme-surface:#fffdfd;
+  --theme-surface-2:#fff1f4;
+  --theme-border:#efcbd2;
+  --theme-text:#3f2830;
+  --theme-muted:#8b6974;
+  --theme-header:#7d3d52;
+  --theme-rail:#9d5870;
+  --theme-rail-active:#753e52;
+  --theme-accent:#a74767;
+  --theme-accent-soft:#f9e1e8;
+  --theme-internal:#fff0c9;
+  --theme-internal-border:#e4c984;
+  --theme-radius:14px;
+  --theme-shadow:0 14px 32px rgba(126,61,82,.13);
+}
+
+body[data-theme="ocean"]{
+  --theme-bg:#edf7f8;
+  --theme-surface:#fbffff;
+  --theme-surface-2:#e5f3f4;
+  --theme-border:#acd0d3;
+  --theme-text:#15353a;
+  --theme-muted:#5e7b80;
+  --theme-header:#073b4c;
+  --theme-rail:#0b5967;
+  --theme-rail-active:#11798a;
+  --theme-accent:#0f7483;
+  --theme-accent-soft:#d4eef0;
+  --theme-internal:#f5e8bb;
+  --theme-internal-border:#d7c06c;
+  --theme-radius:12px;
+  --theme-shadow:0 12px 30px rgba(5,68,78,.13);
+}
+
+body{background:var(--theme-bg);color:var(--theme-text)}
+.topbar{background:var(--theme-header);color:#fff;border-bottom:1px solid var(--theme-border)}
+body[data-theme="office-light"] .topbar{color:var(--theme-text)}
+.rail{background:var(--theme-rail)}
+.brand-button:hover,.brand-button.active{background:var(--theme-rail-active);color:#fff}
+body[data-theme="office-light"] .brand-button{color:#4b4b4b}
+body[data-theme="office-light"] .brand-button:hover,body[data-theme="office-light"] .brand-button.active{color:#1f1f1f}
+.workspaces,.detail-pane,.conversation-card,.composer,.metric,.job-row,.job-section,dialog{background:var(--theme-surface);border-color:var(--theme-border);color:var(--theme-text)}
+.list-pane{background:var(--theme-surface-2);border-color:var(--theme-border)}
+.pane-heading,.detail-header,.composer{border-color:var(--theme-border)}
+.workspace,.conversation-card,.job-button,.link-button{color:var(--theme-text)}
+.workspace:hover,.workspace.active,.conversation-card:hover,.conversation-card.active{background:var(--theme-accent-soft)}
+.section-title,.meta,.snippet,.pane-heading p,.detail-header p,.muted,.empty-state,.financial-row small{color:var(--theme-muted)}
+.empty-state h2{color:var(--theme-text)}
+.message{background:var(--theme-surface-2);color:var(--theme-text)}
+.message.external{background:var(--theme-accent-soft)}
+.message.internal{background:var(--theme-internal);border-color:var(--theme-internal-border)}
+.primary{background:var(--theme-accent);color:#fff;border-radius:var(--theme-radius)}
+.action,.pane-heading button,.profile-button,.theme-picker{background:var(--theme-surface);border:1px solid var(--theme-border);color:var(--theme-text);border-radius:var(--theme-radius)}
+.metric,.job-row,.job-section,.conversation-card,.workspace,.message,dialog{border-radius:var(--theme-radius)}
+dialog{box-shadow:var(--theme-shadow)}
+input,select,textarea{background:var(--theme-surface);color:var(--theme-text);border-color:var(--theme-border)!important}
+.status-pill,.badge{background:var(--theme-accent-soft);color:var(--theme-text)}
+.theme-picker{padding:7px 9px;max-width:160px;font:inherit}
+body[data-theme="mid-century"] .topbar strong{letter-spacing:.12em}
+body[data-theme="steel"] .brand-button,body[data-theme="steel"] .section-title{text-transform:uppercase;letter-spacing:.05em}
+body[data-theme="sakura"] .topbar{box-shadow:0 4px 18px rgba(126,61,82,.12)}
+body[data-theme="ocean"] .topbar{box-shadow:0 4px 18px rgba(5,68,78,.12)}
