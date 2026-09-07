@@ -4,6 +4,9 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient("Aegis", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Aegis:BaseUrl"] ?? "https://localhost:7248");
+    string bookingApiKey = builder.Configuration["Aegis:BookingApiKey"]
+        ?? throw new InvalidOperationException("Aegis:BookingApiKey must be configured.");
+    client.DefaultRequestHeaders.Add("X-Aegis-Booking-Key", bookingApiKey);
 });
 
 WebApplication app = builder.Build();
