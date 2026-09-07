@@ -1,4 +1,5 @@
 let frontDeskJobs = [];
+let frontDeskRole = null;
 
 const frontDeskBaseActivateView = activateView;
 activateView = function(view) {
@@ -10,7 +11,30 @@ activateView = function(view) {
     frontDeskBaseActivateView(view);
 };
 
+async function loadFrontDeskRole() {
+    try {
+        frontDeskRole = await json('/api/security/global-role-me');
+        const button = document.querySelector('.brand-button[data-view="frontdesk"]');
+        if (button) {
+            const me = await json('/api/auth/me');
+            button.classList.toggle('hidden', !frontDeskRole.frontDesk && !me.isAdministrator);
+        }
+    } catch {
+        frontDeskRole = { frontDesk: false, permissions: {} };
+    }
+}
+
 async function showFrontDesk() {
+    if (!frontDeskRole) await loadFrontDeskRole();
+    const me = await json('/api/auth/me');
+    if (!frontDeskRole?.frontDesk && !me.isAdministrator) {
+        activateNavigation('frontdesk');
+        conversationView.classList.add('hidden');
+        genericView.classList.remove('hidden');
+        genericView.innerHTML = '<h1>Front Desk</h1><p class="muted">You are not assigned to the Front Desk operational role.</p>';
+        return;
+    }
+
     activateNavigation('frontdesk');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
@@ -80,23 +104,22 @@ async function openFrontDeskClient(jobId) {
 async function notifyFrontDeskTeam(jobId) {
     let members;
     try {
-        members = await json(`/api/jobs/${jobId}/members`);
+        members = await json(`/api/jobs/${jobId}/notifiable-members`);
     } catch (error) {
-        alert('You need Job Member management permission to select and notify individual job members from Front Desk.');
+        alert('You do not have permission to notify members for this job.');
         return;
     }
 
-    const active = members.filter(member => member.isActive);
-    if (!active.length) {
-        alert('This job has no explicit active members to notify.');
+    if (!members.length) {
+        alert('This job and its workspace have no active members to notify.');
         return;
     }
 
-    const choices = active.map((member, index) => `${index + 1}. ${member.displayName || member.userName} (${member.userName})`).join('\n');
-    const selected = Number(prompt(`Notify which job member?\n\n${choices}`, '1'));
-    if (!Number.isInteger(selected) || selected < 1 || selected > active.length) return;
+    const choices = members.map((member, index) => `${index + 1}. ${member.displayName || member.userName} (${member.userName}) · ${member.source}`).join('\n');
+    const selected = Number(prompt(`Notify which member?\n\n${choices}`, '1'));
+    if (!Number.isInteger(selected) || selected < 1 || selected > members.length) return;
 
-    const member = active[selected - 1];
+    const member = members[selected - 1];
     const subject = prompt('Subject', 'Front Desk message');
     if (!subject) return;
     const body = prompt('Message');
@@ -109,3 +132,5 @@ async function notifyFrontDeskTeam(jobId) {
     });
     alert(`Notification sent to ${member.displayName || member.userName}.`);
 }
+
+loadFrontDeskRole();
