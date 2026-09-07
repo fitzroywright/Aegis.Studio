@@ -1,8 +1,6 @@
 using System.Security.Claims;
-using Aegis.Studio.Web.Email;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
-using Aegis.Studio.Web.Persistence;
 
 namespace Aegis.Studio.Web.Scheduling;
 
@@ -43,11 +41,7 @@ public static class ScheduleEndpoints
             ClaimsPrincipal user,
             ScheduleStore store,
             JobAccessService access,
-            StudioDatabase database,
-            NotificationService notifications,
-            StudioStore studio,
-            WorkspaceAccessService workspaceAccess,
-            OutboundEmailStore outbox) =>
+            JobEventNotifier notifier) =>
         {
             if (!request.JobId.HasValue)
             {
@@ -62,7 +56,6 @@ public static class ScheduleEndpoints
                 ScheduleEntry value = store.Create(request);
                 if (value.JobId.HasValue)
                 {
-                    JobEventNotifier notifier = new(database, notifications, studio, workspaceAccess, access, outbox);
                     notifier.Publish(
                         value.JobId.Value,
                         "ScheduleChanged",
@@ -82,11 +75,7 @@ public static class ScheduleEndpoints
             ClaimsPrincipal user,
             ScheduleStore store,
             JobAccessService access,
-            StudioDatabase database,
-            NotificationService notifications,
-            StudioStore studio,
-            WorkspaceAccessService workspaceAccess,
-            OutboundEmailStore outbox) =>
+            JobEventNotifier notifier) =>
         {
             ScheduleEntry? current = store.GetEntries(DateTimeOffset.UtcNow.AddYears(-5), DateTimeOffset.UtcNow.AddYears(5)).FirstOrDefault(x => x.Id == id);
             Guid? jobId = request.JobId ?? current?.JobId;
@@ -103,7 +92,6 @@ public static class ScheduleEndpoints
                 ScheduleEntry value = store.Update(id, request);
                 if (value.JobId.HasValue)
                 {
-                    JobEventNotifier notifier = new(database, notifications, studio, workspaceAccess, access, outbox);
                     string verb = value.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) ? "Cancelled" : "Schedule updated";
                     notifier.Publish(
                         value.JobId.Value,
