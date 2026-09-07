@@ -24,6 +24,24 @@ public sealed class SensitiveRouteAuthorizationTests
         Assert.Equal("complete", operation);
     }
 
+    [Fact]
+    public void BookingPathParserExtractsBookingAndOperation()
+    {
+        Guid id = Guid.NewGuid();
+        Assert.True(SensitiveRouteAuthorization.TryParseBookingPath($"/api/bookings/{id}/status", out Guid parsed, out string? operation));
+        Assert.Equal(id, parsed);
+        Assert.Equal("status", operation);
+    }
+
+    [Fact]
+    public void BookingPaymentPathParserExtractsOperation()
+    {
+        Guid id = Guid.NewGuid();
+        Assert.True(SensitiveRouteAuthorization.TryParseBookingPath($"/api/bookings/{id}/payment-confirmations", out Guid parsed, out string? operation));
+        Assert.Equal(id, parsed);
+        Assert.Equal("payment-confirmations", operation);
+    }
+
     [Theory]
     [InlineData("/api/jobs/123")]
     [InlineData("/api/pos/catalog")]
@@ -31,5 +49,14 @@ public sealed class SensitiveRouteAuthorizationTests
     public void NonSalePathsAreRejectedByParser(string path)
     {
         Assert.False(SensitiveRouteAuthorization.TryParsePosSalePath(path, out _, out _));
+    }
+
+    [Theory]
+    [InlineData("/api/bookings")]
+    [InlineData("/api/bookings/not-a-guid")]
+    [InlineData("/api/jobs/123")]
+    public void NonSpecificBookingPathsAreRejectedByParser(string path)
+    {
+        Assert.False(SensitiveRouteAuthorization.TryParseBookingPath(path, out _, out _));
     }
 }
