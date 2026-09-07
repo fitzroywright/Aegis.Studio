@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Aegis.Studio.Web.Operations;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Aegis.Studio.Web.Profiles;
@@ -7,6 +8,8 @@ public static class UserProfileEndpoints
 {
     public static void MapStudioUserProfiles(this WebApplication app)
     {
+        app.MapWorkspaceAccess();
+
         app.MapGet("/api/profile", (ClaimsPrincipal user, UserProfileStore profiles) =>
             Results.Ok(profiles.GetOrCreate(user)))
             .RequireAuthorization();
