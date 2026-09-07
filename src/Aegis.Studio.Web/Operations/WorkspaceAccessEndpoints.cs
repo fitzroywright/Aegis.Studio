@@ -18,6 +18,20 @@ public static class WorkspaceAccessEndpoints
             return Results.Ok(values.Select(x => new { workspace = x, permissions = access.GetPermissions(user, x.Id) }));
         }).RequireAuthorization();
 
+        app.MapGet("/api/workspaces/{workspaceId:guid}", (Guid workspaceId, ClaimsPrincipal user, StudioDatabase database, WorkspaceStore workspaces) =>
+        {
+            WorkspaceAccessService access = new(database);
+            if (!access.HasPermission(user, workspaceId, "AccessWorkspace")) return Results.Forbid();
+            return workspaces.Get(workspaceId) is StudioWorkspaceDefinition workspace ? Results.Ok(workspace) : Results.NotFound();
+        }).RequireAuthorization();
+
+        app.MapPut("/api/workspaces/{workspaceId:guid}", (Guid workspaceId, SaveWorkspaceRequest request, ClaimsPrincipal user, StudioDatabase database, WorkspaceStore workspaces) =>
+        {
+            WorkspaceAccessService access = new(database);
+            if (!access.HasPermission(user, workspaceId, "EditWorkspace") && !access.HasPermission(user, workspaceId, "AdminWorkspace")) return Results.Forbid();
+            try { return Results.Ok(workspaces.Update(workspaceId, request)); } catch (KeyNotFoundException) { return Results.NotFound(); }
+        }).RequireAuthorization();
+
         app.MapGet("/api/workspaces/{workspaceId:guid}/permissions", (Guid workspaceId, ClaimsPrincipal user, StudioDatabase database) =>
         {
             WorkspaceAccessService access = new(database);
