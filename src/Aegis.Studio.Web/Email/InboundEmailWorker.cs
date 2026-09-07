@@ -1,5 +1,6 @@
 using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Infrastructure.Email;
+using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
 
 namespace Aegis.Studio.Web.Email;
@@ -12,6 +13,7 @@ public sealed class InboundEmailWorker : BackgroundService
     private readonly UnroutedEmailStore unroutedStore;
     private readonly OutboundEmailStore outboundStore;
     private readonly GraphEmailDeltaStateStore deltaStateStore;
+    private readonly NotificationService notifications;
     private readonly ILogger<InboundEmailWorker> logger;
 
     public InboundEmailWorker(
@@ -21,6 +23,7 @@ public sealed class InboundEmailWorker : BackgroundService
         UnroutedEmailStore unroutedStore,
         OutboundEmailStore outboundStore,
         GraphEmailDeltaStateStore deltaStateStore,
+        NotificationService notifications,
         ILogger<InboundEmailWorker> logger)
     {
         this.graphClient = graphClient;
@@ -29,6 +32,7 @@ public sealed class InboundEmailWorker : BackgroundService
         this.unroutedStore = unroutedStore;
         this.outboundStore = outboundStore;
         this.deltaStateStore = deltaStateStore;
+        this.notifications = notifications;
         this.logger = logger;
     }
 
@@ -36,11 +40,11 @@ public sealed class InboundEmailWorker : BackgroundService
     {
         if (!graphClient.IsConfigured)
         {
-            logger.LogInformation("Microsoft Graph email ingestion is disabled or not configured.");
+            logger.LogWarning("Microsoft Graph email ingestion is enabled but credentials are incomplete. Configure the client secret and restart Studio.");
             return;
         }
 
-        logger.LogInformation("Microsoft Graph email ingestion started for the AegisHub collection mailbox.");
+        logger.LogInformation("Microsoft Graph email ingestion started for the collection mailbox.");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -67,8 +71,15 @@ public sealed class InboundEmailWorker : BackgroundService
 
                     if (result.CreatedConversation)
                     {
-                        outboundStore.QueueAcknowledgement(result.Conversation, route.WorkspaceName ?? "Aegis Studio");
+                        outboundStore.QueueAcknowledgement(result.Conversation, route.WorkspaceName ?? "Studio");
                     }
+
+                    notifications.PublishToAll(
+                        "WorkspaceMessage",
+                        $"Email: {email.Subject}",
+                        $"New email from {email.FromName} routed to {route.WorkspaceName}.",
+                        "Conversation",
+                        result.Conversation.Id.ToString("D"));
 
                     logger.LogInformation("Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}", email.MessageId, route.WorkspaceName, result.Conversation.Id, result.CreatedConversation);
                 }
