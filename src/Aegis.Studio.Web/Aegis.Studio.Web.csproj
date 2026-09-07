@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <UserSecretsId>Aegis.Studio.Web-Development</UserSecretsId>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
@@ -12,6 +13,6 @@
   <ItemGroup>
     <PackageReference Include="Common.Security" Version="1.0.0" />
     <PackageReference Include="Npgsql" Version="10.0.0" />
-    <PackageReference Include="MailKit" Version="4.14.1" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
   </ItemGroup>
 </Project>
