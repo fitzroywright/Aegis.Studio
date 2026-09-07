@@ -40,28 +40,17 @@ public sealed class JobEventNotifier
         }
 
         HashSet<string> recipients = new(StringComparer.OrdinalIgnoreCase);
-        foreach (JobMember member in jobAccess.GetMembers(jobId).Where(x => x.IsActive))
-        {
-            recipients.Add(member.UserName);
-        }
-        foreach (WorkspaceMember member in workspaceAccess.GetMembers(job.WorkspaceId).Where(x => x.IsActive))
-        {
-            recipients.Add(member.UserName);
-        }
-
-        foreach (string userName in recipients)
-        {
-            notifications.PublishToUser(userName, eventType, subject, body, "Job", jobId.ToString("D"));
-        }
+        foreach (JobMember member in jobAccess.GetMembers(jobId).Where(x => x.IsActive)) recipients.Add(member.UserName);
+        foreach (WorkspaceMember member in workspaceAccess.GetMembers(job.WorkspaceId).Where(x => x.IsActive)) recipients.Add(member.UserName);
+        foreach (string userName in recipients) notifications.PublishToUser(userName, eventType, subject, body, "Job", jobId.ToString("D"));
 
         if (requesterEligible && RequesterWants(jobId, eventType))
         {
             StudioConversation? conversation = studio.GetConversation(job.ConversationId);
-            if (conversation is not null && conversation.Channel.Equals("Email", StringComparison.OrdinalIgnoreCase) && conversation.ContactAddress.Contains('@'))
-            {
-                outbox.QueueNotification(conversation, subject, body);
-            }
+            if (conversation is not null && conversation.Channel.Equals("Email", StringComparison.OrdinalIgnoreCase) && conversation.ContactAddress.Contains('@')) outbox.QueueNotification(conversation, subject, body);
         }
+
+        WorkflowAutomationRuntime.Publish(eventType, jobId, new { subject, body, requesterEligible });
     }
 
     public RequesterNotificationPreferences GetRequesterPreferences(Guid jobId)
@@ -71,18 +60,12 @@ public sealed class JobEventNotifier
         command.CommandText = "select schedule_changes,status_changes,production_milestones,delivery_updates from studio_requester_notification_preferences where job_id=$1";
         command.Parameters.AddWithValue(jobId);
         using NpgsqlDataReader reader = command.ExecuteReader();
-        return reader.Read()
-            ? new RequesterNotificationPreferences(reader.GetBoolean(0), reader.GetBoolean(1), reader.GetBoolean(2), reader.GetBoolean(3))
-            : new RequesterNotificationPreferences(false, false, false, false);
+        return reader.Read() ? new RequesterNotificationPreferences(reader.GetBoolean(0), reader.GetBoolean(1), reader.GetBoolean(2), reader.GetBoolean(3)) : new RequesterNotificationPreferences(false, false, false, false);
     }
 
     public RequesterNotificationPreferences SaveRequesterPreferences(Guid jobId, RequesterNotificationPreferences preferences)
     {
-        if (studio.GetJob(jobId) is null)
-        {
-            throw new KeyNotFoundException("Job was not found.");
-        }
-
+        if (studio.GetJob(jobId) is null) throw new KeyNotFoundException("Job was not found.");
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -91,32 +74,19 @@ public sealed class JobEventNotifier
             on conflict(job_id) do update set schedule_changes=excluded.schedule_changes,status_changes=excluded.status_changes,
                 production_milestones=excluded.production_milestones,delivery_updates=excluded.delivery_updates,updated_at_utc=now()
             """;
-        command.Parameters.AddWithValue(jobId);
-        command.Parameters.AddWithValue(preferences.ScheduleChanges);
-        command.Parameters.AddWithValue(preferences.StatusChanges);
-        command.Parameters.AddWithValue(preferences.ProductionMilestones);
-        command.Parameters.AddWithValue(preferences.DeliveryUpdates);
-        command.ExecuteNonQuery();
+        command.Parameters.AddWithValue(jobId); command.Parameters.AddWithValue(preferences.ScheduleChanges); command.Parameters.AddWithValue(preferences.StatusChanges); command.Parameters.AddWithValue(preferences.ProductionMilestones); command.Parameters.AddWithValue(preferences.DeliveryUpdates); command.ExecuteNonQuery();
         return preferences;
     }
 
     private bool RequesterWants(Guid jobId, string eventType)
     {
         RequesterNotificationPreferences preferences = GetRequesterPreferences(jobId);
-        return eventType switch
-        {
-            "ScheduleChanged" => preferences.ScheduleChanges,
-            "JobStatusChanged" => preferences.StatusChanges,
-            "ProductionChanged" => preferences.ProductionMilestones,
-            "DeliveryChanged" => preferences.DeliveryUpdates,
-            _ => false
-        };
+        return eventType switch { "ScheduleChanged" => preferences.ScheduleChanges, "JobStatusChanged" => preferences.StatusChanges, "ProductionChanged" => preferences.ProductionMilestones, "DeliveryChanged" => preferences.DeliveryUpdates, _ => false };
     }
 
     private void EnsureSchema()
     {
-        using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlCommand command = connection.CreateCommand();
+        using NpgsqlConnection connection = database.OpenConnection(); using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             create table if not exists studio_requester_notification_preferences
             (
@@ -127,13 +97,8 @@ public sealed class JobEventNotifier
                 delivery_updates boolean not null default false,
                 updated_at_utc timestamptz not null
             )
-            """;
-        command.ExecuteNonQuery();
+            """; command.ExecuteNonQuery();
     }
 }
 
-public sealed record RequesterNotificationPreferences(
-    bool ScheduleChanges,
-    bool StatusChanges,
-    bool ProductionMilestones,
-    bool DeliveryUpdates);
+public sealed record RequesterNotificationPreferences(bool ScheduleChanges,bool StatusChanges,bool ProductionMilestones,bool DeliveryUpdates);
