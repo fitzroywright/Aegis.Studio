@@ -37,10 +37,25 @@ public sealed class AuthorizationTests
     }
 
     [Fact]
+    public void WorkspaceMemberManagerCannotGrantWorkspaceAdminBeyondOwnRights()
+    {
+        WorkspacePermissionSet caller = new(true,true,true,true,true,true,true,true,true,true,false,true,false);
+        Assert.False(WorkspaceAccessEndpoints.PermissionsWithin(WorkspacePermissionSet.Full, caller));
+        Assert.True(WorkspaceAccessEndpoints.PermissionsWithin(WorkspacePermissionSet.ViewOnly, caller));
+    }
+
+    [Fact]
     public void JobManagerDoesNotImplicitlyGainRefundVoidPermission()
     {
         Assert.False(JobPermissionSet.JobManager.RefundVoidPos);
         Assert.True(JobPermissionSet.Full.RefundVoidPos);
+    }
+
+    [Fact]
+    public void JobManagerCannotGrantRefundVoidOrAdminBeyondOwnRights()
+    {
+        Assert.False(JobAccessEndpoints.PermissionsWithin(JobPermissionSet.Full, JobPermissionSet.JobManager));
+        Assert.True(JobAccessEndpoints.PermissionsWithin(JobPermissionSet.Viewer, JobPermissionSet.JobManager));
     }
 
     [Fact]
