@@ -6,33 +6,10 @@ namespace Aegis.Studio.Web.Operations;
 public sealed class WorkspaceStore
 {
     private readonly StudioDatabase database;
-    private readonly IConfiguration configuration;
 
-    public WorkspaceStore(StudioDatabase database, IConfiguration configuration)
+    public WorkspaceStore(StudioDatabase database)
     {
         this.database = database;
-        this.configuration = configuration;
-    }
-
-    public void EnsureBootstrapWorkspaces()
-    {
-        if (GetAll(true).Count > 0)
-        {
-            return;
-        }
-
-        List<WorkspaceBootstrap> configured = configuration.GetSection("EmailRouting:Routes").Get<List<WorkspaceBootstrap>>() ?? [];
-        int sortOrder = 0;
-        foreach (WorkspaceBootstrap item in configured)
-        {
-            Save(new StudioWorkspaceDefinition(
-                item.WorkspaceId == Guid.Empty ? Guid.NewGuid() : item.WorkspaceId,
-                item.WorkspaceName.Trim(),
-                string.IsNullOrWhiteSpace(item.Address) ? null : item.Address.Trim(),
-                string.IsNullOrWhiteSpace(item.RouteKey) ? null : item.RouteKey.Trim(),
-                item.IsEnabled,
-                sortOrder++));
-        }
     }
 
     public IReadOnlyList<StudioWorkspaceDefinition> GetAll(bool includeDisabled = false)
@@ -143,11 +120,3 @@ public sealed class WorkspaceStore
 
 public sealed record StudioWorkspaceDefinition(Guid Id, string Name, string? EmailAddress, string? RouteKey, bool IsEnabled, int SortOrder);
 public sealed record SaveWorkspaceRequest(string Name, string? EmailAddress, string? RouteKey, bool IsEnabled, int SortOrder);
-public sealed class WorkspaceBootstrap
-{
-    public Guid WorkspaceId { get; init; }
-    public string WorkspaceName { get; init; } = string.Empty;
-    public string Address { get; init; } = string.Empty;
-    public string RouteKey { get; init; } = string.Empty;
-    public bool IsEnabled { get; init; } = true;
-}
