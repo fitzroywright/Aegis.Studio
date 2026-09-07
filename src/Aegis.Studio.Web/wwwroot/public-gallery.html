@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bryan Studios Gallery</title>
+  <link rel="stylesheet" href="/public-gallery.css">
+</head>
+<body>
+  <header class="gallery-header">
+    <div>
+      <div class="eyebrow">BRYAN STUDIOS</div>
+      <h1 id="galleryTitle">Client Gallery</h1>
+      <p id="galleryDescription"></p>
+    </div>
+  </header>
+  <main>
+    <section id="emptyState" class="empty hidden"><h2>No images are available</h2><p>This gallery has not published any visible photographs yet.</p></section>
+    <section id="galleryExperience" class="hidden">
+      <div class="carousel-shell">
+        <button id="previousImage" class="carousel-control previous" aria-label="Previous image">‹</button>
+        <figure class="preview-stage"><img id="previewImage" alt="Gallery preview"><figcaption id="previewCaption"></figcaption></figure>
+        <button id="nextImage" class="carousel-control next" aria-label="Next image">›</button>
+      </div>
+      <div class="thumbnail-wrap"><div id="thumbnailStrip" class="thumbnail-strip" aria-label="Gallery thumbnails"></div></div>
+      <div id="galleryGrid" class="gallery-grid"></div>
+    </section>
+  </main>
+  <script src="/public-gallery.js"></script>
+</body>
+</html>
