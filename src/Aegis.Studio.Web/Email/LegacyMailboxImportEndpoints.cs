@@ -4,6 +4,7 @@ using Aegis.Studio.Web.Storage;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
+using MailKit.Security;
 using MimeKit;
 
 namespace Aegis.Studio.Web.Email;
@@ -53,12 +54,25 @@ public sealed class LegacyMailboxImporter
     public async Task<LegacyMailboxImportResult> ImportAsync(StudioWorkspaceDefinition workspace, LegacyMailboxImportRequest request, CancellationToken cancellationToken)
     {
         ProviderSettings provider = ProviderSettings.Resolve(request.Provider);
-        if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Secret)) throw new InvalidOperationException("Mailbox user name and app password/token are required.");
+        if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Secret)) throw new InvalidOperationException("Mailbox user name and credential are required.");
+        string authenticationMode = string.IsNullOrWhiteSpace(request.AuthenticationMode) ? provider.DefaultAuthenticationMode : request.AuthenticationMode.Trim();
         int maximum = Math.Clamp(request.MaximumMessages ?? 5000, 1, 50000);
         int imported = 0; int duplicates = 0; int attachmentCount = 0; int failed = 0;
         using ImapClient client = new();
-        await client.ConnectAsync(provider.Host, provider.Port, true, cancellationToken);
-        await client.AuthenticateAsync(request.UserName.Trim(), request.Secret, cancellationToken);
+        await client.ConnectAsync(provider.Host, provider.Port, SecureSocketOptions.SslOnConnect, cancellationToken);
+        if (authenticationMode.Equals("OAuth2", StringComparison.OrdinalIgnoreCase))
+        {
+            await client.AuthenticateAsync(new SaslMechanismOAuth2(request.UserName.Trim(), request.Secret), cancellationToken);
+        }
+        else if (authenticationMode.Equals("Password", StringComparison.OrdinalIgnoreCase) || authenticationMode.Equals("AppPassword", StringComparison.OrdinalIgnoreCase))
+        {
+            await client.AuthenticateAsync(request.UserName.Trim(), request.Secret, cancellationToken);
+        }
+        else
+        {
+            throw new InvalidOperationException("AuthenticationMode must be OAuth2 or AppPassword.");
+        }
+
         IMailFolder folder = string.IsNullOrWhiteSpace(request.Folder) ? client.Inbox : await client.GetFolderAsync(request.Folder.Trim(), cancellationToken);
         await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
         SearchQuery query = SearchQuery.All;
@@ -124,19 +138,19 @@ public sealed class LegacyMailboxImporter
             }
         }
         await client.DisconnectAsync(true, cancellationToken);
-        return new LegacyMailboxImportResult(provider.Name, request.UserName.Trim(), folder.FullName, ids.Count, imported, duplicates, attachmentCount, failed);
+        return new LegacyMailboxImportResult(provider.Name, request.UserName.Trim(), folder.FullName, authenticationMode, ids.Count, imported, duplicates, attachmentCount, failed);
     }
 }
 
-public sealed record LegacyMailboxImportRequest(string Provider,string UserName,string Secret,string? Folder,DateTimeOffset? FromUtc,DateTimeOffset? ToUtc,int? MaximumMessages);
-public sealed record LegacyMailboxImportResult(string Provider,string Mailbox,string Folder,int MatchedMessages,int ImportedMessages,int DuplicateMessages,int ImportedAttachments,int FailedMessages);
-internal sealed record ProviderSettings(string Name,string Host,int Port)
+public sealed record LegacyMailboxImportRequest(string Provider,string UserName,string Secret,string? AuthenticationMode,string? Folder,DateTimeOffset? FromUtc,DateTimeOffset? ToUtc,int? MaximumMessages);
+public sealed record LegacyMailboxImportResult(string Provider,string Mailbox,string Folder,string AuthenticationMode,int MatchedMessages,int ImportedMessages,int DuplicateMessages,int ImportedAttachments,int FailedMessages);
+internal sealed record ProviderSettings(string Name,string Host,int Port,string DefaultAuthenticationMode)
 {
     public static ProviderSettings Resolve(string? provider) => provider?.Trim().ToLowerInvariant() switch
     {
-        "gmail" => new("Gmail","imap.gmail.com",993),
-        "hotmail" or "outlook" or "live" => new("Hotmail/Outlook","outlook.office365.com",993),
-        "yahoo" => new("Yahoo","imap.mail.yahoo.com",993),
+        "gmail" => new("Gmail","imap.gmail.com",993,"AppPassword"),
+        "hotmail" or "outlook" or "live" => new("Hotmail/Outlook","outlook.office365.com",993,"OAuth2"),
+        "yahoo" => new("Yahoo","imap.mail.yahoo.com",993,"AppPassword"),
         _ => throw new InvalidOperationException("Provider must be Gmail, Hotmail/Outlook, or Yahoo.")
     };
 }
