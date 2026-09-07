@@ -30,8 +30,6 @@ string bookingApiKey = builder.Configuration["BookingApi:Key"]
 NpgsqlDataSource dataSource = NpgsqlDataSource.Create(studioConnectionString);
 builder.Services.AddSingleton(dataSource);
 builder.Services.AddSingleton<StudioDatabase>();
-// Legacy state store remains only for subsystems not yet moved to first-class tables; core Studio entities no longer use it.
-builder.Services.AddSingleton<PostgresDocumentStore>();
 
 MicrosoftGraphEmailOptions graphEmailOptions = builder.Configuration.GetSection("MicrosoftGraphEmail").Get<MicrosoftGraphEmailOptions>() ?? new MicrosoftGraphEmailOptions();
 ActiveDirectoryAuthenticationOptions activeDirectoryOptions = builder.Configuration.GetSection("Authentication:ActiveDirectory").Get<ActiveDirectoryAuthenticationOptions>() ?? throw new InvalidOperationException("Authentication:ActiveDirectory must be configured.");
@@ -58,7 +56,6 @@ builder.Services.AddHostedService<OutboundEmailWorker>();
 
 WebApplication app = builder.Build();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
-await app.Services.GetRequiredService<PostgresDocumentStore>().InitializeAsync();
 app.Services.GetRequiredService<WorkspaceStore>().EnsureBootstrapWorkspaces();
 
 app.UseAuthentication();
@@ -92,10 +89,10 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, StudioStore store) => store.GetJob(i
 app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, StudioStore store) => store.GetJob(id) is null ? Results.NotFound() : Results.Ok(store.UpdateJob(id, request)));
 
 app.MapGet("/api/bookings", (BookingStore store) => Results.Ok(store.GetAll()));
-RouteHandlerBuilder bookingDetailEndpoint = app.MapGet("/api/bookings/{id:guid}", (Guid id, HttpContext context, BookingStore store) => { if (!HasBookingServiceAccess(context, bookingApiKey)) return Results.Unauthorized(); return store.Get(id) is Booking booking ? Results.Ok(new { booking, payments = store.GetPayments(id) }) : Results.NotFound(); }).AllowAnonymous();
-RouteHandlerBuilder bookingCreateEndpoint = app.MapPost("/api/bookings", (CreateBookingIntakeRequest request, HttpContext context, BookingStore bookings, StudioStore studio) => { if (!HasBookingServiceAccess(context, bookingApiKey)) return Results.Unauthorized(); if (string.IsNullOrWhiteSpace(request.ClientName) || string.IsNullOrWhiteSpace(request.SessionType) || request.EndsAt <= request.StartsAt) return Results.BadRequest(new { error = "Client name, session type and a valid time range are required." }); try { Booking booking = bookings.Create(request, studio); return Results.Created($"/api/bookings/{booking.Id}", new { booking, job = studio.GetJob(booking.JobId) }); } catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); } }).AllowAnonymous();
+app.MapGet("/api/bookings/{id:guid}", (Guid id, HttpContext context, BookingStore store) => { if (!HasBookingServiceAccess(context, bookingApiKey)) return Results.Unauthorized(); return store.Get(id) is Booking booking ? Results.Ok(new { booking, payments = store.GetPayments(id) }) : Results.NotFound(); }).AllowAnonymous();
+app.MapPost("/api/bookings", (CreateBookingIntakeRequest request, HttpContext context, BookingStore bookings, StudioStore studio) => { if (!HasBookingServiceAccess(context, bookingApiKey)) return Results.Unauthorized(); if (string.IsNullOrWhiteSpace(request.ClientName) || string.IsNullOrWhiteSpace(request.SessionType) || request.EndsAt <= request.StartsAt) return Results.BadRequest(new { error = "Client name, session type and a valid time range are required." }); try { Booking booking = bookings.Create(request, studio); return Results.Created($"/api/bookings/{booking.Id}", new { booking, job = studio.GetJob(booking.JobId) }); } catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); } }).AllowAnonymous();
 app.MapPut("/api/bookings/{id:guid}/status", (Guid id, UpdateBookingStatusRequest request, BookingStore store) => store.Get(id) is null ? Results.NotFound() : Results.Ok(store.UpdateStatus(id, request.Status)));
-RouteHandlerBuilder paymentConfirmationEndpoint = app.MapPost("/api/bookings/{id:guid}/payment-confirmations", (Guid id, RecordPaymentConfirmationRequest request, HttpContext context, BookingStore store, StudioStore studio) => { if (!HasBookingServiceAccess(context, bookingApiKey)) return Results.Unauthorized(); Booking? booking = store.Get(id); if (booking is null) return Results.NotFound(); if (request.Amount <= 0 || string.IsNullOrWhiteSpace(request.Currency) || string.IsNullOrWhiteSpace(request.Reference) || string.IsNullOrWhiteSpace(request.Provider)) return Results.BadRequest(new { error = "Positive amount, currency, payment reference and provider are required." }); return Results.Ok(store.RecordPayment(id, request, studio)); }).AllowAnonymous();
+app.MapPost("/api/bookings/{id:guid}/payment-confirmations", (Guid id, RecordPaymentConfirmationRequest request, HttpContext context, BookingStore store, StudioStore studio) => { if (!HasBookingServiceAccess(context, bookingApiKey)) return Results.Unauthorized(); Booking? booking = store.Get(id); if (booking is null) return Results.NotFound(); if (request.Amount <= 0 || string.IsNullOrWhiteSpace(request.Currency) || string.IsNullOrWhiteSpace(request.Reference) || string.IsNullOrWhiteSpace(request.Provider)) return Results.BadRequest(new { error = "Positive amount, currency, payment reference and provider are required." }); return Results.Ok(store.RecordPayment(id, request, studio)); }).AllowAnonymous();
 
 app.MapGet("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, StudioStore studio, StudioPosStore pos) => studio.GetJob(jobId) is null ? Results.NotFound() : Results.Ok(pos.GetForJob(jobId)));
 app.MapPost("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, CreateStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos) => { if (studio.GetJob(jobId) is null) return Results.NotFound(); if (request.Lines is null || request.Lines.Count == 0 || request.Lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.UnitPrice < 0m || x.Quantity <= 0)) return Results.BadRequest(new { error = "At least one valid sale line is required." }); try { Sale sale = pos.Create(jobId, request, studio, context.User.Identity?.Name ?? "Aegis.Studio"); return Results.Created($"/api/pos/sales/{sale.Id}", sale); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
@@ -114,11 +111,9 @@ app.Run();
 
 static bool HasBookingServiceAccess(HttpContext context, string expectedKey)
 {
-    if (context.User.Identity?.IsAuthenticated == true)
-    {
-        return true;
-    }
-    return context.Request.Headers.TryGetValue("X-Aegis-Booking-Key", out Microsoft.Extensions.Primitives.StringValues supplied)
-        && supplied.Count == 1
-        && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(supplied[0] ?? string.Empty), System.Text.Encoding.UTF8.GetBytes(expectedKey));
+    if (context.User.Identity?.IsAuthenticated == true) return true;
+    if (!context.Request.Headers.TryGetValue("X-Aegis-Booking-Key", out Microsoft.Extensions.Primitives.StringValues supplied) || supplied.Count != 1) return false;
+    byte[] suppliedBytes = System.Text.Encoding.UTF8.GetBytes(supplied[0] ?? string.Empty);
+    byte[] expectedBytes = System.Text.Encoding.UTF8.GetBytes(expectedKey);
+    return suppliedBytes.Length == expectedBytes.Length && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(suppliedBytes, expectedBytes);
 }
