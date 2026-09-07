@@ -11,11 +11,7 @@ public sealed class StudioDatabase
         this.dataSource = dataSource;
     }
 
-    public NpgsqlConnection OpenConnection()
-    {
-        NpgsqlConnection connection = dataSource.OpenConnection();
-        return connection;
-    }
+    public NpgsqlConnection OpenConnection() => dataSource.OpenConnection();
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -31,10 +27,8 @@ public sealed class StudioDatabase
                 created_at_utc timestamptz not null,
                 updated_at_utc timestamptz not null
             );
-            create unique index if not exists ux_studio_workspaces_email
-                on studio_workspaces(lower(email_address)) where email_address is not null;
-            create unique index if not exists ux_studio_workspaces_route_key
-                on studio_workspaces(lower(route_key)) where route_key is not null;
+            create unique index if not exists ux_studio_workspaces_email on studio_workspaces(lower(email_address)) where email_address is not null;
+            create unique index if not exists ux_studio_workspaces_route_key on studio_workspaces(lower(route_key)) where route_key is not null;
 
             create table if not exists studio_conversations
             (
@@ -63,8 +57,7 @@ public sealed class StudioDatabase
                 created_at_utc timestamptz not null,
                 external_message_id text null
             );
-            create unique index if not exists ux_studio_messages_external_id
-                on studio_messages(external_message_id) where external_message_id is not null;
+            create unique index if not exists ux_studio_messages_external_id on studio_messages(external_message_id) where external_message_id is not null;
             create index if not exists ix_studio_messages_conversation on studio_messages(conversation_id, created_at_utc);
 
             create table if not exists studio_jobs
@@ -112,8 +105,7 @@ public sealed class StudioDatabase
                 external_booking_id text null,
                 created_at_utc timestamptz not null
             );
-            create unique index if not exists ux_studio_bookings_external_id
-                on studio_bookings(external_booking_id) where external_booking_id is not null;
+            create unique index if not exists ux_studio_bookings_external_id on studio_bookings(external_booking_id) where external_booking_id is not null;
             create index if not exists ix_studio_bookings_start on studio_bookings(starts_at_utc);
 
             create table if not exists studio_booking_payments
@@ -153,6 +145,172 @@ public sealed class StudioDatabase
                 quiet_hours_end time null,
                 created_at_utc timestamptz not null,
                 updated_at_utc timestamptz not null
+            );
+
+            create table if not exists studio_attachments
+            (
+                id uuid primary key,
+                conversation_id uuid not null references studio_conversations(id) on delete cascade,
+                file_name text not null,
+                stored_name text not null,
+                content_type text not null,
+                size_bytes bigint not null,
+                visibility text not null,
+                created_at_utc timestamptz not null
+            );
+            create index if not exists ix_studio_attachments_conversation on studio_attachments(conversation_id, created_at_utc desc);
+
+            create table if not exists studio_outbound_email
+            (
+                id uuid primary key,
+                conversation_id uuid not null references studio_conversations(id) on delete cascade,
+                from_address text not null,
+                to_address text not null,
+                subject text not null,
+                body text not null,
+                thread_id text null,
+                status text not null,
+                created_at_utc timestamptz not null,
+                provider_message_id text null,
+                kind text not null
+            );
+            create index if not exists ix_studio_outbound_email_status on studio_outbound_email(status, created_at_utc);
+
+            create table if not exists studio_unrouted_email
+            (
+                id uuid primary key,
+                provider_message_id text not null unique,
+                thread_id text null,
+                from_name text not null,
+                from_address text not null,
+                to_addresses text[] not null,
+                cc_addresses text[] not null,
+                internet_headers jsonb not null,
+                subject text not null,
+                body text not null,
+                received_at_utc timestamptz not null,
+                failure_reason text not null,
+                resolved_at_utc timestamptz null,
+                resolved_workspace_id uuid null references studio_workspaces(id),
+                resolved_workspace_name text null
+            );
+
+            create table if not exists studio_pos_catalog
+            (
+                id uuid primary key,
+                code text not null,
+                name text not null,
+                category text not null,
+                unit_price numeric(18,2) not null,
+                is_active boolean not null,
+                sort_order integer not null,
+                updated_at_utc timestamptz not null
+            );
+
+            create table if not exists studio_pos_sales
+            (
+                id uuid primary key,
+                reference_type text not null,
+                reference_id text not null,
+                created_at_utc timestamptz not null,
+                submitted_at_utc timestamptz null,
+                completed_at_utc timestamptz null,
+                voided_at_utc timestamptz null,
+                voided_by text null,
+                void_reason text null,
+                cashier_user_id text null,
+                terminal_id text null,
+                status integer not null,
+                financial_event_posted boolean not null,
+                client_request_id uuid null
+            );
+            create unique index if not exists ux_studio_pos_sales_client_request on studio_pos_sales(reference_type, reference_id, client_request_id) where client_request_id is not null;
+            create index if not exists ix_studio_pos_sales_reference on studio_pos_sales(reference_type, reference_id, created_at_utc desc);
+
+            create table if not exists studio_pos_sale_lines
+            (
+                id uuid primary key,
+                sale_id uuid not null references studio_pos_sales(id) on delete cascade,
+                code text not null,
+                description text not null,
+                unit_price numeric(18,2) not null,
+                quantity integer not null
+            );
+            create table if not exists studio_pos_tenders
+            (
+                id uuid primary key,
+                sale_id uuid not null references studio_pos_sales(id) on delete cascade,
+                kind integer not null,
+                amount numeric(18,2) not null,
+                reference text null
+            );
+            create table if not exists studio_pos_refunds
+            (
+                id uuid primary key,
+                sale_id uuid not null references studio_pos_sales(id) on delete cascade,
+                reason text not null,
+                created_at_utc timestamptz not null
+            );
+            create table if not exists studio_pos_refund_lines
+            (
+                id uuid primary key,
+                refund_id uuid not null references studio_pos_refunds(id) on delete cascade,
+                sale_line_id uuid not null,
+                unit_price numeric(18,2) not null,
+                quantity integer not null
+            );
+            create table if not exists studio_pos_refund_tenders
+            (
+                id uuid primary key,
+                refund_id uuid not null references studio_pos_refunds(id) on delete cascade,
+                kind integer not null,
+                amount numeric(18,2) not null,
+                reference text null
+            );
+            create table if not exists studio_pos_audit
+            (
+                id uuid primary key,
+                action text not null,
+                sale_id uuid not null,
+                job_id uuid not null,
+                user_id text not null,
+                amount numeric(18,2) not null,
+                detail text null,
+                created_at_utc timestamptz not null
+            );
+            create index if not exists ix_studio_pos_audit_created on studio_pos_audit(created_at_utc desc);
+
+            create table if not exists studio_pos_receipts
+            (
+                id uuid primary key,
+                sale_id uuid not null unique,
+                job_id uuid not null,
+                receipt_number text not null unique,
+                client_name text not null,
+                job_title text not null,
+                cashier_user_id text not null,
+                currency text not null,
+                total numeric(18,2) not null,
+                created_at_utc timestamptz not null
+            );
+            create table if not exists studio_pos_receipt_lines
+            (
+                id uuid primary key,
+                receipt_id uuid not null references studio_pos_receipts(id) on delete cascade,
+                description text not null,
+                quantity integer not null,
+                unit_price numeric(18,2) not null,
+                total numeric(18,2) not null,
+                sort_order integer not null
+            );
+            create table if not exists studio_pos_receipt_tenders
+            (
+                id uuid primary key,
+                receipt_id uuid not null references studio_pos_receipts(id) on delete cascade,
+                kind text not null,
+                amount numeric(18,2) not null,
+                reference text null,
+                sort_order integer not null
             );
 
             create table if not exists studio_state
