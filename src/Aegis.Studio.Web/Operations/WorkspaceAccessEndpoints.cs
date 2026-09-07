@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using Aegis.Studio.Web.Email;
+using Aegis.Studio.Web.Galleries;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Persistence;
 
@@ -23,6 +24,7 @@ public static class WorkspaceAccessEndpoints
         app.MapStudioSecurityAdministration();
         app.MapLegacyMailboxImport();
         app.MapStudioWorkflowAutomation();
+        app.MapStudioGalleries();
 
         app.MapGet("/api/workspace-access", (ClaimsPrincipal user, StudioDatabase database, WorkspaceStore workspaces) =>
         {
