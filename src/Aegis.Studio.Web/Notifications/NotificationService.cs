@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Aegis.Studio.Infrastructure.Email;
+using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Profiles;
 using Npgsql;
@@ -10,15 +11,36 @@ public sealed class NotificationService
 {
     private readonly StudioDatabase database;
     private readonly UserProfileStore profiles;
+    private readonly StudioStore studio;
+    private readonly WorkspaceAccessService workspaceAccess;
+    private readonly JobAccessService jobAccess;
 
-    public NotificationService(StudioDatabase database, UserProfileStore profiles)
+    public NotificationService(
+        StudioDatabase database,
+        UserProfileStore profiles,
+        StudioStore studio,
+        WorkspaceAccessService workspaceAccess,
+        JobAccessService jobAccess)
     {
         this.database = database;
         this.profiles = profiles;
+        this.studio = studio;
+        this.workspaceAccess = workspaceAccess;
+        this.jobAccess = jobAccess;
     }
 
     public void PublishToAll(string eventType, string subject, string body, string? referenceType = null, string? referenceId = null)
     {
+        IReadOnlyList<string>? scopedRecipients = ResolveScopedRecipients(referenceType, referenceId);
+        if (scopedRecipients is not null)
+        {
+            foreach (string userName in scopedRecipients)
+            {
+                PublishToUser(userName, eventType, subject, body, referenceType, referenceId);
+            }
+            return;
+        }
+
         foreach (StudioUserProfile profile in profiles.GetAll())
         {
             if (!WantsEvent(profile.Messaging, eventType))
@@ -73,6 +95,62 @@ public sealed class NotificationService
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(userName);
         command.ExecuteNonQuery();
+    }
+
+    private IReadOnlyList<string>? ResolveScopedRecipients(string? referenceType, string? referenceId)
+    {
+        if (string.IsNullOrWhiteSpace(referenceType) || string.IsNullOrWhiteSpace(referenceId))
+        {
+            return null;
+        }
+
+        HashSet<string> recipients = new(StringComparer.OrdinalIgnoreCase);
+        if (referenceType.Equals("Job", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(referenceId, out Guid jobId))
+        {
+            AddJobRecipients(jobId, recipients);
+            return recipients.ToList();
+        }
+
+        if (referenceType.Equals("Conversation", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(referenceId, out Guid conversationId))
+        {
+            StudioConversation? conversation = studio.GetConversation(conversationId);
+            if (conversation is null) return [];
+            if (conversation.JobId.HasValue) AddJobRecipients(conversation.JobId.Value, recipients);
+            else AddWorkspaceRecipients(conversation.WorkspaceId, recipients);
+            return recipients.ToList();
+        }
+
+        if (referenceType.Equals("Workspace", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(referenceId, out Guid workspaceId))
+        {
+            AddWorkspaceRecipients(workspaceId, recipients);
+            return recipients.ToList();
+        }
+
+        if (referenceType.Equals("Booking", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(referenceId, out Guid bookingId))
+        {
+            using NpgsqlConnection connection = database.OpenConnection();
+            using NpgsqlCommand command = connection.CreateCommand();
+            command.CommandText = "select job_id from studio_bookings where id=$1";
+            command.Parameters.AddWithValue(bookingId);
+            object? value = command.ExecuteScalar();
+            if (value is Guid bookingJobId) AddJobRecipients(bookingJobId, recipients);
+            return recipients.ToList();
+        }
+
+        return null;
+    }
+
+    private void AddJobRecipients(Guid jobId, HashSet<string> recipients)
+    {
+        StudioJob? job = studio.GetJob(jobId);
+        if (job is null) return;
+        foreach (JobMember member in jobAccess.GetMembers(jobId).Where(x => x.IsActive)) recipients.Add(member.UserName);
+        AddWorkspaceRecipients(job.WorkspaceId, recipients);
+    }
+
+    private void AddWorkspaceRecipients(Guid workspaceId, HashSet<string> recipients)
+    {
+        foreach (WorkspaceMember member in workspaceAccess.GetMembers(workspaceId).Where(x => x.IsActive)) recipients.Add(member.UserName);
     }
 
     private void QueueForProfile(StudioUserProfile profile, string eventType, string subject, string body, string? referenceType, string? referenceId)
@@ -196,7 +274,8 @@ public sealed class NotificationDeliveryWorker : BackgroundService
         command.CommandText = """
             select id,user_name,channel,subject,body,destination,attempts
             from studio_notifications
-            where status in ('Pending','Retry') and attempts < 10
+            where status in ('Pending','Retry','WaitingForConfiguration')
+              and (status='WaitingForConfiguration' or attempts < 10)
             order by created_at_utc
             limit 50
             """;
@@ -260,19 +339,20 @@ public sealed class NotificationDeliveryWorker : BackgroundService
         }
     }
 
-    private void MarkDelivered(Guid id) => Update(id, "Delivered", null, true);
-    private void MarkRetry(Guid id, string error) => Update(id, "Retry", error, false);
-    private void MarkWaitingForConfiguration(Guid id, string error) => Update(id, "WaitingForConfiguration", error, false);
+    private void MarkDelivered(Guid id) => Update(id, "Delivered", null, true, true);
+    private void MarkRetry(Guid id, string error) => Update(id, "Retry", error, false, true);
+    private void MarkWaitingForConfiguration(Guid id, string error) => Update(id, "WaitingForConfiguration", error, false, false);
 
-    private void Update(Guid id, string status, string? error, bool delivered)
+    private void Update(Guid id, string status, string? error, bool delivered, bool incrementAttempts)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "update studio_notifications set status=$2, attempts=attempts+1, last_error=$3, delivered_at_utc=case when $4 then now() else delivered_at_utc end where id=$1";
+        command.CommandText = "update studio_notifications set status=$2, attempts=attempts+case when $5 then 1 else 0 end, last_error=$3, delivered_at_utc=case when $4 then now() else delivered_at_utc end where id=$1";
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(status);
         command.Parameters.AddWithValue((object?)error ?? DBNull.Value);
         command.Parameters.AddWithValue(delivered);
+        command.Parameters.AddWithValue(incrementAttempts);
         command.ExecuteNonQuery();
     }
 }
