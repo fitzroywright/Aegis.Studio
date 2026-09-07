@@ -144,6 +144,69 @@ public sealed class StudioFeatureDatabase
             create index if not exists ix_studio_production_tasks_job on studio_production_tasks(job_id,sort_order);
             create index if not exists ix_studio_production_tasks_queue on studio_production_tasks(status,due_at_utc);
 
+            create table if not exists studio_job_activities
+            (
+                id uuid primary key,
+                job_id uuid not null references studio_jobs(id) on delete cascade,
+                activity_type text not null,
+                title text not null,
+                description text null,
+                status text not null,
+                priority text not null default 'Normal',
+                assigned_to text null,
+                scheduled_at_utc timestamptz null,
+                due_at_utc timestamptz null,
+                started_at_utc timestamptz null,
+                completed_at_utc timestamptz null,
+                location text null,
+                blocked_reason text null,
+                handoff_to text null,
+                created_by text not null,
+                created_at_utc timestamptz not null,
+                updated_at_utc timestamptz not null
+            );
+            create index if not exists ix_studio_job_activities_job on studio_job_activities(job_id,status,due_at_utc);
+            create index if not exists ix_studio_job_activities_assigned on studio_job_activities(lower(assigned_to),status,due_at_utc);
+
+            create table if not exists studio_shoot_sessions
+            (
+                id uuid primary key,
+                job_id uuid not null references studio_jobs(id) on delete cascade,
+                schedule_entry_id uuid null references studio_schedule_entries(id) on delete set null,
+                photographer_user_name text not null,
+                assistant_user_name text null,
+                call_time_utc timestamptz not null,
+                planned_end_utc timestamptz not null,
+                location text null,
+                status text not null,
+                checked_in_at_utc timestamptz null,
+                checked_out_at_utc timestamptz null,
+                image_count integer not null default 0,
+                backup_confirmed boolean not null default false,
+                reshoot_required boolean not null default false,
+                coverage_notes text null,
+                equipment_notes text null,
+                handoff_status text not null default 'NotReady',
+                handoff_to text null,
+                created_at_utc timestamptz not null,
+                updated_at_utc timestamptz not null,
+                check(planned_end_utc > call_time_utc)
+            );
+            create index if not exists ix_studio_shoot_sessions_job on studio_shoot_sessions(job_id,call_time_utc);
+            create index if not exists ix_studio_shoot_sessions_photographer on studio_shoot_sessions(lower(photographer_user_name),call_time_utc);
+
+            create table if not exists studio_operational_audit
+            (
+                id uuid primary key,
+                job_id uuid not null references studio_jobs(id) on delete cascade,
+                activity_id uuid null references studio_job_activities(id) on delete set null,
+                action text not null,
+                user_name text not null,
+                detail text null,
+                created_at_utc timestamptz not null
+            );
+            create index if not exists ix_studio_operational_audit_job on studio_operational_audit(job_id,created_at_utc desc);
+
             create table if not exists studio_booking_api_nonces
             (
                 client_id text not null,
