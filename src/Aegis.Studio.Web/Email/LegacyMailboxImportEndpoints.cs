@@ -137,7 +137,7 @@ public sealed class LegacyMailboxImporter
                 {
                     if (entity is MimePart part)
                     {
-                        MimeContent? content = part.Content;
+                        IMimeContent? content = part.Content;
                         if (content is null)
                         {
                             continue;
