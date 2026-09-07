@@ -20,6 +20,7 @@ public static class WorkspaceAccessEndpoints
             registrations.Add(app, new object());
         }
 
+        app.UseStudioTrustedProxyHeaders();
         app.MapStudioProductionHardening();
         app.UseStudioSameOriginWriteProtection();
         app.UseStudioSensitiveRouteAuthorization();
