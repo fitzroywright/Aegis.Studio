@@ -8,15 +8,23 @@ public sealed class StudioPosStore
 {
     private const string SalesCollection = "pos-sales";
     private readonly PostgresDocumentStore persistence;
+    private readonly PosAuditStore audit;
 
-    public StudioPosStore(PostgresDocumentStore persistence)
+    public StudioPosStore(PostgresDocumentStore persistence, PosAuditStore audit)
     {
         this.persistence = persistence;
+        this.audit = audit;
     }
 
     public IReadOnlyList<Sale> GetForJob(Guid jobId)
         => persistence.GetAll<PersistedSale>(SalesCollection)
             .Where(x => x.ReferenceType == "StudioJob" && x.ReferenceId == jobId.ToString("D"))
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(Rehydrate)
+            .ToList();
+
+    public IReadOnlyList<Sale> GetAll()
+        => persistence.GetAll<PersistedSale>(SalesCollection)
             .OrderByDescending(x => x.CreatedAtUtc)
             .Select(Rehydrate)
             .ToList();
@@ -27,7 +35,7 @@ public sealed class StudioPosStore
         return snapshot is null ? null : Rehydrate(snapshot);
     }
 
-    public Sale Create(Guid jobId, CreateStudioSaleRequest request, StudioStore studio)
+    public Sale Create(Guid jobId, CreateStudioSaleRequest request, StudioStore studio, string userId)
     {
         if (studio.GetJob(jobId) is null)
         {
@@ -38,12 +46,25 @@ public sealed class StudioPosStore
             throw new InvalidOperationException("At least one sale line is required.");
         }
 
+        if (request.ClientRequestId.HasValue)
+        {
+            PersistedSale? existing = persistence.GetAll<PersistedSale>(SalesCollection)
+                .FirstOrDefault(x => x.ClientRequestId == request.ClientRequestId
+                    && x.ReferenceType == "StudioJob"
+                    && x.ReferenceId == jobId.ToString("D"));
+            if (existing is not null)
+            {
+                return Rehydrate(existing);
+            }
+        }
+
         Sale sale = new(Guid.NewGuid(), "StudioJob", jobId.ToString("D"), DateTimeOffset.UtcNow);
         foreach (CreateStudioSaleLineRequest line in request.Lines)
         {
             sale.AddLine(SaleLine.Create(line.Code ?? string.Empty, line.Description, line.UnitPrice, line.Quantity));
         }
-        Save(sale, false);
+        Save(sale, false, request.ClientRequestId);
+        audit.Record("SaleCreated", sale.Id, jobId, userId, sale.Total, $"{sale.Lines.Count} line(s)");
         return sale;
     }
 
@@ -51,6 +72,7 @@ public sealed class StudioPosStore
     {
         PersistedSale snapshot = persistence.Get<PersistedSale>(SalesCollection, saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
+        Guid jobId = Guid.Parse(sale.ReferenceId);
         if (sale.Status == SaleStatus.Completed)
         {
             EnsureFinancialEventPosted(sale, snapshot, studio);
@@ -60,6 +82,10 @@ public sealed class StudioPosStore
         {
             throw new InvalidOperationException("A voided sale cannot be completed.");
         }
+        if (request.Tenders is null || request.Tenders.Count == 0)
+        {
+            throw new InvalidOperationException("At least one tender is required.");
+        }
 
         Tender[] tenders = request.Tenders.Select(x => Tender.Create(x.Kind, x.Amount, x.Reference)).ToArray();
         if (sale.Status == SaleStatus.Draft)
@@ -67,8 +93,10 @@ public sealed class StudioPosStore
             sale.Submit(DateTimeOffset.UtcNow);
         }
         sale.Complete(tenders, DateTimeOffset.UtcNow, cashierUserId, request.TerminalId ?? "StudioWeb");
-        snapshot = Save(sale, snapshot.FinancialEventPosted);
+        snapshot = Save(sale, snapshot.FinancialEventPosted, snapshot.ClientRequestId);
         EnsureFinancialEventPosted(sale, snapshot, studio);
+        audit.Record("SaleCompleted", sale.Id, jobId, cashierUserId, sale.Total,
+            string.Join(", ", sale.Tenders.Select(tender => $"{tender.Kind}:{tender.Amount:N2}")));
         return sale;
     }
 
@@ -77,23 +105,55 @@ public sealed class StudioPosStore
         PersistedSale snapshot = persistence.Get<PersistedSale>(SalesCollection, saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
         sale.Void(userId, DateTimeOffset.UtcNow, reason);
-        Save(sale, snapshot.FinancialEventPosted);
+        Save(sale, snapshot.FinancialEventPosted, snapshot.ClientRequestId);
+        audit.Record("SaleVoided", sale.Id, Guid.Parse(sale.ReferenceId), userId, sale.Total, reason);
         return sale;
     }
 
-    public Sale Refund(Guid saleId, RefundStudioSaleRequest request, StudioStore studio)
+    public Sale Refund(Guid saleId, RefundStudioSaleRequest request, StudioStore studio, string userId)
     {
         PersistedSale snapshot = persistence.Get<PersistedSale>(SalesCollection, saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
+        if (request.Lines is null || request.Lines.Count == 0)
+        {
+            throw new InvalidOperationException("At least one refund line is required.");
+        }
+        if (request.Tenders is null || request.Tenders.Count == 0)
+        {
+            throw new InvalidOperationException("At least one refund tender is required.");
+        }
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            throw new InvalidOperationException("Refund reason is required.");
+        }
+
         RefundLine[] lines = request.Lines.Select(x => new RefundLine(x.SaleLineId, x.UnitPrice, x.Quantity)).ToArray();
         Tender[] tenders = request.Tenders.Select(x => Tender.Create(x.Kind, x.Amount, x.Reference)).ToArray();
-        Refund refund = new(Guid.NewGuid(), sale.Id, lines, tenders, request.Reason, DateTimeOffset.UtcNow);
+        Refund refund = new(Guid.NewGuid(), sale.Id, lines, tenders, request.Reason.Trim(), DateTimeOffset.UtcNow);
         sale.RecordRefund(refund);
-        Save(sale, snapshot.FinancialEventPosted);
+        Save(sale, snapshot.FinancialEventPosted, snapshot.ClientRequestId);
 
         Guid jobId = Guid.Parse(sale.ReferenceId);
         studio.AddFinancialEvent(jobId, new AddFinancialEventRequest("POS Refund", -refund.Total, $"Refund {refund.Id}: {refund.Reason}"));
+        audit.Record("RefundCompleted", sale.Id, jobId, userId, -refund.Total, refund.Reason);
         return sale;
+    }
+
+    public PosDiagnosticsSnapshot GetDiagnostics()
+    {
+        IReadOnlyList<Sale> sales = GetAll();
+        decimal completedTotal = sales.Where(x => x.Status == SaleStatus.Completed).Sum(x => x.Total);
+        decimal refundedTotal = sales.SelectMany(x => x.Refunds).Sum(x => x.Total);
+        return new PosDiagnosticsSnapshot
+        (
+            sales.Count,
+            sales.Count(x => x.Status == SaleStatus.Draft),
+            sales.Count(x => x.Status == SaleStatus.Completed),
+            sales.Count(x => x.Status == SaleStatus.Voided),
+            completedTotal,
+            refundedTotal,
+            sales.OrderByDescending(x => x.CreatedAtUtc).FirstOrDefault()?.CreatedAtUtc
+        );
     }
 
     private void EnsureFinancialEventPosted(Sale sale, PersistedSale snapshot, StudioStore studio)
@@ -106,10 +166,10 @@ public sealed class StudioPosStore
         Guid jobId = Guid.Parse(sale.ReferenceId);
         string tenderSummary = string.Join(", ", sale.Tenders.Select(x => $"{x.Kind} {x.Amount:N2}"));
         studio.AddFinancialEvent(jobId, new AddFinancialEventRequest("POS Sale", sale.Total, $"Sale {sale.Id}: {tenderSummary}"));
-        Save(sale, true);
+        Save(sale, true, snapshot.ClientRequestId);
     }
 
-    private PersistedSale Save(Sale sale, bool financialEventPosted)
+    private PersistedSale Save(Sale sale, bool financialEventPosted, Guid? clientRequestId)
     {
         PersistedSale snapshot = new(
             sale.Id,
@@ -127,7 +187,8 @@ public sealed class StudioPosStore
             sale.Lines.ToList(),
             sale.Tenders.ToList(),
             sale.Refunds.Select(x => new PersistedRefund(x.Id, x.Lines.ToList(), x.Tenders.ToList(), x.Reason, x.CreatedAtUtc)).ToList(),
-            financialEventPosted);
+            financialEventPosted,
+            clientRequestId);
         persistence.Upsert(SalesCollection, sale.Id, snapshot);
         return snapshot;
     }
@@ -160,12 +221,13 @@ public sealed class StudioPosStore
     }
 }
 
-public sealed record PersistedSale(Guid Id, string ReferenceType, string ReferenceId, DateTimeOffset CreatedAtUtc, DateTimeOffset? SubmittedAtUtc, DateTimeOffset? CompletedAtUtc, DateTimeOffset? VoidedAtUtc, string? VoidedBy, string? VoidReason, string? CashierUserId, string? TerminalId, SaleStatus Status, List<SaleLine> Lines, List<Tender> Tenders, List<PersistedRefund> Refunds, bool FinancialEventPosted);
+public sealed record PersistedSale(Guid Id, string ReferenceType, string ReferenceId, DateTimeOffset CreatedAtUtc, DateTimeOffset? SubmittedAtUtc, DateTimeOffset? CompletedAtUtc, DateTimeOffset? VoidedAtUtc, string? VoidedBy, string? VoidReason, string? CashierUserId, string? TerminalId, SaleStatus Status, List<SaleLine> Lines, List<Tender> Tenders, List<PersistedRefund> Refunds, bool FinancialEventPosted, Guid? ClientRequestId = null);
 public sealed record PersistedRefund(Guid Id, List<RefundLine> Lines, List<Tender> Tenders, string Reason, DateTimeOffset CreatedAtUtc);
-public sealed record CreateStudioSaleRequest(IReadOnlyList<CreateStudioSaleLineRequest> Lines);
+public sealed record CreateStudioSaleRequest(IReadOnlyList<CreateStudioSaleLineRequest> Lines, Guid? ClientRequestId = null);
 public sealed record CreateStudioSaleLineRequest(string? Code, string Description, decimal UnitPrice, int Quantity);
 public sealed record CompleteStudioSaleRequest(IReadOnlyList<StudioTenderRequest> Tenders, string? TerminalId);
 public sealed record StudioTenderRequest(TenderKind Kind, decimal Amount, string? Reference);
 public sealed record VoidStudioSaleRequest(string Reason);
 public sealed record RefundStudioSaleRequest(IReadOnlyList<RefundStudioSaleLineRequest> Lines, IReadOnlyList<StudioTenderRequest> Tenders, string Reason);
 public sealed record RefundStudioSaleLineRequest(Guid SaleLineId, decimal UnitPrice, int Quantity);
+public sealed record PosDiagnosticsSnapshot(int TotalSales, int DraftSales, int CompletedSales, int VoidedSales, decimal GrossCompleted, decimal Refunded, DateTimeOffset? LastSaleAtUtc);
