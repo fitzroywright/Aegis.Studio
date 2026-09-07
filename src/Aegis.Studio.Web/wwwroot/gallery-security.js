@@ -2,7 +2,10 @@ const baseOpenWorkspaceGalleryForSecurity = openWorkspaceGallery;
 openWorkspaceGallery = async function(workspaceId, workspaceName) {
     await baseOpenWorkspaceGalleryForSecurity(workspaceId, workspaceName);
     try {
-        const settings = await json(`/api/workspaces/${workspaceId}/gallery/access`);
+        const [settings, review] = await Promise.all([
+            json(`/api/workspaces/${workspaceId}/gallery/access`),
+            json(`/api/workspaces/${workspaceId}/gallery/selection-review`).catch(() => ({ selections: [], submissions: [] }))
+        ]);
         const section = document.createElement('section');
         section.className = 'job-section';
         section.innerHTML = `
@@ -15,7 +18,13 @@ openWorkspaceGallery = async function(workspaceId, workspaceName) {
                 <label><input id="gallerySelectionsEnabled" type="checkbox" ${settings.selectionsEnabled ? 'checked' : ''}> Allow client selections</label>
                 <label>Selection limit<input id="gallerySelectionLimit" type="number" min="1" placeholder="Unlimited" value="${settings.selectionLimit || ''}"></label>
                 <button class="primary" onclick="saveGalleryAccess('${workspaceId}','${esc(workspaceName)}')">Save client access</button>
-            </div>`;
+            </div>
+            <h3>Current client selections</h3>
+            ${review.selections?.length ? `<div class="selection-review-grid">${review.selections.map(item => `
+                <div class="selection-review-item"><b>${esc(item.fileName)}</b><span>${esc(item.caption || '')}</span>${item.note ? `<small>${esc(item.note)}</small>` : ''}</div>`).join('')}</div>` : '<p class="muted">No photographs are currently selected.</p>'}
+            <h3>Selection submissions</h3>
+            ${review.submissions?.length ? review.submissions.map(item => `
+                <div class="financial-row"><div><b>${esc(item.clientName || item.clientEmail || 'Client')}</b><small>${item.selectionCount} selected · ${new Date(item.submittedAtUtc).toLocaleString()}${item.note ? ' · ' + esc(item.note) : ''}</small></div></div>`).join('') : '<p class="muted">No selection set has been submitted yet.</p>'}`;
         genericView.appendChild(section);
     } catch (error) {
         // Users without gallery administration rights can still use the normal gallery view.
