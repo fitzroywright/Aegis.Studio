@@ -49,20 +49,13 @@ public static class SecurityAdministrationEndpoints
             return Results.Ok(new { member = saved, role });
         });
 
-        group.MapGet("/authorization-audit", (IEnumerable<EndpointDataSource> sources) => Results.Ok(AuthorizationAuditService.Audit(sources.SelectMany(x => x.Endpoints))));
+        group.MapGet("/authorization-audit", () => Results.Ok(AuthorizationAuditService.Audit(app.DataSources.SelectMany(x => x.Endpoints))));
 
         app.Lifetime.ApplicationStarted.Register(() =>
         {
-            IEnumerable<EndpointDataSource> sources = app.Services.GetServices<EndpointDataSource>();
-            AuthorizationAuditReport report = AuthorizationAuditService.Audit(sources.SelectMany(x => x.Endpoints));
-            if (report.UnapprovedAnonymous.Count > 0)
-            {
-                app.Logger.LogCritical("Authorization audit found unapproved anonymous API endpoints: {Endpoints}", string.Join(", ", report.UnapprovedAnonymous));
-            }
-            else
-            {
-                app.Logger.LogInformation("Authorization audit completed: {ApiEndpoints} API endpoints checked; fallback authentication is enabled; {ApprovedAnonymous} approved anonymous endpoints.", report.ApiEndpointCount, report.ApprovedAnonymous.Count);
-            }
+            AuthorizationAuditReport report = AuthorizationAuditService.Audit(app.DataSources.SelectMany(x => x.Endpoints));
+            if (report.UnapprovedAnonymous.Count > 0) app.Logger.LogCritical("Authorization audit found unapproved anonymous API endpoints: {Endpoints}", string.Join(", ", report.UnapprovedAnonymous));
+            else app.Logger.LogInformation("Authorization audit completed: {ApiEndpoints} API endpoints checked; fallback authentication is enabled; {ApprovedAnonymous} approved anonymous endpoints.", report.ApiEndpointCount, report.ApprovedAnonymous.Count);
         });
     }
 }
@@ -86,9 +79,9 @@ public sealed class StudioRoleStore
                 permissions_json jsonb not null,
                 is_active boolean not null default true,
                 created_at_utc timestamptz not null,
-                updated_at_utc timestamptz not null,
-                unique(lower(name),scope)
+                updated_at_utc timestamptz not null
             );
+            create unique index if not exists ux_studio_security_roles_name_scope on studio_security_roles(lower(name),scope);
             alter table studio_workspace_members add column if not exists role_id uuid null references studio_security_roles(id) on delete set null;
             alter table studio_job_members add column if not exists role_id uuid null references studio_security_roles(id) on delete set null;
             """;
@@ -125,13 +118,7 @@ public sealed class StudioRoleStore
                 values($1,$2,$3,$4,$5::jsonb,$6,now(),now())
                 on conflict(id) do update set name=excluded.name,scope=excluded.scope,description=excluded.description,permissions_json=excluded.permissions_json,is_active=excluded.is_active,updated_at_utc=now()
                 """;
-            command.Parameters.AddWithValue(roleId);
-            command.Parameters.AddWithValue(request.Name.Trim());
-            command.Parameters.AddWithValue(scope);
-            command.Parameters.AddWithValue((object?)request.Description?.Trim() ?? DBNull.Value);
-            command.Parameters.AddWithValue(request.PermissionsJson);
-            command.Parameters.AddWithValue(request.IsActive);
-            command.ExecuteNonQuery();
+            command.Parameters.AddWithValue(roleId); command.Parameters.AddWithValue(request.Name.Trim()); command.Parameters.AddWithValue(scope); command.Parameters.AddWithValue((object?)request.Description?.Trim() ?? DBNull.Value); command.Parameters.AddWithValue(request.PermissionsJson); command.Parameters.AddWithValue(request.IsActive); command.ExecuteNonQuery();
         }
         Propagate(connection, transaction, roleId, scope, request.PermissionsJson);
         transaction.Commit();
@@ -140,11 +127,7 @@ public sealed class StudioRoleStore
 
     public void Delete(Guid id)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "delete from studio_security_roles where id=$1";
-        command.Parameters.AddWithValue(id);
-        command.ExecuteNonQuery();
+        using NpgsqlConnection connection = database.OpenConnection(); using NpgsqlCommand command = connection.CreateCommand(); command.CommandText = "delete from studio_security_roles where id=$1"; command.Parameters.AddWithValue(id); command.ExecuteNonQuery();
     }
 
     public void SetWorkspaceRole(Guid workspaceId, string userName, Guid roleId) => SetRole("studio_workspace_members", "workspace_id", workspaceId, userName, roleId);
@@ -152,10 +135,7 @@ public sealed class StudioRoleStore
 
     private void SetRole(string table, string idColumn, Guid id, string userName, Guid roleId)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = $"update {table} set role_id=$3,updated_at_utc=now() where {idColumn}=$1 and lower(user_name)=lower($2)";
-        command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userName); command.Parameters.AddWithValue(roleId); command.ExecuteNonQuery();
+        using NpgsqlConnection connection = database.OpenConnection(); using NpgsqlCommand command = connection.CreateCommand(); command.CommandText = $"update {table} set role_id=$3,updated_at_utc=now() where {idColumn}=$1 and lower(user_name)=lower($2)"; command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(userName); command.Parameters.AddWithValue(roleId); command.ExecuteNonQuery();
     }
 
     private static void ValidatePermissions(string scope, string json)
@@ -169,15 +149,13 @@ public sealed class StudioRoleStore
     {
         if (scope == "Workspace")
         {
-            WorkspacePermissionSet p = JsonSerializer.Deserialize<WorkspacePermissionSet>(json)!;
-            using NpgsqlCommand command = connection.CreateCommand(); command.Transaction = transaction;
+            WorkspacePermissionSet p = JsonSerializer.Deserialize<WorkspacePermissionSet>(json)!; using NpgsqlCommand command = connection.CreateCommand(); command.Transaction = transaction;
             command.CommandText = "update studio_workspace_members set access_workspace=$2,can_view=$3,reply_requester=$4,view_attachments=$5,add_attachments=$6,create_job=$7,edit_job=$8,manage_schedule=$9,manage_production=$10,notify_members=$11,edit_workspace=$12,manage_members=$13,admin_workspace=$14,updated_at_utc=now() where role_id=$1";
             object[] values=[roleId,p.AccessWorkspace,p.View,p.ReplyRequester,p.ViewAttachments,p.AddAttachments,p.CreateJob,p.EditJob,p.ManageSchedule,p.ManageProduction,p.NotifyMembers,p.EditWorkspace,p.ManageMembers,p.AdminWorkspace]; foreach(object value in values) command.Parameters.AddWithValue(value); command.ExecuteNonQuery();
         }
         else
         {
-            JobPermissionSet p = JsonSerializer.Deserialize<JobPermissionSet>(json)!;
-            using NpgsqlCommand command = connection.CreateCommand(); command.Transaction = transaction;
+            JobPermissionSet p = JsonSerializer.Deserialize<JobPermissionSet>(json)!; using NpgsqlCommand command = connection.CreateCommand(); command.Transaction = transaction;
             command.CommandText = "update studio_job_members set inherit_workspace_permissions=false,access_job=$2,view_job=$3,view_conversation=$4,reply_requester=$5,view_attachments=$6,add_attachments=$7,edit_job=$8,change_status=$9,assign_staff=$10,manage_schedule=$11,manage_production=$12,view_financials=$13,record_financial_activity=$14,use_pos=$15,view_pos_transactions=$16,refund_void_pos=$17,notify_job_members=$18,manage_job_members=$19,admin_job=$20,updated_at_utc=now() where role_id=$1";
             object[] values=[roleId,p.AccessJob,p.ViewJob,p.ViewConversation,p.ReplyRequester,p.ViewAttachments,p.AddAttachments,p.EditJob,p.ChangeStatus,p.AssignStaff,p.ManageSchedule,p.ManageProduction,p.ViewFinancials,p.RecordFinancialActivity,p.UsePos,p.ViewPosTransactions,p.RefundVoidPos,p.NotifyJobMembers,p.ManageJobMembers,p.AdminJob]; foreach(object value in values) command.Parameters.AddWithValue(value); command.ExecuteNonQuery();
         }
