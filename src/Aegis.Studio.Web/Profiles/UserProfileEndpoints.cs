@@ -15,6 +15,10 @@ public static class UserProfileEndpoints
             Results.Ok(profiles.UpdatePreferences(user, request)))
             .RequireAuthorization();
 
+        app.MapPut("/api/profile/theme", (ClaimsPrincipal user, UpdateThemeRequest request, UserProfileStore profiles) =>
+            Results.Ok(profiles.UpdateTheme(user, request.ThemeName)))
+            .RequireAuthorization();
+
         RouteGroupBuilder administration = app.MapGroup("/api/admin/users")
             .RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
 
