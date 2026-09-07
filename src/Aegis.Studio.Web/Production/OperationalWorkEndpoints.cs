@@ -28,10 +28,22 @@ public static class OperationalWorkEndpoints
             catch(Exception exception){ return Results.BadRequest(new { error=exception.Message }); }
         }).RequireAuthorization();
 
-        app.MapPut("/api/operations/activities/{id:guid}", (Guid id,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications) =>
+        app.MapPut("/api/operations/activities/{id:guid}", (Guid id,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,IConfiguration configuration,IWebHostEnvironment environment) =>
         {
             OperationalWorkStore store=new(database); JobActivity? current=store.GetActivities().FirstOrDefault(x=>x.Id==id); if(current is null) return Results.NotFound(); if(!access.HasPermission(user,current.JobId,"ManageProduction")) return Results.Forbid();
-            try { JobActivity updated=store.UpdateActivity(id,request,UserName(user)); if(updated.Status=="Blocked") notifications.PublishToUser(updated.AssignedTo??UserName(user),"JobStatusChanged",$"Blocked: {updated.Title}",updated.BlockedReason??"Production activity is blocked.","Job",updated.JobId.ToString("D")); return Results.Ok(updated); }
+            try
+            {
+                if(string.Equals(request.Status,"Completed",StringComparison.OrdinalIgnoreCase) && (current.ActivityType=="FileIngest" || current.ActivityType=="Backup"))
+                {
+                    MediaArchiveStore media=new(database,configuration,environment);
+                    IReadOnlyList<MediaArchiveRecord> records=media.GetForJob(current.JobId);
+                    bool primary=records.Any(x=>x.PrimaryVerifiedAtUtc.HasValue&&x.FileCount>0);
+                    bool backup=records.Any(x=>x.BackupVerifiedAtUtc.HasValue&&x.FileCount>0);
+                    if(current.ActivityType=="FileIngest"&&!primary) return Results.BadRequest(new { error="File ingest cannot be completed until Studio verifies files in the configured media archive." });
+                    if(current.ActivityType=="Backup"&&!backup) return Results.BadRequest(new { error="Backup cannot be completed until Studio verifies the backup directory." });
+                }
+                JobActivity updated=store.UpdateActivity(id,request,UserName(user)); if(updated.Status=="Blocked") notifications.PublishToUser(updated.AssignedTo??UserName(user),"JobStatusChanged",$"Blocked: {updated.Title}",updated.BlockedReason??"Production activity is blocked.","Job",updated.JobId.ToString("D")); return Results.Ok(updated);
+            }
             catch(Exception exception){ return Results.BadRequest(new { error=exception.Message }); }
         }).RequireAuthorization();
 
