@@ -20,8 +20,8 @@ public static class WorkspaceAccessEndpoints
             registrations.Add(app, new object());
         }
 
-        app.UseMiddleware<WorkspaceAuthorizationMiddleware>();
         app.MapStudioProductionHardening();
+        app.UseMiddleware<WorkspaceAuthorizationMiddleware>();
         app.MapStudioSecurityAdministration();
         app.MapGlobalOperationalRoles();
         app.MapLegacyMailboxImport();
