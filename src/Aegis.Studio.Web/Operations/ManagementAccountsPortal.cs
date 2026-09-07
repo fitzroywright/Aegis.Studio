@@ -15,8 +15,10 @@ public static class ManagementAccountsPortalEndpoints
         StudioManagementStore management = new(database);
         StudioAccountsStore accounts = new(database);
         ClientPortalStore portal = new(database);
+        GlobalOperationalRoleStore globalRoles = new(database);
         accounts.EnsureSchema();
         portal.EnsureSchema();
+        globalRoles.EnsureSchema();
 
         app.MapGet("/api/management/dashboard", (HttpContext context) =>
         {
@@ -36,7 +38,7 @@ public static class ManagementAccountsPortalEndpoints
             return Results.Ok(management.GetRevenueByMonth(Math.Clamp(months ?? 12, 1, 36)));
         }).RequireAuthorization();
 
-        app.MapGet("/api/accounts/invoices", (HttpContext context, StudioStore studio, JobAccessService jobAccess, GlobalOperationalRoleStore globalRoles) =>
+        app.MapGet("/api/accounts/invoices", (HttpContext context, JobAccessService jobAccess) =>
         {
             IReadOnlyList<AccountInvoice> values = accounts.GetInvoices();
             if (context.User.IsInRole("Administrator") || globalRoles.HasPermission(context.User, "Billing")) return Results.Ok(values);
@@ -44,13 +46,13 @@ public static class ManagementAccountsPortalEndpoints
             return Results.Ok(values.Where(x => allowed.Contains(x.JobId)));
         }).RequireAuthorization();
 
-        app.MapGet("/api/jobs/{jobId:guid}/invoices", (Guid jobId, HttpContext context, JobAccessService jobAccess, GlobalOperationalRoleStore globalRoles) =>
+        app.MapGet("/api/jobs/{jobId:guid}/invoices", (Guid jobId, HttpContext context, JobAccessService jobAccess) =>
         {
             if (!context.User.IsInRole("Administrator") && !globalRoles.HasPermission(context.User, "Billing") && !jobAccess.HasPermission(context.User, jobId, "ViewFinancials")) return Results.Forbid();
             return Results.Ok(accounts.GetInvoices(jobId));
         }).RequireAuthorization();
 
-        app.MapPost("/api/jobs/{jobId:guid}/invoices", (Guid jobId, InvoiceRequest request, HttpContext context, JobAccessService jobAccess, GlobalOperationalRoleStore globalRoles) =>
+        app.MapPost("/api/jobs/{jobId:guid}/invoices", (Guid jobId, InvoiceRequest request, HttpContext context, JobAccessService jobAccess) =>
         {
             if (!context.User.IsInRole("Administrator") && !globalRoles.HasPermission(context.User, "Billing") && !jobAccess.HasPermission(context.User, jobId, "RecordFinancialActivity")) return Results.Forbid();
             try { return Results.Ok(accounts.CreateInvoice(jobId, request, UserName(context.User))); }
@@ -58,15 +60,15 @@ public static class ManagementAccountsPortalEndpoints
             catch (KeyNotFoundException) { return Results.NotFound(); }
         }).RequireAuthorization();
 
-        app.MapPut("/api/accounts/invoices/{invoiceId:guid}/status", (Guid invoiceId, InvoiceStatusRequest request, HttpContext context, GlobalOperationalRoleStore globalRoles) =>
+        app.MapPut("/api/accounts/invoices/{invoiceId:guid}/status", (Guid invoiceId, InvoiceStatusRequest request, HttpContext context) =>
         {
             if (!context.User.IsInRole("Administrator") && !globalRoles.HasPermission(context.User, "Billing")) return Results.Forbid();
-            try { return Results.Ok(accounts.SetStatus(invoiceId, request.Status, UserName(context.User))); }
+            try { return Results.Ok(accounts.SetStatus(invoiceId, request.Status)); }
             catch (InvalidOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
             catch (KeyNotFoundException) { return Results.NotFound(); }
         }).RequireAuthorization();
 
-        app.MapPost("/api/jobs/{jobId:guid}/client-portal", (Guid jobId, ClientPortalAccessRequest request, HttpContext context, JobAccessService jobAccess, GlobalOperationalRoleStore globalRoles) =>
+        app.MapPost("/api/jobs/{jobId:guid}/client-portal", (Guid jobId, ClientPortalAccessRequest request, HttpContext context, JobAccessService jobAccess) =>
         {
             if (!context.User.IsInRole("Administrator") && !globalRoles.HasPermission(context.User, "ReplyToClients") && !jobAccess.HasPermission(context.User, jobId, "ReplyRequester")) return Results.Forbid();
             try
@@ -192,18 +194,19 @@ public sealed class StudioAccountsStore
     public AccountInvoice CreateInvoice(Guid jobId,InvoiceRequest request,string userName)
     {
         if(request.Lines is null||request.Lines.Count==0)throw new InvalidOperationException("At least one invoice line is required.");
+        foreach(InvoiceLineRequest line in request.Lines) if(string.IsNullOrWhiteSpace(line.Description)||line.Quantity<=0||line.UnitPrice<0) throw new InvalidOperationException("Invoice lines require description, positive quantity and non-negative price.");
         using NpgsqlConnection connection=database.OpenConnection();string clientName;string? clientEmail;
         using(NpgsqlCommand lookup=connection.CreateCommand()){lookup.CommandText="select j.client_name,c.contact_address from studio_jobs j join studio_conversations c on c.id=j.conversation_id where j.id=$1";lookup.Parameters.AddWithValue(jobId);using NpgsqlDataReader reader=lookup.ExecuteReader();if(!reader.Read())throw new KeyNotFoundException();clientName=reader.GetString(0);clientEmail=reader.GetString(1).Contains('@')?reader.GetString(1):null;}
         decimal subtotal=request.Lines.Sum(x=>x.UnitPrice*x.Quantity);decimal tax=Math.Round(subtotal*Math.Max(0,request.TaxRatePercent)/100m,2);decimal total=subtotal+tax;Guid id=Guid.NewGuid();string number=NextInvoiceNumber(connection);
         using NpgsqlTransaction transaction=connection.BeginTransaction();
         using(NpgsqlCommand insert=connection.CreateCommand()){insert.Transaction=transaction;insert.CommandText="insert into studio_account_invoices(id,invoice_number,job_id,client_name,client_email,currency,subtotal,tax_amount,total_amount,status,due_at_utc,issued_at_utc,paid_at_utc,created_by,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'Draft',$10,null,null,$11,now(),now())";object?[] values=[id,number,jobId,clientName,(object?)clientEmail??DBNull.Value,string.IsNullOrWhiteSpace(request.Currency)?"JMD":request.Currency.Trim().ToUpperInvariant(),subtotal,tax,total,request.DueAtUtc.ToUniversalTime(),userName];foreach(object? value in values)insert.Parameters.AddWithValue(value??DBNull.Value);insert.ExecuteNonQuery();}
-        for(int i=0;i<request.Lines.Count;i++){InvoiceLineRequest line=request.Lines[i];if(string.IsNullOrWhiteSpace(line.Description)||line.Quantity<=0||line.UnitPrice<0)throw new InvalidOperationException("Invoice lines require description, positive quantity and non-negative price.");using NpgsqlCommand insert=connection.CreateCommand();insert.Transaction=transaction;insert.CommandText="insert into studio_account_invoice_lines(id,invoice_id,description,quantity,unit_price,line_total,sort_order) values($1,$2,$3,$4,$5,$6,$7)";insert.Parameters.AddWithValue(Guid.NewGuid());insert.Parameters.AddWithValue(id);insert.Parameters.AddWithValue(line.Description.Trim());insert.Parameters.AddWithValue(line.Quantity);insert.Parameters.AddWithValue(line.UnitPrice);insert.Parameters.AddWithValue(line.UnitPrice*line.Quantity);insert.Parameters.AddWithValue(i);insert.ExecuteNonQuery();}
+        for(int i=0;i<request.Lines.Count;i++){InvoiceLineRequest line=request.Lines[i];using NpgsqlCommand insert=connection.CreateCommand();insert.Transaction=transaction;insert.CommandText="insert into studio_account_invoice_lines(id,invoice_id,description,quantity,unit_price,line_total,sort_order) values($1,$2,$3,$4,$5,$6,$7)";insert.Parameters.AddWithValue(Guid.NewGuid());insert.Parameters.AddWithValue(id);insert.Parameters.AddWithValue(line.Description.Trim());insert.Parameters.AddWithValue(line.Quantity);insert.Parameters.AddWithValue(line.UnitPrice);insert.Parameters.AddWithValue(line.UnitPrice*line.Quantity);insert.Parameters.AddWithValue(i);insert.ExecuteNonQuery();}
         transaction.Commit();return GetInvoices().First(x=>x.Id==id);
     }
 
-    public AccountInvoice SetStatus(Guid id,string status,string userName)
+    public AccountInvoice SetStatus(Guid id,string status)
     {
-        string normalized=status?.Trim()??string.Empty;if(normalized is not("Draft" or "Issued" or "Paid" or "Void" or "Overdue"))throw new InvalidOperationException("Invalid invoice status.");
+        string normalized=status?.Trim()??string.Empty;if(normalized is not ("Draft" or "Issued" or "Paid" or "Void" or "Overdue"))throw new InvalidOperationException("Invalid invoice status.");
         using NpgsqlConnection connection=database.OpenConnection();using NpgsqlCommand command=connection.CreateCommand();command.CommandText="update studio_account_invoices set status=$2,issued_at_utc=case when $2='Issued' then coalesce(issued_at_utc,now()) else issued_at_utc end,paid_at_utc=case when $2='Paid' then coalesce(paid_at_utc,now()) else paid_at_utc end,updated_at_utc=now() where id=$1";command.Parameters.AddWithValue(id);command.Parameters.AddWithValue(normalized);if(command.ExecuteNonQuery()!=1)throw new KeyNotFoundException();return GetInvoices().First(x=>x.Id==id);
     }
 
@@ -233,10 +236,10 @@ public sealed class ClientPortalStore
             last_accessed_at_utc timestamptz null
         );
         """;q.ExecuteNonQuery();}
-    public ClientPortalIssueResult Issue(Guid jobId,int days,string userName){using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand exists=c.CreateCommand();exists.CommandText="select exists(select 1 from studio_jobs where id=$1)";exists.Parameters.AddWithValue(jobId);if(exists.ExecuteScalar() is not bool found||!found)throw new KeyNotFoundException();string token=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();DateTimeOffset expires=DateTimeOffset.UtcNow.AddDays(Math.Clamp(days,1,365));using NpgsqlCommand q=c.CreateCommand();q.CommandText="insert into studio_client_portal_access(id,job_id,token_hash,expires_at_utc,revoked_at_utc,created_by,created_at_utc) values($1,$2,$3,$4,null,$5,now()) on conflict(job_id) do update set token_hash=excluded.token_hash,expires_at_utc=excluded.expires_at_utc,revoked_at_utc=null,created_by=excluded.created_by,created_at_utc=now()";Guid id=Guid.NewGuid();q.Parameters.AddWithValue(id);q.Parameters.AddWithValue(jobId);q.Parameters.AddWithValue(Hash(token));q.Parameters.AddWithValue(expires);q.Parameters.AddWithValue(userName);q.ExecuteNonQuery();return new ClientPortalIssueResult(new ClientPortalAccess(id,jobId,expires,null,userName,DateTimeOffset.UtcNow),token);}
+    public ClientPortalIssueResult Issue(Guid jobId,int days,string userName){using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand exists=c.CreateCommand();exists.CommandText="select exists(select 1 from studio_jobs where id=$1)";exists.Parameters.AddWithValue(jobId);if(exists.ExecuteScalar() is not bool found||!found)throw new KeyNotFoundException();string token=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();DateTimeOffset expires=DateTimeOffset.UtcNow.AddDays(Math.Clamp(days,1,365));using NpgsqlCommand q=c.CreateCommand();q.CommandText="insert into studio_client_portal_access(id,job_id,token_hash,expires_at_utc,revoked_at_utc,created_by,created_at_utc) values($1,$2,$3,$4,null,$5,now()) on conflict(job_id) do update set token_hash=excluded.token_hash,expires_at_utc=excluded.expires_at_utc,revoked_at_utc=null,created_by=excluded.created_by,created_at_utc=now() returning id";Guid newId=Guid.NewGuid();q.Parameters.AddWithValue(newId);q.Parameters.AddWithValue(jobId);q.Parameters.AddWithValue(Hash(token));q.Parameters.AddWithValue(expires);q.Parameters.AddWithValue(userName);Guid actualId=(Guid)(q.ExecuteScalar()??newId);return new ClientPortalIssueResult(new ClientPortalAccess(actualId,jobId,expires,null,userName,DateTimeOffset.UtcNow),token);}
     public ClientPortalAccess? Validate(string token){if(string.IsNullOrWhiteSpace(token))return null;using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand q=c.CreateCommand();q.CommandText="select id,job_id,expires_at_utc,revoked_at_utc,created_by,created_at_utc from studio_client_portal_access where token_hash=$1 and revoked_at_utc is null and expires_at_utc>now()";q.Parameters.AddWithValue(Hash(token));using NpgsqlDataReader r=q.ExecuteReader();if(!r.Read())return null;ClientPortalAccess value=new(r.GetGuid(0),r.GetGuid(1),r.GetFieldValue<DateTimeOffset>(2),r.IsDBNull(3)?null:r.GetFieldValue<DateTimeOffset>(3),r.GetString(4),r.GetFieldValue<DateTimeOffset>(5));r.Close();using NpgsqlCommand touch=c.CreateCommand();touch.CommandText="update studio_client_portal_access set last_accessed_at_utc=now() where id=$1";touch.Parameters.AddWithValue(value.Id);touch.ExecuteNonQuery();return value;}
     public void Revoke(Guid jobId){using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand q=c.CreateCommand();q.CommandText="update studio_client_portal_access set revoked_at_utc=now() where job_id=$1";q.Parameters.AddWithValue(jobId);q.ExecuteNonQuery();}
-    public ClientPortalData GetData(Guid jobId,StudioAccountsStore accounts){using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand q=c.CreateCommand();q.CommandText="select j.title,j.client_name,j.status,j.event_date,c.id,c.subject,c.contact_address from studio_jobs j join studio_conversations c on c.id=j.conversation_id where j.id=$1";q.Parameters.AddWithValue(jobId);using NpgsqlDataReader r=q.ExecuteReader();if(!r.Read())throw new KeyNotFoundException();string title=r.GetString(0),client=r.GetString(1),status=r.GetString(2);DateOnly? eventDate=r.IsDBNull(3)?null:r.GetFieldValue<DateOnly>(3);Guid conversationId=r.GetGuid(4);string subject=r.GetString(5);string contact=r.GetString(6);r.Close();using NpgsqlCommand messages=c.CreateCommand();messages.CommandText="select author_display_name,visibility,body,created_at_utc from studio_messages where conversation_id=$1 and visibility='External' order by created_at_utc";messages.Parameters.AddWithValue(conversationId);using NpgsqlDataReader mr=messages.ExecuteReader();List<ClientPortalMessage> list=[];while(mr.Read())list.Add(new(mr.GetString(0),mr.GetString(1),mr.GetString(2),mr.GetFieldValue<DateTimeOffset>(3)));return new ClientPortalData(jobId,title,client,status,eventDate,subject,contact,accounts.GetInvoices(jobId),list);}
+    public ClientPortalData GetData(Guid jobId,StudioAccountsStore accounts){using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand q=c.CreateCommand();q.CommandText="select j.title,j.client_name,j.status,j.event_date,c.id,c.subject,c.contact_address from studio_jobs j join studio_conversations c on c.id=j.conversation_id where j.id=$1";q.Parameters.AddWithValue(jobId);using NpgsqlDataReader r=q.ExecuteReader();if(!r.Read())throw new KeyNotFoundException();string title=r.GetString(0),client=r.GetString(1),status=r.GetString(2);DateOnly? eventDate=r.IsDBNull(3)?null:r.GetFieldValue<DateOnly>(3);Guid conversationId=r.GetGuid(4);string subject=r.GetString(5);string contact=r.GetString(6);r.Close();using NpgsqlCommand messages=c.CreateCommand();messages.CommandText="select author_display_name,visibility,body,created_at_utc from studio_messages where conversation_id=$1 and visibility='External' order by created_at_utc";messages.Parameters.AddWithValue(conversationId);using NpgsqlDataReader mr=messages.ExecuteReader();List<ClientPortalMessage> list=[];while(mr.Read())list.Add(new(mr.GetString(0),mr.GetString(1),mr.GetString(2),mr.GetFieldValue<DateTimeOffset>(3)));mr.Close();return new ClientPortalData(jobId,title,client,status,eventDate,subject,contact,accounts.GetInvoices(jobId),list);}
     public void AddClientMessage(Guid jobId,string body){using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand q=c.CreateCommand();q.CommandText="select conversation_id,client_name from studio_jobs where id=$1";q.Parameters.AddWithValue(jobId);using NpgsqlDataReader r=q.ExecuteReader();if(!r.Read())throw new KeyNotFoundException();Guid conversationId=r.GetGuid(0);string client=r.GetString(1);r.Close();using NpgsqlCommand insert=c.CreateCommand();insert.CommandText="insert into studio_messages(id,conversation_id,author_user_name,author_display_name,visibility,body,created_at_utc,external_message_id) values($1,$2,null,$3,'External',$4,now(),null)";insert.Parameters.AddWithValue(Guid.NewGuid());insert.Parameters.AddWithValue(conversationId);insert.Parameters.AddWithValue(client);insert.Parameters.AddWithValue(body);insert.ExecuteNonQuery();}
     private static string Hash(string token)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
 }
