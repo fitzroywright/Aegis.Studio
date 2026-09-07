@@ -22,6 +22,7 @@ public static class WorkspaceAccessEndpoints
 
         app.UseMiddleware<WorkspaceAuthorizationMiddleware>();
         app.MapStudioSecurityAdministration();
+        app.MapGlobalOperationalRoles();
         app.MapLegacyMailboxImport();
         app.MapStudioWorkflowAutomation();
         app.MapStudioGalleries();
