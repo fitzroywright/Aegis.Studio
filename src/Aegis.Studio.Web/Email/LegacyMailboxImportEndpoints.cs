@@ -65,7 +65,11 @@ public sealed class LegacyMailboxImporter
         string? requestedFolder = request.Folder;
 
         int maximum = Math.Clamp(request.MaximumMessages ?? 5000, 1, 50000);
-        int imported = 0; int duplicates = 0; int attachmentCount = 0; int failed = 0;
+        int imported = 0;
+        int duplicates = 0;
+        int attachmentCount = 0;
+        int failed = 0;
+
         using ImapClient client = new();
         await client.ConnectAsync(provider.Host, provider.Port, SecureSocketOptions.SslOnConnect, cancellationToken);
         if (authenticationMode.Equals("OAuth2", StringComparison.OrdinalIgnoreCase))
@@ -85,9 +89,11 @@ public sealed class LegacyMailboxImporter
             ? client.Inbox
             : await client.GetFolderAsync(requestedFolder.Trim(), cancellationToken);
         await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
+
         SearchQuery query = SearchQuery.All;
         if (request.FromUtc.HasValue) query = query.And(SearchQuery.DeliveredAfter(request.FromUtc.Value.UtcDateTime));
         if (request.ToUtc.HasValue) query = query.And(SearchQuery.DeliveredBefore(request.ToUtc.Value.UtcDateTime));
+
         IList<UniqueId> ids = await folder.SearchAsync(query, cancellationToken);
         foreach (UniqueId id in ids.TakeLast(maximum))
         {
@@ -117,6 +123,7 @@ public sealed class LegacyMailboxImporter
                     message.Subject ?? "Imported message",
                     body,
                     message.Date == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : message.Date.ToUniversalTime());
+
                 EmailRouteResult route = new(true, workspace.Id, workspace.Name, userName, null);
                 EmailIngestResult ingest = studio.ReceiveEmail(inbound, route);
                 if (ingest.WasDuplicate)
@@ -124,26 +131,40 @@ public sealed class LegacyMailboxImporter
                     duplicates++;
                     continue;
                 }
+
                 imported++;
                 foreach (MimeEntity entity in message.Attachments)
                 {
                     if (entity is MimePart part)
                     {
+                        MimeContent? content = part.Content;
+                        if (content is null)
+                        {
+                            continue;
+                        }
+
                         using MemoryStream stream = new();
-                        await part.Content.DecodeToAsync(stream, cancellationToken);
+                        await content.DecodeToAsync(stream, cancellationToken);
                         if (stream.Length > 0 && stream.Length <= attachments.MaximumBytes)
                         {
-                            await attachments.AddBytesAsync(ingest.Conversation.Id, part.FileName ?? "attachment.bin", part.ContentType.MimeType, stream.ToArray(), "External", $"Mailbox import: {userName}", cancellationToken);
+                            string contentType = part.ContentType?.MimeType ?? "application/octet-stream";
+                            await attachments.AddBytesAsync(ingest.Conversation.Id, part.FileName ?? "attachment.bin", contentType, stream.ToArray(), "External", $"Mailbox import: {userName}", cancellationToken);
                             attachmentCount++;
                         }
                     }
                     else if (entity is MessagePart attachedMessage)
                     {
+                        MimeMessage? embeddedMessage = attachedMessage.Message;
+                        if (embeddedMessage is null)
+                        {
+                            continue;
+                        }
+
                         using MemoryStream stream = new();
-                        await attachedMessage.Message.WriteToAsync(stream, cancellationToken);
+                        await embeddedMessage.WriteToAsync(stream, cancellationToken);
                         if (stream.Length > 0 && stream.Length <= attachments.MaximumBytes)
                         {
-                            string fileName = attachedMessage.ContentDisposition?.FileName ?? attachedMessage.ContentType.Name ?? "attached-message.eml";
+                            string fileName = attachedMessage.ContentDisposition?.FileName ?? attachedMessage.ContentType?.Name ?? "attached-message.eml";
                             await attachments.AddBytesAsync(ingest.Conversation.Id, fileName, "message/rfc822", stream.ToArray(), "External", $"Mailbox import: {userName}", cancellationToken);
                             attachmentCount++;
                         }
@@ -155,6 +176,7 @@ public sealed class LegacyMailboxImporter
                 failed++;
             }
         }
+
         await client.DisconnectAsync(true, cancellationToken);
         return new LegacyMailboxImportResult(provider.Name, userName, folder.FullName, authenticationMode, ids.Count, imported, duplicates, attachmentCount, failed);
     }
@@ -162,6 +184,7 @@ public sealed class LegacyMailboxImporter
 
 public sealed record LegacyMailboxImportRequest(string Provider,string UserName,string Secret,string? AuthenticationMode,string? Folder,DateTimeOffset? FromUtc,DateTimeOffset? ToUtc,int? MaximumMessages);
 public sealed record LegacyMailboxImportResult(string Provider,string Mailbox,string Folder,string AuthenticationMode,int MatchedMessages,int ImportedMessages,int DuplicateMessages,int ImportedAttachments,int FailedMessages);
+
 internal sealed record ProviderSettings(string Name,string Host,int Port,string DefaultAuthenticationMode)
 {
     public static ProviderSettings Resolve(string? provider) => provider?.Trim().ToLowerInvariant() switch
