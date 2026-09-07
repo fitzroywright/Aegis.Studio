@@ -14,9 +14,10 @@ public static class ProductionEndpoints
         }).RequireAuthorization();
 
         app.MapGet("/api/jobs/{jobId:guid}/production/tasks", (Guid jobId, ClaimsPrincipal user, ProductionStore store, JobAccessService access) =>
-            access.HasPermission(user, jobId, "ViewJob") || access.HasPermission(user, jobId, "ManageProduction")
-                ? Results.Ok(store.GetForJob(jobId))
-                : Results.Forbid()).RequireAuthorization();
+        {
+            if (!access.HasPermission(user, jobId, "ViewJob") && !access.HasPermission(user, jobId, "ManageProduction")) return Results.Forbid();
+            return Results.Ok(store.GetForJob(jobId));
+        }).RequireAuthorization();
 
         app.MapPost("/api/jobs/{jobId:guid}/production/tasks", (Guid jobId, ProductionTaskRequest request, ClaimsPrincipal user, ProductionStore store, JobAccessService access) =>
         {
