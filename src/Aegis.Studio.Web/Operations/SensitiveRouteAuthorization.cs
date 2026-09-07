@@ -1,6 +1,7 @@
 using Aegis.Pos.Core;
 using Aegis.Studio.Domain.Bookings;
 using Aegis.Studio.Web.Bookings;
+using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Pos;
 
 namespace Aegis.Studio.Web.Operations;
@@ -62,7 +63,7 @@ public static class SensitiveRouteAuthorization
     {
         if (context.User.IsInRole("Administrator")) return true;
 
-        GlobalOperationalRoleStore globalRoles = new(context.RequestServices.GetRequiredService<Persistence.StudioDatabase>());
+        GlobalOperationalRoleStore globalRoles = new(context.RequestServices.GetRequiredService<StudioDatabase>());
         if (path.Equals("/api/bookings", StringComparison.OrdinalIgnoreCase)
             && context.Request.Method.Equals("GET", StringComparison.OrdinalIgnoreCase))
         {
