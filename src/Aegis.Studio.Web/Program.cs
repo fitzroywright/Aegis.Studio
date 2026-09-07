@@ -38,6 +38,7 @@ builder.Services.AddSingleton<MicrosoftGraphEmailClient>();
 builder.Services.AddSingleton<StudioStore>();
 builder.Services.AddSingleton<BookingStore>();
 builder.Services.AddSingleton<StudioPosStore>();
+builder.Services.AddStudioPosHardening();
 builder.Services.AddSingleton<AttachmentStore>();
 builder.Services.AddSingleton<OutboundEmailStore>();
 builder.Services.AddSingleton<UnroutedEmailStore>();
@@ -57,6 +58,7 @@ app.MapGet("/login", (IWebHostEnvironment e) => Results.File(Path.Combine(e.WebR
 app.MapGet("/", (IWebHostEnvironment e) => Results.File(Path.Combine(e.WebRootPath, "index.html"), "text/html; charset=utf-8")).RequireAuthorization();
 app.MapStudioAuthentication();
 app.MapHealthChecks("/health").AllowAnonymous();
+app.MapStudioPosHardening();
 
 app.MapGet("/api/email/status", (MicrosoftGraphEmailClient client, MicrosoftGraphEmailOptions options, UnroutedEmailStore unrouted) => Results.Ok(new { configured = client.IsConfigured, collectionMailbox = options.Mailbox, pollSeconds = (int)client.PollInterval.TotalSeconds, mode = client.IsConfigured ? "Microsoft Graph" : "Manual/Test", unroutedCount = unrouted.GetOpen().Count }));
 app.MapGet("/api/workspaces", (StudioStore store) => Results.Ok(store.GetWorkspaces()));
@@ -85,11 +87,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, StudioStore studio, StudioPosStore pos) => studio.GetJob(jobId) is null ? Results.NotFound() : Results.Ok(pos.GetForJob(jobId)));
-app.MapPost("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, CreateStudioSaleRequest request, StudioStore studio, StudioPosStore pos) => { if (studio.GetJob(jobId) is null) return Results.NotFound(); if (request.Lines is null || request.Lines.Count == 0 || request.Lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.UnitPrice < 0m || x.Quantity <= 0)) return Results.BadRequest(new { error = "At least one valid sale line is required." }); try { Sale sale = pos.Create(jobId, request, studio); return Results.Created($"/api/pos/sales/{sale.Id}", sale); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
+app.MapPost("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, CreateStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos) => { if (studio.GetJob(jobId) is null) return Results.NotFound(); if (request.Lines is null || request.Lines.Count == 0 || request.Lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.UnitPrice < 0m || x.Quantity <= 0)) return Results.BadRequest(new { error = "At least one valid sale line is required." }); try { Sale sale = pos.Create(jobId, request, studio, context.User.Identity?.Name ?? "Aegis.Studio"); return Results.Created($"/api/pos/sales/{sale.Id}", sale); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
 app.MapGet("/api/pos/sales/{saleId:guid}", (Guid saleId, StudioPosStore pos) => pos.Get(saleId) is Sale sale ? Results.Ok(sale) : Results.NotFound());
 app.MapPost("/api/pos/sales/{saleId:guid}/complete", (Guid saleId, CompleteStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos) => { if (pos.Get(saleId) is null) return Results.NotFound(); string userId = context.User.Identity?.Name ?? "Aegis.Studio"; try { return Results.Ok(pos.Complete(saleId, request, studio, userId)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
 app.MapPost("/api/pos/sales/{saleId:guid}/void", (Guid saleId, VoidStudioSaleRequest request, HttpContext context, StudioPosStore pos) => { if (pos.Get(saleId) is null) return Results.NotFound(); if (string.IsNullOrWhiteSpace(request.Reason)) return Results.BadRequest(new { error = "Void reason is required." }); try { return Results.Ok(pos.Void(saleId, context.User.Identity?.Name ?? "Aegis.Studio", request.Reason)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
-app.MapPost("/api/pos/sales/{saleId:guid}/refunds", (Guid saleId, RefundStudioSaleRequest request, StudioStore studio, StudioPosStore pos) => { if (pos.Get(saleId) is null) return Results.NotFound(); try { return Results.Ok(pos.Refund(saleId, request, studio)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
+app.MapPost("/api/pos/sales/{saleId:guid}/refunds", (Guid saleId, RefundStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos) => { if (pos.Get(saleId) is null) return Results.NotFound(); try { return Results.Ok(pos.Refund(saleId, request, studio, context.User.Identity?.Name ?? "Aegis.Studio")); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
 app.MapGet("/api/pos/device-agent", (IConfiguration configuration) => Results.Ok(new { baseUrl = configuration["PosDeviceAgent:BaseUrl"] ?? "https://localhost:7399" }));
 
 app.MapGet("/api/conversations/{id:guid}/attachments", (Guid id, StudioStore store, AttachmentStore attachments) => store.GetConversation(id) is null ? Results.NotFound() : Results.Ok(attachments.GetForConversation(id)));
