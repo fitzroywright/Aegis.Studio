@@ -14,7 +14,7 @@ public sealed class ShootCoordinator
         this.photographers = photographers;
     }
 
-    public ShootSession Create(Guid jobId, ShootSessionRequest request, string userName)
+    public ShootSession Create(Guid jobId, IntegratedShootRequest request, string userName)
     {
         if (request.PlannedEndUtc <= request.CallTimeUtc) throw new InvalidOperationException("Shoot end must be after call time.");
         PhotographerProfile photographer = photographers.Get(request.PhotographerUserName) ?? throw new InvalidOperationException("Photographer must have an active photographer profile before assignment.");
@@ -92,3 +92,5 @@ public sealed class ShootCoordinator
         if (reader.Read()) throw new InvalidOperationException($"Schedule conflict: {reader.GetString(0)} is already assigned to {reader.GetString(1)} from {reader.GetFieldValue<DateTimeOffset>(2):u} to {reader.GetFieldValue<DateTimeOffset>(3):u}.");
     }
 }
+
+public sealed record IntegratedShootRequest(string PhotographerUserName,string? AssistantUserName,DateTimeOffset CallTimeUtc,DateTimeOffset PlannedEndUtc,string? Location,string? CoverageNotes,string? EquipmentNotes,IReadOnlyList<Guid>? ResourceIds);
