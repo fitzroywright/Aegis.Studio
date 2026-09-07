@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Persistence;
@@ -6,16 +7,21 @@ namespace Aegis.Studio.Web.Operations;
 
 public static class WorkspaceAccessEndpoints
 {
-    private const string RegistrationKey = "Aegis.Studio.WorkspaceAccessEndpoints.Registered";
+    private static readonly ConditionalWeakTable<WebApplication, object> registrations = new();
+    private static readonly object registrationLock = new();
 
     public static void MapWorkspaceAccess(this WebApplication app)
     {
-        if (app.Properties.ContainsKey(RegistrationKey))
+        lock (registrationLock)
         {
-            return;
+            if (registrations.TryGetValue(app, out _))
+            {
+                return;
+            }
+
+            registrations.Add(app, new object());
         }
 
-        app.Properties[RegistrationKey] = true;
         app.UseMiddleware<WorkspaceAuthorizationMiddleware>();
 
         app.MapGet("/api/workspace-access", (ClaimsPrincipal user, StudioDatabase database, WorkspaceStore workspaces) =>
