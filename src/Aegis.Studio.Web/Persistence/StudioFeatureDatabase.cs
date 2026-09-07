@@ -35,6 +35,31 @@ public sealed class StudioFeatureDatabase
             create index if not exists ix_studio_notifications_user on studio_notifications(lower(user_name),created_at_utc desc);
             create index if not exists ix_studio_notifications_pending on studio_notifications(status,created_at_utc);
 
+            create table if not exists studio_workspace_members
+            (
+                workspace_id uuid not null references studio_workspaces(id) on delete cascade,
+                user_name text not null,
+                display_name text not null,
+                is_active boolean not null default true,
+                access_workspace boolean not null default true,
+                can_view boolean not null default true,
+                reply_requester boolean not null default false,
+                view_attachments boolean not null default true,
+                add_attachments boolean not null default false,
+                create_job boolean not null default false,
+                edit_job boolean not null default false,
+                manage_schedule boolean not null default false,
+                manage_production boolean not null default false,
+                notify_members boolean not null default false,
+                edit_workspace boolean not null default false,
+                manage_members boolean not null default false,
+                admin_workspace boolean not null default false,
+                created_at_utc timestamptz not null,
+                updated_at_utc timestamptz not null,
+                primary key(workspace_id,user_name)
+            );
+            create index if not exists ix_studio_workspace_members_user on studio_workspace_members(lower(user_name),workspace_id);
+
             create table if not exists studio_schedule_resources
             (
                 id uuid primary key,
