@@ -98,7 +98,7 @@ public sealed class WorkflowOperationsStore
         using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
-            command.CommandText = "update studio_workflow_runs set status='Waiting',next_action_at_utc=now(),last_error=null,updated_at_utc=now(),completed_at_utc=null where id=$1 and status='Failed'";
+            command.CommandText = "update studio_workflow_runs set status='Waiting',next_action_at_utc=now(),last_error=null,lease_owner=null,lease_until_utc=null,updated_at_utc=now(),completed_at_utc=null where id=$1 and status='Failed'";
             command.Parameters.AddWithValue(runId);
             if (command.ExecuteNonQuery() != 1) throw new InvalidOperationException("Workflow run changed before retry could be scheduled.");
         }
@@ -116,7 +116,7 @@ public sealed class WorkflowOperationsStore
         using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
-            command.CommandText = "update studio_workflow_runs set status='Cancelled',next_action_at_utc=null,updated_at_utc=now(),completed_at_utc=now() where id=$1 and status not in ('Completed','Cancelled')";
+            command.CommandText = "update studio_workflow_runs set status='Cancelled',next_action_at_utc=null,lease_owner=null,lease_until_utc=null,updated_at_utc=now(),completed_at_utc=now() where id=$1 and status not in ('Completed','Cancelled')";
             command.Parameters.AddWithValue(runId);
             if (command.ExecuteNonQuery() != 1) throw new InvalidOperationException("Workflow run changed before it could be cancelled.");
         }
