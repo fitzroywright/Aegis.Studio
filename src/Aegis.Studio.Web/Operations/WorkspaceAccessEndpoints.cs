@@ -31,8 +31,8 @@ public static class WorkspaceAccessEndpoints
         app.MapLegacyMailboxImport();
         app.MapStudioWorkflowAutomation();
         app.MapStudioWorkflowOperations();
-        app.MapStudioClientGalleryAccess();
         app.MapStudioGalleries();
+        app.MapStudioClientGalleryAccess();
         app.MapStudioGalleryInternalFiles();
         app.MapStudioManagementAccountsPortal();
         app.MapStudioEscalations();
