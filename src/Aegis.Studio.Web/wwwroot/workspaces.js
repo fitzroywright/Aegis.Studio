@@ -13,20 +13,8 @@ async function showWorkspaces() {
 
         genericView.innerHTML = `
             <div class="job-detail-header"><div><h1>Workspaces</h1><p>Workspace access is membership based. Permissions control what each member can see and do.</p></div></div>
-            <section class="job-section">
-                <h2>Your workspaces</h2>
-                ${manageable.length ? manageable.map(item => renderWorkspaceAdminRow(item.workspace, item.permissions, isAdministrator)).join('') : '<p class="muted">You do not administer any workspaces.</p>'}
-            </section>
-            ${isAdministrator ? `<section class="job-section">
-                <h2>Create workspace</h2>
-                <p class="muted">Routing uses the exact email address or route key. Membership can be assigned immediately after creation.</p>
-                <div class="pos-entry">
-                    <label>Name<input id="workspaceName"></label>
-                    <label>Email address<input id="workspaceEmail" type="email"></label>
-                    <label>Route key<input id="workspaceRouteKey"></label>
-                    <button class="primary" onclick="createWorkspace()">Create workspace</button>
-                </div>
-            </section>` : ''}
+            <section class="job-section"><h2>Your workspaces</h2>${manageable.length ? manageable.map(item => renderWorkspaceAdminRow(item.workspace, item.permissions, isAdministrator)).join('') : '<p class="muted">You do not administer any workspaces.</p>'}</section>
+            ${isAdministrator ? `<section class="job-section"><h2>Create workspace</h2><p class="muted">Routing uses the exact email address or route key. Membership can be assigned immediately after creation.</p><div class="pos-entry"><label>Name<input id="workspaceName"></label><label>Email address<input id="workspaceEmail" type="email"></label><label>Route key<input id="workspaceRouteKey"></label><button class="primary" onclick="createWorkspace()">Create workspace</button></div></section>` : ''}
             <section id="workspaceMemberPanel" class="job-section hidden"></section>`;
     } catch (error) {
         genericView.innerHTML = `<h1>Workspaces</h1><div class="empty-state" style="text-align:left"><h2>Unable to load workspace administration</h2><p>${esc(error.message || error)}</p></div>`;
@@ -43,19 +31,16 @@ async function createWorkspace() {
     const name = document.getElementById('workspaceName').value.trim();
     if (!name) return alert('Workspace name is required.');
     const workspace = await json('/api/admin/workspaces/', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, emailAddress:document.getElementById('workspaceEmail').value.trim()||null, routeKey:document.getElementById('workspaceRouteKey').value.trim()||null, isEnabled:true, sortOrder:0 }) });
-    await loadWorkspaces();
-    await showWorkspaces();
-    await manageWorkspaceMembers(workspace.id, workspace.name);
+    await loadWorkspaces(); await showWorkspaces(); await manageWorkspaceMembers(workspace.id, workspace.name);
 }
 
 async function editWorkspace(id) {
-    const current = (await json('/api/admin/workspaces/')).find(x => x.id === id);
-    if (!current) return;
+    const current = await json('/api/workspaces/' + id);
     const name = prompt('Workspace name', current.name); if (!name) return;
     const emailAddress = prompt('Workspace email address', current.emailAddress || ''); if (emailAddress === null) return;
     const routeKey = prompt('Exact routing key', current.routeKey || ''); if (routeKey === null) return;
     const enabledText = prompt('Enabled? yes/no', current.isEnabled ? 'yes' : 'no'); if (enabledText === null) return;
-    await json('/api/admin/workspaces/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name:name.trim(), emailAddress:emailAddress.trim()||null, routeKey:routeKey.trim()||null, isEnabled:!['no','false','0'].includes(enabledText.trim().toLowerCase()), sortOrder:current.sortOrder||0 }) });
+    await json('/api/workspaces/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name:name.trim(), emailAddress:emailAddress.trim()||null, routeKey:routeKey.trim()||null, isEnabled:!['no','false','0'].includes(enabledText.trim().toLowerCase()), sortOrder:current.sortOrder||0 }) });
     await loadWorkspaces(); await showWorkspaces();
 }
 
@@ -75,11 +60,7 @@ async function manageWorkspaceMembers(workspaceId, workspaceName) {
     const panel = document.getElementById('workspaceMemberPanel');
     const members = await json(`/api/workspaces/${workspaceId}/members`);
     panel.classList.remove('hidden');
-    panel.innerHTML = `<h2>${esc(workspaceName)} — Members & permissions</h2>
-        <p class="muted">Only active members with Access workspace can enter this workspace. Permissions are independent so read-only and specialist roles are possible.</p>
-        <div>${members.length ? members.map(member => renderMember(workspaceId, member)).join('') : '<p class="muted">No members yet.</p>'}</div>
-        <h3>Add or update member</h3>
-        <div class="pos-entry"><label>User name<input id="memberUserName" placeholder="domain user name"></label><label>Display name<input id="memberDisplayName"></label><label>Preset<select id="memberPreset"><option value="view">View only</option><option value="reply">Request handler</option><option value="editor">Workspace editor</option><option value="admin">Workspace admin</option></select></label><button class="primary" onclick="saveWorkspaceMember('${workspaceId}','${esc(workspaceName)}')">Save member</button></div>`;
+    panel.innerHTML = `<h2>${esc(workspaceName)} — Members & permissions</h2><p class="muted">Only active members with Access workspace can enter this workspace. Permissions are independent so read-only and specialist roles are possible.</p><div>${members.length ? members.map(member => renderMember(workspaceId, member)).join('') : '<p class="muted">No members yet.</p>'}</div><h3>Add or update member</h3><div class="pos-entry"><label>User name<input id="memberUserName" placeholder="domain user name"></label><label>Display name<input id="memberDisplayName"></label><label>Preset<select id="memberPreset"><option value="view">View only</option><option value="reply">Request handler</option><option value="editor">Workspace editor</option><option value="admin">Workspace admin</option></select></label><button class="primary" onclick="saveWorkspaceMember('${workspaceId}','${esc(workspaceName)}')">Save member</button></div>`;
     panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
@@ -91,8 +72,7 @@ function renderMember(workspaceId, member) {
 async function saveWorkspaceMember(workspaceId, workspaceName) {
     const userName = document.getElementById('memberUserName').value.trim(); if (!userName) return alert('User name is required.');
     const displayName = document.getElementById('memberDisplayName').value.trim() || userName;
-    const permissions = permissionsForPreset(document.getElementById('memberPreset').value);
-    await putWorkspaceMember(workspaceId,userName,displayName,permissions);
+    await putWorkspaceMember(workspaceId,userName,displayName,permissionsForPreset(document.getElementById('memberPreset').value));
     await manageWorkspaceMembers(workspaceId,workspaceName);
 }
 
