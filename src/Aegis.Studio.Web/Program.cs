@@ -50,6 +50,7 @@ builder.Services.AddSingleton<BookingStore>();
 builder.Services.AddSingleton<BookingApiAuthenticator>();
 builder.Services.AddSingleton<UserProfileStore>();
 builder.Services.AddSingleton<NotificationService>();
+builder.Services.AddSingleton<JobEventNotifier>();
 builder.Services.AddSingleton<ScheduleStore>();
 builder.Services.AddSingleton<ProductionStore>();
 builder.Services.AddSingleton<StudioPosStore>();
@@ -166,14 +167,17 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ClaimsPrincipal user, StudioStore st
     if (!access.HasPermission(user, id, "ViewJob")) return Results.Forbid();
     return store.GetJob(id) is StudioJob job ? Results.Ok(job) : Results.NotFound();
 });
-app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrincipal user, StudioStore store, NotificationService notifications, JobAccessService access) =>
+app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrincipal user, StudioStore store, NotificationService notifications, JobEventNotifier jobEvents, JobAccessService access) =>
 {
     StudioJob? before = store.GetJob(id); if (before is null) return Results.NotFound();
     if (!access.HasPermission(user, id, "EditJob")) return Results.Forbid();
     if (!string.IsNullOrWhiteSpace(request.Status) && !string.Equals(before.Status, request.Status, StringComparison.OrdinalIgnoreCase) && !access.HasPermission(user, id, "ChangeStatus")) return Results.Forbid();
     if (!string.IsNullOrWhiteSpace(request.AssignedTo) && !string.Equals(before.AssignedTo, request.AssignedTo, StringComparison.OrdinalIgnoreCase) && !access.HasPermission(user, id, "AssignStaff")) return Results.Forbid();
     StudioJob updated = store.UpdateJob(id, request);
-    if (!string.Equals(before.Status, updated.Status, StringComparison.OrdinalIgnoreCase)) notifications.PublishToAll("JobStatusChanged", $"Job status: {updated.Title}", $"{before.Status} → {updated.Status}", "Job", id.ToString("D"));
+    if (!string.Equals(before.Status, updated.Status, StringComparison.OrdinalIgnoreCase))
+    {
+        jobEvents.Publish(id, "JobStatusChanged", $"Job status: {updated.Title}", $"{before.Status} → {updated.Status}", requesterEligible: true);
+    }
     if (!string.Equals(before.AssignedTo, updated.AssignedTo, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(updated.AssignedTo))
     {
         access.EnsureAssignedMember(id, updated.AssignedTo);
