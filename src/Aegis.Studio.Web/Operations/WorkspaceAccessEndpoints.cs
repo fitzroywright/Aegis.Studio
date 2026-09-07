@@ -24,6 +24,7 @@ public static class WorkspaceAccessEndpoints
         app.UseStudioSameOriginWriteProtection();
         app.UseStudioSensitiveRouteAuthorization();
         app.UseMiddleware<WorkspaceAuthorizationMiddleware>();
+        app.Services.GetRequiredService<JobEventNotifier>();
         app.MapStudioSecurityAdministration();
         app.MapGlobalOperationalRoles();
         app.MapLegacyMailboxImport();
