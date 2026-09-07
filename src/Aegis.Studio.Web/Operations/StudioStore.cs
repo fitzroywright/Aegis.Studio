@@ -1,55 +1,107 @@
+using System.Security.Claims;
 using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Web.Bookings;
 using Aegis.Studio.Web.Persistence;
+using Npgsql;
 
 namespace Aegis.Studio.Web.Operations;
 
 public sealed class StudioStore
 {
-    private const string ConversationsCollection = "conversations";
-    private const string JobsCollection = "jobs";
-    private static readonly Guid WeddingsWorkspaceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    private static readonly Guid IdPhotosWorkspaceId = Guid.Parse("44444444-4444-4444-4444-444444444444");
-    private static readonly Guid GraduationsWorkspaceId = Guid.Parse("55555555-5555-5555-5555-555555555555");
-    private readonly PostgresDocumentStore persistence;
+    private readonly StudioDatabase database;
+    private readonly WorkspaceStore workspaces;
 
-    public StudioStore(PostgresDocumentStore persistence)
+    public StudioStore(StudioDatabase database, WorkspaceStore workspaces)
     {
-        this.persistence = persistence;
+        this.database = database;
+        this.workspaces = workspaces;
     }
 
     public IReadOnlyList<StudioWorkspace> GetWorkspaces()
     {
-        IReadOnlyList<StudioConversation> conversations = persistence.GetAll<StudioConversation>(ConversationsCollection);
-        return
-        [
-            new(WeddingsWorkspaceId, "Weddings", "weddings@bryanstudiosltd.com", conversations.Count(x => x.WorkspaceId == WeddingsWorkspaceId && !x.IsClosed)),
-            new(IdPhotosWorkspaceId, "ID Photos", "idphotos@bryanstudiosltd.com", conversations.Count(x => x.WorkspaceId == IdPhotosWorkspaceId && !x.IsClosed)),
-            new(GraduationsWorkspaceId, "Graduations", "graduations@bryanstudiosltd.com", conversations.Count(x => x.WorkspaceId == GraduationsWorkspaceId && !x.IsClosed))
-        ];
+        IReadOnlyList<StudioWorkspaceDefinition> definitions = workspaces.GetAll();
+        using NpgsqlConnection connection = database.OpenConnection();
+        List<StudioWorkspace> result = [];
+        foreach (StudioWorkspaceDefinition workspace in definitions)
+        {
+            using NpgsqlCommand command = connection.CreateCommand();
+            command.CommandText = "select count(*) from studio_conversations where workspace_id = $1 and not is_closed";
+            command.Parameters.AddWithValue(workspace.Id);
+            int openCount = Convert.ToInt32(command.ExecuteScalar());
+            result.Add(new StudioWorkspace(workspace.Id, workspace.Name, workspace.EmailAddress ?? string.Empty, openCount));
+        }
+        return result;
     }
 
     public IReadOnlyList<StudioConversation> GetConversations(Guid? workspaceId)
     {
-        IEnumerable<StudioConversation> query = persistence.GetAll<StudioConversation>(ConversationsCollection).Where(x => !x.IsClosed);
-        if (workspaceId.HasValue)
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            select c.id, c.workspace_id, c.subject, c.contact_name, c.contact_address, c.channel,
+                   c.is_closed, c.job_id, c.external_thread_id
+            from studio_conversations c
+            where not c.is_closed and ($1::uuid is null or c.workspace_id = $1)
+            order by coalesce((select max(m.created_at_utc) from studio_messages m where m.conversation_id = c.id), c.created_at_utc) desc
+            """;
+        command.Parameters.AddWithValue((object?)workspaceId ?? DBNull.Value);
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<StudioConversation> values = [];
+        while (reader.Read())
         {
-            query = query.Where(x => x.WorkspaceId == workspaceId.Value);
+            values.Add(ReadConversation(reader));
         }
-        return query.OrderByDescending(GetLastActivity).ToList();
+        return values;
     }
 
-    public StudioConversation? GetConversation(Guid id) => persistence.Get<StudioConversation>(ConversationsCollection, id);
-    public StudioJob? GetJob(Guid id) => persistence.Get<StudioJob>(JobsCollection, id);
-    public IReadOnlyList<StudioJob> GetJobs() => persistence.GetAll<StudioJob>(JobsCollection).OrderByDescending(x => x.CreatedAt).ToList();
+    public StudioConversation? GetConversation(Guid id)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            select id, workspace_id, subject, contact_name, contact_address, channel, is_closed, job_id, external_thread_id
+            from studio_conversations where id = $1
+            """;
+        command.Parameters.AddWithValue(id);
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        return reader.Read() ? ReadConversation(reader) : null;
+    }
+
+    public StudioJob? GetJob(Guid id)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to from studio_jobs where id = $1";
+        command.Parameters.AddWithValue(id);
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        return reader.Read() ? ReadJob(reader) : null;
+    }
+
+    public IReadOnlyList<StudioJob> GetJobs()
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to from studio_jobs order by created_at_utc desc";
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<StudioJob> values = [];
+        while (reader.Read())
+        {
+            values.Add(ReadJob(reader));
+        }
+        return values;
+    }
 
     public StudioConversation ReceiveInteraction(IncomingInteractionRequest request)
     {
         Guid workspaceId = ResolveWorkspace(request.WorkspaceId, request.Destination);
-        StudioConversation conversation = new(Guid.NewGuid(), workspaceId, request.Subject.Trim(), request.ContactName.Trim(), request.ContactAddress.Trim(), NormaliseChannel(request.Channel), false, null,
-            [new(Guid.NewGuid(), request.ContactName.Trim(), "External", request.Body.Trim(), DateTimeOffset.UtcNow)]);
-        persistence.Upsert(ConversationsCollection, conversation.Id, conversation);
-        return conversation;
+        Guid conversationId = Guid.NewGuid();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
+        InsertConversation(connection, transaction, conversationId, workspaceId, request.Subject.Trim(), request.ContactName.Trim(), request.ContactAddress.Trim(), NormaliseChannel(request.Channel), null, now);
+        InsertMessage(connection, transaction, new StudioMessage(Guid.NewGuid(), request.ContactName.Trim(), "External", request.Body.Trim(), now, null, null), conversationId);
+        transaction.Commit();
+        return GetConversation(conversationId)!;
     }
 
     public EmailIngestResult ReceiveEmail(InboundEmail email, EmailRouteResult route)
@@ -59,33 +111,45 @@ public sealed class StudioStore
             throw new InvalidOperationException("An email must be routed before it can be ingested.");
         }
 
-        List<StudioConversation> conversations = persistence.GetAll<StudioConversation>(ConversationsCollection).ToList();
-        StudioConversation? duplicate = conversations.FirstOrDefault(x => x.Messages.Any(m => string.Equals(m.ExternalMessageId, email.MessageId, StringComparison.OrdinalIgnoreCase)));
+        StudioConversation? duplicate = FindByExternalMessageId(email.MessageId);
         if (duplicate is not null)
         {
             return new EmailIngestResult(duplicate, false, true);
         }
 
-        StudioConversation? existing = FindConversationForEmail(email, route.WorkspaceId.Value, conversations);
-        StudioMessage message = new(Guid.NewGuid(), email.FromName.Trim(), "External", email.Body.Trim(), email.ReceivedAt.ToUniversalTime(), email.MessageId);
+        StudioConversation? existing = FindConversationForEmail(email, route.WorkspaceId.Value);
+        StudioMessage message = new(Guid.NewGuid(), email.FromName.Trim(), "External", email.Body.Trim(), email.ReceivedAt.ToUniversalTime(), email.MessageId, email.FromAddress.Trim());
         if (existing is not null)
         {
-            existing.Messages.Add(message);
-            persistence.Upsert(ConversationsCollection, existing.Id, existing);
-            return new EmailIngestResult(existing, false, false);
+            using NpgsqlConnection connection = database.OpenConnection();
+            using NpgsqlTransaction transaction = connection.BeginTransaction();
+            InsertMessage(connection, transaction, message, existing.Id);
+            transaction.Commit();
+            return new EmailIngestResult(GetConversation(existing.Id)!, false, false);
         }
 
-        StudioConversation conversation = new(Guid.NewGuid(), route.WorkspaceId.Value, email.Subject.Trim(), email.FromName.Trim(), email.FromAddress.Trim(), "Email", false, null, [message], NormaliseThreadId(email.ThreadId));
-        persistence.Upsert(ConversationsCollection, conversation.Id, conversation);
-        return new EmailIngestResult(conversation, true, false);
+        Guid conversationId = Guid.NewGuid();
+        using (NpgsqlConnection connection = database.OpenConnection())
+        using (NpgsqlTransaction transaction = connection.BeginTransaction())
+        {
+            InsertConversation(connection, transaction, conversationId, route.WorkspaceId.Value, email.Subject.Trim(), email.FromName.Trim(), email.FromAddress.Trim(), "Email", NormaliseThreadId(email.ThreadId), DateTimeOffset.UtcNow);
+            InsertMessage(connection, transaction, message, conversationId);
+            transaction.Commit();
+        }
+        return new EmailIngestResult(GetConversation(conversationId)!, true, false);
     }
 
-    public StudioConversation AddMessage(Guid id, AddMessageRequest request)
+    public StudioConversation AddMessage(Guid id, AddMessageRequest request, ClaimsPrincipal user)
     {
         StudioConversation conversation = GetConversation(id) ?? throw new KeyNotFoundException("Conversation was not found.");
-        conversation.Messages.Add(new StudioMessage(Guid.NewGuid(), request.IsInternal ? "Aegis Staff" : "Bryan's Studio", request.IsInternal ? "Internal" : "External", request.Body.Trim(), DateTimeOffset.UtcNow));
-        persistence.Upsert(ConversationsCollection, conversation.Id, conversation);
-        return conversation;
+        string userName = user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.Identity?.Name ?? "unknown";
+        string displayName = user.Identity?.Name ?? userName;
+        StudioMessage message = new(Guid.NewGuid(), displayName, request.IsInternal ? "Internal" : "External", request.Body.Trim(), DateTimeOffset.UtcNow, null, userName);
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
+        InsertMessage(connection, transaction, message, conversation.Id);
+        transaction.Commit();
+        return GetConversation(id)!;
     }
 
     public StudioJob CreateJob(Guid conversationId, CreateJobRequest request)
@@ -100,76 +164,239 @@ public sealed class StudioStore
             }
         }
 
-        StudioJob job = new(Guid.NewGuid(), conversation.WorkspaceId, conversation.Id, request.Title.Trim(), conversation.ContactName, "New", request.EventDate, DateTimeOffset.UtcNow, null, []);
-        persistence.Upsert(JobsCollection, job.Id, job);
-        StudioConversation updated = conversation with { JobId = job.Id };
-        persistence.Upsert(ConversationsCollection, updated.Id, updated);
-        return job;
+        Guid id = Guid.NewGuid();
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
+        using (NpgsqlCommand command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                insert into studio_jobs(id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to)
+                values ($1,$2,$3,$4,$5,'New',$6,$7,null)
+                """;
+            command.Parameters.AddWithValue(id);
+            command.Parameters.AddWithValue(conversation.WorkspaceId);
+            command.Parameters.AddWithValue(conversation.Id);
+            command.Parameters.AddWithValue(request.Title.Trim());
+            command.Parameters.AddWithValue(conversation.ContactName);
+            command.Parameters.AddWithValue((object?)request.EventDate ?? DBNull.Value);
+            command.Parameters.AddWithValue(DateTimeOffset.UtcNow);
+            command.ExecuteNonQuery();
+        }
+        using (NpgsqlCommand command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "update studio_conversations set job_id = $1 where id = $2";
+            command.Parameters.AddWithValue(id);
+            command.Parameters.AddWithValue(conversation.Id);
+            command.ExecuteNonQuery();
+        }
+        transaction.Commit();
+        return GetJob(id)!;
     }
 
     public StudioJob CreateBookingJob(CreateBookingIntakeRequest request)
     {
-        Guid workspaceId = ResolveWorkspace(request.WorkspaceId, request.Destination ?? request.SessionType);
-        string channel = NormaliseChannel(request.Source);
+        Guid workspaceId = ResolveWorkspace(request.WorkspaceId, request.Destination);
         string address = !string.IsNullOrWhiteSpace(request.ClientEmail) ? request.ClientEmail.Trim() : request.ClientPhone?.Trim() ?? "Walk-in";
         string note = string.IsNullOrWhiteSpace(request.Notes) ? $"Booking request for {request.SessionType}." : request.Notes.Trim();
-        StudioConversation conversation = new(Guid.NewGuid(), workspaceId, $"{request.SessionType} booking", request.ClientName.Trim(), address, channel, false, null,
-            [new(Guid.NewGuid(), request.ClientName.Trim(), "External", note, DateTimeOffset.UtcNow)]);
-        persistence.Upsert(ConversationsCollection, conversation.Id, conversation);
-        StudioJob job = new(Guid.NewGuid(), workspaceId, conversation.Id, request.SessionType.Trim(), request.ClientName.Trim(), "New", DateOnly.FromDateTime(request.StartsAt.UtcDateTime), DateTimeOffset.UtcNow, null, []);
-        persistence.Upsert(JobsCollection, job.Id, job);
-        StudioConversation updated = conversation with { JobId = job.Id };
-        persistence.Upsert(ConversationsCollection, updated.Id, updated);
-        return job;
+        StudioConversation conversation = ReceiveInteraction(new IncomingInteractionRequest(workspaceId, null, request.ClientName, address, $"{request.SessionType} booking", note, request.Source));
+        return CreateJob(conversation.Id, new CreateJobRequest(request.SessionType, DateOnly.FromDateTime(request.StartsAt.UtcDateTime)));
     }
 
     public StudioJob UpdateJob(Guid id, UpdateJobRequest request)
     {
         StudioJob current = GetJob(id) ?? throw new KeyNotFoundException("Job was not found.");
-        StudioJob updated = current with
-        {
-            Status = string.IsNullOrWhiteSpace(request.Status) ? current.Status : request.Status.Trim(),
-            AssignedTo = string.IsNullOrWhiteSpace(request.AssignedTo) ? current.AssignedTo : request.AssignedTo.Trim(),
-            EventDate = request.EventDate ?? current.EventDate
-        };
-        persistence.Upsert(JobsCollection, updated.Id, updated);
-        return updated;
+        string status = string.IsNullOrWhiteSpace(request.Status) ? current.Status : request.Status.Trim();
+        string? assignedTo = string.IsNullOrWhiteSpace(request.AssignedTo) ? current.AssignedTo : request.AssignedTo.Trim();
+        DateOnly? eventDate = request.EventDate ?? current.EventDate;
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "update studio_jobs set status=$2, assigned_to=$3, event_date=$4 where id=$1";
+        command.Parameters.AddWithValue(id);
+        command.Parameters.AddWithValue(status);
+        command.Parameters.AddWithValue((object?)assignedTo ?? DBNull.Value);
+        command.Parameters.AddWithValue((object?)eventDate ?? DBNull.Value);
+        command.ExecuteNonQuery();
+        return GetJob(id)!;
     }
 
     public StudioJob AddFinancialEvent(Guid id, AddFinancialEventRequest request)
     {
-        StudioJob current = GetJob(id) ?? throw new KeyNotFoundException("Job was not found.");
-        List<StudioFinancialEvent> events = current.FinancialEvents?.ToList() ?? [];
-        events.Add(new StudioFinancialEvent(Guid.NewGuid(), request.Kind.Trim(), request.Amount, request.Note?.Trim(), DateTimeOffset.UtcNow));
-        StudioJob updated = current with { FinancialEvents = events };
-        persistence.Upsert(JobsCollection, updated.Id, updated);
-        return updated;
+        if (GetJob(id) is null)
+        {
+            throw new KeyNotFoundException("Job was not found.");
+        }
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "insert into studio_financial_events(id, job_id, kind, amount, note, created_at_utc) values ($1,$2,$3,$4,$5,$6)";
+        command.Parameters.AddWithValue(Guid.NewGuid());
+        command.Parameters.AddWithValue(id);
+        command.Parameters.AddWithValue(request.Kind.Trim());
+        command.Parameters.AddWithValue(request.Amount);
+        command.Parameters.AddWithValue((object?)request.Note?.Trim() ?? DBNull.Value);
+        command.Parameters.AddWithValue(DateTimeOffset.UtcNow);
+        command.ExecuteNonQuery();
+        return GetJob(id)!;
     }
 
     public AccountsSummary GetAccountsSummary()
     {
-        IReadOnlyList<StudioJob> jobs = GetJobs();
-        return new(jobs.Sum(x => x.FinancialEvents?.Sum(e => e.Amount) ?? 0m), jobs.Count(x => (x.FinancialEvents?.Count ?? 0) > 0), jobs.Count);
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            select coalesce((select sum(amount) from studio_financial_events),0),
+                   (select count(distinct job_id) from studio_financial_events),
+                   (select count(*) from studio_jobs)
+            """;
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        reader.Read();
+        return new AccountsSummary(reader.GetDecimal(0), reader.GetInt32(1), reader.GetInt32(2));
     }
 
-    private static StudioConversation? FindConversationForEmail(InboundEmail email, Guid workspaceId, IReadOnlyList<StudioConversation> conversations)
+    private Guid ResolveWorkspace(Guid? id, string? destination)
+    {
+        if (id.HasValue)
+        {
+            StudioWorkspaceDefinition? workspace = workspaces.Get(id.Value);
+            if (workspace is null || !workspace.IsEnabled)
+            {
+                throw new InvalidOperationException("The selected workspace does not exist or is disabled.");
+            }
+            return workspace.Id;
+        }
+
+        if (string.IsNullOrWhiteSpace(destination))
+        {
+            throw new InvalidOperationException("WorkspaceId or an exact workspace route/address is required.");
+        }
+
+        StudioWorkspaceDefinition? byRoute = workspaces.FindByRouteKey(destination);
+        StudioWorkspaceDefinition? byAddress = workspaces.FindByAddress(destination);
+        StudioWorkspaceDefinition? resolved = byRoute ?? byAddress;
+        return resolved?.Id ?? throw new InvalidOperationException("No workspace matches the supplied route/address. Heuristic routing is disabled.");
+    }
+
+    private StudioConversation? FindByExternalMessageId(string messageId)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "select conversation_id from studio_messages where external_message_id = $1 limit 1";
+        command.Parameters.AddWithValue(messageId);
+        object? value = command.ExecuteScalar();
+        return value is Guid id ? GetConversation(id) : null;
+    }
+
+    private StudioConversation? FindConversationForEmail(InboundEmail email, Guid workspaceId)
     {
         string? threadId = NormaliseThreadId(email.ThreadId);
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
         if (threadId is not null)
         {
-            StudioConversation? threaded = conversations.FirstOrDefault(x => x.WorkspaceId == workspaceId && string.Equals(x.ExternalThreadId, threadId, StringComparison.OrdinalIgnoreCase));
-            if (threaded is not null)
+            command.CommandText = "select id from studio_conversations where workspace_id=$1 and external_thread_id=$2 order by created_at_utc desc limit 1";
+            command.Parameters.AddWithValue(workspaceId);
+            command.Parameters.AddWithValue(threadId);
+            object? threaded = command.ExecuteScalar();
+            if (threaded is Guid threadedId)
             {
-                return threaded;
+                return GetConversation(threadedId);
+            }
+            command.Parameters.Clear();
+        }
+
+        command.CommandText = "select id, subject from studio_conversations where workspace_id=$1 and lower(contact_address)=lower($2) order by created_at_utc desc";
+        command.Parameters.AddWithValue(workspaceId);
+        command.Parameters.AddWithValue(email.FromAddress.Trim());
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        string subject = NormaliseSubject(email.Subject);
+        while (reader.Read())
+        {
+            if (string.Equals(NormaliseSubject(reader.GetString(1)), subject, StringComparison.OrdinalIgnoreCase))
+            {
+                Guid id = reader.GetGuid(0);
+                reader.Close();
+                return GetConversation(id);
             }
         }
-        string subject = NormaliseSubject(email.Subject);
-        return conversations.Where(x => x.WorkspaceId == workspaceId && string.Equals(x.ContactAddress, email.FromAddress, StringComparison.OrdinalIgnoreCase))
-            .FirstOrDefault(x => string.Equals(NormaliseSubject(x.Subject), subject, StringComparison.OrdinalIgnoreCase));
+        return null;
     }
 
-    private static DateTimeOffset GetLastActivity(StudioConversation conversation) => conversation.Messages.Count == 0 ? DateTimeOffset.MinValue : conversation.Messages.Max(x => x.CreatedAt);
-    private static Guid ResolveWorkspace(Guid? id, string? destination) { if (id.HasValue) return id.Value; string value = destination?.Trim().ToLowerInvariant() ?? string.Empty; if (value.Contains("wedding")) return WeddingsWorkspaceId; if (value.Contains("id") || value.Contains("school")) return IdPhotosWorkspaceId; return GraduationsWorkspaceId; }
+    private StudioConversation ReadConversation(NpgsqlDataReader reader)
+    {
+        Guid id = reader.GetGuid(0);
+        List<StudioMessage> messages = GetMessages(id);
+        return new StudioConversation(id, reader.GetGuid(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetBoolean(6), reader.IsDBNull(7) ? null : reader.GetGuid(7), messages, reader.IsDBNull(8) ? null : reader.GetString(8));
+    }
+
+    private List<StudioMessage> GetMessages(Guid conversationId)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "select id, author_display_name, visibility, body, created_at_utc, external_message_id, author_user_name from studio_messages where conversation_id=$1 order by created_at_utc";
+        command.Parameters.AddWithValue(conversationId);
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<StudioMessage> values = [];
+        while (reader.Read())
+        {
+            values.Add(new StudioMessage(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetString(6)));
+        }
+        return values;
+    }
+
+    private StudioJob ReadJob(NpgsqlDataReader reader)
+    {
+        Guid id = reader.GetGuid(0);
+        return new StudioJob(id, reader.GetGuid(1), reader.GetGuid(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.IsDBNull(6) ? null : DateOnly.FromDateTime(reader.GetDateTime(6)), reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? null : reader.GetString(8), GetFinancialEvents(id));
+    }
+
+    private List<StudioFinancialEvent> GetFinancialEvents(Guid jobId)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "select id, kind, amount, note, created_at_utc from studio_financial_events where job_id=$1 order by created_at_utc";
+        command.Parameters.AddWithValue(jobId);
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<StudioFinancialEvent> values = [];
+        while (reader.Read())
+        {
+            values.Add(new StudioFinancialEvent(reader.GetGuid(0), reader.GetString(1), reader.GetDecimal(2), reader.IsDBNull(3) ? null : reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4)));
+        }
+        return values;
+    }
+
+    private static void InsertConversation(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid id, Guid workspaceId, string subject, string contactName, string contactAddress, string channel, string? externalThreadId, DateTimeOffset createdAt)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "insert into studio_conversations(id, workspace_id, subject, contact_name, contact_address, channel, is_closed, job_id, external_thread_id, created_at_utc) values ($1,$2,$3,$4,$5,$6,false,null,$7,$8)";
+        command.Parameters.AddWithValue(id);
+        command.Parameters.AddWithValue(workspaceId);
+        command.Parameters.AddWithValue(subject);
+        command.Parameters.AddWithValue(contactName);
+        command.Parameters.AddWithValue(contactAddress);
+        command.Parameters.AddWithValue(channel);
+        command.Parameters.AddWithValue((object?)externalThreadId ?? DBNull.Value);
+        command.Parameters.AddWithValue(createdAt);
+        command.ExecuteNonQuery();
+    }
+
+    private static void InsertMessage(NpgsqlConnection connection, NpgsqlTransaction transaction, StudioMessage message, Guid conversationId)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "insert into studio_messages(id, conversation_id, author_user_name, author_display_name, visibility, body, created_at_utc, external_message_id) values ($1,$2,$3,$4,$5,$6,$7,$8)";
+        command.Parameters.AddWithValue(message.Id);
+        command.Parameters.AddWithValue(conversationId);
+        command.Parameters.AddWithValue((object?)message.AuthorUserName ?? DBNull.Value);
+        command.Parameters.AddWithValue(message.Author);
+        command.Parameters.AddWithValue(message.Visibility);
+        command.Parameters.AddWithValue(message.Body);
+        command.Parameters.AddWithValue(message.CreatedAt);
+        command.Parameters.AddWithValue((object?)message.ExternalMessageId ?? DBNull.Value);
+        command.ExecuteNonQuery();
+    }
+
     private static string NormaliseChannel(string? channel) => string.IsNullOrWhiteSpace(channel) ? "Manual" : channel.Trim();
     private static string? NormaliseThreadId(string? id) => string.IsNullOrWhiteSpace(id) ? null : id.Trim();
     private static string NormaliseSubject(string subject) { string value = subject.Trim(); while (value.StartsWith("RE:", StringComparison.OrdinalIgnoreCase) || value.StartsWith("FW:", StringComparison.OrdinalIgnoreCase) || value.StartsWith("FWD:", StringComparison.OrdinalIgnoreCase)) { value = value[(value.IndexOf(':') + 1)..].Trim(); } return value; }
@@ -177,7 +404,7 @@ public sealed class StudioStore
 
 public sealed record StudioWorkspace(Guid Id, string Name, string Address, int OpenCount);
 public sealed record StudioConversation(Guid Id, Guid WorkspaceId, string Subject, string ContactName, string ContactAddress, string Channel, bool IsClosed, Guid? JobId, List<StudioMessage> Messages, string? ExternalThreadId = null);
-public sealed record StudioMessage(Guid Id, string Author, string Visibility, string Body, DateTimeOffset CreatedAt, string? ExternalMessageId = null);
+public sealed record StudioMessage(Guid Id, string Author, string Visibility, string Body, DateTimeOffset CreatedAt, string? ExternalMessageId = null, string? AuthorUserName = null);
 public sealed record StudioJob(Guid Id, Guid WorkspaceId, Guid ConversationId, string Title, string ClientName, string Status, DateOnly? EventDate, DateTimeOffset CreatedAt, string? AssignedTo = null, List<StudioFinancialEvent>? FinancialEvents = null);
 public sealed record StudioFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt);
 public sealed record EmailIngestResult(StudioConversation Conversation, bool CreatedConversation, bool WasDuplicate);
