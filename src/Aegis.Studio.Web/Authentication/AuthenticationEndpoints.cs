@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Profiles;
 using Common.Security.Abstractions;
 using Common.Security.Models;
@@ -66,9 +65,8 @@ public static class AuthenticationEndpoints
             return Results.Ok(CreateCurrentUser(principal));
         }).AllowAnonymous();
 
-        app.MapGet("/api/auth/me", (ClaimsPrincipal user, PostgresDocumentStore persistence) =>
+        app.MapGet("/api/auth/me", (ClaimsPrincipal user, UserProfileStore profiles) =>
         {
-            UserProfileStore profiles = new(persistence);
             StudioUserProfile profile = profiles.GetOrCreate(user);
             return Results.Ok(new
             {
@@ -77,37 +75,31 @@ public static class AuthenticationEndpoints
             });
         }).RequireAuthorization();
 
-        app.MapGet("/api/profile", (ClaimsPrincipal user, PostgresDocumentStore persistence) =>
-        {
-            UserProfileStore profiles = new(persistence);
-            return Results.Ok(profiles.GetOrCreate(user));
-        }).RequireAuthorization();
+        app.MapGet("/api/profile", (ClaimsPrincipal user, UserProfileStore profiles) =>
+            Results.Ok(profiles.GetOrCreate(user)))
+            .RequireAuthorization();
 
-        app.MapPut("/api/profile/messaging", (ClaimsPrincipal user, UserMessagingPreferences request, PostgresDocumentStore persistence) =>
-        {
-            UserProfileStore profiles = new(persistence);
-            return Results.Ok(profiles.UpdatePreferences(user, request));
-        }).RequireAuthorization();
+        app.MapPut("/api/profile/messaging", (ClaimsPrincipal user, UserMessagingPreferences request, UserProfileStore profiles) =>
+            Results.Ok(profiles.UpdatePreferences(user, request)))
+            .RequireAuthorization();
 
-        app.MapGet("/api/admin/users/profiles", (ClaimsPrincipal user, PostgresDocumentStore persistence) =>
+        app.MapGet("/api/admin/users/profiles", (ClaimsPrincipal user, UserProfileStore profiles) =>
         {
             if (!user.IsInRole("Administrator"))
             {
                 return Results.Forbid();
             }
 
-            UserProfileStore profiles = new(persistence);
             return Results.Ok(profiles.GetAll());
         }).RequireAuthorization();
 
-        app.MapPut("/api/admin/users/{userName}/messaging", (string userName, ClaimsPrincipal user, UserMessagingPreferences request, PostgresDocumentStore persistence) =>
+        app.MapPut("/api/admin/users/{userName}/messaging", (string userName, ClaimsPrincipal user, UserMessagingPreferences request, UserProfileStore profiles) =>
         {
             if (!user.IsInRole("Administrator"))
             {
                 return Results.Forbid();
             }
 
-            UserProfileStore profiles = new(persistence);
             StudioUserProfile? updated = profiles.UpdateAsAdministrator(userName, request);
             return updated is null ? Results.NotFound() : Results.Ok(updated);
         }).RequireAuthorization();
