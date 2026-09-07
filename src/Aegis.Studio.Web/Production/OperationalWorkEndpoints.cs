@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Aegis.Studio.Web.Email;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
@@ -22,7 +21,7 @@ public static class OperationalWorkEndpoints
 
         app.MapGet("/api/operations/activities", (Guid? jobId,string? status,string? assignedTo,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) => Results.Ok(new OperationalWorkStore(database).GetActivities(jobId,status,assignedTo).Where(x=>access.HasPermission(user,x.JobId,"ViewJob")).ToList())).RequireAuthorization();
 
-        app.MapPost("/api/jobs/{jobId:guid}/operations/activities", (Guid jobId,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,StudioStore studio,WorkspaceAccessService workspaceAccess,OutboundEmailStore outbox) =>
+        app.MapPost("/api/jobs/{jobId:guid}/operations/activities", (Guid jobId,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,JobEventNotifier notifier) =>
         {
             if(!access.HasPermission(user,jobId,"ManageProduction")) return Results.Forbid();
             try
@@ -34,14 +33,13 @@ public static class OperationalWorkEndpoints
                     access.EnsureAssignedMember(jobId,activity.AssignedTo);
                     notifications.PublishToUser(activity.AssignedTo,"JobAssigned",$"Activity assigned: {activity.Title}",$"You were assigned {activity.ActivityType} work.","Job",jobId.ToString("D"));
                 }
-                JobEventNotifier notifier=new(database,notifications,studio,workspaceAccess,access,outbox);
                 notifier.Publish(jobId,"ProductionChanged",$"Production activity added: {activity.Title}",$"{activity.ActivityType} activity was added to the job.");
                 return Results.Created($"/api/operations/activities/{activity.Id}",activity);
             }
             catch(Exception exception){ return Results.BadRequest(new { error=exception.Message }); }
         }).RequireAuthorization();
 
-        app.MapPut("/api/operations/activities/{id:guid}", (Guid id,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,IConfiguration configuration,IWebHostEnvironment environment,StudioStore studio,WorkspaceAccessService workspaceAccess,OutboundEmailStore outbox) =>
+        app.MapPut("/api/operations/activities/{id:guid}", (Guid id,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,IConfiguration configuration,IWebHostEnvironment environment,JobEventNotifier notifier) =>
         {
             OperationalWorkStore store=new(database); JobActivity? current=store.GetActivities().FirstOrDefault(x=>x.Id==id); if(current is null) return Results.NotFound(); if(!access.HasPermission(user,current.JobId,"ManageProduction")) return Results.Forbid();
             try
@@ -57,7 +55,6 @@ public static class OperationalWorkEndpoints
                 }
                 JobActivity updated=store.UpdateActivity(id,request,UserName(user));
                 if(updated.Status=="Blocked") notifications.PublishToUser(updated.AssignedTo??UserName(user),"JobStatusChanged",$"Blocked: {updated.Title}",updated.BlockedReason??"Production activity is blocked.","Job",updated.JobId.ToString("D"));
-                JobEventNotifier notifier=new(database,notifications,studio,workspaceAccess,access,outbox);
                 bool requesterMilestone=updated.Status=="Completed" && (updated.ActivityType=="Proof" || updated.ActivityType=="Delivery");
                 string eventType=updated.ActivityType=="Delivery" && updated.Status=="Completed" ? "DeliveryChanged" : "ProductionChanged";
                 notifier.Publish(updated.JobId,eventType,$"Production update: {updated.Title}",$"{updated.Title} is now {updated.Status}.{(string.IsNullOrWhiteSpace(updated.BlockedReason)?string.Empty:$" {updated.BlockedReason}")}",requesterMilestone);
@@ -82,7 +79,7 @@ public static class OperationalWorkEndpoints
 
         app.MapGet("/api/operations/shoots", (Guid? jobId,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) => Results.Ok(new OperationalWorkStore(database).GetShoots(jobId).Where(x=>access.HasPermission(user,x.JobId,"ViewJob")).ToList())).RequireAuthorization();
 
-        app.MapPost("/api/jobs/{jobId:guid}/operations/shoots", (Guid jobId,IntegratedShootRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,StudioStore studio,WorkspaceAccessService workspaceAccess,OutboundEmailStore outbox) =>
+        app.MapPost("/api/jobs/{jobId:guid}/operations/shoots", (Guid jobId,IntegratedShootRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,JobEventNotifier notifier) =>
         {
             if(!access.HasPermission(user,jobId,"ManageSchedule")&&!access.HasPermission(user,jobId,"AssignStaff")) return Results.Forbid();
             try
@@ -92,14 +89,13 @@ public static class OperationalWorkEndpoints
                 access.EnsureAssignedMember(jobId,shoot.PhotographerUserName);
                 if(!string.IsNullOrWhiteSpace(shoot.AssistantUserName)) access.EnsureAssignedMember(jobId,shoot.AssistantUserName);
                 notifications.PublishToUser(shoot.PhotographerUserName,"JobAssigned","Photography assignment",$"Call time {shoot.CallTimeUtc:u}{(shoot.Location is null?string.Empty:$" at {shoot.Location}")}.","Job",jobId.ToString("D"));
-                JobEventNotifier notifier=new(database,notifications,studio,workspaceAccess,access,outbox);
                 notifier.Publish(jobId,"ScheduleChanged","Photography scheduled",$"Photography is scheduled for {shoot.CallTimeUtc:u} to {shoot.PlannedEndUtc:u}{(string.IsNullOrWhiteSpace(shoot.Location)?string.Empty:$" at {shoot.Location}")}.",requesterEligible:true);
                 return Results.Created($"/api/operations/shoots/{shoot.Id}",shoot);
             }
             catch(Exception exception){ return Results.BadRequest(new { error=exception.Message }); }
         }).RequireAuthorization();
 
-        app.MapPut("/api/operations/shoots/{id:guid}", (Guid id,ShootSessionUpdateRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,IConfiguration configuration,IWebHostEnvironment environment,StudioStore studio,WorkspaceAccessService workspaceAccess,OutboundEmailStore outbox) =>
+        app.MapPut("/api/operations/shoots/{id:guid}", (Guid id,ShootSessionUpdateRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,IConfiguration configuration,IWebHostEnvironment environment,JobEventNotifier notifier) =>
         {
             OperationalWorkStore store=new(database); ShootSession? current=store.GetShoots().FirstOrDefault(x=>x.Id==id); if(current is null) return Results.NotFound(); string currentUser=UserName(user); bool photographer=string.Equals(current.PhotographerUserName,currentUser,StringComparison.OrdinalIgnoreCase); if(!photographer&&!access.HasPermission(user,current.JobId,"ManageProduction")&&!access.HasPermission(user,current.JobId,"ManageSchedule")) return Results.Forbid();
             try
@@ -113,7 +109,6 @@ public static class OperationalWorkEndpoints
                 ShootSession updated=store.UpdateShoot(id,factual,currentUser);
                 if(updated.ReshootRequired) notifications.PublishToUser(updated.PhotographerUserName,"JobStatusChanged","Reshoot required",updated.CoverageNotes??"This job requires a reshoot.","Job",updated.JobId.ToString("D"));
                 if(updated.HandoffStatus=="HandedOff"&&!string.IsNullOrWhiteSpace(updated.HandoffTo)) notifications.PublishToUser(updated.HandoffTo,"JobAssigned","Files handed off to production",$"{updated.ImageCount} verified files are ready for production. Backup verified: {updated.BackupConfirmed}.","Job",updated.JobId.ToString("D"));
-                JobEventNotifier notifier=new(database,notifications,studio,workspaceAccess,access,outbox);
                 if(updated.ReshootRequired) notifier.Publish(updated.JobId,"ProductionChanged","Reshoot required",updated.CoverageNotes??"A reshoot is required.");
                 if(updated.HandoffStatus=="HandedOff") notifier.Publish(updated.JobId,"ProductionChanged","Shoot handed to production",$"{updated.ImageCount} verified files were handed to {updated.HandoffTo??"production"}. Backup verified: {updated.BackupConfirmed}.");
                 return Results.Ok(updated);
