@@ -41,5 +41,7 @@ public static class ProductionEndpoints
             if (!access.HasPermission(user, jobId, "ManageProduction")) return Results.Forbid();
             return Results.Ok(store.ApplyTemplate(jobId, templateName));
         }).RequireAuthorization();
+
+        app.MapStudioOperationalWork();
     }
 }
