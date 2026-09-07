@@ -1,5 +1,7 @@
 <Solution>
   <Project Path="src/Aegis.Pos.Core/Aegis.Pos.Core.csproj" />
+  <Project Path="src/Aegis.Pos.DeviceClient/Aegis.Pos.DeviceClient.csproj" />
+  <Project Path="src/Aegis.Pos.DeviceAgent/Aegis.Pos.DeviceAgent.csproj" />
   <Project Path="src/Aegis.Studio.Domain/Aegis.Studio.Domain.csproj" />
   <Project Path="src/Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
   <Project Path="src/Aegis.Studio.Infrastructure/Aegis.Studio.Infrastructure.csproj" />
