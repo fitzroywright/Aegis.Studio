@@ -15,6 +15,15 @@
     </div>
   </header>
   <main>
+    <section id="galleryLoginPanel" class="login-panel hidden">
+      <form id="galleryLoginForm">
+        <h2>Private gallery</h2>
+        <p>Enter the password provided by Bryan Studios.</p>
+        <label>Password<input id="galleryPassword" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Open gallery</button>
+        <div id="galleryLoginStatus" class="status"></div>
+      </form>
+    </section>
     <section id="emptyState" class="empty hidden"><h2>No images are available</h2><p>This gallery has not published any visible photographs yet.</p></section>
     <section id="galleryExperience" class="hidden">
       <div class="carousel-shell">
@@ -23,6 +32,7 @@
         <button id="nextImage" class="carousel-control next" aria-label="Next image">›</button>
       </div>
       <div class="thumbnail-wrap"><div id="thumbnailStrip" class="thumbnail-strip" aria-label="Gallery thumbnails"></div></div>
+      <div id="selectionBar" class="selection-bar hidden"><strong id="selectionCount">0 selected</strong><span>Choose the photographs you want Bryan Studios to use.</span><button id="submitSelections" type="button">Submit selections</button></div>
       <div id="galleryGrid" class="gallery-grid"></div>
     </section>
   </main>
