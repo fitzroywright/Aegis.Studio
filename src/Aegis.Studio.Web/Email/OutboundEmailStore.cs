@@ -18,6 +18,9 @@ public sealed class OutboundEmailStore
     public OutboundEmail Queue(StudioConversation conversation, string body)
         => QueueMessage(conversation, body, conversation.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? conversation.Subject : "Re: " + conversation.Subject);
 
+    public OutboundEmail QueueNotification(StudioConversation conversation, string subject, string body)
+        => QueueMessage(conversation, body, subject, "Notification");
+
     public OutboundEmail? QueueAcknowledgement(StudioConversation conversation, string workspaceName)
     {
         if (ExistsAcknowledgement(conversation.Id)) return null;
