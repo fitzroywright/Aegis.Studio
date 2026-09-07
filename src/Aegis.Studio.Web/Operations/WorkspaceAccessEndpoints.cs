@@ -71,7 +71,10 @@ public static class WorkspaceAccessEndpoints
         app.MapPut("/api/workspaces/{workspaceId:guid}/members/{userName}", (Guid workspaceId, string userName, WorkspaceMemberRequest request, ClaimsPrincipal user, StudioDatabase database) =>
         {
             WorkspaceAccessService access = new(database);
-            if (!access.HasPermission(user, workspaceId, "ManageMembers") && !access.HasPermission(user, workspaceId, "AdminWorkspace")) return Results.Forbid();
+            WorkspacePermissionSet caller = access.GetPermissions(user, workspaceId);
+            if (!user.IsInRole("Administrator") && !caller.ManageMembers && !caller.AdminWorkspace) return Results.Forbid();
+            WorkspacePermissionSet requested = request.Permissions ?? WorkspacePermissionSet.ViewOnly;
+            if (!user.IsInRole("Administrator") && !PermissionsWithin(requested, caller)) return Results.Forbid();
             WorkspaceMemberRequest normalized = request with { UserName = userName };
             return Results.Ok(access.SaveMember(workspaceId, normalized));
         }).RequireAuthorization();
@@ -79,7 +82,10 @@ public static class WorkspaceAccessEndpoints
         app.MapDelete("/api/workspaces/{workspaceId:guid}/members/{userName}", (Guid workspaceId, string userName, ClaimsPrincipal user, StudioDatabase database) =>
         {
             WorkspaceAccessService access = new(database);
-            if (!access.HasPermission(user, workspaceId, "ManageMembers") && !access.HasPermission(user, workspaceId, "AdminWorkspace")) return Results.Forbid();
+            WorkspacePermissionSet caller = access.GetPermissions(user, workspaceId);
+            if (!user.IsInRole("Administrator") && !caller.ManageMembers && !caller.AdminWorkspace) return Results.Forbid();
+            WorkspaceMember? target = access.GetMembers(workspaceId).FirstOrDefault(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
+            if (target is not null && !user.IsInRole("Administrator") && !PermissionsWithin(target.Permissions, caller)) return Results.Forbid();
             access.RemoveMember(workspaceId, userName);
             return Results.NoContent();
         }).RequireAuthorization();
@@ -96,6 +102,21 @@ public static class WorkspaceAccessEndpoints
             return Results.Ok(new { sent = true, workspace = workspace?.Name, member = member.DisplayName });
         }).RequireAuthorization();
     }
+
+    public static bool PermissionsWithin(WorkspacePermissionSet requested, WorkspacePermissionSet caller)
+        => (!requested.AccessWorkspace || caller.AccessWorkspace)
+        && (!requested.View || caller.View)
+        && (!requested.ReplyRequester || caller.ReplyRequester)
+        && (!requested.ViewAttachments || caller.ViewAttachments)
+        && (!requested.AddAttachments || caller.AddAttachments)
+        && (!requested.CreateJob || caller.CreateJob)
+        && (!requested.EditJob || caller.EditJob)
+        && (!requested.ManageSchedule || caller.ManageSchedule)
+        && (!requested.ManageProduction || caller.ManageProduction)
+        && (!requested.NotifyMembers || caller.NotifyMembers)
+        && (!requested.EditWorkspace || caller.EditWorkspace)
+        && (!requested.ManageMembers || caller.ManageMembers)
+        && (!requested.AdminWorkspace || caller.AdminWorkspace);
 }
 
 public sealed record WorkspaceMemberNotificationRequest(string UserName,string Subject,string Body);
