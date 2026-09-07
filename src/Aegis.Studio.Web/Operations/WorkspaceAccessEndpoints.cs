@@ -6,8 +6,16 @@ namespace Aegis.Studio.Web.Operations;
 
 public static class WorkspaceAccessEndpoints
 {
+    private const string RegistrationKey = "Aegis.Studio.WorkspaceAccessEndpoints.Registered";
+
     public static void MapWorkspaceAccess(this WebApplication app)
     {
+        if (app.Properties.ContainsKey(RegistrationKey))
+        {
+            return;
+        }
+
+        app.Properties[RegistrationKey] = true;
         app.UseMiddleware<WorkspaceAuthorizationMiddleware>();
 
         app.MapGet("/api/workspace-access", (ClaimsPrincipal user, StudioDatabase database, WorkspaceStore workspaces) =>
