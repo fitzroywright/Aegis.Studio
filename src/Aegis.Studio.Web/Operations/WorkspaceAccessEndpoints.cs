@@ -27,6 +27,7 @@ public static class WorkspaceAccessEndpoints
         app.MapGlobalOperationalRoles();
         app.MapLegacyMailboxImport();
         app.MapStudioWorkflowAutomation();
+        app.MapStudioWorkflowOperations();
         app.MapStudioGalleries();
         app.MapStudioGalleryInternalFiles();
 
