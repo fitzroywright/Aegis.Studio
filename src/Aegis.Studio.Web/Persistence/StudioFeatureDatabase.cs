@@ -95,6 +95,11 @@ public sealed class StudioFeatureDatabase
                 primary key(client_id,nonce)
             );
             create index if not exists ix_studio_booking_api_nonces_used on studio_booking_api_nonces(used_at_utc);
+
+            alter table studio_attachments add column if not exists sha256 text null;
+            alter table studio_attachments add column if not exists uploaded_by text null;
+            alter table studio_attachments add column if not exists storage_status text not null default 'Stored';
+            create unique index if not exists ux_studio_attachments_stored_name on studio_attachments(stored_name);
             """;
 
         await using NpgsqlCommand command = dataSource.CreateCommand(sql);
