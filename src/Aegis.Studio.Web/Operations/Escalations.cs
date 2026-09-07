@@ -132,11 +132,63 @@ public sealed class EscalationStore
 
     private bool EnsureEscalation(EscalationCandidate candidate,int level)
     {
-        using NpgsqlConnection connection=database.OpenConnection();using NpgsqlTransaction transaction=connection.BeginTransaction();Guid id=Guid.NewGuid();
-        using NpgsqlCommand command=connection.CreateCommand();command.Transaction=transaction;command.CommandText="insert into studio_escalations(id,source_type,source_id,job_id,level,subject,detail,opened_at_utc,last_notified_at_utc) values($1,$2,$3,$4,$5,$6,$7,now(),now()) on conflict(source_type,source_id,level) do nothing";command.Parameters.AddWithValue(id);command.Parameters.AddWithValue(candidate.SourceType);command.Parameters.AddWithValue(candidate.SourceId);command.Parameters.AddWithValue(candidate.JobId);command.Parameters.AddWithValue(level);command.Parameters.AddWithValue(candidate.Subject);command.Parameters.AddWithValue(candidate.Detail);bool inserted=command.ExecuteNonQuery()==1;transaction.Commit();if(!inserted)return false;
-        IReadOnlyList<string> recipients=GetRecipients(candidate.JobId,candidate.SourceType,level);foreach(string userName in recipients)notifications.PublishToUser(userName,"Escalation",$"[Escalation L{level}] {candidate.Subject}",candidate.Detail,"Job",candidate.JobId.ToString("D"));
+        IReadOnlyList<string> recipients=GetRecipients(candidate.JobId,candidate.SourceType,level);
+        if(recipients.Count==0)
+        {
+            recipients=GetFallbackOperationalRecipients();
+        }
+        if(recipients.Count==0)
+        {
+            logger.LogCritical("Escalation {SourceType} {SourceId} for job {JobId} has no configured recipient. It will be retried on the next scan.",candidate.SourceType,candidate.SourceId,candidate.JobId);
+            return false;
+        }
+
+        DateTimeOffset now=DateTimeOffset.UtcNow;
+        bool inserted=false;
+        bool shouldNotify=false;
+        Guid id=Guid.NewGuid();
+        using NpgsqlConnection connection=database.OpenConnection();
+        using NpgsqlTransaction transaction=connection.BeginTransaction();
+        using(NpgsqlCommand insert=connection.CreateCommand())
+        {
+            insert.Transaction=transaction;
+            insert.CommandText="insert into studio_escalations(id,source_type,source_id,job_id,level,subject,detail,opened_at_utc,last_notified_at_utc) values($1,$2,$3,$4,$5,$6,$7,now(),now()) on conflict(source_type,source_id,level) do nothing";
+            insert.Parameters.AddWithValue(id);insert.Parameters.AddWithValue(candidate.SourceType);insert.Parameters.AddWithValue(candidate.SourceId);insert.Parameters.AddWithValue(candidate.JobId);insert.Parameters.AddWithValue(level);insert.Parameters.AddWithValue(candidate.Subject);insert.Parameters.AddWithValue(candidate.Detail);
+            inserted=insert.ExecuteNonQuery()==1;
+        }
+        if(inserted)
+        {
+            shouldNotify=true;
+        }
+        else
+        {
+            using NpgsqlCommand existing=connection.CreateCommand();
+            existing.Transaction=transaction;
+            existing.CommandText="select id,last_notified_at_utc,acknowledged_at_utc from studio_escalations where source_type=$1 and source_id=$2 and level=$3 and resolved_at_utc is null for update";
+            existing.Parameters.AddWithValue(candidate.SourceType);existing.Parameters.AddWithValue(candidate.SourceId);existing.Parameters.AddWithValue(level);
+            using NpgsqlDataReader reader=existing.ExecuteReader();
+            if(reader.Read())
+            {
+                id=reader.GetGuid(0);
+                DateTimeOffset lastNotified=reader.GetFieldValue<DateTimeOffset>(1);
+                bool acknowledged=!reader.IsDBNull(2);
+                shouldNotify=!acknowledged && now-lastNotified>=RepeatInterval(level);
+            }
+            reader.Close();
+            if(shouldNotify)
+            {
+                using NpgsqlCommand touch=connection.CreateCommand();
+                touch.Transaction=transaction;
+                touch.CommandText="update studio_escalations set last_notified_at_utc=now(),subject=$2,detail=$3 where id=$1";
+                touch.Parameters.AddWithValue(id);touch.Parameters.AddWithValue(candidate.Subject);touch.Parameters.AddWithValue(candidate.Detail);touch.ExecuteNonQuery();
+            }
+        }
+        transaction.Commit();
+        if(!shouldNotify)return inserted;
+
+        foreach(string userName in recipients)notifications.PublishToUser(userName,"Escalation",$"[Escalation L{level}] {candidate.Subject}",candidate.Detail,"Job",candidate.JobId.ToString("D"));
         logger.LogWarning("Escalation L{Level} {SourceType} {SourceId} job {JobId} notified {RecipientCount} recipient(s)",level,candidate.SourceType,candidate.SourceId,candidate.JobId,recipients.Count);
-        return true;
+        return inserted;
     }
 
     private IReadOnlyList<string> GetRecipients(Guid jobId,string sourceType,int level)
@@ -164,6 +216,17 @@ public sealed class EscalationStore
         return recipients.ToList();
     }
 
+    private IReadOnlyList<string> GetFallbackOperationalRecipients()
+    {
+        using NpgsqlConnection connection=database.OpenConnection();
+        using NpgsqlCommand command=connection.CreateCommand();
+        command.CommandText="select distinct m.user_name from studio_global_operational_role_members m join studio_global_operational_roles r on r.id=m.role_id where m.is_active and r.is_active order by m.user_name";
+        using NpgsqlDataReader reader=command.ExecuteReader();
+        List<string> recipients=[];
+        while(reader.Read())recipients.Add(reader.GetString(0));
+        return recipients;
+    }
+
     private int ResolveNoLongerActive()
     {
         using NpgsqlConnection connection=database.OpenConnection();using NpgsqlCommand command=connection.CreateCommand();command.CommandText="""
@@ -180,6 +243,14 @@ public sealed class EscalationStore
     {
         TimeSpan age=DateTimeOffset.UtcNow-since;if(age>=TimeSpan.FromHours(24))return 3;if(age>=TimeSpan.FromHours(4))return 2;return 1;
     }
+
+    private static TimeSpan RepeatInterval(int level)
+        => level switch
+        {
+            >=3 => TimeSpan.FromHours(1),
+            2 => TimeSpan.FromHours(4),
+            _ => TimeSpan.FromHours(2)
+        };
 
     private static EscalationEntry Read(NpgsqlDataReader r)=>new(r.GetGuid(0),r.GetString(1),r.GetGuid(2),r.IsDBNull(3)?null:r.GetGuid(3),r.GetInt32(4),r.GetString(5),r.GetString(6),r.GetFieldValue<DateTimeOffset>(7),r.GetFieldValue<DateTimeOffset>(8),r.IsDBNull(9)?null:r.GetFieldValue<DateTimeOffset>(9),r.IsDBNull(10)?null:r.GetString(10),r.IsDBNull(11)?null:r.GetFieldValue<DateTimeOffset>(11));
 }
