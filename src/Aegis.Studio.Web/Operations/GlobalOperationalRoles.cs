@@ -181,7 +181,7 @@ public static class GlobalOperationalRoleEndpoints
 {
     public static void MapGlobalOperationalRoles(this WebApplication app)
     {
-        GlobalOperationalRoleStore roles = app.Services.GetRequiredService<GlobalOperationalRoleStore>();
+        GlobalOperationalRoleStore roles = new(app.Services.GetRequiredService<StudioDatabase>());
         roles.EnsureSchema();
 
         RouteGroupBuilder group = app.MapGroup("/api/security/global-roles").RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
