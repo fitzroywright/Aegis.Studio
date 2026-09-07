@@ -47,6 +47,14 @@ public static class JobAccessEndpoints
             notifications.PublishToUser(member.UserName, "JobNotification", request.Subject.Trim(), request.Body.Trim(), "Job", jobId.ToString("D"));
             return Results.Ok(new { sent = true, job = job.Title, member = member.DisplayName });
         }).RequireAuthorization();
+
+        app.MapPost("/api/jobs/{jobId:guid}/financial-events", (Guid jobId, AddFinancialEventRequest request, ClaimsPrincipal user, JobAccessService access, StudioStore studio) =>
+        {
+            if (!access.HasPermission(user, jobId, "RecordFinancialActivity")) return Results.Forbid();
+            if (string.IsNullOrWhiteSpace(request.Kind) || request.Amount == 0) return Results.BadRequest(new { error = "Financial event type and a non-zero amount are required." });
+            try { return Results.Ok(studio.AddFinancialEvent(jobId, request)); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+        }).RequireAuthorization();
     }
 }
 
