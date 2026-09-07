@@ -40,7 +40,15 @@ public sealed class AttachmentStore
     {
         ArgumentNullException.ThrowIfNull(file);
         if (file.Length <= 0 || file.Length > maximumBytes) throw new InvalidOperationException($"Attachment must be between 1 byte and {maximumBytes / 1024L / 1024L} MB.");
-        string originalName = Path.GetFileName(file.FileName).Trim();
+        await using MemoryStream buffer = new();
+        await file.CopyToAsync(buffer, cancellationToken);
+        return await AddBytesAsync(conversationId, file.FileName, string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType, buffer.ToArray(), visibility, uploadedBy, cancellationToken);
+    }
+
+    public async Task<StudioAttachment> AddBytesAsync(Guid conversationId, string fileName, string contentType, byte[] bytes, string visibility, string uploadedBy, CancellationToken cancellationToken)
+    {
+        if (bytes.Length <= 0 || bytes.LongLength > maximumBytes) throw new InvalidOperationException($"Attachment must be between 1 byte and {maximumBytes / 1024L / 1024L} MB.");
+        string originalName = Path.GetFileName(fileName).Trim();
         if (string.IsNullOrWhiteSpace(originalName)) throw new InvalidOperationException("Attachment file name is required.");
         string extension = Path.GetExtension(originalName);
         Guid id = Guid.NewGuid();
@@ -49,17 +57,10 @@ public sealed class AttachmentStore
         string temporaryPath = finalPath + ".uploading";
         try
         {
-            await using (FileStream stream = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.WriteThrough))
-            {
-                await file.CopyToAsync(stream, cancellationToken);
-                await stream.FlushAsync(cancellationToken);
-            }
-            await using FileStream hashStream = File.OpenRead(temporaryPath);
-            byte[] hash = await SHA256.HashDataAsync(hashStream, cancellationToken);
-            string sha256 = Convert.ToHexString(hash).ToLowerInvariant();
+            await File.WriteAllBytesAsync(temporaryPath, bytes, cancellationToken);
+            string sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             File.Move(temporaryPath, finalPath, false);
-
-            StudioAttachment attachment = new(id,conversationId,originalName,storedName,string.IsNullOrWhiteSpace(file.ContentType)?"application/octet-stream":file.ContentType.Trim(),file.Length,string.Equals(visibility,"Internal",StringComparison.OrdinalIgnoreCase)?"Internal":"External",DateTimeOffset.UtcNow,sha256,string.IsNullOrWhiteSpace(uploadedBy)?"Unknown":uploadedBy.Trim(),"Stored");
+            StudioAttachment attachment = new(id,conversationId,originalName,storedName,string.IsNullOrWhiteSpace(contentType)?"application/octet-stream":contentType.Trim(),bytes.LongLength,string.Equals(visibility,"Internal",StringComparison.OrdinalIgnoreCase)?"Internal":"External",DateTimeOffset.UtcNow,sha256,string.IsNullOrWhiteSpace(uploadedBy)?"Unknown":uploadedBy.Trim(),"Stored");
             using NpgsqlConnection connection=database.OpenConnection();
             using NpgsqlCommand command=connection.CreateCommand();
             command.CommandText="insert into studio_attachments(id,conversation_id,file_name,stored_name,content_type,size_bytes,visibility,created_at_utc,sha256,uploaded_by,storage_status) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)";
