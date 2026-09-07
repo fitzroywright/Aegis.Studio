@@ -55,6 +55,8 @@ public sealed class LegacyMailboxImporter
     {
         ProviderSettings provider = ProviderSettings.Resolve(request.Provider);
         if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Secret)) throw new InvalidOperationException("Mailbox user name and credential are required.");
+        string userName = request.UserName.Trim();
+        string credential = request.Secret;
         string authenticationMode = string.IsNullOrWhiteSpace(request.AuthenticationMode) ? provider.DefaultAuthenticationMode : request.AuthenticationMode.Trim();
         int maximum = Math.Clamp(request.MaximumMessages ?? 5000, 1, 50000);
         int imported = 0; int duplicates = 0; int attachmentCount = 0; int failed = 0;
@@ -62,11 +64,11 @@ public sealed class LegacyMailboxImporter
         await client.ConnectAsync(provider.Host, provider.Port, SecureSocketOptions.SslOnConnect, cancellationToken);
         if (authenticationMode.Equals("OAuth2", StringComparison.OrdinalIgnoreCase))
         {
-            await client.AuthenticateAsync(new SaslMechanismOAuth2(request.UserName.Trim(), request.Secret), cancellationToken);
+            await client.AuthenticateAsync(new SaslMechanismOAuth2(userName, credential), cancellationToken);
         }
         else if (authenticationMode.Equals("Password", StringComparison.OrdinalIgnoreCase) || authenticationMode.Equals("AppPassword", StringComparison.OrdinalIgnoreCase))
         {
-            await client.AuthenticateAsync(request.UserName.Trim(), request.Secret, cancellationToken);
+            await client.AuthenticateAsync(userName, credential, cancellationToken);
         }
         else
         {
@@ -85,22 +87,28 @@ public sealed class LegacyMailboxImporter
             try
             {
                 MimeMessage message = await folder.GetMessageAsync(id, cancellationToken);
-                string senderAddress = message.From.Mailboxes.FirstOrDefault()?.Address ?? request.UserName;
-                string senderName = message.From.Mailboxes.FirstOrDefault()?.Name ?? senderAddress;
+                MailboxAddress? sender = message.From.Mailboxes.FirstOrDefault();
+                string senderAddress = sender?.Address ?? userName;
+                string senderName = string.IsNullOrWhiteSpace(sender?.Name) ? senderAddress : sender.Name;
                 string messageId = string.IsNullOrWhiteSpace(message.MessageId) ? $"legacy-{provider.Name}-{id.Id}@import.local" : message.MessageId;
                 string body = message.TextBody ?? message.HtmlBody ?? string.Empty;
+                IReadOnlyDictionary<string, string> headers = message.Headers
+                    .Where(header => !string.IsNullOrWhiteSpace(header.Field))
+                    .GroupBy(header => header.Field, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.Last().Value ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+
                 InboundEmail inbound = new(
                     messageId,
                     message.InReplyTo,
-                    senderAddress,
                     senderName,
+                    senderAddress,
                     message.To.Mailboxes.Select(x => x.Address).ToArray(),
                     message.Cc.Mailboxes.Select(x => x.Address).ToArray(),
+                    headers,
                     message.Subject ?? "Imported message",
                     body,
-                    message.Date == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : message.Date.ToUniversalTime(),
-                    new Dictionary<string,string>());
-                EmailRouteResult route = new(true, workspace.Id, workspace.Name, request.UserName.Trim(), null);
+                    message.Date == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : message.Date.ToUniversalTime());
+                EmailRouteResult route = new(true, workspace.Id, workspace.Name, userName, null);
                 EmailIngestResult ingest = studio.ReceiveEmail(inbound, route);
                 if (ingest.WasDuplicate)
                 {
@@ -116,7 +124,7 @@ public sealed class LegacyMailboxImporter
                         await part.Content.DecodeToAsync(stream, cancellationToken);
                         if (stream.Length > 0 && stream.Length <= attachments.MaximumBytes)
                         {
-                            await attachments.AddBytesAsync(ingest.Conversation.Id, part.FileName ?? "attachment.bin", part.ContentType.MimeType, stream.ToArray(), "External", $"Mailbox import: {request.UserName}", cancellationToken);
+                            await attachments.AddBytesAsync(ingest.Conversation.Id, part.FileName ?? "attachment.bin", part.ContentType.MimeType, stream.ToArray(), "External", $"Mailbox import: {userName}", cancellationToken);
                             attachmentCount++;
                         }
                     }
@@ -126,7 +134,8 @@ public sealed class LegacyMailboxImporter
                         await attachedMessage.Message.WriteToAsync(stream, cancellationToken);
                         if (stream.Length > 0 && stream.Length <= attachments.MaximumBytes)
                         {
-                            await attachments.AddBytesAsync(ingest.Conversation.Id, attachedMessage.FileName ?? "attached-message.eml", "message/rfc822", stream.ToArray(), "External", $"Mailbox import: {request.UserName}", cancellationToken);
+                            string fileName = attachedMessage.ContentDisposition?.FileName ?? attachedMessage.ContentType.Name ?? "attached-message.eml";
+                            await attachments.AddBytesAsync(ingest.Conversation.Id, fileName, "message/rfc822", stream.ToArray(), "External", $"Mailbox import: {userName}", cancellationToken);
                             attachmentCount++;
                         }
                     }
@@ -138,7 +147,7 @@ public sealed class LegacyMailboxImporter
             }
         }
         await client.DisconnectAsync(true, cancellationToken);
-        return new LegacyMailboxImportResult(provider.Name, request.UserName.Trim(), folder.FullName, authenticationMode, ids.Count, imported, duplicates, attachmentCount, failed);
+        return new LegacyMailboxImportResult(provider.Name, userName, folder.FullName, authenticationMode, ids.Count, imported, duplicates, attachmentCount, failed);
     }
 }
 
