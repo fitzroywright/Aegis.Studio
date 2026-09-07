@@ -9,7 +9,8 @@ async function loadSignedInUser() {
         return;
     }
 
-    const user = await response.json();
+    const payload = await response.json();
+    const user = payload.user || payload;
     const signedInUser = document.getElementById('signedInUser');
     const userAvatar = document.getElementById('userAvatar');
     const signOutButton = document.getElementById('signOutButton');
