@@ -7,6 +7,6 @@
   <Project Path="Aegis.Studio.Infrastructure/Aegis.Studio.Infrastructure.csproj" />
   <Project Path="Aegis.Studio.Web/Aegis.Studio.Web.csproj" />
   <Project Path="Aegis.Studio.BookingStub/Aegis.Studio.BookingStub.csproj" />
-  <Project Path="tests/Aegis.Studio.Domain.Tests/Aegis.Studio.Domain.Tests.csproj" />
-  <Project Path="tests/Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj" />
+  <Project Path="Aegis.Studio.Domain.Tests/Aegis.Studio.Domain.Tests.csproj" />
+  <Project Path="Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj" />
 </Solution>

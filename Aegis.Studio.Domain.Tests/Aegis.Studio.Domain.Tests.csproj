@@ -11,8 +11,8 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Aegis.Pos.Core/Aegis.Pos.Core.csproj" />
-    <ProjectReference Include="../../Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
-    <ProjectReference Include="../../Aegis.Studio.Domain/Aegis.Studio.Domain.csproj" />
+    <ProjectReference Include="../Aegis.Pos.Core/Aegis.Pos.Core.csproj" />
+    <ProjectReference Include="../Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
+    <ProjectReference Include="../Aegis.Studio.Domain/Aegis.Studio.Domain.csproj" />
   </ItemGroup>
 </Project>
