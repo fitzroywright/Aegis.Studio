@@ -1,8 +1,9 @@
-using System.Net.Http.Json;
 using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Profiles;
+using Common.Messaging;
+using Common.Secrets;
 using Npgsql;
 
 namespace Aegis.Studio.Web.Notifications;
@@ -228,19 +229,40 @@ public sealed class NotificationService
 public sealed class NotificationDeliveryWorker : BackgroundService
 {
     private readonly StudioDatabase database;
-    private readonly MicrosoftGraphEmailClient graph;
-    private readonly MicrosoftGraphEmailOptions graphOptions;
-    private readonly IConfiguration configuration;
+    private readonly IMessageService messageService;
     private readonly ILogger<NotificationDeliveryWorker> logger;
-    private readonly HttpClient httpClient = new();
 
-    public NotificationDeliveryWorker(StudioDatabase database, MicrosoftGraphEmailClient graph, MicrosoftGraphEmailOptions graphOptions, IConfiguration configuration, ILogger<NotificationDeliveryWorker> logger)
+    public NotificationDeliveryWorker(
+        StudioDatabase database,
+        MicrosoftGraphEmailClient graph,
+        MicrosoftGraphEmailOptions graphOptions,
+        IConfiguration configuration,
+        UserProfileStore profiles,
+        ILogger<NotificationDeliveryWorker> logger)
     {
         this.database = database;
-        this.graph = graph;
-        this.graphOptions = graphOptions;
-        this.configuration = configuration;
         this.logger = logger;
+
+        ISecretProvider secrets = CommonSecretProviderFactory.Create(configuration);
+        IExternalMessageChannel[] externalChannels =
+        [
+            new StudioGraphEmailChannel(graph, graphOptions),
+            new StudioWebhookMessageChannel(
+                MessageChannel.Slack,
+                secrets,
+                "Notifications:SlackWebhookUrl",
+                request => new { text = $"*{request.Title}*\n{request.Body}" }),
+            new StudioWebhookMessageChannel(
+                MessageChannel.MsTeams,
+                secrets,
+                "Notifications:TeamsWebhookUrl",
+                request => new { text = $"**{request.Title}**\n\n{request.Body}" })
+        ];
+
+        messageService = new MessageService(
+            new StudioMessageRecipientDirectory(profiles),
+            new InMemoryMessageStore(),
+            externalChannels);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -290,48 +312,49 @@ public sealed class NotificationDeliveryWorker : BackgroundService
 
     private async Task DeliverAsync(PendingNotification item, CancellationToken cancellationToken)
     {
+        MessageChannel channel = item.Channel switch
+        {
+            "Email" => MessageChannel.MsEmail,
+            "Slack" => MessageChannel.Slack,
+            "Teams" => MessageChannel.MsTeams,
+            _ => MessageChannel.None
+        };
+
+        if (channel == MessageChannel.None)
+        {
+            MarkDelivered(item.Id);
+            return;
+        }
+
+        Dictionary<string, string>? metadata = string.IsNullOrWhiteSpace(item.Destination)
+            ? null
+            : new Dictionary<string, string> { ["Destination"] = item.Destination };
+
+        MessageRequest request = new()
+        {
+            RecipientIds = [item.UserName],
+            Title = item.Subject,
+            Body = item.Body,
+            Channels = channel,
+            Source = "Aegis.Studio",
+            CorrelationId = item.Id.ToString("D"),
+            Metadata = metadata
+        };
+
         try
         {
-            switch (item.Channel)
+            MessageSendResult result = await messageService.SendAsync(request, cancellationToken);
+            if (!result.Succeeded)
             {
-                case "Email":
-                    if (!graph.IsConfigured || string.IsNullOrWhiteSpace(item.Destination))
-                    {
-                        MarkWaitingForConfiguration(item.Id, "Microsoft Graph client secret or recipient email is not configured.");
-                        return;
-                    }
-                    await graph.SendEmailAsync(graphOptions.Mailbox, item.Destination, item.Subject, item.Body, cancellationToken);
-                    break;
-                case "Slack":
-                    string? slackWebhook = configuration["Notifications:SlackWebhookUrl"];
-                    if (string.IsNullOrWhiteSpace(slackWebhook))
-                    {
-                        MarkWaitingForConfiguration(item.Id, "Slack webhook token is not configured.");
-                        return;
-                    }
-                    using (HttpResponseMessage response = await httpClient.PostAsJsonAsync(slackWebhook, new { text = $"*{item.Subject}*\n{item.Body}" }, cancellationToken))
-                    {
-                        response.EnsureSuccessStatusCode();
-                    }
-                    break;
-                case "Teams":
-                    string? teamsWebhook = configuration["Notifications:TeamsWebhookUrl"];
-                    if (string.IsNullOrWhiteSpace(teamsWebhook))
-                    {
-                        MarkWaitingForConfiguration(item.Id, "Teams webhook token is not configured.");
-                        return;
-                    }
-                    using (HttpResponseMessage response = await httpClient.PostAsJsonAsync(teamsWebhook, new { text = $"**{item.Subject}**\n\n{item.Body}" }, cancellationToken))
-                    {
-                        response.EnsureSuccessStatusCode();
-                    }
-                    break;
-                default:
-                    MarkDelivered(item.Id);
-                    return;
+                MarkRetry(item.Id, result.Error ?? "Common.Messaging delivery failed.");
+                return;
             }
 
             MarkDelivered(item.Id);
+        }
+        catch (StudioMessageConfigurationException exception)
+        {
+            MarkWaitingForConfiguration(item.Id, exception.Message);
         }
         catch (Exception exception)
         {
