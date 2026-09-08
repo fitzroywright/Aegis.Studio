@@ -6,6 +6,7 @@ on:
       - main
       - development
       - chatgpt/shared-pos-web-device-agent
+      - common-storage-integration
   pull_request:
 
 jobs:
@@ -31,6 +32,13 @@ jobs:
         with:
           repository: fitzroywright/Common.Messaging
           path: Common/Common.Messaging
+
+      - name: Checkout Common.Storage
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Storage
+          ref: development
+          path: Common/Common.Storage
 
       - name: Mirror local sibling Common layout
         shell: pwsh
