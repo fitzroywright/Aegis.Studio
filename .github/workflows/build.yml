@@ -26,6 +26,12 @@ jobs:
           repository: fitzroywright/Common.Secrets
           path: Common/Common.Secrets
 
+      - name: Checkout Common.Messaging
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Messaging
+          path: Common/Common.Messaging
+
       - name: Mirror local sibling Common layout
         shell: pwsh
         run: |
