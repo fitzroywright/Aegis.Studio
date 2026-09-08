@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Aegis.Studio.Web.Persistence;
+using Common.Secrets;
 using Microsoft.Extensions.Primitives;
 using Npgsql;
 
@@ -10,11 +11,13 @@ namespace Aegis.Studio.Web.Bookings;
 public sealed class BookingApiAuthenticator
 {
     private readonly IConfiguration configuration;
+    private readonly ISecretProvider secretProvider;
     private readonly StudioDatabase database;
 
     public BookingApiAuthenticator(IConfiguration configuration, StudioDatabase database)
     {
         this.configuration = configuration;
+        this.secretProvider = CommonSecretProviderFactory.Create(configuration);
         this.database = database;
     }
 
@@ -33,7 +36,8 @@ public sealed class BookingApiAuthenticator
             return false;
         }
 
-        string? secret = configuration[$"BookingApi:Clients:{clientId}:Secret"];
+        string secretName = $"BookingApi:Clients:{clientId}:Secret";
+        string? secret = secretProvider.GetAsync(secretName).GetAwaiter().GetResult();
         if (string.IsNullOrWhiteSpace(secret))
         {
             return false;
@@ -77,7 +81,7 @@ public sealed class BookingApiAuthenticator
     public BookingApiSecurityStatus GetStatus()
     {
         IConfigurationSection clients = configuration.GetSection("BookingApi:Clients");
-        int configuredClients = clients.GetChildren().Count(child => !string.IsNullOrWhiteSpace(child["Secret"]));
+        int configuredClients = clients.GetChildren().Count();
         return new BookingApiSecurityStatus(configuredClients, configuredClients > 0, "HMAC-SHA256", 300);
     }
 
