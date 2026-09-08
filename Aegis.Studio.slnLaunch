@@ -3,15 +3,15 @@
     "Name": "Studio + Booking Stub + Device Agent",
     "Projects": [
       {
-        "Path": "src\\Aegis.Studio.Web\\Aegis.Studio.Web.csproj",
+        "Path": "Aegis.Studio.Web\\Aegis.Studio.Web.csproj",
         "Action": "Start"
       },
       {
-        "Path": "src\\Aegis.Studio.BookingStub\\Aegis.Studio.BookingStub.csproj",
+        "Path": "Aegis.Studio.BookingStub\\Aegis.Studio.BookingStub.csproj",
         "Action": "Start"
       },
       {
-        "Path": "src\\Aegis.Pos.DeviceAgent\\Aegis.Pos.DeviceAgent.csproj",
+        "Path": "Aegis.Pos.DeviceAgent\\Aegis.Pos.DeviceAgent.csproj",
         "Action": "Start"
       }
     ]

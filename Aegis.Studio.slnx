@@ -1,12 +1,12 @@
 <Solution>
-  <Project Path="src/Aegis.Pos.Core/Aegis.Pos.Core.csproj" />
-  <Project Path="src/Aegis.Pos.DeviceClient/Aegis.Pos.DeviceClient.csproj" />
-  <Project Path="src/Aegis.Pos.DeviceAgent/Aegis.Pos.DeviceAgent.csproj" />
-  <Project Path="src/Aegis.Studio.Domain/Aegis.Studio.Domain.csproj" />
-  <Project Path="src/Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
-  <Project Path="src/Aegis.Studio.Infrastructure/Aegis.Studio.Infrastructure.csproj" />
-  <Project Path="src/Aegis.Studio.Web/Aegis.Studio.Web.csproj" />
-  <Project Path="src/Aegis.Studio.BookingStub/Aegis.Studio.BookingStub.csproj" />
+  <Project Path="Aegis.Pos.Core/Aegis.Pos.Core.csproj" />
+  <Project Path="Aegis.Pos.DeviceClient/Aegis.Pos.DeviceClient.csproj" />
+  <Project Path="Aegis.Pos.DeviceAgent/Aegis.Pos.DeviceAgent.csproj" />
+  <Project Path="Aegis.Studio.Domain/Aegis.Studio.Domain.csproj" />
+  <Project Path="Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
+  <Project Path="Aegis.Studio.Infrastructure/Aegis.Studio.Infrastructure.csproj" />
+  <Project Path="Aegis.Studio.Web/Aegis.Studio.Web.csproj" />
+  <Project Path="Aegis.Studio.BookingStub/Aegis.Studio.BookingStub.csproj" />
   <Project Path="tests/Aegis.Studio.Domain.Tests/Aegis.Studio.Domain.Tests.csproj" />
   <Project Path="tests/Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj" />
 </Solution>

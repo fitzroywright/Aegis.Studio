@@ -3,17 +3,30 @@ name: build
 on:
   push:
     branches:
+      - main
+      - development
       - chatgpt/shared-pos-web-device-agent
   pull_request:
 
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      CommonRoot: ${{ github.workspace }}\Common
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout Common.Security
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Security
+          path: Common/Common.Security
+          token: ${{ secrets.COMMON_SECURITY_TOKEN || secrets.GITHUB_TOKEN }}
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
       - run: dotnet restore
       - run: dotnet build --no-restore --configuration Release
       - run: dotnet test --no-build --configuration Release
