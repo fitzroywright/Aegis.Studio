@@ -8,13 +8,14 @@ public sealed class AttachmentStore
 {
     private readonly StudioDatabase database;
     private readonly IFileStorage storage;
+    private readonly string attachmentDirectory;
     private readonly long maximumBytes;
 
     public AttachmentStore(IWebHostEnvironment environment, IConfiguration configuration, StudioDatabase database)
     {
         this.database = database;
         string configuredPath = configuration["Storage:AttachmentsPath"] ?? string.Empty;
-        string attachmentDirectory = string.IsNullOrWhiteSpace(configuredPath)
+        attachmentDirectory = string.IsNullOrWhiteSpace(configuredPath)
             ? Path.Combine(environment.ContentRootPath, "Storage", "attachments")
             : Path.GetFullPath(configuredPath);
         storage = new LocalFileStorage(attachmentDirectory);
@@ -32,10 +33,7 @@ public sealed class AttachmentStore
         command.Parameters.AddWithValue(conversationId);
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<StudioAttachment> values = [];
-        while (reader.Read())
-        {
-            values.Add(Read(reader));
-        }
+        while (reader.Read()) values.Add(Read(reader));
         return values;
     }
 
@@ -77,19 +75,7 @@ public sealed class AttachmentStore
                 maximumBytes),
             cancellationToken);
 
-        StudioAttachment attachment = new(
-            id,
-            conversationId,
-            originalName,
-            stored.StorageKey,
-            stored.ContentType,
-            stored.Length,
-            normalizedVisibility,
-            stored.StoredUtc,
-            stored.Sha256,
-            stored.UploadedBy,
-            stored.Status.ToString());
-
+        StudioAttachment attachment = new(id, conversationId, originalName, stored.StorageKey, stored.ContentType, stored.Length, normalizedVisibility, stored.StoredUtc, stored.Sha256, stored.UploadedBy, stored.Status.ToString());
         try
         {
             InsertAttachment(attachment);
@@ -118,13 +104,18 @@ public sealed class AttachmentStore
     public Task<StorageHealth> CheckHealthAsync(CancellationToken cancellationToken = default)
         => storage.CheckHealthAsync(cancellationToken);
 
+    public string GetPhysicalPath(StudioAttachment attachment)
+    {
+        string path = Path.GetFullPath(Path.Combine(attachmentDirectory, attachment.StoredName));
+        string root = Path.GetFullPath(attachmentDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Attachment path escaped the configured storage root.");
+        return path;
+    }
+
     private static string NormalizeFileName(string fileName)
     {
         string originalName = Path.GetFileName(fileName).Trim();
-        if (string.IsNullOrWhiteSpace(originalName))
-        {
-            throw new InvalidOperationException("Attachment file name is required.");
-        }
+        if (string.IsNullOrWhiteSpace(originalName)) throw new InvalidOperationException("Attachment file name is required.");
         return originalName;
     }
 
@@ -156,18 +147,7 @@ public sealed class AttachmentStore
     private const string SelectSql = "select id,conversation_id,file_name,stored_name,content_type,size_bytes,visibility,created_at_utc,sha256,uploaded_by,storage_status from studio_attachments";
 
     private static StudioAttachment Read(NpgsqlDataReader reader)
-        => new(
-            reader.GetGuid(0),
-            reader.GetGuid(1),
-            reader.GetString(2),
-            reader.GetString(3),
-            reader.GetString(4),
-            reader.GetInt64(5),
-            reader.GetString(6),
-            reader.GetFieldValue<DateTimeOffset>(7),
-            reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
-            reader.IsDBNull(9) ? "Unknown" : reader.GetString(9),
-            reader.IsDBNull(10) ? "Stored" : reader.GetString(10));
+        => new(reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt64(5), reader.GetString(6), reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? string.Empty : reader.GetString(8), reader.IsDBNull(9) ? "Unknown" : reader.GetString(9), reader.IsDBNull(10) ? "Stored" : reader.GetString(10));
 }
 
 public sealed record StudioAttachment(Guid Id, Guid ConversationId, string FileName, string StoredName, string ContentType, long Size, string Visibility, DateTimeOffset CreatedAt, string Sha256, string UploadedBy, string StorageStatus);
