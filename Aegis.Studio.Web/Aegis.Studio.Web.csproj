@@ -11,6 +11,7 @@
     <ProjectReference Include="../Aegis.Pos.DeviceClient/Aegis.Pos.DeviceClient.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Secrets\Common.Secrets.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="10.0.0" />
