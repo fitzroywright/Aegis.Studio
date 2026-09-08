@@ -15,6 +15,7 @@ using Aegis.Studio.Web.Production;
 using Aegis.Studio.Web.Profiles;
 using Aegis.Studio.Web.Scheduling;
 using Aegis.Studio.Web.Storage;
+using Common.Secrets;
 using Common.Security.Abstractions;
 using Common.Security.Authenticators;
 using Common.Security.Options;
@@ -25,8 +26,10 @@ using Npgsql;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
-string studioConnectionString = builder.Configuration.GetConnectionString("Studio")
-    ?? throw new InvalidOperationException("ConnectionStrings:Studio must be configured.");
+ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
+builder.Services.AddSingleton(secretProvider);
+
+string studioConnectionString = await secretProvider.GetRequiredAsync("ConnectionStrings:Studio");
 
 NpgsqlDataSource dataSource = NpgsqlDataSource.Create(studioConnectionString);
 builder.Services.AddSingleton(dataSource);
@@ -84,17 +87,22 @@ app.MapJobAccess();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapStudioPosHardening();
 
-app.MapGet("/api/email/status", (MicrosoftGraphEmailClient client, MicrosoftGraphEmailOptions options, UnroutedEmailStore unrouted, IConfiguration configuration) => Results.Ok(new
+app.MapGet("/api/email/status", async (MicrosoftGraphEmailClient client, MicrosoftGraphEmailOptions options, UnroutedEmailStore unrouted, CancellationToken cancellationToken) =>
 {
-    enabled = options.Enabled,
-    configured = client.IsConfigured,
-    collectionMailbox = options.Mailbox,
-    pollSeconds = (int)client.PollInterval.TotalSeconds,
-    mode = client.IsConfigured ? "Microsoft Graph" : "Microsoft Graph - waiting for client secret",
-    slackConfigured = !string.IsNullOrWhiteSpace(configuration["Notifications:SlackWebhookUrl"]),
-    teamsConfigured = !string.IsNullOrWhiteSpace(configuration["Notifications:TeamsWebhookUrl"]),
-    unroutedCount = unrouted.GetOpen().Count
-}));
+    string? slackWebhook = await secretProvider.GetAsync("Notifications:SlackWebhookUrl", cancellationToken);
+    string? teamsWebhook = await secretProvider.GetAsync("Notifications:TeamsWebhookUrl", cancellationToken);
+    return Results.Ok(new
+    {
+        enabled = options.Enabled,
+        configured = client.IsConfigured,
+        collectionMailbox = options.Mailbox,
+        pollSeconds = (int)client.PollInterval.TotalSeconds,
+        mode = client.IsConfigured ? "Microsoft Graph" : "Microsoft Graph - waiting for client secret",
+        slackConfigured = !string.IsNullOrWhiteSpace(slackWebhook),
+        teamsConfigured = !string.IsNullOrWhiteSpace(teamsWebhook),
+        unroutedCount = unrouted.GetOpen().Count
+    });
+});
 app.MapGet("/api/booking-security/status", (BookingApiAuthenticator authentication) => Results.Ok(authentication.GetStatus())).RequireAuthorization();
 
 app.MapGet("/api/workspaces", (ClaimsPrincipal user, StudioStore store, WorkspaceAccessService access) =>
