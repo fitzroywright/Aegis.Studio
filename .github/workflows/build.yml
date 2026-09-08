@@ -20,6 +20,12 @@ jobs:
           repository: fitzroywright/Common.Security
           path: Common/Common.Security
 
+      - name: Checkout Common.Secrets
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Secrets
+          path: Common/Common.Secrets
+
       - name: Mirror local sibling Common layout
         shell: pwsh
         run: |
