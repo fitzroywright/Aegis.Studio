@@ -3,23 +3,37 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Aegis.Studio.Application.EmailRouting;
+using Common.Secrets;
+using Microsoft.Extensions.Configuration;
 
 namespace Aegis.Studio.Infrastructure.Email;
 
 public sealed class MicrosoftGraphEmailClient
 {
     private readonly MicrosoftGraphEmailOptions options;
+    private readonly string? clientSecret;
     private readonly HttpClient httpClient;
 
-    public MicrosoftGraphEmailClient(MicrosoftGraphEmailOptions options)
+    public MicrosoftGraphEmailClient(MicrosoftGraphEmailOptions options, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(configuration);
 
         this.options = options;
+        ISecretProvider secretProvider = CommonSecretProviderFactory.Create(configuration);
+        clientSecret = secretProvider
+            .GetAsync("MicrosoftGraphEmail:ClientSecret")
+            .GetAwaiter()
+            .GetResult();
         httpClient = new HttpClient();
     }
 
-    public bool IsConfigured => options.IsConfigured;
+    public bool IsConfigured =>
+        options.Enabled &&
+        !string.IsNullOrWhiteSpace(options.TenantId) &&
+        !string.IsNullOrWhiteSpace(options.ClientId) &&
+        !string.IsNullOrWhiteSpace(clientSecret) &&
+        !string.IsNullOrWhiteSpace(options.Mailbox);
 
     public TimeSpan PollInterval => TimeSpan.FromSeconds(Math.Max(5, options.PollSeconds));
 
@@ -27,7 +41,7 @@ public sealed class MicrosoftGraphEmailClient
         string? deltaLink,
         CancellationToken cancellationToken)
     {
-        if (!options.IsConfigured)
+        if (!IsConfigured)
         {
             return new GraphInboxDeltaBatch(Array.Empty<InboundEmail>(), deltaLink);
         }
@@ -88,7 +102,7 @@ public sealed class MicrosoftGraphEmailClient
         string body,
         CancellationToken cancellationToken)
     {
-        if (!options.IsConfigured)
+        if (!IsConfigured)
         {
             throw new InvalidOperationException("Microsoft Graph email is not configured.");
         }
@@ -123,7 +137,7 @@ public sealed class MicrosoftGraphEmailClient
         using FormUrlEncodedContent content = new(new Dictionary<string, string>
         {
             ["client_id"] = options.ClientId,
-            ["client_secret"] = options.ClientSecret,
+            ["client_secret"] = clientSecret!,
             ["scope"] = "https://graph.microsoft.com/.default",
             ["grant_type"] = "client_credentials"
         });
