@@ -5,6 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>preview</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <CommonRoot Condition="'$(CommonRoot)' == ''">D:\Projects\Common</CommonRoot>
+    <CommonRoot Condition="'$(CommonRoot)' == ''">$(MSBuildThisFileDirectory)..\Common</CommonRoot>
   </PropertyGroup>
 </Project>
