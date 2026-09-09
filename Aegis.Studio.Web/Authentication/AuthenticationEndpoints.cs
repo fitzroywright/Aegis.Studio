@@ -1,6 +1,9 @@
 using System.Security.Claims;
+using Aegis.Studio.Web.Operations;
+using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Profiles;
 using Common.Security.Abstractions;
+using Common.Security.Authorization;
 using Common.Security.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -14,6 +17,7 @@ public static class AuthenticationEndpoints
         app.MapPost("/api/auth/login", async (
             LoginRequest request,
             IAuthenticator authenticator,
+            StudioDatabase database,
             HttpContext httpContext) =>
         {
             if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password))
@@ -30,6 +34,18 @@ public static class AuthenticationEndpoints
             string userName = request.UserName.Trim();
             string? directoryDisplayName = result.UserInfo?.DisplayName;
             string displayName = string.IsNullOrWhiteSpace(directoryDisplayName) ? userName : directoryDisplayName!;
+
+            GlobalOperationalRoleStore roles = new(database);
+            Common.Security.Options.ActiveDirectoryAuthenticationOptions? directoryOptions = app.Services.GetService<Common.Security.Options.ActiveDirectoryAuthenticationOptions>();
+            roles.EnsureSchema(directoryOptions?.AdministrativeGroups);
+            roles.EnsureDefaultUserRole(userName, displayName);
+
+            PermissionAuthorizer authorizer = new(roles);
+            AuthorizationDecision roleDecision = await authorizer.AuthorizeAsync(
+                AuthorizationSubject.Create(userName, result.GroupNames),
+                StudioPermissions.Access,
+                httpContext.RequestAborted);
+
             List<Claim> claims =
             [
                 new Claim(ClaimTypes.NameIdentifier, userName),
@@ -39,14 +55,23 @@ public static class AuthenticationEndpoints
             AddOptionalClaim(claims, ClaimTypes.Email, result.UserInfo?.Mail);
             AddOptionalClaim(claims, "department", result.UserInfo?.Department);
             AddOptionalClaim(claims, "title", result.UserInfo?.Title);
-            if (result.IsAdministrative)
+
+            foreach (string groupName in result.GroupNames.Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                claims.Add(new Claim(ClaimTypes.Role, "Administrator"));
+                claims.Add(new Claim("directory_group", groupName));
+            }
+
+            foreach (string roleName in roleDecision.EffectiveRoles.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, roleName));
             }
 
             ClaimsIdentity identity = new(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             ClaimsPrincipal principal = new(identity);
-            await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = false, AllowRefresh = true });
+            await httpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                new AuthenticationProperties { IsPersistent = false, AllowRefresh = true });
             return Results.Ok(CreateCurrentUser(principal));
         }).AllowAnonymous();
 
@@ -71,7 +96,8 @@ public static class AuthenticationEndpoints
             email = user.FindFirstValue(ClaimTypes.Email),
             department = user.FindFirstValue("department"),
             title = user.FindFirstValue("title"),
-            isAdministrator = user.IsInRole("Administrator")
+            roles = user.FindAll(ClaimTypes.Role).Select(claim => claim.Value).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            isAdministrator = user.IsInRole(StudioRoleNames.Administrator)
         };
 
     private static void AddOptionalClaim(List<Claim> claims, string claimType, string? value)
