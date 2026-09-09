@@ -1,22 +1,45 @@
 using System.Security.Claims;
 using Aegis.Studio.Web.Persistence;
+using Common.Security.Abstractions;
+using Common.Security.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
 
 namespace Aegis.Studio.Web.Operations;
 
-public sealed class GlobalOperationalRoleStore
+public static class StudioRoleNames
 {
-    public const string FrontDeskRoleName = "Front Desk";
+    public const string User = "User";
+    public const string FrontDesk = "Front Desk";
+    public const string Administrator = "Administrator";
+}
+
+public static class StudioPermissions
+{
+    public const string Access = "studio.access";
+    public const string ViewAllJobs = "studio.jobs.view_all";
+    public const string ReplyToClients = "studio.clients.reply";
+    public const string NotifyJobMembers = "studio.jobs.notify_members";
+    public const string Billing = "studio.billing.manage";
+    public const string ViewClientAttachments = "studio.attachments.view";
+    public const string AddClientAttachments = "studio.attachments.add";
+    public const string ManageSecurity = "studio.security.manage";
+}
+
+public sealed class GlobalOperationalRoleStore : IAuthorizationStore
+{
+    private static readonly Guid UserRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc002");
+    private static readonly Guid FrontDeskRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc001");
+    private static readonly Guid AdministratorRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc003");
 
     private readonly StudioDatabase database;
 
     public GlobalOperationalRoleStore(StudioDatabase database)
     {
-        this.database = database;
+        this.database = database ?? throw new ArgumentNullException(nameof(database));
     }
 
-    public void EnsureSchema()
+    public void EnsureSchema(IEnumerable<string>? administratorGroups = null)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -26,16 +49,17 @@ public sealed class GlobalOperationalRoleStore
                 id uuid primary key,
                 name text not null unique,
                 description text null,
-                view_all_jobs boolean not null default false,
-                reply_to_clients boolean not null default false,
-                notify_job_members boolean not null default false,
-                billing boolean not null default false,
-                view_client_attachments boolean not null default false,
-                add_client_attachments boolean not null default false,
                 is_active boolean not null default true,
                 created_at_utc timestamptz not null,
                 updated_at_utc timestamptz not null
             );
+
+            alter table studio_global_operational_roles drop column if exists view_all_jobs;
+            alter table studio_global_operational_roles drop column if exists reply_to_clients;
+            alter table studio_global_operational_roles drop column if exists notify_job_members;
+            alter table studio_global_operational_roles drop column if exists billing;
+            alter table studio_global_operational_roles drop column if exists view_client_attachments;
+            alter table studio_global_operational_roles drop column if exists add_client_attachments;
 
             create table if not exists studio_global_operational_role_members
             (
@@ -48,80 +72,110 @@ public sealed class GlobalOperationalRoleStore
                 primary key(role_id,user_name)
             );
 
-            insert into studio_global_operational_roles
-            (id,name,description,view_all_jobs,reply_to_clients,notify_job_members,billing,view_client_attachments,add_client_attachments,is_active,created_at_utc,updated_at_utc)
-            values
-            ('f40f8c48-233b-49f4-a1d3-5ba85d6fc001','Front Desk','Global operational role for reception/front-desk staff. Provides cross-workspace job visibility, client communication, job-member notifications, attachments and billing without workspace administration.',true,true,true,true,true,true,true,now(),now())
-            on conflict(name) do update set
-                description=excluded.description,
-                view_all_jobs=true,
-                reply_to_clients=true,
-                notify_job_members=true,
-                billing=true,
-                view_client_attachments=true,
-                add_client_attachments=true,
-                is_active=true,
-                updated_at_utc=now();
+            create table if not exists studio_global_operational_role_permissions
+            (
+                role_id uuid not null references studio_global_operational_roles(id) on delete cascade,
+                permission_key text not null,
+                primary key(role_id,permission_key)
+            );
+
+            create table if not exists studio_directory_group_roles
+            (
+                group_name text not null,
+                role_id uuid not null references studio_global_operational_roles(id) on delete cascade,
+                primary key(group_name,role_id)
+            );
             """;
         command.ExecuteNonQuery();
+
+        EnsureRole(UserRoleId, StudioRoleNames.User, "Baseline role for authenticated Studio users.");
+        EnsureRole(FrontDeskRoleId, StudioRoleNames.FrontDesk, "Cross-workspace reception and client-service operations.");
+        EnsureRole(AdministratorRoleId, StudioRoleNames.Administrator, "Application security and unrestricted administration.");
+
+        EnsurePermission(UserRoleId, StudioPermissions.Access);
+        foreach (string permission in new[]
+        {
+            StudioPermissions.Access,
+            StudioPermissions.ViewAllJobs,
+            StudioPermissions.ReplyToClients,
+            StudioPermissions.NotifyJobMembers,
+            StudioPermissions.Billing,
+            StudioPermissions.ViewClientAttachments,
+            StudioPermissions.AddClientAttachments
+        })
+        {
+            EnsurePermission(FrontDeskRoleId, permission);
+        }
+
+        EnsurePermission(AdministratorRoleId, PermissionAuthorizer.AllPermissions);
+
+        foreach (string group in administratorGroups ?? Array.Empty<string>())
+        {
+            if (!string.IsNullOrWhiteSpace(group))
+            {
+                SaveGroupMapping(group.Trim(), AdministratorRoleId);
+            }
+        }
+    }
+
+    public void EnsureDefaultUserRole(string userName, string? displayName = null)
+    {
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return;
+        }
+
+        SaveMember(
+            UserRoleId,
+            new GlobalOperationalRoleMemberRequest(
+                userName.Trim(),
+                string.IsNullOrWhiteSpace(displayName) ? userName.Trim() : displayName.Trim(),
+                true));
     }
 
     public bool HasPermission(ClaimsPrincipal user, string permission)
     {
-        if (user.IsInRole("Administrator"))
-        {
-            return true;
-        }
-
         string userName = GetUserName(user);
-        GlobalOperationalPermissions permissions = GetEffectivePermissions(userName);
-        return permission switch
-        {
-            "ViewAllJobs" => permissions.ViewAllJobs,
-            "ReplyToClients" => permissions.ReplyToClients,
-            "NotifyJobMembers" => permissions.NotifyJobMembers,
-            "Billing" => permissions.Billing,
-            "ViewClientAttachments" => permissions.ViewClientAttachments,
-            "AddClientAttachments" => permissions.AddClientAttachments,
-            _ => false
-        };
+        string permissionKey = NormalizePermission(permission);
+        string[] groups = user.FindAll("directory_group").Select(claim => claim.Value).ToArray();
+        PermissionAuthorizer authorizer = new(this);
+        return authorizer.CanAsync(AuthorizationSubject.Create(userName, groups), permissionKey)
+            .GetAwaiter()
+            .GetResult();
     }
 
     public GlobalOperationalPermissions GetEffectivePermissions(string userName)
     {
-        using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = """
-            select
-                coalesce(bool_or(r.view_all_jobs),false),
-                coalesce(bool_or(r.reply_to_clients),false),
-                coalesce(bool_or(r.notify_job_members),false),
-                coalesce(bool_or(r.billing),false),
-                coalesce(bool_or(r.view_client_attachments),false),
-                coalesce(bool_or(r.add_client_attachments),false)
-            from studio_global_operational_roles r
-            join studio_global_operational_role_members m on m.role_id=r.id
-            where r.is_active and m.is_active and lower(m.user_name)=lower($1)
-            """;
-        command.Parameters.AddWithValue(userName);
-        using NpgsqlDataReader reader = command.ExecuteReader();
-        if (!reader.Read()) return GlobalOperationalPermissions.None;
-        return new GlobalOperationalPermissions(reader.GetBoolean(0), reader.GetBoolean(1), reader.GetBoolean(2), reader.GetBoolean(3), reader.GetBoolean(4), reader.GetBoolean(5));
+        string[] directRoles = GetDirectRoleKeysAsync(userName).GetAwaiter().GetResult().ToArray();
+        IReadOnlyCollection<RoleDefinition> roles = GetRolesAsync(directRoles).GetAwaiter().GetResult();
+        HashSet<string> permissions = roles.SelectMany(role => role.Permissions).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        bool all = permissions.Contains(PermissionAuthorizer.AllPermissions);
+        return new GlobalOperationalPermissions(
+            all || permissions.Contains(StudioPermissions.ViewAllJobs),
+            all || permissions.Contains(StudioPermissions.ReplyToClients),
+            all || permissions.Contains(StudioPermissions.NotifyJobMembers),
+            all || permissions.Contains(StudioPermissions.Billing),
+            all || permissions.Contains(StudioPermissions.ViewClientAttachments),
+            all || permissions.Contains(StudioPermissions.AddClientAttachments));
     }
 
     public IReadOnlyList<GlobalOperationalRole> GetRoles()
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id,name,description,view_all_jobs,reply_to_clients,notify_job_members,billing,view_client_attachments,add_client_attachments,is_active from studio_global_operational_roles order by name";
+        command.CommandText = "select id,name,description,is_active from studio_global_operational_roles order by name";
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<GlobalOperationalRole> roles = [];
         while (reader.Read())
         {
+            Guid id = reader.GetGuid(0);
+            string name = reader.GetString(1);
             roles.Add(new GlobalOperationalRole(
-                reader.GetGuid(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2),
-                new GlobalOperationalPermissions(reader.GetBoolean(3), reader.GetBoolean(4), reader.GetBoolean(5), reader.GetBoolean(6), reader.GetBoolean(7), reader.GetBoolean(8)),
-                reader.GetBoolean(9)));
+                id,
+                name,
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                GetPermissionsForRole(id),
+                reader.GetBoolean(3)));
         }
         return roles;
     }
@@ -144,7 +198,7 @@ public sealed class GlobalOperationalRoleStore
     public GlobalOperationalRoleMember SaveMember(Guid roleId, GlobalOperationalRoleMemberRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.UserName)) throw new InvalidOperationException("User name is required.");
-        if (!GetRoles().Any(x => x.Id == roleId && x.IsActive)) throw new KeyNotFoundException("Global operational role was not found.");
+        if (!GetRoles().Any(role => role.Id == roleId && role.IsActive)) throw new KeyNotFoundException("Global operational role was not found.");
 
         string userName = request.UserName.Trim();
         string displayName = string.IsNullOrWhiteSpace(request.DisplayName) ? userName : request.DisplayName.Trim();
@@ -160,7 +214,7 @@ public sealed class GlobalOperationalRoleStore
         command.Parameters.AddWithValue(displayName);
         command.Parameters.AddWithValue(request.IsActive);
         command.ExecuteNonQuery();
-        return GetMembers(roleId).First(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
+        return GetMembers(roleId).First(member => string.Equals(member.UserName, userName, StringComparison.OrdinalIgnoreCase));
     }
 
     public void RemoveMember(Guid roleId, string userName)
@@ -173,6 +227,159 @@ public sealed class GlobalOperationalRoleStore
         command.ExecuteNonQuery();
     }
 
+    public IReadOnlyList<DirectoryGroupRoleMapping> GetGroupMappings()
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            select g.group_name,r.id,r.name
+            from studio_directory_group_roles g
+            join studio_global_operational_roles r on r.id=g.role_id
+            order by g.group_name,r.name
+            """;
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<DirectoryGroupRoleMapping> results = [];
+        while (reader.Read())
+        {
+            results.Add(new DirectoryGroupRoleMapping(reader.GetString(0), reader.GetGuid(1), reader.GetString(2)));
+        }
+        return results;
+    }
+
+    public void SaveGroupMapping(string groupName, Guid roleId)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "insert into studio_directory_group_roles(group_name,role_id) values($1,$2) on conflict do nothing";
+        command.Parameters.AddWithValue(groupName.Trim());
+        command.Parameters.AddWithValue(roleId);
+        command.ExecuteNonQuery();
+    }
+
+    public void RemoveGroupMapping(string groupName, Guid roleId)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "delete from studio_directory_group_roles where lower(group_name)=lower($1) and role_id=$2";
+        command.Parameters.AddWithValue(groupName.Trim());
+        command.Parameters.AddWithValue(roleId);
+        command.ExecuteNonQuery();
+    }
+
+    public Task<IReadOnlyCollection<string>> GetDirectRoleKeysAsync(string subjectId, CancellationToken cancellationToken = default)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            select r.name
+            from studio_global_operational_role_members m
+            join studio_global_operational_roles r on r.id=m.role_id
+            where m.is_active and r.is_active and lower(m.user_name)=lower($1)
+            order by r.name
+            """;
+        command.Parameters.AddWithValue(subjectId.Trim());
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<string> results = [];
+        while (reader.Read()) results.Add(reader.GetString(0));
+        return Task.FromResult<IReadOnlyCollection<string>>(results);
+    }
+
+    public Task<IReadOnlyCollection<string>> GetRoleKeysForGroupsAsync(IReadOnlyCollection<string> groupNames, CancellationToken cancellationToken = default)
+    {
+        if (groupNames.Count == 0) return Task.FromResult<IReadOnlyCollection<string>>(Array.Empty<string>());
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            select distinct r.name
+            from studio_directory_group_roles g
+            join studio_global_operational_roles r on r.id=g.role_id
+            where r.is_active and lower(g.group_name)=any($1)
+            order by r.name
+            """;
+        command.Parameters.AddWithValue(groupNames.Select(group => group.Trim().ToLowerInvariant()).ToArray());
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<string> results = [];
+        while (reader.Read()) results.Add(reader.GetString(0));
+        return Task.FromResult<IReadOnlyCollection<string>>(results);
+    }
+
+    public Task<IReadOnlyCollection<RoleDefinition>> GetRolesAsync(IReadOnlyCollection<string> roleKeys, CancellationToken cancellationToken = default)
+    {
+        if (roleKeys.Count == 0) return Task.FromResult<IReadOnlyCollection<RoleDefinition>>(Array.Empty<RoleDefinition>());
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            select r.name,p.permission_key
+            from studio_global_operational_roles r
+            left join studio_global_operational_role_permissions p on p.role_id=r.id
+            where r.is_active and lower(r.name)=any($1)
+            order by r.name,p.permission_key
+            """;
+        command.Parameters.AddWithValue(roleKeys.Select(role => role.Trim().ToLowerInvariant()).ToArray());
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        Dictionary<string,List<string>> permissions = new(StringComparer.OrdinalIgnoreCase);
+        while (reader.Read())
+        {
+            string roleName = reader.GetString(0);
+            if (!permissions.TryGetValue(roleName, out List<string>? values))
+            {
+                values = [];
+                permissions[roleName] = values;
+            }
+            if (!reader.IsDBNull(1)) values.Add(reader.GetString(1));
+        }
+        RoleDefinition[] roles = permissions.Select(pair => new RoleDefinition(pair.Key, pair.Key, pair.Value)).ToArray();
+        return Task.FromResult<IReadOnlyCollection<RoleDefinition>>(roles);
+    }
+
+    private void EnsureRole(Guid id, string name, string description)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            insert into studio_global_operational_roles(id,name,description,is_active,created_at_utc,updated_at_utc)
+            values($1,$2,$3,true,now(),now())
+            on conflict(name) do update set description=excluded.description,is_active=true,updated_at_utc=now()
+            """;
+        command.Parameters.AddWithValue(id);
+        command.Parameters.AddWithValue(name);
+        command.Parameters.AddWithValue(description);
+        command.ExecuteNonQuery();
+    }
+
+    private void EnsurePermission(Guid roleId, string permission)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "insert into studio_global_operational_role_permissions(role_id,permission_key) values($1,$2) on conflict do nothing";
+        command.Parameters.AddWithValue(roleId);
+        command.Parameters.AddWithValue(permission);
+        command.ExecuteNonQuery();
+    }
+
+    private IReadOnlyCollection<string> GetPermissionsForRole(Guid roleId)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "select permission_key from studio_global_operational_role_permissions where role_id=$1 order by permission_key";
+        command.Parameters.AddWithValue(roleId);
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<string> permissions = [];
+        while (reader.Read()) permissions.Add(reader.GetString(0));
+        return permissions;
+    }
+
+    private static string NormalizePermission(string permission) => permission switch
+    {
+        "ViewAllJobs" => StudioPermissions.ViewAllJobs,
+        "ReplyToClients" => StudioPermissions.ReplyToClients,
+        "NotifyJobMembers" => StudioPermissions.NotifyJobMembers,
+        "Billing" => StudioPermissions.Billing,
+        "ViewClientAttachments" => StudioPermissions.ViewClientAttachments,
+        "AddClientAttachments" => StudioPermissions.AddClientAttachments,
+        _ => permission
+    };
+
     private static string GetUserName(ClaimsPrincipal user)
         => user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.Identity?.Name ?? throw new InvalidOperationException("Authenticated user has no login identifier.");
 }
@@ -182,9 +389,10 @@ public static class GlobalOperationalRoleEndpoints
     public static void MapGlobalOperationalRoles(this WebApplication app)
     {
         GlobalOperationalRoleStore roles = new(app.Services.GetRequiredService<StudioDatabase>());
-        roles.EnsureSchema();
+        Common.Security.Options.ActiveDirectoryAuthenticationOptions? directoryOptions = app.Services.GetService<Common.Security.Options.ActiveDirectoryAuthenticationOptions>();
+        roles.EnsureSchema(directoryOptions?.AdministrativeGroups);
 
-        RouteGroupBuilder group = app.MapGroup("/api/security/global-roles").RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
+        RouteGroupBuilder group = app.MapGroup("/api/security/global-roles").RequireAuthorization(new AuthorizeAttribute { Roles = StudioRoleNames.Administrator });
         group.MapGet("/", () => Results.Ok(roles.GetRoles()));
         group.MapGet("/{roleId:guid}/members", (Guid roleId) => Results.Ok(roles.GetMembers(roleId)));
         group.MapPut("/{roleId:guid}/members/{userName}", (Guid roleId, string userName, GlobalOperationalRoleMemberRequest request) =>
@@ -194,10 +402,13 @@ public static class GlobalOperationalRoleEndpoints
             catch (InvalidOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
         });
         group.MapDelete("/{roleId:guid}/members/{userName}", (Guid roleId, string userName) => { roles.RemoveMember(roleId, userName); return Results.NoContent(); });
+        group.MapGet("/directory-groups", () => Results.Ok(roles.GetGroupMappings()));
+        group.MapPut("/{roleId:guid}/directory-groups/{groupName}", (Guid roleId, string groupName) => { roles.SaveGroupMapping(groupName, roleId); return Results.NoContent(); });
+        group.MapDelete("/{roleId:guid}/directory-groups/{groupName}", (Guid roleId, string groupName) => { roles.RemoveGroupMapping(groupName, roleId); return Results.NoContent(); });
 
         app.MapGet("/api/security/global-role-me", (ClaimsPrincipal user) => Results.Ok(new
         {
-            frontDesk = roles.HasPermission(user, "ViewAllJobs"),
+            roles = roles.GetDirectRoleKeysAsync(GetUserName(user)).GetAwaiter().GetResult(),
             permissions = roles.GetEffectivePermissions(GetUserName(user))
         })).RequireAuthorization();
     }
@@ -211,6 +422,7 @@ public sealed record GlobalOperationalPermissions(bool ViewAllJobs,bool ReplyToC
     public static GlobalOperationalPermissions None => new(false,false,false,false,false,false);
 }
 
-public sealed record GlobalOperationalRole(Guid Id,string Name,string? Description,GlobalOperationalPermissions Permissions,bool IsActive);
+public sealed record GlobalOperationalRole(Guid Id,string Name,string? Description,IReadOnlyCollection<string> Permissions,bool IsActive);
 public sealed record GlobalOperationalRoleMember(Guid RoleId,string UserName,string DisplayName,bool IsActive,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc);
 public sealed record GlobalOperationalRoleMemberRequest(string UserName,string? DisplayName,bool IsActive = true);
+public sealed record DirectoryGroupRoleMapping(string GroupName,Guid RoleId,string RoleName);
