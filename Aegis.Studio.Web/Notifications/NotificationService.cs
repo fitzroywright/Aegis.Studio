@@ -226,10 +226,14 @@ public sealed class NotificationService
             reader.IsDBNull(12) ? null : reader.GetFieldValue<DateTimeOffset>(12));
 }
 
-public sealed class NotificationDeliveryWorker : BackgroundService
+public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDisposable
 {
+    private const string QueueName = "aegis-studio";
     private readonly StudioDatabase database;
-    private readonly IMessageService messageService;
+    private readonly StudioMessageRecipientDirectory recipientDirectory;
+    private readonly PostgreSqlExternalDeliveryStore deliveryStore;
+    private readonly ExternalDeliveryProcessor processor;
+    private readonly IExternalMessageChannel[] externalChannels;
     private readonly ILogger<NotificationDeliveryWorker> logger;
 
     public NotificationDeliveryWorker(
@@ -242,9 +246,22 @@ public sealed class NotificationDeliveryWorker : BackgroundService
     {
         this.database = database;
         this.logger = logger;
+        this.recipientDirectory = new StudioMessageRecipientDirectory(profiles);
+
+        string connectionString = configuration.GetConnectionString("Studio")
+            ?? throw new InvalidOperationException("Studio PostgreSQL connection string is not configured for durable messaging.");
+        ExternalDeliveryOptions deliveryOptions = new()
+        {
+            DeliveryMode = ExternalDeliveryMode.ParallelByRecipient,
+            MaxConcurrency = 4,
+            MaxAttempts = 10,
+            InitialRetryDelay = TimeSpan.FromSeconds(5),
+            MaxRetryDelay = TimeSpan.FromMinutes(5),
+            LeaseDuration = TimeSpan.FromMinutes(2)
+        };
 
         ISecretProvider secrets = CommonSecretProviderFactory.Create(configuration);
-        IExternalMessageChannel[] externalChannels =
+        this.externalChannels =
         [
             new StudioGraphEmailChannel(graph, graphOptions),
             new StudioWebhookMessageChannel(
@@ -259,33 +276,51 @@ public sealed class NotificationDeliveryWorker : BackgroundService
                 request => new { text = $"**{request.Title}**\n\n{request.Body}" })
         ];
 
-        messageService = new MessageService(
-            new StudioMessageRecipientDirectory(profiles),
-            new InMemoryMessageStore(),
-            externalChannels);
+        this.deliveryStore = new PostgreSqlExternalDeliveryStore(connectionString, deliveryOptions, QueueName);
+        ExternalDeliveryDispatcher dispatcher = new(
+            this.externalChannels,
+            deliveryOptions,
+            idempotencyStore: this.deliveryStore);
+        this.processor = new ExternalDeliveryProcessor(this.deliveryStore, dispatcher, deliveryOptions);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        Task processorTask = this.processor.RunAsync(stoppingToken);
+
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    ReconcileDeliveryState();
+                    foreach (PendingNotification item in GetPending())
+                    {
+                        await QueueAsync(item, stoppingToken);
+                    }
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception exception)
+                {
+                    this.logger.LogError(exception, "Notification queueing cycle failed.");
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+            }
+        }
+        finally
         {
             try
             {
-                foreach (PendingNotification item in GetPending())
-                {
-                    await DeliverAsync(item, stoppingToken);
-                }
+                await processorTask;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                break;
             }
-            catch (Exception exception)
-            {
-                logger.LogError(exception, "Notification delivery cycle failed.");
-            }
-
-            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
         }
     }
 
@@ -297,7 +332,7 @@ public sealed class NotificationDeliveryWorker : BackgroundService
             select id,user_name,channel,subject,body,destination,attempts
             from studio_notifications
             where status in ('Pending','Retry','WaitingForConfiguration')
-              and (status='WaitingForConfiguration' or attempts < 10)
+              and attempts < 10
             order by created_at_utc
             limit 50
             """;
@@ -305,12 +340,19 @@ public sealed class NotificationDeliveryWorker : BackgroundService
         List<PendingNotification> values = [];
         while (reader.Read())
         {
-            values.Add(new PendingNotification(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetInt32(6)));
+            values.Add(new PendingNotification(
+                reader.GetGuid(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.GetInt32(6)));
         }
         return values;
     }
 
-    private async Task DeliverAsync(PendingNotification item, CancellationToken cancellationToken)
+    private async Task QueueAsync(PendingNotification item, CancellationToken cancellationToken)
     {
         MessageChannel channel = item.Channel switch
         {
@@ -326,10 +368,17 @@ public sealed class NotificationDeliveryWorker : BackgroundService
             return;
         }
 
+        IReadOnlyList<MessageRecipient> resolved = await this.recipientDirectory.ResolveAsync([item.UserName], cancellationToken);
+        MessageRecipient? recipient = resolved.FirstOrDefault();
+        if (recipient is null)
+        {
+            MarkRetry(item.Id, "Recipient profile could not be resolved.");
+            return;
+        }
+
         Dictionary<string, string>? metadata = string.IsNullOrWhiteSpace(item.Destination)
             ? null
             : new Dictionary<string, string> { ["Destination"] = item.Destination };
-
         MessageRequest request = new()
         {
             RecipientIds = [item.UserName],
@@ -340,31 +389,52 @@ public sealed class NotificationDeliveryWorker : BackgroundService
             CorrelationId = item.Id.ToString("D"),
             Metadata = metadata
         };
+        RecipientSnapshot snapshot = new(
+            recipient.UserId,
+            recipient.UserName,
+            recipient.Email,
+            recipient.SlackUserId,
+            recipient.Mobile,
+            recipient.PreferredChannels);
+        ExternalDeliveryWorkItem workItem = new(
+            item.Id,
+            [snapshot],
+            channel,
+            request,
+            item.Id.ToString("D"),
+            "Aegis.Studio notification",
+            DateTimeOffset.UtcNow,
+            item.Attempts);
 
-        try
-        {
-            MessageSendResult result = await messageService.SendAsync(request, cancellationToken);
-            if (!result.Succeeded)
-            {
-                MarkRetry(item.Id, result.Error ?? "Common.Messaging delivery failed.");
-                return;
-            }
+        await this.deliveryStore.EnqueueAsync(workItem, cancellationToken);
+        Update(item.Id, "Queued", null, false, false);
+    }
 
-            MarkDelivered(item.Id);
-        }
-        catch (StudioMessageConfigurationException exception)
-        {
-            MarkWaitingForConfiguration(item.Id, exception.Message);
-        }
-        catch (Exception exception)
-        {
-            MarkRetry(item.Id, exception.Message);
-        }
+    private void ReconcileDeliveryState()
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            update studio_notifications n
+            set status = case
+                    when q.state='completed' then 'Delivered'
+                    when q.state='dead' then 'Failed'
+                    else n.status
+                end,
+                attempts = greatest(n.attempts, q.attempt),
+                last_error = case when q.state='dead' then q.error_code else n.last_error end,
+                delivered_at_utc = case when q.state='completed' then q.updated_at else n.delivered_at_utc end
+            from common_messaging_queue q
+            where q.queue_name=$1
+              and q.notification_id=n.id
+              and n.status in ('Queued','Retry','WaitingForConfiguration')
+            """;
+        command.Parameters.AddWithValue(QueueName);
+        command.ExecuteNonQuery();
     }
 
     private void MarkDelivered(Guid id) => Update(id, "Delivered", null, true, true);
     private void MarkRetry(Guid id, string error) => Update(id, "Retry", error, false, true);
-    private void MarkWaitingForConfiguration(Guid id, string error) => Update(id, "WaitingForConfiguration", error, false, false);
 
     private void Update(Guid id, string status, string? error, bool delivered, bool incrementAttempts)
     {
@@ -377,6 +447,16 @@ public sealed class NotificationDeliveryWorker : BackgroundService
         command.Parameters.AddWithValue(delivered);
         command.Parameters.AddWithValue(incrementAttempts);
         command.ExecuteNonQuery();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (IDisposable disposable in this.externalChannels.OfType<IDisposable>())
+        {
+            disposable.Dispose();
+        }
+        await this.deliveryStore.DisposeAsync();
+        base.Dispose();
     }
 }
 
