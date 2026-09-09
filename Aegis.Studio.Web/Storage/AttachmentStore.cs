@@ -8,7 +8,6 @@ public sealed class AttachmentStore
 {
     private readonly StudioDatabase database;
     private readonly IFileStorage storage;
-    private readonly string legacyAttachmentRoot;
     private readonly string deliveryCacheRoot;
     private readonly long maximumBytes;
 
@@ -19,10 +18,10 @@ public sealed class AttachmentStore
     {
         this.database = database ?? throw new ArgumentNullException(nameof(database));
         string configuredPath = configuration["Storage:AttachmentsPath"] ?? string.Empty;
-        legacyAttachmentRoot = string.IsNullOrWhiteSpace(configuredPath)
+        string storageRoot = string.IsNullOrWhiteSpace(configuredPath)
             ? Path.Combine(environment.ContentRootPath, "Storage", "attachments")
             : Path.GetFullPath(configuredPath);
-        storage = new LocalFileStorage(legacyAttachmentRoot);
+        storage = new LocalFileStorage(storageRoot);
         deliveryCacheRoot = Path.Combine(environment.ContentRootPath, "Storage", ".delivery-cache");
         Directory.CreateDirectory(deliveryCacheRoot);
 
@@ -181,31 +180,12 @@ public sealed class AttachmentStore
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(attachment);
-        string legacyPath = GetSafeLegacyPath(attachment.StoredName);
-        if (File.Exists(legacyPath))
-        {
-            Stream legacy = new FileStream(
-                legacyPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                128 * 1024,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
-            return Task.FromResult(legacy);
-        }
-
         return storage.OpenReadAsync(attachment.StoredName, cancellationToken);
     }
 
     public string GetPhysicalPath(StudioAttachment attachment)
     {
         ArgumentNullException.ThrowIfNull(attachment);
-
-        string legacyPath = GetSafeLegacyPath(attachment.StoredName);
-        if (File.Exists(legacyPath))
-        {
-            return legacyPath;
-        }
 
         string cachePath = Path.Combine(deliveryCacheRoot, attachment.StoredName);
         if (File.Exists(cachePath))
@@ -232,17 +212,6 @@ public sealed class AttachmentStore
     public Task<StorageHealth> CheckStorageHealthAsync(
         CancellationToken cancellationToken = default)
         => storage.CheckHealthAsync(cancellationToken);
-
-    private string GetSafeLegacyPath(string storedName)
-    {
-        string root = Path.GetFullPath(legacyAttachmentRoot) + Path.DirectorySeparatorChar;
-        string path = Path.GetFullPath(Path.Combine(legacyAttachmentRoot, storedName));
-        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Attachment path escaped the configured storage root.");
-        }
-        return path;
-    }
 
     private static string NormalizeFileName(string fileName)
     {
