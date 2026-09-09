@@ -1,0 +1,57 @@
+name: Common.Security integration
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  common-security-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Studio
+        uses: actions/checkout@v4
+
+      - name: Checkout Common.Diagnostics
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Diagnostics
+          path: Common/Common.Diagnostics
+
+      - name: Checkout Common.Security
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Security
+          path: Common/Common.Security
+
+      - name: Checkout Common.Secrets
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Secrets
+          path: Common/Common.Secrets
+
+      - name: Checkout Common.Messaging
+        uses: actions/checkout@v4
+        with:
+          repository: fitzroywright/Common.Messaging
+          path: Common/Common.Messaging
+
+      - name: Mirror sibling Common layout
+        shell: pwsh
+        run: |
+          $siblingCommon = Join-Path (Split-Path $env:GITHUB_WORKSPACE -Parent) 'Common'
+          if (Test-Path $siblingCommon) { Remove-Item $siblingCommon -Recurse -Force }
+          Move-Item (Join-Path $env:GITHUB_WORKSPACE 'Common') $siblingCommon
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore Studio web tests
+        run: dotnet restore Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj
+
+      - name: Build Studio web tests
+        run: dotnet build Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj --no-restore --configuration Release
+
+      - name: Run Common.Security consumer test
+        run: dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj --no-build --configuration Release --filter FullyQualifiedName~CommonSecurityConsumerIntegrationTests

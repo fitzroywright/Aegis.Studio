@@ -10,5 +10,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Aegis.Studio.Web/Aegis.Studio.Web.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Diagnostics\Common.Diagnostics.csproj" />
   </ItemGroup>
 </Project>
