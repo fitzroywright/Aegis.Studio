@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Aegis.Pos.Core;
+using Aegis.Studio.Web.Diagnostics;
 using Aegis.Studio.Web.Operations;
 using Microsoft.AspNetCore.Authorization;
 
@@ -12,11 +13,14 @@ public static class PosHardeningEndpoints
         services.AddSingleton<PosAuditStore>();
         services.AddSingleton<PosCatalogStore>();
         services.AddSingleton<PosReceiptStore>();
+        services.AddStudioEngineeringDiagnostics();
         return services;
     }
 
     public static void MapStudioPosHardening(this WebApplication app)
     {
+        app.MapStudioEngineeringDiagnostics();
+
         app.MapGet("/api/pos/catalog", (PosCatalogStore catalog) => Results.Ok(catalog.GetAll()));
 
         RouteGroupBuilder catalogAdmin = app.MapGroup("/api/admin/pos/catalog")
