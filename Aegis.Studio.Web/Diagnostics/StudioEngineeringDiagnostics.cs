@@ -2,6 +2,7 @@ namespace Aegis.Studio.Web.Diagnostics;
 
 using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Storage;
 using Common.Diagnostics;
 using Common.Messaging;
 using Common.Secrets;
@@ -126,6 +127,7 @@ public sealed class StudioEngineeringDiagnosticCatalog
     private readonly MicrosoftGraphEmailClient graphClient;
     private readonly MicrosoftGraphEmailOptions graphOptions;
     private readonly ISecretProvider secretProvider;
+    private readonly AttachmentStore attachmentStore;
     private readonly IServiceProvider services;
 
     public StudioEngineeringDiagnosticCatalog(
@@ -133,12 +135,14 @@ public sealed class StudioEngineeringDiagnosticCatalog
         MicrosoftGraphEmailClient graphClient,
         MicrosoftGraphEmailOptions graphOptions,
         ISecretProvider secretProvider,
+        AttachmentStore attachmentStore,
         IServiceProvider services)
     {
         this.dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
         this.graphClient = graphClient ?? throw new ArgumentNullException(nameof(graphClient));
         this.graphOptions = graphOptions ?? throw new ArgumentNullException(nameof(graphOptions));
         this.secretProvider = secretProvider ?? throw new ArgumentNullException(nameof(secretProvider));
+        this.attachmentStore = attachmentStore ?? throw new ArgumentNullException(nameof(attachmentStore));
         this.services = services ?? throw new ArgumentNullException(nameof(services));
     }
 
@@ -182,10 +186,7 @@ public sealed class StudioEngineeringDiagnosticCatalog
                 "studio-l4-storage",
                 "Common.Storage",
                 EngineeringDiagnosticLevel.Level4Analysis,
-                _ => Task.FromResult(Warning(
-                    "studio-l4-storage",
-                    "Common.Storage",
-                    "Studio still uses its application-local AttachmentStore; Common.Storage is not yet integrated into the runtime."))),
+                CheckStorageAsync),
 
             new EngineeringDiagnosticCheckDefinition(
                 "studio-l3-email",
@@ -199,10 +200,15 @@ public sealed class StudioEngineeringDiagnosticCatalog
                 "studio-l2-common-platform",
                 "Studio Common platform integration",
                 EngineeringDiagnosticLevel.Level2Repair,
-                _ => Task.FromResult(Warning(
-                    "studio-l2-common-platform",
-                    "Studio Common platform integration",
-                    "Common.Diagnostics is active and Security/Secrets are integrated, but Common.Storage and the Common.Messaging runtime queue must be present before platform integration is fully green."))),
+                _ => Task.FromResult(services.GetService<IExternalDeliveryQueueHealth>() is not null
+                    ? Passed(
+                        "studio-l2-common-platform",
+                        "Studio Common platform integration",
+                        "Common.Diagnostics, Common.Security, Common.Secrets, Common.Messaging and Common.Storage are integrated into the Studio runtime.")
+                    : Warning(
+                        "studio-l2-common-platform",
+                        "Studio Common platform integration",
+                        "Common.Storage is integrated. Common.Messaging still requires a durable runtime queue before the complete Common platform is green."))),
 
             new EngineeringDiagnosticCheckDefinition(
                 "studio-l1-full-system",
@@ -267,6 +273,19 @@ public sealed class StudioEngineeringDiagnosticCatalog
         return result.DeadLettered > 0
             ? Warning("studio-l4-messaging", "Common.Messaging", $"Messaging queue is available with {result.DeadLettered} dead-lettered item(s).")
             : Passed("studio-l4-messaging", "Common.Messaging", $"Messaging queue is available; pending={result.Pending}.");
+    }
+
+    private async Task<EngineeringDiagnosticCheckResult> CheckStorageAsync(CancellationToken cancellationToken)
+    {
+        Common.Storage.StorageHealth result = await attachmentStore.CheckStorageHealthAsync(cancellationToken).ConfigureAwait(false);
+        if (!result.Available)
+        {
+            return Failed("studio-l4-storage", "Common.Storage", "Common.Storage is unavailable.", result.Error ?? "Storage provider health check failed.");
+        }
+
+        return result.Writable
+            ? Passed("studio-l4-storage", "Common.Storage", $"Common.Storage provider {result.Provider} is available and writable.")
+            : Warning("studio-l4-storage", "Common.Storage", $"Common.Storage provider {result.Provider} is reachable but not writable.");
     }
 
     private static EngineeringDiagnosticCheckResult Passed(string id, string name, string summary) =>
