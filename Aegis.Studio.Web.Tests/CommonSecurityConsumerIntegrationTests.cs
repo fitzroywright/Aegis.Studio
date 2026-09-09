@@ -17,6 +17,7 @@ public sealed class CommonSecurityConsumerIntegrationTests
         services.AddCommonSecurity(new ActiveDirectoryAuthenticationOptions
         {
             Domain = "example.local",
+            SearchBase = "DC=example,DC=local",
             Servers = ["dc1.example.local"],
             Port = 636
         });
