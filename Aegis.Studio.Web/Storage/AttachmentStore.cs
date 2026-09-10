@@ -160,7 +160,7 @@ public sealed class AttachmentStore
         }
         catch
         {
-            await storage.DeleteAsync(storageKey, cancellationToken);
+            await RollBackStoredAttachmentAsync(storageKey, cancellationToken);
             throw;
         }
     }
@@ -212,6 +212,17 @@ public sealed class AttachmentStore
     public Task<StorageHealth> CheckStorageHealthAsync(
         CancellationToken cancellationToken = default)
         => storage.CheckHealthAsync(cancellationToken);
+
+    private async Task RollBackStoredAttachmentAsync(string storageKey, CancellationToken cancellationToken)
+    {
+        if (storage is IStorageLifecycle lifecycle)
+        {
+            await lifecycle.PurgeAsync(storageKey, cancellationToken);
+            return;
+        }
+
+        await storage.DeleteAsync(storageKey, cancellationToken);
+    }
 
     private static string NormalizeFileName(string fileName)
     {
