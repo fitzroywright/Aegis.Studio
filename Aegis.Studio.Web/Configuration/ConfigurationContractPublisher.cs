@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text;
 using Common.Secrets;
 
@@ -31,7 +30,7 @@ public sealed class ConfigurationContractPublisher(
             }
 
             string json = await File.ReadAllTextAsync(path, stoppingToken);
-            string? key = await secrets.GetAsync("aegis/configuration/registration/Aegis.Studio", stoppingToken);
+            string? key = await secrets.GetAsync("configuration/registration/Aegis.Studio", stoppingToken);
             if (string.IsNullOrWhiteSpace(key))
             {
                 logger.LogWarning("Aegis.Configuration registration credential is unavailable; Studio will continue without publishing its contract.");
