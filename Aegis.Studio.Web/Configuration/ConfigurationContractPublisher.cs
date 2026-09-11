@@ -19,7 +19,7 @@ public sealed class ConfigurationContractPublisher(
         }
 
         string path = configuration["AegisConfiguration:ContractPath"]
-            ?? Path.Combine(environment.ContentRootPath, "configuration", "Aegis.Studio.configuration-contract.json");
+            ?? Path.GetFullPath(Path.Combine(environment.ContentRootPath, "..", "configuration", "Aegis.Studio.configuration-contract.json"));
 
         try
         {
