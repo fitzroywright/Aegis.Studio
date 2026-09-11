@@ -57,6 +57,7 @@ public sealed class MicrosoftGraphEmailClient
         {
             using HttpRequestMessage request = new(HttpMethod.Get, nextUrl);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            request.Headers.TryAddWithoutValidation("Prefer", "outlook.body-content-type=\"text\"");
 
             using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
             if (response.StatusCode == HttpStatusCode.Gone && !string.IsNullOrWhiteSpace(deltaLink))
@@ -160,7 +161,7 @@ public sealed class MicrosoftGraphEmailClient
         int pageSize = Math.Clamp(options.PageSize, 1, 100);
         string mailbox = Uri.EscapeDataString(options.Mailbox);
         return $"https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/inbox/messages/delta" +
-            $"?$select=id,conversationId,subject,receivedDateTime,from,toRecipients,ccRecipients,bodyPreview,internetMessageHeaders" +
+            $"?$select=id,conversationId,subject,receivedDateTime,from,toRecipients,ccRecipients,body,internetMessageHeaders" +
             $"&$top={pageSize}";
     }
 
@@ -170,7 +171,7 @@ public sealed class MicrosoftGraphEmailClient
             !string.IsNullOrWhiteSpace(message.From?.EmailAddress?.Address) &&
             (message.ToRecipients.Count > 0 || message.CcRecipients.Count > 0) &&
             !string.IsNullOrWhiteSpace(message.Subject) &&
-            !string.IsNullOrWhiteSpace(message.BodyPreview);
+            !string.IsNullOrWhiteSpace(message.Body?.Content);
     }
 
     private static InboundEmail ToInboundEmail(GraphMessage message)
@@ -198,7 +199,7 @@ public sealed class MicrosoftGraphEmailClient
             ccRecipients,
             headers,
             message.Subject!,
-            message.BodyPreview!,
+            message.Body!.Content,
             message.ReceivedDateTime ?? DateTimeOffset.UtcNow);
     }
 
@@ -255,8 +256,8 @@ public sealed class MicrosoftGraphEmailClient
         [JsonPropertyName("internetMessageHeaders")]
         public List<GraphInternetMessageHeader> InternetMessageHeaders { get; init; } = new();
 
-        [JsonPropertyName("bodyPreview")]
-        public string? BodyPreview { get; init; }
+        [JsonPropertyName("body")]
+        public GraphBody? Body { get; init; }
 
         [JsonPropertyName("@removed")]
         public object? Removed { get; init; }
