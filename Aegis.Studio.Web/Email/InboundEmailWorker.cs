@@ -2,6 +2,7 @@ using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
+using Aegis.Studio.Web.Storage;
 
 namespace Aegis.Studio.Web.Email;
 
@@ -14,6 +15,7 @@ public sealed class InboundEmailWorker : BackgroundService
     private readonly OutboundEmailStore outboundStore;
     private readonly GraphEmailDeltaStateStore deltaStateStore;
     private readonly NotificationService notifications;
+    private readonly AttachmentStore attachments;
     private readonly ILogger<InboundEmailWorker> logger;
 
     public InboundEmailWorker(
@@ -24,6 +26,7 @@ public sealed class InboundEmailWorker : BackgroundService
         OutboundEmailStore outboundStore,
         GraphEmailDeltaStateStore deltaStateStore,
         NotificationService notifications,
+        AttachmentStore attachments,
         ILogger<InboundEmailWorker> logger)
     {
         this.graphClient = graphClient;
@@ -33,6 +36,7 @@ public sealed class InboundEmailWorker : BackgroundService
         this.outboundStore = outboundStore;
         this.deltaStateStore = deltaStateStore;
         this.notifications = notifications;
+        this.attachments = attachments;
         this.logger = logger;
     }
 
@@ -69,6 +73,18 @@ public sealed class InboundEmailWorker : BackgroundService
                         continue;
                     }
 
+                    foreach (InboundEmailAttachment attachment in email.FileAttachments.Where(x => !x.IsInline))
+                    {
+                        await attachments.AddBytesAsync(
+                            result.Conversation.Id,
+                            attachment.FileName,
+                            attachment.ContentType,
+                            attachment.Content,
+                            "External",
+                            $"Microsoft Graph: {email.FromAddress}",
+                            stoppingToken);
+                    }
+
                     if (result.CreatedConversation)
                     {
                         outboundStore.QueueAcknowledgement(result.Conversation, route.WorkspaceName ?? "Studio");
@@ -81,7 +97,13 @@ public sealed class InboundEmailWorker : BackgroundService
                         "Conversation",
                         result.Conversation.Id.ToString("D"));
 
-                    logger.LogInformation("Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}", email.MessageId, route.WorkspaceName, result.Conversation.Id, result.CreatedConversation);
+                    logger.LogInformation(
+                        "Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}. Attachments: {AttachmentCount}",
+                        email.MessageId,
+                        route.WorkspaceName,
+                        result.Conversation.Id,
+                        result.CreatedConversation,
+                        email.FileAttachments.Count);
                 }
 
                 if (!string.IsNullOrWhiteSpace(batch.DeltaLink))
