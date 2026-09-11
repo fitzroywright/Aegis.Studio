@@ -9,6 +9,8 @@ public sealed class ConfigurationContractPublisher(
     ISecretProvider secrets,
     ILogger<ConfigurationContractPublisher> logger) : BackgroundService
 {
+    private static readonly TimeSpan retryDelay = TimeSpan.FromMinutes(5);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         string? baseUrl = configuration["AegisConfiguration:BaseUrl"];
@@ -21,41 +23,64 @@ public sealed class ConfigurationContractPublisher(
         string path = configuration["AegisConfiguration:ContractPath"]
             ?? Path.GetFullPath(Path.Combine(environment.ContentRootPath, "..", "configuration", "Aegis.Studio.configuration-contract.json"));
 
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            if (await TryPublishAsync(baseUrl, path, stoppingToken))
+            {
+                return;
+            }
+
+            try
+            {
+                await Task.Delay(retryDelay, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+        }
+    }
+
+    private async Task<bool> TryPublishAsync(string baseUrl, string path, CancellationToken cancellationToken)
+    {
         try
         {
             if (!File.Exists(path))
             {
-                logger.LogWarning("Aegis.Configuration contract was not found at {ContractPath}; Studio will continue without publishing it.", path);
-                return;
+                logger.LogWarning("Aegis.Configuration contract was not found at {ContractPath}; Studio remains operational and will retry publication.", path);
+                return false;
             }
 
-            string json = await File.ReadAllTextAsync(path, stoppingToken);
-            string? key = await secrets.GetAsync("configuration/registration/Aegis.Studio", stoppingToken);
+            string? key = await secrets.GetAsync("configuration/registration/Aegis.Studio", cancellationToken);
             if (string.IsNullOrWhiteSpace(key))
             {
-                logger.LogWarning("Aegis.Configuration registration credential is unavailable; Studio will continue without publishing its contract.");
-                return;
+                logger.LogWarning("Aegis.Configuration registration credential is unavailable; Studio remains operational and will retry publication.");
+                return false;
             }
 
+            string json = await File.ReadAllTextAsync(path, cancellationToken);
             using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(10) };
             using HttpRequestMessage request = new(HttpMethod.Post, $"{baseUrl.TrimEnd('/')}/api/contracts/register");
             request.Headers.TryAddWithoutValidation("X-Configuration-Registration-Key", key);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            using HttpResponseMessage response = await client.SendAsync(request, stoppingToken);
+            using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Aegis.Configuration rejected Studio contract publication with HTTP {StatusCode}; Studio remains operational.", (int)response.StatusCode);
-                return;
+                logger.LogWarning("Aegis.Configuration rejected Studio contract publication with HTTP {StatusCode}; Studio remains operational and will retry publication.", (int)response.StatusCode);
+                return false;
             }
 
-            logger.LogInformation("Published Aegis.Studio configuration contract to Aegis.Configuration.");
+            logger.LogInformation("Aegis.Studio configuration requirements are registered with Aegis.Configuration.");
+            return true;
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            throw;
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Unable to publish Aegis.Studio configuration contract; Studio remains operational.");
+            logger.LogWarning(exception, "Unable to publish Aegis.Studio configuration requirements; Studio remains operational and will retry publication.");
+            return false;
         }
     }
 }
