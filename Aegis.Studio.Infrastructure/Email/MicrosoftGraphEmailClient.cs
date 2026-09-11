@@ -74,10 +74,13 @@ public sealed class MicrosoftGraphEmailClient
                 throw new InvalidOperationException("Microsoft Graph returned an empty delta response.");
             }
 
-            messages.AddRange(page.Value
-                .Where(message => message.Removed is null)
-                .Where(IsUsable)
-                .Select(ToInboundEmail));
+            foreach (GraphMessage message in page.Value.Where(message => message.Removed is null).Where(IsUsable))
+            {
+                IReadOnlyCollection<InboundEmailAttachment> attachments = message.HasAttachments
+                    ? await GetFileAttachmentsAsync(accessToken, message.Id!, cancellationToken)
+                    : Array.Empty<InboundEmailAttachment>();
+                messages.Add(ToInboundEmail(message, attachments));
+            }
 
             if (!string.IsNullOrWhiteSpace(page.NextLink))
             {
@@ -131,6 +134,66 @@ public sealed class MicrosoftGraphEmailClient
         response.EnsureSuccessStatusCode();
     }
 
+    private async Task<IReadOnlyCollection<InboundEmailAttachment>> GetFileAttachmentsAsync(
+        string accessToken,
+        string messageId,
+        CancellationToken cancellationToken)
+    {
+        string mailbox = Uri.EscapeDataString(options.Mailbox);
+        string escapedMessageId = Uri.EscapeDataString(messageId);
+        string? nextUrl = $"https://graph.microsoft.com/v1.0/users/{mailbox}/messages/{escapedMessageId}/attachments?$select=id,name,contentType,isInline,@odata.type,contentBytes";
+        List<InboundEmailAttachment> attachments = [];
+
+        while (!string.IsNullOrWhiteSpace(nextUrl))
+        {
+            using HttpRequestMessage request = new(HttpMethod.Get, nextUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            GraphAttachmentPage? page = await response.Content.ReadFromJsonAsync<GraphAttachmentPage>(cancellationToken: cancellationToken);
+            if (page is null)
+            {
+                throw new InvalidOperationException("Microsoft Graph returned an empty attachment response.");
+            }
+
+            foreach (GraphAttachment attachment in page.Value)
+            {
+                if (!string.Equals(attachment.ODataType, "#microsoft.graph.fileAttachment", StringComparison.OrdinalIgnoreCase) ||
+                    attachment.IsInline ||
+                    string.IsNullOrWhiteSpace(attachment.ContentBytes))
+                {
+                    continue;
+                }
+
+                byte[] content;
+                try
+                {
+                    content = Convert.FromBase64String(attachment.ContentBytes);
+                }
+                catch (FormatException exception)
+                {
+                    throw new InvalidOperationException($"Microsoft Graph returned invalid base64 content for attachment '{attachment.Name}'.", exception);
+                }
+
+                if (content.Length == 0)
+                {
+                    continue;
+                }
+
+                attachments.Add(new InboundEmailAttachment(
+                    string.IsNullOrWhiteSpace(attachment.Name) ? "attachment.bin" : attachment.Name,
+                    string.IsNullOrWhiteSpace(attachment.ContentType) ? "application/octet-stream" : attachment.ContentType,
+                    content,
+                    false));
+            }
+
+            nextUrl = page.NextLink;
+        }
+
+        return attachments;
+    }
+
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
         string tenantId = Uri.EscapeDataString(options.TenantId);
@@ -161,7 +224,7 @@ public sealed class MicrosoftGraphEmailClient
         int pageSize = Math.Clamp(options.PageSize, 1, 100);
         string mailbox = Uri.EscapeDataString(options.Mailbox);
         return $"https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/inbox/messages/delta" +
-            $"?$select=id,conversationId,subject,receivedDateTime,from,toRecipients,ccRecipients,body,internetMessageHeaders" +
+            $"?$select=id,conversationId,subject,receivedDateTime,from,toRecipients,ccRecipients,body,internetMessageHeaders,hasAttachments" +
             $"&$top={pageSize}";
     }
 
@@ -174,7 +237,9 @@ public sealed class MicrosoftGraphEmailClient
             !string.IsNullOrWhiteSpace(message.Body?.Content);
     }
 
-    private static InboundEmail ToInboundEmail(GraphMessage message)
+    private static InboundEmail ToInboundEmail(
+        GraphMessage message,
+        IReadOnlyCollection<InboundEmailAttachment> attachments)
     {
         GraphEmailAddress sender = message.From!.EmailAddress!;
         IReadOnlyCollection<string> toRecipients = ExtractAddresses(message.ToRecipients);
@@ -200,7 +265,8 @@ public sealed class MicrosoftGraphEmailClient
             headers,
             message.Subject!,
             message.Body!.Content,
-            message.ReceivedDateTime ?? DateTimeOffset.UtcNow);
+            message.ReceivedDateTime ?? DateTimeOffset.UtcNow,
+            attachments);
     }
 
     private static IReadOnlyCollection<string> ExtractAddresses(IEnumerable<GraphRecipient> recipients)
@@ -228,6 +294,33 @@ public sealed class MicrosoftGraphEmailClient
 
         [JsonPropertyName("@odata.deltaLink")]
         public string? DeltaLink { get; init; }
+    }
+
+    private sealed class GraphAttachmentPage
+    {
+        [JsonPropertyName("value")]
+        public List<GraphAttachment> Value { get; init; } = new();
+
+        [JsonPropertyName("@odata.nextLink")]
+        public string? NextLink { get; init; }
+    }
+
+    private sealed class GraphAttachment
+    {
+        [JsonPropertyName("@odata.type")]
+        public string? ODataType { get; init; }
+
+        [JsonPropertyName("name")]
+        public string? Name { get; init; }
+
+        [JsonPropertyName("contentType")]
+        public string? ContentType { get; init; }
+
+        [JsonPropertyName("isInline")]
+        public bool IsInline { get; init; }
+
+        [JsonPropertyName("contentBytes")]
+        public string? ContentBytes { get; init; }
     }
 
     private sealed class GraphMessage
@@ -258,6 +351,9 @@ public sealed class MicrosoftGraphEmailClient
 
         [JsonPropertyName("body")]
         public GraphBody? Body { get; init; }
+
+        [JsonPropertyName("hasAttachments")]
+        public bool HasAttachments { get; init; }
 
         [JsonPropertyName("@removed")]
         public object? Removed { get; init; }
