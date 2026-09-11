@@ -13,6 +13,8 @@ public static class PosHardeningEndpoints
         services.AddSingleton<PosAuditStore>();
         services.AddSingleton<PosCatalogStore>();
         services.AddSingleton<PosReceiptStore>();
+        services.AddSingleton<IAccountingGateway, NullAccountingGateway>();
+        services.AddSingleton<AccountingStore>();
         services.AddStudioEngineeringDiagnostics();
         return services;
     }
@@ -108,6 +110,64 @@ public static class PosHardeningEndpoints
             {
                 return Results.BadRequest(new { error = exception.Message });
             }
+        });
+
+        RouteGroupBuilder register = app.MapGroup("/api/pos/register").RequireAuthorization();
+        register.MapPost("/open", (OpenRegisterRequest request, ClaimsPrincipal user, AccountingStore accounting) =>
+        {
+            try
+            {
+                string cashier = user.Identity?.Name ?? "Aegis.Studio";
+                return Results.Ok(accounting.OpenRegister(request.TerminalId, cashier, request.OpeningFloat));
+            }
+            catch (Exception exception)
+            {
+                return Results.BadRequest(new { error = exception.Message });
+            }
+        });
+        register.MapGet("/open/{terminalId}", (string terminalId, AccountingStore accounting) =>
+            accounting.GetOpenRegister(terminalId) is RegisterSession session ? Results.Ok(session) : Results.NotFound());
+        register.MapGet("/{sessionId:guid}/reconciliation", (Guid sessionId, AccountingStore accounting) =>
+        {
+            try { return Results.Ok(accounting.Reconcile(sessionId)); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (Exception exception) { return Results.BadRequest(new { error = exception.Message }); }
+        });
+        register.MapPost("/{sessionId:guid}/close", (Guid sessionId, CloseRegisterRequest request, ClaimsPrincipal user, AccountingStore accounting) =>
+        {
+            try
+            {
+                return Results.Ok(accounting.CloseRegister(sessionId, request.CountedCash, user.Identity?.Name ?? "Aegis.Studio", request.Note));
+            }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (Exception exception) { return Results.BadRequest(new { error = exception.Message }); }
+        });
+
+        RouteGroupBuilder accountingAdmin = app.MapGroup("/api/admin/accounting")
+            .RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
+        accountingAdmin.MapGet("/mappings", (AccountingStore accounting) => Results.Ok(accounting.GetMappings()));
+        accountingAdmin.MapPut("/mappings", (AccountMapping mapping, AccountingStore accounting) =>
+        {
+            try { return Results.Ok(accounting.SaveMapping(mapping)); }
+            catch (Exception exception) { return Results.BadRequest(new { error = exception.Message }); }
+        });
+        accountingAdmin.MapPost("/batches/register/{sessionId:guid}", (Guid sessionId, AccountingStore accounting) =>
+        {
+            try { return Results.Ok(accounting.GenerateBatch(sessionId)); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (Exception exception) { return Results.BadRequest(new { error = exception.Message }); }
+        });
+        accountingAdmin.MapGet("/batches/{batchId:guid}", (Guid batchId, AccountingStore accounting) =>
+            accounting.GetBatch(batchId) is AccountingBatch batch ? Results.Ok(batch) : Results.NotFound());
+        accountingAdmin.MapPost("/batches/{batchId:guid}/export", async (Guid batchId, AccountingStore accounting, CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                AccountingExportResult result = await accounting.ExportBatchAsync(batchId, cancellationToken);
+                return result.Success ? Results.Ok(result) : Results.Conflict(result);
+            }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (Exception exception) { return Results.BadRequest(new { error = exception.Message }); }
         });
     }
 }
