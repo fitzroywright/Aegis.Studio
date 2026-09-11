@@ -1,0 +1,81 @@
+{
+  "applicationId": "Aegis.Studio",
+  "displayName": "Aegis Studio",
+  "version": "1.0.0",
+  "requirements": [
+    {
+      "id": "database",
+      "displayName": "Studio PostgreSQL database",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Stores Studio application data and durable messaging state.",
+      "configurationKey": "ConnectionStrings:Studio",
+      "validator": "postgresql",
+      "instructionId": "studio-postgresql"
+    },
+    {
+      "id": "graph-tenant",
+      "displayName": "Microsoft Graph tenant ID",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Identifies the Microsoft 365 tenant used by the Studio mail router.",
+      "configurationKey": "MicrosoftGraphEmail:TenantId",
+      "instructionId": "studio-graph-tenant"
+    },
+    {
+      "id": "graph-client",
+      "displayName": "Microsoft Graph application client ID",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Identifies the application registration used by the Studio mail router.",
+      "configurationKey": "MicrosoftGraphEmail:ClientId",
+      "instructionId": "studio-graph-client"
+    },
+    {
+      "id": "graph-client-secret",
+      "displayName": "Microsoft Graph application credential",
+      "kind": "Secret",
+      "required": true,
+      "purpose": "Authenticates the Studio mail router to Microsoft Graph.",
+      "secretName": "Studio:MicrosoftGraphEmail:ClientSecret",
+      "validator": "secret",
+      "instructionId": "studio-graph-secret"
+    },
+    {
+      "id": "graph-mailbox",
+      "displayName": "Studio mail-router mailbox",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Selects the mailbox monitored by the Studio mail router.",
+      "configurationKey": "MicrosoftGraphEmail:Mailbox",
+      "instructionId": "studio-graph-mailbox"
+    },
+    {
+      "id": "attachments-storage",
+      "displayName": "Attachments storage",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines persistent storage for Studio message and job attachments.",
+      "configurationKey": "Storage:AttachmentsPath",
+      "instructionId": "studio-attachments-storage"
+    },
+    {
+      "id": "gallery-storage",
+      "displayName": "Gallery storage",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines persistent storage for Studio galleries.",
+      "configurationKey": "Storage:GalleriesPath",
+      "instructionId": "studio-gallery-storage"
+    },
+    {
+      "id": "media-archive",
+      "displayName": "Media archive storage",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Defines persistent archive storage for Studio media.",
+      "configurationKey": "Storage:MediaArchivePath",
+      "instructionId": "studio-media-archive"
+    }
+  ]
+}
