@@ -2,6 +2,7 @@ using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
+using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Storage;
 
 namespace Aegis.Studio.Web.Email;
@@ -11,6 +12,7 @@ public sealed class InboundEmailWorker : BackgroundService
     private readonly MicrosoftGraphEmailClient graphClient;
     private readonly IInboundEmailRouter router;
     private readonly StudioStore store;
+    private readonly StudioDatabase database;
     private readonly UnroutedEmailStore unroutedStore;
     private readonly OutboundEmailStore outboundStore;
     private readonly GraphEmailDeltaStateStore deltaStateStore;
@@ -22,6 +24,7 @@ public sealed class InboundEmailWorker : BackgroundService
         MicrosoftGraphEmailClient graphClient,
         IInboundEmailRouter router,
         StudioStore store,
+        StudioDatabase database,
         UnroutedEmailStore unroutedStore,
         OutboundEmailStore outboundStore,
         GraphEmailDeltaStateStore deltaStateStore,
@@ -32,6 +35,7 @@ public sealed class InboundEmailWorker : BackgroundService
         this.graphClient = graphClient;
         this.router = router;
         this.store = store;
+        this.database = database;
         this.unroutedStore = unroutedStore;
         this.outboundStore = outboundStore;
         this.deltaStateStore = deltaStateStore;
@@ -67,7 +71,19 @@ public sealed class InboundEmailWorker : BackgroundService
                         continue;
                     }
 
-                    EmailIngestResult result = store.ReceiveEmail(email, route);
+                    AegisReferenceRecoveryResult recovery = AegisReferenceRecovery.TryRecover(database, store, email, route);
+                    if (recovery.Ambiguous)
+                    {
+                        string reason = $"AEGIS reference {recovery.ReferenceToken} matched more than one active conversation for this sender in the routed workspace.";
+                        UnroutedEmail captured = unroutedStore.Capture(email, reason);
+                        logger.LogWarning("Inbound email {MessageId} contains ambiguous AEGIS reference {Reference}. Review item {ReviewId}.", email.MessageId, recovery.ReferenceToken, captured.Id);
+                        continue;
+                    }
+
+                    EmailIngestResult result = recovery.Matched
+                        ? recovery.IngestResult!
+                        : store.ReceiveEmail(email, route);
+
                     if (result.WasDuplicate)
                     {
                         continue;
@@ -98,11 +114,12 @@ public sealed class InboundEmailWorker : BackgroundService
                         result.Conversation.Id.ToString("D"));
 
                     logger.LogInformation(
-                        "Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}. Attachments: {AttachmentCount}",
+                        "Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}. Reference recovery: {ReferenceRecovered}. Attachments: {AttachmentCount}",
                         email.MessageId,
                         route.WorkspaceName,
                         result.Conversation.Id,
                         result.CreatedConversation,
+                        recovery.Matched,
                         email.FileAttachments.Count);
                 }
 
