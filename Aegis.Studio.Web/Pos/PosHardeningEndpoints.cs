@@ -13,7 +13,15 @@ public static class PosHardeningEndpoints
         services.AddSingleton<PosAuditStore>();
         services.AddSingleton<PosCatalogStore>();
         services.AddSingleton<PosReceiptStore>();
-        services.AddSingleton<IAccountingGateway, NullAccountingGateway>();
+        services.AddSingleton<IAccountingGateway>(provider =>
+        {
+            IConfiguration configuration = provider.GetRequiredService<IConfiguration>();
+            IWebHostEnvironment environment = provider.GetRequiredService<IWebHostEnvironment>();
+            bool fileExportEnabled = configuration.GetValue<bool?>("Accounting:Export:Enabled") ?? false;
+            return fileExportEnabled
+                ? new DelimitedFileAccountingGateway(configuration, environment)
+                : new NullAccountingGateway();
+        });
         services.AddSingleton<AccountingStore>();
         services.AddStudioEngineeringDiagnostics();
         return services;
