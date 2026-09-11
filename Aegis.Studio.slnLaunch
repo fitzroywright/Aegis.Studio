@@ -1,13 +1,9 @@
 [
   {
-    "Name": "Studio + Booking Stub + Device Agent",
+    "Name": "Studio + Device Agent",
     "Projects": [
       {
         "Path": "Aegis.Studio.Web\\Aegis.Studio.Web.csproj",
-        "Action": "Start"
-      },
-      {
-        "Path": "Aegis.Studio.BookingStub\\Aegis.Studio.BookingStub.csproj",
         "Action": "Start"
       },
       {
