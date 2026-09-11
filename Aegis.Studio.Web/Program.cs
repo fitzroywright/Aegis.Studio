@@ -6,6 +6,7 @@ using Aegis.Studio.Domain.Bookings;
 using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Authentication;
 using Aegis.Studio.Web.Bookings;
+using Aegis.Studio.Web.Configuration;
 using Aegis.Studio.Web.Email;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
@@ -66,6 +67,7 @@ builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
 builder.Services.AddHostedService<InboundEmailWorker>();
 builder.Services.AddHostedService<OutboundEmailWorker>();
 builder.Services.AddHostedService<NotificationDeliveryWorker>();
+builder.Services.AddHostedService<ConfigurationContractPublisher>();
 
 WebApplication app = builder.Build();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
