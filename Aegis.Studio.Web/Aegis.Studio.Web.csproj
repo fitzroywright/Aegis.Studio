@@ -20,4 +20,7 @@
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="../configuration/Aegis.Studio.configuration-contract.json" Link="configuration/Aegis.Studio.configuration-contract.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
