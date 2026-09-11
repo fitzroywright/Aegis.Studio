@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Aegis.Pos.Core;
+using Aegis.Studio.Web.Configuration;
 using Aegis.Studio.Web.Diagnostics;
 using Aegis.Studio.Web.Operations;
 using Microsoft.AspNetCore.Authorization;
@@ -24,6 +25,7 @@ public static class PosHardeningEndpoints
         });
         services.AddSingleton<AccountingStore>();
         services.AddStudioEngineeringDiagnostics();
+        services.AddHostedService<ConfigurationContractPublisher>();
         return services;
     }
 
