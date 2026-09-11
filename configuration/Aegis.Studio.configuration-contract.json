@@ -76,6 +76,16 @@
       "purpose": "Defines persistent archive storage for Studio media.",
       "configurationKey": "Storage:MediaArchivePath",
       "instructionId": "studio-media-archive"
+    },
+    {
+      "id": "diagnostics-key",
+      "displayName": "Engineering diagnostics machine credential",
+      "kind": "Secret",
+      "required": true,
+      "purpose": "Protects the Common.Diagnostics machine interface consumed by Aegis.Diagnostics. Provision the resolved secret to the STUDIO_DIAGNOSTICS_KEY runtime environment variable.",
+      "secretName": "Studio:Diagnostics:Key",
+      "validator": "secret",
+      "instructionId": "studio-diagnostics-key"
     }
   ]
 }
