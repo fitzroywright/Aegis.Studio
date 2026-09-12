@@ -88,7 +88,7 @@ public sealed class AccountingStore
             command.Parameters.AddWithValue(closedAt);
             command.Parameters.AddWithValue(countedCash);
             command.Parameters.AddWithValue(reconciliation.ExpectedCash);
-            command.Parameters.AddWithValue(reconciliation.CashVariance);
+            command.Parameters.AddWithValue((object?)reconciliation.CashVariance ?? DBNull.Value);
             command.Parameters.AddWithValue(string.IsNullOrWhiteSpace(closedBy) ? "Aegis.Studio" : closedBy.Trim());
             command.Parameters.AddWithValue((object?)note?.Trim() ?? DBNull.Value);
             if (command.ExecuteNonQuery() != 1) throw new InvalidOperationException("Register session could not be closed.");
@@ -297,26 +297,23 @@ public sealed class AccountingStore
                 id uuid primary key,
                 terminal_id text not null,
                 cashier_user_id text not null,
-                opening_float numeric(18,2) not null,
+                opening_float numeric(12,2) not null,
                 opened_at_utc timestamptz not null,
                 closed_at_utc timestamptz null,
-                counted_cash numeric(18,2) null,
-                expected_cash numeric(18,2) null,
-                variance numeric(18,2) null,
-                status text not null,
+                counted_cash numeric(12,2) null,
+                expected_cash numeric(12,2) null,
+                variance numeric(12,2) null,
                 closed_by text null,
-                close_note text null
+                close_note text null,
+                status text not null
             );
-            create unique index if not exists ux_studio_register_open_terminal on studio_register_sessions(terminal_id) where closed_at_utc is null;
-            create index if not exists ix_studio_register_sessions_opened on studio_register_sessions(opened_at_utc desc);
-
+            create index if not exists ix_studio_register_sessions_terminal_open on studio_register_sessions(terminal_id,closed_at_utc);
             create table if not exists studio_account_mappings
             (
                 mapping_key text primary key,
                 account_code text not null,
                 description text null
             );
-
             create table if not exists studio_accounting_batches
             (
                 id uuid primary key,
@@ -326,8 +323,8 @@ public sealed class AccountingStore
                 period_end_utc timestamptz not null,
                 created_at_utc timestamptz not null,
                 status text not null,
-                debit_total numeric(18,2) not null,
-                credit_total numeric(18,2) not null,
+                debit_total numeric(12,2) not null,
+                credit_total numeric(12,2) not null,
                 exported_at_utc timestamptz null,
                 external_reference text null
             );
@@ -337,10 +334,9 @@ public sealed class AccountingStore
                 batch_id uuid not null references studio_accounting_batches(id) on delete cascade,
                 account_code text not null,
                 description text not null,
-                debit numeric(18,2) not null,
-                credit numeric(18,2) not null
+                debit numeric(12,2) not null,
+                credit numeric(12,2) not null
             );
-            create index if not exists ix_studio_accounting_batch_lines_batch on studio_accounting_batch_lines(batch_id);
             """;
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -348,14 +344,3 @@ public sealed class AccountingStore
         command.ExecuteNonQuery();
     }
 }
-
-public sealed record RegisterSession(Guid Id, string TerminalId, string CashierUserId, decimal OpeningFloat, DateTimeOffset OpenedAtUtc, DateTimeOffset? ClosedAtUtc, decimal? CountedCash, decimal? ExpectedCash, decimal? Variance, string Status);
-public sealed record OpenRegisterRequest(string TerminalId, decimal OpeningFloat);
-public sealed record CloseRegisterRequest(decimal CountedCash, string? Note);
-public sealed record RegisterCloseResult(RegisterSession Session, ReconciliationSnapshot Reconciliation);
-public sealed record TenderReconciliation(TenderKind Kind, decimal SalesAmount, decimal RefundAmount, decimal NetAmount);
-public sealed record ReconciliationSnapshot(Guid RegisterSessionId, DateTimeOffset PeriodStartUtc, DateTimeOffset PeriodEndUtc, decimal OpeningFloat, decimal GrossSales, decimal RefundTotal, decimal NetSales, decimal ExpectedCash, decimal? CountedCash, decimal? CashVariance, IReadOnlyList<TenderReconciliation> Tenders);
-public sealed record AccountMapping(string Key, string AccountCode, string? Description = null);
-public sealed record AccountingBatchLine(Guid Id, string AccountCode, string Description, decimal Debit, decimal Credit);
-public sealed record AccountingBatch(Guid Id, string Reference, Guid RegisterSessionId, DateTimeOffset PeriodStartUtc, DateTimeOffset PeriodEndUtc, DateTimeOffset CreatedAtUtc, string Status, decimal DebitTotal, decimal CreditTotal, IReadOnlyList<AccountingBatchLine> Lines, DateTimeOffset? ExportedAtUtc, string? ExternalReference);
-public sealed record AccountingExportResult(bool Success, string Status, string? ExternalReference, string? Message);
