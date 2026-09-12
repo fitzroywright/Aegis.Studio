@@ -2,6 +2,14 @@ using Aegis.Pos.Core;
 
 namespace Aegis.Studio.Web.Pos;
 
+public sealed record OpenRegisterRequest(
+    string TerminalId,
+    decimal OpeningFloat);
+
+public sealed record CloseRegisterRequest(
+    decimal CountedCash,
+    string? Note);
+
 public sealed record RegisterSession(
     Guid Id,
     string TerminalId,
