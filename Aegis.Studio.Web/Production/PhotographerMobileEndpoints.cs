@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Scheduling;
 
 namespace Aegis.Studio.Web.Production;
@@ -9,8 +10,9 @@ public static class PhotographerMobileEndpoints
     {
         RouteGroupBuilder mobile = app.MapGroup("/api/mobile/photographer").RequireAuthorization();
 
-        mobile.MapGet("/me", (ClaimsPrincipal user, PhotographerStore photographers) =>
+        mobile.MapGet("/me", (ClaimsPrincipal user, StudioDatabase database) =>
         {
+            PhotographerStore photographers = new(database);
             string userName = GetUserName(user);
             PhotographerProfile? profile = photographers.Get(userName);
             return profile is null ? Results.NotFound(new { error = "No photographer profile is linked to this account." }) : Results.Ok(profile);
@@ -20,9 +22,10 @@ public static class PhotographerMobileEndpoints
             ClaimsPrincipal user,
             DateTimeOffset? from,
             DateTimeOffset? to,
-            PhotographerStore photographers,
+            StudioDatabase database,
             ScheduleStore schedules) =>
         {
+            PhotographerStore photographers = new(database);
             string userName = GetUserName(user);
             PhotographerProfile? profile = photographers.Get(userName);
             if (profile is null) return Results.NotFound(new { error = "No photographer profile is linked to this account." });
@@ -42,8 +45,9 @@ public static class PhotographerMobileEndpoints
             ClaimsPrincipal user,
             DateTimeOffset? from,
             DateTimeOffset? to,
-            PhotographerStore photographers) =>
+            StudioDatabase database) =>
         {
+            PhotographerStore photographers = new(database);
             string userName = GetUserName(user);
             if (photographers.Get(userName) is null) return Results.NotFound(new { error = "No photographer profile is linked to this account." });
             return Results.Ok(photographers.GetAvailability(userName, from, to));
@@ -52,8 +56,9 @@ public static class PhotographerMobileEndpoints
         mobile.MapPost("/availability", (
             ClaimsPrincipal user,
             PhotographerAvailabilityRequest request,
-            PhotographerStore photographers) =>
+            StudioDatabase database) =>
         {
+            PhotographerStore photographers = new(database);
             string userName = GetUserName(user);
             try
             {
