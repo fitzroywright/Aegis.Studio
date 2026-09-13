@@ -5,5 +5,6 @@ public static class ProductionEndpoints
     public static void MapStudioProduction(this WebApplication app)
     {
         app.MapStudioOperationalWork();
+        app.MapStudioPhotographerMobile();
     }
 }
