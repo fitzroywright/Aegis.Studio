@@ -1,0 +1,10 @@
+[
+  {"view":"conversations","title":"Working with requests and conversations","description":"Learn how Studio keeps customer messages, internal discussion and job context together.","videoUrl":"","duration":"1–2 min","active":true},
+  {"view":"jobs","title":"Managing a Studio job","description":"A quick walkthrough of job ownership, status, assignments and customer context.","videoUrl":"","duration":"1–2 min","active":true},
+  {"view":"schedule","title":"Using the Studio schedule","description":"Learn how bookings and production commitments appear in the Studio schedule.","videoUrl":"","duration":"1 min","active":true},
+  {"view":"workspaces","title":"Understanding workspaces","description":"Learn how Studio organizes departments, locations and their incoming work.","videoUrl":"","duration":"1 min","active":true},
+  {"view":"frontdesk","title":"Front Desk workflow","description":"A short guide to handling walk-ins, bookings and front-desk transactions.","videoUrl":"","duration":"1–2 min","active":true},
+  {"view":"production","title":"Production workflow","description":"Learn how work moves through Studio production and how staff see what is next.","videoUrl":"","duration":"1–2 min","active":true},
+  {"view":"accounts","title":"Accounts and reconciliation","description":"A short guide to the accounting and reconciliation boundary in Studio.","videoUrl":"","duration":"1–2 min","active":true},
+  {"view":"management","title":"Managing Studio","description":"Learn where administrators manage operational settings and access.","videoUrl":"","duration":"1–2 min","active":true}
+]
