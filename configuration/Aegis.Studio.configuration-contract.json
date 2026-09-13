@@ -2,90 +2,19 @@
   "applicationId": "Aegis.Studio",
   "displayName": "Aegis Studio",
   "version": "1.0.0",
+  "description": "Studio workspace, booking, messaging, gallery and production application.",
   "requirements": [
-    {
-      "id": "database",
-      "displayName": "Studio PostgreSQL database",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Stores Studio application data and durable messaging state.",
-      "configurationKey": "ConnectionStrings:Studio",
-      "validator": "postgresql",
-      "instructionId": "studio-postgresql"
-    },
-    {
-      "id": "graph-tenant",
-      "displayName": "Microsoft Graph tenant ID",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Identifies the Microsoft 365 tenant used by the Studio mail router.",
-      "configurationKey": "MicrosoftGraphEmail:TenantId",
-      "instructionId": "studio-graph-tenant"
-    },
-    {
-      "id": "graph-client",
-      "displayName": "Microsoft Graph application client ID",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Identifies the application registration used by the Studio mail router.",
-      "configurationKey": "MicrosoftGraphEmail:ClientId",
-      "instructionId": "studio-graph-client"
-    },
-    {
-      "id": "graph-client-secret",
-      "displayName": "Microsoft Graph application credential",
-      "kind": "Secret",
-      "required": true,
-      "purpose": "Authenticates the Studio mail router to Microsoft Graph.",
-      "secretName": "Studio:MicrosoftGraphEmail:ClientSecret",
-      "validator": "secret",
-      "instructionId": "studio-graph-secret"
-    },
-    {
-      "id": "graph-mailbox",
-      "displayName": "Studio mail-router mailbox",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Selects the mailbox monitored by the Studio mail router.",
-      "configurationKey": "MicrosoftGraphEmail:Mailbox",
-      "instructionId": "studio-graph-mailbox"
-    },
-    {
-      "id": "attachments-storage",
-      "displayName": "Attachments storage",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Defines persistent storage for Studio message and job attachments.",
-      "configurationKey": "Storage:AttachmentsPath",
-      "instructionId": "studio-attachments-storage"
-    },
-    {
-      "id": "gallery-storage",
-      "displayName": "Gallery storage",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Defines persistent storage for Studio galleries.",
-      "configurationKey": "Storage:GalleriesPath",
-      "instructionId": "studio-gallery-storage"
-    },
-    {
-      "id": "media-archive",
-      "displayName": "Media archive storage",
-      "kind": "Configuration",
-      "required": true,
-      "purpose": "Defines persistent archive storage for Studio media.",
-      "configurationKey": "Storage:MediaArchivePath",
-      "instructionId": "studio-media-archive"
-    },
-    {
-      "id": "diagnostics-key",
-      "displayName": "Engineering diagnostics machine credential",
-      "kind": "Secret",
-      "required": true,
-      "purpose": "Protects the Common.Diagnostics machine interface consumed by Aegis.Diagnostics. Provision the resolved secret to the STUDIO_DIAGNOSTICS_KEY runtime environment variable.",
-      "secretName": "Studio:Diagnostics:Key",
-      "validator": "secret",
-      "instructionId": "studio-diagnostics-key"
-    }
+    { "id": "database", "displayName": "Studio PostgreSQL database", "kind": "Secret", "required": true, "purpose": "Stores Studio application data and durable messaging state.", "secretName": "ConnectionStrings:Studio", "isConfigured": false, "sensitive": true },
+    { "id": "graph-tenant", "displayName": "Microsoft Graph tenant ID", "kind": "Configuration", "required": true, "purpose": "Identifies the Microsoft 365 tenant used by the Studio mail router.", "configurationKey": "MicrosoftGraphEmail:TenantId", "isConfigured": false },
+    { "id": "graph-client", "displayName": "Microsoft Graph application client ID", "kind": "Configuration", "required": true, "purpose": "Identifies the application registration used by the Studio mail router.", "configurationKey": "MicrosoftGraphEmail:ClientId", "isConfigured": false },
+    { "id": "graph-client-secret", "displayName": "Microsoft Graph application credential", "kind": "Secret", "required": true, "purpose": "Authenticates the Studio mail router to Microsoft Graph.", "secretName": "Studio:MicrosoftGraphEmail:ClientSecret", "isConfigured": false, "sensitive": true },
+    { "id": "graph-mailbox", "displayName": "Studio mail-router mailbox", "kind": "Configuration", "required": true, "purpose": "Selects the mailbox monitored by the Studio mail router.", "configurationKey": "MicrosoftGraphEmail:Mailbox", "isConfigured": false },
+    { "id": "attachments-storage", "displayName": "Attachments storage", "kind": "Configuration", "required": true, "purpose": "Defines persistent storage for Studio message and job attachments.", "configurationKey": "Storage:AttachmentsPath", "isConfigured": false },
+    { "id": "gallery-storage", "displayName": "Gallery storage", "kind": "Configuration", "required": true, "purpose": "Defines persistent storage for Studio galleries.", "configurationKey": "Storage:GalleriesPath", "isConfigured": false },
+    { "id": "media-archive", "displayName": "Media archive storage", "kind": "Configuration", "required": true, "purpose": "Defines persistent archive storage for Studio media.", "configurationKey": "Storage:MediaArchivePath", "isConfigured": false },
+    { "id": "openbao-url", "displayName": "OpenBao URL", "kind": "ExternalService", "required": true, "purpose": "Identifies the OpenBao instance used for Studio secrets.", "configurationKey": "Secrets:OpenBao:Address", "isConfigured": false },
+    { "id": "openbao-credentials", "displayName": "OpenBao credentials", "kind": "Secret", "required": true, "purpose": "Provides Studio with its OpenBao authentication material.", "secretName": "studio/openbao-auth", "isConfigured": false, "sensitive": true },
+    { "id": "site-id", "displayName": "Site ID", "kind": "Configuration", "required": true, "purpose": "Identifies the deployment site for this Studio instance.", "configurationKey": "Site:Id", "isConfigured": false },
+    { "id": "service-identity", "displayName": "Service identity", "kind": "Configuration", "required": true, "purpose": "Uniquely identifies this independently deployed Studio instance.", "configurationKey": "Service:Identity", "isConfigured": false }
   ]
 }
