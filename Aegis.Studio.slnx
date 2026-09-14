@@ -8,6 +8,8 @@
   <Project Path="Aegis.Studio.Web/Aegis.Studio.Web.csproj" />
   <Project Path="Aegis.Studio.Domain.Tests/Aegis.Studio.Domain.Tests.csproj" />
   <Project Path="Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj" />
+  <Project Path="../Aegis.Configuration/Aegis.Configuration.Web/Aegis.Configuration.Web.csproj" />
+  <Project Path="../Aegis.Diagnostics/Aegis.Diagnostics.csproj" />
   <Project Path="../Common/Common.Security/Common.Security.csproj" />
   <Project Path="../Common/Common.Secrets/Common.Secrets.csproj" />
   <Project Path="../Common/Common.Messaging/Common.Messaging.csproj" />
