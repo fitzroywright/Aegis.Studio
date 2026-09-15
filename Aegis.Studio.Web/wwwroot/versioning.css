@@ -1,0 +1,1 @@
+.version-compare-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.version-card{border:1px solid var(--border,#d7d7d7);border-radius:.75rem;padding:1rem;background:var(--surface,#fff)}.version-card h3{margin-top:0}.version-card p{overflow-wrap:anywhere}@media(max-width:760px){.version-compare-grid{grid-template-columns:1fr}}
