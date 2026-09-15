@@ -12,6 +12,7 @@ public sealed class StudioVersionStore
     public StudioVersionStore(StudioDatabase database, IConfiguration configuration, IWebHostEnvironment environment)
     {
         this.database = database;
+        StudioVersionSchema.EnsureCreated(database);
         string configured = configuration["Storage:VersionStorePath"] ?? string.Empty;
         root = Path.GetFullPath(string.IsNullOrWhiteSpace(configured)
             ? Path.Combine(environment.ContentRootPath, "VersionStore")
