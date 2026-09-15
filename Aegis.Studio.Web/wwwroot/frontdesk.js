@@ -125,12 +125,12 @@ async function notifyFrontDeskTeam(jobId) {
     const body = prompt('Message');
     if (!body) return;
 
-    await json(`/api/jobs/${jobId}/notifications`, {
+    const result = await json(`/api/jobs/${jobId}/notifications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userName: member.userName, subject, body })
     });
-    alert(`Notification sent to ${member.displayName || member.userName}.`);
+    alert(result.message || `Notification request accepted for ${member.displayName || member.userName}. Delivery is not yet confirmed.`);
 }
 
 loadFrontDeskRole();
