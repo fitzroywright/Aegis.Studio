@@ -1,7 +1,6 @@
 using System.Reflection;
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
+using Common.Registration;
 using Common.Secrets;
 
 namespace Aegis.Studio.Web.Configuration;
@@ -62,10 +61,14 @@ public sealed class ConfigurationContractPublisher(
                 return false;
             }
 
-            JsonNode contract = JsonNode.Parse(await File.ReadAllTextAsync(path, cancellationToken))
+            JsonNode contractNode = JsonNode.Parse(await File.ReadAllTextAsync(path, cancellationToken))
                 ?? throw new InvalidDataException("Configuration contract is empty.");
+            if (contractNode is not JsonObject contract)
+            {
+                throw new InvalidDataException("Configuration contract must be a JSON object.");
+            }
 
-            contract["version"] = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "1.0.0";
+            contract["version"] = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
             contract["siteId"] = NullIfBlank(configuration["Site:Id"]);
             contract["instanceId"] = NullIfBlank(configuration["Service:Identity"]);
 
@@ -112,19 +115,21 @@ public sealed class ConfigurationContractPublisher(
                 };
             }
 
-            using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(10) };
-            using HttpRequestMessage request = new(HttpMethod.Post, $"{baseUrl.TrimEnd('/')}/api/contracts/register");
-            request.Headers.TryAddWithoutValidation("X-Configuration-Registration-Key", key);
-            request.Content = new StringContent(contract.ToJsonString(new JsonSerializerOptions()), Encoding.UTF8, "application/json");
-
-            using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            using HttpClient client = new();
+            var registrar = new ConfigurationRegistrar(
+                client,
+                new RegistrationOptions(
+                    new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute),
+                    key,
+                    TimeSpan.FromSeconds(10)));
+            RegistrationResult result = await registrar.RegisterContractAsync(contract, cancellationToken);
+            if (!result.Succeeded)
             {
-                logger.LogWarning("Aegis.Configuration rejected Studio publication with HTTP {StatusCode}; Studio remains operational and will retry.", (int)response.StatusCode);
+                logger.LogWarning("Aegis.Configuration registration failed for Studio: {RegistrationError}; Studio remains operational and will retry.", result.Error ?? "Unknown registration failure.");
                 return false;
             }
 
-            logger.LogInformation("Aegis.Studio configuration requirements and configured state are registered with Aegis.Configuration.");
+            logger.LogInformation("Aegis.Studio configuration requirements and configured state registered with Aegis.Configuration with HTTP {StatusCode}.", (int?)result.StatusCode);
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
