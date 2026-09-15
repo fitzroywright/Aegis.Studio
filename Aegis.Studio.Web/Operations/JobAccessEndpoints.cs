@@ -77,8 +77,16 @@ public static class JobAccessEndpoints
 
             StudioJob? job = studio.GetJob(jobId);
             if (job is null) return Results.NotFound();
+
             notifications.PublishToUser(recipientUserName, "JobNotification", request.Subject.Trim(), request.Body.Trim(), "Job", jobId.ToString("D"));
-            return Results.Ok(new { sent = true, job = job.Title, member = recipientDisplayName ?? recipientUserName });
+            return Results.Accepted(value: new
+            {
+                accepted = true,
+                deliveryConfirmed = false,
+                job = job.Title,
+                member = recipientDisplayName ?? recipientUserName,
+                message = "The notification request was accepted. Delivery is handled asynchronously and is not confirmed by this response."
+            });
         }).RequireAuthorization();
 
         app.MapPost("/api/jobs/{jobId:guid}/financial-events", (Guid jobId, AddFinancialEventRequest request, ClaimsPrincipal user, JobAccessService access, StudioStore studio) =>
