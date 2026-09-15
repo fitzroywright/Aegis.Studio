@@ -1,5 +1,6 @@
 using System.Reflection;
 using Aegis.Studio.Web.Versioning;
+using Xunit;
 
 namespace Aegis.Studio.Web.Tests;
 
