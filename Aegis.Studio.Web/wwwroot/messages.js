@@ -1,10 +1,17 @@
 (() => {
+    const signalRRecordSeparator = '\u001e';
     let selectedThread = null;
     let refreshTimer = null;
     let lastUnreadTotal = 0;
     let knownThreadUnread = new Map();
     let mentionUsers = [];
     let toastTimer = null;
+    let realtimeSocket = null;
+    let realtimeReconnectTimer = null;
+    let realtimeInvocationId = 0;
+    let joinedRealtimeThread = null;
+    let recentMentionThread = null;
+    let recentMentionAt = 0;
 
     function installNavigation() {
         const rail = document.querySelector('.rail');
@@ -109,7 +116,9 @@
     }
 
     async function openThread(id) {
+        const previousThread = selectedThread;
         selectedThread = id;
+        await joinRealtimeThread(id, previousThread);
         const threads = await json('/api/messages/threads');
         const thread = threads.find(item => item.id === id);
         const messages = await json(`/api/messages/threads/${id}`);
@@ -226,13 +235,26 @@
         updateUnreadBadge(total);
         if (lastUnreadTotal > 0 && total > lastUnreadTotal) {
             const changed = threads.find(thread => Number(thread.unreadCount || 0) > Number(knownThreadUnread.get(thread.id) || 0));
-            if (changed && selectedThread !== changed.id) showMessageToast(changed);
+            const recentlyMentioned = changed && recentMentionThread === changed.id && Date.now() - recentMentionAt < 4000;
+            if (changed && selectedThread !== changed.id && !recentlyMentioned) showMessageToast(changed);
         }
         knownThreadUnread = new Map(threads.map(thread => [thread.id, Number(thread.unreadCount || 0)]));
         lastUnreadTotal = total;
     }
 
     function showMessageToast(thread) {
+        showToast('New Studio message', thread.title, `${Number(thread.unreadCount || 1)} unread`, thread.id);
+    }
+
+    function showMentionToast(payload) {
+        recentMentionThread = payload.threadId;
+        recentMentionAt = Date.now();
+        const sender = payload.senderUserName || 'A Studio user';
+        const preview = String(payload.body || '').replace(/\s+/g, ' ').trim();
+        showToast('You were mentioned', sender, preview.length > 110 ? `${preview.slice(0, 107)}…` : preview, payload.threadId);
+    }
+
+    function showToast(kicker, title, detail, threadId) {
         let host = document.getElementById('studioMessageToast');
         if (!host) {
             host = document.createElement('button');
@@ -240,8 +262,8 @@
             host.className = 'studio-message-toast';
             document.body.appendChild(host);
         }
-        host.innerHTML = `<span class="toast-kicker">New Studio message</span><strong>${esc(thread.title)}</strong><span>${Number(thread.unreadCount || 1)} unread</span>`;
-        host.onclick = async () => { host.classList.remove('show'); await showMessages(); await openThread(thread.id); };
+        host.innerHTML = `<span class="toast-kicker">${esc(kicker)}</span><strong>${esc(title)}</strong><span>${esc(detail || '')}</span>`;
+        host.onclick = async () => { host.classList.remove('show'); await showMessages(); await openThread(threadId); };
         host.classList.add('show');
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => host.classList.remove('show'), 7000);
@@ -275,11 +297,7 @@
             const messagesButton = document.querySelector('[data-view="messages"]');
             if (messagesButton?.classList.contains('active')) {
                 await loadThreads();
-                if (selectedThread) {
-                    const messages = await json(`/api/messages/threads/${selectedThread}`);
-                    const history = document.getElementById('studioMessageHistory');
-                    if (history) history.innerHTML = messages.map(renderMessage).join('');
-                }
+                if (selectedThread) await refreshSelectedThread(false);
             } else {
                 const threads = await json('/api/messages/threads');
                 handleUnreadChanges(threads);
@@ -287,9 +305,94 @@
         } catch { }
     }
 
+    async function refreshSelectedThread(markRead) {
+        if (!selectedThread) return;
+        const messages = await json(`/api/messages/threads/${selectedThread}`);
+        const history = document.getElementById('studioMessageHistory');
+        if (history) {
+            history.innerHTML = messages.map(renderMessage).join('');
+            history.scrollTop = history.scrollHeight;
+        }
+        if (markRead) {
+            await fetch(`/api/messages/threads/${selectedThread}/read`, { method: 'POST' });
+            await loadThreads();
+        }
+    }
+
     function startRefresh() {
         if (refreshTimer) clearInterval(refreshTimer);
         refreshTimer = setInterval(refreshIfVisible, 5000);
+    }
+
+    async function connectRealtime() {
+        clearTimeout(realtimeReconnectTimer);
+        if (realtimeSocket && (realtimeSocket.readyState === WebSocket.OPEN || realtimeSocket.readyState === WebSocket.CONNECTING)) return;
+        try {
+            const response = await fetch('/hubs/messages/negotiate?negotiateVersion=1', { method: 'POST', credentials: 'same-origin' });
+            if (!response.ok) throw new Error(`SignalR negotiate failed (${response.status}).`);
+            const negotiation = await response.json();
+            const token = negotiation.connectionToken || negotiation.connectionId;
+            if (!token) throw new Error('SignalR negotiate did not return a connection token.');
+            const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const socket = new WebSocket(`${scheme}//${location.host}/hubs/messages?id=${encodeURIComponent(token)}`);
+            realtimeSocket = socket;
+            socket.onopen = () => {
+                socket.send(JSON.stringify({ protocol: 'json', version: 1 }) + signalRRecordSeparator);
+                joinedRealtimeThread = null;
+                if (selectedThread) joinRealtimeThread(selectedThread, null);
+            };
+            socket.onmessage = event => handleRealtimeFrames(String(event.data || ''));
+            socket.onerror = () => { try { socket.close(); } catch { } };
+            socket.onclose = () => {
+                if (realtimeSocket === socket) realtimeSocket = null;
+                joinedRealtimeThread = null;
+                realtimeReconnectTimer = setTimeout(connectRealtime, 3000);
+            };
+        } catch {
+            realtimeSocket = null;
+            realtimeReconnectTimer = setTimeout(connectRealtime, 5000);
+        }
+    }
+
+    function handleRealtimeFrames(payload) {
+        for (const frame of payload.split(signalRRecordSeparator)) {
+            if (!frame.trim()) continue;
+            let message;
+            try { message = JSON.parse(frame); } catch { continue; }
+            if (message.type !== 1 || !message.target) continue;
+            const target = String(message.target).toLowerCase();
+            const value = Array.isArray(message.arguments) ? message.arguments[0] : null;
+            if (target === 'mentionreceived' && value) {
+                showMentionToast(value);
+                refreshIfVisible();
+            } else if (target === 'threadchanged') {
+                const threadId = value;
+                if (selectedThread && threadId === selectedThread) refreshSelectedThread(true);
+                else refreshIfVisible();
+            } else if (target === 'messagereceived' && value && selectedThread && value.threadId === selectedThread) {
+                refreshSelectedThread(true);
+            }
+        }
+    }
+
+    function invokeHub(target, args) {
+        if (!realtimeSocket || realtimeSocket.readyState !== WebSocket.OPEN) return false;
+        realtimeSocket.send(JSON.stringify({
+            type: 1,
+            invocationId: String(++realtimeInvocationId),
+            target,
+            arguments: args || []
+        }) + signalRRecordSeparator);
+        return true;
+    }
+
+    async function joinRealtimeThread(threadId, previousThread) {
+        if (previousThread && previousThread !== threadId && joinedRealtimeThread === previousThread) {
+            invokeHub('LeaveThread', [previousThread]);
+            joinedRealtimeThread = null;
+        }
+        if (joinedRealtimeThread === threadId) return;
+        if (invokeHub('JoinThread', [threadId])) joinedRealtimeThread = threadId;
     }
 
     window.openStudioWorkspaceMessages = async function(workspaceId) {
@@ -306,5 +409,6 @@
 
     installNavigation();
     startRefresh();
+    connectRealtime();
     refreshIfVisible().then(showAwayDigestOnce);
 })();
