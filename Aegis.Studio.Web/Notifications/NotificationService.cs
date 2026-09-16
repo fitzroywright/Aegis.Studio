@@ -44,11 +44,7 @@ public sealed class NotificationService
 
         foreach (StudioUserProfile profile in profiles.GetAll())
         {
-            if (!WantsEvent(profile.Messaging, eventType))
-            {
-                continue;
-            }
-
+            if (!WantsEvent(profile.Messaging, eventType)) continue;
             QueueForProfile(profile, eventType, subject, body, referenceType, referenceId);
         }
     }
@@ -58,11 +54,7 @@ public sealed class NotificationService
         StudioUserProfile? profile = profiles.GetAll().FirstOrDefault(x =>
             string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(x.DisplayName, userName, StringComparison.OrdinalIgnoreCase));
-        if (profile is null || !WantsEvent(profile.Messaging, eventType))
-        {
-            return;
-        }
-
+        if (profile is null || !WantsEvent(profile.Messaging, eventType)) return;
         QueueForProfile(profile, eventType, subject, body, referenceType, referenceId);
     }
 
@@ -81,10 +73,7 @@ public sealed class NotificationService
         command.Parameters.AddWithValue(Math.Clamp(count, 1, 500));
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<StudioNotification> values = [];
-        while (reader.Read())
-        {
-            values.Add(Read(reader));
-        }
+        while (reader.Read()) values.Add(Read(reader));
         return values;
     }
 
@@ -100,10 +89,7 @@ public sealed class NotificationService
 
     private IReadOnlyList<string>? ResolveScopedRecipients(string? referenceType, string? referenceId)
     {
-        if (string.IsNullOrWhiteSpace(referenceType) || string.IsNullOrWhiteSpace(referenceId))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(referenceType) || string.IsNullOrWhiteSpace(referenceId)) return null;
 
         HashSet<string> recipients = new(StringComparer.OrdinalIgnoreCase);
         if (referenceType.Equals("Job", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(referenceId, out Guid jobId))
@@ -158,21 +144,13 @@ public sealed class NotificationService
     {
         UserMessagingPreferences preferences = profile.Messaging;
         if (preferences.InAppEnabled)
-        {
             Insert(profile.UserName, "InApp", eventType, subject, body, referenceType, referenceId, "Delivered", null);
-        }
         if (preferences.EmailEnabled && !string.IsNullOrWhiteSpace(profile.Email))
-        {
             Insert(profile.UserName, "Email", eventType, subject, body, referenceType, referenceId, "Pending", profile.Email);
-        }
         if (preferences.SlackEnabled)
-        {
             Insert(profile.UserName, "Slack", eventType, subject, body, referenceType, referenceId, "Pending", null);
-        }
         if (preferences.TeamsEnabled)
-        {
             Insert(profile.UserName, "Teams", eventType, subject, body, referenceType, referenceId, "Pending", null);
-        }
     }
 
     private void Insert(string userName, string channel, string eventType, string subject, string body, string? referenceType, string? referenceId, string status, string? destination)
@@ -234,6 +212,7 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
     private readonly PostgreSqlExternalDeliveryStore deliveryStore;
     private readonly ExternalDeliveryProcessor processor;
     private readonly IExternalMessageChannel[] externalChannels;
+    private readonly HttpClient[] ownedHttpClients;
     private readonly ILogger<NotificationDeliveryWorker> logger;
 
     public NotificationDeliveryWorker(
@@ -261,21 +240,63 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         };
 
         ISecretProvider secrets = CommonSecretProviderFactory.Create(configuration);
-        this.externalChannels =
-        [
-            new StudioGraphEmailChannel(graph, graphOptions),
-            new StudioWebhookMessageChannel(
-                MessageChannel.Slack,
-                secrets,
-                "Notifications:SlackWebhookUrl",
-                request => new { text = $"*{request.Title}*\n{request.Body}" }),
-            new StudioWebhookMessageChannel(
+        IChannelSecretResolver secretResolver = new StudioCommonSecretsChannelSecretResolver(secrets);
+        List<IExternalMessageChannel> channels = [];
+        List<HttpClient> clients = [];
+
+        if (configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false))
+        {
+            HttpClient emailClient = new();
+            clients.Add(emailClient);
+            channels.Add(new Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphEmailMessageChannel(
+                emailClient,
+                new Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphEmailOptions
+                {
+                    TenantId = configuration["Messaging:MicrosoftGraph:TenantId"] ?? string.Empty,
+                    ClientId = configuration["Messaging:MicrosoftGraph:ClientId"] ?? string.Empty,
+                    SenderUpn = configuration["Messaging:MicrosoftGraph:Email:SenderUpn"] ?? string.Empty,
+                    ClientSecretName = configuration["Messaging:MicrosoftGraph:ClientSecretName"] ?? "messaging/msgraph/client-secret"
+                },
+                secretResolver));
+        }
+        else
+        {
+            // Preserve Studio's existing mailbox transport until the Common channel is commissioned.
+            channels.Add(new StudioGraphEmailChannel(graph, graphOptions));
+        }
+
+        channels.Add(new StudioWebhookMessageChannel(
+            MessageChannel.Slack,
+            secrets,
+            "Notifications:SlackWebhookUrl",
+            request => new { text = $"*{request.Title}*\n{request.Body}" }));
+
+        if (configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false))
+        {
+            HttpClient teamsClient = new();
+            clients.Add(teamsClient);
+            channels.Add(new Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphTeamsMessageChannel(
+                teamsClient,
+                new Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphTeamsOptions
+                {
+                    SenderUpn = configuration["Messaging:MicrosoftGraph:Teams:SenderUpn"] ?? string.Empty,
+                    DelegatedAccessTokenSecretName = configuration["Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"]
+                        ?? "messaging/msgraph/teams/delegated-access-token"
+                },
+                secretResolver));
+        }
+        else
+        {
+            // Preserve the existing webhook Teams transport until Graph Teams is commissioned.
+            channels.Add(new StudioWebhookMessageChannel(
                 MessageChannel.MsTeams,
                 secrets,
                 "Notifications:TeamsWebhookUrl",
-                request => new { text = $"**{request.Title}**\n\n{request.Body}" })
-        ];
+                request => new { text = $"**{request.Title}**\n\n{request.Body}" }));
+        }
 
+        this.externalChannels = channels.ToArray();
+        this.ownedHttpClients = clients.ToArray();
         this.deliveryStore = new PostgreSqlExternalDeliveryStore(connectionString, deliveryOptions, QueueName);
         ExternalDeliveryDispatcher dispatcher = new(
             this.externalChannels,
@@ -287,7 +308,6 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Task processorTask = this.processor.RunAsync(stoppingToken);
-
         try
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -295,10 +315,7 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
                 try
                 {
                     ReconcileDeliveryState();
-                    foreach (PendingNotification item in GetPending())
-                    {
-                        await QueueAsync(item, stoppingToken);
-                    }
+                    foreach (PendingNotification item in GetPending()) await QueueAsync(item, stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -314,13 +331,8 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         }
         finally
         {
-            try
-            {
-                await processorTask;
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-            }
+            try { await processorTask; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
         }
     }
 
@@ -451,13 +463,17 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
 
     public async ValueTask DisposeAsync()
     {
-        foreach (IDisposable disposable in this.externalChannels.OfType<IDisposable>())
-        {
-            disposable.Dispose();
-        }
+        foreach (IDisposable disposable in this.externalChannels.OfType<IDisposable>()) disposable.Dispose();
+        foreach (HttpClient client in this.ownedHttpClients) client.Dispose();
         await this.deliveryStore.DisposeAsync();
         base.Dispose();
     }
+}
+
+internal sealed class StudioCommonSecretsChannelSecretResolver(ISecretProvider secrets) : IChannelSecretResolver
+{
+    public Task<string?> GetSecretAsync(string secretName, CancellationToken cancellationToken = default)
+        => secrets.GetAsync(secretName, cancellationToken);
 }
 
 public sealed record StudioNotification(Guid Id, string UserName, string Channel, string EventType, string Subject, string Body, string? ReferenceType, string? ReferenceId, string Status, int Attempts, string? LastError, DateTimeOffset CreatedAtUtc, DateTimeOffset? DeliveredAtUtc);
