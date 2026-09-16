@@ -8,6 +8,7 @@ using Aegis.Studio.Web.Authentication;
 using Aegis.Studio.Web.Bookings;
 using Aegis.Studio.Web.Configuration;
 using Aegis.Studio.Web.Email;
+using Aegis.Studio.Web.Messaging;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
@@ -26,6 +27,7 @@ using Npgsql;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddSignalR();
 
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
 builder.Services.AddSingleton(secretProvider);
@@ -36,6 +38,7 @@ NpgsqlDataSource dataSource = NpgsqlDataSource.Create(studioConnectionString);
 builder.Services.AddSingleton(dataSource);
 builder.Services.AddSingleton<StudioDatabase>();
 builder.Services.AddSingleton<StudioFeatureDatabase>();
+builder.Services.AddSingleton<StudioMessagingDatabase>();
 
 MicrosoftGraphEmailOptions graphEmailOptions = builder.Configuration.GetSection("MicrosoftGraphEmail").Get<MicrosoftGraphEmailOptions>() ?? new MicrosoftGraphEmailOptions();
 ActiveDirectoryAuthenticationOptions activeDirectoryOptions = builder.Configuration.GetSection("Authentication:ActiveDirectory").Get<ActiveDirectoryAuthenticationOptions>() ?? throw new InvalidOperationException("Authentication:ActiveDirectory must be configured.");
@@ -53,6 +56,7 @@ builder.Services.AddSingleton<StudioStore>();
 builder.Services.AddSingleton<BookingStore>();
 builder.Services.AddSingleton<BookingApiAuthenticator>();
 builder.Services.AddSingleton<UserProfileStore>();
+builder.Services.AddSingleton<StudioInAppMessageStore>();
 builder.Services.AddSingleton<NotificationService>();
 builder.Services.AddSingleton<JobEventNotifier>();
 builder.Services.AddSingleton<ScheduleStore>();
@@ -72,6 +76,7 @@ builder.Services.AddHostedService<ConfigurationContractPublisher>();
 WebApplication app = builder.Build();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioFeatureDatabase>().InitializeAsync();
+await app.Services.GetRequiredService<StudioMessagingDatabase>().InitializeAsync();
 
 app.UseAuthentication();
 app.Use(async (context, next) => { bool document = context.Request.Path == "/" || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase); if (document && context.User.Identity?.IsAuthenticated != true) { context.Response.Redirect("/login"); return; } await next(); });
@@ -82,6 +87,7 @@ app.MapGet("/", (IWebHostEnvironment e) => Results.File(Path.Combine(e.WebRootPa
 app.MapStudioAuthentication();
 app.MapStudioUserProfiles();
 app.MapStudioNotifications();
+app.MapStudioInAppMessaging();
 app.MapStudioScheduling();
 app.MapStudioProduction();
 app.MapWorkspaceAccess();
