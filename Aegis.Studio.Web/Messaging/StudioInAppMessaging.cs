@@ -9,6 +9,13 @@ namespace Aegis.Studio.Web.Messaging;
 
 public sealed class StudioMessageHub : Hub
 {
+    private readonly StudioInAppMessageStore store;
+
+    public StudioMessageHub(StudioInAppMessageStore store)
+    {
+        this.store = store;
+    }
+
     public override async Task OnConnectedAsync()
     {
         string userName = Context.User?.FindFirstValue("login_name") ?? Context.User?.Identity?.Name ?? string.Empty;
@@ -16,7 +23,12 @@ public sealed class StudioMessageHub : Hub
         await base.OnConnectedAsync();
     }
 
-    public Task JoinThread(Guid threadId) => Groups.AddToGroupAsync(Context.ConnectionId, ThreadGroup(threadId));
+    public async Task JoinThread(Guid threadId)
+    {
+        store.AssertThreadAccess(threadId, Context.User ?? throw new HubException("Authentication is required."));
+        await Groups.AddToGroupAsync(Context.ConnectionId, ThreadGroup(threadId));
+    }
+
     public Task LeaveThread(Guid threadId) => Groups.RemoveFromGroupAsync(Context.ConnectionId, ThreadGroup(threadId));
 
     internal static string UserGroup(string userName) => $"user:{userName.Trim().ToLowerInvariant()}";
@@ -145,7 +157,7 @@ public sealed class StudioInAppMessageStore
 
     public IReadOnlyList<StudioInAppMessage> GetMessages(Guid threadId, ClaimsPrincipal user, int count = 100)
     {
-        EnsureThreadAccess(threadId, user);
+        AssertThreadAccess(threadId, user);
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = "select id,thread_id,sender_user_name,body,created_at_utc from studio_inapp_messages where thread_id=$1 order by created_at_utc desc limit $2";
@@ -159,7 +171,7 @@ public sealed class StudioInAppMessageStore
 
     public StudioInAppMessage AddMessage(Guid threadId, ClaimsPrincipal user, string body)
     {
-        EnsureThreadAccess(threadId, user);
+        AssertThreadAccess(threadId, user);
         string current = CurrentUser(user);
         string text = body.Trim();
         if (string.IsNullOrWhiteSpace(text)) throw new InvalidOperationException("Message body is required.");
@@ -175,7 +187,7 @@ public sealed class StudioInAppMessageStore
 
     public void MarkRead(Guid threadId, ClaimsPrincipal user)
     {
-        EnsureThreadAccess(threadId, user);
+        AssertThreadAccess(threadId, user);
         string current = CurrentUser(user);
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -195,7 +207,7 @@ public sealed class StudioInAppMessageStore
         return users;
     }
 
-    private void EnsureThreadAccess(Guid threadId, ClaimsPrincipal user)
+    public void AssertThreadAccess(Guid threadId, ClaimsPrincipal user)
     {
         string current = CurrentUser(user);
         using NpgsqlConnection connection = database.OpenConnection();
