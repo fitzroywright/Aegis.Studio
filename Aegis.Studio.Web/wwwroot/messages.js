@@ -54,15 +54,48 @@
     }
 
     async function startDirect() {
-        const userName = prompt('Studio user name');
-        if (!userName) return;
-        const thread = await json('/api/messages/threads/direct', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userName })
-        });
-        await loadThreads();
-        await openThread(thread.id);
+        const users = await json('/api/messages/users');
+        if (!users.length) {
+            alert('No other Studio users are available for direct messaging yet.');
+            return;
+        }
+
+        let dialog = document.getElementById('directMessageDialog');
+        if (!dialog) {
+            dialog = document.createElement('dialog');
+            dialog.id = 'directMessageDialog';
+            dialog.className = 'direct-message-dialog';
+            document.body.appendChild(dialog);
+        }
+
+        dialog.innerHTML = `
+            <form method="dialog" class="direct-message-form">
+                <div class="message-dialog-heading"><div><h2>New message</h2><p>Start a private Studio conversation.</p></div><button type="button" class="message-dialog-close" aria-label="Close">×</button></div>
+                <label>Studio user
+                    <select id="directMessageUser" required>
+                        ${users.map(user => `<option value="${esc(user.userName)}">${esc(user.displayName || user.userName)}${user.displayName && user.displayName !== user.userName ? ` · ${esc(user.userName)}` : ''}</option>`).join('')}
+                    </select>
+                </label>
+                <div class="dialog-actions"><button type="button" class="direct-message-cancel">Cancel</button><button type="submit" class="primary">Open conversation</button></div>
+            </form>`;
+
+        const close = () => dialog.close();
+        dialog.querySelector('.message-dialog-close').onclick = close;
+        dialog.querySelector('.direct-message-cancel').onclick = close;
+        dialog.querySelector('form').onsubmit = async event => {
+            event.preventDefault();
+            const userName = document.getElementById('directMessageUser').value;
+            if (!userName) return;
+            const thread = await json('/api/messages/threads/direct', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userName })
+            });
+            dialog.close();
+            await loadThreads();
+            await openThread(thread.id);
+        };
+        dialog.showModal();
     }
 
     async function openWorkspaceThread() {
