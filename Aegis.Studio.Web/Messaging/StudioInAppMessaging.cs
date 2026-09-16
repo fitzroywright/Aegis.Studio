@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Text.RegularExpressions;
+using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Profiles;
@@ -26,10 +28,13 @@ public sealed class StudioMessageHub : Hub
     public async Task JoinThread(Guid threadId)
     {
         store.AssertThreadAccess(threadId, Context.User ?? throw new HubException("Authentication is required."));
+        await Groups.AddToGroupAsync(Context.ConnectionId, UserGroup(CurrentUser()));
         await Groups.AddToGroupAsync(Context.ConnectionId, ThreadGroup(threadId));
     }
 
     public Task LeaveThread(Guid threadId) => Groups.RemoveFromGroupAsync(Context.ConnectionId, ThreadGroup(threadId));
+
+    private string CurrentUser() => Context.User?.FindFirstValue("login_name") ?? Context.User?.Identity?.Name ?? throw new HubException("Authentication is required.");
 
     internal static string UserGroup(string userName) => $"user:{userName.Trim().ToLowerInvariant()}";
     internal static string ThreadGroup(Guid threadId) => $"thread:{threadId:D}";
@@ -190,6 +195,18 @@ public sealed class StudioInAppMessageStore
         return message;
     }
 
+    public IReadOnlyList<string> ResolveMentionedParticipants(Guid threadId, string senderUserName, string body)
+    {
+        List<string> mentioned = [];
+        foreach (string participant in GetThreadParticipants(threadId))
+        {
+            if (string.Equals(participant, senderUserName, StringComparison.OrdinalIgnoreCase)) continue;
+            string pattern = $@"(?<!\S)@{Regex.Escape(participant)}(?=$|\s|[.,!?;:)\]])";
+            if (Regex.IsMatch(body, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) mentioned.Add(participant);
+        }
+        return mentioned.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
     public void MarkRead(Guid threadId, ClaimsPrincipal user)
     {
         AssertThreadAccess(threadId, user);
@@ -297,11 +314,31 @@ public static class StudioInAppMessagingEndpoints
         group.MapPost("/threads/direct", (StartDirectMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.CreateDirect(user, request.UserName))));
         group.MapPost("/threads/{scopeType}/{scopeId:guid}", (string scopeType, Guid scopeId, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetOrCreateScoped(user, scopeType, scopeId))));
         group.MapGet("/threads/{threadId:guid}", (Guid threadId, int? count, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetMessages(threadId, user, count ?? 100))));
-        group.MapPost("/threads/{threadId:guid}", async (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, IHubContext<StudioMessageHub> hub) =>
+        group.MapPost("/threads/{threadId:guid}", async (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, NotificationService notifications, IHubContext<StudioMessageHub> hub) =>
         {
             try
             {
                 StudioInAppMessage message = store.AddMessage(threadId, user, request.Body);
+                IReadOnlyList<string> mentionedUsers = store.ResolveMentionedParticipants(threadId, message.SenderUserName, message.Body);
+                foreach (string mentionedUser in mentionedUsers)
+                {
+                    notifications.PublishToUser(
+                        mentionedUser,
+                        "Mention",
+                        $"{message.SenderUserName} mentioned you",
+                        message.Body,
+                        "MessageThread",
+                        threadId.ToString("D"));
+                    await hub.Clients.Group(StudioMessageHub.UserGroup(mentionedUser)).SendAsync("mentionReceived", new
+                    {
+                        threadId,
+                        messageId = message.Id,
+                        senderUserName = message.SenderUserName,
+                        body = message.Body,
+                        createdAtUtc = message.CreatedAtUtc
+                    });
+                }
+
                 await hub.Clients.Group(StudioMessageHub.ThreadGroup(threadId)).SendAsync("messageReceived", message);
                 foreach (string participant in store.GetThreadParticipants(threadId))
                     await hub.Clients.Group(StudioMessageHub.UserGroup(participant)).SendAsync("threadChanged", threadId);
