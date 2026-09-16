@@ -63,7 +63,12 @@ public sealed class StudioInAppMessageStore
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
-            select t.id,t.scope_type,t.scope_id,t.title,t.created_by,t.created_at_utc,
+            select t.id,t.scope_type,t.scope_id,
+                   case when t.scope_type='Direct' then coalesce(
+                       (select dm.user_name from studio_message_thread_members dm where dm.thread_id=t.id and lower(dm.user_name)<>lower($1) order by dm.user_name limit 1),
+                       t.title)
+                   else t.title end as display_title,
+                   t.created_by,t.created_at_utc,
                    max(m.created_at_utc) as last_message_at,
                    count(m.id) filter (where m.created_at_utc > coalesce(r.last_read_at_utc,'epoch'::timestamptz) and lower(m.sender_user_name)<>lower($1)) as unread_count
             from studio_message_threads t
@@ -108,7 +113,7 @@ public sealed class StudioInAppMessageStore
         using NpgsqlDataReader reader = existing.ExecuteReader();
         if (reader.Read())
         {
-            StudioMessageThread found = new(reader.GetGuid(0), "Direct", null, reader.GetString(1), reader.GetString(2), reader.GetFieldValue<DateTimeOffset>(3));
+            StudioMessageThread found = new(reader.GetGuid(0), "Direct", null, other, reader.GetString(2), reader.GetFieldValue<DateTimeOffset>(3));
             reader.Close();
             transaction.Commit();
             return found;
@@ -195,16 +200,43 @@ public sealed class StudioInAppMessageStore
         command.Parameters.AddWithValue(threadId); command.Parameters.AddWithValue(current); command.ExecuteNonQuery();
     }
 
-    public IReadOnlyList<string> GetDirectParticipants(Guid threadId)
+    public IReadOnlyList<string> GetThreadParticipants(Guid threadId)
     {
         using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand scope = connection.CreateCommand();
+        scope.CommandText = "select scope_type,scope_id from studio_message_threads where id=$1";
+        scope.Parameters.AddWithValue(threadId);
+        using NpgsqlDataReader scopeReader = scope.ExecuteReader();
+        if (!scopeReader.Read()) return [];
+        string scopeType = scopeReader.GetString(0);
+        Guid? scopeId = scopeReader.IsDBNull(1) ? null : scopeReader.GetGuid(1);
+        scopeReader.Close();
+
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select user_name from studio_message_thread_members where thread_id=$1";
-        command.Parameters.AddWithValue(threadId);
+        if (scopeType == "Direct")
+        {
+            command.CommandText = "select user_name from studio_message_thread_members where thread_id=$1 order by user_name";
+            command.Parameters.AddWithValue(threadId);
+        }
+        else if (scopeType == "Workspace" && scopeId.HasValue)
+        {
+            command.CommandText = "select user_name from studio_workspace_members where workspace_id=$1 and is_active order by user_name";
+            command.Parameters.AddWithValue(scopeId.Value);
+        }
+        else if (scopeType == "Job" && scopeId.HasValue)
+        {
+            command.CommandText = "select user_name from studio_job_members where job_id=$1 and is_active order by user_name";
+            command.Parameters.AddWithValue(scopeId.Value);
+        }
+        else
+        {
+            return [];
+        }
+
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<string> users = [];
         while (reader.Read()) users.Add(reader.GetString(0));
-        return users;
+        return users.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     public void AssertThreadAccess(Guid threadId, ClaimsPrincipal user)
@@ -254,6 +286,14 @@ public static class StudioInAppMessagingEndpoints
     {
         RouteGroupBuilder group = app.MapGroup("/api/messages").RequireAuthorization();
         group.MapGet("/threads", (ClaimsPrincipal user, StudioInAppMessageStore store) => Results.Ok(store.GetThreads(user)));
+        group.MapGet("/users", (ClaimsPrincipal user, UserProfileStore profiles) =>
+        {
+            string current = user.FindFirstValue("login_name") ?? user.Identity?.Name ?? string.Empty;
+            return Results.Ok(profiles.GetAll()
+                .Where(x => !string.Equals(x.UserName, current, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(x => x.DisplayName)
+                .Select(x => new StudioMessageUser(x.UserName, x.DisplayName)));
+        });
         group.MapPost("/threads/direct", (StartDirectMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.CreateDirect(user, request.UserName))));
         group.MapPost("/threads/{scopeType}/{scopeId:guid}", (string scopeType, Guid scopeId, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetOrCreateScoped(user, scopeType, scopeId))));
         group.MapGet("/threads/{threadId:guid}", (Guid threadId, int? count, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetMessages(threadId, user, count ?? 100))));
@@ -263,7 +303,7 @@ public static class StudioInAppMessagingEndpoints
             {
                 StudioInAppMessage message = store.AddMessage(threadId, user, request.Body);
                 await hub.Clients.Group(StudioMessageHub.ThreadGroup(threadId)).SendAsync("messageReceived", message);
-                foreach (string participant in store.GetDirectParticipants(threadId))
+                foreach (string participant in store.GetThreadParticipants(threadId))
                     await hub.Clients.Group(StudioMessageHub.UserGroup(participant)).SendAsync("threadChanged", threadId);
                 return Results.Ok(message);
             }
@@ -287,5 +327,6 @@ public static class StudioInAppMessagingEndpoints
 public sealed record StudioMessageThread(Guid Id, string ScopeType, Guid? ScopeId, string Title, string CreatedBy, DateTimeOffset CreatedAtUtc);
 public sealed record StudioMessageThreadSummary(Guid Id, string ScopeType, Guid? ScopeId, string Title, string CreatedBy, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastMessageAtUtc, long UnreadCount);
 public sealed record StudioInAppMessage(Guid Id, Guid ThreadId, string SenderUserName, string Body, DateTimeOffset CreatedAtUtc);
+public sealed record StudioMessageUser(string UserName, string DisplayName);
 public sealed record StartDirectMessageRequest(string UserName);
 public sealed record SendStudioMessageRequest(string Body);
