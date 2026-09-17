@@ -4,25 +4,25 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Aegis.Studio.Application.EmailRouting;
 using Common.Secrets;
-using Microsoft.Extensions.Configuration;
 
 namespace Aegis.Studio.Infrastructure.Email;
 
 public sealed class MicrosoftGraphEmailClient
 {
+    public const string ClientSecretName = "Studio:MicrosoftGraphEmail:ClientSecret";
+
     private readonly MicrosoftGraphEmailOptions options;
     private readonly string? clientSecret;
     private readonly HttpClient httpClient;
 
-    public MicrosoftGraphEmailClient(MicrosoftGraphEmailOptions options, IConfiguration configuration)
+    public MicrosoftGraphEmailClient(MicrosoftGraphEmailOptions options, ISecretProvider secretProvider)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(secretProvider);
 
         this.options = options;
-        ISecretProvider secretProvider = CommonSecretProviderFactory.Create(configuration);
         clientSecret = secretProvider
-            .GetAsync("MicrosoftGraphEmail:ClientSecret")
+            .GetAsync(ClientSecretName)
             .GetAwaiter()
             .GetResult();
         httpClient = new HttpClient();
