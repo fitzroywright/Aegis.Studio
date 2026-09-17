@@ -28,19 +28,9 @@ public sealed class ConfigurationContractPublisher(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (await TryPublishAsync(baseUrl, path, stoppingToken))
-            {
-                return;
-            }
-
-            try
-            {
-                await Task.Delay(RetryDelay, stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
-            }
+            if (await TryPublishAsync(baseUrl, path, stoppingToken)) return;
+            try { await Task.Delay(RetryDelay, stoppingToken); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
         }
     }
 
@@ -63,10 +53,7 @@ public sealed class ConfigurationContractPublisher(
 
             JsonNode contractNode = JsonNode.Parse(await File.ReadAllTextAsync(path, cancellationToken))
                 ?? throw new InvalidDataException("Configuration contract is empty.");
-            if (contractNode is not JsonObject contract)
-            {
-                throw new InvalidDataException("Configuration contract must be a JSON object.");
-            }
+            if (contractNode is not JsonObject contract) throw new InvalidDataException("Configuration contract must be a JSON object.");
 
             contract["version"] = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
             contract["siteId"] = NullIfBlank(configuration["Site:Id"]);
@@ -74,38 +61,34 @@ public sealed class ConfigurationContractPublisher(
 
             bool databaseConfigured = HasValue(await secrets.GetAsync("ConnectionStrings:Studio", cancellationToken));
             bool graphSecretConfigured = HasValue(await secrets.GetAsync("Studio:MicrosoftGraphEmail:ClientSecret", cancellationToken));
-            bool messagingGraphSecretConfigured = HasValue(await secrets.GetAsync("messaging/msgraph/client-secret", cancellationToken));
-            bool messagingTeamsTokenConfigured = HasValue(await secrets.GetAsync("messaging/msgraph/teams/delegated-access-token", cancellationToken));
+            bool messagingGraphSecretConfigured = HasValue(await secrets.GetAsync(configuration["Messaging:MicrosoftGraph:ClientSecretName"] ?? "messaging/msgraph/client-secret", cancellationToken));
+            bool messagingTeamsTokenConfigured = HasValue(await secrets.GetAsync(configuration["Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"] ?? "messaging/msgraph/teams/delegated-access-token", cancellationToken));
+            bool graphEmailEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
+            bool graphTeamsEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false);
 
             JsonArray requirements = contract["requirements"] as JsonArray
                 ?? throw new InvalidDataException("Configuration contract has no requirements array.");
 
             foreach (JsonNode? node in requirements)
             {
-                if (node is not JsonObject requirement)
-                {
-                    continue;
-                }
+                if (node is not JsonObject requirement) continue;
 
                 string id = requirement["id"]?.GetValue<string>() ?? string.Empty;
-                requirement["isConfigured"] = id switch
+                bool configured = id switch
                 {
                     "database" => databaseConfigured,
                     "graph-tenant" => HasValue(configuration["MicrosoftGraphEmail:TenantId"]),
                     "graph-client" => HasValue(configuration["MicrosoftGraphEmail:ClientId"]),
                     "graph-client-secret" => graphSecretConfigured,
                     "graph-mailbox" => HasValue(configuration["MicrosoftGraphEmail:Mailbox"]),
-                    "messaging-graph-tenant" => HasValue(configuration["Messaging:MicrosoftGraph:TenantId"]),
-                    "messaging-graph-client" => HasValue(configuration["Messaging:MicrosoftGraph:ClientId"]),
-                    "messaging-graph-client-secret" => messagingGraphSecretConfigured,
-                    "messaging-graph-email-enabled" => true,
-                    "messaging-graph-email-sender" => !configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false)
-                        || HasValue(configuration["Messaging:MicrosoftGraph:Email:SenderUpn"]),
-                    "messaging-graph-teams-enabled" => true,
-                    "messaging-graph-teams-sender" => !configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false)
-                        || HasValue(configuration["Messaging:MicrosoftGraph:Teams:SenderUpn"]),
-                    "messaging-graph-teams-token" => !configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false)
-                        || messagingTeamsTokenConfigured,
+                    "messaging-graph-tenant" => !graphEmailEnabled || HasValue(configuration["Messaging:MicrosoftGraph:TenantId"]),
+                    "messaging-graph-client" => !graphEmailEnabled || HasValue(configuration["Messaging:MicrosoftGraph:ClientId"]),
+                    "messaging-graph-client-secret" => !graphEmailEnabled || messagingGraphSecretConfigured,
+                    "messaging-graph-email-enabled" => graphEmailEnabled,
+                    "messaging-graph-email-sender" => !graphEmailEnabled || HasValue(configuration["Messaging:MicrosoftGraph:Email:SenderUpn"]),
+                    "messaging-graph-teams-enabled" => graphTeamsEnabled,
+                    "messaging-graph-teams-sender" => !graphTeamsEnabled || HasValue(configuration["Messaging:MicrosoftGraph:Teams:SenderUpn"]),
+                    "messaging-graph-teams-token" => !graphTeamsEnabled || messagingTeamsTokenConfigured,
                     "attachments-storage" => HasValue(configuration["Storage:AttachmentsPath"]),
                     "gallery-storage" => HasValue(configuration["Storage:GalleriesPath"]),
                     "media-archive" => HasValue(configuration["Storage:MediaArchivePath"]),
@@ -113,6 +96,10 @@ public sealed class ConfigurationContractPublisher(
                     "service-identity" => HasValue(configuration["Service:Identity"]),
                     _ => false
                 };
+                requirement["isConfigured"] = configured;
+                requirement["configurationState"] = configured ? "Configured" : "Missing";
+                requirement["effectiveValueAvailable"] = configured;
+                requirement["verificationStatus"] = configured ? "PASS" : "Not commissioned";
             }
 
             using HttpClient client = new();
@@ -132,10 +119,7 @@ public sealed class ConfigurationContractPublisher(
             logger.LogInformation("Aegis.Studio configuration requirements and configured state registered with Aegis.Configuration with HTTP {StatusCode}.", (int?)result.StatusCode);
             return true;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception)
         {
             logger.LogWarning(exception, "Unable to publish Aegis.Studio configuration requirements; Studio remains operational and will retry publication.");
@@ -144,6 +128,5 @@ public sealed class ConfigurationContractPublisher(
     }
 
     private static bool HasValue(string? value) => !string.IsNullOrWhiteSpace(value);
-
     private static string? NullIfBlank(string? value) => HasValue(value) ? value : null;
 }
