@@ -54,10 +54,10 @@ public sealed class ConfigurationContractPublisher(
                 return false;
             }
 
-            string? key = await secrets.GetAsync($"configuration/registration/{ApplicationId}", cancellationToken);
+            string? key = await secrets.GetAsync(RegistrationCredentialResolver.SecretNameFor(ApplicationId), cancellationToken);
             if (string.IsNullOrWhiteSpace(key))
             {
-                logger.LogWarning("Aegis.Configuration registration credential is unavailable; Studio remains operational and will retry publication.");
+                logger.LogWarning("Aegis.Configuration registration credential is unavailable through Common.Secrets; Studio remains operational and will retry publication.");
                 return false;
             }
 
@@ -72,15 +72,10 @@ public sealed class ConfigurationContractPublisher(
             contract["siteId"] = NullIfBlank(configuration["Site:Id"]);
             contract["instanceId"] = NullIfBlank(configuration["Service:Identity"]);
 
-            bool databaseConfigured = HasValue(await secrets.GetAsync("ConnectionStrings:Studio", cancellationToken))
-                || HasNonPlaceholderValue(configuration.GetConnectionString("Studio"));
+            bool databaseConfigured = HasValue(await secrets.GetAsync("ConnectionStrings:Studio", cancellationToken));
             bool graphSecretConfigured = HasValue(await secrets.GetAsync("Studio:MicrosoftGraphEmail:ClientSecret", cancellationToken));
-            bool openBaoCredentialsConfigured = HasAnyValue(
-                configuration["Secrets:OpenBao:Token"],
-                configuration["OpenBao:Token"],
-                configuration["Secrets:OpenBao:RoleId"],
-                Environment.GetEnvironmentVariable("OPENBAO_TOKEN"),
-                Environment.GetEnvironmentVariable("VAULT_TOKEN"));
+            bool messagingGraphSecretConfigured = HasValue(await secrets.GetAsync("messaging/msgraph/client-secret", cancellationToken));
+            bool messagingTeamsTokenConfigured = HasValue(await secrets.GetAsync("messaging/msgraph/teams/delegated-access-token", cancellationToken));
 
             JsonArray requirements = contract["requirements"] as JsonArray
                 ?? throw new InvalidDataException("Configuration contract has no requirements array.");
@@ -100,15 +95,20 @@ public sealed class ConfigurationContractPublisher(
                     "graph-client" => HasValue(configuration["MicrosoftGraphEmail:ClientId"]),
                     "graph-client-secret" => graphSecretConfigured,
                     "graph-mailbox" => HasValue(configuration["MicrosoftGraphEmail:Mailbox"]),
+                    "messaging-graph-tenant" => HasValue(configuration["Messaging:MicrosoftGraph:TenantId"]),
+                    "messaging-graph-client" => HasValue(configuration["Messaging:MicrosoftGraph:ClientId"]),
+                    "messaging-graph-client-secret" => messagingGraphSecretConfigured,
+                    "messaging-graph-email-enabled" => true,
+                    "messaging-graph-email-sender" => !configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false)
+                        || HasValue(configuration["Messaging:MicrosoftGraph:Email:SenderUpn"]),
+                    "messaging-graph-teams-enabled" => true,
+                    "messaging-graph-teams-sender" => !configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false)
+                        || HasValue(configuration["Messaging:MicrosoftGraph:Teams:SenderUpn"]),
+                    "messaging-graph-teams-token" => !configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false)
+                        || messagingTeamsTokenConfigured,
                     "attachments-storage" => HasValue(configuration["Storage:AttachmentsPath"]),
                     "gallery-storage" => HasValue(configuration["Storage:GalleriesPath"]),
                     "media-archive" => HasValue(configuration["Storage:MediaArchivePath"]),
-                    "openbao-url" => HasAnyValue(
-                        configuration["Secrets:OpenBao:Address"],
-                        configuration["OpenBao:Address"],
-                        Environment.GetEnvironmentVariable("OPENBAO_ADDR"),
-                        Environment.GetEnvironmentVariable("VAULT_ADDR")),
-                    "openbao-credentials" => openBaoCredentialsConfigured,
                     "site-id" => HasValue(configuration["Site:Id"]),
                     "service-identity" => HasValue(configuration["Service:Identity"]),
                     _ => false
@@ -144,13 +144,6 @@ public sealed class ConfigurationContractPublisher(
     }
 
     private static bool HasValue(string? value) => !string.IsNullOrWhiteSpace(value);
-
-    private static bool HasAnyValue(params string?[] values) => values.Any(HasValue);
-
-    private static bool HasNonPlaceholderValue(string? value) =>
-        value is not null
-        && !string.IsNullOrWhiteSpace(value)
-        && !value.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase);
 
     private static string? NullIfBlank(string? value) => HasValue(value) ? value : null;
 }
