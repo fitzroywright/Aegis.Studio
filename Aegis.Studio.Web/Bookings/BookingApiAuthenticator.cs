@@ -39,8 +39,8 @@ public sealed class BookingApiAuthenticator
             return false;
         }
 
-        string secretName = $"BookingApi:Clients:{clientId}:Secret";
-        string? secret = secretProvider.GetAsync(secretName).GetAwaiter().GetResult();
+        string secretName = SecretNameFor(clientId);
+        string? secret = ResolveSecret(secretName);
         if (string.IsNullOrWhiteSpace(secret))
         {
             return false;
@@ -83,10 +83,31 @@ public sealed class BookingApiAuthenticator
 
     public BookingApiSecurityStatus GetStatus()
     {
-        IConfigurationSection clients = configuration.GetSection("BookingApi:Clients");
-        int configuredClients = clients.GetChildren().Count();
+        string[] clientIds = configuration
+            .GetSection("BookingApi:Clients")
+            .GetChildren()
+            .Select(client => client.Key)
+            .Where(clientId => !string.IsNullOrWhiteSpace(clientId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        int configuredClients = clientIds.Count(clientId => !string.IsNullOrWhiteSpace(ResolveSecret(SecretNameFor(clientId))));
         return new BookingApiSecurityStatus(configuredClients, configuredClients > 0, "HMAC-SHA256", 300);
     }
+
+    private string? ResolveSecret(string name)
+    {
+        try
+        {
+            return secretProvider.GetAsync(name).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string SecretNameFor(string clientId) => $"BookingApi:Clients:{clientId}:Secret";
 
     private bool TryConsumeNonce(string clientId, string nonce)
     {
