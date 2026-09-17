@@ -14,10 +14,13 @@ public sealed class BookingApiAuthenticator
     private readonly ISecretProvider secretProvider;
     private readonly StudioDatabase database;
 
-    public BookingApiAuthenticator(IConfiguration configuration, StudioDatabase database)
+    public BookingApiAuthenticator(
+        IConfiguration configuration,
+        ISecretProvider secretProvider,
+        StudioDatabase database)
     {
         this.configuration = configuration;
-        this.secretProvider = CommonSecretProviderFactory.Create(configuration);
+        this.secretProvider = secretProvider;
         this.database = database;
     }
 
