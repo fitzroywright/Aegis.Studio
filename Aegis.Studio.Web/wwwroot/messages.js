@@ -9,6 +9,7 @@
     let realtimeSocket = null;
     let realtimeReconnectTimer = null;
     let realtimeInvocationId = 0;
+    let realtimeHandshakeComplete = false;
     let joinedRealtimeThread = null;
     let recentMentionThread = null;
     let recentMentionAt = 0;
@@ -336,20 +337,21 @@
             const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
             const socket = new WebSocket(`${scheme}//${location.host}/hubs/messages?id=${encodeURIComponent(token)}`);
             realtimeSocket = socket;
+            realtimeHandshakeComplete = false;
             socket.onopen = () => {
                 socket.send(JSON.stringify({ protocol: 'json', version: 1 }) + signalRRecordSeparator);
-                joinedRealtimeThread = null;
-                if (selectedThread) joinRealtimeThread(selectedThread, null);
             };
             socket.onmessage = event => handleRealtimeFrames(String(event.data || ''));
             socket.onerror = () => { try { socket.close(); } catch { } };
             socket.onclose = () => {
                 if (realtimeSocket === socket) realtimeSocket = null;
+                realtimeHandshakeComplete = false;
                 joinedRealtimeThread = null;
                 realtimeReconnectTimer = setTimeout(connectRealtime, 3000);
             };
         } catch {
             realtimeSocket = null;
+            realtimeHandshakeComplete = false;
             realtimeReconnectTimer = setTimeout(connectRealtime, 5000);
         }
     }
@@ -359,6 +361,21 @@
             if (!frame.trim()) continue;
             let message;
             try { message = JSON.parse(frame); } catch { continue; }
+
+            if (!realtimeHandshakeComplete) {
+                if (message.error) {
+                    try { realtimeSocket?.close(); } catch { }
+                    return;
+                }
+                if (message.type === undefined) {
+                    realtimeHandshakeComplete = true;
+                    joinedRealtimeThread = null;
+                    if (selectedThread) joinRealtimeThread(selectedThread, null);
+                    continue;
+                }
+                continue;
+            }
+
             if (message.type !== 1 || !message.target) continue;
             const target = String(message.target).toLowerCase();
             const value = Array.isArray(message.arguments) ? message.arguments[0] : null;
@@ -376,7 +393,7 @@
     }
 
     function invokeHub(target, args) {
-        if (!realtimeSocket || realtimeSocket.readyState !== WebSocket.OPEN) return false;
+        if (!realtimeSocket || realtimeSocket.readyState !== WebSocket.OPEN || !realtimeHandshakeComplete) return false;
         realtimeSocket.send(JSON.stringify({
             type: 1,
             invocationId: String(++realtimeInvocationId),
