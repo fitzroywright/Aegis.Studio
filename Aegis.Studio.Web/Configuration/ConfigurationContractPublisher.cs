@@ -61,10 +61,10 @@ public sealed class ConfigurationContractPublisher(
 
             bool databaseConfigured = HasValue(await secrets.GetAsync("ConnectionStrings:Studio", cancellationToken));
             bool graphSecretConfigured = HasValue(await secrets.GetAsync("Studio:MicrosoftGraphEmail:ClientSecret", cancellationToken));
-            bool messagingGraphSecretConfigured = HasValue(await secrets.GetAsync(configuration["Messaging:MicrosoftGraph:ClientSecretName"] ?? "messaging/msgraph/client-secret", cancellationToken));
-            bool messagingTeamsTokenConfigured = HasValue(await secrets.GetAsync(configuration["Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"] ?? "messaging/msgraph/teams/delegated-access-token", cancellationToken));
             bool graphEmailEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
             bool graphTeamsEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false);
+            bool messagingGraphSecretConfigured = !graphEmailEnabled || HasValue(await secrets.GetAsync(configuration["Messaging:MicrosoftGraph:ClientSecretName"] ?? "messaging/msgraph/client-secret", cancellationToken));
+            bool messagingTeamsTokenConfigured = !graphTeamsEnabled || HasValue(await secrets.GetAsync(configuration["Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"] ?? "messaging/msgraph/teams/delegated-access-token", cancellationToken));
 
             JsonArray requirements = contract["requirements"] as JsonArray
                 ?? throw new InvalidDataException("Configuration contract has no requirements array.");
@@ -74,36 +74,38 @@ public sealed class ConfigurationContractPublisher(
                 if (node is not JsonObject requirement) continue;
 
                 string id = requirement["id"]?.GetValue<string>() ?? string.Empty;
-                bool configured = id switch
+                bool required = requirement["required"]?.GetValue<bool>() ?? false;
+                (bool configured, string state, string? verification) = id switch
                 {
-                    "database" => databaseConfigured,
-                    "graph-tenant" => HasValue(configuration["MicrosoftGraphEmail:TenantId"]),
-                    "graph-client" => HasValue(configuration["MicrosoftGraphEmail:ClientId"]),
-                    "graph-client-secret" => graphSecretConfigured,
-                    "graph-mailbox" => HasValue(configuration["MicrosoftGraphEmail:Mailbox"]),
-                    "messaging-graph-tenant" => !graphEmailEnabled || HasValue(configuration["Messaging:MicrosoftGraph:TenantId"]),
-                    "messaging-graph-client" => !graphEmailEnabled || HasValue(configuration["Messaging:MicrosoftGraph:ClientId"]),
-                    "messaging-graph-client-secret" => !graphEmailEnabled || messagingGraphSecretConfigured,
-                    "messaging-graph-email-enabled" => graphEmailEnabled,
-                    "messaging-graph-email-sender" => !graphEmailEnabled || HasValue(configuration["Messaging:MicrosoftGraph:Email:SenderUpn"]),
-                    "messaging-graph-teams-enabled" => graphTeamsEnabled,
-                    "messaging-graph-teams-sender" => !graphTeamsEnabled || HasValue(configuration["Messaging:MicrosoftGraph:Teams:SenderUpn"]),
-                    "messaging-graph-teams-token" => !graphTeamsEnabled || messagingTeamsTokenConfigured,
-                    "attachments-storage" => HasValue(configuration["Storage:AttachmentsPath"]),
-                    "gallery-storage" => HasValue(configuration["Storage:GalleriesPath"]),
-                    "media-archive" => HasValue(configuration["Storage:MediaArchivePath"]),
-                    "site-id" => HasValue(configuration["Site:Id"]),
-                    "service-identity" => HasValue(configuration["Service:Identity"]),
-                    _ => false
+                    "database" => State(databaseConfigured, required, "ST-CONFIG-DB-001: Studio PostgreSQL connection string must resolve through Common.Secrets."),
+                    "graph-tenant" => State(HasValue(configuration["MicrosoftGraphEmail:TenantId"]), required, "ST-CONFIG-MAIL-001: Studio mailbox routing requires MicrosoftGraphEmail:TenantId."),
+                    "graph-client" => State(HasValue(configuration["MicrosoftGraphEmail:ClientId"]), required, "ST-CONFIG-MAIL-002: Studio mailbox routing requires MicrosoftGraphEmail:ClientId."),
+                    "graph-client-secret" => State(graphSecretConfigured, required, "ST-CONFIG-MAIL-003: Studio mailbox routing client secret must resolve through Common.Secrets."),
+                    "graph-mailbox" => State(HasValue(configuration["MicrosoftGraphEmail:Mailbox"]), required, "ST-CONFIG-MAIL-004: Studio mailbox routing requires MicrosoftGraphEmail:Mailbox."),
+                    "messaging-graph-tenant" => OptionalDependencyState(graphEmailEnabled, HasValue(configuration["Messaging:MicrosoftGraph:TenantId"]), "ST-MSG-GRAPH-EMAIL-001: Graph Email requires Messaging:MicrosoftGraph:TenantId."),
+                    "messaging-graph-client" => OptionalDependencyState(graphEmailEnabled, HasValue(configuration["Messaging:MicrosoftGraph:ClientId"]), "ST-MSG-GRAPH-EMAIL-002: Graph Email requires Messaging:MicrosoftGraph:ClientId."),
+                    "messaging-graph-client-secret" => OptionalDependencyState(graphEmailEnabled, messagingGraphSecretConfigured, "ST-MSG-GRAPH-EMAIL-003: Graph Email requires its client secret through Common.Secrets."),
+                    "messaging-graph-email-enabled" => OptionalFeatureState(graphEmailEnabled),
+                    "messaging-graph-email-sender" => OptionalDependencyState(graphEmailEnabled, HasValue(configuration["Messaging:MicrosoftGraph:Email:SenderUpn"]), "ST-MSG-GRAPH-EMAIL-004: Graph Email requires a sender UPN when enabled."),
+                    "messaging-graph-teams-enabled" => OptionalFeatureState(graphTeamsEnabled),
+                    "messaging-graph-teams-sender" => OptionalDependencyState(graphTeamsEnabled, HasValue(configuration["Messaging:MicrosoftGraph:Teams:SenderUpn"]), "ST-MSG-GRAPH-TEAMS-001: Graph Teams requires a sender UPN when enabled."),
+                    "messaging-graph-teams-token" => OptionalDependencyState(graphTeamsEnabled, messagingTeamsTokenConfigured, "ST-MSG-GRAPH-TEAMS-002: Graph Teams requires its delegated token through Common.Secrets."),
+                    "attachments-storage" => State(HasValue(configuration["Storage:AttachmentsPath"]), required, "ST-CONFIG-STORAGE-001: Storage:AttachmentsPath must be configured."),
+                    "gallery-storage" => State(HasValue(configuration["Storage:GalleriesPath"]), required, "ST-CONFIG-STORAGE-002: Storage:GalleriesPath must be configured."),
+                    "media-archive" => State(HasValue(configuration["Storage:MediaArchivePath"]), required, "ST-CONFIG-STORAGE-003: Storage:MediaArchivePath must be configured."),
+                    "site-id" => State(HasValue(configuration["Site:Id"]), required, "ST-CONFIG-SITE-001: Site:Id must identify this deployment."),
+                    "service-identity" => State(HasValue(configuration["Service:Identity"]), required, "ST-CONFIG-IDENTITY-001: Service:Identity must identify this Studio instance."),
+                    _ => (false, "Unknown", "No runtime commissioning evaluator is defined for this requirement.")
                 };
+
                 requirement["isConfigured"] = configured;
-                requirement["configurationState"] = configured ? "Configured" : "Missing";
+                requirement["configurationState"] = state;
                 requirement["effectiveValueAvailable"] = configured;
-                requirement["verificationStatus"] = configured ? "PASS" : "Not commissioned";
+                requirement["verificationStatus"] = state == "Disabled" ? "NOT REQUIRED" : configured ? "PASS" : verification;
             }
 
             using HttpClient client = new();
-            var registrar = new ConfigurationRegistrar(
+            ConfigurationRegistrar registrar = new(
                 client,
                 new RegistrationOptions(
                     new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute),
@@ -126,6 +128,15 @@ public sealed class ConfigurationContractPublisher(
             return false;
         }
     }
+
+    private static (bool Configured, string State, string? Verification) State(bool configured, bool required, string message)
+        => configured ? (true, "Configured", null) : required ? (false, "Missing", message) : (false, "Disabled", null);
+
+    private static (bool Configured, string State, string? Verification) OptionalFeatureState(bool enabled)
+        => enabled ? (true, "Configured", null) : (false, "Disabled", null);
+
+    private static (bool Configured, string State, string? Verification) OptionalDependencyState(bool enabled, bool configured, string message)
+        => !enabled ? (false, "Disabled", null) : configured ? (true, "Configured", null) : (false, "Missing", message);
 
     private static bool HasValue(string? value) => !string.IsNullOrWhiteSpace(value);
     private static string? NullIfBlank(string? value) => HasValue(value) ? value : null;
