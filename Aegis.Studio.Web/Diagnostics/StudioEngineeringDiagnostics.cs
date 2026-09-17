@@ -14,7 +14,7 @@ using System.Text;
 public static class StudioEngineeringDiagnostics
 {
     private const string DefaultApiKeyHeader = "X-Aegis-Diagnostics-Key";
-    private const string DefaultApiKeyEnvironmentVariable = "STUDIO_DIAGNOSTICS_KEY";
+    private const string DefaultApiKeySecretName = "Studio:Diagnostics:ApiKey";
 
     public static IServiceCollection AddStudioEngineeringDiagnostics(this IServiceCollection services)
     {
@@ -30,16 +30,16 @@ public static class StudioEngineeringDiagnostics
 
         RouteGroupBuilder group = endpoints.MapGroup("/api/engineering/diagnostics").AllowAnonymous();
 
-        group.MapGet("/runs", async (int? take, HttpContext context, IConfiguration configuration, IEngineeringDiagnosticRunStore store, CancellationToken cancellationToken) =>
+        group.MapGet("/runs", async (int? take, HttpContext context, IConfiguration configuration, ISecretProvider secrets, IEngineeringDiagnosticRunStore store, CancellationToken cancellationToken) =>
         {
-            if (!IsAuthorized(context, configuration)) return Results.Unauthorized();
+            if (!await IsAuthorizedAsync(context, configuration, secrets, cancellationToken)) return Results.Unauthorized();
             int requested = Math.Clamp(take ?? 25, 1, 100);
             return Results.Ok(await store.GetRecentAsync(requested, cancellationToken));
         });
 
-        group.MapGet("/runs/{runId:guid}", async (Guid runId, HttpContext context, IConfiguration configuration, IEngineeringDiagnosticRunStore store, CancellationToken cancellationToken) =>
+        group.MapGet("/runs/{runId:guid}", async (Guid runId, HttpContext context, IConfiguration configuration, ISecretProvider secrets, IEngineeringDiagnosticRunStore store, CancellationToken cancellationToken) =>
         {
-            if (!IsAuthorized(context, configuration)) return Results.Unauthorized();
+            if (!await IsAuthorizedAsync(context, configuration, secrets, cancellationToken)) return Results.Unauthorized();
             EngineeringDiagnosticRun? run = await store.GetAsync(runId, cancellationToken);
             return run is null ? Results.NotFound() : Results.Ok(run);
         });
@@ -51,9 +51,10 @@ public static class StudioEngineeringDiagnostics
             IWebHostEnvironment environment,
             HttpContext context,
             IConfiguration configuration,
+            ISecretProvider secrets,
             CancellationToken cancellationToken) =>
         {
-            if (!IsAuthorized(context, configuration)) return Results.Unauthorized();
+            if (!await IsAuthorizedAsync(context, configuration, secrets, cancellationToken)) return Results.Unauthorized();
             try
             {
                 string requestedBy = context.User.Identity?.Name ?? "Aegis.Diagnostics";
@@ -79,9 +80,10 @@ public static class StudioEngineeringDiagnostics
             IEngineeringDiagnosticRunStore store,
             HttpContext context,
             IConfiguration configuration,
+            ISecretProvider secrets,
             CancellationToken cancellationToken) =>
         {
-            if (!IsAuthorized(context, configuration)) return Results.Unauthorized();
+            if (!await IsAuthorizedAsync(context, configuration, secrets, cancellationToken)) return Results.Unauthorized();
             if (string.IsNullOrWhiteSpace(request.Resolution))
             {
                 return Results.BadRequest(new { error = "Resolution is required." });
@@ -99,7 +101,11 @@ public static class StudioEngineeringDiagnostics
         return endpoints;
     }
 
-    private static bool IsAuthorized(HttpContext context, IConfiguration configuration)
+    private static async Task<bool> IsAuthorizedAsync(
+        HttpContext context,
+        IConfiguration configuration,
+        ISecretProvider secrets,
+        CancellationToken cancellationToken)
     {
         if (context.User.Identity?.IsAuthenticated == true)
         {
@@ -107,8 +113,8 @@ public static class StudioEngineeringDiagnostics
         }
 
         string headerName = configuration["Diagnostics:ApiKeyHeader"] ?? DefaultApiKeyHeader;
-        string environmentVariable = configuration["Diagnostics:ApiKeyEnvironmentVariable"] ?? DefaultApiKeyEnvironmentVariable;
-        string? expected = Environment.GetEnvironmentVariable(environmentVariable);
+        string secretName = configuration["Diagnostics:ApiKeySecretName"] ?? DefaultApiKeySecretName;
+        string? expected = await secrets.GetAsync(secretName, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(expected) || !context.Request.Headers.TryGetValue(headerName, out var supplied))
         {
             return false;
