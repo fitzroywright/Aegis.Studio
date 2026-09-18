@@ -16,10 +16,10 @@ public sealed class ConfigurationContractPublisher(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        string? baseUrl = configuration["AegisConfiguration:BaseUrl"];
+        string? baseUrl = configuration["Aegis:Operations:Url"] ?? configuration["AegisOperations:BaseUrl"];
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
-            logger.LogInformation("Aegis.Configuration publication is disabled because AegisConfiguration:BaseUrl is not configured.");
+            logger.LogInformation("Application registration is disabled because no Operations URL is configured.");
             return;
         }
 
@@ -41,13 +41,6 @@ public sealed class ConfigurationContractPublisher(
             if (!File.Exists(path))
             {
                 logger.LogWarning("Aegis.Configuration contract was not found at {ContractPath}; Studio remains operational and will retry publication.", path);
-                return false;
-            }
-
-            string? key = await secrets.GetAsync(RegistrationCredentialResolver.SecretNameFor(ApplicationId), cancellationToken);
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                logger.LogWarning("Aegis.Configuration registration credential is unavailable through Common.Secrets; Studio remains operational and will retry publication.");
                 return false;
             }
 
@@ -105,20 +98,22 @@ public sealed class ConfigurationContractPublisher(
             }
 
             using HttpClient client = new();
-            ConfigurationRegistrar registrar = new(
+            var registration = new ApplicationRegistrationClient(
                 client,
-                new RegistrationOptions(
+                new ApplicationRegistrationOptions(
                     new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute),
-                    key,
+                    ApplicationId,
+                    contract["instanceId"]?.GetValue<string>() ?? Environment.MachineName,
+                    RegistrationCredentialResolver.EnvironmentVariableName,
                     TimeSpan.FromSeconds(10)));
-            RegistrationResult result = await registrar.RegisterContractAsync(contract, cancellationToken);
-            if (!result.Succeeded)
+            ApplicationRegistrationStatus result = await registration.RegisterAsync(contract, cancellationToken);
+            if (!result.IsRegistered)
             {
-                logger.LogWarning("Aegis.Configuration registration failed for Studio: {RegistrationError}; Studio remains operational and will retry.", result.Error ?? "Unknown registration failure.");
+                logger.LogWarning("Aegis.Studio registration state is {RegistrationState}: {RegistrationError}; Studio remains operational. Bootstrap must be repeated in Operations when the key is missing, invalid, or revoked.", result.State, result.Error ?? "No additional detail.");
                 return false;
             }
 
-            logger.LogInformation("Aegis.Studio configuration requirements and configured state registered with Aegis.Configuration with HTTP {StatusCode}.", (int?)result.StatusCode);
+            logger.LogInformation("Aegis.Studio registration is valid and its configuration contract was published.");
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
