@@ -32,6 +32,62 @@ public static class ScheduleEndpoints
             return Results.Ok(entries.Where(x => x.JobId.HasValue && allowed.Contains(x.JobId.Value)));
         }).RequireAuthorization();
 
+        app.MapGet("/api/schedule/capacity", (
+            DateTimeOffset from,
+            DateTimeOffset to,
+            ClaimsPrincipal user,
+            ScheduleStore store,
+            WorkspaceAccessService workspaceAccess) =>
+        {
+            bool allowed=user.IsInRole("Administrator") ||
+                workspaceAccess.GetAccessibleWorkspaceIds(user).Any(id =>
+                    workspaceAccess.HasPermission(user,id,"ManageSchedule") ||
+                    workspaceAccess.HasPermission(user,id,"ManageProduction"));
+            if(!allowed) return Results.Forbid();
+            try{return Results.Ok(store.GetStaffCapacity(from,to));}
+            catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
+        }).RequireAuthorization();
+
+        app.MapPost("/api/schedule/entries/{id:guid}/reassign", (
+            Guid id,
+            ScheduleReassignmentRequest request,
+            ClaimsPrincipal user,
+            ScheduleStore store,
+            JobAccessService access,
+            StudioDatabase database,
+            StudioOperationsFlowPublisher flows) =>
+        {
+            ScheduleEntry? current=store.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10)).FirstOrDefault(x=>x.Id==id);
+            if(current is null) return Results.NotFound();
+            Guid? jobId=current.JobId??ResolveBookingJobId(current.BookingId,database);
+            if(jobId is not Guid effectiveJobId || !access.HasPermission(user,effectiveJobId,"ManageSchedule")) return Results.Forbid();
+            try
+            {
+                ScheduleAssignmentChange change=store.Reassign(id,request.ResourceIds??[],CurrentUser(user),request.Reason);
+                ScheduleEntry updated=store.GetEntries(current.StartsAtUtc.AddMinutes(-1),current.EndsAtUtc.AddMinutes(1)).First(x=>x.Id==id);
+                EnsureAssignedPhotographers(updated,database,access);
+                flows.TryEnqueueJobFlow(effectiveJobId.ToString("D"),"Assigned",effectiveJobId.ToString("D"),
+                    string.IsNullOrWhiteSpace(request.Reason)?"Job reassigned.":"Job reassigned: "+request.Reason.Trim());
+                return Results.Ok(new{assignment=updated,change});
+            }
+            catch(ScheduleConflictException ex){return Results.Conflict(new{error=ex.Message,conflicts=ex.Conflicts});}
+            catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
+        }).RequireAuthorization();
+
+        app.MapGet("/api/schedule/entries/{id:guid}/assignment-history", (
+            Guid id,
+            ClaimsPrincipal user,
+            ScheduleStore store,
+            JobAccessService access,
+            StudioDatabase database) =>
+        {
+            ScheduleEntry? current=store.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10)).FirstOrDefault(x=>x.Id==id);
+            if(current is null) return Results.NotFound();
+            Guid? jobId=current.JobId??ResolveBookingJobId(current.BookingId,database);
+            if(jobId is not Guid effectiveJobId || !access.HasPermission(user,effectiveJobId,"ManageSchedule")) return Results.Forbid();
+            return Results.Ok(store.GetAssignmentHistory(id));
+        }).RequireAuthorization();
+
         app.MapGet("/api/schedule/conflicts", (DateTimeOffset startsAtUtc, DateTimeOffset endsAtUtc, string? resourceIds, ScheduleStore store) =>
         {
             Guid[] ids = ParseIds(resourceIds);
@@ -44,7 +100,8 @@ public static class ScheduleEndpoints
             ScheduleStore store,
             JobAccessService access,
             JobEventNotifier notifier,
-            StudioDatabase database) =>
+            StudioDatabase database,
+            StudioOperationsFlowPublisher flows) =>
         {
             if (!request.JobId.HasValue)
             {
@@ -58,6 +115,12 @@ public static class ScheduleEndpoints
             {
                 ScheduleEntry value = store.Create(request);
                 EnsureAssignedPhotographers(value, database, access);
+                Guid? createdJobId=value.JobId??ResolveBookingJobId(value.BookingId,database);
+                if(createdJobId is Guid createdJob)
+                {
+                    flows.TryEnqueueJobFlow(createdJob.ToString("D"),"Created",createdJob.ToString("D"));
+                    if(value.ResourceIds.Count>0) flows.TryEnqueueJobFlow(createdJob.ToString("D"),"Assigned",createdJob.ToString("D"));
+                }
                 if (value.JobId.HasValue)
                 {
                     notifier.Publish(
@@ -80,7 +143,8 @@ public static class ScheduleEndpoints
             ScheduleStore store,
             JobAccessService access,
             JobEventNotifier notifier,
-            StudioDatabase database) =>
+            StudioDatabase database,
+            StudioOperationsFlowPublisher flows) =>
         {
             ScheduleEntry? current = store.GetEntries(DateTimeOffset.UtcNow.AddYears(-5), DateTimeOffset.UtcNow.AddYears(5)).FirstOrDefault(x => x.Id == id);
             Guid? jobId = request.JobId ?? current?.JobId;
@@ -96,6 +160,9 @@ public static class ScheduleEndpoints
             {
                 ScheduleEntry value = store.Update(id, request);
                 EnsureAssignedPhotographers(value, database, access);
+                Guid? updatedJobId=value.JobId??ResolveBookingJobId(value.BookingId,database);
+                if(updatedJobId is Guid updatedJob && value.ResourceIds.Count>0)
+                    flows.TryEnqueueJobFlow(updatedJob.ToString("D"),"Assigned",updatedJob.ToString("D"),"Schedule assignment updated.");
                 if (value.JobId.HasValue)
                 {
                     string verb = value.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) ? "Cancelled" : "Schedule updated";
@@ -137,8 +204,13 @@ public static class ScheduleEndpoints
         return command.ExecuteScalar() is Guid jobId ? jobId : null;
     }
 
+    private static string CurrentUser(ClaimsPrincipal user)=>
+        user.FindFirstValue("login_name")??user.FindFirstValue(ClaimTypes.NameIdentifier)??user.Identity?.Name??"unknown";
+
     private static Guid[] ParseIds(string? value)
         => string.IsNullOrWhiteSpace(value)
             ? []
             : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Guid.Parse).ToArray();
 }
+
+public sealed record ScheduleReassignmentRequest(IReadOnlyList<Guid>? ResourceIds,string? Reason);
