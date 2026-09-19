@@ -314,12 +314,15 @@ app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest
         }
     });
 });
-app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest request, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService access) =>
+app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest request, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService access, StudioOperationsFlowPublisher flows) =>
 {
     StudioConversation? conversation = store.GetConversation(id);
     if (conversation is null) return Results.NotFound();
     if (!access.HasPermission(user, conversation.WorkspaceId, "CreateJob")) return Results.Forbid();
-    return string.IsNullOrWhiteSpace(request.Title) ? Results.BadRequest(new { error = "Job title is required." }) : Results.Ok(store.CreateJob(id, request));
+    if (string.IsNullOrWhiteSpace(request.Title)) return Results.BadRequest(new { error = "Job title is required." });
+    StudioJob job=store.CreateJob(id, request);
+    flows.TryEnqueueJobFlow(job.Id.ToString("D"),"Created",job.Id.ToString("D"),$"Job created in workspace {job.WorkspaceId:D}.");
+    return Results.Ok(job);
 });
 app.MapGet("/api/jobs", (ClaimsPrincipal user, StudioStore store, JobAccessService access) =>
 {
@@ -331,7 +334,7 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ClaimsPrincipal user, StudioStore st
     if (!access.HasPermission(user, id, "ViewJob")) return Results.Forbid();
     return store.GetJob(id) is StudioJob job ? Results.Ok(job) : Results.NotFound();
 });
-app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrincipal user, StudioStore store, NotificationService notifications, JobEventNotifier jobEvents, JobAccessService access) =>
+app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrincipal user, StudioStore store, NotificationService notifications, JobEventNotifier jobEvents, JobAccessService access, StudioOperationsFlowPublisher flows) =>
 {
     StudioJob? before = store.GetJob(id); if (before is null) return Results.NotFound();
     if (!access.HasPermission(user, id, "EditJob")) return Results.Forbid();
@@ -341,11 +344,21 @@ app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrin
     if (!string.Equals(before.Status, updated.Status, StringComparison.OrdinalIgnoreCase))
     {
         jobEvents.Publish(id, "JobStatusChanged", $"Job status: {updated.Title}", $"{before.Status} → {updated.Status}", requesterEligible: true);
+        string? flowStage=updated.Status.Trim() switch
+        {
+            "Accepted"=>"Accepted",
+            "Arrived"=>"Arrived",
+            "InProgress"=>"InProgress",
+            "Completed"=>"Completed",
+            _=>null
+        };
+        if(flowStage is not null) flows.TryEnqueueJobFlow(id.ToString("D"),flowStage,id.ToString("D"),$"Job status changed to {updated.Status}.");
     }
     if (!string.Equals(before.AssignedTo, updated.AssignedTo, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(updated.AssignedTo))
     {
         access.EnsureAssignedMember(id, updated.AssignedTo);
         notifications.PublishToUser(updated.AssignedTo, "JobAssigned", $"Job assigned: {updated.Title}", $"You were assigned to {updated.Title} for {updated.ClientName}.", "Job", id.ToString("D"));
+        flows.TryEnqueueJobFlow(id.ToString("D"),"Assigned",id.ToString("D"),$"Assigned to {updated.AssignedTo}.");
     }
     return Results.Ok(updated);
 });
