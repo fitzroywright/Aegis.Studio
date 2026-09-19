@@ -71,6 +71,23 @@ async function openConversation(id) {
     });
 
     const conversation = await json('/api/conversations/' + id);
+    let sendingIdentity = null;
+    if (String(conversation.channel || '').toLowerCase() === 'email') {
+        try {
+            sendingIdentity = await json('/api/conversations/' + id + '/sending-identities');
+        } catch {
+            sendingIdentity = { defaultIdentity: 'Workspace', identities: [] };
+        }
+    }
+    const identityOptions = sendingIdentity?.identities || [];
+    const identityPicker = identityOptions.length
+        ? `<label class="sending-identity">Send as
+            <select id="sendingIdentity">
+                ${identityOptions.map(identity => `<option value="${esc(identity.type)}" ${identity.isDefault ? 'selected' : ''}>${esc(identity.label)}</option>`).join('')}
+            </select>
+            <small id="sendingIdentityHint">The selected identity is recorded in the message audit trail.</small>
+          </label>`
+        : '';
     detailPane.classList.remove('empty');
     detailPane.innerHTML = `
         <div class="detail-header">
@@ -94,9 +111,23 @@ async function openConversation(id) {
             <textarea id="messageBody" placeholder="Write a reply or internal note..."></textarea>
             <div class="composer-row">
                 <label class="toggle"><input id="internalToggle" type="checkbox"> Internal note — customer will not see this</label>
+                ${identityPicker}
                 <button class="primary" onclick="sendMessage()">Send</button>
             </div>
         </div>`;
+    const internalToggle = document.getElementById('internalToggle');
+    const identitySelect = document.getElementById('sendingIdentity');
+    if (internalToggle && identitySelect) {
+        const syncIdentityState = () => {
+            identitySelect.disabled = internalToggle.checked;
+            const hint = document.getElementById('sendingIdentityHint');
+            if (hint) hint.textContent = internalToggle.checked
+                ? 'Internal notes do not use an external sending identity.'
+                : 'The selected identity is recorded in the message audit trail.';
+        };
+        internalToggle.addEventListener('change', syncIdentityState);
+        syncIdentityState();
+    }
 }
 
 async function sendMessage() {
@@ -110,7 +141,8 @@ async function sendMessage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             body,
-            isInternal: document.getElementById('internalToggle').checked
+            isInternal: document.getElementById('internalToggle').checked,
+            sendingIdentity: document.getElementById('sendingIdentity')?.value || 'Workspace'
         })
     });
 
