@@ -15,8 +15,15 @@ public sealed class OutboundEmailStore
         this.workspaces = workspaces;
     }
 
-    public OutboundEmail Queue(StudioConversation conversation, string body)
-        => QueueMessage(conversation, body, conversation.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? conversation.Subject : "Re: " + conversation.Subject);
+    public OutboundEmail Queue(
+        StudioConversation conversation,
+        string body,
+        StudioSendingIdentity? sendingIdentity = null)
+        => QueueMessage(
+            conversation,
+            body,
+            conversation.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? conversation.Subject : "Re: " + conversation.Subject,
+            sendingIdentity: sendingIdentity);
 
     public OutboundEmail QueueNotification(StudioConversation conversation, string subject, string body)
         => QueueMessage(conversation, body, subject, "Notification");
@@ -50,17 +57,84 @@ public sealed class OutboundEmailStore
         using NpgsqlConnection connection=database.OpenConnection();using NpgsqlCommand command=connection.CreateCommand();command.CommandText="select exists(select 1 from studio_outbound_email where conversation_id=$1 and lower(kind)='acknowledgement')";command.Parameters.AddWithValue(conversationId);return (bool)(command.ExecuteScalar()??false);
     }
 
-    private OutboundEmail QueueMessage(StudioConversation conversation, string body, string subject, string kind = "Reply")
+    private OutboundEmail QueueMessage(
+        StudioConversation conversation,
+        string body,
+        string subject,
+        string kind = "Reply",
+        StudioSendingIdentity? sendingIdentity = null)
     {
         StudioWorkspaceDefinition workspace = workspaces.Get(conversation.WorkspaceId) ?? throw new InvalidOperationException("The conversation workspace no longer exists.");
         if (string.IsNullOrWhiteSpace(workspace.EmailAddress)) throw new InvalidOperationException("The conversation workspace has no outbound email identity configured.");
-        OutboundEmail message=new(Guid.NewGuid(),conversation.Id,workspace.EmailAddress,conversation.ContactAddress,subject,body.Trim(),conversation.ExternalThreadId,"Pending",DateTimeOffset.UtcNow,null,kind);
-        using NpgsqlConnection connection=database.OpenConnection();using NpgsqlCommand command=connection.CreateCommand();command.CommandText="insert into studio_outbound_email(id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)";object?[] values=[message.Id,message.ConversationId,message.FromAddress,message.ToAddress,message.Subject,message.Body,(object?)message.ThreadId??DBNull.Value,message.Status,message.CreatedAt,(object?)message.ProviderMessageId??DBNull.Value,message.Kind];foreach(object? value in values)command.Parameters.AddWithValue(value??DBNull.Value);command.ExecuteNonQuery();return message;
+
+        StudioSendingIdentity identity = sendingIdentity ??
+            new StudioSendingIdentity(StudioSendingIdentityType.Workspace, workspace.EmailAddress, null);
+
+        OutboundEmail message = new(
+            Guid.NewGuid(),
+            conversation.Id,
+            identity.FromAddress,
+            conversation.ContactAddress,
+            subject,
+            body.Trim(),
+            conversation.ExternalThreadId,
+            "Pending",
+            DateTimeOffset.UtcNow,
+            null,
+            kind,
+            identity.UserName,
+            identity.Type.ToString());
+
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            insert into studio_outbound_email
+            (id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type)
+            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            """;
+        object?[] values =
+        [
+            message.Id,
+            message.ConversationId,
+            message.FromAddress,
+            message.ToAddress,
+            message.Subject,
+            message.Body,
+            (object?)message.ThreadId ?? DBNull.Value,
+            message.Status,
+            message.CreatedAt,
+            (object?)message.ProviderMessageId ?? DBNull.Value,
+            message.Kind,
+            (object?)message.SentByUserName ?? DBNull.Value,
+            message.SendingIdentityType
+        ];
+        foreach (object? value in values) command.Parameters.AddWithValue(value ?? DBNull.Value);
+        command.ExecuteNonQuery();
+        return message;
     }
 
-    private static OutboundEmail Read(NpgsqlDataReader r)=>new(r.GetGuid(0),r.GetGuid(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetString(5),r.IsDBNull(6)?null:r.GetString(6),r.GetString(7),r.GetFieldValue<DateTimeOffset>(8),r.IsDBNull(9)?null:r.GetString(9),r.GetString(10));
-    private const string SelectSql="select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind from studio_outbound_email";
+    private static OutboundEmail Read(NpgsqlDataReader r) => new(
+        r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5),
+        r.IsDBNull(6) ? null : r.GetString(6), r.GetString(7), r.GetFieldValue<DateTimeOffset>(8),
+        r.IsDBNull(9) ? null : r.GetString(9), r.GetString(10),
+        r.IsDBNull(11) ? null : r.GetString(11), r.GetString(12));
+
+    private const string SelectSql =
+        "select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type from studio_outbound_email";
 }
 
-public sealed record OutboundEmail(Guid Id,Guid ConversationId,string FromAddress,string ToAddress,string Subject,string Body,string? ThreadId,string Status,DateTimeOffset CreatedAt,string? ProviderMessageId,string Kind="Reply");
+public sealed record OutboundEmail(
+    Guid Id,
+    Guid ConversationId,
+    string FromAddress,
+    string ToAddress,
+    string Subject,
+    string Body,
+    string? ThreadId,
+    string Status,
+    DateTimeOffset CreatedAt,
+    string? ProviderMessageId,
+    string Kind = "Reply",
+    string? SentByUserName = null,
+    string SendingIdentityType = "Workspace");
 public sealed record MarkOutboundSentRequest(string? ProviderMessageId);
