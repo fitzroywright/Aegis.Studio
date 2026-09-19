@@ -409,7 +409,7 @@ public sealed record StudioJob(Guid Id, Guid WorkspaceId, Guid ConversationId, s
 public sealed record StudioFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt);
 public sealed record EmailIngestResult(StudioConversation Conversation, bool CreatedConversation, bool WasDuplicate);
 public sealed record IncomingInteractionRequest(Guid? WorkspaceId, string? Destination, string ContactName, string ContactAddress, string Subject, string Body, string? Channel);
-public sealed record AddMessageRequest(string Body, bool IsInternal);
+public sealed record AddMessageRequest(string Body, bool IsInternal, string? SendingIdentity = null);
 public sealed record CreateJobRequest(string Title, DateOnly? EventDate);
 public sealed record UpdateJobRequest(string? Status, string? AssignedTo, DateOnly? EventDate);
 public sealed record AddFinancialEventRequest(string Kind, decimal Amount, string? Note);
