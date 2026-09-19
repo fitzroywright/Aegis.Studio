@@ -76,6 +76,18 @@ public sealed class LocalUpload
     public Guid? ServerAttachmentId { get; set; }
 }
 
+public sealed class LocalAvailability
+{
+    [PrimaryKey] public Guid Id { get; set; }
+    public string UserName { get; set; }="";
+    public DateTimeOffset StartsAtUtc { get; set; }
+    public DateTimeOffset EndsAtUtc { get; set; }
+    public string AvailabilityType { get; set; }="";
+    [Ignore] public string? Note { get; set; }
+    public string? NoteCiphertext { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
 public sealed class LocalMetadata
 {
     [PrimaryKey] public string Key { get; set; }="";
@@ -121,6 +133,7 @@ public sealed class WorkDayLocalStore
         await db.CreateTableAsync<LocalOperation>();
         await db.CreateTableAsync<LocalWorkSession>();
         await db.CreateTableAsync<LocalUpload>();
+        await db.CreateTableAsync<LocalAvailability>();
         await db.CreateTableAsync<LocalLocationObservation>();
         await MigrateAsync();
     }
@@ -232,6 +245,24 @@ public sealed class WorkDayLocalStore
         LocalAssignment? value=await db.Table<LocalAssignment>().Where(x=>x.Id==id).FirstOrDefaultAsync();
         if(value is not null) await UnprotectAsync(value);
         return value;
+    }
+
+    public async Task ReplaceAvailabilityAsync(IEnumerable<LocalAvailability> values)
+    {
+        await InitializeAsync();
+        await db.DeleteAllAsync<LocalAvailability>();
+        foreach(LocalAvailability value in values)
+        {
+            value.NoteCiphertext=await protector.ProtectAsync(value.Note);
+            await db.InsertOrReplaceAsync(value);
+        }
+    }
+
+    public async Task<List<LocalAvailability>> GetAvailabilityAsync()
+    {
+        List<LocalAvailability> values=await db.Table<LocalAvailability>().OrderBy(x=>x.StartsAtUtc).ToListAsync();
+        foreach(LocalAvailability value in values) value.Note=await protector.UnprotectAsync(value.NoteCiphertext);
+        return values;
     }
 
     public async Task QueueAsync(LocalOperation operation)
