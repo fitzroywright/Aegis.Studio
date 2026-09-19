@@ -148,7 +148,7 @@ public sealed record WorkspacePhotographerActivity(
     WorkDayClientStatus? Client,
     WorkDayWorkSession? ActiveWorkSession,
     IReadOnlyList<WorkDayAssignment> Assignments,
-    Scheduling.StaffCapacitySnapshot? Capacity);
+    Aegis.Studio.Web.Scheduling.StaffCapacitySnapshot? Capacity);
 
 public sealed record WorkspaceWorkDayActivity(
     Guid WorkspaceId,
