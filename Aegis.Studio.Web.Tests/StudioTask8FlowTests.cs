@@ -1,6 +1,7 @@
 using Aegis.Studio.Web;
 using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Email;
+using Aegis.Studio.Web.Storage;
 using Xunit;
 
 namespace Aegis.Studio.Web.Tests;
@@ -145,6 +146,18 @@ public sealed class StudioTask8FlowTests
         Assert.Equal("Unknown", stages.Single(x => x.Name == "Recipient").State);
         Assert.Null(stages.Single(x => x.Name == "Recipient").CompletedAtUtc);
         Assert.Equal("Completed", stages.Single(x => x.Name == "Provider").State);
+    }
+
+    [Fact]
+    public void Storage_metadata_preserves_application_conversation_and_correlation()
+    {
+        Guid conversationId = Guid.NewGuid();
+        IReadOnlyDictionary<string,string> metadata =
+            AttachmentStore.BuildStorageMetadata(conversationId, "External", "corr-storage-1");
+
+        Assert.Equal("Aegis.Studio", metadata["Application"]);
+        Assert.Equal(conversationId.ToString("D"), metadata["ConversationId"]);
+        Assert.Equal("corr-storage-1", metadata["CorrelationId"]);
     }
 
     [Fact]
