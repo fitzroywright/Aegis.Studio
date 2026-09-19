@@ -295,3 +295,45 @@ Assignment rule:
 - availability/leave remains photographer-global and is not workspace-scoped.
 
 Automatic assignment reconciliation is intentionally non-destructive: it will not overwrite an existing explicit job membership and will not remove job membership when a schedule assignment changes, because membership provenance is not yet modeled.
+
+
+## Workspace managers, reassignment, capacity and Job Flow
+
+Workspace management now includes a non-global `WorkspacePermissionSet.Manager` preset. A workspace manager can view and operate the workspace, create/edit jobs, manage scheduling/production, notify and manage ordinary workspace members, and use approved Studio sending identities, while `AdminWorkspace` remains false.
+
+Managers can monitor only photographer activity relevant to their workspace through:
+
+- `GET /api/workday/workspaces/{workspaceId}/activity`
+- `/workspaces/{workspaceId}/workday-management`
+
+The manager view shows assigned photographers, recent WorkDay connectivity/synchronization evidence, active work-session state, assignments in that workspace, and current capacity.
+
+Photographer capacity is calculated from:
+
+- configured nominal daily capacity (`Scheduling:DefaultDailyCapacityHours`, default 8);
+- scheduled assignment minutes;
+- declared Unavailable/Leave minutes.
+
+Capacity states are `Available`, `NearCapacity`, `OverCapacity`, and `Unavailable`.
+
+Jobs/schedule assignments are explicitly reassignable through:
+
+- `POST /api/schedule/entries/{id}/reassign`
+
+Reassignment:
+
+- enforces `ManageSchedule`;
+- checks schedule conflicts;
+- stores immutable assignment-change history;
+- grants JobStaff access to newly assigned photographers;
+- does not destructively remove old explicit job membership because membership provenance is not yet modeled.
+
+Photographers are global Studio resources and can be assigned into any workspace. Assignment grants job-scoped access rather than standing workspace membership.
+
+Assigned JobStaff now has `ReplyRequester` for that job. Customer replies therefore work for cross-workspace photographers through the existing conversation API, whose safe default sender remains the owning workspace email identity. `SendAsSelf` remains separately workspace-controlled.
+
+A first-class Operations flow named `JobFlow` is published for tracking-light visualization:
+
+`Created -> Assigned -> Accepted -> Arrived -> InProgress -> Completed -> Synchronized`
+
+The same job ID is used as the correlation/business identifier across schedule assignment, reassignment, WorkDay field actions and Studio job lifecycle updates, allowing Aegis.Operations to show where a job is currently sitting or stalled.
