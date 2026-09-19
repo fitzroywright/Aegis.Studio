@@ -14,7 +14,8 @@ public sealed record StudioFlowTelemetryItem(
     DateTimeOffset ObservedAtUtc,
     string? BusinessId,
     string? Detail,
-    bool Failed);
+    bool Failed,
+    string? StateOverride = null);
 
 public sealed class StudioOperationsFlowPublisher(
     IConfiguration configuration,
@@ -57,6 +58,13 @@ public sealed class StudioOperationsFlowPublisher(
         bool failed = false)
         => Enqueue(correlationId, "OutboundMessage", stage, null, businessId, detail, failed);
 
+    public bool TryEnqueueOutboundUnknown(
+        string correlationId,
+        string stage,
+        string? businessId = null,
+        string? detail = null)
+        => Enqueue(correlationId, "OutboundMessage", stage, null, businessId, detail, false, "Unknown");
+
     public bool TryEnqueueNotification(
         string correlationId,
         string branch,
@@ -72,7 +80,8 @@ public sealed class StudioOperationsFlowPublisher(
         string? branch,
         string? businessId,
         string? detail,
-        bool failed)
+        bool failed,
+        string? stateOverride = null)
     {
         if (string.IsNullOrWhiteSpace(correlationId)) return false;
         return queue.Writer.TryWrite(new(
@@ -83,7 +92,8 @@ public sealed class StudioOperationsFlowPublisher(
             DateTimeOffset.UtcNow,
             businessId,
             detail,
-            failed));
+            failed,
+            stateOverride));
     }
 
     public bool TryEnqueueAttachment(
@@ -186,7 +196,8 @@ public sealed class StudioOperationsFlowPublisher(
                     item.Stage,
                     item.ObservedAtUtc,
                     item.Failed,
-                    item.Detail)
+                    item.Detail,
+                    item.StateOverride)
                 .Select((stage, index) => (object)new
                 {
                     name = stage.Name,
