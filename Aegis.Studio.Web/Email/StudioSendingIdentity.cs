@@ -39,13 +39,16 @@ public static class StudioSendingIdentityResolver
             throw new InvalidOperationException("Reply as Myself requires a valid Studio email address on the user profile.");
 
         string domain = email[(at + 1)..].Trim().TrimEnd('.');
+        string workspaceDomain = workspaceEmail[(workspaceEmail.LastIndexOf('@') + 1)..].Trim().TrimEnd('.');
         string[] allowed = allowedPersonalSenderDomains
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim().TrimStart('@').TrimEnd('.'))
+            .Append(workspaceDomain)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        if (allowed.Length == 0 || !allowed.Contains(domain, StringComparer.OrdinalIgnoreCase))
+        if (!allowed.Contains(domain, StringComparer.OrdinalIgnoreCase))
             throw new InvalidOperationException("The user's email address is not an approved Studio sending domain.");
 
         return new(StudioSendingIdentityType.Self, email, userName);
