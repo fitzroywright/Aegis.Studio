@@ -23,7 +23,7 @@ public sealed class StudioOperationsFlowPublisher(
 {
     private const string ApplicationId = "Aegis.Studio";
     private readonly ConcurrentDictionary<string, DateTimeOffset> firstObserved = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, (string State, DateTimeOffset AtUtc, string? Error)>> branchStates = new(StringComparer.OrdinalIgnoreCase);
+    private readonly StudioNotificationBranchTracker branchTracker = new();
     private readonly Channel<StudioFlowTelemetryItem> queue =
         Channel.CreateBounded<StudioFlowTelemetryItem>(new BoundedChannelOptions(2000)
         {
@@ -155,25 +155,32 @@ public sealed class StudioOperationsFlowPublisher(
         if (item.FlowType == "NotificationFanout")
         {
             string key = item.FlowType + "|" + item.CorrelationId;
-            ConcurrentDictionary<string, (string State, DateTimeOffset AtUtc, string? Error)> state =
-                branchStates.GetOrAdd(key, _ => new(StringComparer.OrdinalIgnoreCase));
-            state["Event"] = ("Completed", startedAt, null);
             if (!string.IsNullOrWhiteSpace(item.Branch))
-                state[item.Branch] = (item.Failed ? "Failed" : "Completed", item.ObservedAtUtc, item.Failed ? item.Detail : null);
+            {
+                branchTracker.Observe(
+                    key,
+                    item.Branch,
+                    item.Failed,
+                    item.ObservedAtUtc,
+                    item.Failed ? item.Detail : null);
+            }
+
+            IReadOnlyDictionary<string, StudioNotificationBranchObservation> state =
+                branchTracker.Get(key);
 
             stages = stageNames.Select(name =>
             {
                 bool isBranch = !name.Equals("Event", StringComparison.OrdinalIgnoreCase);
-                bool seen = state.TryGetValue(name, out var snapshot);
+                bool seen = state.TryGetValue(name, out StudioNotificationBranchObservation? snapshot);
                 return (object)new
                 {
                     name,
-                    state = seen ? snapshot.State : isBranch ? "Pending" : "Completed",
-                    startedAtUtc = seen ? snapshot.AtUtc : name == "Event" ? startedAt : (DateTimeOffset?)null,
-                    completedAtUtc = seen && snapshot.State == "Completed" ? snapshot.AtUtc : name == "Event" ? startedAt : (DateTimeOffset?)null,
+                    state = seen ? snapshot!.State : isBranch ? "Pending" : "Completed",
+                    startedAtUtc = seen ? snapshot!.ObservedAtUtc : name == "Event" ? startedAt : (DateTimeOffset?)null,
+                    completedAtUtc = seen && snapshot!.State == "Completed" ? snapshot.ObservedAtUtc : name == "Event" ? startedAt : (DateTimeOffset?)null,
                     warningAfterSeconds = isBranch ? 60 : 10,
                     criticalAfterSeconds = isBranch ? 600 : 60,
-                    error = seen ? snapshot.Error : null,
+                    error = seen ? snapshot!.Detail : null,
                     parentStage = isBranch ? "Event" : null,
                     branch = isBranch ? name : null
                 };
