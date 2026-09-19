@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Aegis.Studio.WorkDay;
 
 public sealed class LoginPage:ContentPage
