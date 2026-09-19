@@ -186,6 +186,11 @@ public sealed class MainPage:ContentPage
         List<string> items=[];
         if(pendingOps>0)items.Add($"{pendingOps} change(s) waiting to synchronize");
         if(pendingFiles>0)items.Add($"{pendingFiles} file(s) waiting to upload");
+        bool locationExpected=active?.EndedAtUtc is null && !string.Equals(sync.LocationTrackingMode,"Disabled",StringComparison.OrdinalIgnoreCase);
+        if(locationExpected && location.PermissionState is "Denied" or "Unavailable")
+            items.Add($"Location evidence unavailable during active work session ({location.PermissionState})");
+        if(locationExpected && location.LastSamplingAttemptUtc is DateTimeOffset attempt && DateTimeOffset.UtcNow-attempt>TimeSpan.FromHours(2))
+            items.Add("Location evidence has not been sampled for more than 2 hours");
         foreach(LocalAssignment a in assignments.Where(x=>x.EndsAtUtc<DateTimeOffset.UtcNow&&x.Status is not ("Completed" or "Cancelled")).Take(3))
             items.Add($"Incomplete: {a.Title}");
         try
