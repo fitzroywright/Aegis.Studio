@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Notifications;
@@ -94,35 +95,71 @@ public sealed class InboundEmailWorker : BackgroundService
                     operationsFlows.TryEnqueueInbound(correlationId, "Workspace", businessId: result.Conversation.Id.ToString("D"));
                     operationsFlows.TryEnqueueInbound(correlationId, "Conversation", businessId: result.Conversation.Id.ToString("D"));
 
-                    if (result.WasDuplicate)
-                    {
-                        continue;
-                    }
-
+                    int attachmentIndex = 0;
                     foreach (InboundEmailAttachment attachment in email.FileAttachments.Where(x => !x.IsInline))
                     {
-                        await attachments.AddBytesAsync(
-                            result.Conversation.Id,
-                            attachment.FileName,
-                            attachment.ContentType,
-                            attachment.Content,
-                            "External",
-                            $"Microsoft Graph: {email.FromAddress}",
-                            stoppingToken);
+                        attachmentIndex++;
+                        string contentHash = Convert.ToHexString(SHA256.HashData(attachment.Content)).ToLowerInvariant();
+                        string sourceKey = $"graph:{email.MessageId}:{attachment.FileName}:{contentHash}";
+                        string attachmentCorrelation = $"{email.MessageId}:attachment:{attachmentIndex}";
+
+                        operationsFlows.TryEnqueueAttachment(
+                            attachmentCorrelation,
+                            "Received",
+                            businessId: result.Conversation.Id.ToString("D"));
+
+                        try
+                        {
+                            StudioAttachment storedAttachment = await attachments.AddBytesAsync(
+                                result.Conversation.Id,
+                                attachment.FileName,
+                                attachment.ContentType,
+                                attachment.Content,
+                                "External",
+                                $"Microsoft Graph: {email.FromAddress}",
+                                stoppingToken,
+                                sourceKey);
+
+                            operationsFlows.TryEnqueueAttachment(
+                                attachmentCorrelation,
+                                "Storage",
+                                businessId: storedAttachment.Id.ToString("D"));
+                            operationsFlows.TryEnqueueAttachment(
+                                attachmentCorrelation,
+                                "Metadata",
+                                businessId: storedAttachment.Id.ToString("D"));
+                            operationsFlows.TryEnqueueAttachment(
+                                attachmentCorrelation,
+                                "Workspace",
+                                businessId: storedAttachment.Id.ToString("D"));
+                        }
+                        catch (Exception exception)
+                        {
+                            operationsFlows.TryEnqueueAttachment(
+                                attachmentCorrelation,
+                                "Storage",
+                                businessId: result.Conversation.Id.ToString("D"),
+                                detail: exception.GetType().Name,
+                                failed: true);
+                            throw;
+                        }
                     }
 
-                    if (result.CreatedConversation)
+                    if (!result.WasDuplicate)
                     {
-                        outboundStore.QueueAcknowledgement(result.Conversation, route.WorkspaceName ?? "Studio");
-                    }
+                        if (result.CreatedConversation)
+                        {
+                            outboundStore.QueueAcknowledgement(result.Conversation, route.WorkspaceName ?? "Studio");
+                        }
 
-                    notifications.PublishToAll(
-                        "WorkspaceMessage",
-                        $"Email: {email.Subject}",
-                        $"New email from {email.FromName} routed to {route.WorkspaceName}.",
-                        "Conversation",
-                        result.Conversation.Id.ToString("D"));
-                    operationsFlows.TryEnqueueInbound(correlationId, "Notification", businessId: result.Conversation.Id.ToString("D"));
+                        notifications.PublishToAll(
+                            "WorkspaceMessage",
+                            $"Email: {email.Subject}",
+                            $"New email from {email.FromName} routed to {route.WorkspaceName}.",
+                            "Conversation",
+                            result.Conversation.Id.ToString("D"));
+                        operationsFlows.TryEnqueueInbound(correlationId, "Notification", businessId: result.Conversation.Id.ToString("D"));
+                    }
 
                     logger.LogInformation(
                         "Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}. Reference recovery: {ReferenceRecovered}. Attachments: {AttachmentCount}",
