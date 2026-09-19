@@ -35,12 +35,12 @@ public static class GalleryEndpoints
                 WorkspaceGallery gallery = store.GetOrCreate(workspaceId);
                 List<GalleryItem> added = [];
                 foreach (IFormFile file in form.Files) added.Add(await store.AddImageAsync(gallery, file, cancellationToken));
-                operationsFlows.TryEnqueue(workspaceId.ToString("D"), "Attachments", businessId: workspaceId.ToString("D"));
+                operationsFlows.TryEnqueueGallery(workspaceId.ToString("D"), "InternalStorage", businessId: workspaceId.ToString("D"));
                 return Results.Ok(new { gallery = store.Get(workspaceId), added });
             }
             catch (InvalidOperationException exception)
             {
-                operationsFlows.TryEnqueue(workspaceId.ToString("D"), "Attachments", businessId: workspaceId.ToString("D"), detail: exception.Message, failed: true);
+                operationsFlows.TryEnqueueGallery(workspaceId.ToString("D"), "InternalStorage", businessId: workspaceId.ToString("D"), detail: exception.Message, failed: true);
                 return Results.BadRequest(new { error = exception.Message });
             }
         }).RequireAuthorization().DisableAntiforgery();
@@ -71,13 +71,13 @@ public static class GalleryEndpoints
             try
             {
                 WorkspaceGallery gallery = store.Publish(workspaceId);
-                operationsFlows.TryEnqueue(workspaceId.ToString("D"), "Workspace", businessId: gallery.Id.ToString("D"));
+                operationsFlows.TryEnqueueGallery(workspaceId.ToString("D"), "PublicGallery", businessId: gallery.Id.ToString("D"));
                 string publicUrl = $"{context.Request.Scheme}://{context.Request.Host}/g/{gallery.PublicToken}";
                 return Results.Ok(new { gallery, publicUrl });
             }
             catch (Exception exception)
             {
-                operationsFlows.TryEnqueue(workspaceId.ToString("D"), "Workspace", businessId: workspaceId.ToString("D"), detail: exception.Message, failed: true);
+                operationsFlows.TryEnqueueGallery(workspaceId.ToString("D"), "Publish", businessId: workspaceId.ToString("D"), detail: exception.Message, failed: true);
                 throw;
             }
         }).RequireAuthorization();
