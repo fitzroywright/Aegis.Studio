@@ -23,6 +23,7 @@ public sealed class StudioOperationsFlowPublisher(
 {
     private const string ApplicationId = "Aegis.Studio";
     private readonly ConcurrentDictionary<string, DateTimeOffset> firstObserved = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, (string State, DateTimeOffset AtUtc, string? Error)>> branchStates = new(StringComparer.OrdinalIgnoreCase);
     private readonly Channel<StudioFlowTelemetryItem> queue =
         Channel.CreateBounded<StudioFlowTelemetryItem>(new BoundedChannelOptions(2000)
         {
@@ -38,11 +39,45 @@ public sealed class StudioOperationsFlowPublisher(
         string? businessId = null,
         string? detail = null,
         bool failed = false)
+        => TryEnqueueNotification(correlationId, branch ?? stage, businessId, detail, failed);
+
+    public bool TryEnqueueInbound(
+        string correlationId,
+        string stage,
+        string? businessId = null,
+        string? detail = null,
+        bool failed = false)
+        => Enqueue(correlationId, "InboundMessage", stage, null, businessId, detail, failed);
+
+    public bool TryEnqueueOutbound(
+        string correlationId,
+        string stage,
+        string? businessId = null,
+        string? detail = null,
+        bool failed = false)
+        => Enqueue(correlationId, "OutboundMessage", stage, null, businessId, detail, failed);
+
+    public bool TryEnqueueNotification(
+        string correlationId,
+        string branch,
+        string? businessId = null,
+        string? detail = null,
+        bool failed = false)
+        => Enqueue(correlationId, "NotificationFanout", branch, branch, businessId, detail, failed);
+
+    private bool Enqueue(
+        string correlationId,
+        string flowType,
+        string stage,
+        string? branch,
+        string? businessId,
+        string? detail,
+        bool failed)
     {
         if (string.IsNullOrWhiteSpace(correlationId)) return false;
         return queue.Writer.TryWrite(new(
             correlationId.Trim(),
-            "WorkspaceMessage",
+            flowType,
             stage,
             branch,
             DateTimeOffset.UtcNow,
@@ -58,16 +93,7 @@ public sealed class StudioOperationsFlowPublisher(
         string? detail = null,
         bool failed = false)
     {
-        if (string.IsNullOrWhiteSpace(correlationId)) return false;
-        return queue.Writer.TryWrite(new(
-            correlationId.Trim(),
-            "AttachmentProcessing",
-            stage,
-            null,
-            DateTimeOffset.UtcNow,
-            businessId,
-            detail,
-            failed));
+        return Enqueue(correlationId, "AttachmentProcessing", stage, null, businessId, detail, failed);
     }
 
     public bool TryEnqueueGallery(
@@ -77,16 +103,7 @@ public sealed class StudioOperationsFlowPublisher(
         string? detail = null,
         bool failed = false)
     {
-        if (string.IsNullOrWhiteSpace(correlationId)) return false;
-        return queue.Writer.TryWrite(new(
-            correlationId.Trim(),
-            "GalleryPublish",
-            stage,
-            null,
-            DateTimeOffset.UtcNow,
-            businessId,
-            detail,
-            failed));
+        return Enqueue(correlationId, "GalleryPublish", stage, null, businessId, detail, failed);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -120,9 +137,12 @@ public sealed class StudioOperationsFlowPublisher(
 
         string[] stageNames = item.FlowType switch
         {
+            "InboundMessage" => ["Mailbox", "Router", "Workspace", "Conversation", "Notification"],
+            "OutboundMessage" => ["User", "SendingIdentity", "Message", "Provider", "Recipient"],
+            "NotificationFanout" => ["Event", "Email", "Slack", "WhatsApp", "InApp"],
             "AttachmentProcessing" => ["Received", "Storage", "Metadata", "Workspace"],
             "GalleryPublish" => ["InternalStorage", "Publish", "PublicGallery", "Verification"],
-            _ => ["MailRouting", "Attachments", "Workspace", "Email", "Slack", "WhatsApp", "InApp"]
+            _ => [item.Stage]
         };
         int currentIndex = Array.FindIndex(stageNames, x => x.Equals(item.Stage, StringComparison.OrdinalIgnoreCase));
         if (currentIndex < 0) currentIndex = 2;
@@ -131,30 +151,53 @@ public sealed class StudioOperationsFlowPublisher(
         DateTimeOffset startedAt = firstObserved.GetOrAdd(
             item.FlowType + "|" + item.CorrelationId,
             item.ObservedAtUtc);
-        var stages = stageNames.Select((name, index) => new
+        object[] stages;
+        if (item.FlowType == "NotificationFanout")
         {
-            name,
-            state = index < currentIndex
-                ? "Completed"
-                : index == currentIndex
-                    ? item.Failed ? "Failed" : "Completed"
-                    : item.FlowType == "WorkspaceMessage" &&
-                      index > 2 &&
-                      !string.Equals(name, item.Branch, StringComparison.OrdinalIgnoreCase)
-                        ? "Skipped"
+            string key = item.FlowType + "|" + item.CorrelationId;
+            ConcurrentDictionary<string, (string State, DateTimeOffset AtUtc, string? Error)> state =
+                branchStates.GetOrAdd(key, _ => new(StringComparer.OrdinalIgnoreCase));
+            state["Event"] = ("Completed", startedAt, null);
+            if (!string.IsNullOrWhiteSpace(item.Branch))
+                state[item.Branch] = (item.Failed ? "Failed" : "Completed", item.ObservedAtUtc, item.Failed ? item.Detail : null);
+
+            stages = stageNames.Select(name =>
+            {
+                bool isBranch = !name.Equals("Event", StringComparison.OrdinalIgnoreCase);
+                bool seen = state.TryGetValue(name, out var snapshot);
+                return (object)new
+                {
+                    name,
+                    state = seen ? snapshot.State : isBranch ? "Pending" : "Completed",
+                    startedAtUtc = seen ? snapshot.AtUtc : name == "Event" ? startedAt : (DateTimeOffset?)null,
+                    completedAtUtc = seen && snapshot.State == "Completed" ? snapshot.AtUtc : name == "Event" ? startedAt : (DateTimeOffset?)null,
+                    warningAfterSeconds = isBranch ? 60 : 10,
+                    criticalAfterSeconds = isBranch ? 600 : 60,
+                    error = seen ? snapshot.Error : null,
+                    parentStage = isBranch ? "Event" : null,
+                    branch = isBranch ? name : null
+                };
+            }).ToArray();
+        }
+        else
+        {
+            stages = stageNames.Select((name, index) => (object)new
+            {
+                name,
+                state = index < currentIndex
+                    ? "Completed"
+                    : index == currentIndex
+                        ? item.Failed ? "Failed" : "Completed"
                         : "Pending",
-            startedAtUtc = index == currentIndex ? item.ObservedAtUtc : (DateTimeOffset?)null,
-            completedAtUtc = index == currentIndex && !item.Failed ? now : (DateTimeOffset?)null,
-            warningAfterSeconds = index <= 2 ? 30 : 60,
-            criticalAfterSeconds = index <= 2 ? 300 : 600,
-            error = index == currentIndex && item.Failed ? item.Detail : null,
-            parentStage = index == 0
-                ? null
-                : item.FlowType == "WorkspaceMessage" && index > 2
-                    ? "Workspace"
-                    : stageNames[index - 1],
-            branch = item.FlowType == "WorkspaceMessage" && index > 2 ? name : null
-        }).ToArray();
+                startedAtUtc = index == currentIndex ? item.ObservedAtUtc : (DateTimeOffset?)null,
+                completedAtUtc = index == currentIndex && !item.Failed ? now : (DateTimeOffset?)null,
+                warningAfterSeconds = index <= 2 ? 30 : 60,
+                criticalAfterSeconds = index <= 2 ? 300 : 600,
+                error = index == currentIndex && item.Failed ? item.Detail : null,
+                parentStage = index == 0 ? null : stageNames[index - 1],
+                branch = (string?)null
+            }).ToArray();
+        }
 
         using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(5) };
         using var request = new HttpRequestMessage(
