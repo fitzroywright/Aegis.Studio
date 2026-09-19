@@ -22,6 +22,7 @@ public static class StudioFlowSemantics
         "WorkDaySync" => ["LocalChange", "Pending", "Sending", "ServerProcessing", "Acknowledged"],
         "WorkDayUpload" => ["Selected", "LocalQueue", "Upload", "Storage", "MetadataAssociation", "Acknowledged"],
         "WorkDayMessage" => ["WorkDay", "Studio", "CommonMessaging", "Provider", "Recipient"],
+        "JobFlow" => ["Created", "Assigned", "Accepted", "Arrived", "InProgress", "Completed", "Synchronized"],
         _ => []
     };
 
