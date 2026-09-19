@@ -108,3 +108,21 @@ public sealed record WorkDayFleetSnapshot(
     long PendingUploads,
     long FailedUploads,
     DateTimeOffset GeneratedAtUtc);
+
+
+public sealed record WorkDaySessionCorrectionRequest(
+    DateTimeOffset? CorrectedStartedAtUtc,
+    DateTimeOffset? CorrectedEndedAtUtc,
+    string Reason);
+
+public sealed record WorkDaySessionCorrection(
+    Guid Id,
+    Guid WorkSessionId,
+    string UserName,
+    DateTimeOffset OriginalStartedAtUtc,
+    DateTimeOffset? OriginalEndedAtUtc,
+    DateTimeOffset? CorrectedStartedAtUtc,
+    DateTimeOffset? CorrectedEndedAtUtc,
+    string Reason,
+    string CorrectedBy,
+    DateTimeOffset CorrectedAtUtc);
