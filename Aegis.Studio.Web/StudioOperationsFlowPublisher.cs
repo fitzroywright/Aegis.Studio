@@ -19,7 +19,6 @@ public sealed record StudioFlowTelemetryItem(
 
 public sealed class StudioOperationsFlowPublisher(
     IConfiguration configuration,
-    IHostEnvironment environment,
     ILogger<StudioOperationsFlowPublisher> logger) : BackgroundService
 {
     private const string ApplicationId = "Aegis.Studio";
