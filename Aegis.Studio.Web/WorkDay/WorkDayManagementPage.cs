@@ -38,12 +38,27 @@ async function load(){
   var rows=await getJson('/api/workday/management/sessions?count=100');
   var html='<table><thead><tr><th>User</th><th>Started</th><th>Ended</th><th>Source</th><th></th></tr></thead><tbody>';
   rows.forEach(function(x){
-    html+='<tr><td>'+esc(x.userName)+'</td><td>'+new Date(x.startedAtUtc).toLocaleString()+'</td><td>'+(x.endedAtUtc?new Date(x.endedAtUtc).toLocaleString():'ACTIVE')+'</td><td>'+esc(x.source)+'</td><td><button data-id="'+x.id+'" data-user="'+encodeURIComponent(x.userName)+'">View</button></td></tr>';
+    html+='<tr><td>'+esc(x.userName)+'</td><td>'+new Date(x.startedAtUtc).toLocaleString()+'</td><td>'+(x.endedAtUtc?new Date(x.endedAtUtc).toLocaleString():'ACTIVE')+'</td><td>'+esc(x.source)+'</td><td><button class="view" data-id="'+x.id+'" data-user="'+encodeURIComponent(x.userName)+'">View</button> <button class="correct" data-id="'+x.id+'">Correct</button></td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('sessions').innerHTML=html;
-  document.querySelectorAll('#sessions button').forEach(function(b){b.onclick=function(){show(b.dataset.id,b.dataset.user);};});
+  document.querySelectorAll('#sessions button.view').forEach(function(b){b.onclick=function(){show(b.dataset.id,b.dataset.user);};});
+  document.querySelectorAll('#sessions button.correct').forEach(function(b){b.onclick=function(){correctSession(b.dataset.id);};});
  }catch(err){document.getElementById('sessions').textContent='Sessions unavailable: '+err.message;}
+}
+async function correctSession(id){
+ var start=prompt('Corrected sign-in time (ISO 8601), or leave blank to keep current:','');
+ if(start===null)return;
+ var end=prompt('Corrected sign-out time (ISO 8601), or leave blank to keep current:','');
+ if(end===null)return;
+ var reason=prompt('Correction reason (required):','');
+ if(!reason||!reason.trim())return;
+ var payload={correctedStartedAtUtc:start.trim()?new Date(start).toISOString():null,correctedEndedAtUtc:end.trim()?new Date(end).toISOString():null,reason:reason.trim()};
+ try{
+  var r=await fetch('/api/workday/management/sessions/'+id+'/corrections',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(payload)});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  await load();
+ }catch(err){alert('Correction was not applied: '+err.message);}
 }
 async function show(id,user){
  try{
