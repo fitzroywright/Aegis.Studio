@@ -294,7 +294,7 @@ app.MapPost("/api/conversations/{id:guid}/attachments", async (Guid id, IFormFil
     }
     catch (Exception exception) when (exception is InvalidOperationException or Common.Storage.StorageException)
     {
-        operationsFlows.TryEnqueueAttachment(id.ToString("D"), "Storage", businessId: id.ToString("D"), detail: exception.Message, failed: true);
+        operationsFlows.TryEnqueueAttachment(id.ToString("D"), "Storage", businessId: id.ToString("D"), detail: $"Attachment persistence failed ({exception.GetType().Name}).", failed: true);
         return Results.BadRequest(new { error = exception.Message });
     }
 }).DisableAntiforgery();
