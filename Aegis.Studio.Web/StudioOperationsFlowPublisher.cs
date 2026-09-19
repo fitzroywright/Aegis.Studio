@@ -127,6 +127,10 @@ public sealed class StudioOperationsFlowPublisher(
     public bool TryEnqueueWorkDayMessage(string correlationId,string stage,string? businessId=null,string? detail=null,bool failed=false)
         => Enqueue(correlationId,"WorkDayMessage",stage,null,businessId,detail,failed);
 
+    public bool TryEnqueueJobFlow(string correlationId,string stage,string? businessId=null,string? detail=null,bool failed=false)
+        => Enqueue(correlationId,"JobFlow",stage,null,businessId,detail,failed);
+
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await foreach (StudioFlowTelemetryItem item in queue.Reader.ReadAllAsync(stoppingToken))
