@@ -142,41 +142,74 @@ public sealed class OperationsTelemetryPublisher(
         RegistrationIdentityDocument identity,
         CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            operationsUrl.TrimEnd('/') + "/api/operations/flow-definitions")
-        {
-            Content = JsonContent.Create(new
+        object[] definitions =
+        [
+            new
             {
                 applicationId = ApplicationId,
                 flowType = "WorkspaceMessage",
                 displayName = "Studio Workspace Message",
                 stages = new object[]
                 {
-                new { name = "MailRouting", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
-                new { name = "Attachments", parentStage = "MailRouting", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
-                new { name = "Workspace", parentStage = "Attachments", branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
-                new { name = "Email", parentStage = "Workspace", branch = "Email", warningAfterSeconds = 30, criticalAfterSeconds = 300 },
-                new { name = "Slack", parentStage = "Workspace", branch = "Slack", warningAfterSeconds = 30, criticalAfterSeconds = 300 },
-                new { name = "WhatsApp", parentStage = "Workspace", branch = "WhatsApp", warningAfterSeconds = 30, criticalAfterSeconds = 300 },
-                new { name = "InApp", parentStage = "Workspace", branch = "InApp", warningAfterSeconds = 10, criticalAfterSeconds = 60 }
+                    new { name = "MailRouting", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "Attachments", parentStage = "MailRouting", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Workspace", parentStage = "Attachments", branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "Email", parentStage = "Workspace", branch = "Email", warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Slack", parentStage = "Workspace", branch = "Slack", warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "WhatsApp", parentStage = "Workspace", branch = "WhatsApp", warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "InApp", parentStage = "Workspace", branch = "InApp", warningAfterSeconds = 10, criticalAfterSeconds = 60 }
                 },
                 updatedAtUtc = DateTimeOffset.UtcNow
-            })
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", identity.Credential);
-        request.Headers.TryAddWithoutValidation("X-Aegis-Application-Id", identity.ApplicationId);
-        request.Headers.TryAddWithoutValidation("X-Aegis-Instance-Id", identity.InstanceId);
-        request.Headers.TryAddWithoutValidation("X-Aegis-Installation-Id", identity.InstallationId);
-        request.Headers.TryAddWithoutValidation("X-Aegis-Correlation-Id", Guid.NewGuid().ToString("N"));
+            },
+            new
+            {
+                applicationId = ApplicationId,
+                flowType = "AttachmentProcessing",
+                displayName = "Studio Attachment Processing",
+                stages = new object[]
+                {
+                    new { name = "Received", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "Storage", parentStage = "Received", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Metadata", parentStage = "Storage", branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "Workspace", parentStage = "Metadata", branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 }
+                },
+                updatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new
+            {
+                applicationId = ApplicationId,
+                flowType = "GalleryPublish",
+                displayName = "Studio Gallery Publish",
+                stages = new object[]
+                {
+                    new { name = "InternalStorage", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Publish", parentStage = "InternalStorage", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "PublicGallery", parentStage = "Publish", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Verification", parentStage = "PublicGallery", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 }
+                },
+                updatedAtUtc = DateTimeOffset.UtcNow
+            }
+        ];
 
-        using HttpResponseMessage response = await client.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode)
+        foreach (object definition in definitions)
         {
-            // Flow metadata is advisory to Operations and must never affect application availability.
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                operationsUrl.TrimEnd('/') + "/api/operations/flow-definitions")
+            {
+                Content = JsonContent.Create(definition)
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", identity.Credential);
+            request.Headers.TryAddWithoutValidation("X-Aegis-Application-Id", identity.ApplicationId);
+            request.Headers.TryAddWithoutValidation("X-Aegis-Instance-Id", identity.InstanceId);
+            request.Headers.TryAddWithoutValidation("X-Aegis-Installation-Id", identity.InstallationId);
+            request.Headers.TryAddWithoutValidation("X-Aegis-Correlation-Id", Guid.NewGuid().ToString("N"));
+
+            using HttpResponseMessage response = await client.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+                break;
         }
     }
-
 
     private static string ToOperationalState(EngineeringDiagnosticStatus status) =>
         status switch
