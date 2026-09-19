@@ -118,7 +118,8 @@ public sealed class InboundEmailWorker : BackgroundService
                                 "External",
                                 $"Microsoft Graph: {email.FromAddress}",
                                 stoppingToken,
-                                sourceKey);
+                                sourceKey,
+                                attachmentCorrelation);
 
                             operationsFlows.TryEnqueueAttachment(
                                 attachmentCorrelation,
