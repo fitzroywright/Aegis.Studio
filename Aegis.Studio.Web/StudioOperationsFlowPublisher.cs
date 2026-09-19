@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.Channels;
@@ -21,6 +22,7 @@ public sealed class StudioOperationsFlowPublisher(
     ILogger<StudioOperationsFlowPublisher> logger) : BackgroundService
 {
     private const string ApplicationId = "Aegis.Studio";
+    private readonly ConcurrentDictionary<string, DateTimeOffset> firstObserved = new(StringComparer.OrdinalIgnoreCase);
     private readonly Channel<StudioFlowTelemetryItem> queue =
         Channel.CreateBounded<StudioFlowTelemetryItem>(new BoundedChannelOptions(2000)
         {
@@ -126,6 +128,9 @@ public sealed class StudioOperationsFlowPublisher(
         if (currentIndex < 0) currentIndex = 2;
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset startedAt = firstObserved.GetOrAdd(
+            item.FlowType + "|" + item.CorrelationId,
+            item.ObservedAtUtc);
         var stages = stageNames.Select((name, index) => new
         {
             name,
@@ -138,8 +143,8 @@ public sealed class StudioOperationsFlowPublisher(
                       !string.Equals(name, item.Branch, StringComparison.OrdinalIgnoreCase)
                         ? "Skipped"
                         : "Pending",
-            startedAtUtc = index <= currentIndex ? item.ObservedAtUtc : (DateTimeOffset?)null,
-            completedAtUtc = index <= currentIndex ? now : (DateTimeOffset?)null,
+            startedAtUtc = index == currentIndex ? item.ObservedAtUtc : (DateTimeOffset?)null,
+            completedAtUtc = index == currentIndex && !item.Failed ? now : (DateTimeOffset?)null,
             warningAfterSeconds = index <= 2 ? 30 : 60,
             criticalAfterSeconds = index <= 2 ? 300 : 600,
             error = index == currentIndex && item.Failed ? item.Detail : null,
@@ -162,7 +167,7 @@ public sealed class StudioOperationsFlowPublisher(
                 applicationId = ApplicationId,
                 flowType = item.FlowType,
                 instanceId,
-                startedAtUtc = item.ObservedAtUtc,
+                startedAtUtc,
                 observedAtUtc = now,
                 currentStage = item.Stage,
                 relatedBusinessId = item.BusinessId,
