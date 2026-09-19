@@ -106,7 +106,19 @@ public static class WorkDayEndpoints
                         WorkDayOperationKind.CompleteSession=>"Completed",
                         _=>null
                     };
-                    if(stage is not null) flows.TryEnqueueWorkDaySession(correlation,stage,businessId.ToString("D"));
+                    if(stage is not null)
+                    {
+                        flows.TryEnqueueWorkDaySession(correlation,stage,businessId.ToString("D"));
+                        ScheduleEntry? flowEntry=schedules.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10))
+                            .FirstOrDefault(x=>x.Id==businessId);
+                        Guid? flowJobId=flowEntry is null?null:ResolveAssignmentJobId(flowEntry,db);
+                        if(flowJobId is Guid jobId)
+                        {
+                            flows.TryEnqueueJobFlow(jobId.ToString("D"),stage,jobId.ToString("D"),$"WorkDay {request.Kind} acknowledged for assignment {businessId:D}.");
+                            if(request.Kind==WorkDayOperationKind.CompleteSession)
+                                flows.TryEnqueueJobFlow(jobId.ToString("D"),"Synchronized",jobId.ToString("D"),"Completion acknowledged by Studio.");
+                        }
+                    }
                 }
                 return Results.Ok(result);
             }
@@ -234,6 +246,69 @@ public static class WorkDayEndpoints
             });
         });
 
+        group.MapGet("/workspaces/{workspaceId:guid}/activity",(
+            Guid workspaceId,
+            ClaimsPrincipal user,
+            StudioDatabase db,
+            ScheduleStore schedules,
+            WorkDayStore store,
+            WorkspaceAccessService workspaceAccess)=>
+        {
+            if(!user.IsInRole("Administrator") &&
+               !workspaceAccess.HasPermission(user,workspaceId,"ManageProduction") &&
+               !workspaceAccess.HasPermission(user,workspaceId,"ManageSchedule"))
+                return Results.Forbid();
+
+            PhotographerStore photographers=new(db);
+            IReadOnlyList<PhotographerProfile> profiles=photographers.GetAll()
+                .Where(x=>x.IsActive)
+                .ToArray();
+
+            using Npgsql.NpgsqlConnection connection=db.OpenConnection();
+            using Npgsql.NpgsqlCommand jobs=connection.CreateCommand();
+            jobs.CommandText="select id from studio_jobs where workspace_id=$1";
+            jobs.Parameters.AddWithValue(workspaceId);
+            using Npgsql.NpgsqlDataReader reader=jobs.ExecuteReader();
+            HashSet<Guid> jobIds=[];
+            while(reader.Read()) jobIds.Add(reader.GetGuid(0));
+            reader.Close();
+
+            DateTimeOffset from=DateTimeOffset.UtcNow.AddDays(-1);
+            DateTimeOffset to=DateTimeOffset.UtcNow.AddDays(30);
+            ScheduleEntry[] entries=schedules.GetEntries(from,to)
+                .Where(x=>ResolveAssignmentJobId(x,db) is Guid jobId && jobIds.Contains(jobId))
+                .ToArray();
+
+            HashSet<Guid> assignedResourceIds=entries.SelectMany(x=>x.ResourceIds).ToHashSet();
+            PhotographerProfile[] assignedProfiles=profiles.Where(x=>assignedResourceIds.Contains(x.ScheduleResourceId)).ToArray();
+            IReadOnlyList<WorkDayClientStatus> clients=store.GetClientStatuses(assignedProfiles.Select(x=>x.UserName).ToArray());
+            Dictionary<string,WorkDayClientStatus> latest=clients
+                .GroupBy(x=>x.UserName,StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g=>g.Key,g=>g.OrderByDescending(x=>x.ObservedAtUtc).First(),StringComparer.OrdinalIgnoreCase);
+            Dictionary<Guid,StaffCapacitySnapshot> capacity=schedules.GetStaffCapacity(DateTimeOffset.UtcNow,DateTimeOffset.UtcNow.AddDays(7))
+                .ToDictionary(x=>x.ScheduleResourceId);
+
+            var activity=assignedProfiles.Select(profile=>
+            {
+                WorkDayAssignment[] assignments=entries
+                    .Where(x=>x.ResourceIds.Contains(profile.ScheduleResourceId))
+                    .Select(x=>MapAssignment(x,db,store))
+                    .ToArray();
+                latest.TryGetValue(profile.UserName,out WorkDayClientStatus? client);
+                capacity.TryGetValue(profile.ScheduleResourceId,out StaffCapacitySnapshot? cap);
+                return new WorkspacePhotographerActivity(
+                    profile.UserName,
+                    profile.DisplayName,
+                    profile.ScheduleResourceId,
+                    client,
+                    store.GetActiveSession(profile.UserName),
+                    assignments,
+                    cap);
+            }).OrderBy(x=>x.DisplayName,StringComparer.OrdinalIgnoreCase).ToArray();
+
+            return Results.Ok(new WorkspaceWorkDayActivity(workspaceId,DateTimeOffset.UtcNow,activity));
+        });
+
         group.MapGet("/management/sessions",(string? userName,int? count,ClaimsPrincipal user,WorkDayStore store)=>
         {
             if(!CanViewLocation(user)) return Results.Forbid();
@@ -258,6 +333,15 @@ public static class WorkDayEndpoints
             catch(KeyNotFoundException){return Results.NotFound();}
             catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
         });
+
+        app.MapGet("/workspaces/{workspaceId:guid}/workday-management",(Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access)=>
+        {
+            if(!user.IsInRole("Administrator") &&
+               !access.HasPermission(user,workspaceId,"ManageProduction") &&
+               !access.HasPermission(user,workspaceId,"ManageSchedule"))
+                return Results.Forbid();
+            return Results.Content(WorkspaceWorkDayManagementPage.Render(workspaceId),"text/html");
+        }).RequireAuthorization();
 
         app.MapGet("/workday-management",(ClaimsPrincipal user)=>
         {
