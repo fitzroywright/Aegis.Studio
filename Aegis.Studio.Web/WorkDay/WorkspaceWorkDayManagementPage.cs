@@ -23,6 +23,7 @@ a{color:#50c8ff}
 <main>
 <section class="panel"><div id="summary">Loading workspace activity…</div></section>
 <section class="panel"><h2>Photographers</h2><div id="people" class="grid"></div></section>
+<section class="panel"><h2>Performance Metrics</h2><p class="muted">Descriptive operational metrics only — no composite employee score.</p><div id="performance"></div></section>
 <section class="panel"><h2>Job Flow</h2><p class="muted">Live JobFlow tracking lights are published to Aegis Operations. Open Operations → Flows and filter <b>Studio Job Flow</b> for the detailed stage path.</p></section>
 </main>
 <script>
@@ -30,9 +31,12 @@ const workspaceId='{{workspaceId:D}}';
 function e(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function cls(state){return state==='Available'||state==='Online'?'good':state==='OverCapacity'||state==='Offline'?'bad':'warn';}
 async function load(){
- const r=await fetch('/api/workday/workspaces/'+workspaceId+'/activity',{credentials:'same-origin'});
- if(!r.ok){summary.textContent='Activity unavailable: HTTP '+r.status;return;}
- const d=await r.json();
+ const [activityResponse,performanceResponse]=await Promise.all([
+  fetch('/api/workday/workspaces/'+workspaceId+'/activity',{credentials:'same-origin'}),
+  fetch('/api/workspaces/'+workspaceId+'/performance',{credentials:'same-origin'})
+ ]);
+ if(!activityResponse.ok){summary.textContent='Activity unavailable: HTTP '+activityResponse.status;return;}
+ const d=await activityResponse.json();
  summary.innerHTML='Photographers <b>'+d.photographers.length+'</b> · Updated '+new Date(d.generatedAtUtc).toLocaleString();
  people.innerHTML=d.photographers.map(p=>{
    const c=p.client,cap=p.capacity,a=p.assignments||[],t=p.timeSummary;
@@ -47,6 +51,36 @@ async function load(){
     a.slice(0,6).map(x=>'<div class="muted">'+new Date(x.startsAtUtc).toLocaleString()+' · '+e(x.title)+' · '+e(x.status)+'</div>').join('')+
     '</article>';
  }).join('');
+
+ if(performanceResponse.ok){
+  const p=await performanceResponse.json();
+  const photographerCards=(p.photographers||[]).map(x=>
+   '<article class="card"><h3>'+e(x.displayName)+'</h3>'+
+   '<p><b>'+x.completedShoots+'/'+x.assignedShoots+'</b> shoots completed · '+x.completionPercent+'%</p>'+
+   '<p>On-time arrival '+x.onTimePercent+'% · Backup confirmed '+x.backupConfirmedPercent+'%</p>'+
+   '<p>Reshoots '+x.reshootsRequired+' · '+x.reshootPercent+'% · Verified images '+x.imageCount+'</p>'+
+   '<p class="muted">Avg field session '+(x.averageSessionMinutes==null?'—':Math.round(x.averageSessionMinutes)+' min')+'</p></article>').join('');
+
+  const editorCards=(p.editors||[]).map(x=>
+   '<article class="card"><h3>'+e(x.displayName)+' · Editor</h3>'+
+   '<p><b>'+x.completedActivities+'/'+x.assignedActivities+'</b> completed · '+x.completionPercent+'%</p>'+
+   '<p>On time '+x.onTimePercent+'% · Open '+x.openActivities+' · Overdue '+x.overdueActivities+'</p>'+
+   '<p>Blocked '+x.blockedActivities+' · Avg cycle '+(x.averageCycleMinutes==null?'—':Math.round(x.averageCycleMinutes)+' min')+'</p>'+
+   '<p class="muted">Avg start delay '+(x.averageStartDelayMinutes==null?'—':Math.round(x.averageStartDelayMinutes)+' min')+'</p></article>').join('');
+
+  const productionCards=(p.production||[]).map(x=>
+   '<article class="card"><h3>'+e(x.displayName)+' · Production</h3>'+
+   '<p><b>'+x.completedActivities+'/'+x.assignedActivities+'</b> completed · '+x.completionPercent+'%</p>'+
+   '<p>On time '+x.onTimePercent+'% · Open '+x.openActivities+' · Overdue '+x.overdueActivities+'</p>'+
+   '<p>Blocked '+x.blockedActivities+' · Avg cycle '+(x.averageCycleMinutes==null?'—':Math.round(x.averageCycleMinutes)+' min')+'</p></article>').join('');
+
+  performance.innerHTML=
+   '<h3>Photographers</h3><div class="grid">'+(photographerCards||'<p class="muted">No photographer metrics in this window.</p>')+'</div>'+
+   '<h3>Editors</h3><div class="grid">'+(editorCards||'<p class="muted">No editor metrics in this window.</p>')+'</div>'+
+   '<h3>Other Production</h3><div class="grid">'+(productionCards||'<p class="muted">No production metrics in this window.</p>')+'</div>';
+ }else{
+  performance.innerHTML='<p class="muted">Performance metrics unavailable: HTTP '+performanceResponse.status+'</p>';
+ }
 }
 load();setInterval(load,30000);
 </script></body></html>
