@@ -33,6 +33,7 @@ public sealed class AssignmentPage:ContentPage
         Button start=Action("START SESSION",async()=>await RecordStatus("StartSession",captureLocation:true));
         Button note=Action("ADD NOTE",AddNote);
         Button exception=Action("RECORD EXCEPTION",RecordException);
+        Button exceptionStatus=Action("SET EXCEPTION STATUS",SetExceptionStatus);
         Button upload=Action("ADD / UPLOAD FILES",Upload);
         Button messages=Action("MESSAGES",Messages);
         Button gallery=Action("GALLERY STATUS",Gallery);
@@ -51,7 +52,7 @@ public sealed class AssignmentPage:ContentPage
                     new Label{Text=assignment.Location??"Location not set"},
                     new Label{Text=assignment.Instructions??"No special instructions."},
                     status,uploadState,
-                    navigate,contact,accept,arrived,start,note,exception,upload,messages,gallery,complete
+                    navigate,contact,accept,arrived,start,note,exception,exceptionStatus,upload,messages,gallery,complete
                 }
             }
         };
@@ -94,6 +95,18 @@ public sealed class AssignmentPage:ContentPage
         string? text=await DisplayPromptAsync("Exception", "Describe what happened");
         if(string.IsNullOrWhiteSpace(text))return;
         await QueueText("RecordException",text,category);
+    }
+
+    private async Task SetExceptionStatus()
+    {
+        string value=await DisplayActionSheetAsync("Exception status","Cancel",null,"Cancelled","NoShow","Delayed","UnableToComplete");
+        if(string.IsNullOrWhiteSpace(value)||value=="Cancel")return;
+        string? reason=await DisplayPromptAsync(value,"Reason");
+        if(string.IsNullOrWhiteSpace(reason))return;
+        string deviceId=await device.GetAsync();
+        await store.QueueAsync(new LocalOperation{OperationId=Guid.NewGuid(),Kind="SetExceptionStatus",AssignmentId=assignment.Id,OccurredAtUtc=DateTimeOffset.UtcNow,DeviceId=deviceId,Text=reason,Category=value,ExpectedVersion=assignment.Version,State=nameof(LocalSyncState.Pending)});
+        status.Text=$"{value} safely recorded locally · synchronization pending";
+        try{await sync.SynchronizeAsync();LocalAssignment? updated=await store.GetAssignmentAsync(assignment.Id);if(updated is not null){assignment.Version=updated.Version;assignment.Status=updated.Status;status.Text=$"Status: {updated.Status}";}}catch{}
     }
 
     private async Task QueueText(string kind,string text,string? category)
