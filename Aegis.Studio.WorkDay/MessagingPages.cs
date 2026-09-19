@@ -36,16 +36,13 @@ public sealed class WorkDayThreadPage:ContentPage
     {
         this.api=api;this.thread=thread;Title=thread.Title;
         Button send=new(){Text="SEND",HeightRequest=52};send.Clicked+=Send;
-        Content=new Grid
-        {
-            RowDefinitions={new RowDefinition(GridLength.Star),new RowDefinition(GridLength.Auto)},
-            Children=
-            {
-                new ScrollView{Content=messages},
-                new VerticalStackLayout{Padding=12,Children={compose,send}}
-            }
-        };
-        Grid.SetRow(Content is Grid g?g.Children[1]:throw new InvalidOperationException(),1);
+        ScrollView messageScroll=new(){Content=messages};
+        VerticalStackLayout composer=new(){Padding=12,Children={compose,send}};
+        Grid layout=new(){RowDefinitions={new RowDefinition(GridLength.Star),new RowDefinition(GridLength.Auto)}};
+        layout.Children.Add(messageScroll);
+        layout.Children.Add(composer);
+        Grid.SetRow(composer,1);
+        Content=layout;
         Loaded+=async(_,_)=>await LoadAsync();
     }
     private async Task LoadAsync()
