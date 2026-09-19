@@ -172,8 +172,19 @@ public static class WorkDayEndpoints
         {
             if(!CanViewLocation(user)) return Results.Forbid();
             string target=string.IsNullOrWhiteSpace(userName)?UserName(user):userName.Trim();
+            store.AuditLocationAccess(UserName(user),target,workSessionId,"ViewTimeline");
             IReadOnlyList<WorkDayLocationEvidence> observations=store.GetLocationTimeline(target,workSessionId);
-            return Results.Ok(new WorkDayTimeline(workSessionId,target,DateTimeOffset.MinValue,null,observations));
+            WorkDayWorkSession? session=store.GetWorkSessions(target,500).FirstOrDefault(x=>x.Id==workSessionId);
+            if(session is null) return Results.NotFound();
+            return Results.Ok(new WorkDayTimeline(workSessionId,target,session.StartedAtUtc,session.EndedAtUtc,observations));
+        });
+
+        group.MapPost("/management/sessions/{workSessionId:guid}/corrections",(Guid workSessionId,WorkDaySessionCorrectionRequest request,ClaimsPrincipal user,WorkDayStore store)=>
+        {
+            if(!CanCorrectWorkSession(user)) return Results.Forbid();
+            try{return Results.Ok(store.CorrectWorkSession(workSessionId,request,UserName(user)));}
+            catch(KeyNotFoundException){return Results.NotFound();}
+            catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
         });
 
         app.MapGet("/workday-management",(ClaimsPrincipal user)=>
@@ -239,6 +250,11 @@ public static class WorkDayEndpoints
         user.IsInRole("Administrator") ||
         user.HasClaim("permission","Studio.WorkDay.Location.View") ||
         user.HasClaim("capability","Studio.WorkDay.Location.View");
+
+    private static bool CanCorrectWorkSession(ClaimsPrincipal user)=>
+        user.IsInRole("Administrator") ||
+        user.HasClaim("permission","Studio.WorkDay.Attendance.Correct") ||
+        user.HasClaim("capability","Studio.WorkDay.Attendance.Correct");
 
     private static string UserName(ClaimsPrincipal user)=>
         user.FindFirstValue("login_name")??user.FindFirstValue(ClaimTypes.NameIdentifier)??user.Identity?.Name??string.Empty;
