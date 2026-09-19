@@ -164,7 +164,8 @@ public static class WorkDayEndpoints
             if(!Guid.TryParse(form["uploadId"],out Guid uploadId) || uploadId==Guid.Empty) return Results.BadRequest(new{error="A stable uploadId is required."});
 
             ScheduleEntry? entry=schedules.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10)).FirstOrDefault(x=>x.Id==assignmentId);
-            if(entry?.JobId is not Guid jobId) return Results.BadRequest(new{error="The assignment is not associated with a Studio job."});
+            if(entry is null || ResolveAssignmentJobId(entry,db) is not Guid jobId)
+                return Results.BadRequest(new{error="The assignment is not associated with a Studio job."});
             StudioJob? job=studio.GetJob(jobId);
             if(job is null) return Results.NotFound(new{error="The assignment job was not found."});
 
@@ -185,6 +186,53 @@ public static class WorkDayEndpoints
                 return Results.BadRequest(new{error=ex.Message});
             }
         }).DisableAntiforgery();
+
+        group.MapGet("/assignments/{assignmentId:guid}/gallery-status",(
+            Guid assignmentId,
+            ClaimsPrincipal user,
+            StudioDatabase db,
+            ScheduleStore schedules,
+            JobAccessService access)=>
+        {
+            string userName=UserName(user);
+            if(!AssignmentAllowed(user,userName,assignmentId,db,schedules,access,"ViewAttachments"))
+                return Results.Forbid();
+
+            ScheduleEntry? entry=schedules.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10))
+                .FirstOrDefault(x=>x.Id==assignmentId);
+            if(entry is null || ResolveAssignmentJobId(entry,db) is not Guid jobId)
+                return Results.NotFound();
+
+            using Npgsql.NpgsqlConnection connection=db.OpenConnection();
+            using Npgsql.NpgsqlCommand job=connection.CreateCommand();
+            job.CommandText="select workspace_id from studio_jobs where id=$1";
+            job.Parameters.AddWithValue(jobId);
+            if(job.ExecuteScalar() is not Guid workspaceId) return Results.NotFound();
+
+            using Npgsql.NpgsqlCommand gallery=connection.CreateCommand();
+            gallery.CommandText="""
+                select g.id,g.title,g.is_published,g.published_at_utc,count(i.id)
+                from studio_workspace_galleries g
+                left join studio_gallery_items i on i.gallery_id=g.id and i.is_visible
+                where g.workspace_id=$1
+                group by g.id,g.title,g.is_published,g.published_at_utc
+                """;
+            gallery.Parameters.AddWithValue(workspaceId);
+            using Npgsql.NpgsqlDataReader reader=gallery.ExecuteReader();
+            if(!reader.Read())
+                return Results.Ok(new { workspaceId, exists=false, title=(string?)null, isPublished=false, publishedAtUtc=(DateTimeOffset?)null, visibleItems=0L });
+
+            return Results.Ok(new
+            {
+                workspaceId,
+                exists=true,
+                galleryId=reader.GetGuid(0),
+                title=reader.GetString(1),
+                isPublished=reader.GetBoolean(2),
+                publishedAtUtc=reader.IsDBNull(3)?(DateTimeOffset?)null:reader.GetFieldValue<DateTimeOffset>(3),
+                visibleItems=reader.GetInt64(4)
+            });
+        });
 
         group.MapGet("/management/sessions",(string? userName,int? count,ClaimsPrincipal user,WorkDayStore store)=>
         {
@@ -317,9 +365,10 @@ public static class WorkDayEndpoints
             if(r.Read()){workspace=r.GetGuid(0);conversation=r.GetGuid(1);customer=r.GetString(2);}
         }
 
+        Guid? effectiveJobId=ResolveAssignmentJobId(e,db);
         var state=store.GetAssignmentState(e.Id);
         return new(
-            e.Id,e.JobId,e.BookingId,e.Title,e.StartsAtUtc,e.EndsAtUtc,e.Location,
+            e.Id,effectiveJobId,e.BookingId,e.Title,e.StartsAtUtc,e.EndsAtUtc,e.Location,
             state?.Status??e.Status,e.Notes,workspace,conversation,customer,email,phone,state?.Version??0);
     }
 
