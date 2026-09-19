@@ -171,12 +171,12 @@ public sealed class AssignmentPage:ContentPage
 
     private async Task Gallery()
     {
-        if(assignment.WorkspaceId is not Guid workspace){await DisplayAlertAsync("Gallery","No workspace is associated with this assignment.","OK");return;}
         try
         {
-            GalleryDto? gallery=await api.GetGalleryAsync(workspace);
-            string state=gallery is null?"Unknown":gallery.IsPublished?"Published":"Internal / not published";
-            await DisplayAlertAsync("Gallery",$"{gallery?.Title??"Workspace Gallery"}\nStatus: {state}\nItems: {gallery?.Items.Count??0}","OK");
+            AssignmentGalleryStatusDto? gallery=await api.GetAssignmentGalleryStatusAsync(assignment.Id);
+            if(gallery is null){await DisplayAlertAsync("Gallery","Gallery status is unavailable.","OK");return;}
+            string state=!gallery.Exists?"No gallery":gallery.IsPublished?"Published":"Internal / not published";
+            await DisplayAlertAsync("Gallery",$"{gallery.Title??"Workspace Gallery"}\nStatus: {state}\nVisible items: {gallery.VisibleItems}","OK");
         }
         catch(Exception ex){await DisplayAlertAsync("Gallery","Gallery status is unavailable: "+ex.Message,"OK");}
     }
