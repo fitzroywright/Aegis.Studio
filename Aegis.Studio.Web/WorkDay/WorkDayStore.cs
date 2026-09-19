@@ -26,9 +26,10 @@ public sealed class WorkDayStore(StudioDatabase database)
 
         create table if not exists studio_workday_location_observations(
           id uuid primary key, user_name text not null, work_session_id uuid null references studio_workday_work_sessions(id),
-          assignment_id uuid null, operation_id uuid null references studio_workday_operations(operation_id),
+          assignment_id uuid null, operation_id uuid null,
           latitude double precision not null, longitude double precision not null, accuracy_metres double precision null,
           observed_at_utc timestamptz not null, source text null, mock_location boolean null, received_at_utc timestamptz not null);
+        alter table studio_workday_location_observations drop constraint if exists studio_workday_location_observations_operation_id_fkey;
         create index if not exists ix_workday_location_session on studio_workday_location_observations(work_session_id,observed_at_utc);
 
         create table if not exists studio_workday_notes(
@@ -41,6 +42,36 @@ public sealed class WorkDayStore(StudioDatabase database)
           changed_by text not null, changed_at_utc timestamptz not null, last_operation_id uuid not null);
         """;
         cmd.ExecuteNonQuery();
+    }
+
+    public (string Status, long Version)? GetAssignmentState(Guid assignmentId)
+    {
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand cmd=c.CreateCommand();
+        cmd.CommandText="select status,version from studio_workday_assignment_state where assignment_id=$1";
+        cmd.Parameters.AddWithValue(assignmentId);
+        using NpgsqlDataReader r=cmd.ExecuteReader();
+        return r.Read() ? (r.GetString(0), r.GetInt64(1)) : null;
+    }
+
+    public IReadOnlyList<(Guid OperationId,string Kind,Guid? AssignmentId,DateTimeOffset OccurredAtUtc,string State,string? Message)> GetRecentOperations(string userName,int count=100)
+    {
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand cmd=c.CreateCommand();
+        cmd.CommandText="select operation_id,kind,assignment_id,occurred_at_utc,state,result_message from studio_workday_operations where lower(user_name)=lower($1) order by occurred_at_utc desc limit $2";
+        cmd.Parameters.AddWithValue(userName); cmd.Parameters.AddWithValue(Math.Clamp(count,1,500));
+        using NpgsqlDataReader r=cmd.ExecuteReader();
+        var values=new List<(Guid,string,Guid?,DateTimeOffset,string,string?)>();
+        while(r.Read()) values.Add((r.GetGuid(0),r.GetString(1),r.IsDBNull(2)?null:r.GetGuid(2),r.GetFieldValue<DateTimeOffset>(3),r.GetString(4),r.IsDBNull(5)?null:r.GetString(5)));
+        return values;
+    }
+
+    public IReadOnlyList<WorkDayLocationEvidence> GetLocationTimeline(string userName, Guid workSessionId)
+    {
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand cmd=c.CreateCommand();
+        cmd.CommandText="select id,latitude,longitude,accuracy_metres,observed_at_utc,source,mock_location from studio_workday_location_observations where lower(user_name)=lower($1) and work_session_id=$2 order by observed_at_utc";
+        cmd.Parameters.AddWithValue(userName); cmd.Parameters.AddWithValue(workSessionId);
+        using NpgsqlDataReader r=cmd.ExecuteReader(); var values=new List<WorkDayLocationEvidence>();
+        while(r.Read()) values.Add(new(r.GetGuid(0),r.GetDouble(1),r.GetDouble(2),r.IsDBNull(3)?null:r.GetDouble(3),r.GetFieldValue<DateTimeOffset>(4),r.IsDBNull(5)?null:r.GetString(5),r.IsDBNull(6)?null:r.GetBoolean(6)));
+        return values;
     }
 
     public WorkDayWorkSession? GetActiveSession(string userName)
