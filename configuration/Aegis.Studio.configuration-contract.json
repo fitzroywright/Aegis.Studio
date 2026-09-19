@@ -250,6 +250,16 @@
       "configurationKey": "WorkDay:TimeTracking:WeekendDays",
       "isConfigured": false,
       "example": "Saturday,Sunday"
+    },
+    {
+      "id": "performance-photographer-on-time-grace",
+      "displayName": "Photographer on-time grace",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines the grace period after scheduled call time used by descriptive photographer punctuality metrics.",
+      "configurationKey": "Performance:PhotographerOnTimeGraceMinutes",
+      "isConfigured": false,
+      "example": "15"
     }
   ],
   "runbookReference": "docs/RUNBOOK.md",
