@@ -162,6 +162,12 @@ public static class WorkDayEndpoints
             }
         }).DisableAntiforgery();
 
+        group.MapGet("/management/sessions",(string? userName,int? count,ClaimsPrincipal user,WorkDayStore store)=>
+        {
+            if(!CanViewLocation(user)) return Results.Forbid();
+            return Results.Ok(store.GetWorkSessions(string.IsNullOrWhiteSpace(userName)?null:userName.Trim(),count??100));
+        });
+
         group.MapGet("/work-sessions/{workSessionId:guid}/timeline",(Guid workSessionId,string? userName,ClaimsPrincipal user,WorkDayStore store)=>
         {
             if(!CanViewLocation(user)) return Results.Forbid();
@@ -169,6 +175,12 @@ public static class WorkDayEndpoints
             IReadOnlyList<WorkDayLocationEvidence> observations=store.GetLocationTimeline(target,workSessionId);
             return Results.Ok(new WorkDayTimeline(workSessionId,target,DateTimeOffset.MinValue,null,observations));
         });
+
+        app.MapGet("/workday-management",(ClaimsPrincipal user)=>
+        {
+            if(!CanViewLocation(user)) return Results.Forbid();
+            return Results.Content(WorkDayManagementPage.Render(),"text/html");
+        }).RequireAuthorization();
     }
 
     private static bool AssignmentAllowed(string userName,Guid assignmentId,StudioDatabase db,ScheduleStore schedules)
