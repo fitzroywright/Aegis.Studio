@@ -245,7 +245,7 @@ public sealed class OperationsTelemetryPublisher(
                     observedAtUtc = run.CompletedAt,
                     detail = check.Evidence,
                     correlationId = run.RunId.ToString("D"),
-                    runbook = "Studio / Diagnostics"
+                    runbook = "docs/RUNBOOK.md"
                 })
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", identity.Credential);
