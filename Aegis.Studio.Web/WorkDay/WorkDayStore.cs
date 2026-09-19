@@ -109,6 +109,21 @@ public sealed class WorkDayStore(StudioDatabase database)
         return values;
     }
 
+    public IReadOnlyList<WorkDayWorkSession> GetWorkSessions(string? userName,int count=100)
+    {
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="""
+          select id,user_name,started_at_utc,ended_at_utc,device_id,started_offline,ended_offline,source,updated_at_utc
+          from studio_workday_work_sessions
+          where ($1::text is null or lower(user_name)=lower($1))
+          order by started_at_utc desc limit $2
+        """;
+        q.Parameters.AddWithValue((object?)userName??DBNull.Value);q.Parameters.AddWithValue(Math.Clamp(count,1,500));
+        using NpgsqlDataReader r=q.ExecuteReader();var values=new List<WorkDayWorkSession>();
+        while(r.Read()) values.Add(new(r.GetGuid(0),r.GetString(1),r.GetFieldValue<DateTimeOffset>(2),r.IsDBNull(3)?null:r.GetFieldValue<DateTimeOffset>(3),r.GetString(4),r.GetBoolean(5),r.IsDBNull(6)?null:r.GetBoolean(6),null,null,r.GetString(7),r.GetFieldValue<DateTimeOffset>(8)));
+        return values;
+    }
+
     public IReadOnlyList<WorkDayLocationEvidence> GetLocationTimeline(string userName, Guid workSessionId)
     {
         using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand cmd=c.CreateCommand();
