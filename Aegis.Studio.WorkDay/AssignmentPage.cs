@@ -73,7 +73,7 @@ public sealed class AssignmentPage:ContentPage
         {
             OperationId=Guid.NewGuid(),Kind=kind,AssignmentId=assignment.Id,OccurredAtUtc=DateTimeOffset.UtcNow,
             DeviceId=deviceId,ExpectedVersion=assignment.Version,State=nameof(LocalSyncState.Pending),
-            Latitude=loc?.Latitude,Longitude=loc?.Longitude,AccuracyMetres=loc?.AccuracyMetres,
+            LocationObservationId=loc?.ObservationId,Latitude=loc?.Latitude,Longitude=loc?.Longitude,AccuracyMetres=loc?.AccuracyMetres,
             LocationObservedAtUtc=loc?.ObservedAtUtc,LocationSource=loc?.Source
         });
         status.Text=$"{kind} safely recorded locally · synchronization pending";
