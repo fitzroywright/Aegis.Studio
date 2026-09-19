@@ -369,3 +369,81 @@ Photographers can view their own recent totals through:
 - the WorkDay mobile home screen (14-day summary).
 
 Workspace managers see the same 14-day regular/overtime/weekend totals for photographers assigned to their workspace through the workspace WorkDay management dashboard.
+
+
+## Workspace manager performance dashboards
+
+Workspace managers now have role-specific operational metrics derived from Studio's existing factual records. These metrics are descriptive and workspace-scoped; Studio does not calculate a composite employee score, rank, or rating.
+
+Endpoint:
+
+- `GET /api/workspaces/{workspaceId}/performance`
+
+Default reporting window: previous 30 days. Managers may supply `from` and `to`.
+
+### Photographer metrics
+
+Derived from `studio_shoot_sessions` for jobs owned by the selected workspace:
+
+- assigned shoots;
+- completed shoots and completion percentage;
+- check-ins;
+- on-time check-ins and on-time percentage;
+- backup-confirmed shoots and backup-confirmation percentage;
+- reshoots required and reshoot percentage;
+- verified image count;
+- average recorded field-session duration.
+
+The on-time grace period is configurable through `Performance:PhotographerOnTimeGraceMinutes` (default 15).
+
+These metrics should be read alongside WorkDay time/capacity evidence. A reshoot flag is operational evidence, not by itself a conclusion about the photographer's quality or fault.
+
+### Editor metrics
+
+A staff member appears in Editor metrics when assigned one or more of these production activities:
+
+- Cull
+- Edit
+- Retouch
+- Proof
+- QC
+
+Metrics include:
+
+- assigned activities;
+- completed activities and completion percentage;
+- current open work/WIP;
+- blocked activities;
+- overdue activities;
+- completed-on-time percentage where a due date exists;
+- average cycle time from start to completion;
+- average delay from activity creation to start.
+
+### Other production metrics
+
+Other production staff use the same activity-based model for:
+
+- FileIngest
+- Backup
+- Print
+- Delivery
+- Archive
+- Other
+
+This makes the performance model extensible without forcing every role into photographer or editor semantics.
+
+### Manager dashboard
+
+The workspace WorkDay management screen now combines:
+
+- photographer connectivity/synchronization;
+- active Work Session;
+- capacity;
+- regular/overtime/weekend time evidence;
+- current workspace assignments;
+- photographer operational metrics;
+- editor operational metrics;
+- other production metrics;
+- Job Flow tracking-light visibility through Aegis.Operations.
+
+No metric from another workspace is included unless the person also has work recorded in the selected workspace.
