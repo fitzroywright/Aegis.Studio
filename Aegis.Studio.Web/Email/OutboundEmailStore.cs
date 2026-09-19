@@ -39,12 +39,55 @@ public sealed class OutboundEmailStore
 
     public IReadOnlyList<OutboundEmail> GetPending()
     {
-        using NpgsqlConnection connection=database.OpenConnection();using NpgsqlCommand command=connection.CreateCommand();command.CommandText=SelectSql+" where status='Pending' order by created_at_utc";using NpgsqlDataReader reader=command.ExecuteReader();List<OutboundEmail> values=[];while(reader.Read())values.Add(Read(reader));return values;
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = SelectSql + """
+            where status in ('Pending','Retry')
+              and attempts < 10
+              and (next_attempt_at_utc is null or next_attempt_at_utc <= now())
+            order by created_at_utc
+            """;
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<OutboundEmail> values = [];
+        while (reader.Read()) values.Add(Read(reader));
+        return values;
     }
 
-    public OutboundEmail? MarkSent(Guid id, string? providerMessageId)
+    public OutboundEmail? MarkProviderAccepted(Guid id, string? providerMessageId)
     {
-        using NpgsqlConnection connection=database.OpenConnection();using NpgsqlCommand command=connection.CreateCommand();command.CommandText="update studio_outbound_email set status='Sent',provider_message_id=$2 where id=$1";command.Parameters.AddWithValue(id);command.Parameters.AddWithValue((object?)providerMessageId?.Trim()??DBNull.Value);return command.ExecuteNonQuery()==0?null:Get(id);
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            update studio_outbound_email
+            set status='ProviderAccepted',
+                provider_message_id=$2,
+                attempts=attempts+1,
+                last_error=null,
+                next_attempt_at_utc=null,
+                provider_accepted_at_utc=now()
+            where id=$1
+            """;
+        command.Parameters.AddWithValue(id);
+        command.Parameters.AddWithValue((object?)providerMessageId?.Trim() ?? DBNull.Value);
+        return command.ExecuteNonQuery() == 0 ? null : Get(id);
+    }
+
+    public OutboundEmail? MarkFailure(Guid id, string failureCode, DateTimeOffset nextAttemptAtUtc)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            update studio_outbound_email
+            set attempts=attempts+1,
+                status=case when attempts+1 >= 10 then 'Failed' else 'Retry' end,
+                last_error=$2,
+                next_attempt_at_utc=case when attempts+1 >= 10 then null else $3 end
+            where id=$1
+            """;
+        command.Parameters.AddWithValue(id);
+        command.Parameters.AddWithValue(string.IsNullOrWhiteSpace(failureCode) ? "ProviderFailure" : failureCode.Trim());
+        command.Parameters.AddWithValue(nextAttemptAtUtc);
+        return command.ExecuteNonQuery() == 0 ? null : Get(id);
     }
 
     private OutboundEmail? Get(Guid id)
@@ -83,7 +126,11 @@ public sealed class OutboundEmailStore
             null,
             kind,
             identity.UserName,
-            identity.Type.ToString());
+            identity.Type.ToString(),
+            0,
+            null,
+            null,
+            null);
 
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -117,10 +164,14 @@ public sealed class OutboundEmailStore
         r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5),
         r.IsDBNull(6) ? null : r.GetString(6), r.GetString(7), r.GetFieldValue<DateTimeOffset>(8),
         r.IsDBNull(9) ? null : r.GetString(9), r.GetString(10),
-        r.IsDBNull(11) ? null : r.GetString(11), r.GetString(12));
+        r.IsDBNull(11) ? null : r.GetString(11), r.GetString(12),
+        r.GetInt32(13),
+        r.IsDBNull(14) ? null : r.GetString(14),
+        r.IsDBNull(15) ? null : r.GetFieldValue<DateTimeOffset>(15),
+        r.IsDBNull(16) ? null : r.GetFieldValue<DateTimeOffset>(16));
 
     private const string SelectSql =
-        "select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type from studio_outbound_email";
+        "select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,attempts,last_error,next_attempt_at_utc,provider_accepted_at_utc from studio_outbound_email ";
 }
 
 public sealed record OutboundEmail(
@@ -136,5 +187,9 @@ public sealed record OutboundEmail(
     string? ProviderMessageId,
     string Kind = "Reply",
     string? SentByUserName = null,
-    string SendingIdentityType = "Workspace");
+    string SendingIdentityType = "Workspace",
+    int Attempts = 0,
+    string? LastError = null,
+    DateTimeOffset? NextAttemptAtUtc = null,
+    DateTimeOffset? ProviderAcceptedAtUtc = null);
 public sealed record MarkOutboundSentRequest(string? ProviderMessageId);
