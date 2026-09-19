@@ -1,9 +1,7 @@
+using Aegis.Studio.WorkDay.Core;
 using SQLite;
 
 namespace Aegis.Studio.WorkDay;
-
-public enum LocalSyncState { Pending, Sending, Acknowledged, Failed, Conflict }
-public enum LocalUploadState { Pending, Uploading, Uploaded, Failed, Retrying }
 
 public sealed class LocalAssignment
 {
