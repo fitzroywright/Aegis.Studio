@@ -287,7 +287,7 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
     }
 
     private static string CorrelationId(PendingNotification item) =>
-        string.IsNullOrWhiteSpace(item.ReferenceId) ? item.Id.ToString("D") : item.ReferenceId.Trim();
+        StudioFlowSemantics.CorrelationId(item.ReferenceId, item.Id);
 
     private void MarkDelivered(Guid id) => Update(id, "Delivered", null, true, true);
     private void MarkRetry(Guid id, string error) => Update(id, "Retry", error, false, true);
