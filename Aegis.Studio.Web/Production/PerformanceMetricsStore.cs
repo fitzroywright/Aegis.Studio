@@ -14,14 +14,14 @@ public sealed class PerformanceMetricsStore(StudioDatabase database, IConfigurat
             workspaceId,
             fromUtc,
             toUtc,
-            ["Cull", "Edit", "Retouch", "Proof", "QC"],
+            StudioPerformanceSemantics.EditorActivityTypes,
             "Editor");
 
         IReadOnlyList<ProductionRolePerformanceMetrics> production = GetProductionMetrics(
             workspaceId,
             fromUtc,
             toUtc,
-            ["FileIngest", "Backup", "Print", "Delivery", "Archive", "Other"],
+            StudioPerformanceSemantics.ProductionActivityTypes,
             "Production");
 
         return new(workspaceId, fromUtc, toUtc, photographers, editors, production, DateTimeOffset.UtcNow);
@@ -202,3 +202,10 @@ public sealed record ProductionRolePerformanceMetrics(
     double OnTimePercent,
     double? AverageCycleMinutes,
     double? AverageStartDelayMinutes);
+
+
+public static class StudioPerformanceSemantics
+{
+    public static string[] EditorActivityTypes => ["Cull", "Edit", "Retouch", "Proof", "QC"];
+    public static string[] ProductionActivityTypes => ["FileIngest", "Backup", "Print", "Delivery", "Archive", "Other"];
+}
