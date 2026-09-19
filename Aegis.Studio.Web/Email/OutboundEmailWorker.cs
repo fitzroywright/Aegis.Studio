@@ -60,11 +60,12 @@ public sealed class OutboundEmailWorker : BackgroundService
                             message.Body,
                             stoppingToken);
 
-                        outbox.MarkSent(message.Id, null);
+                        outbox.MarkProviderAccepted(message.Id, null);
                         operationsFlows.TryEnqueueOutbound(
                             message.ConversationId.ToString("D"),
                             "Provider",
-                            businessId: message.Id.ToString("D"));
+                            businessId: message.Id.ToString("D"),
+                            detail: "ProviderAccepted");
                         logger.LogInformation(
                             "Sent outbound email {MessageId} from {FromAddress} to {ToAddress}.",
                             message.Id,
@@ -73,18 +74,27 @@ public sealed class OutboundEmailWorker : BackgroundService
                     }
                     catch (Exception exception)
                     {
+                        double retrySeconds = Math.Min(300, 5 * Math.Pow(2, Math.Min(message.Attempts, 6)));
+                        OutboundEmail? updated = outbox.MarkFailure(
+                            message.Id,
+                            exception.GetType().Name,
+                            DateTimeOffset.UtcNow.AddSeconds(retrySeconds));
+
                         operationsFlows.TryEnqueueOutbound(
                             message.ConversationId.ToString("D"),
                             "Provider",
                             businessId: message.Id.ToString("D"),
-                            detail: exception.GetType().Name,
+                            detail: updated?.Status == "Failed" ? "RetryExhausted" : exception.GetType().Name,
                             failed: true);
+
                         logger.LogError(
                             exception,
-                            "Failed sending outbound email {MessageId} from {FromAddress} to {ToAddress}.",
+                            "Failed sending outbound email {MessageId} from {FromAddress} to {ToAddress}. Attempt={Attempt}; State={State}.",
                             message.Id,
                             message.FromAddress,
-                            message.ToAddress);
+                            message.ToAddress,
+                            (updated?.Attempts ?? message.Attempts + 1),
+                            updated?.Status ?? "Unknown");
                     }
                 }
             }
