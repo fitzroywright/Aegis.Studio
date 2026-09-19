@@ -173,8 +173,8 @@ public sealed class StudioRoleStore
             WorkspacePermissionSet p = JsonSerializer.Deserialize<WorkspacePermissionSet>(json)!;
             using NpgsqlCommand command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = "update studio_workspace_members set access_workspace=$2,can_view=$3,reply_requester=$4,view_attachments=$5,add_attachments=$6,create_job=$7,edit_job=$8,manage_schedule=$9,manage_production=$10,notify_members=$11,edit_workspace=$12,manage_members=$13,admin_workspace=$14,updated_at_utc=now() where role_id=$1";
-            object[] values=[roleId,p.AccessWorkspace,p.View,p.ReplyRequester,p.ViewAttachments,p.AddAttachments,p.CreateJob,p.EditJob,p.ManageSchedule,p.ManageProduction,p.NotifyMembers,p.EditWorkspace,p.ManageMembers,p.AdminWorkspace];
+            command.CommandText = "update studio_workspace_members set access_workspace=$2,can_view=$3,reply_requester=$4,view_attachments=$5,add_attachments=$6,create_job=$7,edit_job=$8,manage_schedule=$9,manage_production=$10,notify_members=$11,edit_workspace=$12,manage_members=$13,admin_workspace=$14,send_as_self=$15,updated_at_utc=now() where role_id=$1";
+            object[] values=[roleId,p.AccessWorkspace,p.View,p.ReplyRequester,p.ViewAttachments,p.AddAttachments,p.CreateJob,p.EditJob,p.ManageSchedule,p.ManageProduction,p.NotifyMembers,p.EditWorkspace,p.ManageMembers,p.AdminWorkspace,p.SendAsSelf];
             foreach(object value in values) command.Parameters.AddWithValue(value);
             command.ExecuteNonQuery();
         }
