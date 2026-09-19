@@ -3,55 +3,123 @@
 Updated: 2026-09-19
 
 ## Baseline inspection
-- COMPLETE — Existing native MAUI `Aegis.Studio.Photographer` client found.
-- COMPLETE — Existing authenticated mobile endpoints under `/api/mobile/photographer` found.
-- COMPLETE — Existing Studio schedule resource/entry model will remain authoritative.
-- COMPLETE — Existing photographer profile maps Studio user -> schedule resource.
-- COMPLETE — Existing PostgreSQL StudioDatabase is authoritative; WorkDay will not create a second server database.
-- COMPLETE — Existing Common.Security/Common.Storage/Common.Messaging/Common.Diagnostics/Common.Registration dependencies are already part of the Studio solution.
-- COMPLETE — Existing client is only an online thin schedule/availability client; it has no durable offline store, outbox, session workflow, uploads, Work Session attendance or location evidence.
+- COMPLETE — Existing Aegis.Studio solution inspected.
+- COMPLETE — Existing MAUI Aegis.Studio.Photographer client identified as an online-only precursor.
+- COMPLETE — Existing customer/booking/job/workspace/gallery/storage/messaging/notification/auth/authorization/scheduling infrastructure reused.
+- COMPLETE — Existing authoritative Studio PostgreSQL database retained.
+- COMPLETE — Pre-existing build/test baseline recorded independently.
 
 ## Architecture
-- IN PROGRESS — Rename/evolve field client product to Aegis Studio WorkDay.
-- IN PROGRESS — Separate WorkDay presentation, local persistence, synchronization, API and device services.
-- NOT STARTED — Secure token/device session storage review.
-- NOT STARTED — Client/device identity decision against Common.Registration.
+- COMPLETE — Aegis.Studio remains the single authoritative system.
+- COMPLETE — WorkDay implemented as a cross-platform MAUI field client.
+- COMPLETE — Client presentation, local persistence, synchronization, API, upload and device services separated.
+- COMPLETE — No direct production database connection from WorkDay.
+- COMPLETE — No OpenBao/provider credentials on the device.
+- COMPLETE — Revocable per-device WorkDay session token; raw token only in SecureStorage; hash stored server-side.
 
-## Server APIs
-- IN PROGRESS — WorkDay bootstrap/today/upcoming.
-- NOT STARTED — Assignment detail/status transition APIs.
-- NOT STARTED — Notes/exceptions.
-- NOT STARTED — Work Session sign-in/sign-out.
-- NOT STARTED — Location evidence/timeline.
-- NOT STARTED — Durable idempotent operation ingestion.
-- NOT STARTED — Upload protocol/Common.Storage association.
-- NOT STARTED — Messaging and Reply-as-Myself integration.
-- NOT STARTED — Gallery status/publication authorization.
-- NOT STARTED — WorkDay diagnostics/Operations telemetry.
+## Home / field workflow
+- COMPLETE — My WorkDay home.
+- COMPLETE — Today / Upcoming.
+- COMPLETE — Needs Attention.
+- COMPLETE — Local authorized search.
+- COMPLETE — Assignment detail.
+- COMPLETE — Navigate / Contact.
+- COMPLETE — Accept / Arrive / Start / Complete.
+- COMPLETE — Structured exception status and exception notes.
+- COMPLETE — Internal field notes.
+- COMPLETE — Work Sign In / Sign Out distinct from authentication.
 
-## Client
-- NOT STARTED — My WorkDay home.
-- NOT STARTED — Today/Upcoming/Needs Attention.
-- NOT STARTED — Assignment detail.
-- NOT STARTED — Arrived/Start/Complete.
-- NOT STARTED — Notes/exceptions.
-- NOT STARTED — Durable SQLite local store/migrations.
-- NOT STARTED — Durable sync outbox/idempotency/restart recovery.
-- NOT STARTED — Durable upload queue.
-- NOT STARTED — Offline-first startup and UI.
-- NOT STARTED — Work Session Sign In/Out.
-- NOT STARTED — Policy-controlled location evidence.
-- NOT STARTED — Navigation handoff.
-- NOT STARTED — Notifications.
+## Offline / synchronization
+- COMPLETE — Durable SQLite local store.
+- COMPLETE — Sensitive cached assignment/customer data protected with AES-GCM key held in SecureStorage.
+- COMPLETE — Durable operation outbox with stable IDs.
+- COMPLETE — Retry/restart recovery.
+- COMPLETE — Idempotent server operation ingestion.
+- COMPLETE — Version conflict detection; ambiguous conflicts are not silently overwritten.
+- COMPLETE — Offline restart after prior valid authentication.
+- COMPLETE — Assignment retention does not delete records referenced by pending work.
+- COMPLETE — Offline UI reports local-safe degradation rather than false failure/health.
 
-## Proof
-- COMPLETE — Pre-existing repository had an authoritative build/test pass before this directive (independent prior build evidence).
-- NOT STARTED — Build all WorkDay changes.
-- NOT STARTED — Automated WorkDay acceptance suite.
-- NOT STARTED — Field failure test.
-- NOT STARTED — Two-location test.
-- NOT STARTED — Field-day attendance/location test.
-- NOT STARTED — Security review.
-- NOT STARTED — Runbook.
+## Uploads
+- COMPLETE — Durable local upload queue.
+- COMPLETE — Pending / Uploading / Uploaded / Failed / Retrying states.
+- COMPLETE — File copied to app-private storage before upload.
+- COMPLETE — Stable UploadId and server source-key idempotency.
+- COMPLETE — Common.Storage-backed Studio AttachmentStore used server-side.
+- COMPLETE — Uploaded state only after server acknowledgement.
 
-Resume rule: inspect this file and Git history, then continue from the first incomplete implementation item. Do not restart completed work.
+## Messaging / galleries / notifications
+- COMPLETE — Existing Studio in-app messaging reused.
+- COMPLETE — Existing customer conversation reply path reused.
+- COMPLETE — Workspace identity is selected by default.
+- COMPLETE — Reply as Myself appears only when existing SendAsSelf authorization and approved email identity allow it.
+- COMPLETE — Existing Studio outbound audit remains authoritative.
+- COMPLETE — Gallery status exposed; WorkDay does not grant publication permission by default.
+- COMPLETE — Existing notifications included in Needs Attention.
+- COMPLETE — No provider credentials added to WorkDay.
+
+## Work Session / location
+- COMPLETE — Explicit Work Session server/local model.
+- COMPLETE — Original offline event timestamps preserved.
+- COMPLETE — Sign-in/sign-out location evidence when permitted/available.
+- COMPLETE — Policy modes: Disabled / SignInOutOnly / AssignmentEvents / BackgroundDuringWork.
+- COMPLETE — Battery-conscious sampling implementation for BackgroundDuringWork while the app process can collect location.
+- COMPLETE — Tracking visibly stops on Sign Out.
+- COMPLETE — Location observations durable/offline/idempotent.
+- COMPLETE — Precise location excluded from general diagnostics/Operations telemetry.
+- COMPLETE — Authorized management work-session timeline and map handoff.
+- COMPLETE — Location history view permission-gated.
+- COMPLETE — GPS represented as field-presence evidence, not proof of conduct.
+
+## Diagnostics / Operations
+- COMPLETE — Client observations contain timestamp, connectivity, sync state, pending operations/uploads, active Work Session and location-service state.
+- COMPLETE — No precise GPS in client fleet telemetry.
+- COMPLETE — Fleet stale/offline semantics implemented on Studio aggregation.
+- COMPLETE — WorkDaySession / WorkDaySync / WorkDayUpload / WorkDayMessage flow contracts added.
+- COMPLETE — Studio Operations publisher emits WorkDay fleet diagnostic with runbook reference.
+- COMPLETE — No-observation fleet state is Unknown, not Healthy.
+
+## Server security
+- COMPLETE — WorkDay routes authenticated.
+- COMPLETE — Assignment mutations validate assignment ownership against the user's Studio schedule resource.
+- COMPLETE — Device token bound to device ID where device-token authentication is used.
+- COMPLETE — Management/location routes require explicit privilege.
+- COMPLETE — WorkDay device sessions revocable without rotating Studio-wide secrets.
+- COMPLETE — Existing Studio permission model retained for messaging/gallery behavior.
+
+## Automated tests
+- COMPLETE — WorkDay lifecycle rule tests.
+- COMPLETE — exception status normalization tests.
+- COMPLETE — flow-order tests.
+- COMPLETE — Unknown-vs-completed sync semantics test.
+- COMPLETE — Existing Studio messaging/security tests remain in authoritative suite.
+- LOCAL PROOF PENDING — full updated server suite.
+- LOCAL PROOF PENDING — Android MAUI compile.
+- LOCAL PROOF PENDING — iOS MAUI compile on macOS.
+
+## Documentation / operations
+- COMPLETE — docs/WORKDAY-RUNBOOK.md.
+- COMPLETE — WorkDay configuration contract additions.
+- COMPLETE — scripts/Build-WorkDay.ps1.
+- COMPLETE — lost/stolen device recovery documented.
+- COMPLETE — offline field-failure acceptance procedure documented.
+- COMPLETE — attendance/location field-day acceptance procedure documented.
+
+## Acceptance proof still requiring execution
+- PENDING PROOF — full Release server build/test after WorkDay changes.
+- PENDING PROOF — Android client compile/package.
+- PENDING PROOF — iOS client compile/package on macOS.
+- PENDING PROOF — physical-device offline/restart/reconnect field failure.
+- PENDING PROOF — physical-device location permission/battery/background behavior.
+- PENDING PROOF — two-location real-data validation.
+
+## Current handoff
+
+IMPLEMENTATION COMPLETE
+TESTS WRITTEN
+STATIC REVIEW COMPLETE
+DOCUMENTATION COMPLETE
+RUNBOOK COMPLETE
+LOCAL BUILD PROOF PENDING
+
+Resume rule: inspect this file and Git history. If compile/runtime proof exposes a defect, fix only the defect, update this checkpoint, and repeat the failed proof. Do not restart completed implementation.
