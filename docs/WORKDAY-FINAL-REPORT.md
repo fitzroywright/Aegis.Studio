@@ -261,3 +261,20 @@ RUNBOOK COMPLETE
 LOCAL BUILD PROOF PENDING
 
 READY FOR LOCAL COMPILE PROOF: YES
+
+
+## Photographer client consolidation
+
+The former Aegis.Studio.Photographer MAUI client has been retired. Its functional scope is now part of Aegis.Studio.WorkDay:
+
+- signed-in field profile/display name;
+- photographer-resource filtered schedule;
+- booking/job time, location, status and notes;
+- availability/unavailability/leave view and entry;
+- quick “tomorrow unavailable” action;
+- schedule navigation/contact actions;
+- assignment confirmation and field lifecycle;
+- offline schedule cache and WorkDay outbox;
+- messaging, gallery status, uploads, notifications and diagnostics.
+
+The legacy /api/mobile/photographer route surface has been retired. WorkDay uses /api/workday as the mobile field API. The server-side PhotographerStore/profile and availability data model remain because WorkDay and Studio scheduling use them; only the obsolete standalone client/API surface was removed.
