@@ -77,7 +77,7 @@ public sealed class OutboundEmailWorker : BackgroundService
                             message.ConversationId.ToString("D"),
                             "Provider",
                             businessId: message.Id.ToString("D"),
-                            detail: exception.Message,
+                            detail: exception.GetType().Name,
                             failed: true);
                         logger.LogError(
                             exception,
