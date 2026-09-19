@@ -2,14 +2,14 @@ namespace Aegis.Studio.WorkDay;
 
 public sealed class LoginPage:ContentPage
 {
-    private readonly WorkDayApiClient api; private readonly WorkDaySessionContext session; private readonly IServiceProvider services;
+    private readonly WorkDayApiClient api; private readonly WorkDaySessionContext session; private readonly IServiceProvider services; private readonly WorkDayDeviceIdentity device; private readonly WorkDayCredentialStore credentials;
     private readonly Entry server=new(){Placeholder="https://studio.example.com",Keyboard=Keyboard.Url};
     private readonly Entry user=new(){Placeholder="User name"};
     private readonly Entry password=new(){Placeholder="Password",IsPassword=true};
     private readonly Label status=new(){Text="Authenticate to Aegis Studio. Signing in for work happens separately."};
-    public LoginPage(WorkDayApiClient api,WorkDaySessionContext session,IServiceProvider services)
+    public LoginPage(WorkDayApiClient api,WorkDaySessionContext session,IServiceProvider services,WorkDayDeviceIdentity device,WorkDayCredentialStore credentials)
     {
-        this.api=api;this.session=session;this.services=services;Title="WorkDay Login";
+        this.api=api;this.session=session;this.services=services;this.device=device;this.credentials=credentials;Title="WorkDay Login";
         server.Text=Preferences.Default.Get("WorkDay.ServerUrl","");
         Button login=new(){Text="LOGIN",HeightRequest=58,FontSize=18};login.Clicked+=Login;
         Content=new ScrollView{Content=new VerticalStackLayout{Padding=24,Spacing=14,Children={new Label{Text="AEGIS STUDIO WORKDAY",FontSize=28,FontAttributes=FontAttributes.Bold},new Label{Text="Secure field access"},server,user,password,login,status}}};
@@ -24,7 +24,13 @@ public sealed class LoginPage:ContentPage
             api.SetServer(uri); await api.LoginAsync(user.Text??"",password.Text??"");
             WorkDayBootstrapDto? bootstrap=await api.BootstrapAsync();
             if(bootstrap is null) throw new InvalidOperationException("Studio did not return a WorkDay profile.");
+            string deviceId=await device.GetAsync();
+            DeviceSessionDto issued=await api.IssueDeviceSessionAsync(deviceId);
+            await credentials.SaveAsync(issued.Token,issued.ExpiresAtUtc);
+            api.SetDeviceToken(issued.Token);
             Preferences.Default.Set("WorkDay.ServerUrl",uri.ToString());
+            Preferences.Default.Set("WorkDay.UserName",bootstrap.UserName);
+            Preferences.Default.Set("WorkDay.DisplayName",bootstrap.DisplayName);
             session.UserName=bootstrap.UserName;session.DisplayName=bootstrap.DisplayName;session.Server=uri;session.IsAuthenticated=true;
             password.Text="";
             MainPage main=services.GetRequiredService<MainPage>();
