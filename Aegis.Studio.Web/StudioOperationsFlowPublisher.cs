@@ -115,6 +115,18 @@ public sealed class StudioOperationsFlowPublisher(
         return Enqueue(correlationId, "GalleryPublish", stage, null, businessId, detail, failed);
     }
 
+    public bool TryEnqueueWorkDaySession(string correlationId,string stage,string? businessId=null,string? detail=null,bool failed=false)
+        => Enqueue(correlationId,"WorkDaySession",stage,null,businessId,detail,failed);
+
+    public bool TryEnqueueWorkDaySync(string correlationId,string stage,string? businessId=null,string? detail=null,bool failed=false,string? stateOverride=null)
+        => Enqueue(correlationId,"WorkDaySync",stage,null,businessId,detail,failed,stateOverride);
+
+    public bool TryEnqueueWorkDayUpload(string correlationId,string stage,string? businessId=null,string? detail=null,bool failed=false)
+        => Enqueue(correlationId,"WorkDayUpload",stage,null,businessId,detail,failed);
+
+    public bool TryEnqueueWorkDayMessage(string correlationId,string stage,string? businessId=null,string? detail=null,bool failed=false)
+        => Enqueue(correlationId,"WorkDayMessage",stage,null,businessId,detail,failed);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await foreach (StudioFlowTelemetryItem item in queue.Reader.ReadAllAsync(stoppingToken))
