@@ -299,6 +299,13 @@ public sealed class WorkDayStore(StudioDatabase database)
 
         if(request.Kind is WorkDayOperationKind.WorkSignIn)
         {
+            using(NpgsqlCommand userLock=c.CreateCommand())
+            {
+                userLock.Transaction=tx;
+                userLock.CommandText="select pg_advisory_xact_lock(hashtext(lower($1)))";
+                userLock.Parameters.AddWithValue(userName);
+                userLock.ExecuteNonQuery();
+            }
             using NpgsqlCommand active=c.CreateCommand(); active.Transaction=tx;
             active.CommandText="select id from studio_workday_work_sessions where lower(user_name)=lower($1) and ended_at_utc is null limit 1"; active.Parameters.AddWithValue(userName);
             object? activeId=active.ExecuteScalar();
