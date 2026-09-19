@@ -210,6 +210,16 @@
       "configurationKey": "WorkDay:LocationRetentionDays",
       "isConfigured": false,
       "example": "30"
+    },
+    {
+      "id": "scheduling-daily-capacity-hours",
+      "displayName": "Scheduling daily staff capacity",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines nominal daily photographer capacity used by workspace managers for assignment and overload visibility.",
+      "configurationKey": "Scheduling:DefaultDailyCapacityHours",
+      "isConfigured": false,
+      "example": "8"
     }
   ],
   "runbookReference": "docs/RUNBOOK.md",
