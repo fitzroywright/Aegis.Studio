@@ -1,4 +1,5 @@
 using Aegis.Studio.Web.Versioning;
+using Aegis.Studio.Web.WorkDay;
 
 namespace Aegis.Studio.Web.Production;
 
@@ -8,6 +9,7 @@ public static class ProductionEndpoints
     {
         app.MapStudioOperationalWork();
         app.MapStudioPhotographerMobile();
+        app.MapStudioWorkDay();
         app.MapStudioVersioning();
     }
 }
