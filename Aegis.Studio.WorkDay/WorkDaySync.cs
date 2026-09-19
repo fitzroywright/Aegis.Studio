@@ -8,6 +8,11 @@ public sealed class WorkDayApiClient
     private readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(15)};
     public Uri? Server=>http.BaseAddress;
     public void SetServer(Uri server)=>http.BaseAddress=server;
+    public void SetDeviceToken(string? token)
+    {
+        http.DefaultRequestHeaders.Remove("X-Aegis-WorkDay-Token");
+        if(!string.IsNullOrWhiteSpace(token)) http.DefaultRequestHeaders.TryAddWithoutValidation("X-Aegis-WorkDay-Token",token);
+    }
 
     public async Task LoginAsync(string user,string password,CancellationToken ct=default)
     {
@@ -18,6 +23,19 @@ public sealed class WorkDayApiClient
 
     public Task<WorkDayBootstrapDto?> BootstrapAsync(CancellationToken ct=default)=>
         http.GetFromJsonAsync<WorkDayBootstrapDto>("api/workday/bootstrap",ct);
+
+    public async Task<DeviceSessionDto> IssueDeviceSessionAsync(string deviceId,CancellationToken ct=default)
+    {
+        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/device-session",new{deviceId},ct);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<DeviceSessionDto>(cancellationToken:ct) ?? throw new InvalidOperationException("Studio did not issue a device session.");
+    }
+
+    public async Task RevokeDeviceSessionAsync(string deviceId,CancellationToken ct=default)
+    {
+        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/device-session/revoke",new{deviceId},ct);
+        r.EnsureSuccessStatusCode();
+    }
 
     public async Task<OperationResultDto> SendAsync(LocalOperation op,CancellationToken ct=default)
     {
@@ -122,3 +140,5 @@ public sealed record NotificationDto(Guid Id,string UserName,string Channel,stri
 public sealed record GalleryDto(Guid Id,Guid WorkspaceId,string Title,string? Description,string PublicToken,bool IsPublished,DateTimeOffset? PublishedAtUtc,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc,IReadOnlyList<object> Items);
 public sealed record SendingIdentityOptionDto(string Type,string Label,string FromAddress,bool IsDefault);
 public sealed record SendingIdentityOptionsDto(string DefaultIdentity,bool CanSendAsSelf,IReadOnlyList<SendingIdentityOptionDto> Identities);
+
+public sealed record DeviceSessionDto(Guid SessionId,string Token,DateTimeOffset ExpiresAtUtc);
