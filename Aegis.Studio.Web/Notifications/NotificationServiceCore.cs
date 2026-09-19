@@ -180,4 +180,13 @@ public sealed class NotificationService
 }
 
 public sealed record StudioNotification(Guid Id, string UserName, string Channel, string EventType, string Subject, string Body, string? ReferenceType, string? ReferenceId, string Status, int Attempts, string? LastError, DateTimeOffset CreatedAtUtc, DateTimeOffset? DeliveredAtUtc);
-internal sealed record PendingNotification(Guid Id, string UserName, string Channel, string Subject, string Body, string? Destination, int Attempts);
+internal sealed record PendingNotification(
+    Guid Id,
+    string UserName,
+    string Channel,
+    string Subject,
+    string Body,
+    string? Destination,
+    int Attempts,
+    string? ReferenceType,
+    string? ReferenceId);
