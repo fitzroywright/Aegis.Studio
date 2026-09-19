@@ -47,6 +47,12 @@ public sealed class WorkDayStore(StudioDatabase database)
           expires_at_utc timestamptz not null, revoked_at_utc timestamptz null,
           last_seen_at_utc timestamptz null);
         create index if not exists ix_workday_device_sessions_user on studio_workday_device_sessions(lower(user_name),expires_at_utc);
+
+        create table if not exists studio_workday_client_observations(
+          device_id text primary key, user_name text not null, observed_at_utc timestamptz not null,
+          connectivity text not null, synchronization_state text not null, pending_operations integer not null,
+          oldest_pending_at_utc timestamptz null, pending_uploads integer not null, failed_uploads integer not null,
+          work_session_active boolean not null, location_permission_state text not null, received_at_utc timestamptz not null);
         """;
         cmd.ExecuteNonQuery();
     }
@@ -111,6 +117,44 @@ public sealed class WorkDayStore(StudioDatabase database)
         using NpgsqlDataReader r=cmd.ExecuteReader(); var values=new List<WorkDayLocationEvidence>();
         while(r.Read()) values.Add(new(r.GetGuid(0),r.GetDouble(1),r.GetDouble(2),r.IsDBNull(3)?null:r.GetDouble(3),r.GetFieldValue<DateTimeOffset>(4),r.IsDBNull(5)?null:r.GetString(5),r.IsDBNull(6)?null:r.GetBoolean(6)));
         return values;
+    }
+
+    public void ObserveClient(string userName, WorkDayClientObservation observation)
+    {
+        if(string.IsNullOrWhiteSpace(observation.DeviceId)) throw new InvalidOperationException("DeviceId is required.");
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="""
+          insert into studio_workday_client_observations(device_id,user_name,observed_at_utc,connectivity,synchronization_state,pending_operations,oldest_pending_at_utc,pending_uploads,failed_uploads,work_session_active,location_permission_state,received_at_utc)
+          values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now())
+          on conflict(device_id) do update set user_name=excluded.user_name,observed_at_utc=excluded.observed_at_utc,connectivity=excluded.connectivity,
+          synchronization_state=excluded.synchronization_state,pending_operations=excluded.pending_operations,oldest_pending_at_utc=excluded.oldest_pending_at_utc,
+          pending_uploads=excluded.pending_uploads,failed_uploads=excluded.failed_uploads,work_session_active=excluded.work_session_active,
+          location_permission_state=excluded.location_permission_state,received_at_utc=now()
+        """;
+        q.Parameters.AddWithValue(observation.DeviceId);q.Parameters.AddWithValue(userName);q.Parameters.AddWithValue(observation.ObservedAtUtc);
+        q.Parameters.AddWithValue(observation.Connectivity);q.Parameters.AddWithValue(observation.SynchronizationState);q.Parameters.AddWithValue(Math.Max(0,observation.PendingOperations));
+        q.Parameters.AddWithValue((object?)observation.OldestPendingAtUtc??DBNull.Value);q.Parameters.AddWithValue(Math.Max(0,observation.PendingUploads));
+        q.Parameters.AddWithValue(Math.Max(0,observation.FailedUploads));q.Parameters.AddWithValue(observation.WorkSessionActive);
+        q.Parameters.AddWithValue(string.IsNullOrWhiteSpace(observation.LocationPermissionState)?"Unknown":observation.LocationPermissionState);
+        q.ExecuteNonQuery();
+    }
+
+    public WorkDayFleetSnapshot GetFleetSnapshot(TimeSpan staleAfter)
+    {
+        DateTimeOffset now=DateTimeOffset.UtcNow; DateTimeOffset cutoff=now-staleAfter;
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="""
+          select count(*),
+          count(*) filter(where observed_at_utc >= $1 and lower(connectivity)='online'),
+          count(*) filter(where observed_at_utc < $1 or lower(connectivity)<>'online'),
+          coalesce(sum(pending_operations),0),
+          min(oldest_pending_at_utc),
+          coalesce(sum(pending_uploads),0),
+          coalesce(sum(failed_uploads),0)
+          from studio_workday_client_observations
+        """;
+        q.Parameters.AddWithValue(cutoff); using NpgsqlDataReader r=q.ExecuteReader();r.Read();
+        return new WorkDayFleetSnapshot(r.GetInt32(0),r.GetInt32(1),r.GetInt32(2),r.GetInt64(3),r.IsDBNull(4)?null:r.GetFieldValue<DateTimeOffset>(4),r.GetInt64(5),r.GetInt64(6),now);
     }
 
     public WorkDayDiagnosticsSnapshot GetDiagnostics(string userName)
