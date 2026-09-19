@@ -135,15 +135,8 @@ public sealed class StudioOperationsFlowPublisher(
             await store.LoadOrCreateAsync(ApplicationId, instanceId, ct);
         if (string.IsNullOrWhiteSpace(identity.Credential)) return;
 
-        string[] stageNames = item.FlowType switch
-        {
-            "InboundMessage" => ["Mailbox", "Router", "Workspace", "Conversation", "Notification"],
-            "OutboundMessage" => ["User", "SendingIdentity", "Message", "Provider", "Recipient"],
-            "NotificationFanout" => ["Event", "Email", "Slack", "Teams", "InApp"],
-            "AttachmentProcessing" => ["Received", "Storage", "Metadata", "Workspace"],
-            "GalleryPublish" => ["InternalStorage", "Publish", "PublicGallery", "Verification"],
-            _ => [item.Stage]
-        };
+        string[] stageNames = StudioFlowSemantics.StageNames(item.FlowType);
+        if (stageNames.Length == 0) stageNames = [item.Stage];
         int currentIndex = Array.FindIndex(stageNames, x => x.Equals(item.Stage, StringComparison.OrdinalIgnoreCase));
         if (currentIndex < 0) currentIndex = 2;
 
