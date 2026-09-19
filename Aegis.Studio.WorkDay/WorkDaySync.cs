@@ -62,6 +62,12 @@ public sealed class WorkDayApiClient
     }
 
     public Task<List<MessageThreadDto>?> GetThreadsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageThreadDto>>("api/messages/threads",ct);
+    public async Task<MessageThreadDto> GetOrCreateThreadAsync(string scopeType,Guid scopeId,CancellationToken ct=default)
+    {
+        using HttpResponseMessage r=await http.PostAsync($"api/messages/threads/{Uri.EscapeDataString(scopeType)}/{scopeId:D}",null,ct);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<MessageThreadDto>(cancellationToken:ct)??throw new InvalidOperationException("Studio did not return the message thread.");
+    }
     public Task<List<MessageDto>?> GetMessagesAsync(Guid threadId,CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageDto>>($"api/messages/threads/{threadId:D}",ct);
     public async Task SendThreadMessageAsync(Guid threadId,string body,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"api/messages/threads/{threadId:D}",new{body},ct);r.EnsureSuccessStatusCode();}
     public Task<List<NotificationDto>?> GetNotificationsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<NotificationDto>>("api/notifications?count=50",ct);
