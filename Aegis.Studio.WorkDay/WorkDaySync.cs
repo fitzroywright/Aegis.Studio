@@ -118,7 +118,7 @@ public sealed record WorkSessionDto(Guid Id,string UserName,DateTimeOffset Start
 public sealed record OperationResultDto(Guid OperationId,string State,DateTimeOffset AcknowledgedAtUtc,string? Message,long? ServerVersion);
 public sealed record MessageThreadDto(Guid Id,string ScopeType,Guid? ScopeId,string Title,string CreatedBy,DateTimeOffset CreatedAtUtc,DateTimeOffset? LastMessageAtUtc,long UnreadCount);
 public sealed record MessageDto(Guid Id,Guid ThreadId,string SenderUserName,string Body,DateTimeOffset CreatedAtUtc);
-public sealed record NotificationDto(Guid Id,string Type,string Title,string Body,string? EntityType,string? EntityId,DateTimeOffset CreatedAtUtc,bool IsRead);
+public sealed record NotificationDto(Guid Id,string UserName,string Channel,string EventType,string Subject,string Body,string? ReferenceType,string? ReferenceId,string Status,int Attempts,string? LastError,DateTimeOffset CreatedAtUtc,DateTimeOffset? DeliveredAtUtc);
 public sealed record GalleryDto(Guid Id,Guid WorkspaceId,string Title,string? Description,string PublicToken,bool IsPublished,DateTimeOffset? PublishedAtUtc,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc,IReadOnlyList<object> Items);
-public sealed record SendingIdentityOptionDto(string Type,string FromAddress,string? UserName);
-public sealed record SendingIdentityOptionsDto(SendingIdentityOptionDto Workspace,SendingIdentityOptionDto? Self);
+public sealed record SendingIdentityOptionDto(string Type,string Label,string FromAddress,bool IsDefault);
+public sealed record SendingIdentityOptionsDto(string DefaultIdentity,bool CanSendAsSelf,IReadOnlyList<SendingIdentityOptionDto> Identities);
