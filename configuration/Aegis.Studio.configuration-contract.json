@@ -200,7 +200,18 @@
       "configurationKey": "WorkDay:TelemetryStaleSeconds",
       "isConfigured": false,
       "example": "300"
+    },
+    {
+      "id": "workday-location-retention",
+      "displayName": "WorkDay precise location retention",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Controls retention of acknowledged precise WorkDay location observations independently from longer-lived attendance/work-session records.",
+      "configurationKey": "WorkDay:LocationRetentionDays",
+      "isConfigured": false,
+      "example": "30"
     }
   ],
-  "runbookReference": "docs/RUNBOOK.md"
+  "runbookReference": "docs/RUNBOOK.md",
+  "workDayRunbookReference": "docs/WORKDAY-RUNBOOK.md"
 }
