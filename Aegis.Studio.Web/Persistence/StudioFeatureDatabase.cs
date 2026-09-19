@@ -29,9 +29,10 @@ public sealed class StudioFeatureDatabase
                 access_workspace boolean not null default true,can_view boolean not null default true,reply_requester boolean not null default false,view_attachments boolean not null default true,
                 add_attachments boolean not null default false,create_job boolean not null default false,edit_job boolean not null default false,manage_schedule boolean not null default false,
                 manage_production boolean not null default false,notify_members boolean not null default false,edit_workspace boolean not null default false,manage_members boolean not null default false,
-                admin_workspace boolean not null default false,created_at_utc timestamptz not null,updated_at_utc timestamptz not null,primary key(workspace_id,user_name)
+                admin_workspace boolean not null default false,send_as_self boolean not null default false,created_at_utc timestamptz not null,updated_at_utc timestamptz not null,primary key(workspace_id,user_name)
             );
             create index if not exists ix_studio_workspace_members_user on studio_workspace_members(lower(user_name),workspace_id);
+            alter table studio_workspace_members add column if not exists send_as_self boolean not null default false;
 
             create table if not exists studio_job_members
             (
@@ -152,6 +153,8 @@ public sealed class StudioFeatureDatabase
             alter table studio_attachments add column if not exists storage_status text not null default 'Stored';
             create unique index if not exists ux_studio_attachments_stored_name on studio_attachments(stored_name);
             alter table studio_user_profiles add column if not exists theme_name text not null default 'studio-default';
+            alter table studio_outbound_email add column if not exists sent_by_user_name text null;
+            alter table studio_outbound_email add column if not exists sending_identity_type text not null default 'Workspace';
             """;
 
         await using NpgsqlCommand command = dataSource.CreateCommand(sql);
