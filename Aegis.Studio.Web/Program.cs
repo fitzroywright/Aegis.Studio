@@ -160,12 +160,18 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
     if (!route.IsRouted)
     {
         UnroutedEmail item = unrouted.Capture(email, route.FailureReason ?? "No route was resolved.");
-        operationsFlows.TryEnqueue(correlationId, "MailRouting", businessId: item.Id.ToString("D"), detail: route.FailureReason, failed: true);
+        operationsFlows.TryEnqueueInbound(correlationId, "Router", businessId: item.Id.ToString("D"), detail: route.FailureReason, failed: true);
         return Results.UnprocessableEntity(new { routed = false, reviewId = item.Id, route.FailureReason });
     }
+    operationsFlows.TryEnqueueInbound(correlationId, "Router", businessId: route.WorkspaceId?.ToString("D"));
     EmailIngestResult result = store.ReceiveEmail(email, route);
-    operationsFlows.TryEnqueue(correlationId, "Workspace", businessId: result.Conversation.Id.ToString("D"));
-    if (!result.WasDuplicate) notifications.PublishToAll("WorkspaceMessage", $"Email: {email.Subject}", $"New email from {email.FromName} routed to {route.WorkspaceName}.", "Conversation", result.Conversation.Id.ToString("D"));
+    operationsFlows.TryEnqueueInbound(correlationId, "Workspace", businessId: result.Conversation.Id.ToString("D"));
+    operationsFlows.TryEnqueueInbound(correlationId, "Conversation", businessId: result.Conversation.Id.ToString("D"));
+    if (!result.WasDuplicate)
+    {
+        notifications.PublishToAll("WorkspaceMessage", $"Email: {email.Subject}", $"New email from {email.FromName} routed to {route.WorkspaceName}.", "Conversation", result.Conversation.Id.ToString("D"));
+        operationsFlows.TryEnqueueInbound(correlationId, "Notification", businessId: result.Conversation.Id.ToString("D"));
+    }
     return Results.Ok(new { routed = true, workspaceId = route.WorkspaceId, conversationId = result.Conversation.Id, result.CreatedConversation, result.WasDuplicate });
 });
 app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen()));
@@ -239,8 +245,10 @@ app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest
     bool allowed = workspaceAccess.HasPermission(user, current.WorkspaceId, "ReplyRequester") || (current.JobId.HasValue && jobAccess.HasPermission(user, current.JobId.Value, "ReplyRequester"));
     if (!allowed) return Results.Forbid();
     StudioSendingIdentity? sendingIdentity = null;
-    if (!request.IsInternal && string.Equals(current.Channel, "Email", StringComparison.OrdinalIgnoreCase))
+    bool externalEmailReply = !request.IsInternal && string.Equals(current.Channel, "Email", StringComparison.OrdinalIgnoreCase);
+    if (externalEmailReply)
     {
+        operationsFlows.TryEnqueueOutbound(id.ToString("D"), "User", businessId: id.ToString("D"));
         StudioWorkspaceDefinition workspace = workspaces.Get(current.WorkspaceId)
             ?? throw new InvalidOperationException("The conversation workspace no longer exists.");
         StudioUserProfile profile = profiles.GetOrCreate(user);
@@ -258,6 +266,10 @@ app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest
                 profile.Email,
                 canSendAsSelf,
                 allowedDomains);
+            operationsFlows.TryEnqueueOutbound(
+                id.ToString("D"),
+                "SendingIdentity",
+                businessId: id.ToString("D"));
         }
         catch (UnauthorizedAccessException)
         {
@@ -270,15 +282,12 @@ app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest
     }
 
     StudioConversation updated = store.AddMessage(id, request, user);
-    OutboundEmail? email = !request.IsInternal && string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase)
+    OutboundEmail? email = externalEmailReply
         ? outbox.Queue(updated, request.Body, sendingIdentity)
         : null;
     string correlationId = id.ToString("D");
-    operationsFlows.TryEnqueue(
-        correlationId,
-        request.IsInternal ? "InApp" : string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase) ? "Email" : "Workspace",
-        branch: request.IsInternal ? "InApp" : string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase) ? "Email" : null,
-        businessId: id.ToString("D"));
+    if (externalEmailReply)
+        operationsFlows.TryEnqueueOutbound(correlationId, "Message", businessId: email?.Id.ToString("D"));
     if (request.IsInternal) notifications.PublishToAll("Mention", $"Internal note: {updated.Subject}", request.Body, "Conversation", id.ToString("D"));
     return Results.Ok(new
     {
