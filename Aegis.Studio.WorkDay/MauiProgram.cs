@@ -6,6 +6,7 @@ public static class MauiProgram
    var b=MauiApp.CreateBuilder();
    b.UseMauiApp<App>();
    b.Services.AddSingleton<WorkDaySessionContext>();
+   b.Services.AddSingleton<WorkDayCredentialStore>();
    b.Services.AddSingleton<WorkDayDataProtector>();
    b.Services.AddSingleton<WorkDayDeviceIdentity>();
    b.Services.AddSingleton<WorkDayLocalStore>();
