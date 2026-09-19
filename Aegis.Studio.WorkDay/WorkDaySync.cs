@@ -112,7 +112,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                     if(op.AssignmentId is Guid id && result.ServerVersion is long version)
                     {
                         LocalAssignment? assignment=await store.GetAssignmentAsync(id);
-                        if(assignment is not null){assignment.Version=version;assignment.Status=OperationStatus(op.Kind,assignment.Status);await store.ReplaceAssignmentsAsync([assignment]);}
+                        if(assignment is not null){assignment.Version=version;assignment.Status=OperationStatus(op.Kind,op.Category,assignment.Status);await store.ReplaceAssignmentsAsync([assignment]);}
                     }
                 }
                 catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException)
@@ -135,7 +135,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
         finally{gate.Release();}
     }
 
-    private static string OperationStatus(string kind,string current)=>kind switch{"AcceptAssignment"=>"Accepted","Arrive"=>"Arrived","StartSession"=>"InProgress","CompleteSession"=>"Completed",_=>current};
+    private static string OperationStatus(string kind,string? category,string current)=>kind switch{"AcceptAssignment"=>"Accepted","Arrive"=>"Arrived","StartSession"=>"InProgress","CompleteSession"=>"Completed","SetExceptionStatus" when !string.IsNullOrWhiteSpace(category)=>category!,_=>current};
 }
 
 public sealed record WorkDayBootstrapDto(string UserName,string DisplayName,DateTimeOffset ServerTimeUtc,IReadOnlyList<AssignmentDto> Today,IReadOnlyList<AssignmentDto> Upcoming,WorkSessionDto? ActiveWorkSession,string LocationTrackingMode,DateTimeOffset GeneratedAtUtc);
