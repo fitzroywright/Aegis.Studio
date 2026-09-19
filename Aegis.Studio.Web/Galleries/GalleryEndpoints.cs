@@ -70,10 +70,26 @@ public static class GalleryEndpoints
             if (!CanPublish(access, context, workspaceId)) return Results.Forbid();
             try
             {
+                string correlationId = workspaceId.ToString("D");
+                operationsFlows.TryEnqueueGallery(correlationId, "Publish", businessId: workspaceId.ToString("D"));
                 WorkspaceGallery gallery = store.Publish(workspaceId);
-                operationsFlows.TryEnqueueGallery(workspaceId.ToString("D"), "PublicGallery", businessId: gallery.Id.ToString("D"));
+                operationsFlows.TryEnqueueGallery(correlationId, "PublicGallery", businessId: gallery.Id.ToString("D"));
+
+                WorkspaceGallery? verified = store.GetPublished(gallery.PublicToken);
+                if (verified is null || !verified.IsPublished || !verified.Items.Any(x => x.IsVisible))
+                {
+                    operationsFlows.TryEnqueueGallery(
+                        correlationId,
+                        "Verification",
+                        businessId: gallery.Id.ToString("D"),
+                        detail: "PublishedGalleryReadbackFailed",
+                        failed: true);
+                    return Results.Problem("The gallery was published but verification failed.", statusCode: StatusCodes.Status503ServiceUnavailable);
+                }
+
+                operationsFlows.TryEnqueueGallery(correlationId, "Verification", businessId: gallery.Id.ToString("D"));
                 string publicUrl = $"{context.Request.Scheme}://{context.Request.Host}/g/{gallery.PublicToken}";
-                return Results.Ok(new { gallery, publicUrl });
+                return Results.Ok(new { gallery = verified, publicUrl });
             }
             catch (Exception exception)
             {
