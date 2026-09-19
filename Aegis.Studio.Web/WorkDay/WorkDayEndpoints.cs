@@ -131,6 +131,20 @@ public static class WorkDayEndpoints
             return session is null?Results.NoContent():Results.Ok(session);
         });
 
+        group.MapGet("/time-summary",(
+            DateTimeOffset? from,
+            DateTimeOffset? to,
+            ClaimsPrincipal user,
+            WorkDayStore store,
+            IConfiguration configuration)=>
+        {
+            DateTimeOffset end=(to??DateTimeOffset.UtcNow).ToUniversalTime();
+            DateTimeOffset start=(from??end.AddDays(-14)).ToUniversalTime();
+            if(end<=start) return Results.BadRequest(new{error="Time summary end must be after start."});
+            WorkDayTimePolicy policy=WorkDayTimeSemantics.FromConfiguration(configuration);
+            return Results.Ok(store.GetTimeSummaries([UserName(user)],start,end,policy).Single());
+        });
+
         group.MapGet("/diagnostics",(ClaimsPrincipal user,WorkDayStore store)=>
             Results.Ok(store.GetDiagnostics(UserName(user))));
 
@@ -252,7 +266,8 @@ public static class WorkDayEndpoints
             StudioDatabase db,
             ScheduleStore schedules,
             WorkDayStore store,
-            WorkspaceAccessService workspaceAccess)=>
+            WorkspaceAccessService workspaceAccess,
+            IConfiguration configuration)=>
         {
             if(!user.IsInRole("Administrator") &&
                !workspaceAccess.HasPermission(user,workspaceId,"ManageProduction") &&
@@ -287,6 +302,12 @@ public static class WorkDayEndpoints
                 .ToDictionary(g=>g.Key,g=>g.OrderByDescending(x=>x.ObservedAtUtc).First(),StringComparer.OrdinalIgnoreCase);
             Dictionary<Guid,StaffCapacitySnapshot> capacity=schedules.GetStaffCapacity(DateTimeOffset.UtcNow,DateTimeOffset.UtcNow.AddDays(7))
                 .ToDictionary(x=>x.ScheduleResourceId);
+            WorkDayTimePolicy timePolicy=WorkDayTimeSemantics.FromConfiguration(configuration);
+            DateTimeOffset timeFrom=DateTimeOffset.UtcNow.AddDays(-14);
+            DateTimeOffset timeTo=DateTimeOffset.UtcNow;
+            Dictionary<string,WorkDayTimeSummary> timeSummaries=store
+                .GetTimeSummaries(assignedProfiles.Select(x=>x.UserName).ToArray(),timeFrom,timeTo,timePolicy)
+                .ToDictionary(x=>x.UserName,StringComparer.OrdinalIgnoreCase);
 
             var activity=assignedProfiles.Select(profile=>
             {
@@ -296,6 +317,7 @@ public static class WorkDayEndpoints
                     .ToArray();
                 latest.TryGetValue(profile.UserName,out WorkDayClientStatus? client);
                 capacity.TryGetValue(profile.ScheduleResourceId,out StaffCapacitySnapshot? cap);
+                timeSummaries.TryGetValue(profile.UserName,out WorkDayTimeSummary? timeSummary);
                 return new WorkspacePhotographerActivity(
                     profile.UserName,
                     profile.DisplayName,
@@ -303,7 +325,8 @@ public static class WorkDayEndpoints
                     client,
                     store.GetActiveSession(profile.UserName),
                     assignments,
-                    cap);
+                    cap,
+                    timeSummary);
             }).OrderBy(x=>x.DisplayName,StringComparer.OrdinalIgnoreCase).ToArray();
 
             return Results.Ok(new WorkspaceWorkDayActivity(workspaceId,DateTimeOffset.UtcNow,activity));
