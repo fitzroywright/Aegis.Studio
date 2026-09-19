@@ -170,13 +170,13 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
 });
 app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen()));
 app.MapGet("/api/email/outbox", (OutboundEmailStore store) => Results.Ok(store.GetPending()));
-app.MapGet("/api/conversations/{id:guid}/sending-identities", (Guid id, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService workspaceAccess, WorkspaceStore workspaces, UserProfileStore profiles, IConfiguration configuration) =>
+app.MapGet("/api/conversations/{id:guid}/sending-identities", (Guid id, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, WorkspaceStore workspaces, UserProfileStore profiles, IConfiguration configuration) =>
 {
     StudioConversation? conversation = store.GetConversation(id);
     if (conversation is null) return Results.NotFound();
 
     bool allowed = workspaceAccess.HasPermission(user, conversation.WorkspaceId, "View") ||
-        (conversation.JobId.HasValue && app.Services.GetRequiredService<JobAccessService>().HasPermission(user, conversation.JobId.Value, "ViewConversation"));
+        (conversation.JobId.HasValue && jobAccess.HasPermission(user, conversation.JobId.Value, "ViewConversation"));
     if (!allowed) return Results.Forbid();
 
     StudioWorkspaceDefinition workspace = workspaces.Get(conversation.WorkspaceId)
