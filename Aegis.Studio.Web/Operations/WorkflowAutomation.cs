@@ -34,7 +34,7 @@ public static class WorkflowAutomationEndpoints
             app.Services.GetRequiredService<NotificationService>(),
             app.Services.GetRequiredService<WorkspaceAccessService>(),
             app.Services.GetRequiredService<JobAccessService>(),
-            app.Services.GetRequiredService<OutboundEmailStore>());
+            app.Services.GetRequiredService<OutboundEmailStore>(),\n            app.Services.GetRequiredService<IConfiguration>());
         engine.EnsureSchema();
         WorkflowAutomationRuntime.Initialize(engine);
 
@@ -118,7 +118,7 @@ public sealed class WorkflowAutomationEngine
     private readonly NotificationService notifications;
     private readonly WorkspaceAccessService workspaceAccess;
     private readonly JobAccessService jobAccess;
-    private readonly OutboundEmailStore outbox;
+    private readonly OutboundEmailStore outbox;\n    private readonly IConfiguration configuration;
     private readonly string instanceId = Guid.NewGuid().ToString("N");
 
     public WorkflowAutomationEngine(
@@ -134,7 +134,7 @@ public sealed class WorkflowAutomationEngine
         this.notifications = notifications;
         this.workspaceAccess = workspaceAccess;
         this.jobAccess = jobAccess;
-        this.outbox = outbox;
+        this.outbox = outbox;\n        this.configuration = configuration;
     }
 
     public void EnsureSchema()
@@ -421,7 +421,7 @@ public sealed class WorkflowAutomationEngine
             case "createschedule":
                 DateTimeOffset start = DateTimeOffset.UtcNow.AddMinutes(OptionalInt(action,"startsInMinutes") ?? 0);
                 int duration = Math.Max(1, OptionalInt(action,"durationMinutes") ?? 60);
-                new ScheduleStore(database).Create(new ScheduleEntryRequest(jobId,null,Text(action,"title","Scheduled work"),start,start.AddMinutes(duration),OptionalText(action,"location"),"Scheduled",OptionalText(action,"notes"),[]));
+                new ScheduleStore(database, configuration).Create(new ScheduleEntryRequest(jobId,null,Text(action,"title","Scheduled work"),start,start.AddMinutes(duration),OptionalText(action,"location"),"Scheduled",OptionalText(action,"notes"),[]));
                 break;
             default:
                 throw new InvalidOperationException($"Unsupported workflow action '{type}'.");
