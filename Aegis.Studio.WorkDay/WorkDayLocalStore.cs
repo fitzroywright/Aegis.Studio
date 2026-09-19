@@ -90,6 +90,11 @@ public sealed class LocalLocationObservation
     [Ignore] public double Latitude { get; set; }
     [Ignore] public double Longitude { get; set; }
     [Ignore] public double? AccuracyMetres { get; set; }
+    // Compatibility columns preserve upgradeability from the pre-release schema.
+    // They are always scrubbed to non-sensitive values; encrypted fields are authoritative.
+    [Column("Latitude")] public double LegacyLatitude { get; set; }
+    [Column("Longitude")] public double LegacyLongitude { get; set; }
+    [Column("AccuracyMetres")] public double? LegacyAccuracyMetres { get; set; }
     public string LatitudeCiphertext { get; set; }="";
     public string LongitudeCiphertext { get; set; }="";
     public string? AccuracyCiphertext { get; set; }
@@ -151,6 +156,7 @@ public sealed class WorkDayLocalStore
                 await ProtectOperationAsync(current);
                 await db.InsertOrReplaceAsync(current);
             }
+            await db.ExecuteAsync("update LocalOperation set Text=null, Latitude=null, Longitude=null, AccuracyMetres=null");
         }
 
         IReadOnlyList<SQLiteConnection.ColumnInfo> locationColumns=await db.GetTableInfoAsync(nameof(LocalLocationObservation));
@@ -167,8 +173,12 @@ public sealed class WorkDayLocalStore
                 if(string.IsNullOrWhiteSpace(current.LongitudeCiphertext)) current.Longitude=old.Longitude;
                 if(string.IsNullOrWhiteSpace(current.AccuracyCiphertext)&&old.AccuracyMetres.HasValue) current.AccuracyMetres=old.AccuracyMetres;
                 await ProtectLocationAsync(current);
+                current.LegacyLatitude=0d;
+                current.LegacyLongitude=0d;
+                current.LegacyAccuracyMetres=null;
                 await db.InsertOrReplaceAsync(current);
             }
+            await db.ExecuteAsync("update LocalLocationObservation set Latitude=0, Longitude=0, AccuracyMetres=null");
         }
     }
 
