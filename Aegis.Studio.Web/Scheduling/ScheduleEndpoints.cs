@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
+using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Production;
 
 namespace Aegis.Studio.Web.Scheduling;
 
@@ -41,7 +43,8 @@ public static class ScheduleEndpoints
             ClaimsPrincipal user,
             ScheduleStore store,
             JobAccessService access,
-            JobEventNotifier notifier) =>
+            JobEventNotifier notifier,
+            StudioDatabase database) =>
         {
             if (!request.JobId.HasValue)
             {
@@ -54,6 +57,7 @@ public static class ScheduleEndpoints
             try
             {
                 ScheduleEntry value = store.Create(request);
+                EnsureAssignedPhotographers(value, database, access);
                 if (value.JobId.HasValue)
                 {
                     notifier.Publish(
@@ -75,7 +79,8 @@ public static class ScheduleEndpoints
             ClaimsPrincipal user,
             ScheduleStore store,
             JobAccessService access,
-            JobEventNotifier notifier) =>
+            JobEventNotifier notifier,
+            StudioDatabase database) =>
         {
             ScheduleEntry? current = store.GetEntries(DateTimeOffset.UtcNow.AddYears(-5), DateTimeOffset.UtcNow.AddYears(5)).FirstOrDefault(x => x.Id == id);
             Guid? jobId = request.JobId ?? current?.JobId;
@@ -90,6 +95,7 @@ public static class ScheduleEndpoints
             try
             {
                 ScheduleEntry value = store.Update(id, request);
+                EnsureAssignedPhotographers(value, database, access);
                 if (value.JobId.HasValue)
                 {
                     string verb = value.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) ? "Cancelled" : "Schedule updated";
