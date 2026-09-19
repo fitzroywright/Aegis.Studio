@@ -12,19 +12,22 @@ public sealed class NotificationService
     private readonly StudioStore studio;
     private readonly WorkspaceAccessService workspaceAccess;
     private readonly JobAccessService jobAccess;
+    private readonly StudioOperationsFlowPublisher operationsFlows;
 
     public NotificationService(
         StudioDatabase database,
         UserProfileStore profiles,
         StudioStore studio,
         WorkspaceAccessService workspaceAccess,
-        JobAccessService jobAccess)
+        JobAccessService jobAccess,
+        StudioOperationsFlowPublisher operationsFlows)
     {
         this.database = database;
         this.profiles = profiles;
         this.studio = studio;
         this.workspaceAccess = workspaceAccess;
         this.jobAccess = jobAccess;
+        this.operationsFlows = operationsFlows;
     }
 
     public void PublishToAll(string eventType, string subject, string body, string? referenceType = null, string? referenceId = null)
@@ -79,6 +82,7 @@ public sealed class NotificationService
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(userName);
         command.ExecuteNonQuery();
+        return id;
     }
 
     private IReadOnlyList<string>? ResolveScopedRecipients(string? referenceType, string? referenceId)
@@ -133,14 +137,22 @@ public sealed class NotificationService
     private void QueueForProfile(StudioUserProfile profile, string eventType, string subject, string body, string? referenceType, string? referenceId)
     {
         UserMessagingPreferences preferences = profile.Messaging;
-        if (preferences.InAppEnabled) Insert(profile.UserName, "InApp", eventType, subject, body, referenceType, referenceId, "Delivered", null);
+        if (preferences.InAppEnabled)
+        {
+            Guid id = Insert(profile.UserName, "InApp", eventType, subject, body, referenceType, referenceId, "Delivered", null);
+            operationsFlows.TryEnqueueNotification(
+                string.IsNullOrWhiteSpace(referenceId) ? id.ToString("D") : referenceId,
+                "InApp",
+                businessId: id.ToString("D"));
+        }
         if (preferences.EmailEnabled && !string.IsNullOrWhiteSpace(profile.Email)) Insert(profile.UserName, "Email", eventType, subject, body, referenceType, referenceId, "Pending", profile.Email);
         if (preferences.SlackEnabled) Insert(profile.UserName, "Slack", eventType, subject, body, referenceType, referenceId, "Pending", null);
         if (preferences.TeamsEnabled) Insert(profile.UserName, "Teams", eventType, subject, body, referenceType, referenceId, "Pending", null);
     }
 
-    private void Insert(string userName, string channel, string eventType, string subject, string body, string? referenceType, string? referenceId, string status, string? destination)
+    private Guid Insert(string userName, string channel, string eventType, string subject, string body, string? referenceType, string? referenceId, string status, string? destination)
     {
+        Guid id = Guid.NewGuid();
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -148,7 +160,7 @@ public sealed class NotificationService
             (id,user_name,channel,event_type,subject,body,reference_type,reference_id,status,destination,attempts,last_error,is_read,created_at_utc,delivered_at_utc)
             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,null,false,now(),case when $9='Delivered' then now() else null end)
             """;
-        command.Parameters.AddWithValue(Guid.NewGuid());
+        command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(userName);
         command.Parameters.AddWithValue(channel);
         command.Parameters.AddWithValue(eventType);
