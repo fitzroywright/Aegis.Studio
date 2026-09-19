@@ -1,6 +1,6 @@
 namespace Aegis.Studio.Web.WorkDay;
 
-public enum WorkDayOperationKind { AcceptAssignment, Arrive, StartSession, CompleteSession, AddNote, RecordException, WorkSignIn, WorkSignOut, LocationObservation }
+public enum WorkDayOperationKind { AcceptAssignment, Arrive, StartSession, CompleteSession, SetExceptionStatus, AddNote, RecordException, WorkSignIn, WorkSignOut, LocationObservation }
 public enum WorkDayOperationState { Pending, Acknowledged, Failed, Conflict }
 public enum WorkDayLocationTrackingMode { Disabled, SignInOutOnly, AssignmentEvents, BackgroundDuringWork }
 
