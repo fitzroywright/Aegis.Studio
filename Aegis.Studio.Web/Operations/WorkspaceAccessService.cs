@@ -153,5 +153,25 @@ public sealed record WorkspacePermissionSet(bool AccessWorkspace,bool View,bool 
 {
     public static WorkspacePermissionSet None => new(false,false,false,false,false,false,false,false,false,false,false,false,false,false);
     public static WorkspacePermissionSet ViewOnly => new(true,true,false,true,false,false,false,false,false,false,false,false,false,false);
+
+    // Workspace Manager supervises the workspace without becoming a global/system administrator.
+    // Managers can schedule/reassign work, monitor production, communicate as the workspace,
+    // manage ordinary workspace members and operational content, but AdminWorkspace remains false.
+    public static WorkspacePermissionSet Manager => new(
+        true,  // AccessWorkspace
+        true,  // View
+        true,  // ReplyRequester
+        true,  // ViewAttachments
+        true,  // AddAttachments
+        true,  // CreateJob
+        true,  // EditJob
+        true,  // ManageSchedule
+        true,  // ManageProduction
+        true,  // NotifyMembers
+        true,  // EditWorkspace
+        true,  // ManageMembers
+        false, // AdminWorkspace
+        true); // SendAsSelf
+
     public static WorkspacePermissionSet Full => new(true,true,true,true,true,true,true,true,true,true,true,true,true,true);
 }
