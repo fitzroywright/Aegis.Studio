@@ -222,13 +222,13 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         command.CommandText = """
             update studio_notifications n
             set status = case
-                    when q.state='completed' then 'Delivered'
+                    when q.state='completed' then 'ProviderAccepted'
                     when q.state='dead' then 'Failed'
                     else n.status
                 end,
                 attempts = greatest(n.attempts, q.attempt),
                 last_error = case when q.state='dead' then q.error_code else n.last_error end,
-                delivered_at_utc = case when q.state='completed' then q.updated_at else n.delivered_at_utc end
+                delivered_at_utc = case when q.state='delivered' then q.updated_at else n.delivered_at_utc end
             from common_messaging_queue q
             where q.queue_name=$1
               and q.notification_id=n.id
