@@ -7,6 +7,7 @@ namespace Aegis.Studio.Web;
 
 public sealed record StudioFlowTelemetryItem(
     string CorrelationId,
+    string FlowType,
     string Stage,
     string? Branch,
     DateTimeOffset ObservedAtUtc,
@@ -39,8 +40,47 @@ public sealed class StudioOperationsFlowPublisher(
         if (string.IsNullOrWhiteSpace(correlationId)) return false;
         return queue.Writer.TryWrite(new(
             correlationId.Trim(),
+            "WorkspaceMessage",
             stage,
             branch,
+            DateTimeOffset.UtcNow,
+            businessId,
+            detail,
+            failed));
+    }
+
+    public bool TryEnqueueAttachment(
+        string correlationId,
+        string stage,
+        string? businessId = null,
+        string? detail = null,
+        bool failed = false)
+    {
+        if (string.IsNullOrWhiteSpace(correlationId)) return false;
+        return queue.Writer.TryWrite(new(
+            correlationId.Trim(),
+            "AttachmentProcessing",
+            stage,
+            null,
+            DateTimeOffset.UtcNow,
+            businessId,
+            detail,
+            failed));
+    }
+
+    public bool TryEnqueueGallery(
+        string correlationId,
+        string stage,
+        string? businessId = null,
+        string? detail = null,
+        bool failed = false)
+    {
+        if (string.IsNullOrWhiteSpace(correlationId)) return false;
+        return queue.Writer.TryWrite(new(
+            correlationId.Trim(),
+            "GalleryPublish",
+            stage,
+            null,
             DateTimeOffset.UtcNow,
             businessId,
             detail,
@@ -76,7 +116,12 @@ public sealed class StudioOperationsFlowPublisher(
             await store.LoadOrCreateAsync(ApplicationId, instanceId, ct);
         if (string.IsNullOrWhiteSpace(identity.Credential)) return;
 
-        string[] stageNames = ["MailRouting", "Attachments", "Workspace", "Email", "Slack", "WhatsApp", "InApp"];
+        string[] stageNames = item.FlowType switch
+        {
+            "AttachmentProcessing" => ["Received", "Storage", "Metadata", "Workspace"],
+            "GalleryPublish" => ["InternalStorage", "Publish", "PublicGallery", "Verification"],
+            _ => ["MailRouting", "Attachments", "Workspace", "Email", "Slack", "WhatsApp", "InApp"]
+        };
         int currentIndex = Array.FindIndex(stageNames, x => x.Equals(item.Stage, StringComparison.OrdinalIgnoreCase));
         if (currentIndex < 0) currentIndex = 2;
 
@@ -84,11 +129,13 @@ public sealed class StudioOperationsFlowPublisher(
         var stages = stageNames.Select((name, index) => new
         {
             name,
-            state = index < currentIndex && index <= 2
+            state = index < currentIndex
                 ? "Completed"
                 : index == currentIndex
                     ? item.Failed ? "Failed" : "Completed"
-                    : index > 2 && !string.Equals(name, item.Branch, StringComparison.OrdinalIgnoreCase)
+                    : item.FlowType == "WorkspaceMessage" &&
+                      index > 2 &&
+                      !string.Equals(name, item.Branch, StringComparison.OrdinalIgnoreCase)
                         ? "Skipped"
                         : "Pending",
             startedAtUtc = index <= currentIndex ? item.ObservedAtUtc : (DateTimeOffset?)null,
@@ -96,8 +143,12 @@ public sealed class StudioOperationsFlowPublisher(
             warningAfterSeconds = index <= 2 ? 30 : 60,
             criticalAfterSeconds = index <= 2 ? 300 : 600,
             error = index == currentIndex && item.Failed ? item.Detail : null,
-            parentStage = index == 0 ? null : index <= 2 ? stageNames[index - 1] : "Workspace",
-            branch = index > 2 ? name : null
+            parentStage = index == 0
+                ? null
+                : item.FlowType == "WorkspaceMessage" && index > 2
+                    ? "Workspace"
+                    : stageNames[index - 1],
+            branch = item.FlowType == "WorkspaceMessage" && index > 2 ? name : null
         }).ToArray();
 
         using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(5) };
@@ -109,13 +160,18 @@ public sealed class StudioOperationsFlowPublisher(
             {
                 correlationId = item.CorrelationId,
                 applicationId = ApplicationId,
-                flowType = "WorkspaceMessage",
+                flowType = item.FlowType,
                 instanceId,
                 startedAtUtc = item.ObservedAtUtc,
                 observedAtUtc = now,
                 currentStage = item.Stage,
                 relatedBusinessId = item.BusinessId,
-                runbook = "Studio / Workspace Messaging",
+                runbook = item.FlowType switch
+                {
+                    "AttachmentProcessing" => "Studio / Attachments",
+                    "GalleryPublish" => "Studio / Gallery Publishing",
+                    _ => "Studio / Workspace Messaging"
+                },
                 stages
             })
         };
