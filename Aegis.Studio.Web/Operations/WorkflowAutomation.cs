@@ -34,7 +34,8 @@ public static class WorkflowAutomationEndpoints
             app.Services.GetRequiredService<NotificationService>(),
             app.Services.GetRequiredService<WorkspaceAccessService>(),
             app.Services.GetRequiredService<JobAccessService>(),
-            app.Services.GetRequiredService<OutboundEmailStore>(),\n            app.Services.GetRequiredService<IConfiguration>());
+            app.Services.GetRequiredService<OutboundEmailStore>(),
+            app.Services.GetRequiredService<IConfiguration>());
         engine.EnsureSchema();
         WorkflowAutomationRuntime.Initialize(engine);
 
@@ -118,7 +119,8 @@ public sealed class WorkflowAutomationEngine
     private readonly NotificationService notifications;
     private readonly WorkspaceAccessService workspaceAccess;
     private readonly JobAccessService jobAccess;
-    private readonly OutboundEmailStore outbox;\n    private readonly IConfiguration configuration;
+    private readonly OutboundEmailStore outbox;
+    private readonly IConfiguration configuration;
     private readonly string instanceId = Guid.NewGuid().ToString("N");
 
     public WorkflowAutomationEngine(
@@ -127,14 +129,16 @@ public sealed class WorkflowAutomationEngine
         NotificationService notifications,
         WorkspaceAccessService workspaceAccess,
         JobAccessService jobAccess,
-        OutboundEmailStore outbox)
+        OutboundEmailStore outbox,
+        IConfiguration configuration)
     {
         this.database = database;
         this.studio = studio;
         this.notifications = notifications;
         this.workspaceAccess = workspaceAccess;
         this.jobAccess = jobAccess;
-        this.outbox = outbox;\n        this.configuration = configuration;
+        this.outbox = outbox;
+        this.configuration = configuration;
     }
 
     public void EnsureSchema()
