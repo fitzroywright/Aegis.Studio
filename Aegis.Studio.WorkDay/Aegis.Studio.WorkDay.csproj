@@ -18,6 +18,10 @@
     <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
   </ItemGroup>
   <ItemGroup>
+    <MauiIcon Include="Resources/AppIcon/appicon.svg" ForegroundFile="Resources/AppIcon/appiconfg.svg" />
+    <MauiSplashScreen Include="Resources/Splash/splash.svg" BaseSize="128,128" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Aegis.Studio.WorkDay.Core/Aegis.Studio.WorkDay.Core.csproj" />
   </ItemGroup>
 </Project>
