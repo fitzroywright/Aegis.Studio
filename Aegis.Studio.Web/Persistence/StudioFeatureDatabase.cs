@@ -151,7 +151,9 @@ public sealed class StudioFeatureDatabase
             alter table studio_attachments add column if not exists sha256 text null;
             alter table studio_attachments add column if not exists uploaded_by text null;
             alter table studio_attachments add column if not exists storage_status text not null default 'Stored';
+            alter table studio_attachments add column if not exists source_key text null;
             create unique index if not exists ux_studio_attachments_stored_name on studio_attachments(stored_name);
+            create unique index if not exists ux_studio_attachments_source_key on studio_attachments(source_key) where source_key is not null;
             alter table studio_user_profiles add column if not exists theme_name text not null default 'studio-default';
             alter table studio_outbound_email add column if not exists sent_by_user_name text null;
             alter table studio_outbound_email add column if not exists sending_identity_type text not null default 'Workspace';
