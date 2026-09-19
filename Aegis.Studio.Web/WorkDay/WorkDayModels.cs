@@ -86,3 +86,25 @@ public sealed record WorkDayTimeline(Guid WorkSessionId,string UserName,DateTime
 
 public sealed record WorkDayDeviceSessionRequest(string DeviceId);
 public sealed record WorkDayDeviceSessionResponse(Guid SessionId,string Token,DateTimeOffset ExpiresAtUtc);
+
+public sealed record WorkDayClientObservation(
+    string DeviceId,
+    DateTimeOffset ObservedAtUtc,
+    string Connectivity,
+    string SynchronizationState,
+    int PendingOperations,
+    DateTimeOffset? OldestPendingAtUtc,
+    int PendingUploads,
+    int FailedUploads,
+    bool WorkSessionActive,
+    string LocationPermissionState);
+
+public sealed record WorkDayFleetSnapshot(
+    int Clients,
+    int RecentlyOnline,
+    int OfflineOrStale,
+    long PendingSync,
+    DateTimeOffset? OldestPendingAtUtc,
+    long PendingUploads,
+    long FailedUploads,
+    DateTimeOffset GeneratedAtUtc);
