@@ -171,12 +171,7 @@ public sealed class StudioOperationsFlowPublisher(
                 observedAtUtc = now,
                 currentStage = item.Stage,
                 relatedBusinessId = item.BusinessId,
-                runbook = item.FlowType switch
-                {
-                    "AttachmentProcessing" => "Studio / Attachments",
-                    "GalleryPublish" => "Studio / Gallery Publishing",
-                    _ => "Studio / Workspace Messaging"
-                },
+                runbook = "docs/RUNBOOK.md",
                 stages
             })
         };
