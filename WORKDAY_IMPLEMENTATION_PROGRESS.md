@@ -147,3 +147,17 @@ Resume rule: inspect this file and Git history. If compile/runtime proof exposes
 - COMPLETE — legacy /api/mobile/photographer routes retired.
 - COMPLETE — standalone Aegis.Studio.Photographer MAUI project removed.
 - RETAINED — PhotographerStore/profile/availability server model because WorkDay and Studio scheduling still depend on it.
+
+
+## Cross-workspace photographer cleanup
+- COMPLETE — Photographer identity remains global to Studio and is not bound to one workspace.
+- COMPLETE — Assigning a photographer schedule resource to a job automatically ensures JobStaff membership for that job.
+- COMPLETE — Assignment-derived access works across any workspace without requiring standing workspace membership.
+- COMPLETE — Existing explicit/manual job membership is never overwritten by automatic assignment reconciliation.
+- COMPLETE — Removing/changing a schedule assignment does not destructively delete existing job membership because membership provenance is not yet modeled.
+- COMPLETE — WorkDay bootstrap reconciles legacy assignments into JobStaff access and then requires ViewJob.
+- COMPLETE — WorkDay field mutations require job-scoped ManageProduction.
+- COMPLETE — WorkDay uploads require job-scoped AddAttachments.
+- COMPLETE — Booking-backed assignments resolve their effective Studio job for access, uploads and client JobId.
+- COMPLETE — Gallery status moved to an assignment-scoped endpoint; WorkDay no longer requires broad workspace-gallery membership.
+- COMPLETE — Availability/leave remains global to the photographer and independent of workspace.
