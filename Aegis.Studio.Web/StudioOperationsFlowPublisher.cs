@@ -167,7 +167,7 @@ public sealed class StudioOperationsFlowPublisher(
                 applicationId = ApplicationId,
                 flowType = item.FlowType,
                 instanceId,
-                startedAtUtc,
+                startedAtUtc = startedAt,
                 observedAtUtc = now,
                 currentStage = item.Stage,
                 relatedBusinessId = item.BusinessId,
