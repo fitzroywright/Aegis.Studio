@@ -86,7 +86,10 @@ WebApplication app = builder.Build();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioFeatureDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioMessagingDatabase>().InitializeAsync();
-app.Services.GetRequiredService<WorkDayStore>().EnsureSchema();
+WorkDayStore workDayStore=app.Services.GetRequiredService<WorkDayStore>();
+workDayStore.EnsureSchema();
+int workDayLocationRetentionDays=Math.Clamp(app.Configuration.GetValue<int?>("WorkDay:LocationRetentionDays")??30,1,3650);
+workDayStore.ApplyLocationRetention(TimeSpan.FromDays(workDayLocationRetentionDays));
 
 app.UseAuthentication();
 app.UseMiddleware<WorkDayDeviceTokenMiddleware>();
