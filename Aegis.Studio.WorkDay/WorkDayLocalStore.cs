@@ -89,8 +89,10 @@ public sealed class LocalLocationObservation
 public sealed class WorkDayLocalStore
 {
     private readonly SQLiteAsyncConnection db;
-    public WorkDayLocalStore()
+    private readonly WorkDayDataProtector protector;
+    public WorkDayLocalStore(WorkDayDataProtector protector)
     {
+        this.protector=protector;
         string path=Path.Combine(FileSystem.AppDataDirectory,"workday-v1.db3");
         db=new SQLiteAsyncConnection(path,SQLiteOpenFlags.ReadWrite|SQLiteOpenFlags.Create|SQLiteOpenFlags.FullMutex);
     }
@@ -107,7 +109,18 @@ public sealed class WorkDayLocalStore
     public async Task ReplaceAssignmentsAsync(IEnumerable<LocalAssignment> values)
     {
         await InitializeAsync();
-        foreach(LocalAssignment v in values) await db.InsertOrReplaceAsync(v);
+        foreach(LocalAssignment value in values)
+        {
+            LocalAssignment v=new()
+            {
+                Id=value.Id,JobId=value.JobId,BookingId=value.BookingId,WorkspaceId=value.WorkspaceId,ConversationId=value.ConversationId,
+                Title=await protector.ProtectAsync(value.Title)??"",StartsAtUtc=value.StartsAtUtc,EndsAtUtc=value.EndsAtUtc,
+                Location=await protector.ProtectAsync(value.Location),Status=value.Status,Instructions=await protector.ProtectAsync(value.Instructions),
+                CustomerName=await protector.ProtectAsync(value.CustomerName),CustomerEmail=await protector.ProtectAsync(value.CustomerEmail),
+                CustomerPhone=await protector.ProtectAsync(value.CustomerPhone),Version=value.Version,CachedAtUtc=value.CachedAtUtc
+            };
+            await db.InsertOrReplaceAsync(v);
+        }
         DateTimeOffset cutoff=DateTimeOffset.UtcNow.AddDays(-14);
         IReadOnlyList<Guid> protectedIds=(await PendingAsync()).Where(x=>x.AssignmentId.HasValue).Select(x=>x.AssignmentId!.Value)
             .Concat((await PendingUploadsAsync()).Select(x=>x.AssignmentId)).Distinct().ToArray();
@@ -115,8 +128,18 @@ public sealed class WorkDayLocalStore
             if(!protectedIds.Contains(old.Id)) await db.DeleteAsync(old);
     }
 
-    public async Task<List<LocalAssignment>> GetAssignmentsAsync()=>await db.Table<LocalAssignment>().OrderBy(x=>x.StartsAtUtc).ToListAsync();
-    public Task<LocalAssignment?> GetAssignmentAsync(Guid id)=>db.Table<LocalAssignment>().Where(x=>x.Id==id).FirstOrDefaultAsync();
+    public async Task<List<LocalAssignment>> GetAssignmentsAsync()
+    {
+        List<LocalAssignment> values=await db.Table<LocalAssignment>().OrderBy(x=>x.StartsAtUtc).ToListAsync();
+        foreach(LocalAssignment v in values) await UnprotectAsync(v);
+        return values;
+    }
+    public async Task<LocalAssignment?> GetAssignmentAsync(Guid id)
+    {
+        LocalAssignment? value=await db.Table<LocalAssignment>().Where(x=>x.Id==id).FirstOrDefaultAsync();
+        if(value is not null) await UnprotectAsync(value);
+        return value;
+    }
 
     public async Task QueueAsync(LocalOperation operation){await InitializeAsync();await db.InsertOrReplaceAsync(operation);}
     public async Task<List<LocalOperation>> PendingAsync()=>await db.Table<LocalOperation>().Where(x=>x.State==nameof(LocalSyncState.Pending)||x.State==nameof(LocalSyncState.Failed)).OrderBy(x=>x.OccurredAtUtc).ToListAsync();
@@ -133,4 +156,14 @@ public sealed class WorkDayLocalStore
     public async Task SaveLocationAsync(LocalLocationObservation location){await InitializeAsync();await db.InsertOrReplaceAsync(location);}
     public async Task<List<LocalLocationObservation>> PendingLocationsAsync()=>await db.Table<LocalLocationObservation>().Where(x=>x.State==nameof(LocalSyncState.Pending)||x.State==nameof(LocalSyncState.Failed)).OrderBy(x=>x.ObservedAtUtc).ToListAsync();
     public Task UpdateLocationAsync(LocalLocationObservation location)=>db.InsertOrReplaceAsync(location);
+
+    private async Task UnprotectAsync(LocalAssignment v)
+    {
+        v.Title=await protector.UnprotectAsync(v.Title)??"";
+        v.Location=await protector.UnprotectAsync(v.Location);
+        v.Instructions=await protector.UnprotectAsync(v.Instructions);
+        v.CustomerName=await protector.UnprotectAsync(v.CustomerName);
+        v.CustomerEmail=await protector.UnprotectAsync(v.CustomerEmail);
+        v.CustomerPhone=await protector.UnprotectAsync(v.CustomerPhone);
+    }
 }
