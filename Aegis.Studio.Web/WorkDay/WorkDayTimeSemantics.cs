@@ -106,8 +106,8 @@ public static class WorkDayTimeSemantics
 
     public static WorkDayTimePolicy FromConfiguration(IConfiguration configuration)
     {
-        string? configuredTimeZoneId = configuration["WorkDay:TimeTracking:TimeZoneId"]?.Trim();\n        string timeZoneId = string.IsNullOrWhiteSpace(configuredTimeZoneId) ? "America/Jamaica" : configuredTimeZoneId;
-        if (string.IsNullOrWhiteSpace(timeZoneId)) timeZoneId = "America/Jamaica";
+        string? configuredTimeZoneId = configuration["WorkDay:TimeTracking:TimeZoneId"]?.Trim();
+        string timeZoneId = string.IsNullOrWhiteSpace(configuredTimeZoneId) ? "America/Jamaica" : configuredTimeZoneId!;
 
         double regularDailyHours = Math.Clamp(
             configuration.GetValue<double?>("WorkDay:TimeTracking:RegularDailyHours") ?? 8d,
