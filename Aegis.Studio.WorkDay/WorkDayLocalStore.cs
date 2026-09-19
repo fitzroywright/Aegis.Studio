@@ -144,6 +144,7 @@ public sealed class WorkDayLocalStore
 
     public async Task QueueAsync(LocalOperation operation){await InitializeAsync();await db.InsertOrReplaceAsync(operation);}
     public async Task<List<LocalOperation>> PendingAsync()=>await db.Table<LocalOperation>().Where(x=>x.State==nameof(LocalSyncState.Pending)||x.State==nameof(LocalSyncState.Failed)).OrderBy(x=>x.OccurredAtUtc).ToListAsync();
+    public async Task<DateTimeOffset?> OldestPendingOperationAsync()=> (await PendingAsync()).FirstOrDefault()?.OccurredAtUtc;
     public Task SaveOperationAsync(LocalOperation operation)=>db.InsertOrReplaceAsync(operation);
 
     public Task SaveWorkSessionAsync(LocalWorkSession session)=>db.InsertOrReplaceAsync(session);
@@ -153,6 +154,7 @@ public sealed class WorkDayLocalStore
     public async Task<List<LocalUpload>> PendingUploadsAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Pending)||x.State==nameof(LocalUploadState.Failed)||x.State==nameof(LocalUploadState.Retrying)).OrderBy(x=>x.CreatedAtUtc).ToListAsync();
     public Task SaveUploadAsync(LocalUpload upload)=>db.InsertOrReplaceAsync(upload);
     public async Task<int> PendingUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State!=nameof(LocalUploadState.Uploaded)).CountAsync();
+    public async Task<int> FailedUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Failed)).CountAsync();
 
     public async Task SaveLocationAsync(LocalLocationObservation location){await InitializeAsync();await db.InsertOrReplaceAsync(location);}
     public async Task<List<LocalLocationObservation>> PendingLocationsAsync()=>await db.Table<LocalLocationObservation>().Where(x=>x.State==nameof(LocalSyncState.Pending)||x.State==nameof(LocalSyncState.Failed)).OrderBy(x=>x.ObservedAtUtc).ToListAsync();
