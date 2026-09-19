@@ -103,7 +103,7 @@ public sealed class WorkspaceAccessService
         command.CommandText = """
             insert into studio_workspace_members
             (workspace_id,user_name,display_name,is_active,access_workspace,can_view,reply_requester,view_attachments,add_attachments,create_job,edit_job,manage_schedule,manage_production,notify_members,edit_workspace,manage_members,admin_workspace,send_as_self,created_at_utc,updated_at_utc)
-            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,now(),now())
+            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,now(),now())
             on conflict(workspace_id,user_name) do update set
               display_name=excluded.display_name,is_active=excluded.is_active,access_workspace=excluded.access_workspace,can_view=excluded.can_view,
               reply_requester=excluded.reply_requester,view_attachments=excluded.view_attachments,add_attachments=excluded.add_attachments,
