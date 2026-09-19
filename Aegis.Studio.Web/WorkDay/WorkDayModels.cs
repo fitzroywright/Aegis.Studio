@@ -154,3 +154,34 @@ public sealed record WorkspaceWorkDayActivity(
     Guid WorkspaceId,
     DateTimeOffset GeneratedAtUtc,
     IReadOnlyList<WorkspacePhotographerActivity> Photographers);
+
+
+public sealed record WorkDayTimePolicy(
+    string TimeZoneId,
+    double RegularDailyHours,
+    IReadOnlyList<DayOfWeek> WeekendDays);
+
+public sealed record WorkDayTimeBreakdown(
+    string UserName,
+    DateOnly LocalDate,
+    double TotalMinutes,
+    double RegularMinutes,
+    double OvertimeMinutes,
+    double WeekendMinutes,
+    double WeekendOvertimeMinutes);
+
+public sealed record WorkDayTimeSummary(
+    string UserName,
+    DateTimeOffset FromUtc,
+    DateTimeOffset ToUtc,
+    double TotalMinutes,
+    double RegularMinutes,
+    double OvertimeMinutes,
+    double WeekendMinutes,
+    double WeekendOvertimeMinutes,
+    IReadOnlyList<WorkDayTimeBreakdown> Days);
+
+public sealed record WorkDayTimeInterval(
+    string UserName,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset EndedAtUtc);
