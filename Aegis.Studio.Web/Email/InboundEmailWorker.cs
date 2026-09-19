@@ -18,6 +18,7 @@ public sealed class InboundEmailWorker : BackgroundService
     private readonly GraphEmailDeltaStateStore deltaStateStore;
     private readonly NotificationService notifications;
     private readonly AttachmentStore attachments;
+    private readonly StudioOperationsFlowPublisher operationsFlows;
     private readonly ILogger<InboundEmailWorker> logger;
 
     public InboundEmailWorker(
@@ -30,6 +31,7 @@ public sealed class InboundEmailWorker : BackgroundService
         GraphEmailDeltaStateStore deltaStateStore,
         NotificationService notifications,
         AttachmentStore attachments,
+        StudioOperationsFlowPublisher operationsFlows,
         ILogger<InboundEmailWorker> logger)
     {
         this.graphClient = graphClient;
@@ -41,6 +43,7 @@ public sealed class InboundEmailWorker : BackgroundService
         this.deltaStateStore = deltaStateStore;
         this.notifications = notifications;
         this.attachments = attachments;
+        this.operationsFlows = operationsFlows;
         this.logger = logger;
     }
 
@@ -63,10 +66,13 @@ public sealed class InboundEmailWorker : BackgroundService
 
                 foreach (InboundEmail email in batch.Messages)
                 {
+                    string correlationId = email.MessageId;
+                    operationsFlows.TryEnqueueInbound(correlationId, "Mailbox");
                     EmailRouteResult route = router.Route(email);
                     if (!route.IsRouted)
                     {
                         UnroutedEmail captured = unroutedStore.Capture(email, route.FailureReason ?? "No route was resolved.");
+                        operationsFlows.TryEnqueueInbound(correlationId, "Router", businessId: captured.Id.ToString("D"), detail: "RouteUnresolved", failed: true);
                         logger.LogWarning("Inbound email {MessageId} from {Sender} needs routing review. Review item {ReviewId}. To: {To}; Cc: {Cc}", email.MessageId, email.FromAddress, captured.Id, string.Join(", ", email.ToAddresses), string.Join(", ", email.CcAddresses));
                         continue;
                     }
@@ -76,13 +82,17 @@ public sealed class InboundEmailWorker : BackgroundService
                     {
                         string reason = $"AEGIS reference {recovery.ReferenceToken} matched more than one active conversation for this sender in the routed workspace.";
                         UnroutedEmail captured = unroutedStore.Capture(email, reason);
+                        operationsFlows.TryEnqueueInbound(correlationId, "Router", businessId: captured.Id.ToString("D"), detail: "AmbiguousReference", failed: true);
                         logger.LogWarning("Inbound email {MessageId} contains ambiguous AEGIS reference {Reference}. Review item {ReviewId}.", email.MessageId, recovery.ReferenceToken, captured.Id);
                         continue;
                     }
 
+                    operationsFlows.TryEnqueueInbound(correlationId, "Router", businessId: route.WorkspaceId?.ToString("D"));
                     EmailIngestResult result = recovery.Matched
                         ? recovery.IngestResult!
                         : store.ReceiveEmail(email, route);
+                    operationsFlows.TryEnqueueInbound(correlationId, "Workspace", businessId: result.Conversation.Id.ToString("D"));
+                    operationsFlows.TryEnqueueInbound(correlationId, "Conversation", businessId: result.Conversation.Id.ToString("D"));
 
                     if (result.WasDuplicate)
                     {
@@ -112,6 +122,7 @@ public sealed class InboundEmailWorker : BackgroundService
                         $"New email from {email.FromName} routed to {route.WorkspaceName}.",
                         "Conversation",
                         result.Conversation.Id.ToString("D"));
+                    operationsFlows.TryEnqueueInbound(correlationId, "Notification", businessId: result.Conversation.Id.ToString("D"));
 
                     logger.LogInformation(
                         "Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}. Reference recovery: {ReferenceRecovered}. Attachments: {AttachmentCount}",
