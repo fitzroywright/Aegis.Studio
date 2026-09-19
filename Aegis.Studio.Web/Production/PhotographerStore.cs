@@ -31,6 +31,15 @@ public sealed class PhotographerStore
 
     public PhotographerProfile? Get(string userName)
         => GetAll(true).FirstOrDefault(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
+    public PhotographerProfile? GetByScheduleResourceId(Guid scheduleResourceId)
+        => GetAll(true).FirstOrDefault(x => x.ScheduleResourceId == scheduleResourceId);
+
+    public IReadOnlyList<PhotographerProfile> GetByScheduleResourceIds(IEnumerable<Guid> scheduleResourceIds)
+    {
+        HashSet<Guid> ids = scheduleResourceIds.ToHashSet();
+        return GetAll(true).Where(x => ids.Contains(x.ScheduleResourceId)).ToArray();
+    }
+
 
     public PhotographerProfile Save(PhotographerProfileRequest request)
     {
