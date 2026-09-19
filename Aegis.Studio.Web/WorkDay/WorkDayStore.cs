@@ -74,6 +74,20 @@ public sealed class WorkDayStore(StudioDatabase database)
         return values;
     }
 
+    public WorkDayDiagnosticsSnapshot GetDiagnostics(string userName)
+    {
+        using NpgsqlConnection c=database.OpenConnection();
+        long pending=0, failed=0; DateTimeOffset? oldest=null;
+        using(NpgsqlCommand q=c.CreateCommand())
+        {
+            q.CommandText="select count(*) filter(where state='Pending'),count(*) filter(where state in ('Failed','Conflict')),min(occurred_at_utc) filter(where state='Pending') from studio_workday_operations where lower(user_name)=lower($1)";
+            q.Parameters.AddWithValue(userName);
+            using NpgsqlDataReader r=q.ExecuteReader();
+            if(r.Read()){pending=r.GetInt64(0);failed=r.GetInt64(1);oldest=r.IsDBNull(2)?null:r.GetFieldValue<DateTimeOffset>(2);}
+        }
+        return new WorkDayDiagnosticsSnapshot("Online","ServerAcknowledged",pending,failed,oldest,0,0,GetActiveSession(userName) is not null,DateTimeOffset.UtcNow);
+    }
+
     public WorkDayWorkSession? GetActiveSession(string userName)
     {
         using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand cmd=c.CreateCommand();
