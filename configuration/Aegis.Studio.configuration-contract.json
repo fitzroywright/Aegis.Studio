@@ -168,7 +168,38 @@
       "required": true,
       "purpose": "Uniquely identifies this independently deployed Studio instance.",
       "configurationKey": "Service:Identity",
-      "isConfigured": false
+      "isConfigured": false,
+      "workDayNote": "Also used by Aegis Studio WorkDay telemetry correlation."
+    },
+    {
+      "id": "workday-location-mode",
+      "displayName": "WorkDay location tracking mode",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Controls policy-driven field presence collection: Disabled, SignInOutOnly, AssignmentEvents or BackgroundDuringWork.",
+      "configurationKey": "WorkDay:LocationTrackingMode",
+      "isConfigured": false,
+      "example": "SignInOutOnly"
+    },
+    {
+      "id": "workday-device-session-days",
+      "displayName": "WorkDay device session lifetime",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Controls the maximum lifetime of a revocable WorkDay mobile device session without storing user passwords.",
+      "configurationKey": "WorkDay:DeviceSessionDays",
+      "isConfigured": false,
+      "example": "30"
+    },
+    {
+      "id": "workday-telemetry-stale",
+      "displayName": "WorkDay telemetry stale threshold",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines how long Operations may treat a WorkDay client observation as current before it becomes stale/offline.",
+      "configurationKey": "WorkDay:TelemetryStaleSeconds",
+      "isConfigured": false,
+      "example": "300"
     }
   ],
   "runbookReference": "docs/RUNBOOK.md"
