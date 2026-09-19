@@ -18,6 +18,10 @@ public static class StudioFlowSemantics
         "NotificationFanout" => ["Event", "Email", "Slack", "Teams", "InApp"],
         "AttachmentProcessing" => ["Received", "Storage", "Metadata", "Workspace"],
         "GalleryPublish" => ["InternalStorage", "Publish", "PublicGallery", "Verification"],
+        "WorkDaySession" => ["Assigned", "Accepted", "Arrived", "InProgress", "Completed", "Synchronized"],
+        "WorkDaySync" => ["LocalChange", "Pending", "Sending", "ServerProcessing", "Acknowledged"],
+        "WorkDayUpload" => ["Selected", "LocalQueue", "Upload", "Storage", "MetadataAssociation", "Acknowledged"],
+        "WorkDayMessage" => ["WorkDay", "Studio", "CommonMessaging", "Provider", "Recipient"],
         _ => []
     };
 
