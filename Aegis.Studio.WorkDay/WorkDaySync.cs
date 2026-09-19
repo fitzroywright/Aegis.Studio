@@ -88,7 +88,7 @@ public sealed class WorkDayApiClient
     public Task<List<MessageDto>?> GetMessagesAsync(Guid threadId,CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageDto>>($"api/messages/threads/{threadId:D}",ct);
     public async Task SendThreadMessageAsync(Guid threadId,string body,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"api/messages/threads/{threadId:D}",new{body},ct);r.EnsureSuccessStatusCode();}
     public Task<List<NotificationDto>?> GetNotificationsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<NotificationDto>>("api/notifications?count=50",ct);
-    public Task<GalleryDto?> GetGalleryAsync(Guid workspaceId,CancellationToken ct=default)=>http.GetFromJsonAsync<GalleryDto>($"api/workspaces/{workspaceId:D}/gallery",ct);
+    public Task<AssignmentGalleryStatusDto?> GetAssignmentGalleryStatusAsync(Guid assignmentId,CancellationToken ct=default)=>http.GetFromJsonAsync<AssignmentGalleryStatusDto>($"api/workday/assignments/{assignmentId:D}/gallery-status",ct);
     public Task<SendingIdentityOptionsDto?> GetSendingIdentitiesAsync(Guid conversationId,CancellationToken ct=default)=>http.GetFromJsonAsync<SendingIdentityOptionsDto>($"api/conversations/{conversationId:D}/sending-identities",ct);
     public async Task ReplyConversationAsync(Guid conversationId,string body,string identity,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"api/conversations/{conversationId:D}/messages",new{body,isInternal=false,sendingIdentity=identity},ct);r.EnsureSuccessStatusCode();}
 }
@@ -171,3 +171,5 @@ public sealed record DeviceSessionDto(Guid SessionId,string Token,DateTimeOffset
 public sealed record WorkDayClientObservationDto(string DeviceId,DateTimeOffset ObservedAtUtc,string Connectivity,string SynchronizationState,int PendingOperations,DateTimeOffset? OldestPendingAtUtc,int PendingUploads,int FailedUploads,bool WorkSessionActive,string LocationPermissionState);
 
 public sealed record PhotographerAvailabilityDto(Guid Id,string UserName,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string AvailabilityType,string? Note,DateTimeOffset CreatedAtUtc);
+
+public sealed record AssignmentGalleryStatusDto(Guid WorkspaceId,bool Exists,Guid? GalleryId,string? Title,bool IsPublished,DateTimeOffset? PublishedAtUtc,long VisibleItems);
