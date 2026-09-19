@@ -170,14 +170,47 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
 });
 app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen()));
 app.MapGet("/api/email/outbox", (OutboundEmailStore store) => Results.Ok(store.GetPending()));
-app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, ClaimsPrincipal user, StudioStore store, OutboundEmailStore outbox, NotificationService notifications, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, StudioOperationsFlowPublisher operationsFlows) =>
+app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, ClaimsPrincipal user, StudioStore store, OutboundEmailStore outbox, NotificationService notifications, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, WorkspaceStore workspaces, UserProfileStore profiles, IConfiguration configuration, StudioOperationsFlowPublisher operationsFlows) =>
 {
     if (string.IsNullOrWhiteSpace(request.Body)) return Results.BadRequest(new { error = "Message body is required." });
     StudioConversation? current = store.GetConversation(id); if (current is null) return Results.NotFound();
     bool allowed = workspaceAccess.HasPermission(user, current.WorkspaceId, "ReplyRequester") || (current.JobId.HasValue && jobAccess.HasPermission(user, current.JobId.Value, "ReplyRequester"));
     if (!allowed) return Results.Forbid();
+    StudioSendingIdentity? sendingIdentity = null;
+    if (!request.IsInternal && string.Equals(current.Channel, "Email", StringComparison.OrdinalIgnoreCase))
+    {
+        StudioWorkspaceDefinition workspace = workspaces.Get(current.WorkspaceId)
+            ?? throw new InvalidOperationException("The conversation workspace no longer exists.");
+        StudioUserProfile profile = profiles.GetOrCreate(user);
+        bool canSendAsSelf = workspaceAccess.HasPermission(user, current.WorkspaceId, "SendAsSelf");
+        string[] allowedDomains = configuration
+            .GetSection("Messaging:AllowedPersonalSenderDomains")
+            .Get<string[]>() ?? [];
+
+        try
+        {
+            sendingIdentity = StudioSendingIdentityResolver.Resolve(
+                request.SendingIdentity,
+                workspace.EmailAddress ?? string.Empty,
+                profile.UserName,
+                profile.Email,
+                canSendAsSelf,
+                allowedDomains);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Forbid();
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Results.BadRequest(new { error = exception.Message });
+        }
+    }
+
     StudioConversation updated = store.AddMessage(id, request, user);
-    OutboundEmail? email = !request.IsInternal && string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase) ? outbox.Queue(updated, request.Body) : null;
+    OutboundEmail? email = !request.IsInternal && string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase)
+        ? outbox.Queue(updated, request.Body, sendingIdentity)
+        : null;
     string correlationId = id.ToString("D");
     operationsFlows.TryEnqueue(
         correlationId,
@@ -185,7 +218,17 @@ app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest
         branch: request.IsInternal ? "InApp" : string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase) ? "Email" : null,
         businessId: id.ToString("D"));
     if (request.IsInternal) notifications.PublishToAll("Mention", $"Internal note: {updated.Subject}", request.Body, "Conversation", id.ToString("D"));
-    return Results.Ok(new { conversation = updated, outboundEmail = email });
+    return Results.Ok(new
+    {
+        conversation = updated,
+        outboundEmail = email,
+        sendingIdentity = email is null ? null : new
+        {
+            type = email.SendingIdentityType,
+            fromAddress = email.FromAddress,
+            actualUser = email.SentByUserName
+        }
+    });
 });
 app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest request, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService access) =>
 {
