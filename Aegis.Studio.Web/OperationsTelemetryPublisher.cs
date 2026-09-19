@@ -212,6 +212,23 @@ public sealed class OperationsTelemetryPublisher(
             new
             {
                 applicationId = ApplicationId,
+                flowType = "JobFlow",
+                displayName = "Studio Job Flow",
+                stages = new object[]
+                {
+                    new { name = "Created", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 300, criticalAfterSeconds = 3600 },
+                    new { name = "Assigned", parentStage = "Created", branch = (string?)null, warningAfterSeconds = 300, criticalAfterSeconds = 3600 },
+                    new { name = "Accepted", parentStage = "Assigned", branch = (string?)null, warningAfterSeconds = 600, criticalAfterSeconds = 7200 },
+                    new { name = "Arrived", parentStage = "Accepted", branch = (string?)null, warningAfterSeconds = 600, criticalAfterSeconds = 7200 },
+                    new { name = "InProgress", parentStage = "Arrived", branch = (string?)null, warningAfterSeconds = 1800, criticalAfterSeconds = 14400 },
+                    new { name = "Completed", parentStage = "InProgress", branch = (string?)null, warningAfterSeconds = 1800, criticalAfterSeconds = 14400 },
+                    new { name = "Synchronized", parentStage = "Completed", branch = (string?)null, warningAfterSeconds = 300, criticalAfterSeconds = 1800 }
+                },
+                updatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new
+            {
+                applicationId = ApplicationId,
                 flowType = "WorkDaySession",
                 displayName = "Studio WorkDay Session",
                 stages = new object[]
