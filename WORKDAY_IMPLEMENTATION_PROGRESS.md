@@ -137,3 +137,13 @@ Resume rule: inspect this file and Git history. If compile/runtime proof exposes
 - COMPLETE — cross-device Sign In serialized per user to avoid concurrent active-session races.
 - COMPLETE — explicit MAUI icon/splash resources wired for Android/iOS packaging.
 - COMPLETE — WorkDay location retention configuration published through the Studio configuration contract.
+
+
+## Photographer consolidation
+- COMPLETE — legacy Aegis.Studio.Photographer feature inventory reviewed before removal.
+- COMPLETE — photographer-filtered schedule/profile behavior is covered by WorkDay bootstrap.
+- COMPLETE — availability/unavailability/leave moved into WorkDay with local protected cache.
+- COMPLETE — quick tomorrow-unavailable action moved into WorkDay.
+- COMPLETE — legacy /api/mobile/photographer routes retired.
+- COMPLETE — standalone Aegis.Studio.Photographer MAUI project removed.
+- RETAINED — PhotographerStore/profile/availability server model because WorkDay and Studio scheduling still depend on it.
