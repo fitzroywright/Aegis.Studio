@@ -220,6 +220,36 @@
       "configurationKey": "Scheduling:DefaultDailyCapacityHours",
       "isConfigured": false,
       "example": "8"
+    },
+    {
+      "id": "workday-time-zone",
+      "displayName": "WorkDay time tracking timezone",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines the local timezone used when classifying work sessions by local day for regular, overtime and weekend tracking.",
+      "configurationKey": "WorkDay:TimeTracking:TimeZoneId",
+      "isConfigured": false,
+      "example": "America/Jamaica"
+    },
+    {
+      "id": "workday-regular-daily-hours",
+      "displayName": "WorkDay regular daily hours",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines the daily regular-time threshold. Minutes beyond this threshold are classified as overtime evidence; this does not calculate pay rates.",
+      "configurationKey": "WorkDay:TimeTracking:RegularDailyHours",
+      "isConfigured": false,
+      "example": "8"
+    },
+    {
+      "id": "workday-weekend-days",
+      "displayName": "WorkDay weekend days",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Defines which local weekdays are tracked as weekend work.",
+      "configurationKey": "WorkDay:TimeTracking:WeekendDays",
+      "isConfigured": false,
+      "example": "Saturday,Sunday"
     }
   ],
   "runbookReference": "docs/RUNBOOK.md",
