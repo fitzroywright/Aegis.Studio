@@ -121,6 +121,44 @@ public sealed class WorkDayStore(StudioDatabase database)
         return values;
     }
 
+    public IReadOnlyList<WorkDayTimeSummary> GetTimeSummaries(
+        IReadOnlyCollection<string> userNames,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        WorkDayTimePolicy policy)
+    {
+        if(userNames.Count==0) return [];
+        string[] users=userNames.Where(x=>!string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if(users.Length==0) return [];
+
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="""
+          select user_name,started_at_utc,coalesce(ended_at_utc,least(now(),$3))
+          from studio_workday_work_sessions
+          where lower(user_name)=any($1)
+            and started_at_utc<$3
+            and coalesce(ended_at_utc,now())>$2
+          order by lower(user_name),started_at_utc
+        """;
+        q.Parameters.AddWithValue(users.Select(x=>x.ToLowerInvariant()).ToArray());
+        q.Parameters.AddWithValue(fromUtc);
+        q.Parameters.AddWithValue(toUtc);
+        using NpgsqlDataReader r=q.ExecuteReader();
+        List<WorkDayTimeInterval> intervals=[];
+        while(r.Read())
+        {
+            DateTimeOffset start=r.GetFieldValue<DateTimeOffset>(1);
+            DateTimeOffset end=r.GetFieldValue<DateTimeOffset>(2);
+            if(end>start) intervals.Add(new(r.GetString(0),start,end));
+        }
+
+        IReadOnlyList<WorkDayTimeSummary> classified=WorkDayTimeSemantics.Classify(intervals,fromUtc,toUtc,policy);
+        Dictionary<string,WorkDayTimeSummary> byUser=classified.ToDictionary(x=>x.UserName,StringComparer.OrdinalIgnoreCase);
+        return users.Select(user=>byUser.TryGetValue(user,out WorkDayTimeSummary? value)
+            ? value
+            : new WorkDayTimeSummary(user,fromUtc,toUtc,0,0,0,0,0,[])).ToArray();
+    }
+
     public IReadOnlyList<WorkDayWorkSession> GetWorkSessions(string? userName,int count=100)
     {
         using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
