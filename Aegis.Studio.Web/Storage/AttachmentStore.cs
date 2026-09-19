@@ -81,7 +81,8 @@ public sealed class AttachmentStore
         byte[] bytes,
         string visibility,
         string uploadedBy,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? sourceKey = null)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         if (bytes.Length <= 0 || bytes.LongLength > maximumBytes)
@@ -98,7 +99,8 @@ public sealed class AttachmentStore
             source,
             visibility,
             uploadedBy,
-            cancellationToken);
+            cancellationToken,
+            sourceKey);
     }
 
     public async Task<StudioAttachment> AddStreamAsync(
@@ -108,9 +110,16 @@ public sealed class AttachmentStore
         Stream source,
         string visibility,
         string uploadedBy,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? sourceKey = null)
     {
         ArgumentNullException.ThrowIfNull(source);
+        string? normalizedSourceKey = string.IsNullOrWhiteSpace(sourceKey) ? null : sourceKey.Trim();
+        if (normalizedSourceKey is not null)
+        {
+            StudioAttachment? existing = GetBySourceKey(normalizedSourceKey);
+            if (existing is not null) return existing;
+        }
         if (!source.CanRead)
         {
             throw new InvalidOperationException("Attachment source stream must be readable.");
@@ -155,7 +164,7 @@ public sealed class AttachmentStore
 
         try
         {
-            InsertAttachment(attachment);
+            InsertAttachment(attachment, normalizedSourceKey);
             return attachment;
         }
         catch
@@ -268,11 +277,11 @@ public sealed class AttachmentStore
             uploadedBy,
             "Stored");
 
-    private void InsertAttachment(StudioAttachment attachment)
+    private void InsertAttachment(StudioAttachment attachment, string? sourceKey)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "insert into studio_attachments(id,conversation_id,file_name,stored_name,content_type,size_bytes,visibility,created_at_utc,sha256,uploaded_by,storage_status) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)";
+        command.CommandText = "insert into studio_attachments(id,conversation_id,file_name,stored_name,content_type,size_bytes,visibility,created_at_utc,sha256,uploaded_by,storage_status,source_key) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)";
         command.Parameters.AddWithValue(attachment.Id);
         command.Parameters.AddWithValue(attachment.ConversationId);
         command.Parameters.AddWithValue(attachment.FileName);
@@ -284,7 +293,18 @@ public sealed class AttachmentStore
         command.Parameters.AddWithValue(attachment.Sha256);
         command.Parameters.AddWithValue(attachment.UploadedBy);
         command.Parameters.AddWithValue(attachment.StorageStatus);
+        command.Parameters.AddWithValue((object?)sourceKey ?? DBNull.Value);
         command.ExecuteNonQuery();
+    }
+
+    private StudioAttachment? GetBySourceKey(string sourceKey)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = SelectSql + " where source_key=$1";
+        command.Parameters.AddWithValue(sourceKey);
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        return reader.Read() ? Read(reader) : null;
     }
 
     private const string SelectSql = "select id,conversation_id,file_name,stored_name,content_type,size_bytes,visibility,created_at_utc,sha256,uploaded_by,storage_status from studio_attachments";
