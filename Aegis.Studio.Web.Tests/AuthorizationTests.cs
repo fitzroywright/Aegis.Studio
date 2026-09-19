@@ -88,6 +88,26 @@ public sealed class AuthorizationTests
     }
 
     [Fact]
+    public void WorkspaceManagerCanOperateWorkspaceWithoutBecomingWorkspaceAdmin()
+    {
+        WorkspacePermissionSet manager = WorkspacePermissionSet.Manager;
+        Assert.True(manager.AccessWorkspace);
+        Assert.True(manager.View);
+        Assert.True(manager.ReplyRequester);
+        Assert.True(manager.ManageSchedule);
+        Assert.True(manager.ManageProduction);
+        Assert.True(manager.ManageMembers);
+        Assert.True(manager.SendAsSelf);
+        Assert.False(manager.AdminWorkspace);
+    }
+
+    [Fact]
+    public void WorkspaceManagerCannotDelegateWorkspaceAdmin()
+    {
+        Assert.False(WorkspaceAccessEndpoints.PermissionsWithin(WorkspacePermissionSet.Full, WorkspacePermissionSet.Manager));
+    }
+
+    [Fact]
     public void ReusableRolePermissionJsonRoundTrips()
     {
         string json = JsonSerializer.Serialize(WorkspacePermissionSet.ViewOnly);
