@@ -68,6 +68,16 @@ public sealed class WorkDayApiClient
         return await r.Content.ReadFromJsonAsync<UploadResultDto>(cancellationToken:ct) ?? throw new InvalidOperationException("Studio did not acknowledge the upload.");
     }
 
+    public Task<List<PhotographerAvailabilityDto>?> GetAvailabilityAsync(DateTimeOffset from,DateTimeOffset to,CancellationToken ct=default)=>
+        http.GetFromJsonAsync<List<PhotographerAvailabilityDto>>($"api/workday/availability?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}",ct);
+
+    public async Task<PhotographerAvailabilityDto> AddAvailabilityAsync(DateTimeOffset startsAtUtc,DateTimeOffset endsAtUtc,string availabilityType,string? note,CancellationToken ct=default)
+    {
+        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/availability",new{startsAtUtc,endsAtUtc,availabilityType,note},ct);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<PhotographerAvailabilityDto>(cancellationToken:ct)??throw new InvalidOperationException("Studio did not return the availability entry.");
+    }
+
     public Task<List<MessageThreadDto>?> GetThreadsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageThreadDto>>("api/messages/threads",ct);
     public async Task<MessageThreadDto> GetOrCreateThreadAsync(string scopeType,Guid scopeId,CancellationToken ct=default)
     {
@@ -159,3 +169,5 @@ public sealed record SendingIdentityOptionsDto(string DefaultIdentity,bool CanSe
 public sealed record DeviceSessionDto(Guid SessionId,string Token,DateTimeOffset ExpiresAtUtc);
 
 public sealed record WorkDayClientObservationDto(string DeviceId,DateTimeOffset ObservedAtUtc,string Connectivity,string SynchronizationState,int PendingOperations,DateTimeOffset? OldestPendingAtUtc,int PendingUploads,int FailedUploads,bool WorkSessionActive,string LocationPermissionState);
+
+public sealed record PhotographerAvailabilityDto(Guid Id,string UserName,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string AvailabilityType,string? Note,DateTimeOffset CreatedAtUtc);
