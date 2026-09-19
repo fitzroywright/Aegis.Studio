@@ -83,3 +83,6 @@ public sealed record WorkDayDiagnosticsSnapshot(
     bool WorkSessionActive,
     DateTimeOffset ObservedAtUtc);
 public sealed record WorkDayTimeline(Guid WorkSessionId,string UserName,DateTimeOffset StartedAtUtc,DateTimeOffset? EndedAtUtc,IReadOnlyList<WorkDayLocationEvidence> LocationEvidence);
+
+public sealed record WorkDayDeviceSessionRequest(string DeviceId);
+public sealed record WorkDayDeviceSessionResponse(Guid SessionId,string Token,DateTimeOffset ExpiresAtUtc);
