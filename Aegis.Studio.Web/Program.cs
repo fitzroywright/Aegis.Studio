@@ -9,6 +9,7 @@ using Aegis.Studio.Web.Bookings;
 using Aegis.Studio.Web.Configuration;
 using Aegis.Studio.Web.Diagnostics;
 using Aegis.Studio.Web.Email;
+using Aegis.Studio.Web.Galleries;
 using Aegis.Studio.Web.Messaging;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
@@ -100,6 +101,7 @@ app.MapJobAccess();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapStudioEngineeringDiagnostics();
 app.MapStudioPosHardening();
+app.MapStudioGalleries();
 
 app.MapGet("/api/email/status", async (MicrosoftGraphEmailClient client, MicrosoftGraphEmailOptions options, UnroutedEmailStore unrouted, CancellationToken cancellationToken) =>
 {
@@ -278,13 +280,23 @@ app.MapGet("/api/conversations/{id:guid}/attachments", (Guid id, ClaimsPrincipal
     bool allowed = workspaceAccess.HasPermission(user, conversation.WorkspaceId, "ViewAttachments") || (conversation.JobId.HasValue && jobAccess.HasPermission(user, conversation.JobId.Value, "ViewAttachments"));
     return allowed ? Results.Ok(attachments.GetForConversation(id)) : Results.Forbid();
 });
-app.MapPost("/api/conversations/{id:guid}/attachments", async (Guid id, IFormFile file, string? visibility, ClaimsPrincipal user, StudioStore store, AttachmentStore attachments, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, CancellationToken token) =>
+app.MapPost("/api/conversations/{id:guid}/attachments", async (Guid id, IFormFile file, string? visibility, ClaimsPrincipal user, StudioStore store, AttachmentStore attachments, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, StudioOperationsFlowPublisher operationsFlows, CancellationToken token) =>
 {
     StudioConversation? conversation = store.GetConversation(id); if (conversation is null) return Results.NotFound();
     bool allowed = workspaceAccess.HasPermission(user, conversation.WorkspaceId, "AddAttachments") || (conversation.JobId.HasValue && jobAccess.HasPermission(user, conversation.JobId.Value, "AddAttachments"));
     if (!allowed) return Results.Forbid();
-    try { StudioAttachment attachment = await attachments.AddAsync(id, file, visibility ?? "External", user.Identity?.Name ?? "Unknown", token); return Results.Created($"/api/attachments/{attachment.Id}", attachment); }
-    catch (InvalidOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
+    try
+    {
+        operationsFlows.TryEnqueue(id.ToString("D"), "Attachments", businessId: id.ToString("D"));
+        StudioAttachment attachment = await attachments.AddAsync(id, file, visibility ?? "External", user.Identity?.Name ?? "Unknown", token);
+        operationsFlows.TryEnqueue(id.ToString("D"), "Workspace", businessId: attachment.Id.ToString("D"));
+        return Results.Created($"/api/attachments/{attachment.Id}", attachment);
+    }
+    catch (Exception exception) when (exception is InvalidOperationException or Common.Storage.StorageException)
+    {
+        operationsFlows.TryEnqueue(id.ToString("D"), "Attachments", businessId: id.ToString("D"), detail: exception.Message, failed: true);
+        return Results.BadRequest(new { error = exception.Message });
+    }
 }).DisableAntiforgery();
 app.MapGet("/api/attachments/{id:guid}", (Guid id, ClaimsPrincipal user, AttachmentStore attachments, StudioStore store, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess) =>
 {
