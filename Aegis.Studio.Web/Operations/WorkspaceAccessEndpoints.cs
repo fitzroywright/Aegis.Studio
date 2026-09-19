@@ -121,7 +121,8 @@ public static class WorkspaceAccessEndpoints
         && (!requested.NotifyMembers || caller.NotifyMembers)
         && (!requested.EditWorkspace || caller.EditWorkspace)
         && (!requested.ManageMembers || caller.ManageMembers)
-        && (!requested.AdminWorkspace || caller.AdminWorkspace);
+        && (!requested.AdminWorkspace || caller.AdminWorkspace)
+        && (!requested.SendAsSelf || caller.SendAsSelf);
 }
 
 public sealed record WorkspaceMemberNotificationRequest(string UserName,string Subject,string Body);
