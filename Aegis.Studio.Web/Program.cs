@@ -408,7 +408,13 @@ app.MapPost("/api/conversations/{id:guid}/attachments", async (Guid id, IFormFil
     {
         string correlationId = id.ToString("D");
         operationsFlows.TryEnqueueAttachment(correlationId, "Received", businessId: id.ToString("D"));
-        StudioAttachment attachment = await attachments.AddAsync(id, file, visibility ?? "External", user.Identity?.Name ?? "Unknown", token);
+        StudioAttachment attachment = await attachments.AddAsync(
+            id,
+            file,
+            visibility ?? "External",
+            user.Identity?.Name ?? "Unknown",
+            token,
+            correlationId);
         operationsFlows.TryEnqueueAttachment(correlationId, "Storage", businessId: attachment.Id.ToString("D"));
         operationsFlows.TryEnqueueAttachment(correlationId, "Metadata", businessId: attachment.Id.ToString("D"));
         operationsFlows.TryEnqueueAttachment(correlationId, "Workspace", businessId: attachment.Id.ToString("D"));
