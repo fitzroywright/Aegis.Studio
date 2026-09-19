@@ -89,6 +89,7 @@ await app.Services.GetRequiredService<StudioMessagingDatabase>().InitializeAsync
 app.Services.GetRequiredService<WorkDayStore>().EnsureSchema();
 
 app.UseAuthentication();
+app.UseMiddleware<WorkDayDeviceTokenMiddleware>();
 app.Use(async (context, next) => { bool document = context.Request.Path == "/" || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase); if (document && context.User.Identity?.IsAuthenticated != true) { context.Response.Redirect("/login"); return; } await next(); });
 app.UseAuthorization();
 app.UseStaticFiles();
