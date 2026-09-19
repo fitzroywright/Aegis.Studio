@@ -99,6 +99,27 @@ public static class WorkDayEndpoints
         group.MapGet("/diagnostics",(ClaimsPrincipal user,WorkDayStore store)=>
             Results.Ok(store.GetDiagnostics(UserName(user))));
 
+        group.MapPost("/client-observation",(ClaimsPrincipal user,WorkDayClientObservation observation,WorkDayStore store)=>
+        {
+            string userName=UserName(user);
+            string? tokenDevice=user.FindFirstValue("workday_device_id");
+            if(!string.IsNullOrWhiteSpace(tokenDevice) &&
+               !string.Equals(tokenDevice,observation.DeviceId,StringComparison.Ordinal))
+                return Results.Forbid();
+            store.ObserveClient(userName,observation);
+            return Results.NoContent();
+        });
+
+        group.MapGet("/fleet",(ClaimsPrincipal user,WorkDayStore store,IConfiguration configuration)=>
+        {
+            if(!user.IsInRole("Administrator") &&
+               !user.HasClaim("permission","Studio.WorkDay.Management.View") &&
+               !user.HasClaim("capability","Studio.WorkDay.Management.View"))
+                return Results.Forbid();
+            int seconds=Math.Clamp(configuration.GetValue<int?>("WorkDay:TelemetryStaleSeconds")??300,60,3600);
+            return Results.Ok(store.GetFleetSnapshot(TimeSpan.FromSeconds(seconds)));
+        });
+
         group.MapPost("/assignments/{assignmentId:guid}/uploads", async (
             Guid assignmentId,
             HttpContext context,
