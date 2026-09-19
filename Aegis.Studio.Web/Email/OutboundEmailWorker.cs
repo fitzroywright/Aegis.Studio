@@ -6,15 +6,18 @@ public sealed class OutboundEmailWorker : BackgroundService
 {
     private readonly MicrosoftGraphEmailClient graphClient;
     private readonly OutboundEmailStore outbox;
+    private readonly StudioOperationsFlowPublisher operationsFlows;
     private readonly ILogger<OutboundEmailWorker> logger;
 
     public OutboundEmailWorker(
         MicrosoftGraphEmailClient graphClient,
         OutboundEmailStore outbox,
+        StudioOperationsFlowPublisher operationsFlows,
         ILogger<OutboundEmailWorker> logger)
     {
         this.graphClient = graphClient;
         this.outbox = outbox;
+        this.operationsFlows = operationsFlows;
         this.logger = logger;
     }
 
@@ -58,6 +61,10 @@ public sealed class OutboundEmailWorker : BackgroundService
                             stoppingToken);
 
                         outbox.MarkSent(message.Id, null);
+                        operationsFlows.TryEnqueueOutbound(
+                            message.ConversationId.ToString("D"),
+                            "Provider",
+                            businessId: message.Id.ToString("D"));
                         logger.LogInformation(
                             "Sent outbound email {MessageId} from {FromAddress} to {ToAddress}.",
                             message.Id,
@@ -66,6 +73,12 @@ public sealed class OutboundEmailWorker : BackgroundService
                     }
                     catch (Exception exception)
                     {
+                        operationsFlows.TryEnqueueOutbound(
+                            message.ConversationId.ToString("D"),
+                            "Provider",
+                            businessId: message.Id.ToString("D"),
+                            detail: exception.Message,
+                            failed: true);
                         logger.LogError(
                             exception,
                             "Failed sending outbound email {MessageId} from {FromAddress} to {ToAddress}.",
