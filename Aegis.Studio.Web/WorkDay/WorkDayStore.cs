@@ -169,7 +169,15 @@ public sealed class WorkDayStore(StudioDatabase database)
           from studio_workday_client_observations
         """;
         q.Parameters.AddWithValue(cutoff); using NpgsqlDataReader r=q.ExecuteReader();r.Read();
-        return new WorkDayFleetSnapshot(r.GetInt32(0),r.GetInt32(1),r.GetInt32(2),r.GetInt64(3),r.IsDBNull(4)?null:r.GetFieldValue<DateTimeOffset>(4),r.GetInt64(5),r.GetInt64(6),now);
+        return new WorkDayFleetSnapshot(
+            checked((int)r.GetInt64(0)),
+            checked((int)r.GetInt64(1)),
+            checked((int)r.GetInt64(2)),
+            r.GetInt64(3),
+            r.IsDBNull(4)?null:r.GetFieldValue<DateTimeOffset>(4),
+            r.GetInt64(5),
+            r.GetInt64(6),
+            now);
     }
 
     public WorkDayDiagnosticsSnapshot GetDiagnostics(string userName)
@@ -201,6 +209,7 @@ public sealed class WorkDayStore(StudioDatabase database)
         if(string.IsNullOrWhiteSpace(request.DeviceId)) throw new InvalidOperationException("DeviceId is required.");
         using NpgsqlConnection c=database.OpenConnection(); using NpgsqlTransaction tx=c.BeginTransaction();
 
+        WorkDayOperationResult? replay = null;
         using(NpgsqlCommand existing=c.CreateCommand())
         {
             existing.Transaction=tx; existing.CommandText="select state,result_message,server_version,coalesce(acknowledged_at_utc,received_at_utc) from studio_workday_operations where operation_id=$1";
@@ -208,9 +217,18 @@ public sealed class WorkDayStore(StudioDatabase database)
             using NpgsqlDataReader r=existing.ExecuteReader();
             if(r.Read())
             {
-                WorkDayOperationResult prior=new(request.OperationId,Enum.Parse<WorkDayOperationState>(r.GetString(0)),r.GetFieldValue<DateTimeOffset>(3),r.IsDBNull(1)?null:r.GetString(1),r.IsDBNull(2)?null:r.GetInt64(2));
-                tx.Commit(); return prior;
+                replay=new WorkDayOperationResult(
+                    request.OperationId,
+                    Enum.Parse<WorkDayOperationState>(r.GetString(0)),
+                    r.GetFieldValue<DateTimeOffset>(3),
+                    r.IsDBNull(1)?null:r.GetString(1),
+                    r.IsDBNull(2)?null:r.GetInt64(2));
             }
+        }
+        if(replay is not null)
+        {
+            tx.Commit();
+            return replay;
         }
 
         DateTimeOffset now=DateTimeOffset.UtcNow;
