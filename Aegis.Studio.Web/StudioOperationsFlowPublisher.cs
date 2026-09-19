@@ -158,45 +158,48 @@ public sealed class StudioOperationsFlowPublisher(
                     item.Failed ? item.Detail : null);
             }
 
-            IReadOnlyDictionary<string, StudioNotificationBranchObservation> state =
-                branchTracker.Get(key);
+            IReadOnlyDictionary<string, StudioNotificationBranchObservation> tracked = branchTracker.Get(key);
+            var observed = tracked.ToDictionary(
+                x => x.Key,
+                x => (x.Value.State, x.Value.ObservedAtUtc, x.Value.Detail),
+                StringComparer.OrdinalIgnoreCase);
 
-            stages = stageNames.Select(name =>
-            {
-                bool isBranch = !name.Equals("Event", StringComparison.OrdinalIgnoreCase);
-                bool seen = state.TryGetValue(name, out StudioNotificationBranchObservation? snapshot);
-                return (object)new
+            stages = StudioFlowSemantics.NotificationFanout(observed, startedAt)
+                .Select(stage => (object)new
                 {
-                    name,
-                    state = seen ? snapshot!.State : isBranch ? "Pending" : "Completed",
-                    startedAtUtc = seen ? snapshot!.ObservedAtUtc : name == "Event" ? startedAt : (DateTimeOffset?)null,
-                    completedAtUtc = seen && snapshot!.State == "Completed" ? snapshot.ObservedAtUtc : name == "Event" ? startedAt : (DateTimeOffset?)null,
-                    warningAfterSeconds = isBranch ? 60 : 10,
-                    criticalAfterSeconds = isBranch ? 600 : 60,
-                    error = seen ? snapshot!.Detail : null,
-                    parentStage = isBranch ? "Event" : null,
-                    branch = isBranch ? name : null
-                };
-            }).ToArray();
+                    name = stage.Name,
+                    state = stage.State,
+                    startedAtUtc = stage.StartedAtUtc,
+                    completedAtUtc = stage.CompletedAtUtc,
+                    warningAfterSeconds = stage.Name == "Event" ? 10 : 60,
+                    criticalAfterSeconds = stage.Name == "Event" ? 60 : 600,
+                    error = stage.Error,
+                    parentStage = stage.ParentStage,
+                    branch = stage.Branch
+                })
+                .ToArray();
         }
         else
         {
-            stages = stageNames.Select((name, index) => (object)new
-            {
-                name,
-                state = index < currentIndex
-                    ? "Completed"
-                    : index == currentIndex
-                        ? item.Failed ? "Failed" : "Completed"
-                        : "Pending",
-                startedAtUtc = index == currentIndex ? item.ObservedAtUtc : (DateTimeOffset?)null,
-                completedAtUtc = index == currentIndex && !item.Failed ? now : (DateTimeOffset?)null,
-                warningAfterSeconds = index <= 2 ? 30 : 60,
-                criticalAfterSeconds = index <= 2 ? 300 : 600,
-                error = index == currentIndex && item.Failed ? item.Detail : null,
-                parentStage = index == 0 ? null : stageNames[index - 1],
-                branch = (string?)null
-            }).ToArray();
+            stages = StudioFlowSemantics.Linear(
+                    item.FlowType,
+                    item.Stage,
+                    item.ObservedAtUtc,
+                    item.Failed,
+                    item.Detail)
+                .Select((stage, index) => (object)new
+                {
+                    name = stage.Name,
+                    state = stage.State,
+                    startedAtUtc = stage.StartedAtUtc,
+                    completedAtUtc = stage.CompletedAtUtc,
+                    warningAfterSeconds = index <= 2 ? 30 : 60,
+                    criticalAfterSeconds = index <= 2 ? 300 : 600,
+                    error = stage.Error,
+                    parentStage = stage.ParentStage,
+                    branch = stage.Branch
+                })
+                .ToArray();
         }
 
         using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(5) };
