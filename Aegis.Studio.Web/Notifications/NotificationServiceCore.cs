@@ -171,6 +171,7 @@ public sealed class NotificationService
         command.Parameters.AddWithValue(status);
         command.Parameters.AddWithValue((object?)destination ?? DBNull.Value);
         command.ExecuteNonQuery();
+        return id;
     }
 
     private static bool WantsEvent(UserMessagingPreferences preferences, string eventType) => eventType switch
