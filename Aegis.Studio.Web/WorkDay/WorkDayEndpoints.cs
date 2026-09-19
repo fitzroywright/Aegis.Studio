@@ -13,7 +13,7 @@ public static class WorkDayEndpoints
     {
         RouteGroupBuilder group=app.MapGroup("/api/workday").RequireAuthorization();
 
-        group.MapGet("/bootstrap",(ClaimsPrincipal user,StudioDatabase db,ScheduleStore schedules,WorkDayStore store)=>
+        group.MapGet("/bootstrap",(ClaimsPrincipal user,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,IConfiguration configuration)=>
         {
             string userName=UserName(user);
             PhotographerProfile? profile=new PhotographerStore(db).Get(userName);
@@ -34,7 +34,7 @@ public static class WorkDayEndpoints
                 all.Where(x=>x.StartsAtUtc<todayEnd&&x.EndsAtUtc>todayStart).ToArray(),
                 all.Where(x=>x.StartsAtUtc>=todayEnd).ToArray(),
                 store.GetActiveSession(userName),
-                WorkDayLocationTrackingMode.SignInOutOnly,
+                ParseTrackingMode(configuration["WorkDay:LocationTrackingMode"]),
                 now));
         });
 
@@ -181,6 +181,9 @@ public static class WorkDayEndpoints
             e.Id,e.JobId,e.BookingId,e.Title,e.StartsAtUtc,e.EndsAtUtc,e.Location,
             state?.Status??e.Status,e.Notes,workspace,conversation,customer,email,phone,state?.Version??0);
     }
+
+    private static WorkDayLocationTrackingMode ParseTrackingMode(string? value)=>
+        Enum.TryParse<WorkDayLocationTrackingMode>(value,true,out var mode)?mode:WorkDayLocationTrackingMode.SignInOutOnly;
 
     private static bool CanViewLocation(ClaimsPrincipal user)=>
         user.IsInRole("Administrator") ||
