@@ -40,7 +40,7 @@ public static class GalleryEndpoints
             }
             catch (InvalidOperationException exception)
             {
-                operationsFlows.TryEnqueueGallery(workspaceId.ToString("D"), "InternalStorage", businessId: workspaceId.ToString("D"), detail: exception.Message, failed: true);
+                operationsFlows.TryEnqueueGallery(workspaceId.ToString("D"), "InternalStorage", businessId: workspaceId.ToString("D"), detail: $"Gallery storage failed ({exception.GetType().Name}).", failed: true);
                 return Results.BadRequest(new { error = exception.Message });
             }
         }).RequireAuthorization().DisableAntiforgery();
@@ -77,7 +77,7 @@ public static class GalleryEndpoints
             }
             catch (Exception exception)
             {
-                operationsFlows.TryEnqueueGallery(workspaceId.ToString("D"), "Publish", businessId: workspaceId.ToString("D"), detail: exception.Message, failed: true);
+                operationsFlows.TryEnqueueGallery(workspaceId.ToString("D"), "Publish", businessId: workspaceId.ToString("D"), detail: $"Gallery publication failed ({exception.GetType().Name}).", failed: true);
                 throw;
             }
         }).RequireAuthorization();
