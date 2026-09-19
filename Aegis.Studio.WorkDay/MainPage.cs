@@ -214,7 +214,7 @@ public sealed class MainPage:ContentPage
         {
             OperationId=Guid.NewGuid(),Kind=kind,AssignmentId=assignment,OccurredAtUtc=DateTimeOffset.UtcNow,
             DeviceId=deviceId,Text=text,State=nameof(LocalSyncState.Pending),
-            Latitude=loc?.Latitude,Longitude=loc?.Longitude,AccuracyMetres=loc?.AccuracyMetres,
+            LocationObservationId=loc?.ObservationId,Latitude=loc?.Latitude,Longitude=loc?.Longitude,AccuracyMetres=loc?.AccuracyMetres,
             LocationObservedAtUtc=loc?.ObservedAtUtc,LocationSource=loc?.Source
         });
 
