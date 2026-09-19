@@ -155,6 +155,10 @@ public sealed class StudioFeatureDatabase
             alter table studio_user_profiles add column if not exists theme_name text not null default 'studio-default';
             alter table studio_outbound_email add column if not exists sent_by_user_name text null;
             alter table studio_outbound_email add column if not exists sending_identity_type text not null default 'Workspace';
+            alter table studio_outbound_email add column if not exists attempts integer not null default 0;
+            alter table studio_outbound_email add column if not exists last_error text null;
+            alter table studio_outbound_email add column if not exists next_attempt_at_utc timestamptz null;
+            alter table studio_outbound_email add column if not exists provider_accepted_at_utc timestamptz null;
             """;
 
         await using NpgsqlCommand command = dataSource.CreateCommand(sql);
