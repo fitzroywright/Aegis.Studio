@@ -37,6 +37,12 @@ public sealed class WorkDayApiClient
         r.EnsureSuccessStatusCode();
     }
 
+    public async Task PublishObservationAsync(WorkDayClientObservationDto observation,CancellationToken ct=default)
+    {
+        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/client-observation",observation,ct);
+        r.EnsureSuccessStatusCode();
+    }
+
     public async Task<OperationResultDto> SendAsync(LocalOperation op,CancellationToken ct=default)
     {
         object? location=op.Latitude.HasValue&&op.Longitude.HasValue
@@ -150,3 +156,5 @@ public sealed record SendingIdentityOptionDto(string Type,string Label,string Fr
 public sealed record SendingIdentityOptionsDto(string DefaultIdentity,bool CanSendAsSelf,IReadOnlyList<SendingIdentityOptionDto> Identities);
 
 public sealed record DeviceSessionDto(Guid SessionId,string Token,DateTimeOffset ExpiresAtUtc);
+
+public sealed record WorkDayClientObservationDto(string DeviceId,DateTimeOffset ObservedAtUtc,string Connectivity,string SynchronizationState,int PendingOperations,DateTimeOffset? OldestPendingAtUtc,int PendingUploads,int FailedUploads,bool WorkSessionActive,string LocationPermissionState);
