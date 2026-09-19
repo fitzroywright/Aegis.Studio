@@ -55,6 +55,23 @@ public static class WorkDayEndpoints
                 now));
         });
 
+        group.MapGet("/availability",(ClaimsPrincipal user,DateTimeOffset? from,DateTimeOffset? to,StudioDatabase db)=>
+        {
+            string userName=UserName(user);
+            PhotographerStore photographers=new(db);
+            if(photographers.Get(userName) is not { IsActive:true }) return Results.NotFound(new{error="No active Studio field profile is linked to this account."});
+            return Results.Ok(photographers.GetAvailability(userName,from,to));
+        });
+
+        group.MapPost("/availability",(ClaimsPrincipal user,PhotographerAvailabilityRequest request,StudioDatabase db)=>
+        {
+            string userName=UserName(user);
+            PhotographerStore photographers=new(db);
+            try{return Results.Created("/api/workday/availability",photographers.AddAvailability(userName,request));}
+            catch(KeyNotFoundException){return Results.NotFound(new{error="No active Studio field profile is linked to this account."});}
+            catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
+        });
+
         group.MapPost("/operations",(ClaimsPrincipal user,WorkDayOperationRequest request,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,StudioOperationsFlowPublisher flows)=>
         {
             string userName=UserName(user);
