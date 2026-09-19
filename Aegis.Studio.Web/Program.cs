@@ -287,14 +287,14 @@ app.MapPost("/api/conversations/{id:guid}/attachments", async (Guid id, IFormFil
     if (!allowed) return Results.Forbid();
     try
     {
-        operationsFlows.TryEnqueue(id.ToString("D"), "Attachments", businessId: id.ToString("D"));
+        operationsFlows.TryEnqueueAttachment(id.ToString("D"), "Storage", businessId: id.ToString("D"));
         StudioAttachment attachment = await attachments.AddAsync(id, file, visibility ?? "External", user.Identity?.Name ?? "Unknown", token);
-        operationsFlows.TryEnqueue(id.ToString("D"), "Workspace", businessId: attachment.Id.ToString("D"));
+        operationsFlows.TryEnqueueAttachment(id.ToString("D"), "Workspace", businessId: attachment.Id.ToString("D"));
         return Results.Created($"/api/attachments/{attachment.Id}", attachment);
     }
     catch (Exception exception) when (exception is InvalidOperationException or Common.Storage.StorageException)
     {
-        operationsFlows.TryEnqueue(id.ToString("D"), "Attachments", businessId: id.ToString("D"), detail: exception.Message, failed: true);
+        operationsFlows.TryEnqueueAttachment(id.ToString("D"), "Storage", businessId: id.ToString("D"), detail: exception.Message, failed: true);
         return Results.BadRequest(new { error = exception.Message });
     }
 }).DisableAntiforgery();
