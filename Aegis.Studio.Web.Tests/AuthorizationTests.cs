@@ -60,6 +60,33 @@ public sealed class AuthorizationTests
     }
 
     [Fact]
+    public void AssignedPhotographerJobStaffHasFieldPermissionsWithoutWorkspaceAdminPowers()
+    {
+        JobPermissionSet permissions = JobPermissionSet.JobStaff;
+
+        Assert.True(permissions.AccessJob);
+        Assert.True(permissions.ViewJob);
+        Assert.True(permissions.ViewConversation);
+        Assert.True(permissions.ViewAttachments);
+        Assert.True(permissions.AddAttachments);
+        Assert.True(permissions.ManageSchedule);
+        Assert.True(permissions.ManageProduction);
+
+        Assert.False(permissions.AdminJob);
+        Assert.False(permissions.ManageJobMembers);
+        Assert.False(permissions.ViewFinancials);
+        Assert.False(permissions.RecordFinancialActivity);
+        Assert.False(permissions.UsePos);
+        Assert.False(permissions.RefundVoidPos);
+    }
+
+    [Fact]
+    public void JobStaffDoesNotImplyCustomerReplyPermission()
+    {
+        Assert.False(JobPermissionSet.JobStaff.ReplyRequester);
+    }
+
+    [Fact]
     public void ReusableRolePermissionJsonRoundTrips()
     {
         string json = JsonSerializer.Serialize(WorkspacePermissionSet.ViewOnly);
