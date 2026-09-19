@@ -176,6 +176,11 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
 });
 app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen()));
 app.MapGet("/api/email/outbox", (OutboundEmailStore store) => Results.Ok(store.GetPending()));
+app.MapGet("/api/email/audit", (int? count, ClaimsPrincipal user, OutboundEmailStore store, WorkspaceAccessService access) =>
+{
+    IReadOnlyList<Guid> workspaceIds = access.GetAccessibleWorkspaceIds(user);
+    return Results.Ok(store.GetRecentAudit(workspaceIds, count ?? 200));
+}).RequireAuthorization();
 app.MapGet("/api/conversations/{id:guid}/sending-identities", (Guid id, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, WorkspaceStore workspaces, UserProfileStore profiles, IConfiguration configuration) =>
 {
     StudioConversation? conversation = store.GetConversation(id);
