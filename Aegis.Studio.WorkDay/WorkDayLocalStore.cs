@@ -35,6 +35,7 @@ public sealed class LocalOperation
     public string? Text { get; set; }
     public string? Category { get; set; }
     public long? ExpectedVersion { get; set; }
+    public Guid? LocationObservationId { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public double? AccuracyMetres { get; set; }
