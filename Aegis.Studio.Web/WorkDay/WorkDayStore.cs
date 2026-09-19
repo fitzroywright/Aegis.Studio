@@ -191,12 +191,35 @@ public sealed class WorkDayStore(StudioDatabase database)
         }
         else if(request.AssignmentId is Guid assignmentId)
         {
-            string? next=request.Kind switch { WorkDayOperationKind.AcceptAssignment=>"Accepted",WorkDayOperationKind.Arrive=>"Arrived",WorkDayOperationKind.StartSession=>"InProgress",WorkDayOperationKind.CompleteSession=>"Completed",_=>null};
+            string? next=request.Kind switch
+            {
+                WorkDayOperationKind.AcceptAssignment=>"Accepted",
+                WorkDayOperationKind.Arrive=>"Arrived",
+                WorkDayOperationKind.StartSession=>"InProgress",
+                WorkDayOperationKind.CompleteSession=>"Completed",
+                WorkDayOperationKind.SetExceptionStatus=>WorkDaySemantics.NormalizeExceptionStatus(request.Category),
+                _=>null
+            };
+            if(request.Kind==WorkDayOperationKind.SetExceptionStatus && next is null)
+                throw new InvalidOperationException("Exception status must be Cancelled, NoShow, Delayed or UnableToComplete.");
             if(next is not null)
             {
-                long current=0; using(NpgsqlCommand q=c.CreateCommand()){q.Transaction=tx;q.CommandText="select version from studio_workday_assignment_state where assignment_id=$1";q.Parameters.AddWithValue(assignmentId);object? v=q.ExecuteScalar();if(v is long l)current=l;}
-                if(request.ExpectedVersion is long expected && current>0 && expected!=current){tx.Rollback();return new(request.OperationId,WorkDayOperationState.Conflict,now,$"Version conflict. Client {expected}; server {current}.",current);}
-                version=current+1; using NpgsqlCommand up=c.CreateCommand();up.Transaction=tx;up.CommandText="insert into studio_workday_assignment_state(assignment_id,status,version,changed_by,changed_at_utc,last_operation_id) values($1,$2,$3,$4,$5,$6) on conflict(assignment_id) do update set status=excluded.status,version=excluded.version,changed_by=excluded.changed_by,changed_at_utc=excluded.changed_at_utc,last_operation_id=excluded.last_operation_id";up.Parameters.AddWithValue(assignmentId);up.Parameters.AddWithValue(next);up.Parameters.AddWithValue(version.Value);up.Parameters.AddWithValue(userName);up.Parameters.AddWithValue(request.OccurredAtUtc);up.Parameters.AddWithValue(request.OperationId);up.ExecuteNonQuery();
+                long currentVersion=0; string? currentStatus=null;
+                using(NpgsqlCommand q=c.CreateCommand())
+                {
+                    q.Transaction=tx;q.CommandText="select status,version from studio_workday_assignment_state where assignment_id=$1";q.Parameters.AddWithValue(assignmentId);
+                    using NpgsqlDataReader r=q.ExecuteReader();if(r.Read()){currentStatus=r.GetString(0);currentVersion=r.GetInt64(1);}
+                }
+                if(request.ExpectedVersion is long expected && currentVersion>0 && expected!=currentVersion)
+                {
+                    tx.Rollback();return new(request.OperationId,WorkDayOperationState.Conflict,now,$"Version conflict. Client {expected}; server {currentVersion}.",currentVersion);
+                }
+                if(!WorkDaySemantics.CanTransition(currentStatus,next))
+                    throw new InvalidOperationException($"Invalid WorkDay status transition from {WorkDaySemantics.InitialStatus(currentStatus)} to {next}.");
+                version=currentVersion+1;
+                using NpgsqlCommand up=c.CreateCommand();up.Transaction=tx;
+                up.CommandText="insert into studio_workday_assignment_state(assignment_id,status,version,changed_by,changed_at_utc,last_operation_id) values($1,$2,$3,$4,$5,$6) on conflict(assignment_id) do update set status=excluded.status,version=excluded.version,changed_by=excluded.changed_by,changed_at_utc=excluded.changed_at_utc,last_operation_id=excluded.last_operation_id";
+                up.Parameters.AddWithValue(assignmentId);up.Parameters.AddWithValue(next);up.Parameters.AddWithValue(version.Value);up.Parameters.AddWithValue(userName);up.Parameters.AddWithValue(request.OccurredAtUtc);up.Parameters.AddWithValue(request.OperationId);up.ExecuteNonQuery();
             }
             if(request.Kind is WorkDayOperationKind.AddNote or WorkDayOperationKind.RecordException)
             {
