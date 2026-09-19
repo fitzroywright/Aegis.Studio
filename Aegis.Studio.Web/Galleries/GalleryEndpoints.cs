@@ -24,7 +24,7 @@ public static class GalleryEndpoints
             return Results.Ok(store.GetOrCreate(workspaceId));
         }).RequireAuthorization();
 
-        app.MapPost("/api/workspaces/{workspaceId:guid}/gallery/items", async (Guid workspaceId, HttpContext context, WorkspaceAccessService access, CancellationToken cancellationToken) =>
+        app.MapPost("/api/workspaces/{workspaceId:guid}/gallery/items", async (Guid workspaceId, HttpContext context, WorkspaceAccessService access, StudioOperationsFlowPublisher operationsFlows, CancellationToken cancellationToken) =>
         {
             if (!CanManage(access, context, workspaceId)) return Results.Forbid();
             if (!context.Request.HasFormContentType) return Results.BadRequest(new { error = "multipart/form-data is required." });
@@ -35,10 +35,12 @@ public static class GalleryEndpoints
                 WorkspaceGallery gallery = store.GetOrCreate(workspaceId);
                 List<GalleryItem> added = [];
                 foreach (IFormFile file in form.Files) added.Add(await store.AddImageAsync(gallery, file, cancellationToken));
+                operationsFlows.TryEnqueue(workspaceId.ToString("D"), "Attachments", businessId: workspaceId.ToString("D"));
                 return Results.Ok(new { gallery = store.Get(workspaceId), added });
             }
             catch (InvalidOperationException exception)
             {
+                operationsFlows.TryEnqueue(workspaceId.ToString("D"), "Attachments", businessId: workspaceId.ToString("D"), detail: exception.Message, failed: true);
                 return Results.BadRequest(new { error = exception.Message });
             }
         }).RequireAuthorization().DisableAntiforgery();
@@ -63,12 +65,21 @@ public static class GalleryEndpoints
             return Results.NoContent();
         }).RequireAuthorization();
 
-        app.MapPost("/api/workspaces/{workspaceId:guid}/gallery/publish", (Guid workspaceId, HttpContext context, WorkspaceAccessService access) =>
+        app.MapPost("/api/workspaces/{workspaceId:guid}/gallery/publish", (Guid workspaceId, HttpContext context, WorkspaceAccessService access, StudioOperationsFlowPublisher operationsFlows) =>
         {
             if (!CanPublish(access, context, workspaceId)) return Results.Forbid();
-            WorkspaceGallery gallery = store.Publish(workspaceId);
-            string publicUrl = $"{context.Request.Scheme}://{context.Request.Host}/g/{gallery.PublicToken}";
-            return Results.Ok(new { gallery, publicUrl });
+            try
+            {
+                WorkspaceGallery gallery = store.Publish(workspaceId);
+                operationsFlows.TryEnqueue(workspaceId.ToString("D"), "Workspace", businessId: gallery.Id.ToString("D"));
+                string publicUrl = $"{context.Request.Scheme}://{context.Request.Host}/g/{gallery.PublicToken}";
+                return Results.Ok(new { gallery, publicUrl });
+            }
+            catch (Exception exception)
+            {
+                operationsFlows.TryEnqueue(workspaceId.ToString("D"), "Workspace", businessId: workspaceId.ToString("D"), detail: exception.Message, failed: true);
+                throw;
+            }
         }).RequireAuthorization();
 
         app.MapPost("/api/workspaces/{workspaceId:guid}/gallery/unpublish", (Guid workspaceId, HttpContext context, WorkspaceAccessService access) =>
