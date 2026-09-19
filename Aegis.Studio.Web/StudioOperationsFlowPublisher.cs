@@ -139,7 +139,7 @@ public sealed class StudioOperationsFlowPublisher(
         {
             "InboundMessage" => ["Mailbox", "Router", "Workspace", "Conversation", "Notification"],
             "OutboundMessage" => ["User", "SendingIdentity", "Message", "Provider", "Recipient"],
-            "NotificationFanout" => ["Event", "Email", "Slack", "WhatsApp", "InApp"],
+            "NotificationFanout" => ["Event", "Email", "Slack", "Teams", "InApp"],
             "AttachmentProcessing" => ["Received", "Storage", "Metadata", "Workspace"],
             "GalleryPublish" => ["InternalStorage", "Publish", "PublicGallery", "Verification"],
             _ => [item.Stage]
