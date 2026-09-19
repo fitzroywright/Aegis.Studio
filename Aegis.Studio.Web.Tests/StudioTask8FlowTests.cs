@@ -130,6 +130,24 @@ public sealed class StudioTask8FlowTests
     }
 
     [Fact]
+    public void Provider_acceptance_without_delivery_receipt_leaves_recipient_unknown()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        IReadOnlyList<StudioFlowStageSnapshot> stages =
+            StudioFlowSemantics.Linear(
+                "OutboundMessage",
+                "Recipient",
+                now,
+                failed: false,
+                detail: "DeliveryReceiptUnavailable",
+                stateOverride: "Unknown");
+
+        Assert.Equal("Unknown", stages.Single(x => x.Name == "Recipient").State);
+        Assert.Null(stages.Single(x => x.Name == "Recipient").CompletedAtUtc);
+        Assert.Equal("Completed", stages.Single(x => x.Name == "Provider").State);
+    }
+
+    [Fact]
     public void Correlation_continuity_prefers_business_reference_over_durable_queue_id()
     {
         Guid durableId = Guid.NewGuid();
