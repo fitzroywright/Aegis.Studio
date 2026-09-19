@@ -401,9 +401,12 @@ app.MapPost("/api/conversations/{id:guid}/attachments", async (Guid id, IFormFil
     if (!allowed) return Results.Forbid();
     try
     {
-        operationsFlows.TryEnqueueAttachment(id.ToString("D"), "Storage", businessId: id.ToString("D"));
+        string correlationId = id.ToString("D");
+        operationsFlows.TryEnqueueAttachment(correlationId, "Received", businessId: id.ToString("D"));
         StudioAttachment attachment = await attachments.AddAsync(id, file, visibility ?? "External", user.Identity?.Name ?? "Unknown", token);
-        operationsFlows.TryEnqueueAttachment(id.ToString("D"), "Workspace", businessId: attachment.Id.ToString("D"));
+        operationsFlows.TryEnqueueAttachment(correlationId, "Storage", businessId: attachment.Id.ToString("D"));
+        operationsFlows.TryEnqueueAttachment(correlationId, "Metadata", businessId: attachment.Id.ToString("D"));
+        operationsFlows.TryEnqueueAttachment(correlationId, "Workspace", businessId: attachment.Id.ToString("D"));
         return Results.Created($"/api/attachments/{attachment.Id}", attachment);
     }
     catch (Exception exception) when (exception is InvalidOperationException or Common.Storage.StorageException)
