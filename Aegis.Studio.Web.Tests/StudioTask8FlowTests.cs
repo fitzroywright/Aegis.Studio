@@ -17,6 +17,14 @@ public sealed class StudioTask8FlowTests
     }
 
     [Fact]
+    public void Studio_job_flow_has_tracking_light_stages()
+    {
+        Assert.Equal(
+            ["Created", "Assigned", "Accepted", "Arrived", "InProgress", "Completed", "Synchronized"],
+            StudioFlowSemantics.StageNames("JobFlow"));
+    }
+
+    [Fact]
     public void Outbound_workspace_identity_is_the_safe_default()
     {
         StudioSendingIdentity identity = StudioSendingIdentityResolver.Resolve(
