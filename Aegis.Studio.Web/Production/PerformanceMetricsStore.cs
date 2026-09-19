@@ -3,7 +3,7 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.Production;
 
-public sealed class PerformanceMetricsStore(StudioDatabase database)
+public sealed class PerformanceMetricsStore(StudioDatabase database, IConfiguration configuration)
 {
     public WorkspacePerformanceSnapshot GetWorkspacePerformance(Guid workspaceId, DateTimeOffset fromUtc, DateTimeOffset toUtc)
     {
@@ -37,7 +37,7 @@ public sealed class PerformanceMetricsStore(StudioDatabase database)
                    count(*) as assigned_shoots,
                    count(*) filter(where s.status in ('ShootComplete','HandedOff')) as completed_shoots,
                    count(*) filter(where s.checked_in_at_utc is not null) as checked_in_shoots,
-                   count(*) filter(where s.checked_in_at_utc is not null and s.checked_in_at_utc <= s.call_time_utc + interval '15 minutes') as on_time_checkins,
+                   count(*) filter(where s.checked_in_at_utc is not null and s.checked_in_at_utc <= s.call_time_utc + ($4 * interval '1 minute')) as on_time_checkins,
                    count(*) filter(where s.backup_confirmed) as backup_confirmed,
                    count(*) filter(where s.reshoot_required) as reshoots,
                    coalesce(sum(s.image_count),0) as image_count,
@@ -56,6 +56,7 @@ public sealed class PerformanceMetricsStore(StudioDatabase database)
         q.Parameters.AddWithValue(workspaceId);
         q.Parameters.AddWithValue(fromUtc);
         q.Parameters.AddWithValue(toUtc);
+        q.Parameters.AddWithValue(Math.Clamp(configuration.GetValue<int?>("Performance:PhotographerOnTimeGraceMinutes") ?? 15, 0, 120));
 
         using NpgsqlDataReader r = q.ExecuteReader();
         List<PhotographerPerformanceMetrics> values = [];
