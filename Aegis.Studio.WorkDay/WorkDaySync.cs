@@ -76,6 +76,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
     public DateTimeOffset? LastAttemptUtc{get;private set;}
     public DateTimeOffset? LastSuccessUtc{get;private set;}
     public string State{get;private set;}="Unknown";
+    public string LocationTrackingMode{get;private set;}="Unknown";
 
     public async Task SynchronizeAsync(CancellationToken ct=default)
     {
@@ -85,6 +86,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
             LastAttemptUtc=DateTimeOffset.UtcNow;State="Sending";
             WorkDayBootstrapDto? bootstrap=await api.BootstrapAsync(ct);
             if(bootstrap is null) throw new InvalidOperationException("Studio returned no WorkDay bootstrap.");
+            LocationTrackingMode=bootstrap.LocationTrackingMode;
 
             await store.ReplaceAssignmentsAsync(bootstrap.Today.Concat(bootstrap.Upcoming).Select(x=>new LocalAssignment
             {
