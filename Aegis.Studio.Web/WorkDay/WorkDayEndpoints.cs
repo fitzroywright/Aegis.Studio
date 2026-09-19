@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Production;
 using Aegis.Studio.Web.Scheduling;
+using Aegis.Studio.Web.Storage;
 
 namespace Aegis.Studio.Web.WorkDay;
 
@@ -13,13 +15,22 @@ public static class WorkDayEndpoints
 
         group.MapGet("/bootstrap",(ClaimsPrincipal user,StudioDatabase db,ScheduleStore schedules,WorkDayStore store)=>
         {
-            string userName=UserName(user); PhotographerProfile? profile=new PhotographerStore(db).Get(userName);
-            if(profile is null)return Results.NotFound(new{error="No Studio field profile is linked to this account."});
-            DateTimeOffset now=DateTimeOffset.UtcNow; DateTimeOffset todayStart=new(now.UtcDateTime.Date,TimeSpan.Zero); DateTimeOffset todayEnd=todayStart.AddDays(1);
+            string userName=UserName(user);
+            PhotographerProfile? profile=new PhotographerStore(db).Get(userName);
+            if(profile is null || !profile.IsActive) return Results.NotFound(new{error="No active Studio field profile is linked to this account."});
+
+            DateTimeOffset now=DateTimeOffset.UtcNow;
+            DateTimeOffset todayStart=new(now.UtcDateTime.Date,TimeSpan.Zero);
+            DateTimeOffset todayEnd=todayStart.AddDays(1);
             WorkDayAssignment[] all=schedules.GetEntries(todayStart.AddDays(-1),todayEnd.AddDays(30))
                 .Where(x=>x.ResourceIds.Contains(profile.ScheduleResourceId))
-                .Select(x=>MapAssignment(x,db,store)).ToArray();
-            return Results.Ok(new WorkDayBootstrap(userName,profile.DisplayName,now,
+                .Select(x=>MapAssignment(x,db,store))
+                .ToArray();
+
+            return Results.Ok(new WorkDayBootstrap(
+                userName,
+                profile.DisplayName,
+                now,
                 all.Where(x=>x.StartsAtUtc<todayEnd&&x.EndsAtUtc>todayStart).ToArray(),
                 all.Where(x=>x.StartsAtUtc>=todayEnd).ToArray(),
                 store.GetActiveSession(userName),
@@ -27,12 +38,37 @@ public static class WorkDayEndpoints
                 now));
         });
 
-        group.MapPost("/operations",(ClaimsPrincipal user,WorkDayOperationRequest request,WorkDayStore store)=>
+        group.MapPost("/operations",(ClaimsPrincipal user,WorkDayOperationRequest request,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,StudioOperationsFlowPublisher flows)=>
         {
+            string userName=UserName(user);
+            if(request.AssignmentId is Guid assignmentId && !AssignmentAllowed(userName,assignmentId,db,schedules))
+                return Results.Forbid();
+
             try
             {
-                WorkDayOperationResult result=store.Apply(UserName(user),request);
-                return result.State==WorkDayOperationState.Conflict?Results.Conflict(result):Results.Ok(result);
+                string correlation=request.OperationId.ToString("D");
+                flows.TryEnqueueWorkDaySync(correlation,"ServerProcessing",request.AssignmentId?.ToString("D"));
+                WorkDayOperationResult result=store.Apply(userName,request);
+                if(result.State==WorkDayOperationState.Conflict)
+                {
+                    flows.TryEnqueueWorkDaySync(correlation,"ServerProcessing",request.AssignmentId?.ToString("D"),result.Message,failed:true);
+                    return Results.Conflict(result);
+                }
+
+                flows.TryEnqueueWorkDaySync(correlation,"Acknowledged",request.AssignmentId?.ToString("D"));
+                if(request.AssignmentId is Guid businessId)
+                {
+                    string? stage=request.Kind switch
+                    {
+                        WorkDayOperationKind.AcceptAssignment=>"Accepted",
+                        WorkDayOperationKind.Arrive=>"Arrived",
+                        WorkDayOperationKind.StartSession=>"InProgress",
+                        WorkDayOperationKind.CompleteSession=>"Completed",
+                        _=>null
+                    };
+                    if(stage is not null) flows.TryEnqueueWorkDaySession(correlation,stage,businessId.ToString("D"));
+                }
+                return Results.Ok(result);
             }
             catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
         });
@@ -42,19 +78,115 @@ public static class WorkDayEndpoints
             WorkDayWorkSession? session=store.GetActiveSession(UserName(user));
             return session is null?Results.NoContent():Results.Ok(session);
         });
+
+        group.MapGet("/diagnostics",(ClaimsPrincipal user,WorkDayStore store)=>
+            Results.Ok(store.GetDiagnostics(UserName(user))));
+
+        group.MapPost("/assignments/{assignmentId:guid}/uploads", async (
+            Guid assignmentId,
+            HttpContext context,
+            ClaimsPrincipal user,
+            StudioDatabase db,
+            ScheduleStore schedules,
+            StudioStore studio,
+            AttachmentStore attachments,
+            StudioOperationsFlowPublisher flows,
+            CancellationToken ct)=>
+        {
+            string userName=UserName(user);
+            if(!AssignmentAllowed(userName,assignmentId,db,schedules)) return Results.Forbid();
+            if(!context.Request.HasFormContentType) return Results.BadRequest(new{error="multipart/form-data is required."});
+
+            IFormCollection form=await context.Request.ReadFormAsync(ct);
+            if(form.Files.Count!=1) return Results.BadRequest(new{error="Exactly one file is required per upload operation."});
+            if(!Guid.TryParse(form["uploadId"],out Guid uploadId) || uploadId==Guid.Empty) return Results.BadRequest(new{error="A stable uploadId is required."});
+
+            ScheduleEntry? entry=schedules.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10)).FirstOrDefault(x=>x.Id==assignmentId);
+            if(entry?.JobId is not Guid jobId) return Results.BadRequest(new{error="The assignment is not associated with a Studio job."});
+            StudioJob? job=studio.GetJob(jobId);
+            if(job is null) return Results.NotFound(new{error="The assignment job was not found."});
+
+            string correlation=uploadId.ToString("D");
+            IFormFile file=form.Files[0];
+            try
+            {
+                flows.TryEnqueueWorkDayUpload(correlation,"Upload",assignmentId.ToString("D"));
+                StudioAttachment stored=await attachments.AddAsync(job.ConversationId,file,"Internal",userName,ct,$"workday:{uploadId:D}");
+                flows.TryEnqueueWorkDayUpload(correlation,"Storage",stored.Id.ToString("D"));
+                flows.TryEnqueueWorkDayUpload(correlation,"MetadataAssociation",assignmentId.ToString("D"));
+                flows.TryEnqueueWorkDayUpload(correlation,"Acknowledged",stored.Id.ToString("D"));
+                return Results.Ok(new WorkDayUploadResult(uploadId,stored.Id,assignmentId,stored.FileName,stored.Size,stored.StorageStatus,DateTimeOffset.UtcNow));
+            }
+            catch(Exception ex) when(ex is InvalidOperationException or Common.Storage.StorageException)
+            {
+                flows.TryEnqueueWorkDayUpload(correlation,"Storage",assignmentId.ToString("D"),ex.GetType().Name,failed:true);
+                return Results.BadRequest(new{error=ex.Message});
+            }
+        }).DisableAntiforgery();
+
+        group.MapGet("/work-sessions/{workSessionId:guid}/timeline",(Guid workSessionId,string? userName,ClaimsPrincipal user,WorkDayStore store)=>
+        {
+            if(!CanViewLocation(user)) return Results.Forbid();
+            string target=string.IsNullOrWhiteSpace(userName)?UserName(user):userName.Trim();
+            IReadOnlyList<WorkDayLocationEvidence> observations=store.GetLocationTimeline(target,workSessionId);
+            return Results.Ok(new WorkDayTimeline(workSessionId,target,DateTimeOffset.MinValue,null,observations));
+        });
+    }
+
+    private static bool AssignmentAllowed(string userName,Guid assignmentId,StudioDatabase db,ScheduleStore schedules)
+    {
+        PhotographerProfile? profile=new PhotographerStore(db).Get(userName);
+        if(profile is null || !profile.IsActive) return false;
+        ScheduleEntry? assignment=schedules.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10)).FirstOrDefault(x=>x.Id==assignmentId);
+        return assignment is not null && assignment.ResourceIds.Contains(profile.ScheduleResourceId);
     }
 
     private static WorkDayAssignment MapAssignment(ScheduleEntry e,StudioDatabase db,WorkDayStore store)
     {
-        string? customer=null,email=null,phone=null; Guid? workspace=null;
+        string? customer=null,email=null,phone=null;
+        Guid? workspace=null,conversation=null;
         if(e.BookingId is Guid bookingId)
         {
-            using Npgsql.NpgsqlConnection c=db.OpenConnection();using Npgsql.NpgsqlCommand q=c.CreateCommand();
-            q.CommandText="select client_name,client_email,client_phone,workspace_id from studio_bookings where id=$1";q.Parameters.AddWithValue(bookingId);
-            using Npgsql.NpgsqlDataReader r=q.ExecuteReader();if(r.Read()){customer=r.GetString(0);email=r.GetString(1);phone=r.IsDBNull(2)?null:r.GetString(2);workspace=r.GetGuid(3);}
+            using Npgsql.NpgsqlConnection c=db.OpenConnection();
+            using Npgsql.NpgsqlCommand q=c.CreateCommand();
+            q.CommandText="select client_name,client_email,client_phone,workspace_id,job_id from studio_bookings where id=$1";
+            q.Parameters.AddWithValue(bookingId);
+            using Npgsql.NpgsqlDataReader r=q.ExecuteReader();
+            if(r.Read())
+            {
+                customer=r.GetString(0);
+                email=r.GetString(1);
+                phone=r.IsDBNull(2)?null:r.GetString(2);
+                workspace=r.GetGuid(3);
+                Guid jobId=r.GetGuid(4);
+                r.Close();
+                using Npgsql.NpgsqlCommand jq=c.CreateCommand();
+                jq.CommandText="select conversation_id from studio_jobs where id=$1";
+                jq.Parameters.AddWithValue(jobId);
+                if(jq.ExecuteScalar() is Guid cid) conversation=cid;
+            }
         }
-        return new(e.Id,e.JobId,e.BookingId,e.Title,e.StartsAtUtc,e.EndsAtUtc,e.Location,e.Status,e.Notes,workspace,customer,email,phone,0);
+        else if(e.JobId is Guid jobId)
+        {
+            using Npgsql.NpgsqlConnection c=db.OpenConnection();
+            using Npgsql.NpgsqlCommand q=c.CreateCommand();
+            q.CommandText="select workspace_id,conversation_id,client_name from studio_jobs where id=$1";
+            q.Parameters.AddWithValue(jobId);
+            using Npgsql.NpgsqlDataReader r=q.ExecuteReader();
+            if(r.Read()){workspace=r.GetGuid(0);conversation=r.GetGuid(1);customer=r.GetString(2);}
+        }
+
+        var state=store.GetAssignmentState(e.Id);
+        return new(
+            e.Id,e.JobId,e.BookingId,e.Title,e.StartsAtUtc,e.EndsAtUtc,e.Location,
+            state?.Status??e.Status,e.Notes,workspace,conversation,customer,email,phone,state?.Version??0);
     }
 
-    private static string UserName(ClaimsPrincipal user)=>user.FindFirstValue("login_name")??user.Identity?.Name??string.Empty;
+    private static bool CanViewLocation(ClaimsPrincipal user)=>
+        user.IsInRole("Administrator") ||
+        user.HasClaim("permission","Studio.WorkDay.Location.View") ||
+        user.HasClaim("capability","Studio.WorkDay.Location.View");
+
+    private static string UserName(ClaimsPrincipal user)=>
+        user.FindFirstValue("login_name")??user.FindFirstValue(ClaimTypes.NameIdentifier)??user.Identity?.Name??string.Empty;
 }
