@@ -134,7 +134,7 @@ public sealed class WorkDayLocalStore
 
     private async Task MigrateSensitiveQueueFieldsAsync()
     {
-        IReadOnlyList<ColumnInfo> opColumns=await db.GetTableInfoAsync(nameof(LocalOperation));
+        IReadOnlyList<SQLiteConnection.ColumnInfo> opColumns=await db.GetTableInfoAsync(nameof(LocalOperation));
         HashSet<string> opNames=opColumns.Select(x=>x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if(opNames.Contains("Text"))
         {
@@ -153,7 +153,7 @@ public sealed class WorkDayLocalStore
             }
         }
 
-        IReadOnlyList<ColumnInfo> locationColumns=await db.GetTableInfoAsync(nameof(LocalLocationObservation));
+        IReadOnlyList<SQLiteConnection.ColumnInfo> locationColumns=await db.GetTableInfoAsync(nameof(LocalLocationObservation));
         HashSet<string> locationNames=locationColumns.Select(x=>x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if(locationNames.Contains("Latitude")&&locationNames.Contains("Longitude"))
         {
