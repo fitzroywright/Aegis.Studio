@@ -6,10 +6,33 @@ namespace Aegis.Studio.Web.Scheduling;
 public sealed class ScheduleStore
 {
     private readonly StudioDatabase database;
+    private readonly IConfiguration configuration;
 
-    public ScheduleStore(StudioDatabase database)
+    public ScheduleStore(StudioDatabase database, IConfiguration configuration)
     {
         this.database = database;
+        this.configuration = configuration;
+        EnsureOperationalSchema();
+    }
+
+    private void EnsureOperationalSchema()
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            create table if not exists studio_schedule_assignment_history(
+              id uuid primary key,
+              entry_id uuid not null,
+              job_id uuid null,
+              changed_by text not null,
+              changed_at_utc timestamptz not null,
+              previous_resource_ids uuid[] not null,
+              new_resource_ids uuid[] not null,
+              reason text null);
+            create index if not exists ix_schedule_assignment_history_entry
+              on studio_schedule_assignment_history(entry_id,changed_at_utc desc);
+            """;
+        command.ExecuteNonQuery();
     }
 
     public IReadOnlyList<ScheduleResource> GetResources(bool includeInactive = false)
@@ -129,6 +152,91 @@ public sealed class ScheduleStore
         return values;
     }
 
+    public IReadOnlyList<StaffCapacitySnapshot> GetStaffCapacity(DateTimeOffset from, DateTimeOffset to)
+    {
+        if (to <= from) throw new InvalidOperationException("Capacity end must be after start.");
+        DateTimeOffset start=from.ToUniversalTime(), end=to.ToUniversalTime();
+        double days=Math.Max(1d,(end-start).TotalDays);
+        double dailyHours=Math.Clamp(configuration.GetValue<double?>("Scheduling:DefaultDailyCapacityHours")??8d,1d,24d);
+        double capacityMinutes=days*dailyHours*60d;
+
+        using NpgsqlConnection connection=database.OpenConnection();
+        using NpgsqlCommand command=connection.CreateCommand();
+        command.CommandText="""
+            select p.user_name,p.display_name,p.schedule_resource_id,
+                   coalesce(sum(extract(epoch from (least(e.ends_at_utc,$2)-greatest(e.starts_at_utc,$1)))/60.0)
+                       filter(where e.id is not null and e.status<>'Cancelled'),0),
+                   coalesce((select sum(extract(epoch from (least(a.ends_at_utc,$2)-greatest(a.starts_at_utc,$1)))/60.0)
+                       from studio_photographer_availability a
+                       where lower(a.user_name)=lower(p.user_name)
+                         and a.availability_type in ('Unavailable','Leave')
+                         and a.starts_at_utc<$2 and a.ends_at_utc>$1),0)
+            from studio_photographers p
+            left join studio_schedule_entry_resources er on er.resource_id=p.schedule_resource_id
+            left join studio_schedule_entries e on e.id=er.entry_id and e.starts_at_utc<$2 and e.ends_at_utc>$1
+            where p.is_active
+            group by p.user_name,p.display_name,p.schedule_resource_id
+            order by p.display_name,p.user_name
+            """;
+        command.Parameters.AddWithValue(start);command.Parameters.AddWithValue(end);
+        using NpgsqlDataReader r=command.ExecuteReader();
+        List<StaffCapacitySnapshot> values=[];
+        while(r.Read())
+        {
+            double scheduled=Convert.ToDouble(r.GetValue(3),System.Globalization.CultureInfo.InvariantCulture);
+            double unavailable=Convert.ToDouble(r.GetValue(4),System.Globalization.CultureInfo.InvariantCulture);
+            double effective=Math.Max(0d,capacityMinutes-unavailable);
+            double remaining=Math.Max(0d,effective-scheduled);
+            double utilization=effective<=0d?(scheduled>0?100d:0d):(scheduled/effective*100d);
+            string state=effective<=0d?"Unavailable":scheduled>effective?"OverCapacity":utilization>=85d?"NearCapacity":"Available";
+            values.Add(new(r.GetString(0),r.GetString(1),r.GetGuid(2),start,end,
+                Math.Round(effective,1),Math.Round(scheduled,1),Math.Round(unavailable,1),Math.Round(remaining,1),Math.Round(utilization,1),state));
+        }
+        return values;
+    }
+
+    public ScheduleAssignmentChange Reassign(
+        Guid entryId,
+        IReadOnlyList<Guid> newResourceIds,
+        string changedBy,
+        string? reason)
+    {
+        ScheduleEntry current=GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10))
+            .FirstOrDefault(x=>x.Id==entryId)??throw new KeyNotFoundException("Schedule entry was not found.");
+        Guid[] next=(newResourceIds??[]).Distinct().ToArray();
+        IReadOnlyList<ScheduleConflict> conflicts=FindConflicts(current.StartsAtUtc,current.EndsAtUtc,next,entryId);
+        if(conflicts.Count>0) throw new ScheduleConflictException(conflicts);
+
+        using NpgsqlConnection connection=database.OpenConnection();
+        using NpgsqlTransaction tx=connection.BeginTransaction();
+        using(NpgsqlCommand delete=connection.CreateCommand())
+        {
+            delete.Transaction=tx;delete.CommandText="delete from studio_schedule_entry_resources where entry_id=$1";delete.Parameters.AddWithValue(entryId);delete.ExecuteNonQuery();
+        }
+        SaveResources(connection,tx,entryId,next);
+        Guid historyId=Guid.NewGuid();DateTimeOffset changedAt=DateTimeOffset.UtcNow;
+        using(NpgsqlCommand audit=connection.CreateCommand())
+        {
+            audit.Transaction=tx;
+            audit.CommandText="insert into studio_schedule_assignment_history(id,entry_id,job_id,changed_by,changed_at_utc,previous_resource_ids,new_resource_ids,reason) values($1,$2,$3,$4,$5,$6,$7,$8)";
+            audit.Parameters.AddWithValue(historyId);audit.Parameters.AddWithValue(entryId);audit.Parameters.AddWithValue((object?)current.JobId??DBNull.Value);
+            audit.Parameters.AddWithValue(changedBy);audit.Parameters.AddWithValue(changedAt);audit.Parameters.AddWithValue(current.ResourceIds.ToArray());audit.Parameters.AddWithValue(next);audit.Parameters.AddWithValue((object?)reason?.Trim()??DBNull.Value);
+            audit.ExecuteNonQuery();
+        }
+        tx.Commit();
+        return new(historyId,entryId,current.JobId,changedBy,changedAt,current.ResourceIds.ToArray(),next,reason?.Trim());
+    }
+
+    public IReadOnlyList<ScheduleAssignmentChange> GetAssignmentHistory(Guid entryId,int count=100)
+    {
+        using NpgsqlConnection connection=database.OpenConnection();using NpgsqlCommand q=connection.CreateCommand();
+        q.CommandText="select id,entry_id,job_id,changed_by,changed_at_utc,previous_resource_ids,new_resource_ids,reason from studio_schedule_assignment_history where entry_id=$1 order by changed_at_utc desc limit $2";
+        q.Parameters.AddWithValue(entryId);q.Parameters.AddWithValue(Math.Clamp(count,1,500));
+        using NpgsqlDataReader r=q.ExecuteReader();List<ScheduleAssignmentChange> values=[];
+        while(r.Read())values.Add(new(r.GetGuid(0),r.GetGuid(1),r.IsDBNull(2)?null:r.GetGuid(2),r.GetString(3),r.GetFieldValue<DateTimeOffset>(4),r.GetFieldValue<Guid[]>(5),r.GetFieldValue<Guid[]>(6),r.IsDBNull(7)?null:r.GetString(7)));
+        return values;
+    }
+
     private static void ValidateEntry(ScheduleEntryRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Title)) throw new InvalidOperationException("Schedule title is required.");
@@ -158,3 +266,27 @@ public sealed record ScheduleEntry(Guid Id,Guid? JobId,Guid? BookingId,string Ti
 public sealed record ScheduleEntryRequest(Guid? JobId,Guid? BookingId,string Title,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? Location,string? Status,string? Notes,IReadOnlyList<Guid>? ResourceIds,bool AllowConflicts=false);
 public sealed record ScheduleConflict(Guid EntryId,string EntryTitle,Guid ResourceId,string ResourceName,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc);
 public sealed class ScheduleConflictException : Exception { public ScheduleConflictException(IReadOnlyList<ScheduleConflict> conflicts) : base("Schedule conflicts were detected.") { Conflicts = conflicts; } public IReadOnlyList<ScheduleConflict> Conflicts { get; } }
+
+
+public sealed record StaffCapacitySnapshot(
+    string UserName,
+    string DisplayName,
+    Guid ScheduleResourceId,
+    DateTimeOffset FromUtc,
+    DateTimeOffset ToUtc,
+    double EffectiveCapacityMinutes,
+    double ScheduledMinutes,
+    double UnavailableMinutes,
+    double RemainingMinutes,
+    double UtilizationPercent,
+    string State);
+
+public sealed record ScheduleAssignmentChange(
+    Guid Id,
+    Guid EntryId,
+    Guid? JobId,
+    string ChangedBy,
+    DateTimeOffset ChangedAtUtc,
+    IReadOnlyList<Guid> PreviousResourceIds,
+    IReadOnlyList<Guid> NewResourceIds,
+    string? Reason);
