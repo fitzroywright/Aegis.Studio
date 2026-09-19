@@ -111,9 +111,13 @@ public sealed class MicrosoftGraphEmailClient
             throw new InvalidOperationException("Microsoft Graph email is not configured.");
         }
 
+        if (string.IsNullOrWhiteSpace(fromAddress))
+        {
+            throw new InvalidOperationException("An explicit sending mailbox is required.");
+        }
+
         string accessToken = await GetAccessTokenAsync(cancellationToken);
-        string sendingMailbox = Uri.EscapeDataString(options.Mailbox);
-        string url = $"https://graph.microsoft.com/v1.0/users/{sendingMailbox}/sendMail";
+        string url = BuildSendMailUrl(fromAddress);
 
         GraphSendMailRequest payload = new(
             new GraphSendMessage(
@@ -132,6 +136,13 @@ public sealed class MicrosoftGraphEmailClient
 
         using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+
+    public static string BuildSendMailUrl(string fromAddress)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fromAddress);
+        string sendingMailbox = Uri.EscapeDataString(fromAddress.Trim());
+        return $"https://graph.microsoft.com/v1.0/users/{sendingMailbox}/sendMail";
     }
 
     private async Task<IReadOnlyCollection<InboundEmailAttachment>> GetFileAttachmentsAsync(
