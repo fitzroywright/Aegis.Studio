@@ -114,6 +114,29 @@ public static class ScheduleEndpoints
         }).RequireAuthorization();
     }
 
+    private static void EnsureAssignedPhotographers(ScheduleEntry entry, StudioDatabase database, JobAccessService access)
+    {
+        Guid? jobId = entry.JobId ?? ResolveBookingJobId(entry.BookingId, database);
+        if (jobId is not Guid effectiveJobId || entry.ResourceIds.Count == 0) return;
+
+        PhotographerStore photographers = new(database);
+        foreach (PhotographerProfile photographer in photographers.GetByScheduleResourceIds(entry.ResourceIds))
+        {
+            if (!photographer.IsActive) continue;
+            access.EnsureAssignedMember(effectiveJobId, photographer.UserName);
+        }
+    }
+
+    private static Guid? ResolveBookingJobId(Guid? bookingId, StudioDatabase database)
+    {
+        if (bookingId is not Guid id) return null;
+        using Npgsql.NpgsqlConnection connection = database.OpenConnection();
+        using Npgsql.NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "select job_id from studio_bookings where id=$1";
+        command.Parameters.AddWithValue(id);
+        return command.ExecuteScalar() is Guid jobId ? jobId : null;
+    }
+
     private static Guid[] ParseIds(string? value)
         => string.IsNullOrWhiteSpace(value)
             ? []
