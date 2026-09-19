@@ -21,6 +21,8 @@ public sealed class MainPage:ContentPage
     private readonly Label uploadCount=new(){Text="0 files pending upload"};
     private readonly Label lastSync=new(){Text="Last Sync: Never"};
     private readonly Label attention=new(){Text="Nothing needs attention."};
+    private readonly SearchBar search=new(){Placeholder="Search today's/upcoming customer or session"};
+    private readonly VerticalStackLayout searchResults=new(){Spacing=8};
     private readonly VerticalStackLayout todayList=new(){Spacing=10};
     private readonly VerticalStackLayout upcomingList=new(){Spacing=10};
     private readonly Button workButton=new(){Text="SIGN IN FOR WORK",FontSize=18,HeightRequest=58};
@@ -41,6 +43,7 @@ public sealed class MainPage:ContentPage
         this.store=store;this.sync=sync;this.uploads=uploads;this.location=location;this.device=device;this.session=session;this.api=api;this.credentials=credentials;this.services=services;
         Title="My WorkDay";
         workButton.Clicked+=ToggleWork;
+        search.TextChanged+=async(_,_)=>RenderSearch(await store.GetAssignmentsAsync());
 
         Button refresh=new(){Text="SYNC NOW",HeightRequest=48};
         refresh.Clicked+=async(_,_)=>await RefreshAsync();
@@ -70,6 +73,7 @@ public sealed class MainPage:ContentPage
                         }
                     },
                     pending,uploadCount,
+                    search,searchResults,
                     refresh,messages,
                     new Label{Text="NEEDS ATTENTION",FontSize=19,FontAttributes=FontAttributes.Bold},
                     attention,
@@ -120,6 +124,34 @@ public sealed class MainPage:ContentPage
         RenderAssignments(assignments);
         await RenderAttentionAsync(assignments);
         ApplyTrackingPolicy();
+        RenderSearch(assignments);
+        if(online) await PublishObservationAsync();
+    }
+
+    private void RenderSearch(IReadOnlyList<LocalAssignment> values)
+    {
+        searchResults.Children.Clear();
+        string query=search.Text?.Trim()??"";
+        if(query.Length<2)return;
+        foreach(LocalAssignment a in values.Where(x=>
+            (x.Title?.Contains(query,StringComparison.OrdinalIgnoreCase)??false) ||
+            (x.CustomerName?.Contains(query,StringComparison.OrdinalIgnoreCase)??false) ||
+            x.Id.ToString("D").Contains(query,StringComparison.OrdinalIgnoreCase)).Take(10))
+            searchResults.Children.Add(AssignmentCard(a));
+    }
+
+    private async Task PublishObservationAsync()
+    {
+        try
+        {
+            IReadOnlyList<LocalOperation> pendingOps=await store.PendingAsync();
+            string deviceId=await device.GetAsync();
+            await api.PublishObservationAsync(new WorkDayClientObservationDto(
+                deviceId,DateTimeOffset.UtcNow,"Online",sync.State,pendingOps.Count,
+                pendingOps.FirstOrDefault()?.OccurredAtUtc,await store.PendingUploadCountAsync(),
+                await store.FailedUploadCountAsync(),active?.EndedAtUtc is null,location.PermissionState));
+        }
+        catch { }
     }
 
     private void RenderAssignments(IReadOnlyList<LocalAssignment> values)
