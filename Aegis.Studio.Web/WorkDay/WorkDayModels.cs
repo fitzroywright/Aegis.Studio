@@ -126,3 +126,31 @@ public sealed record WorkDaySessionCorrection(
     string Reason,
     string CorrectedBy,
     DateTimeOffset CorrectedAtUtc);
+
+
+public sealed record WorkDayClientStatus(
+    string DeviceId,
+    string UserName,
+    DateTimeOffset ObservedAtUtc,
+    string Connectivity,
+    string SynchronizationState,
+    int PendingOperations,
+    DateTimeOffset? OldestPendingAtUtc,
+    int PendingUploads,
+    int FailedUploads,
+    bool WorkSessionActive,
+    string LocationPermissionState);
+
+public sealed record WorkspacePhotographerActivity(
+    string UserName,
+    string DisplayName,
+    Guid ScheduleResourceId,
+    WorkDayClientStatus? Client,
+    WorkDayWorkSession? ActiveWorkSession,
+    IReadOnlyList<WorkDayAssignment> Assignments,
+    Scheduling.StaffCapacitySnapshot? Capacity);
+
+public sealed record WorkspaceWorkDayActivity(
+    Guid WorkspaceId,
+    DateTimeOffset GeneratedAtUtc,
+    IReadOnlyList<WorkspacePhotographerActivity> Photographers);
