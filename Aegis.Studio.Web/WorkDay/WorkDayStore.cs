@@ -216,6 +216,27 @@ public sealed class WorkDayStore(StudioDatabase database)
         q.ExecuteNonQuery();
     }
 
+    public IReadOnlyList<WorkDayClientStatus> GetClientStatuses(IReadOnlyCollection<string> userNames)
+    {
+        if(userNames.Count==0) return [];
+        string[] users=userNames.Where(x=>!string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if(users.Length==0) return [];
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="""
+          select device_id,user_name,observed_at_utc,connectivity,synchronization_state,pending_operations,
+                 oldest_pending_at_utc,pending_uploads,failed_uploads,work_session_active,location_permission_state
+          from studio_workday_client_observations
+          where lower(user_name)=any($1)
+          order by observed_at_utc desc
+        """;
+        q.Parameters.AddWithValue(users.Select(x=>x.ToLowerInvariant()).ToArray());
+        using NpgsqlDataReader r=q.ExecuteReader(); List<WorkDayClientStatus> values=[];
+        while(r.Read()) values.Add(new(
+            r.GetString(0),r.GetString(1),r.GetFieldValue<DateTimeOffset>(2),r.GetString(3),r.GetString(4),r.GetInt32(5),
+            r.IsDBNull(6)?null:r.GetFieldValue<DateTimeOffset>(6),r.GetInt32(7),r.GetInt32(8),r.GetBoolean(9),r.GetString(10)));
+        return values;
+    }
+
     public WorkDayFleetSnapshot GetFleetSnapshot(TimeSpan staleAfter)
     {
         DateTimeOffset now=DateTimeOffset.UtcNow; DateTimeOffset cutoff=now-staleAfter;
