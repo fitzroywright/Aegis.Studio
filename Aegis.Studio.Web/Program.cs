@@ -7,6 +7,7 @@ using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Authentication;
 using Aegis.Studio.Web.Bookings;
 using Aegis.Studio.Web.Configuration;
+using Aegis.Studio.Web.Diagnostics;
 using Aegis.Studio.Web.Email;
 using Aegis.Studio.Web.Messaging;
 using Aegis.Studio.Web.Notifications;
@@ -28,6 +29,7 @@ using Npgsql;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSignalR();
+builder.Services.AddStudioEngineeringDiagnostics();
 builder.Services.AddHostedService<Aegis.Studio.Web.OperationsTelemetryPublisher>();
 
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
@@ -94,6 +96,7 @@ app.MapStudioProduction();
 app.MapWorkspaceAccess();
 app.MapJobAccess();
 app.MapHealthChecks("/health").AllowAnonymous();
+app.MapStudioEngineeringDiagnostics();
 app.MapStudioPosHardening();
 
 app.MapGet("/api/email/status", async (MicrosoftGraphEmailClient client, MicrosoftGraphEmailOptions options, UnroutedEmailStore unrouted, CancellationToken cancellationToken) =>
