@@ -20,6 +20,7 @@ public sealed class MainPage:ContentPage
     private readonly Label pending=new(){Text="0 changes pending"};
     private readonly Label uploadCount=new(){Text="0 files pending upload"};
     private readonly Label lastSync=new(){Text="Last Sync: Never"};
+    private readonly Label timeSummary=new(){Text="Regular 0h · Overtime 0h · Weekend 0h"};
     private readonly Label attention=new(){Text="Nothing needs attention."};
     private readonly SearchBar search=new(){Placeholder="Search today's/upcoming customer or session"};
     private readonly VerticalStackLayout searchResults=new(){Spacing=8};
@@ -75,6 +76,8 @@ public sealed class MainPage:ContentPage
                         }
                     },
                     pending,uploadCount,
+                    new Label{Text="TIME (LAST 14 DAYS)",FontSize=18,FontAttributes=FontAttributes.Bold},
+                    timeSummary,
                     search,searchResults,
                     refresh,messages,availability,
                     new Label{Text="NEEDS ATTENTION",FontSize=19,FontAttributes=FontAttributes.Bold},
@@ -127,7 +130,17 @@ public sealed class MainPage:ContentPage
         await RenderAttentionAsync(assignments);
         ApplyTrackingPolicy();
         RenderSearch(assignments);
-        if(online) await PublishObservationAsync();
+        if(online)
+        {
+            await PublishObservationAsync();
+            try
+            {
+                WorkDayTimeSummaryDto? summary=await api.GetTimeSummaryAsync();
+                if(summary is not null)
+                    timeSummary.Text=$"Regular {summary.RegularMinutes/60d:0.0}h · Overtime {summary.OvertimeMinutes/60d:0.0}h · Weekend {summary.WeekendMinutes/60d:0.0}h";
+            }
+            catch { }
+        }
     }
 
     private void RenderSearch(IReadOnlyList<LocalAssignment> values)
