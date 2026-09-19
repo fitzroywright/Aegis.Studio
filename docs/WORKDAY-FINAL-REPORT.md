@@ -337,3 +337,35 @@ A first-class Operations flow named `JobFlow` is published for tracking-light vi
 `Created -> Assigned -> Accepted -> Arrived -> InProgress -> Completed -> Synchronized`
 
 The same job ID is used as the correlation/business identifier across schedule assignment, reassignment, WorkDay field actions and Studio job lifecycle updates, allowing Aegis.Operations to show where a job is currently sitting or stalled.
+
+
+## Overtime and weekend work tracking
+
+WorkDay now classifies completed and active Work Sessions into auditable time evidence:
+
+- total worked minutes;
+- regular minutes;
+- overtime minutes;
+- weekend minutes;
+- weekend-overtime minutes (the intersection of weekend and overtime evidence).
+
+Classification is based on raw Work Session sign-in/sign-out timestamps. The raw timestamps remain authoritative and are not replaced by the derived totals.
+
+Policy is configurable:
+
+- `WorkDay:TimeTracking:TimeZoneId` — default `America/Jamaica`;
+- `WorkDay:TimeTracking:RegularDailyHours` — default `8`;
+- `WorkDay:TimeTracking:WeekendDays` — default Saturday/Sunday.
+
+Multiple Work Sessions on the same local day share one regular-time threshold. Sessions crossing local midnight are split across local dates before classification.
+
+Weekend work is tracked independently from overtime. A weekend minute is not automatically declared overtime merely because it occurred on a weekend. If weekend work also exceeds the configured daily regular threshold, that overlapping portion appears as `WeekendOvertimeMinutes`.
+
+This is time evidence, not payroll calculation. Studio does not apply overtime multipliers, statutory rates or payroll amounts. Those remain the responsibility of Payroll/rules processing.
+
+Photographers can view their own recent totals through:
+
+- `GET /api/workday/time-summary`
+- the WorkDay mobile home screen (14-day summary).
+
+Workspace managers see the same 14-day regular/overtime/weekend totals for photographers assigned to their workspace through the workspace WorkDay management dashboard.
