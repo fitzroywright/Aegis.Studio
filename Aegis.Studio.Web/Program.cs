@@ -170,6 +170,68 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
 });
 app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen()));
 app.MapGet("/api/email/outbox", (OutboundEmailStore store) => Results.Ok(store.GetPending()));
+app.MapGet("/api/conversations/{id:guid}/sending-identities", (Guid id, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService workspaceAccess, WorkspaceStore workspaces, UserProfileStore profiles, IConfiguration configuration) =>
+{
+    StudioConversation? conversation = store.GetConversation(id);
+    if (conversation is null) return Results.NotFound();
+
+    bool allowed = workspaceAccess.HasPermission(user, conversation.WorkspaceId, "View") ||
+        (conversation.JobId.HasValue && app.Services.GetRequiredService<JobAccessService>().HasPermission(user, conversation.JobId.Value, "ViewConversation"));
+    if (!allowed) return Results.Forbid();
+
+    StudioWorkspaceDefinition workspace = workspaces.Get(conversation.WorkspaceId)
+        ?? throw new InvalidOperationException("The conversation workspace no longer exists.");
+
+    var identities = new List<object>();
+    if (!string.IsNullOrWhiteSpace(workspace.EmailAddress))
+    {
+        identities.Add(new
+        {
+            type = "Workspace",
+            label = $"Workspace — {workspace.EmailAddress}",
+            fromAddress = workspace.EmailAddress,
+            isDefault = true
+        });
+    }
+
+    StudioUserProfile profile = profiles.GetOrCreate(user);
+    bool canSendAsSelf = workspaceAccess.HasPermission(user, conversation.WorkspaceId, "SendAsSelf");
+    string[] allowedDomains = configuration.GetSection("Messaging:AllowedPersonalSenderDomains").Get<string[]>() ?? [];
+
+    if (canSendAsSelf && !string.IsNullOrWhiteSpace(profile.Email))
+    {
+        try
+        {
+            StudioSendingIdentity self = StudioSendingIdentityResolver.Resolve(
+                "Self",
+                workspace.EmailAddress ?? string.Empty,
+                profile.UserName,
+                profile.Email,
+                true,
+                allowedDomains);
+
+            identities.Add(new
+            {
+                type = "Self",
+                label = $"Myself — {self.FromAddress}",
+                fromAddress = self.FromAddress,
+                isDefault = false
+            });
+        }
+        catch (InvalidOperationException)
+        {
+            // Fail closed: invalid/unapproved personal identities are simply not offered.
+        }
+    }
+
+    return Results.Ok(new
+    {
+        defaultIdentity = "Workspace",
+        canSendAsSelf,
+        identities
+    });
+}).RequireAuthorization();
+
 app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, ClaimsPrincipal user, StudioStore store, OutboundEmailStore outbox, NotificationService notifications, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, WorkspaceStore workspaces, UserProfileStore profiles, IConfiguration configuration, StudioOperationsFlowPublisher operationsFlows) =>
 {
     if (string.IsNullOrWhiteSpace(request.Body)) return Results.BadRequest(new { error = "Message body is required." });
