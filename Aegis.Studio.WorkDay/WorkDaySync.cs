@@ -40,7 +40,7 @@ public sealed class WorkDayApiClient
     public async Task<OperationResultDto> SendAsync(LocalOperation op,CancellationToken ct=default)
     {
         object? location=op.Latitude.HasValue&&op.Longitude.HasValue
-            ? new{observationId=op.OperationId,latitude=op.Latitude.Value,longitude=op.Longitude.Value,accuracyMetres=op.AccuracyMetres,observedAtUtc=op.LocationObservedAtUtc??op.OccurredAtUtc,source=op.LocationSource,mockLocation=(bool?)null}
+            ? new{observationId=op.LocationObservationId??op.OperationId,latitude=op.Latitude.Value,longitude=op.Longitude.Value,accuracyMetres=op.AccuracyMetres,observedAtUtc=op.LocationObservedAtUtc??op.OccurredAtUtc,source=op.LocationSource,mockLocation=(bool?)null}
             : null;
         using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/operations",new{operationId=op.OperationId,kind=op.Kind,assignmentId=op.AssignmentId,occurredAtUtc=op.OccurredAtUtc,deviceId=op.DeviceId,text=op.Text,category=op.Category,location,expectedVersion=op.ExpectedVersion},ct);
         OperationResultDto? result=await r.Content.ReadFromJsonAsync<OperationResultDto>(cancellationToken:ct);
@@ -101,13 +101,6 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                 CustomerName=x.CustomerName,CustomerEmail=x.CustomerEmail,CustomerPhone=x.CustomerPhone,Version=x.Version,CachedAtUtc=DateTimeOffset.UtcNow
             }));
 
-            foreach(LocalLocationObservation loc in await store.PendingLocationsAsync())
-            {
-                LocalOperation op=new(){OperationId=loc.ObservationId,Kind="LocationObservation",AssignmentId=loc.AssignmentId,OccurredAtUtc=loc.ObservedAtUtc,DeviceId="location",Latitude=loc.Latitude,Longitude=loc.Longitude,AccuracyMetres=loc.AccuracyMetres,LocationObservedAtUtc=loc.ObservedAtUtc,LocationSource=loc.Source};
-                try{await api.SendAsync(op,ct);loc.State=nameof(LocalSyncState.Acknowledged);await store.UpdateLocationAsync(loc);}
-                catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException){loc.State=nameof(LocalSyncState.Failed);await store.UpdateLocationAsync(loc);State="Waiting";return;}
-            }
-
             foreach(LocalOperation op in await store.PendingAsync())
             {
                 op.State=nameof(LocalSyncState.Sending);op.LastAttemptUtc=DateTimeOffset.UtcNow;op.AttemptCount++;await store.SaveOperationAsync(op);
@@ -127,6 +120,13 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                     op.State=nameof(LocalSyncState.Failed);op.LastError=ex.Message;await store.SaveOperationAsync(op);State="Waiting";return;
                 }
                 await store.SaveOperationAsync(op);
+            }
+
+            foreach(LocalLocationObservation loc in await store.PendingLocationsAsync())
+            {
+                LocalOperation locationOperation=new(){OperationId=loc.ObservationId,Kind="LocationObservation",AssignmentId=loc.AssignmentId,OccurredAtUtc=loc.ObservedAtUtc,DeviceId="location",LocationObservationId=loc.ObservationId,Latitude=loc.Latitude,Longitude=loc.Longitude,AccuracyMetres=loc.AccuracyMetres,LocationObservedAtUtc=loc.ObservedAtUtc,LocationSource=loc.Source};
+                try{await api.SendAsync(locationOperation,ct);loc.State=nameof(LocalSyncState.Acknowledged);await store.UpdateLocationAsync(loc);}
+                catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException){loc.State=nameof(LocalSyncState.Failed);await store.UpdateLocationAsync(loc);State="Waiting";return;}
             }
 
             await uploads.ProcessAsync(ct);
