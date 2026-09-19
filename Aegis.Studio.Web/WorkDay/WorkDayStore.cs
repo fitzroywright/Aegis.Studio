@@ -53,6 +53,18 @@ public sealed class WorkDayStore(StudioDatabase database)
           connectivity text not null, synchronization_state text not null, pending_operations integer not null,
           oldest_pending_at_utc timestamptz null, pending_uploads integer not null, failed_uploads integer not null,
           work_session_active boolean not null, location_permission_state text not null, received_at_utc timestamptz not null);
+
+        create table if not exists studio_workday_location_access_audit(
+          id uuid primary key, viewer_user_name text not null, target_user_name text not null,
+          work_session_id uuid null, action text not null, viewed_at_utc timestamptz not null);
+        create index if not exists ix_workday_location_access_audit_time on studio_workday_location_access_audit(viewed_at_utc desc);
+
+        create table if not exists studio_workday_session_corrections(
+          id uuid primary key, work_session_id uuid not null references studio_workday_work_sessions(id),
+          user_name text not null, original_started_at_utc timestamptz not null, original_ended_at_utc timestamptz null,
+          corrected_started_at_utc timestamptz null, corrected_ended_at_utc timestamptz null,
+          reason text not null, corrected_by text not null, corrected_at_utc timestamptz not null);
+        create index if not exists ix_workday_session_corrections_session on studio_workday_session_corrections(work_session_id,corrected_at_utc);
         """;
         cmd.ExecuteNonQuery();
     }
@@ -122,6 +134,56 @@ public sealed class WorkDayStore(StudioDatabase database)
         using NpgsqlDataReader r=q.ExecuteReader();var values=new List<WorkDayWorkSession>();
         while(r.Read()) values.Add(new(r.GetGuid(0),r.GetString(1),r.GetFieldValue<DateTimeOffset>(2),r.IsDBNull(3)?null:r.GetFieldValue<DateTimeOffset>(3),r.GetString(4),r.GetBoolean(5),r.IsDBNull(6)?null:r.GetBoolean(6),null,null,r.GetString(7),r.GetFieldValue<DateTimeOffset>(8)));
         return values;
+    }
+
+    public void AuditLocationAccess(string viewerUserName,string targetUserName,Guid? workSessionId,string action)
+    {
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="insert into studio_workday_location_access_audit(id,viewer_user_name,target_user_name,work_session_id,action,viewed_at_utc) values($1,$2,$3,$4,$5,now())";
+        q.Parameters.AddWithValue(Guid.NewGuid());q.Parameters.AddWithValue(viewerUserName);q.Parameters.AddWithValue(targetUserName);
+        q.Parameters.AddWithValue((object?)workSessionId??DBNull.Value);q.Parameters.AddWithValue(action);q.ExecuteNonQuery();
+    }
+
+    public int ApplyLocationRetention(TimeSpan retention)
+    {
+        if(retention<TimeSpan.FromDays(1)) retention=TimeSpan.FromDays(1);
+        DateTimeOffset cutoff=DateTimeOffset.UtcNow-retention;
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="delete from studio_workday_location_observations where observed_at_utc<$1";
+        q.Parameters.AddWithValue(cutoff);
+        return q.ExecuteNonQuery();
+    }
+
+    public WorkDaySessionCorrection CorrectWorkSession(Guid workSessionId,WorkDaySessionCorrectionRequest request,string correctedBy)
+    {
+        if(string.IsNullOrWhiteSpace(request.Reason)) throw new InvalidOperationException("Correction reason is required.");
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlTransaction tx=c.BeginTransaction();
+        string? userName=null;DateTimeOffset originalStart=default;DateTimeOffset? originalEnd=null;
+        using(NpgsqlCommand find=c.CreateCommand())
+        {
+            find.Transaction=tx;find.CommandText="select user_name,started_at_utc,ended_at_utc from studio_workday_work_sessions where id=$1 for update";
+            find.Parameters.AddWithValue(workSessionId);using NpgsqlDataReader r=find.ExecuteReader();
+            if(!r.Read()) throw new KeyNotFoundException("Work session was not found.");
+            userName=r.GetString(0);originalStart=r.GetFieldValue<DateTimeOffset>(1);originalEnd=r.IsDBNull(2)?null:r.GetFieldValue<DateTimeOffset>(2);
+        }
+        DateTimeOffset newStart=request.CorrectedStartedAtUtc??originalStart;
+        DateTimeOffset? newEnd=request.CorrectedEndedAtUtc??originalEnd;
+        if(newEnd.HasValue&&newEnd.Value<newStart) throw new InvalidOperationException("Corrected sign-out cannot be before sign-in.");
+        Guid correctionId=Guid.NewGuid();DateTimeOffset now=DateTimeOffset.UtcNow;
+        using(NpgsqlCommand audit=c.CreateCommand())
+        {
+            audit.Transaction=tx;audit.CommandText="insert into studio_workday_session_corrections(id,work_session_id,user_name,original_started_at_utc,original_ended_at_utc,corrected_started_at_utc,corrected_ended_at_utc,reason,corrected_by,corrected_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)";
+            audit.Parameters.AddWithValue(correctionId);audit.Parameters.AddWithValue(workSessionId);audit.Parameters.AddWithValue(userName!);audit.Parameters.AddWithValue(originalStart);
+            audit.Parameters.AddWithValue((object?)originalEnd??DBNull.Value);audit.Parameters.AddWithValue((object?)request.CorrectedStartedAtUtc??DBNull.Value);
+            audit.Parameters.AddWithValue((object?)request.CorrectedEndedAtUtc??DBNull.Value);audit.Parameters.AddWithValue(request.Reason.Trim());audit.Parameters.AddWithValue(correctedBy);audit.Parameters.AddWithValue(now);audit.ExecuteNonQuery();
+        }
+        using(NpgsqlCommand update=c.CreateCommand())
+        {
+            update.Transaction=tx;update.CommandText="update studio_workday_work_sessions set started_at_utc=$2,ended_at_utc=$3,updated_at_utc=now() where id=$1";
+            update.Parameters.AddWithValue(workSessionId);update.Parameters.AddWithValue(newStart);update.Parameters.AddWithValue((object?)newEnd??DBNull.Value);update.ExecuteNonQuery();
+        }
+        tx.Commit();
+        return new(correctionId,workSessionId,userName!,originalStart,originalEnd,request.CorrectedStartedAtUtc,request.CorrectedEndedAtUtc,request.Reason.Trim(),correctedBy,now);
     }
 
     public IReadOnlyList<WorkDayLocationEvidence> GetLocationTimeline(string userName, Guid workSessionId)
