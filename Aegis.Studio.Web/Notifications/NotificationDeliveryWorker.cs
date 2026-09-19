@@ -147,7 +147,7 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
-            select id,user_name,channel,subject,body,destination,attempts
+            select id,user_name,channel,subject,body,destination,attempts,reference_type,reference_id
             from studio_notifications
             where status in ('Pending','Retry','WaitingForConfiguration')
               and attempts < 10
@@ -160,7 +160,9 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         {
             values.Add(new PendingNotification(
                 reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetInt32(6)));
+                reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetInt32(6),
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8)));
         }
         return values;
     }
@@ -198,6 +200,22 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         Dictionary<string, string>? metadata = string.IsNullOrWhiteSpace(item.Destination)
             ? null
             : new Dictionary<string, string> { ["Destination"] = item.Destination };
+        string correlationId =
+            !string.IsNullOrWhiteSpace(item.ReferenceId)
+                ? item.ReferenceId.Trim()
+                : item.Id.ToString("D");
+
+        if (!string.IsNullOrWhiteSpace(item.ReferenceType))
+        {
+            metadata ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            metadata["ReferenceType"] = item.ReferenceType.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(item.ReferenceId))
+        {
+            metadata ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            metadata["ReferenceId"] = item.ReferenceId.Trim();
+        }
+
         MessageRequest request = new()
         {
             RecipientIds = [item.UserName],
@@ -205,11 +223,11 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
             Body = item.Body,
             Channels = channel,
             Source = "Aegis.Studio",
-            CorrelationId = item.Id.ToString("D"),
+            CorrelationId = correlationId,
             Metadata = metadata
         };
         RecipientSnapshot snapshot = new(recipient.UserId, recipient.UserName, recipient.Email, recipient.SlackUserId, recipient.Mobile, recipient.PreferredChannels);
-        ExternalDeliveryWorkItem workItem = new(item.Id, [snapshot], channel, request, item.Id.ToString("D"), "Aegis.Studio notification", DateTimeOffset.UtcNow, item.Attempts);
+        ExternalDeliveryWorkItem workItem = new(item.Id, [snapshot], channel, request, correlationId, "Aegis.Studio notification", DateTimeOffset.UtcNow, item.Attempts);
 
         await this.deliveryStore.EnqueueAsync(workItem, cancellationToken);
         Update(item.Id, "Queued", null, false, false);
