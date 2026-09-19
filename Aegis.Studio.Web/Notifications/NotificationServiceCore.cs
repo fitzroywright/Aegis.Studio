@@ -82,7 +82,6 @@ public sealed class NotificationService
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(userName);
         command.ExecuteNonQuery();
-        return id;
     }
 
     private IReadOnlyList<string>? ResolveScopedRecipients(string? referenceType, string? referenceId)
