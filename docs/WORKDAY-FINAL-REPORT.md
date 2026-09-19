@@ -278,3 +278,20 @@ The former Aegis.Studio.Photographer MAUI client has been retired. Its functiona
 - messaging, gallery status, uploads, notifications and diagnostics.
 
 The legacy /api/mobile/photographer route surface has been retired. WorkDay uses /api/workday as the mobile field API. The server-side PhotographerStore/profile and availability data model remain because WorkDay and Studio scheduling use them; only the obsolete standalone client/API surface was removed.
+
+
+## Cross-workspace photographer access model
+
+Photographers are global Studio field resources, not workspace-bound users.
+
+Assignment rule:
+
+- a photographer may be assigned to a job owned by any workspace;
+- assignment of the photographer's schedule resource automatically ensures JobStaff membership on that specific job;
+- WorkDay visibility requires both assignment to the photographer resource and job-level ViewJob access;
+- WorkDay field-state changes require job-level ManageProduction;
+- WorkDay file uploads require job-level AddAttachments;
+- WorkDay gallery status is exposed through an assignment-scoped endpoint and does not grant general workspace gallery access;
+- availability/leave remains photographer-global and is not workspace-scoped.
+
+Automatic assignment reconciliation is intentionally non-destructive: it will not overwrite an existing explicit job membership and will not remove job membership when a schedule assignment changes, because membership provenance is not yet modeled.
