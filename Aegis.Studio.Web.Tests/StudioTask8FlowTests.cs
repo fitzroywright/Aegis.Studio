@@ -1,4 +1,5 @@
 using Aegis.Studio.Web;
+using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Email;
 using Xunit;
 
@@ -27,6 +28,14 @@ public sealed class StudioTask8FlowTests
 
         Assert.Equal(StudioSendingIdentityType.Workspace, identity.Type);
         Assert.Equal("workspace@bryans.example", identity.FromAddress);
+    }
+
+    [Fact]
+    public void Graph_send_endpoint_uses_selected_sending_identity()
+    {
+        Assert.Equal(
+            "https://graph.microsoft.com/v1.0/users/manager%40bryans.example/sendMail",
+            MicrosoftGraphEmailClient.BuildSendMailUrl("manager@bryans.example"));
     }
 
     [Fact]
