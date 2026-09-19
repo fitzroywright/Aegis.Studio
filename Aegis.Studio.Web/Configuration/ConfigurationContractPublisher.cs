@@ -51,7 +51,10 @@ public sealed class ConfigurationContractPublisher(
 
             contract["version"] = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
             contract["siteId"] = NullIfBlank(configuration["Site:Id"]);
-            contract["instanceId"] = NullIfBlank(configuration["Service:Identity"]);
+            string instanceId =
+                NullIfBlank(configuration["Service:Identity"])
+                ?? Environment.MachineName;
+            contract["instanceId"] = instanceId;
 
             bool databaseConfigured = HasValue(await secrets.GetAsync("ConnectionStrings:Studio", cancellationToken));
             bool graphSecretConfigured = HasValue(await secrets.GetAsync("Studio:MicrosoftGraphEmail:ClientSecret", cancellationToken));
@@ -97,10 +100,6 @@ public sealed class ConfigurationContractPublisher(
                 requirement["effectiveValueAvailable"] = configured;
                 requirement["verificationStatus"] = state == "Disabled" ? "NOT REQUIRED" : configured ? "PASS" : verification;
             }
-
-            string instanceId =
-                contract["instanceId"]?.GetValue<string>()
-                ?? Environment.MachineName;
 
             string identityFile =
                 configuration["Aegis:Registration:IdentityFile"]
