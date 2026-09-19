@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
 using Common.Registration;
+using Aegis.Studio.Web.WorkDay;
 
 namespace Aegis.Studio.Web;
 
@@ -12,6 +13,7 @@ public sealed class OperationsTelemetryPublisher(
     IHostEnvironment environment,
     EngineeringDiagnosticEngine diagnosticEngine,
     StudioEngineeringDiagnosticCatalog diagnosticCatalog,
+    WorkDayStore workDayStore,
     ILogger<OperationsTelemetryPublisher> logger) : BackgroundService
 {
     private const string ApplicationId = "Aegis.Studio";
@@ -120,6 +122,10 @@ public sealed class OperationsTelemetryPublisher(
                             diagnosticRun,
                             stoppingToken);
                     }
+
+                    int staleSeconds = Math.Clamp(configuration.GetValue<int?>("WorkDay:TelemetryStaleSeconds") ?? 300, 60, 3600);
+                    WorkDayFleetSnapshot workDay = workDayStore.GetFleetSnapshot(TimeSpan.FromSeconds(staleSeconds));
+                    await PublishWorkDayDiagnosticsAsync(client, operationsUrl, identity, workDay, stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -206,6 +212,53 @@ public sealed class OperationsTelemetryPublisher(
             new
             {
                 applicationId = ApplicationId,
+                flowType = "WorkDaySession",
+                displayName = "Studio WorkDay Session",
+                stages = new object[]
+                {
+                    new { name = "Assigned", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "Accepted", parentStage = "Assigned", branch = (string?)null, warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "Arrived", parentStage = "Accepted", branch = (string?)null, warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "InProgress", parentStage = "Arrived", branch = (string?)null, warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "Completed", parentStage = "InProgress", branch = (string?)null, warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "Synchronized", parentStage = "Completed", branch = (string?)null, warningAfterSeconds = 300, criticalAfterSeconds = 1800 }
+                },
+                updatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new
+            {
+                applicationId = ApplicationId,
+                flowType = "WorkDaySync",
+                displayName = "Studio WorkDay Synchronization",
+                stages = new object[]
+                {
+                    new { name = "LocalChange", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Pending", parentStage = "LocalChange", branch = (string?)null, warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "Sending", parentStage = "Pending", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "ServerProcessing", parentStage = "Sending", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Acknowledged", parentStage = "ServerProcessing", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 }
+                },
+                updatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new
+            {
+                applicationId = ApplicationId,
+                flowType = "WorkDayUpload",
+                displayName = "Studio WorkDay Upload",
+                stages = new object[]
+                {
+                    new { name = "Selected", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "LocalQueue", parentStage = "Selected", branch = (string?)null, warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "Upload", parentStage = "LocalQueue", branch = (string?)null, warningAfterSeconds = 300, criticalAfterSeconds = 1800 },
+                    new { name = "Storage", parentStage = "Upload", branch = (string?)null, warningAfterSeconds = 120, criticalAfterSeconds = 1200 },
+                    new { name = "MetadataAssociation", parentStage = "Storage", branch = (string?)null, warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "Acknowledged", parentStage = "MetadataAssociation", branch = (string?)null, warningAfterSeconds = 60, criticalAfterSeconds = 600 }
+                },
+                updatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new
+            {
+                applicationId = ApplicationId,
                 flowType = "GalleryPublish",
                 displayName = "Studio Gallery Publish",
                 stages = new object[]
@@ -237,6 +290,58 @@ public sealed class OperationsTelemetryPublisher(
             if (!response.IsSuccessStatusCode)
                 break;
         }
+    }
+
+    private static async Task PublishWorkDayDiagnosticsAsync(
+        HttpClient client,
+        string operationsUrl,
+        RegistrationIdentityDocument identity,
+        WorkDayFleetSnapshot snapshot,
+        CancellationToken ct)
+    {
+        string state = snapshot.Clients == 0 ? "Unknown"
+            : snapshot.FailedUploads > 0 ? "Warning"
+            : snapshot.OfflineOrStale > 0 ? "Warning"
+            : "Healthy";
+        string summary = snapshot.Clients == 0
+            ? "No WorkDay client observations have been received."
+            : $"WorkDay clients {snapshot.Clients}; recently online {snapshot.RecentlyOnline}; offline/stale {snapshot.OfflineOrStale}; pending sync {snapshot.PendingSync}; pending uploads {snapshot.PendingUploads}; failed uploads {snapshot.FailedUploads}.";
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            operationsUrl.TrimEnd('/') + "/api/operations/diagnostics/observe")
+        {
+            Content = JsonContent.Create(new
+            {
+                diagnosticId = ApplicationId + ":WorkDayFleet",
+                applicationId = ApplicationId,
+                component = "Aegis Studio WorkDay",
+                category = "MobileFleet",
+                state,
+                summary,
+                observedAtUtc = snapshot.GeneratedAtUtc,
+                detail = new
+                {
+                    snapshot.Clients,
+                    snapshot.RecentlyOnline,
+                    snapshot.OfflineOrStale,
+                    snapshot.PendingSync,
+                    snapshot.OldestPendingAtUtc,
+                    snapshot.PendingUploads,
+                    snapshot.FailedUploads
+                },
+                correlationId = "workday-fleet-" + snapshot.GeneratedAtUtc.ToUnixTimeSeconds(),
+                runbook = "docs/WORKDAY-RUNBOOK.md"
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", identity.Credential);
+        request.Headers.TryAddWithoutValidation("X-Aegis-Application-Id", identity.ApplicationId);
+        request.Headers.TryAddWithoutValidation("X-Aegis-Instance-Id", identity.InstanceId);
+        request.Headers.TryAddWithoutValidation("X-Aegis-Installation-Id", identity.InstallationId);
+        request.Headers.TryAddWithoutValidation("X-Aegis-Correlation-Id", "workday-fleet-" + snapshot.GeneratedAtUtc.ToUnixTimeSeconds());
+        using HttpResponseMessage response = await client.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+            return;
     }
 
     private static string ToOperationalState(EngineeringDiagnosticStatus status) =>
