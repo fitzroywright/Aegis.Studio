@@ -10,13 +10,19 @@ PostgreSQL, Microsoft Graph/mail routing where enabled, Common.Messaging, Common
 Verify database initialization, storage health, diagnostics registration and configured external messaging providers.
 
 ## Health Verification
-Inspect workspace-message flows, attachment-processing flows, gallery-publish flows, provider queue health and application diagnostics.
+Inspect InboundMessage, OutboundMessage, NotificationFanout, AttachmentProcessing and GalleryPublish flows, provider queue health and application diagnostics. Notification branches are independent; one failed provider must not erase successful branch evidence.
 
 ## Normal State
 Inbound routing persists to the correct workspace; attachment storage is writable/integrity-checked; gallery publication is reachable; outbound provider queues drain without dead letters.
 
 ## Messaging Semantics
 A completed provider dispatch is ProviderAccepted unless delivery receipts prove Delivered. Do not label provider acceptance as recipient delivery.
+
+Outbound customer email uses an explicit sending identity. Workspace identity is the default. Reply as Myself is offered only when the user has the workspace SendAsSelf capability and a valid profile email on the workspace mail domain or another explicitly allowed personal-sender domain. The server resolves the From address; clients may select only the identity type.
+
+Microsoft Graph must be permitted to send as the selected mailbox. A successful Graph send advances the Provider stage to ProviderAccepted; the Recipient stage remains unproven unless a delivery receipt is available.
+
+Review `/api/email/audit` for workspace-scoped message/conversation IDs, actual user, From address, sending identity type, status and timestamp. Message bodies are intentionally excluded from that audit view.
 
 ## Common Warnings
 Unrouted mail, provider configuration waiting, retrying notification queue or slow attachment/gallery processing.
