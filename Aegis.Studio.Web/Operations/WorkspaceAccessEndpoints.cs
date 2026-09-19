@@ -43,7 +43,19 @@ public static class WorkspaceAccessEndpoints
             WorkspaceAccessService access = new(database);
             IReadOnlyList<Guid> ids = access.GetAccessibleWorkspaceIds(user);
             IReadOnlyList<StudioWorkspaceDefinition> values = workspaces.GetAll().Where(x => ids.Contains(x.Id)).ToList();
-            return Results.Ok(values.Select(x => new { workspace = x, permissions = access.GetPermissions(user, x.Id) }));
+            return Results.Ok(values.Select(x =>
+            {
+                WorkspacePermissionSet permissions=access.GetPermissions(user,x.Id);
+                return new
+                {
+                    workspace=x,
+                    permissions,
+                    isManager=permissions.ManageSchedule&&permissions.ManageProduction&&permissions.ManageMembers&&!permissions.AdminWorkspace,
+                    workDayManagementUrl=(permissions.ManageSchedule||permissions.ManageProduction||user.IsInRole("Administrator"))
+                        ? $"/workspaces/{x.Id:D}/workday-management"
+                        : null
+                };
+            }));
         }).RequireAuthorization();
 
         app.MapGet("/api/workspaces/{workspaceId:guid}", (Guid workspaceId, ClaimsPrincipal user, StudioDatabase database, WorkspaceStore workspaces) =>
