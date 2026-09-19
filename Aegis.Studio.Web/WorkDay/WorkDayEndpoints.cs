@@ -30,7 +30,7 @@ public static class WorkDayEndpoints
             return Results.NoContent();
         });
 
-        group.MapGet("/bootstrap",(ClaimsPrincipal user,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,IConfiguration configuration)=>
+        group.MapGet("/bootstrap",(ClaimsPrincipal user,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,IConfiguration configuration,JobAccessService access)=>
         {
             string userName=UserName(user);
             PhotographerProfile? profile=new PhotographerStore(db).Get(userName);
@@ -41,7 +41,9 @@ public static class WorkDayEndpoints
             DateTimeOffset todayEnd=todayStart.AddDays(1);
             WorkDayAssignment[] all=schedules.GetEntries(todayStart.AddDays(-1),todayEnd.AddDays(30))
                 .Where(x=>x.ResourceIds.Contains(profile.ScheduleResourceId))
-                .Select(x=>MapAssignment(x,db,store))
+                .Select(x=>EnsureAndMapAssignmentAccess(user,profile,x,db,store,access))
+                .Where(x=>x is not null)
+                .Select(x=>x!)
                 .ToArray();
 
             return Results.Ok(new WorkDayBootstrap(
@@ -72,11 +74,15 @@ public static class WorkDayEndpoints
             catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
         });
 
-        group.MapPost("/operations",(ClaimsPrincipal user,WorkDayOperationRequest request,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,StudioOperationsFlowPublisher flows)=>
+        group.MapPost("/operations",(ClaimsPrincipal user,WorkDayOperationRequest request,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,StudioOperationsFlowPublisher flows,JobAccessService access)=>
         {
             string userName=UserName(user);
-            if(request.AssignmentId is Guid assignmentId && !AssignmentAllowed(userName,assignmentId,db,schedules))
-                return Results.Forbid();
+            if(request.AssignmentId is Guid assignmentId)
+            {
+                string permission=RequiredJobPermission(request.Kind);
+                if(!AssignmentAllowed(user,userName,assignmentId,db,schedules,access,permission))
+                    return Results.Forbid();
+            }
 
             try
             {
@@ -145,11 +151,12 @@ public static class WorkDayEndpoints
             ScheduleStore schedules,
             StudioStore studio,
             AttachmentStore attachments,
+            JobAccessService access,
             StudioOperationsFlowPublisher flows,
             CancellationToken ct)=>
         {
             string userName=UserName(user);
-            if(!AssignmentAllowed(userName,assignmentId,db,schedules)) return Results.Forbid();
+            if(!AssignmentAllowed(user,userName,assignmentId,db,schedules,access,"AddAttachments")) return Results.Forbid();
             if(!context.Request.HasFormContentType) return Results.BadRequest(new{error="multipart/form-data is required."});
 
             IFormCollection form=await context.Request.ReadFormAsync(ct);
@@ -211,13 +218,69 @@ public static class WorkDayEndpoints
         }).RequireAuthorization();
     }
 
-    private static bool AssignmentAllowed(string userName,Guid assignmentId,StudioDatabase db,ScheduleStore schedules)
+    private static bool AssignmentAllowed(
+        ClaimsPrincipal user,
+        string userName,
+        Guid assignmentId,
+        StudioDatabase db,
+        ScheduleStore schedules,
+        JobAccessService access,
+        string permission)
     {
         PhotographerProfile? profile=new PhotographerStore(db).Get(userName);
         if(profile is null || !profile.IsActive) return false;
-        ScheduleEntry? assignment=schedules.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10)).FirstOrDefault(x=>x.Id==assignmentId);
-        return assignment is not null && assignment.ResourceIds.Contains(profile.ScheduleResourceId);
+
+        ScheduleEntry? assignment=schedules.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10))
+            .FirstOrDefault(x=>x.Id==assignmentId);
+        if(assignment is null || !assignment.ResourceIds.Contains(profile.ScheduleResourceId)) return false;
+
+        Guid? jobId=ResolveAssignmentJobId(assignment,db);
+        if(jobId is not Guid effectiveJobId) return false;
+
+        // Assignment is the grant boundary: ensure a globally defined photographer receives
+        // job-scoped staff access even when they are not a standing member of the workspace.
+        access.EnsureAssignedMember(effectiveJobId,userName);
+        return access.HasPermission(user,effectiveJobId,permission);
     }
+
+    private static WorkDayAssignment? EnsureAndMapAssignmentAccess(
+        ClaimsPrincipal user,
+        PhotographerProfile profile,
+        ScheduleEntry entry,
+        StudioDatabase db,
+        WorkDayStore store,
+        JobAccessService access)
+    {
+        Guid? jobId=ResolveAssignmentJobId(entry,db);
+        if(jobId is not Guid effectiveJobId) return null;
+        access.EnsureAssignedMember(effectiveJobId,profile.UserName);
+        if(!access.HasPermission(user,effectiveJobId,"ViewJob")) return null;
+        return MapAssignment(entry,db,store);
+    }
+
+    private static Guid? ResolveAssignmentJobId(ScheduleEntry entry,StudioDatabase db)
+    {
+        if(entry.JobId is Guid jobId) return jobId;
+        if(entry.BookingId is not Guid bookingId) return null;
+        using Npgsql.NpgsqlConnection c=db.OpenConnection();
+        using Npgsql.NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="select job_id from studio_bookings where id=$1";
+        q.Parameters.AddWithValue(bookingId);
+        return q.ExecuteScalar() is Guid value?value:null;
+    }
+
+    private static string RequiredJobPermission(WorkDayOperationKind kind)=>kind switch
+    {
+        WorkDayOperationKind.AcceptAssignment=>"ManageProduction",
+        WorkDayOperationKind.Arrive=>"ManageProduction",
+        WorkDayOperationKind.StartSession=>"ManageProduction",
+        WorkDayOperationKind.CompleteSession=>"ManageProduction",
+        WorkDayOperationKind.AddNote=>"ManageProduction",
+        WorkDayOperationKind.RecordException=>"ManageProduction",
+        WorkDayOperationKind.SetExceptionStatus=>"ManageProduction",
+        WorkDayOperationKind.LocationObservation=>"ManageProduction",
+        _=>"ViewJob"
+    };
 
     private static WorkDayAssignment MapAssignment(ScheduleEntry e,StudioDatabase db,WorkDayStore store)
     {
