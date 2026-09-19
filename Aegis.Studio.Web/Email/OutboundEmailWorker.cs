@@ -66,6 +66,11 @@ public sealed class OutboundEmailWorker : BackgroundService
                             "Provider",
                             businessId: message.Id.ToString("D"),
                             detail: "ProviderAccepted");
+                        operationsFlows.TryEnqueueOutboundUnknown(
+                            message.ConversationId.ToString("D"),
+                            "Recipient",
+                            businessId: message.Id.ToString("D"),
+                            detail: "DeliveryReceiptUnavailable");
                         logger.LogInformation(
                             "Sent outbound email {MessageId} from {FromAddress} to {ToAddress}.",
                             message.Id,
