@@ -140,14 +140,8 @@ public sealed class AttachmentStore
         Guid id = Guid.NewGuid();
         string storageKey = BuildStoredName(id, originalName);
 
-        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Application"] = "Aegis.Studio",
-            ["ConversationId"] = conversationId.ToString("D"),
-            ["Visibility"] = NormalizeVisibility(visibility)
-        };
-        if (!string.IsNullOrWhiteSpace(correlationId))
-            metadata["CorrelationId"] = correlationId.Trim();
+        IReadOnlyDictionary<string, string> metadata =
+            BuildStorageMetadata(conversationId, visibility, correlationId);
 
         StoredFile stored = await storage.StoreAsync(
             new StorageWriteRequest(
@@ -240,6 +234,22 @@ public sealed class AttachmentStore
         }
 
         await storage.DeleteAsync(storageKey, cancellationToken);
+    }
+
+    public static IReadOnlyDictionary<string, string> BuildStorageMetadata(
+        Guid conversationId,
+        string visibility,
+        string? correlationId)
+    {
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Application"] = "Aegis.Studio",
+            ["ConversationId"] = conversationId.ToString("D"),
+            ["Visibility"] = NormalizeVisibility(visibility)
+        };
+        if (!string.IsNullOrWhiteSpace(correlationId))
+            metadata["CorrelationId"] = correlationId.Trim();
+        return metadata;
     }
 
     private static string NormalizeFileName(string fileName)
