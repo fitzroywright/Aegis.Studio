@@ -49,6 +49,8 @@ public sealed class MainPage:ContentPage
         refresh.Clicked+=async(_,_)=>await RefreshAsync();
         Button messages=new(){Text="MESSAGES",HeightRequest=48};
         messages.Clicked+=async(_,_)=>await Navigation.PushAsync(new WorkDayMessagesPage(api));
+        Button availability=new(){Text="AVAILABILITY / LEAVE",HeightRequest=48};
+        availability.Clicked+=async(_,_)=>await Navigation.PushAsync(new WorkDayAvailabilityPage(api,store));
         Button logout=new(){Text="LOG OUT",HeightRequest=44};
         logout.Clicked+=Logout;
 
@@ -74,7 +76,7 @@ public sealed class MainPage:ContentPage
                     },
                     pending,uploadCount,
                     search,searchResults,
-                    refresh,messages,
+                    refresh,messages,availability,
                     new Label{Text="NEEDS ATTENTION",FontSize=19,FontAttributes=FontAttributes.Bold},
                     attention,
                     new Label{Text="TODAY",FontSize=20,FontAttributes=FontAttributes.Bold},
