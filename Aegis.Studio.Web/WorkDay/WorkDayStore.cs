@@ -40,8 +40,47 @@ public sealed class WorkDayStore(StudioDatabase database)
         create table if not exists studio_workday_assignment_state(
           assignment_id uuid primary key, status text not null, version bigint not null default 1,
           changed_by text not null, changed_at_utc timestamptz not null, last_operation_id uuid not null);
+
+        create table if not exists studio_workday_device_sessions(
+          id uuid primary key, user_name text not null, device_id text not null,
+          token_hash text not null unique, created_at_utc timestamptz not null,
+          expires_at_utc timestamptz not null, revoked_at_utc timestamptz null,
+          last_seen_at_utc timestamptz null);
+        create index if not exists ix_workday_device_sessions_user on studio_workday_device_sessions(lower(user_name),expires_at_utc);
         """;
         cmd.ExecuteNonQuery();
+    }
+
+    public (Guid SessionId,string Token,DateTimeOffset ExpiresAtUtc) IssueDeviceSession(string userName,string deviceId,TimeSpan lifetime)
+    {
+        if(string.IsNullOrWhiteSpace(userName)||string.IsNullOrWhiteSpace(deviceId)) throw new InvalidOperationException("User and device identity are required.");
+        byte[] tokenBytes=System.Security.Cryptography.RandomNumberGenerator.GetBytes(48);
+        string token=Convert.ToBase64String(tokenBytes);
+        string hash=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
+        Guid id=Guid.NewGuid(); DateTimeOffset expires=DateTimeOffset.UtcNow.Add(lifetime);
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="insert into studio_workday_device_sessions(id,user_name,device_id,token_hash,created_at_utc,expires_at_utc) values($1,$2,$3,$4,now(),$5)";
+        q.Parameters.AddWithValue(id);q.Parameters.AddWithValue(userName);q.Parameters.AddWithValue(deviceId);q.Parameters.AddWithValue(hash);q.Parameters.AddWithValue(expires);q.ExecuteNonQuery();
+        return(id,token,expires);
+    }
+
+    public (string UserName,string DeviceId)? ValidateDeviceToken(string token)
+    {
+        if(string.IsNullOrWhiteSpace(token)) return null;
+        string hash=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="select user_name,device_id,id from studio_workday_device_sessions where token_hash=$1 and revoked_at_utc is null and expires_at_utc>now()";
+        q.Parameters.AddWithValue(hash); using NpgsqlDataReader r=q.ExecuteReader(); if(!r.Read()) return null;
+        string user=r.GetString(0),device=r.GetString(1);Guid id=r.GetGuid(2);r.Close();
+        using NpgsqlCommand touch=c.CreateCommand();touch.CommandText="update studio_workday_device_sessions set last_seen_at_utc=now() where id=$1";touch.Parameters.AddWithValue(id);touch.ExecuteNonQuery();
+        return(user,device);
+    }
+
+    public void RevokeDeviceSession(string userName,string deviceId)
+    {
+        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="update studio_workday_device_sessions set revoked_at_utc=now() where lower(user_name)=lower($1) and device_id=$2 and revoked_at_utc is null";
+        q.Parameters.AddWithValue(userName);q.Parameters.AddWithValue(deviceId);q.ExecuteNonQuery();
     }
 
     public (string Status, long Version)? GetAssignmentState(Guid assignmentId)
