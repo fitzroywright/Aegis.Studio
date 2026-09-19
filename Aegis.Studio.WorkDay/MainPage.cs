@@ -206,7 +206,13 @@ public sealed class MainPage:ContentPage
         bool on=active?.EndedAtUtc is null;
         workState.Text=on?$"SIGNED IN · Started {active!.StartedAtUtc.ToLocalTime():t}":"SIGNED OUT";
         workButton.Text=on?"SIGN OUT":"SIGN IN FOR WORK";
-        tracking.Text=on&&location.TrackingActive?"WORK SESSION ACTIVE · Location Tracking: Active":on?"WORK SESSION ACTIVE · Location Tracking: Policy/availability dependent":"Location Tracking: Inactive";
+        tracking.Text=!on
+            ?"Location Tracking: Inactive"
+            :location.SamplingState=="SuspendedByOS"
+                ?"WORK SESSION ACTIVE · Location Tracking: OS SUSPENDED / CONTINUITY UNKNOWN"
+                :location.TrackingActive
+                    ?$"WORK SESSION ACTIVE · Location Tracking: {location.SamplingState}"
+                    :"WORK SESSION ACTIVE · Location Tracking: Policy/availability dependent";
     }
 
     private void ApplyTrackingPolicy()
