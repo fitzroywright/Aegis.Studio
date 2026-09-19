@@ -66,6 +66,30 @@ public static class WorkspaceAccessEndpoints
             return Results.Ok(access.GetPermissions(user, workspaceId));
         }).RequireAuthorization();
 
+        app.MapGet("/api/workspaces/{workspaceId:guid}/managers", (Guid workspaceId, ClaimsPrincipal user, StudioDatabase database) =>
+        {
+            WorkspaceAccessService access = new(database);
+            if (!access.HasPermission(user, workspaceId, "View") && !user.IsInRole("Administrator")) return Results.Forbid();
+            return Results.Ok(access.GetMembers(workspaceId)
+                .Where(x => x.IsActive && IsManager(x.Permissions))
+                .Select(x => new { x.UserName, x.DisplayName, x.Permissions }));
+        }).RequireAuthorization();
+
+        app.MapPut("/api/workspaces/{workspaceId:guid}/managers/{userName}", (Guid workspaceId, string userName, WorkspaceMemberRequest request, ClaimsPrincipal user, StudioDatabase database) =>
+        {
+            WorkspaceAccessService access = new(database);
+            WorkspacePermissionSet caller = access.GetPermissions(user, workspaceId);
+            if (!user.IsInRole("Administrator") && !caller.AdminWorkspace) return Results.Forbid();
+
+            WorkspaceMemberRequest normalized = request with
+            {
+                UserName = userName,
+                Permissions = WorkspacePermissionSet.Manager,
+                IsActive = true
+            };
+            return Results.Ok(access.SaveMember(workspaceId, normalized));
+        }).RequireAuthorization();
+
         app.MapGet("/api/workspaces/{workspaceId:guid}/members", (Guid workspaceId, ClaimsPrincipal user, StudioDatabase database) =>
         {
             WorkspaceAccessService access = new(database);
@@ -107,6 +131,14 @@ public static class WorkspaceAccessEndpoints
             return Results.Ok(new { sent = true, workspace = workspace?.Name, member = member.DisplayName });
         }).RequireAuthorization();
     }
+
+    private static bool IsManager(WorkspacePermissionSet permissions) =>
+        permissions.AccessWorkspace &&
+        permissions.View &&
+        permissions.ManageSchedule &&
+        permissions.ManageProduction &&
+        permissions.ManageMembers &&
+        !permissions.AdminWorkspace;
 
     public static bool PermissionsWithin(WorkspacePermissionSet requested, WorkspacePermissionSet caller)
         => (!requested.AccessWorkspace || caller.AccessWorkspace)
