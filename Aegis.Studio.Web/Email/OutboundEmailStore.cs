@@ -53,6 +53,45 @@ public sealed class OutboundEmailStore
         return values;
     }
 
+    public IReadOnlyList<OutboundEmailAuditRecord> GetRecentAudit(
+        IReadOnlyCollection<Guid> workspaceIds,
+        int count = 200)
+    {
+        if (workspaceIds.Count == 0) return [];
+
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            select e.id,e.conversation_id,e.from_address,e.to_address,e.status,e.created_at_utc,
+                   e.provider_message_id,e.kind,e.sent_by_user_name,e.sending_identity_type,c.workspace_id
+            from studio_outbound_email e
+            join studio_conversations c on c.id=e.conversation_id
+            where c.workspace_id = any($1)
+            order by e.created_at_utc desc
+            limit $2
+            """;
+        command.Parameters.AddWithValue(workspaceIds.ToArray());
+        command.Parameters.AddWithValue(Math.Clamp(count, 1, 1000));
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        List<OutboundEmailAuditRecord> values = [];
+        while (reader.Read())
+        {
+            values.Add(new(
+                reader.GetGuid(0),
+                reader.GetGuid(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetFieldValue<DateTimeOffset>(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.GetString(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                reader.GetString(9),
+                reader.GetGuid(10)));
+        }
+        return values;
+    }
+
     public OutboundEmail? MarkProviderAccepted(Guid id, string? providerMessageId)
     {
         using NpgsqlConnection connection = database.OpenConnection();
@@ -192,4 +231,17 @@ public sealed record OutboundEmail(
     string? LastError = null,
     DateTimeOffset? NextAttemptAtUtc = null,
     DateTimeOffset? ProviderAcceptedAtUtc = null);
+public sealed record OutboundEmailAuditRecord(
+    Guid MessageId,
+    Guid ConversationId,
+    string FromAddress,
+    string ToAddress,
+    string Status,
+    DateTimeOffset CreatedAtUtc,
+    string? ProviderMessageId,
+    string Kind,
+    string? ActualUser,
+    string SendingIdentityType,
+    Guid WorkspaceId);
+
 public sealed record MarkOutboundSentRequest(string? ProviderMessageId);
