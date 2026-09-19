@@ -34,9 +34,9 @@ A lost/stolen device:
 
 ## Local data
 
-The local database is app-private SQLite. Customer/session display data is AES-GCM protected with a random key held in platform SecureStorage. Queue/index fields remain queryable so WorkDay can recover synchronization state.
+The local database is app-private SQLite. Customer/session display data, offline note text and precise location coordinates are AES-GCM protected with a random key held in platform SecureStorage. Queue/index fields remain queryable so WorkDay can recover synchronization state.
 
-Unsynchronized operations and uploads are never removed by age-based assignment retention.
+The local schema is versioned. The pre-release plaintext queue/location layout is migrated in place: sensitive values are protected first, then legacy plaintext columns are scrubbed. Unsynchronized operations and uploads are never removed by age-based assignment retention.
 
 ## Synchronization
 
@@ -88,13 +88,17 @@ The default is SignInOutOnly.
 
 Location evidence is optional evidence, not proof of employee conduct. Failure to obtain GPS does not invalidate an otherwise legitimate Sign In/Out unless organizational policy is separately changed to require it.
 
-BackgroundDuringWork begins only while a Work Session is active and stops on Sign Out. The current client uses battery-conscious interval sampling rather than continuous high-accuracy GPS.
+BackgroundDuringWork begins only while a Work Session is active and stops on Sign Out. The current client uses battery-conscious interval sampling rather than continuous high-accuracy GPS. When the operating system suspends the application, WorkDay explicitly reports the sampling state as OS-suspended/continuity-unknown rather than pretending evidence collection remained continuous.
 
 General Operations telemetry NEVER contains precise coordinates.
 
 ## Privacy and authorization
 
-Location history is sensitive. The server timeline endpoint requires Administrator or Studio.WorkDay.Location.View.
+Location history is sensitive. The server timeline endpoint requires Administrator or Studio.WorkDay.Location.View. Each location-history view is written to a dedicated access-audit table.
+
+Attendance corrections require Administrator or Studio.WorkDay.Attendance.Correct. A correction writes an immutable correction record containing the original values, corrected values, reason, actor and timestamp before the current session row is changed.
+
+Precise location retention is controlled by WorkDay:LocationRetentionDays (default 30). Work-session/attendance records are retained independently from raw location observations.
 
 General WorkDay fleet health may expose:
 - client count
@@ -164,7 +168,7 @@ Stop accepting new field actions that cannot be durably persisted. Tell the user
 Server:
 1. deploy the updated Aegis.Studio.Web;
 2. ensure PostgreSQL migrations/schema initialization completes;
-3. configure WorkDay policy keys;
+3. configure WorkDay policy keys, including LocationTrackingMode, DeviceSessionDays, TelemetryStaleSeconds and LocationRetentionDays;
 4. ensure Aegis.Operations URL/registration identity is valid;
 5. verify /api/workday/bootstrap after authentication.
 
@@ -235,3 +239,12 @@ Escalate when:
 - device tokens cannot be revoked;
 - precise location appears in general Operations telemetry;
 - unauthorized users can access WorkDay location history or sending identities.
+
+
+## Administrator correction
+
+Use the authorized WorkDay management screen or POST /api/workday/management/sessions/{workSessionId}/corrections with a reason and corrected timestamps. Never edit attendance rows directly. Correction history is append-only and preserves the prior values and correcting user.
+
+## Registration decision
+
+WorkDay mobile devices do not pretend to be independently deployed server applications in Common.Registration. They use revocable Studio-issued device sessions bound to a WorkDay device ID. Aegis.Studio itself remains the registered Aegis application and publishes aggregate WorkDay operational evidence to Operations.
