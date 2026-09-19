@@ -125,6 +125,27 @@ public static class OperationalWorkEndpoints
         app.MapPost("/api/jobs/{jobId:guid}/media-archives", (Guid jobId,MediaArchiveRegistrationRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase database,IConfiguration configuration,IWebHostEnvironment environment) => { if(!access.HasPermission(user,jobId,"ManageProduction")) return Results.Forbid(); try{return Results.Ok(new MediaArchiveStore(database,configuration,environment).Register(jobId,request));}catch(Exception exception){return Results.BadRequest(new{error=exception.Message});} }).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media-archives/{id:guid}/verify", (Guid jobId,Guid id,ClaimsPrincipal user,JobAccessService access,StudioDatabase database,IConfiguration configuration,IWebHostEnvironment environment) => { if(!access.HasPermission(user,jobId,"ManageProduction")) return Results.Forbid(); try{MediaArchiveRecord value=new MediaArchiveStore(database,configuration,environment).Verify(id); return value.JobId==jobId?Results.Ok(value):Results.NotFound();}catch(Exception exception){return Results.BadRequest(new{error=exception.Message});} }).RequireAuthorization();
 
+        app.MapGet("/api/workspaces/{workspaceId:guid}/performance", (
+            Guid workspaceId,
+            DateTimeOffset? from,
+            DateTimeOffset? to,
+            ClaimsPrincipal user,
+            WorkspaceAccessService workspaceAccess,
+            PerformanceMetricsStore metrics) =>
+        {
+            if(!user.IsInRole("Administrator") &&
+               !workspaceAccess.HasPermission(user,workspaceId,"ManageProduction") &&
+               !workspaceAccess.HasPermission(user,workspaceId,"ManageSchedule"))
+                return Results.Forbid();
+
+            DateTimeOffset end=(to??DateTimeOffset.UtcNow).ToUniversalTime();
+            DateTimeOffset start=(from??end.AddDays(-30)).ToUniversalTime();
+            if(end<=start) return Results.BadRequest(new{error="Performance window end must be after start."});
+
+            try{return Results.Ok(metrics.GetWorkspacePerformance(workspaceId,start,end));}
+            catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
+        }).RequireAuthorization();
+
         app.MapGet("/api/jobs/{jobId:guid}/operations/audit", (Guid jobId,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) => access.HasPermission(user,jobId,"ViewJob")?Results.Ok(new OperationalWorkStore(database).GetAudit(jobId)):Results.Forbid()).RequireAuthorization();
     }
 
