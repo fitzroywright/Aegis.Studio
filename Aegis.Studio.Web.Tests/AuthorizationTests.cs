@@ -33,13 +33,14 @@ public sealed class AuthorizationTests
         WorkspacePermissionSet permissions = WorkspacePermissionSet.Full;
         Assert.True(permissions.AccessWorkspace && permissions.View && permissions.ReplyRequester && permissions.ViewAttachments && permissions.AddAttachments);
         Assert.True(permissions.CreateJob && permissions.EditJob && permissions.ManageSchedule && permissions.ManageProduction && permissions.NotifyMembers);
+        Assert.True(permissions.SendAsSelf);
         Assert.True(permissions.EditWorkspace && permissions.ManageMembers && permissions.AdminWorkspace);
     }
 
     [Fact]
     public void WorkspaceMemberManagerCannotGrantWorkspaceAdminBeyondOwnRights()
     {
-        WorkspacePermissionSet caller = new(true,true,true,true,true,true,true,true,true,true,false,true,false);
+        WorkspacePermissionSet caller = new(true,true,true,true,true,true,true,true,true,true,false,true,false,false);
         Assert.False(WorkspaceAccessEndpoints.PermissionsWithin(WorkspacePermissionSet.Full, caller));
         Assert.True(WorkspaceAccessEndpoints.PermissionsWithin(WorkspacePermissionSet.ViewOnly, caller));
     }
