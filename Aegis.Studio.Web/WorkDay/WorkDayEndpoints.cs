@@ -13,6 +13,23 @@ public static class WorkDayEndpoints
     {
         RouteGroupBuilder group=app.MapGroup("/api/workday").RequireAuthorization();
 
+        group.MapPost("/device-session",(ClaimsPrincipal user,WorkDayDeviceSessionRequest request,WorkDayStore store,IConfiguration configuration)=>
+        {
+            if(string.Equals(user.Identity?.AuthenticationType,"WorkDayDeviceToken",StringComparison.OrdinalIgnoreCase))
+                return Results.Forbid();
+            if(string.IsNullOrWhiteSpace(request.DeviceId)) return Results.BadRequest(new{error="DeviceId is required."});
+            int days=Math.Clamp(configuration.GetValue<int?>("WorkDay:DeviceSessionDays")??30,1,90);
+            var issued=store.IssueDeviceSession(UserName(user),request.DeviceId,TimeSpan.FromDays(days));
+            return Results.Ok(new WorkDayDeviceSessionResponse(issued.SessionId,issued.Token,issued.ExpiresAtUtc));
+        });
+
+        group.MapPost("/device-session/revoke",(ClaimsPrincipal user,WorkDayDeviceSessionRequest request,WorkDayStore store)=>
+        {
+            if(string.IsNullOrWhiteSpace(request.DeviceId)) return Results.BadRequest(new{error="DeviceId is required."});
+            store.RevokeDeviceSession(UserName(user),request.DeviceId);
+            return Results.NoContent();
+        });
+
         group.MapGet("/bootstrap",(ClaimsPrincipal user,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,IConfiguration configuration)=>
         {
             string userName=UserName(user);
