@@ -18,15 +18,18 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
     private readonly ExternalDeliveryProcessor processor;
     private readonly IExternalMessageChannel[] externalChannels;
     private readonly HttpClient[] ownedHttpClients;
+    private readonly StudioOperationsFlowPublisher operationsFlows;
     private readonly ILogger<NotificationDeliveryWorker> logger;
 
     public NotificationDeliveryWorker(
         StudioDatabase database,
         IConfiguration configuration,
         UserProfileStore profiles,
+        StudioOperationsFlowPublisher operationsFlows,
         ILogger<NotificationDeliveryWorker> logger)
     {
         this.database = database;
+        this.operationsFlows = operationsFlows;
         this.logger = logger;
         this.recipientDirectory = new StudioMessageRecipientDirectory(profiles);
 
@@ -186,6 +189,12 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         if (!this.externalChannels.Any(x => x.Channel == channel))
         {
             Update(item.Id, "WaitingForConfiguration", $"Common.Messaging channel {channel} is disabled or unconfigured.", false, false);
+            operationsFlows.TryEnqueueNotification(
+                CorrelationId(item),
+                item.Channel,
+                businessId: item.Id.ToString("D"),
+                detail: "ProviderUnavailable",
+                failed: true);
             return;
         }
 
@@ -194,6 +203,12 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         if (recipient is null)
         {
             MarkRetry(item.Id, "Recipient profile could not be resolved.");
+            operationsFlows.TryEnqueueNotification(
+                CorrelationId(item),
+                item.Channel,
+                businessId: item.Id.ToString("D"),
+                detail: "RecipientUnresolved",
+                failed: true);
             return;
         }
 
@@ -251,10 +266,28 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
             where q.queue_name=$1
               and q.notification_id=n.id
               and n.status in ('Queued','Retry','WaitingForConfiguration')
+              and q.state in ('completed','dead')
+            returning n.id,n.channel,n.reference_id,n.status
             """;
         command.Parameters.AddWithValue(QueueName);
-        command.ExecuteNonQuery();
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            Guid id = reader.GetGuid(0);
+            string branch = reader.GetString(1);
+            string? referenceId = reader.IsDBNull(2) ? null : reader.GetString(2);
+            string status = reader.GetString(3);
+            operationsFlows.TryEnqueueNotification(
+                string.IsNullOrWhiteSpace(referenceId) ? id.ToString("D") : referenceId,
+                branch,
+                businessId: id.ToString("D"),
+                detail: status == "ProviderAccepted" ? "ProviderAccepted" : "DeadLetter",
+                failed: status == "Failed");
+        }
     }
+
+    private static string CorrelationId(PendingNotification item) =>
+        string.IsNullOrWhiteSpace(item.ReferenceId) ? item.Id.ToString("D") : item.ReferenceId.Trim();
 
     private void MarkDelivered(Guid id) => Update(id, "Delivered", null, true, true);
     private void MarkRetry(Guid id, string error) => Update(id, "Retry", error, false, true);
