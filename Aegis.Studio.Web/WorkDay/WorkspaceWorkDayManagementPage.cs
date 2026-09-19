@@ -35,13 +35,14 @@ async function load(){
  const d=await r.json();
  summary.innerHTML='Photographers <b>'+d.photographers.length+'</b> · Updated '+new Date(d.generatedAtUtc).toLocaleString();
  people.innerHTML=d.photographers.map(p=>{
-   const c=p.client,cap=p.capacity,a=p.assignments||[];
+   const c=p.client,cap=p.capacity,a=p.assignments||[],t=p.timeSummary;
    const util=cap?Math.min(100,Math.max(0,cap.utilizationPercent)):0;
    return '<article class="card"><h3>'+e(p.displayName)+'</h3>'+
     '<div class="'+cls(c?.connectivity||'Unknown')+'">'+e(c?.connectivity||'No recent client telemetry')+'</div>'+
     '<p>Sync: '+e(c?.synchronizationState||'Unknown')+' · Pending '+e(c?.pendingOperations??0)+' · Uploads '+e(c?.pendingUploads??0)+'</p>'+
     '<p>Work session: '+(p.activeWorkSession?'ACTIVE since '+new Date(p.activeWorkSession.startedAtUtc).toLocaleTimeString():'Signed out')+'</p>'+
     (cap?'<p>Capacity: <b class="'+cls(cap.state)+'">'+e(cap.state)+'</b> · '+cap.utilizationPercent+'%</p><div class="bar"><span style="width:'+util+'%"></span></div><p class="muted">'+Math.round(cap.scheduledMinutes/60*10)/10+'h scheduled · '+Math.round(cap.remainingMinutes/60*10)/10+'h remaining</p>':'')+
+    (t?'<p><b>Time (14d)</b> · Regular '+(t.regularMinutes/60).toFixed(1)+'h · Overtime '+(t.overtimeMinutes/60).toFixed(1)+'h · Weekend '+(t.weekendMinutes/60).toFixed(1)+'h</p>':'')+
     '<p><b>'+a.length+'</b> assigned job(s) in this workspace window</p>'+
     a.slice(0,6).map(x=>'<div class="muted">'+new Date(x.startsAtUtc).toLocaleString()+' · '+e(x.title)+' · '+e(x.status)+'</div>').join('')+
     '</article>';
