@@ -147,17 +147,45 @@ public sealed class OperationsTelemetryPublisher(
             new
             {
                 applicationId = ApplicationId,
-                flowType = "WorkspaceMessage",
-                displayName = "Studio Workspace Message",
+                flowType = "InboundMessage",
+                displayName = "Studio Inbound Message",
                 stages = new object[]
                 {
-                    new { name = "MailRouting", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
-                    new { name = "Attachments", parentStage = "MailRouting", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
-                    new { name = "Workspace", parentStage = "Attachments", branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
-                    new { name = "Email", parentStage = "Workspace", branch = "Email", warningAfterSeconds = 30, criticalAfterSeconds = 300 },
-                    new { name = "Slack", parentStage = "Workspace", branch = "Slack", warningAfterSeconds = 30, criticalAfterSeconds = 300 },
-                    new { name = "WhatsApp", parentStage = "Workspace", branch = "WhatsApp", warningAfterSeconds = 30, criticalAfterSeconds = 300 },
-                    new { name = "InApp", parentStage = "Workspace", branch = "InApp", warningAfterSeconds = 10, criticalAfterSeconds = 60 }
+                    new { name = "Mailbox", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Router", parentStage = "Mailbox", branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "Workspace", parentStage = "Router", branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "Conversation", parentStage = "Workspace", branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "Notification", parentStage = "Conversation", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 }
+                },
+                updatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new
+            {
+                applicationId = ApplicationId,
+                flowType = "OutboundMessage",
+                displayName = "Studio Outbound Message",
+                stages = new object[]
+                {
+                    new { name = "User", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "SendingIdentity", parentStage = "User", branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "Message", parentStage = "SendingIdentity", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Provider", parentStage = "Message", branch = (string?)null, warningAfterSeconds = 30, criticalAfterSeconds = 300 },
+                    new { name = "Recipient", parentStage = "Provider", branch = (string?)null, warningAfterSeconds = 300, criticalAfterSeconds = 3600 }
+                },
+                updatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new
+            {
+                applicationId = ApplicationId,
+                flowType = "NotificationFanout",
+                displayName = "Studio Notification Fan-out",
+                stages = new object[]
+                {
+                    new { name = "Event", parentStage = (string?)null, branch = (string?)null, warningAfterSeconds = 10, criticalAfterSeconds = 60 },
+                    new { name = "Email", parentStage = "Event", branch = "Email", warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "Slack", parentStage = "Event", branch = "Slack", warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "Teams", parentStage = "Event", branch = "Teams", warningAfterSeconds = 60, criticalAfterSeconds = 600 },
+                    new { name = "InApp", parentStage = "Event", branch = "InApp", warningAfterSeconds = 10, criticalAfterSeconds = 60 }
                 },
                 updatedAtUtc = DateTimeOffset.UtcNow
             },
