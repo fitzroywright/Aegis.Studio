@@ -68,6 +68,16 @@ public sealed class WorkDayApiClient
         return await r.Content.ReadFromJsonAsync<UploadResultDto>(cancellationToken:ct) ?? throw new InvalidOperationException("Studio did not acknowledge the upload.");
     }
 
+    public Task<WorkDayTimeSummaryDto?> GetTimeSummaryAsync(DateTimeOffset? from=null,DateTimeOffset? to=null,CancellationToken ct=default)
+    {
+        string query="api/workday/time-summary";
+        List<string> parts=[];
+        if(from.HasValue) parts.Add("from="+Uri.EscapeDataString(from.Value.ToString("O")));
+        if(to.HasValue) parts.Add("to="+Uri.EscapeDataString(to.Value.ToString("O")));
+        if(parts.Count>0) query+="?"+string.Join("&",parts);
+        return http.GetFromJsonAsync<WorkDayTimeSummaryDto>(query,ct);
+    }
+
     public Task<List<PhotographerAvailabilityDto>?> GetAvailabilityAsync(DateTimeOffset from,DateTimeOffset to,CancellationToken ct=default)=>
         http.GetFromJsonAsync<List<PhotographerAvailabilityDto>>($"api/workday/availability?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}",ct);
 
@@ -173,3 +183,6 @@ public sealed record WorkDayClientObservationDto(string DeviceId,DateTimeOffset 
 public sealed record PhotographerAvailabilityDto(Guid Id,string UserName,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string AvailabilityType,string? Note,DateTimeOffset CreatedAtUtc);
 
 public sealed record AssignmentGalleryStatusDto(Guid WorkspaceId,bool Exists,Guid? GalleryId,string? Title,bool IsPublished,DateTimeOffset? PublishedAtUtc,long VisibleItems);
+
+public sealed record WorkDayTimeBreakdownDto(string UserName,DateOnly LocalDate,double TotalMinutes,double RegularMinutes,double OvertimeMinutes,double WeekendMinutes,double WeekendOvertimeMinutes);
+public sealed record WorkDayTimeSummaryDto(string UserName,DateTimeOffset FromUtc,DateTimeOffset ToUtc,double TotalMinutes,double RegularMinutes,double OvertimeMinutes,double WeekendMinutes,double WeekendOvertimeMinutes,IReadOnlyList<WorkDayTimeBreakdownDto> Days);
