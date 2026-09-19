@@ -31,6 +31,8 @@ builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.C
 builder.Services.AddSignalR();
 builder.Services.AddStudioEngineeringDiagnostics();
 builder.Services.AddHostedService<Aegis.Studio.Web.OperationsTelemetryPublisher>();
+builder.Services.AddSingleton<StudioOperationsFlowPublisher>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFlowPublisher>());
 
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
 builder.Services.AddSingleton(secretProvider);
@@ -147,19 +149,26 @@ app.MapPost("/api/interactions", (IncomingInteractionRequest request, ClaimsPrin
     try { StudioConversation conversation = store.ReceiveInteraction(request); notifications.PublishToAll("WorkspaceMessage", $"New request: {conversation.Subject}", $"{conversation.ContactName} sent a new {conversation.Channel} request.", "Conversation", conversation.Id.ToString("D")); return Results.Created("/api/conversations", conversation); }
     catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
 });
-app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter router, StudioStore store, UnroutedEmailStore unrouted, NotificationService notifications) =>
+app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter router, StudioStore store, UnroutedEmailStore unrouted, NotificationService notifications, StudioOperationsFlowPublisher operationsFlows) =>
 {
     bool evidence = email.ToAddresses.Count > 0 || email.CcAddresses.Count > 0 || email.InternetHeaders.ContainsKey("X-Aegis-Route");
     if (string.IsNullOrWhiteSpace(email.MessageId) || string.IsNullOrWhiteSpace(email.FromAddress) || !evidence || string.IsNullOrWhiteSpace(email.Subject) || string.IsNullOrWhiteSpace(email.Body)) return Results.BadRequest(new { error = "Message id, sender, routing evidence, subject and body are required." });
     EmailRouteResult route = router.Route(email);
-    if (!route.IsRouted) { UnroutedEmail item = unrouted.Capture(email, route.FailureReason ?? "No route was resolved."); return Results.UnprocessableEntity(new { routed = false, reviewId = item.Id, route.FailureReason }); }
+    string correlationId = email.MessageId;
+    if (!route.IsRouted)
+    {
+        UnroutedEmail item = unrouted.Capture(email, route.FailureReason ?? "No route was resolved.");
+        operationsFlows.TryEnqueue(correlationId, "MailRouting", businessId: item.Id.ToString("D"), detail: route.FailureReason, failed: true);
+        return Results.UnprocessableEntity(new { routed = false, reviewId = item.Id, route.FailureReason });
+    }
     EmailIngestResult result = store.ReceiveEmail(email, route);
+    operationsFlows.TryEnqueue(correlationId, "Workspace", businessId: result.Conversation.Id.ToString("D"));
     if (!result.WasDuplicate) notifications.PublishToAll("WorkspaceMessage", $"Email: {email.Subject}", $"New email from {email.FromName} routed to {route.WorkspaceName}.", "Conversation", result.Conversation.Id.ToString("D"));
     return Results.Ok(new { routed = true, workspaceId = route.WorkspaceId, conversationId = result.Conversation.Id, result.CreatedConversation, result.WasDuplicate });
 });
 app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen()));
 app.MapGet("/api/email/outbox", (OutboundEmailStore store) => Results.Ok(store.GetPending()));
-app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, ClaimsPrincipal user, StudioStore store, OutboundEmailStore outbox, NotificationService notifications, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess) =>
+app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest request, ClaimsPrincipal user, StudioStore store, OutboundEmailStore outbox, NotificationService notifications, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess, StudioOperationsFlowPublisher operationsFlows) =>
 {
     if (string.IsNullOrWhiteSpace(request.Body)) return Results.BadRequest(new { error = "Message body is required." });
     StudioConversation? current = store.GetConversation(id); if (current is null) return Results.NotFound();
@@ -167,6 +176,12 @@ app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest
     if (!allowed) return Results.Forbid();
     StudioConversation updated = store.AddMessage(id, request, user);
     OutboundEmail? email = !request.IsInternal && string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase) ? outbox.Queue(updated, request.Body) : null;
+    string correlationId = id.ToString("D");
+    operationsFlows.TryEnqueue(
+        correlationId,
+        request.IsInternal ? "InApp" : string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase) ? "Email" : "Workspace",
+        branch: request.IsInternal ? "InApp" : string.Equals(updated.Channel, "Email", StringComparison.OrdinalIgnoreCase) ? "Email" : null,
+        businessId: id.ToString("D"));
     if (request.IsInternal) notifications.PublishToAll("Mention", $"Internal note: {updated.Subject}", request.Body, "Conversation", id.ToString("D"));
     return Results.Ok(new { conversation = updated, outboundEmail = email });
 });
