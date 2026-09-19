@@ -54,7 +54,8 @@ public sealed class AttachmentStore
         IFormFile file,
         string visibility,
         string uploadedBy,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? correlationId = null)
     {
         ArgumentNullException.ThrowIfNull(file);
         if (file.Length <= 0 || file.Length > maximumBytes)
@@ -71,7 +72,8 @@ public sealed class AttachmentStore
             source,
             visibility,
             uploadedBy,
-            cancellationToken);
+            cancellationToken,
+            correlationId: correlationId);
     }
 
     public async Task<StudioAttachment> AddBytesAsync(
@@ -82,7 +84,8 @@ public sealed class AttachmentStore
         string visibility,
         string uploadedBy,
         CancellationToken cancellationToken,
-        string? sourceKey = null)
+        string? sourceKey = null,
+        string? correlationId = null)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         if (bytes.Length <= 0 || bytes.LongLength > maximumBytes)
@@ -100,7 +103,8 @@ public sealed class AttachmentStore
             visibility,
             uploadedBy,
             cancellationToken,
-            sourceKey);
+            sourceKey,
+            correlationId);
     }
 
     public async Task<StudioAttachment> AddStreamAsync(
@@ -111,7 +115,8 @@ public sealed class AttachmentStore
         string visibility,
         string uploadedBy,
         CancellationToken cancellationToken,
-        string? sourceKey = null)
+        string? sourceKey = null,
+        string? correlationId = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         string? normalizedSourceKey = string.IsNullOrWhiteSpace(sourceKey) ? null : sourceKey.Trim();
@@ -135,6 +140,15 @@ public sealed class AttachmentStore
         Guid id = Guid.NewGuid();
         string storageKey = BuildStoredName(id, originalName);
 
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Application"] = "Aegis.Studio",
+            ["ConversationId"] = conversationId.ToString("D"),
+            ["Visibility"] = NormalizeVisibility(visibility)
+        };
+        if (!string.IsNullOrWhiteSpace(correlationId))
+            metadata["CorrelationId"] = correlationId.Trim();
+
         StoredFile stored = await storage.StoreAsync(
             new StorageWriteRequest(
                 storageKey,
@@ -142,12 +156,7 @@ public sealed class AttachmentStore
                 normalizedContentType,
                 originalName,
                 normalizedUploadedBy,
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["Application"] = "Aegis.Studio",
-                    ["ConversationId"] = conversationId.ToString("D"),
-                    ["Visibility"] = NormalizeVisibility(visibility)
-                },
+                metadata,
                 maximumBytes),
             cancellationToken);
 
