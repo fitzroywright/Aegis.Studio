@@ -31,7 +31,8 @@ Updated: 2026-09-19
 
 ## Offline / synchronization
 - COMPLETE — Durable SQLite local store.
-- COMPLETE — Sensitive cached assignment/customer data protected with AES-GCM key held in SecureStorage.
+- COMPLETE — Sensitive cached assignment/customer data, queued note text and precise location coordinates protected with AES-GCM key held in SecureStorage.
+- COMPLETE — Local SQLite schema versioning and non-destructive migration from pre-release sensitive-field layout.
 - COMPLETE — Durable operation outbox with stable IDs.
 - COMPLETE — Retry/restart recovery.
 - COMPLETE — Idempotent server operation ingestion.
@@ -68,7 +69,10 @@ Updated: 2026-09-19
 - COMPLETE — Location observations durable/offline/idempotent.
 - COMPLETE — Precise location excluded from general diagnostics/Operations telemetry.
 - COMPLETE — Authorized management work-session timeline and map handoff.
-- COMPLETE — Location history view permission-gated.
+- COMPLETE — Location history view permission-gated and access-audited.
+- COMPLETE — Configurable precise-location retention independent of attendance records.
+- COMPLETE — Administrator work-session corrections preserve immutable before/after audit history.
+- COMPLETE — OS suspension is surfaced as location-continuity unknown rather than false continuous tracking.
 - COMPLETE — GPS represented as field-presence evidence, not proof of conduct.
 
 ## Diagnostics / Operations
@@ -89,6 +93,7 @@ Updated: 2026-09-19
 
 ## Automated tests
 - COMPLETE — WorkDay lifecycle rule tests.
+- COMPLETE — Platform-neutral client durability/retention/stale-state tests.
 - COMPLETE — exception status normalization tests.
 - COMPLETE — flow-order tests.
 - COMPLETE — Unknown-vs-completed sync semantics test.
@@ -123,3 +128,12 @@ RUNBOOK COMPLETE
 LOCAL BUILD PROOF PENDING
 
 Resume rule: inspect this file and Git history. If compile/runtime proof exposes a defect, fix only the defect, update this checkpoint, and repeat the failed proof. Do not restart completed implementation.
+
+
+## Final hardening completed after initial handoff
+- COMPLETE — WorkDay.Core is now referenced by the MAUI client and included in the normal Studio solution/test graph.
+- COMPLETE — PostgreSQL fleet count type handling corrected.
+- COMPLETE — duplicate operation replay no longer commits with an open data reader.
+- COMPLETE — cross-device Sign In serialized per user to avoid concurrent active-session races.
+- COMPLETE — explicit MAUI icon/splash resources wired for Android/iOS packaging.
+- COMPLETE — WorkDay location retention configuration published through the Studio configuration contract.
