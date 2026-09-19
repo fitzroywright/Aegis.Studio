@@ -287,7 +287,7 @@ public sealed record JobPermissionSet(bool AccessJob,bool ViewJob,bool ViewConve
     public static JobPermissionSet None => new(false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false);
     public static JobPermissionSet Viewer => new(true,true,true,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false);
     public static JobPermissionSet Contributor => new(true,true,true,false,true,true,false,false,false,false,true,false,false,false,false,false,true,false,false);
-    public static JobPermissionSet JobStaff => new(true,true,true,false,true,true,false,false,false,true,true,false,false,false,false,false,true,false,false);
+    public static JobPermissionSet JobStaff => new(true,true,true,true,true,true,false,false,false,true,true,false,false,false,false,false,true,false,false);
     public static JobPermissionSet JobManager => new(true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,true,true,false);
     public static JobPermissionSet Full => new(true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true);
 }
