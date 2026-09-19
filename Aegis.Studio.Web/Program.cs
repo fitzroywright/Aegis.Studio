@@ -69,6 +69,7 @@ builder.Services.AddSingleton<NotificationService>();
 builder.Services.AddSingleton<JobEventNotifier>();
 builder.Services.AddSingleton<ScheduleStore>();
 builder.Services.AddSingleton<ProductionStore>();
+builder.Services.AddSingleton<PerformanceMetricsStore>();
 builder.Services.AddSingleton<WorkDayStore>();
 builder.Services.AddSingleton<StudioPosStore>();
 builder.Services.AddStudioPosHardening();
