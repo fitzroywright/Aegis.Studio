@@ -55,6 +55,7 @@ public sealed record WorkDayAssignment(
     string Status,
     string? Instructions,
     Guid? WorkspaceId,
+    Guid? ConversationId,
     string? CustomerName,
     string? CustomerEmail,
     string? CustomerPhone,
@@ -69,3 +70,16 @@ public sealed record WorkDayBootstrap(
     WorkDayWorkSession? ActiveWorkSession,
     WorkDayLocationTrackingMode LocationTrackingMode,
     DateTimeOffset GeneratedAtUtc);
+
+public sealed record WorkDayUploadResult(Guid UploadId,Guid AttachmentId,Guid AssignmentId,string FileName,long SizeBytes,string StorageStatus,DateTimeOffset AcknowledgedAtUtc);
+public sealed record WorkDayDiagnosticsSnapshot(
+    string Connectivity,
+    string SynchronizationState,
+    long PendingOperations,
+    long FailedOperations,
+    DateTimeOffset? OldestPendingAtUtc,
+    long PendingUploads,
+    long FailedUploads,
+    bool WorkSessionActive,
+    DateTimeOffset ObservedAtUtc);
+public sealed record WorkDayTimeline(Guid WorkSessionId,string UserName,DateTimeOffset StartedAtUtc,DateTimeOffset? EndedAtUtc,IReadOnlyList<WorkDayLocationEvidence> LocationEvidence);
