@@ -76,6 +76,12 @@ public sealed class LocalUpload
     public Guid? ServerAttachmentId { get; set; }
 }
 
+public sealed class LocalMetadata
+{
+    [PrimaryKey] public string Key { get; set; }="";
+    public string Value { get; set; }="";
+}
+
 public sealed class LocalLocationObservation
 {
     [PrimaryKey] public Guid ObservationId { get; set; }
@@ -105,11 +111,82 @@ public sealed class WorkDayLocalStore
 
     public async Task InitializeAsync()
     {
+        await db.CreateTableAsync<LocalMetadata>();
         await db.CreateTableAsync<LocalAssignment>();
         await db.CreateTableAsync<LocalOperation>();
         await db.CreateTableAsync<LocalWorkSession>();
         await db.CreateTableAsync<LocalUpload>();
         await db.CreateTableAsync<LocalLocationObservation>();
+        await MigrateAsync();
+    }
+
+    private async Task MigrateAsync()
+    {
+        LocalMetadata? row=await db.Table<LocalMetadata>().Where(x=>x.Key=="SchemaVersion").FirstOrDefaultAsync();
+        int version=int.TryParse(row?.Value,out int parsed)?parsed:1;
+        if(version<2)
+        {
+            await MigrateSensitiveQueueFieldsAsync();
+            version=2;
+        }
+        await db.InsertOrReplaceAsync(new LocalMetadata{Key="SchemaVersion",Value=version.ToString(System.Globalization.CultureInfo.InvariantCulture)});
+    }
+
+    private async Task MigrateSensitiveQueueFieldsAsync()
+    {
+        IReadOnlyList<ColumnInfo> opColumns=await db.GetTableInfoAsync(nameof(LocalOperation));
+        HashSet<string> opNames=opColumns.Select(x=>x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if(opNames.Contains("Text"))
+        {
+            List<LegacyOperationSensitive> legacy=await db.QueryAsync<LegacyOperationSensitive>(
+                "select OperationId, Text, Latitude, Longitude, AccuracyMetres from LocalOperation");
+            foreach(LegacyOperationSensitive old in legacy)
+            {
+                LocalOperation? current=await db.Table<LocalOperation>().Where(x=>x.OperationId==old.OperationId).FirstOrDefaultAsync();
+                if(current is null) continue;
+                if(string.IsNullOrWhiteSpace(current.TextCiphertext)&&old.Text is not null) current.Text=old.Text;
+                if(string.IsNullOrWhiteSpace(current.LatitudeCiphertext)&&old.Latitude.HasValue) current.Latitude=old.Latitude;
+                if(string.IsNullOrWhiteSpace(current.LongitudeCiphertext)&&old.Longitude.HasValue) current.Longitude=old.Longitude;
+                if(string.IsNullOrWhiteSpace(current.AccuracyCiphertext)&&old.AccuracyMetres.HasValue) current.AccuracyMetres=old.AccuracyMetres;
+                await ProtectOperationAsync(current);
+                await db.InsertOrReplaceAsync(current);
+            }
+        }
+
+        IReadOnlyList<ColumnInfo> locationColumns=await db.GetTableInfoAsync(nameof(LocalLocationObservation));
+        HashSet<string> locationNames=locationColumns.Select(x=>x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if(locationNames.Contains("Latitude")&&locationNames.Contains("Longitude"))
+        {
+            List<LegacyLocationSensitive> legacy=await db.QueryAsync<LegacyLocationSensitive>(
+                "select ObservationId, Latitude, Longitude, AccuracyMetres from LocalLocationObservation");
+            foreach(LegacyLocationSensitive old in legacy)
+            {
+                LocalLocationObservation? current=await db.Table<LocalLocationObservation>().Where(x=>x.ObservationId==old.ObservationId).FirstOrDefaultAsync();
+                if(current is null) continue;
+                if(string.IsNullOrWhiteSpace(current.LatitudeCiphertext)) current.Latitude=old.Latitude;
+                if(string.IsNullOrWhiteSpace(current.LongitudeCiphertext)) current.Longitude=old.Longitude;
+                if(string.IsNullOrWhiteSpace(current.AccuracyCiphertext)&&old.AccuracyMetres.HasValue) current.AccuracyMetres=old.AccuracyMetres;
+                await ProtectLocationAsync(current);
+                await db.InsertOrReplaceAsync(current);
+            }
+        }
+    }
+
+    private sealed class LegacyOperationSensitive
+    {
+        public Guid OperationId { get; set; }
+        public string? Text { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public double? AccuracyMetres { get; set; }
+    }
+
+    private sealed class LegacyLocationSensitive
+    {
+        public Guid ObservationId { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double? AccuracyMetres { get; set; }
     }
 
     public async Task ReplaceAssignmentsAsync(IEnumerable<LocalAssignment> values)
