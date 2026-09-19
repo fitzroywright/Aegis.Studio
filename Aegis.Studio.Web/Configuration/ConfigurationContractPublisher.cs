@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Common.Registration;
@@ -16,10 +17,10 @@ public sealed class ConfigurationContractPublisher(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        string? baseUrl = configuration["Aegis:Operations:Url"] ?? configuration["AegisOperations:BaseUrl"];
-        if (string.IsNullOrWhiteSpace(baseUrl))
+        string? configurationUrl = configuration["Aegis:Configuration:Url"];
+        if (string.IsNullOrWhiteSpace(configurationUrl))
         {
-            logger.LogInformation("Application registration is disabled because no Operations URL is configured.");
+            logger.LogInformation("Application registration is disabled because no Configuration URL is configured.");
             return;
         }
 
@@ -28,13 +29,13 @@ public sealed class ConfigurationContractPublisher(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (await TryPublishAsync(baseUrl, path, stoppingToken)) return;
+            if (await TryPublishAsync(configurationUrl, path, stoppingToken)) return;
             try { await Task.Delay(RetryDelay, stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
         }
     }
 
-    private async Task<bool> TryPublishAsync(string baseUrl, string path, CancellationToken cancellationToken)
+    private async Task<bool> TryPublishAsync(string configurationUrl, string path, CancellationToken cancellationToken)
     {
         try
         {
@@ -97,24 +98,65 @@ public sealed class ConfigurationContractPublisher(
                 requirement["verificationStatus"] = state == "Disabled" ? "NOT REQUIRED" : configured ? "PASS" : verification;
             }
 
+            string instanceId =
+                contract["instanceId"]?.GetValue<string>()
+                ?? Environment.MachineName;
+
+            string identityFile =
+                configuration["Aegis:Registration:IdentityFile"]
+                ?? (OperatingSystem.IsWindows()
+                    ? Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                        "Aegis",
+                        "Studio",
+                        "registration-identity.json")
+                    : "/var/lib/aegis/studio/registration-identity.json");
+
             using HttpClient client = new();
-            var registration = new ApplicationRegistrationClient(
+            var registration = new RegistrationLifecycleClient(
                 client,
-                new ApplicationRegistrationOptions(
-                    new Uri(baseUrl.TrimEnd('/') + "/", UriKind.Absolute),
+                new RegistrationLifecycleOptions(
+                    new Uri(configurationUrl.TrimEnd('/') + "/", UriKind.Absolute),
                     ApplicationId,
-                    contract["instanceId"]?.GetValue<string>() ?? Environment.MachineName,
-                    RegistrationCredentialResolver.EnvironmentVariableName,
-                    TimeSpan.FromSeconds(10)));
-            ApplicationRegistrationStatus result = await registration.RegisterAsync(contract, cancellationToken);
+                    instanceId,
+                    identityFile,
+                    TimeSpan.FromSeconds(10)),
+                logger: logger);
+
+            RegistrationLifecycleStatus result =
+                await registration.StepAsync(
+                    new JsonObject
+                    {
+                        ["displayName"] = "Aegis Studio",
+                        ["siteId"] = contract["siteId"]?.DeepClone(),
+                        ["hostname"] = Environment.MachineName,
+                        ["runtimeEnvironment"] = environment.EnvironmentName
+                    },
+                    cancellationToken);
+
             if (!result.IsRegistered)
             {
-                logger.LogWarning("Aegis.Studio registration state is {RegistrationState}: {RegistrationError}; Studio remains operational. Bootstrap must be repeated in Operations when the key is missing, invalid, or revoked.", result.State, result.Error ?? "No additional detail.");
+                logger.LogInformation(
+                    "Aegis.Studio registration state is {RegistrationState}: {RegistrationError}; Studio remains operational.",
+                    result.State,
+                    result.Error ?? "No additional detail.");
                 return false;
             }
 
-            logger.LogInformation("Aegis.Studio registration is valid and its configuration contract was published.");
-            return true;
+            HttpStatusCode contractStatus =
+                await registration.PublishConfigurationContractAsync(contract, cancellationToken);
+
+            if ((int)contractStatus is >= 200 and < 300)
+            {
+                logger.LogInformation(
+                    "Aegis.Studio registration is valid and its configuration contract was published.");
+                return true;
+            }
+
+            logger.LogWarning(
+                "Aegis.Studio is registered, but Configuration contract publication returned HTTP {StatusCode}.",
+                (int)contractStatus);
+            return false;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception)
