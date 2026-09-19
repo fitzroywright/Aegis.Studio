@@ -81,9 +81,10 @@ public sealed class AuthorizationTests
     }
 
     [Fact]
-    public void JobStaffDoesNotImplyCustomerReplyPermission()
+    public void JobStaffCanReplyToAssignedJobThroughWorkspaceIdentity()
     {
-        Assert.False(JobPermissionSet.JobStaff.ReplyRequester);
+        Assert.True(JobPermissionSet.JobStaff.ReplyRequester);
+        Assert.False(JobPermissionSet.JobStaff.AdminJob);
     }
 
     [Fact]
