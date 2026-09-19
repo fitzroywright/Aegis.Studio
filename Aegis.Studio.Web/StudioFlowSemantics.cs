@@ -26,7 +26,8 @@ public static class StudioFlowSemantics
         string currentStage,
         DateTimeOffset observedAtUtc,
         bool failed,
-        string? detail = null)
+        string? detail = null,
+        string? stateOverride = null)
     {
         string[] stages = StageNames(flowType);
         int currentIndex = Array.FindIndex(stages, x => x.Equals(currentStage, StringComparison.OrdinalIgnoreCase));
@@ -35,11 +36,17 @@ public static class StudioFlowSemantics
         return stages.Select((name, index) => new StudioFlowStageSnapshot(
             name,
             index < currentIndex ? "Completed"
-                : index == currentIndex ? failed ? "Failed" : "Completed"
+                : index == currentIndex
+                    ? !string.IsNullOrWhiteSpace(stateOverride) ? stateOverride
+                    : failed ? "Failed" : "Completed"
                 : "Pending",
             index == currentIndex ? observedAtUtc : null,
-            index == currentIndex && !failed ? observedAtUtc : null,
-            index == currentIndex && failed ? detail : null,
+            index == currentIndex && !failed && string.Equals(stateOverride, "Unknown", StringComparison.OrdinalIgnoreCase) == false
+                ? observedAtUtc
+                : null,
+            index == currentIndex && (failed || string.Equals(stateOverride, "Unknown", StringComparison.OrdinalIgnoreCase))
+                ? detail
+                : null,
             index == 0 ? null : stages[index - 1],
             null)).ToArray();
     }
