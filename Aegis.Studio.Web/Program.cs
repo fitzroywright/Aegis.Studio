@@ -22,6 +22,7 @@ using Aegis.Studio.Web.Scheduling;
 using Aegis.Studio.Web.Storage;
 using Aegis.Studio.Web.WorkDay;
 using Common.Secrets;
+using Common.Registration;
 using Common.Security.Abstractions;
 using Common.Security.Authenticators;
 using Common.Security.Options;
@@ -30,6 +31,12 @@ using Microsoft.AspNetCore.Authorization;
 using Npgsql;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+string operationsLogInstanceId = builder.Configuration["Service:Identity"]?.Trim() ?? Environment.MachineName;
+string operationsLogIdentityFile = builder.Configuration["Aegis:Registration:IdentityFile"]
+    ?? (OperatingSystem.IsWindows()
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Aegis", "Studio", "registration-identity.json")
+        : "/var/lib/aegis/studio/registration-identity.json");
+builder.Services.AddAegisOperationsLogging(builder.Configuration, "Aegis.Studio", operationsLogInstanceId, operationsLogIdentityFile, builder.Environment.EnvironmentName);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSignalR();
 builder.Services.AddStudioEngineeringDiagnostics();
