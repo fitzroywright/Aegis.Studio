@@ -127,6 +127,12 @@ public sealed class ConfigurationContractPublisher(
                     new JsonObject
                     {
                         ["displayName"] = "Aegis Studio",
+                        ["presentation"] = new JsonObject
+                        {
+                            ["iconUrl"] = configuration["Aegis:Presentation:IconUrl"],
+                            ["shortName"] = "Studio",
+                            ["accent"] = configuration["Aegis:Presentation:Accent"] ?? "gold"
+                        },
                         ["siteId"] = contract["siteId"]?.DeepClone(),
                         ["hostname"] = Environment.MachineName,
                         ["runtimeEnvironment"] = environment.EnvironmentName
