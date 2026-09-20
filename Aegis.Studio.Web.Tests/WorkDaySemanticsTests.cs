@@ -43,7 +43,7 @@ public sealed class WorkDaySemanticsTests
     {
         DateTimeOffset now=DateTimeOffset.UtcNow;
         IReadOnlyList<StudioFlowStageSnapshot> stages=StudioFlowSemantics.Linear("WorkDaySync","Sending",now,false,"No acknowledgement","Unknown");
-        StudioFlowStageSnapshot sending=Assert.Single(stages.Where(x=>x.Name=="Sending"));
+        StudioFlowStageSnapshot sending=Assert.Single(stages,x=>x.Name=="Sending");
         Assert.Equal("Unknown",sending.State);
         Assert.Null(sending.CompletedAtUtc);
     }
