@@ -55,6 +55,12 @@ public sealed class ConfigurationContractPublisher(
                 NullIfBlank(configuration["Service:Identity"])
                 ?? Environment.MachineName;
             contract["instanceId"] = instanceId;
+            contract["presentation"] = new JsonObject
+            {
+                ["iconUrl"] = configuration["Aegis:Presentation:IconUrl"],
+                ["shortName"] = "Studio",
+                ["accent"] = configuration["Aegis:Presentation:Accent"] ?? "gold"
+            };
 
             bool databaseConfigured = HasValue(await secrets.GetAsync("ConnectionStrings:Studio", cancellationToken));
             bool graphSecretConfigured = HasValue(await secrets.GetAsync("Studio:MicrosoftGraphEmail:ClientSecret", cancellationToken));
