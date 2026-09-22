@@ -5,6 +5,15 @@
   "description": "Studio workspace, booking, messaging, gallery and production application.",
   "requirements": [
     {
+      "id": "public-url",
+      "displayName": "Public Service URL",
+      "kind": "Configuration",
+      "required": true,
+      "purpose": "Canonical externally reachable Studio URL used by Control Plane health monitoring.",
+      "configurationKey": "Aegis:PublicUrl",
+      "isConfigured": false
+    },
+    {
       "id": "database",
       "displayName": "Studio PostgreSQL database",
       "kind": "Secret",
@@ -263,5 +272,13 @@
     }
   ],
   "runbookReference": "docs/RUNBOOK.md",
-  "workDayRunbookReference": "docs/WORKDAY-RUNBOOK.md"
+  "workDayRunbookReference": "docs/WORKDAY-RUNBOOK.md",
+  "diagnostics": {
+    "baseUrl": null,
+    "healthPath": "/health",
+    "supportsRemoteDiagnostics": false,
+    "supportsOperationalTelemetry": true,
+    "authenticationScheme": "None",
+    "supportedLevels": []
+  }
 }
