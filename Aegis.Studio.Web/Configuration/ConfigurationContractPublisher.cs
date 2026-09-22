@@ -61,6 +61,15 @@ public sealed class ConfigurationContractPublisher(
                 ["shortName"] = "Studio",
                 ["accent"] = configuration["Aegis:Presentation:Accent"] ?? "gold"
             };
+            contract["diagnostics"] = new JsonObject
+            {
+                ["baseUrl"] = NullIfBlank(configuration["Aegis:PublicUrl"]),
+                ["healthPath"] = "/health",
+                ["supportsRemoteDiagnostics"] = false,
+                ["supportsOperationalTelemetry"] = true,
+                ["authenticationScheme"] = "None",
+                ["supportedLevels"] = new JsonArray()
+            };
 
             bool databaseConfigured = HasValue(await secrets.GetAsync("ConnectionStrings:Studio", cancellationToken));
             bool graphSecretConfigured = HasValue(await secrets.GetAsync("Studio:MicrosoftGraphEmail:ClientSecret", cancellationToken));
@@ -98,6 +107,7 @@ public sealed class ConfigurationContractPublisher(
                     "media-archive" => State(HasValue(configuration["Storage:MediaArchivePath"]), required, "ST-CONFIG-STORAGE-003: Storage:MediaArchivePath must be configured."),
                     "site-id" => State(HasValue(configuration["Site:Id"]), required, "ST-CONFIG-SITE-001: Site:Id must identify this deployment."),
                     "service-identity" => State(HasValue(configuration["Service:Identity"]), required, "ST-CONFIG-IDENTITY-001: Service:Identity must identify this Studio instance."),
+                    "public-url" => State(HasValue(configuration["Aegis:PublicUrl"]), required, "ST-CONFIG-PUBLIC-URL-001: Aegis:PublicUrl must identify the externally reachable Studio endpoint."),
                     _ => (false, "Unknown", "No runtime commissioning evaluator is defined for this requirement.")
                 };
 
@@ -105,6 +115,8 @@ public sealed class ConfigurationContractPublisher(
                 requirement["configurationState"] = state;
                 requirement["effectiveValueAvailable"] = configured;
                 requirement["verificationStatus"] = state == "Disabled" ? "NOT REQUIRED" : configured ? "PASS" : verification;
+                if (id == "public-url")
+                    requirement["displayValue"] = configured ? configuration["Aegis:PublicUrl"]?.Trim() : null;
             }
 
             string identityFile =
