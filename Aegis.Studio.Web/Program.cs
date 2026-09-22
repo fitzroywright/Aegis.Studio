@@ -21,6 +21,7 @@ using Aegis.Studio.Web.Profiles;
 using Aegis.Studio.Web.Scheduling;
 using Aegis.Studio.Web.Storage;
 using Aegis.Studio.Web.WorkDay;
+using Common.Diagnostics;
 using Common.Secrets;
 using Common.Registration;
 using Common.Security.Abstractions;
@@ -114,7 +115,23 @@ app.MapStudioScheduling();
 app.MapStudioProduction();
 app.MapWorkspaceAccess();
 app.MapJobAccess();
-app.MapHealthChecks("/health").AllowAnonymous();
+app.MapAegisHealth(
+    "Aegis.Studio",
+    async (services, ct) =>
+    {
+        var report = await services
+            .GetRequiredService<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckService>()
+            .CheckHealthAsync(ct);
+        return report.Status switch
+        {
+            Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Healthy =>
+                AegisHealthAssessment.Healthy("Studio health checks are healthy."),
+            Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded =>
+                AegisHealthAssessment.Degraded("Studio health checks are degraded."),
+            _ => AegisHealthAssessment.Unhealthy("Studio health checks are unhealthy.")
+        };
+    })
+    .AllowAnonymous();
 app.MapStudioEngineeringDiagnostics();
 app.MapStudioPosHardening();
 app.MapStudioGalleries();
