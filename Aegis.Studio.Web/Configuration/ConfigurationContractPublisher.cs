@@ -80,14 +80,19 @@ public sealed class ConfigurationContractPublisher(
                 ["shortName"] = "Studio",
                 ["accent"] = configuration["Aegis:Presentation:Accent"] ?? "gold"
             };
+            string? diagnosticSecretName =
+                NullIfBlank(configuration["Aegis:Diagnostics:RequestCredentialSecretName"]);
             contract["diagnostics"] = new JsonObject
             {
                 ["baseUrl"] = NullIfBlank(configuration["Aegis:PublicUrl"]),
                 ["healthPath"] = "/health",
-                ["supportsRemoteDiagnostics"] = false,
+                ["diagnosticsRunPath"] = "/api/engineering/diagnostics/diagnostic-level/run",
+                ["diagnosticsRunsPath"] = "/api/engineering/diagnostics/diagnostic-level/runs",
+                ["supportsRemoteDiagnostics"] = true,
                 ["supportsOperationalTelemetry"] = true,
-                ["authenticationScheme"] = "None",
-                ["supportedLevels"] = new JsonArray()
+                ["authenticationScheme"] = "DiagnosticLevel-HMAC-SHA256",
+                ["secretName"] = diagnosticSecretName,
+                ["supportedLevels"] = new JsonArray(5, 4, 3, 2, 1)
             };
 
             bool databaseConfigured = HasValue(await secrets.GetAsync("ConnectionStrings:Studio", cancellationToken));
