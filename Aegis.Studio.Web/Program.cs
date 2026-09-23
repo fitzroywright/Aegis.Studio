@@ -47,6 +47,22 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFl
 
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
 builder.Services.AddSingleton(secretProvider);
+builder.Services.AddCommonDiagnostics();
+builder.Services.AddSingleton(new DiagnosticLevelExecutionOptions
+{
+    Application = "Aegis.Studio",
+    Component = "Aegis.Studio.Web",
+    InstanceId = operationsLogInstanceId,
+    CatalogVersion = "1"
+});
+builder.Services.AddSingleton(new DiagnosticLevelStoreOptions
+{
+    Path = builder.Configuration["Aegis:Diagnostics:StorePath"]?.Trim()
+        ?? Path.Combine(builder.Environment.ContentRootPath, "data", "diagnostic-level", "studio.db")
+});
+builder.Services.AddSingleton<IDiagnosticLevelRequestCredentialProvider, CommonSecretsDiagnosticLevelRequestCredentialProvider>();
+builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BasicRuntimeIdentityDiagnosticLevelTest>();
+builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BasicControlPlaneConfigurationDiagnosticLevelTest>();
 
 string studioConnectionString = await secretProvider.GetRequiredAsync("ConnectionStrings:Studio");
 
@@ -92,6 +108,7 @@ builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddHostedService<ConfigurationContractPublisher>();
 
 WebApplication app = builder.Build();
+app.MapDiagnosticLevelRuntime();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioFeatureDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioMessagingDatabase>().InitializeAsync();
