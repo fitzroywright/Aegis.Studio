@@ -280,5 +280,6 @@
     "supportsOperationalTelemetry": true,
     "authenticationScheme": "None",
     "supportedLevels": []
-  }
+  },
+  "module": "Aegis.Studio.Web"
 }
