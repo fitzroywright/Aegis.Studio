@@ -4,14 +4,31 @@ public sealed class WorkDayLocationService(WorkDayLocalStore store,WorkDayDevice
 {
     private CancellationTokenSource? trackingCts;
     private bool appSuspended;
+    public bool Enabled{get;private set;}
     public string PermissionState{get;private set;}="Unknown";
     public DateTimeOffset? LastSamplingAttemptUtc{get;private set;}
     public DateTimeOffset? LastObservationUtc{get;private set;}
     public bool TrackingActive=>trackingCts is not null;
     public string SamplingState=>!TrackingActive?"Inactive":appSuspended?"SuspendedByOS":LastObservationUtc is null?"WaitingForEvidence":"Active";
 
+    public void Configure(bool enabled)
+    {
+        Enabled=enabled;
+        if(!enabled)
+        {
+            StopTracking();
+            PermissionState="Disabled";
+        }
+    }
+
     public async Task<LocalLocationObservation?> CaptureAsync(Guid? assignmentId,Guid? workSessionId,CancellationToken ct=default)
     {
+        if(!Enabled)
+        {
+            PermissionState="Disabled";
+            return null;
+        }
+
         try
         {
             LastSamplingAttemptUtc=DateTimeOffset.UtcNow;
@@ -31,7 +48,7 @@ public sealed class WorkDayLocationService(WorkDayLocalStore store,WorkDayDevice
 
     public void StartBatteryConsciousTracking(Func<Task<Guid?>> currentSession,Func<Task<Guid?>> currentAssignment,TimeSpan? interval=null)
     {
-        if(trackingCts is not null)return;
+        if(!Enabled||trackingCts is not null)return;
         trackingCts=new CancellationTokenSource();
         CancellationToken token=trackingCts.Token;
         _=Task.Run(async()=>{

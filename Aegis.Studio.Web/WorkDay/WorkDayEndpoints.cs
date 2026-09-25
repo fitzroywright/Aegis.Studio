@@ -53,7 +53,10 @@ public static class WorkDayEndpoints
                 all.Where(x=>x.StartsAtUtc<todayEnd&&x.EndsAtUtc>todayStart).ToArray(),
                 all.Where(x=>x.StartsAtUtc>=todayEnd).ToArray(),
                 store.GetActiveSession(userName),
-                ParseTrackingMode(configuration["WorkDay:LocationTrackingMode"]),
+                configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled") ?? false,
+                (configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled") ?? false)
+                    ? ParseTrackingMode(configuration["WorkDay:LocationTrackingMode"])
+                    : WorkDayLocationTrackingMode.Disabled,
                 now));
         });
 
@@ -74,9 +77,15 @@ public static class WorkDayEndpoints
             catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
         });
 
-        group.MapPost("/operations",(ClaimsPrincipal user,WorkDayOperationRequest request,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,StudioOperationsFlowPublisher flows,JobAccessService access)=>
+        group.MapPost("/operations",(ClaimsPrincipal user,WorkDayOperationRequest request,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,StudioOperationsFlowPublisher flows,JobAccessService access,IConfiguration configuration)=>
         {
             string userName=UserName(user);
+            bool locationEnabled=configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled") ?? false;
+            if(!locationEnabled && request.Kind==WorkDayOperationKind.LocationObservation)
+                return Results.BadRequest(new{error="WorkDay location tracking is disabled."});
+            if(!locationEnabled && request.Location is not null)
+                request=request with { Location=null };
+
             if(request.AssignmentId is Guid assignmentId)
             {
                 string permission=RequiredJobPermission(request.Kind);
@@ -145,8 +154,11 @@ public static class WorkDayEndpoints
             return Results.Ok(store.GetTimeSummaries([UserName(user)],start,end,policy).Single());
         });
 
-        group.MapGet("/diagnostics",(ClaimsPrincipal user,WorkDayStore store)=>
-            Results.Ok(store.GetDiagnostics(UserName(user))));
+        group.MapGet("/diagnostics",(ClaimsPrincipal user,WorkDayStore store,IConfiguration configuration)=>
+        {
+            int seconds=Math.Clamp(configuration.GetValue<int?>("WorkDay:TelemetryStaleSeconds")??300,60,3600);
+            return Results.Ok(store.GetDiagnostics(UserName(user),TimeSpan.FromSeconds(seconds)));
+        });
 
         group.MapPost("/client-observation",(ClaimsPrincipal user,WorkDayClientObservation observation,WorkDayStore store)=>
         {
@@ -167,6 +179,15 @@ public static class WorkDayEndpoints
                 return Results.Forbid();
             int seconds=Math.Clamp(configuration.GetValue<int?>("WorkDay:TelemetryStaleSeconds")??300,60,3600);
             return Results.Ok(store.GetFleetSnapshot(TimeSpan.FromSeconds(seconds)));
+        });
+
+        group.MapGet("/management/config",(ClaimsPrincipal user,IConfiguration configuration)=>
+        {
+            if(!CanViewLocation(user)) return Results.Forbid();
+            return Results.Ok(new
+            {
+                locationTrackingEnabled=configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled")??false
+            });
         });
 
         group.MapPost("/assignments/{assignmentId:guid}/uploads", async (
@@ -338,14 +359,19 @@ public static class WorkDayEndpoints
             return Results.Ok(store.GetWorkSessions(string.IsNullOrWhiteSpace(userName)?null:userName.Trim(),count??100));
         });
 
-        group.MapGet("/work-sessions/{workSessionId:guid}/timeline",(Guid workSessionId,string? userName,ClaimsPrincipal user,WorkDayStore store)=>
+        group.MapGet("/work-sessions/{workSessionId:guid}/timeline",(Guid workSessionId,string? userName,ClaimsPrincipal user,WorkDayStore store,IConfiguration configuration)=>
         {
             if(!CanViewLocation(user)) return Results.Forbid();
             string target=string.IsNullOrWhiteSpace(userName)?UserName(user):userName.Trim();
-            store.AuditLocationAccess(UserName(user),target,workSessionId,"ViewTimeline");
-            IReadOnlyList<WorkDayLocationEvidence> observations=store.GetLocationTimeline(target,workSessionId);
             WorkDayWorkSession? session=store.GetWorkSessions(target,500).FirstOrDefault(x=>x.Id==workSessionId);
             if(session is null) return Results.NotFound();
+
+            bool locationEnabled=configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled") ?? false;
+            if(!locationEnabled)
+                return Results.Ok(new WorkDayTimeline(workSessionId,target,session.StartedAtUtc,session.EndedAtUtc,[]));
+
+            store.AuditLocationAccess(UserName(user),target,workSessionId,"ViewTimeline");
+            IReadOnlyList<WorkDayLocationEvidence> observations=store.GetLocationTimeline(target,workSessionId);
             return Results.Ok(new WorkDayTimeline(workSessionId,target,session.StartedAtUtc,session.EndedAtUtc,observations));
         });
 
@@ -357,19 +383,25 @@ public static class WorkDayEndpoints
             catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
         });
 
-        app.MapGet("/workspaces/{workspaceId:guid}/workday-management",(Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access)=>
+        app.MapGet("/workspaces/{workspaceId:guid}/workday-management",(Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access,IWebHostEnvironment environment)=>
         {
             if(!user.IsInRole("Administrator") &&
                !access.HasPermission(user,workspaceId,"ManageProduction") &&
                !access.HasPermission(user,workspaceId,"ManageSchedule"))
                 return Results.Forbid();
-            return Results.Content(WorkspaceWorkDayManagementPage.Render(workspaceId),"text/html");
+
+            return Results.File(
+                Path.Combine(environment.WebRootPath,"workday-workspace-management.html"),
+                "text/html; charset=utf-8");
         }).RequireAuthorization();
 
-        app.MapGet("/workday-management",(ClaimsPrincipal user)=>
+        app.MapGet("/workday-management",(ClaimsPrincipal user,IWebHostEnvironment environment)=>
         {
             if(!CanViewLocation(user)) return Results.Forbid();
-            return Results.Content(WorkDayManagementPage.Render(),"text/html");
+
+            return Results.File(
+                Path.Combine(environment.WebRootPath,"workday-management.html"),
+                "text/html; charset=utf-8");
         }).RequireAuthorization();
     }
 

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Workspace WorkDay Management</title>
+  <link rel="stylesheet" href="/css/workday-management.css">
+</head>
+<body>
+  <header>
+    <h1>Workspace WorkDay</h1>
+    <div class="muted">Photographer activity, capacity and assigned job progress</div>
+  </header>
+  <main>
+    <section class="panel">
+      <div id="summary">Loading workspace activity...</div>
+    </section>
+    <section class="panel">
+      <h2>Photographers</h2>
+      <div id="people" class="grid"></div>
+    </section>
+    <section class="panel">
+      <h2>Performance Metrics</h2>
+      <p class="muted">Descriptive operational metrics only — no composite employee score.</p>
+      <div id="performance"></div>
+    </section>
+    <section class="panel">
+      <h2>Job Flow</h2>
+      <p class="muted">Live JobFlow tracking lights are published to Aegis Operations. Open Operations → Flows and filter <b>Studio Job Flow</b> for the detailed stage path.</p>
+    </section>
+  </main>
+  <script src="/js/workday-workspace-management.js"></script>
+</body>
+</html>

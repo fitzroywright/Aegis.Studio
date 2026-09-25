@@ -115,6 +115,7 @@ public sealed class MainPage:ContentPage
         try
         {
             await sync.SynchronizeAsync();
+            location.Configure(sync.LocationTrackingEnabled);
             await uploads.ProcessAsync();
             online=sync.State=="Healthy";
         }
@@ -201,7 +202,7 @@ public sealed class MainPage:ContentPage
         List<string> items=[];
         if(pendingOps>0)items.Add($"{pendingOps} change(s) waiting to synchronize");
         if(pendingFiles>0)items.Add($"{pendingFiles} file(s) waiting to upload");
-        bool locationExpected=active?.EndedAtUtc is null && !string.Equals(sync.LocationTrackingMode,"Disabled",StringComparison.OrdinalIgnoreCase);
+        bool locationExpected=sync.LocationTrackingEnabled && active?.EndedAtUtc is null && !string.Equals(sync.LocationTrackingMode,"Disabled",StringComparison.OrdinalIgnoreCase);
         if(locationExpected && location.PermissionState is "Denied" or "Unavailable")
             items.Add($"Location evidence unavailable during active work session ({location.PermissionState})");
         if(locationExpected && location.LastSamplingAttemptUtc is DateTimeOffset attempt && DateTimeOffset.UtcNow-attempt>TimeSpan.FromHours(2))
@@ -213,8 +214,8 @@ public sealed class MainPage:ContentPage
             if(connectivity.Text=="ONLINE")
             {
                 List<NotificationDto>? notifications=await api.GetNotificationsAsync();
-                int unread=notifications?.Count(x=>x.Channel=="InApp"&&x.Status=="Delivered")??0;
-                if(unread>0)items.Add($"{unread} recent notification(s)");
+                int unread=notifications?.Count(x=>x.Channel=="InApp"&&!x.IsRead)??0;
+                if(unread>0)items.Add($"{unread} unread notification(s)");
             }
         }
         catch{}
@@ -226,9 +227,11 @@ public sealed class MainPage:ContentPage
         bool on=active?.EndedAtUtc is null;
         workState.Text=on?$"SIGNED IN · Started {active!.StartedAtUtc.ToLocalTime():t}":"SIGNED OUT";
         workButton.Text=on?"SIGN OUT":"SIGN IN FOR WORK";
-        tracking.Text=!on
-            ?"Location Tracking: Inactive"
-            :location.SamplingState=="SuspendedByOS"
+        tracking.Text=!sync.LocationTrackingEnabled
+            ?"Location Tracking: Disabled by Studio policy"
+            :!on
+                ?"Location Tracking: Inactive"
+                :location.SamplingState=="SuspendedByOS"
                 ?"WORK SESSION ACTIVE · Location Tracking: OS SUSPENDED / CONTINUITY UNKNOWN"
                 :location.TrackingActive
                     ?$"WORK SESSION ACTIVE · Location Tracking: {location.SamplingState}"
@@ -238,7 +241,7 @@ public sealed class MainPage:ContentPage
     private void ApplyTrackingPolicy()
     {
         bool activeWork=active?.EndedAtUtc is null;
-        if(!activeWork){location.StopTracking();RenderWorkState();return;}
+        if(!sync.LocationTrackingEnabled||!activeWork){location.StopTracking();RenderWorkState();return;}
         if(string.Equals(sync.LocationTrackingMode,"BackgroundDuringWork",StringComparison.OrdinalIgnoreCase))
         {
             location.StartBatteryConsciousTracking(
@@ -254,7 +257,7 @@ public sealed class MainPage:ContentPage
         string deviceId=await device.GetAsync();
         if(active?.EndedAtUtc is null)
         {
-            LocalLocationObservation? endLocation=await location.CaptureAsync(null,active.Id);
+            LocalLocationObservation? endLocation=sync.LocationTrackingEnabled?await location.CaptureAsync(null,active.Id):null;
             active.EndedAtUtc=DateTimeOffset.UtcNow;active.EndedOffline=!online;await store.SaveWorkSessionAsync(active);
             await QueueAsync("WorkSignOut",null,!online?"offline":null,deviceId,endLocation);
             location.StopTracking();active=null;
@@ -263,7 +266,7 @@ public sealed class MainPage:ContentPage
         {
             active=new LocalWorkSession{Id=Guid.NewGuid(),UserName=session.UserName??"",StartedAtUtc=DateTimeOffset.UtcNow,DeviceId=deviceId,StartedOffline=!online};
             await store.SaveWorkSessionAsync(active);
-            LocalLocationObservation? startLocation=await location.CaptureAsync(null,active.Id);
+            LocalLocationObservation? startLocation=sync.LocationTrackingEnabled?await location.CaptureAsync(null,active.Id):null;
             await QueueAsync("WorkSignIn",null,!online?"offline":null,deviceId,startLocation);
         }
         RenderWorkState();ApplyTrackingPolicy();await RefreshAsync();

@@ -53,7 +53,7 @@ public sealed class NotificationService
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
-            select id,user_name,channel,event_type,subject,body,reference_type,reference_id,status,attempts,last_error,created_at_utc,delivered_at_utc
+            select id,user_name,channel,event_type,subject,body,reference_type,reference_id,status,attempts,last_error,created_at_utc,delivered_at_utc,is_read
             from studio_notifications
             where lower(user_name)=lower($1)
             order by created_at_utc desc
@@ -132,10 +132,10 @@ public sealed class NotificationService
         reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5),
         reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7), reader.GetString(8),
         reader.GetInt32(9), reader.IsDBNull(10) ? null : reader.GetString(10), reader.GetFieldValue<DateTimeOffset>(11),
-        reader.IsDBNull(12) ? null : reader.GetFieldValue<DateTimeOffset>(12));
+        reader.IsDBNull(12) ? null : reader.GetFieldValue<DateTimeOffset>(12), reader.GetBoolean(13));
 }
 
-public sealed record StudioNotification(Guid Id, string UserName, string Channel, string EventType, string Subject, string Body, string? ReferenceType, string? ReferenceId, string Status, int Attempts, string? LastError, DateTimeOffset CreatedAtUtc, DateTimeOffset? DeliveredAtUtc);
+public sealed record StudioNotification(Guid Id, string UserName, string Channel, string EventType, string Subject, string Body, string? ReferenceType, string? ReferenceId, string Status, int Attempts, string? LastError, DateTimeOffset CreatedAtUtc, DateTimeOffset? DeliveredAtUtc, bool IsRead);
 internal sealed record PendingNotification(
     Guid Id,
     string UserName,
