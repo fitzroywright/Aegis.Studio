@@ -69,7 +69,10 @@ public sealed class AssignmentPage:ContentPage
     private async Task RecordStatus(string kind,bool captureLocation=false)
     {
         string deviceId=await device.GetAsync();
-        LocalLocationObservation? loc=captureLocation&&sync.LocationTrackingEnabled
+        bool assignmentLocationEnabled=sync.LocationTrackingEnabled &&
+            (string.Equals(sync.LocationTrackingMode,"AssignmentEvents",StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(sync.LocationTrackingMode,"BackgroundDuringWork",StringComparison.OrdinalIgnoreCase));
+        LocalLocationObservation? loc=captureLocation&&assignmentLocationEnabled
             ?await location.CaptureAsync(assignment.Id,(await store.ActiveSessionAsync())?.Id)
             :null;
         await store.QueueAsync(new LocalOperation
