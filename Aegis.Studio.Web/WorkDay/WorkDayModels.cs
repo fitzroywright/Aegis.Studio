@@ -68,6 +68,7 @@ public sealed record WorkDayBootstrap(
     IReadOnlyList<WorkDayAssignment> Today,
     IReadOnlyList<WorkDayAssignment> Upcoming,
     WorkDayWorkSession? ActiveWorkSession,
+    bool LocationTrackingEnabled,
     WorkDayLocationTrackingMode LocationTrackingMode,
     DateTimeOffset GeneratedAtUtc);
 
@@ -81,7 +82,7 @@ public sealed record WorkDayDiagnosticsSnapshot(
     long PendingUploads,
     long FailedUploads,
     bool WorkSessionActive,
-    DateTimeOffset ObservedAtUtc);
+    DateTimeOffset? ObservedAtUtc);
 public sealed record WorkDayTimeline(Guid WorkSessionId,string UserName,DateTimeOffset StartedAtUtc,DateTimeOffset? EndedAtUtc,IReadOnlyList<WorkDayLocationEvidence> LocationEvidence);
 
 public sealed record WorkDayDeviceSessionRequest(string DeviceId);
