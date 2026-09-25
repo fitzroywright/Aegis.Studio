@@ -69,7 +69,9 @@ public sealed class AssignmentPage:ContentPage
     private async Task RecordStatus(string kind,bool captureLocation=false)
     {
         string deviceId=await device.GetAsync();
-        LocalLocationObservation? loc=captureLocation?await location.CaptureAsync(assignment.Id,(await store.ActiveSessionAsync())?.Id):null;
+        LocalLocationObservation? loc=captureLocation&&sync.LocationTrackingEnabled
+            ?await location.CaptureAsync(assignment.Id,(await store.ActiveSessionAsync())?.Id)
+            :null;
         await store.QueueAsync(new LocalOperation
         {
             OperationId=Guid.NewGuid(),Kind=kind,AssignmentId=assignment.Id,OccurredAtUtc=DateTimeOffset.UtcNow,
