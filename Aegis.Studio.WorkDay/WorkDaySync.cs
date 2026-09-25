@@ -109,6 +109,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
     public DateTimeOffset? LastAttemptUtc{get;private set;}
     public DateTimeOffset? LastSuccessUtc{get;private set;}
     public string State{get;private set;}="Unknown";
+    public bool LocationTrackingEnabled{get;private set;}
     public string LocationTrackingMode{get;private set;}="Unknown";
 
     public async Task SynchronizeAsync(CancellationToken ct=default)
@@ -119,6 +120,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
             LastAttemptUtc=DateTimeOffset.UtcNow;State="Sending";
             WorkDayBootstrapDto? bootstrap=await api.BootstrapAsync(ct);
             if(bootstrap is null) throw new InvalidOperationException("Studio returned no WorkDay bootstrap.");
+            LocationTrackingEnabled=bootstrap.LocationTrackingEnabled;
             LocationTrackingMode=bootstrap.LocationTrackingMode;
 
             await store.ReplaceAssignmentsAsync(bootstrap.Today.Concat(bootstrap.Upcoming).Select(x=>new LocalAssignment
@@ -149,6 +151,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                 await store.SaveOperationAsync(op);
             }
 
+            if(LocationTrackingEnabled)
             foreach(LocalLocationObservation loc in await store.PendingLocationsAsync())
             {
                 LocalOperation locationOperation=new(){OperationId=loc.ObservationId,Kind="LocationObservation",AssignmentId=loc.AssignmentId,OccurredAtUtc=loc.ObservedAtUtc,DeviceId="location",LocationObservationId=loc.ObservationId,Latitude=loc.Latitude,Longitude=loc.Longitude,AccuracyMetres=loc.AccuracyMetres,LocationObservedAtUtc=loc.ObservedAtUtc,LocationSource=loc.Source};
@@ -165,13 +168,13 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
     private static string OperationStatus(string kind,string? category,string current)=>kind switch{"AcceptAssignment"=>"Accepted","Arrive"=>"Arrived","StartSession"=>"InProgress","CompleteSession"=>"Completed","SetExceptionStatus" when !string.IsNullOrWhiteSpace(category)=>category!,_=>current};
 }
 
-public sealed record WorkDayBootstrapDto(string UserName,string DisplayName,DateTimeOffset ServerTimeUtc,IReadOnlyList<AssignmentDto> Today,IReadOnlyList<AssignmentDto> Upcoming,WorkSessionDto? ActiveWorkSession,string LocationTrackingMode,DateTimeOffset GeneratedAtUtc);
+public sealed record WorkDayBootstrapDto(string UserName,string DisplayName,DateTimeOffset ServerTimeUtc,IReadOnlyList<AssignmentDto> Today,IReadOnlyList<AssignmentDto> Upcoming,WorkSessionDto? ActiveWorkSession,bool LocationTrackingEnabled,string LocationTrackingMode,DateTimeOffset GeneratedAtUtc);
 public sealed record AssignmentDto(Guid Id,Guid? JobId,Guid? BookingId,string Title,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? Location,string Status,string? Instructions,Guid? WorkspaceId,Guid? ConversationId,string? CustomerName,string? CustomerEmail,string? CustomerPhone,long Version);
 public sealed record WorkSessionDto(Guid Id,string UserName,DateTimeOffset StartedAtUtc,DateTimeOffset? EndedAtUtc,string DeviceId,bool StartedOffline,bool? EndedOffline,string Source,DateTimeOffset UpdatedAtUtc);
 public sealed record OperationResultDto(Guid OperationId,string State,DateTimeOffset AcknowledgedAtUtc,string? Message,long? ServerVersion);
 public sealed record MessageThreadDto(Guid Id,string ScopeType,Guid? ScopeId,string Title,string CreatedBy,DateTimeOffset CreatedAtUtc,DateTimeOffset? LastMessageAtUtc,long UnreadCount);
 public sealed record MessageDto(Guid Id,Guid ThreadId,string SenderUserName,string Body,DateTimeOffset CreatedAtUtc);
-public sealed record NotificationDto(Guid Id,string UserName,string Channel,string EventType,string Subject,string Body,string? ReferenceType,string? ReferenceId,string Status,int Attempts,string? LastError,DateTimeOffset CreatedAtUtc,DateTimeOffset? DeliveredAtUtc);
+public sealed record NotificationDto(Guid Id,string UserName,string Channel,string EventType,string Subject,string Body,string? ReferenceType,string? ReferenceId,string Status,int Attempts,string? LastError,DateTimeOffset CreatedAtUtc,DateTimeOffset? DeliveredAtUtc,bool IsRead);
 public sealed record GalleryDto(Guid Id,Guid WorkspaceId,string Title,string? Description,string PublicToken,bool IsPublished,DateTimeOffset? PublishedAtUtc,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc,IReadOnlyList<object> Items);
 public sealed record SendingIdentityOptionDto(string Type,string Label,string FromAddress,bool IsDefault);
 public sealed record SendingIdentityOptionsDto(string DefaultIdentity,bool CanSendAsSelf,IReadOnlyList<SendingIdentityOptionDto> Identities);
