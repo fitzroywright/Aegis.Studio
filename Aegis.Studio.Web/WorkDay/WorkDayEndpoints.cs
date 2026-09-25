@@ -181,6 +181,15 @@ public static class WorkDayEndpoints
             return Results.Ok(store.GetFleetSnapshot(TimeSpan.FromSeconds(seconds)));
         });
 
+        group.MapGet("/management/config",(ClaimsPrincipal user,IConfiguration configuration)=>
+        {
+            if(!CanViewLocation(user)) return Results.Forbid();
+            return Results.Ok(new
+            {
+                locationTrackingEnabled=configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled")??false
+            });
+        });
+
         group.MapPost("/assignments/{assignmentId:guid}/uploads", async (
             Guid assignmentId,
             HttpContext context,
@@ -374,20 +383,25 @@ public static class WorkDayEndpoints
             catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
         });
 
-        app.MapGet("/workspaces/{workspaceId:guid}/workday-management",(Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access)=>
+        app.MapGet("/workspaces/{workspaceId:guid}/workday-management",(Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access,IWebHostEnvironment environment)=>
         {
             if(!user.IsInRole("Administrator") &&
                !access.HasPermission(user,workspaceId,"ManageProduction") &&
                !access.HasPermission(user,workspaceId,"ManageSchedule"))
                 return Results.Forbid();
-            return Results.Content(WorkspaceWorkDayManagementPage.Render(workspaceId),"text/html");
+
+            return Results.File(
+                Path.Combine(environment.WebRootPath,"workday-workspace-management.html"),
+                "text/html; charset=utf-8");
         }).RequireAuthorization();
 
-        app.MapGet("/workday-management",(ClaimsPrincipal user,IConfiguration configuration)=>
+        app.MapGet("/workday-management",(ClaimsPrincipal user,IWebHostEnvironment environment)=>
         {
             if(!CanViewLocation(user)) return Results.Forbid();
-            bool locationEnabled=configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled") ?? false;
-            return Results.Content(WorkDayManagementPage.Render(locationEnabled),"text/html");
+
+            return Results.File(
+                Path.Combine(environment.WebRootPath,"workday-management.html"),
+                "text/html; charset=utf-8");
         }).RequireAuthorization();
     }
 
