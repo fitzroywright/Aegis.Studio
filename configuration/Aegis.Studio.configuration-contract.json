@@ -181,6 +181,16 @@
       "workDayNote": "Also used by Aegis Studio WorkDay telemetry correlation."
     },
     {
+      "id": "workday-location-enabled",
+      "displayName": "WorkDay GPS tracking enabled",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Master enable/disable gate for all WorkDay GPS capture, upload and management location display.",
+      "configurationKey": "WorkDay:LocationTrackingEnabled",
+      "isConfigured": false,
+      "example": "false"
+    },
+    {
       "id": "workday-location-mode",
       "displayName": "WorkDay location tracking mode",
       "kind": "Configuration",
