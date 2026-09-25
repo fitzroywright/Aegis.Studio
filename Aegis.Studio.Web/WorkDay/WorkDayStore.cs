@@ -301,18 +301,73 @@ public sealed class WorkDayStore(StudioDatabase database)
             now);
     }
 
-    public WorkDayDiagnosticsSnapshot GetDiagnostics(string userName)
+    public WorkDayDiagnosticsSnapshot GetDiagnostics(string userName, TimeSpan staleAfter)
     {
         using NpgsqlConnection c=database.OpenConnection();
-        long pending=0, failed=0; DateTimeOffset? oldest=null;
+        long serverPending=0, failed=0;
+        DateTimeOffset? serverOldest=null;
         using(NpgsqlCommand q=c.CreateCommand())
         {
             q.CommandText="select count(*) filter(where state='Pending'),count(*) filter(where state in ('Failed','Conflict')),min(occurred_at_utc) filter(where state='Pending') from studio_workday_operations where lower(user_name)=lower($1)";
             q.Parameters.AddWithValue(userName);
             using NpgsqlDataReader r=q.ExecuteReader();
-            if(r.Read()){pending=r.GetInt64(0);failed=r.GetInt64(1);oldest=r.IsDBNull(2)?null:r.GetFieldValue<DateTimeOffset>(2);}
+            if(r.Read())
+            {
+                serverPending=r.GetInt64(0);
+                failed=r.GetInt64(1);
+                serverOldest=r.IsDBNull(2)?null:r.GetFieldValue<DateTimeOffset>(2);
+            }
         }
-        return new WorkDayDiagnosticsSnapshot("Online","ServerAcknowledged",pending,failed,oldest,0,0,GetActiveSession(userName) is not null,DateTimeOffset.UtcNow);
+
+        DateTimeOffset now=DateTimeOffset.UtcNow;
+        using NpgsqlCommand observation=c.CreateCommand();
+        observation.CommandText="""
+            select observed_at_utc,connectivity,synchronization_state,pending_operations,
+                   oldest_pending_at_utc,pending_uploads,failed_uploads
+            from studio_workday_client_observations
+            where lower(user_name)=lower($1)
+            order by observed_at_utc desc
+            limit 1
+            """;
+        observation.Parameters.AddWithValue(userName);
+        using NpgsqlDataReader client=observation.ExecuteReader();
+        if(!client.Read())
+        {
+            return new WorkDayDiagnosticsSnapshot(
+                "Unknown",
+                "Unknown",
+                serverPending,
+                failed,
+                serverOldest,
+                0,
+                0,
+                GetActiveSession(userName) is not null,
+                null);
+        }
+
+        DateTimeOffset observedAt=client.GetFieldValue<DateTimeOffset>(0);
+        bool stale=now-observedAt>staleAfter;
+        string connectivity=stale?"Offline/Stale":client.GetString(1);
+        string synchronization=stale?"Unknown":client.GetString(2);
+        long clientPending=client.GetInt32(3);
+        DateTimeOffset? clientOldest=client.IsDBNull(4)?null:client.GetFieldValue<DateTimeOffset>(4);
+        long pendingUploads=client.GetInt32(5);
+        long failedUploads=client.GetInt32(6);
+        DateTimeOffset? oldest=serverOldest is null?clientOldest:
+            clientOldest is null?serverOldest:
+            (serverOldest<clientOldest?serverOldest:clientOldest);
+
+        client.Close();
+        return new WorkDayDiagnosticsSnapshot(
+            connectivity,
+            synchronization,
+            Math.Max(serverPending,clientPending),
+            failed,
+            oldest,
+            pendingUploads,
+            failedUploads,
+            GetActiveSession(userName) is not null,
+            observedAt);
     }
 
     public WorkDayWorkSession? GetActiveSession(string userName)
