@@ -10,23 +10,20 @@ public sealed class JobEventNotifier
     private readonly StudioDatabase database;
     private readonly NotificationService notifications;
     private readonly StudioStore studio;
-    private readonly WorkspaceAccessService workspaceAccess;
-    private readonly JobAccessService jobAccess;
+    private readonly StudioRecipientResolver recipients;
     private readonly OutboundEmailStore outbox;
 
     public JobEventNotifier(
         StudioDatabase database,
         NotificationService notifications,
         StudioStore studio,
-        WorkspaceAccessService workspaceAccess,
-        JobAccessService jobAccess,
+        StudioRecipientResolver recipients,
         OutboundEmailStore outbox)
     {
         this.database = database;
         this.notifications = notifications;
         this.studio = studio;
-        this.workspaceAccess = workspaceAccess;
-        this.jobAccess = jobAccess;
+        this.recipients = recipients;
         this.outbox = outbox;
         EnsureSchema();
     }
@@ -39,10 +36,10 @@ public sealed class JobEventNotifier
             return;
         }
 
-        HashSet<string> recipients = new(StringComparer.OrdinalIgnoreCase);
-        foreach (JobMember member in jobAccess.GetMembers(jobId).Where(x => x.IsActive)) recipients.Add(member.UserName);
-        foreach (WorkspaceMember member in workspaceAccess.GetMembers(job.WorkspaceId).Where(x => x.IsActive)) recipients.Add(member.UserName);
-        foreach (string userName in recipients) notifications.PublishToUser(userName, eventType, subject, body, "Job", jobId.ToString("D"));
+        foreach (string userName in recipients.ResolveForJob(jobId))
+        {
+            notifications.PublishToUser(userName, eventType, subject, body, "Job", jobId.ToString("D"));
+        }
 
         if (requesterEligible && RequesterWants(jobId, eventType))
         {
