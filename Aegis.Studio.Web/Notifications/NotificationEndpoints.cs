@@ -25,15 +25,10 @@ public static class NotificationEndpoints
         app.MapGet("/api/jobs/{jobId:guid}/requester-notifications", (
             Guid jobId,
             ClaimsPrincipal user,
-            StudioDatabase database,
-            NotificationService notifications,
-            StudioStore studio,
-            WorkspaceAccessService workspaceAccess,
             JobAccessService jobAccess,
-            OutboundEmailStore outbox) =>
+            JobEventNotifier notifier) =>
         {
             if (!jobAccess.HasPermission(user, jobId, "ViewJob")) return Results.Forbid();
-            JobEventNotifier notifier = new(database, notifications, studio, workspaceAccess, jobAccess, outbox);
             return Results.Ok(notifier.GetRequesterPreferences(jobId));
         }).RequireAuthorization();
 
@@ -41,17 +36,12 @@ public static class NotificationEndpoints
             Guid jobId,
             RequesterNotificationPreferences request,
             ClaimsPrincipal user,
-            StudioDatabase database,
-            NotificationService notifications,
-            StudioStore studio,
-            WorkspaceAccessService workspaceAccess,
             JobAccessService jobAccess,
-            OutboundEmailStore outbox) =>
+            JobEventNotifier notifier) =>
         {
             if (!jobAccess.HasPermission(user, jobId, "EditJob") && !jobAccess.HasPermission(user, jobId, "AdminJob")) return Results.Forbid();
             try
             {
-                JobEventNotifier notifier = new(database, notifications, studio, workspaceAccess, jobAccess, outbox);
                 return Results.Ok(notifier.SaveRequesterPreferences(jobId, request));
             }
             catch (KeyNotFoundException)
