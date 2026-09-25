@@ -89,7 +89,9 @@ builder.Services.AddSingleton<BookingStore>();
 builder.Services.AddSingleton<BookingApiAuthenticator>();
 builder.Services.AddSingleton<UserProfileStore>();
 builder.Services.AddSingleton<StudioInAppMessageStore>();
+builder.Services.AddSingleton<StudioRecipientResolver>();
 builder.Services.AddSingleton<NotificationService>();
+builder.Services.AddSingleton<WorkspaceTimelineService>();
 builder.Services.AddSingleton<JobEventNotifier>();
 builder.Services.AddSingleton<ScheduleStore>();
 builder.Services.AddSingleton<ProductionStore>();
@@ -175,6 +177,11 @@ app.MapGet("/api/workspaces", (ClaimsPrincipal user, StudioStore store, Workspac
 {
     HashSet<Guid> allowed = access.GetAccessibleWorkspaceIds(user).ToHashSet();
     return Results.Ok(store.GetWorkspaces().Where(x => allowed.Contains(x.Id)));
+});
+app.MapGet("/api/workspaces/{id:guid}/timeline", (Guid id, int? count, ClaimsPrincipal user, WorkspaceAccessService access, WorkspaceTimelineService timeline) =>
+{
+    if (!access.HasPermission(user, id, "View")) return Results.Forbid();
+    return Results.Ok(timeline.GetForWorkspace(id, count ?? 200));
 });
 RouteGroupBuilder workspaceAdmin = app.MapGroup("/api/admin/workspaces").RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
 workspaceAdmin.MapGet("/", (WorkspaceStore store) => Results.Ok(store.GetAll(true)));
@@ -375,6 +382,12 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ClaimsPrincipal user, StudioStore st
 {
     if (!access.HasPermission(user, id, "ViewJob")) return Results.Forbid();
     return store.GetJob(id) is StudioJob job ? Results.Ok(job) : Results.NotFound();
+});
+app.MapGet("/api/jobs/{id:guid}/timeline", (Guid id, int? count, ClaimsPrincipal user, StudioStore store, JobAccessService access, WorkspaceTimelineService timeline) =>
+{
+    if (store.GetJob(id) is null) return Results.NotFound();
+    if (!access.HasPermission(user, id, "ViewJob")) return Results.Forbid();
+    return Results.Ok(timeline.GetForJob(id, count ?? 200));
 });
 app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrincipal user, StudioStore store, NotificationService notifications, JobEventNotifier jobEvents, JobAccessService access, StudioOperationsFlowPublisher flows) =>
 {
