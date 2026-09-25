@@ -25,7 +25,7 @@ public sealed class WorkspaceTimelineService
         List<StudioTimelineItem> items = [];
         items.Add(new StudioTimelineItem(
             job.Id,
-            job.CreatedAtUtc,
+            job.CreatedAt,
             "JobCreated",
             "Job created",
             job.Title,
