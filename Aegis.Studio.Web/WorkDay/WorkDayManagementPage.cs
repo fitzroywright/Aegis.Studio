@@ -2,7 +2,7 @@ namespace Aegis.Studio.Web.WorkDay;
 
 public static class WorkDayManagementPage
 {
-    public static string Render() => """
+    public static string Render(bool locationTrackingEnabled) => $"""
 <!doctype html>
 <html lang="en">
 <head>
@@ -27,6 +27,7 @@ a{color:#50c8ff}
 <section class="panel"><h2>Selected Timeline</h2><div id="timeline" class="muted">Select a work session.</div><div id="map">Precise location appears only in this authorized view.</div></section>
 </main>
 <script>
+const locationTrackingEnabled={{(locationTrackingEnabled ? "true" : "false")}};
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 async function getJson(u){var r=await fetch(u,{credentials:'same-origin'});if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
 async function load(){
@@ -68,10 +69,23 @@ async function show(id,user){
     t.locationEvidence.forEach(function(x){html+=new Date(x.observedAtUtc).toLocaleString()+' · accuracy '+(x.accuracyMetres==null?'unknown':x.accuracyMetres)+'m · '+esc(x.source||'Device')+'<br>';});
   }else html+='No location evidence recorded.';
   document.getElementById('timeline').innerHTML=html;
-  if(t.locationEvidence.length){
-    var p=t.locationEvidence[0];
-    document.getElementById('map').innerHTML='<div><b>Field presence evidence</b><br>'+t.locationEvidence.length+' observation(s).<br><a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat='+p.latitude+'&mlon='+p.longitude+'#map=16/'+p.latitude+'/'+p.longitude+'">Open first observation on map</a><br><span class="muted">Location is evidence associated with a device; it is not represented as proof of employee conduct.</span></div>';
-  }else document.getElementById('map').textContent='No map evidence available.';
+  if(!locationTrackingEnabled){
+    document.getElementById('map').textContent='GPS tracking is disabled by Studio policy.';
+  }else if(t.locationEvidence.length){
+    var pts=t.locationEvidence;
+    var minLat=Math.min.apply(null,pts.map(x=>x.latitude)),maxLat=Math.max.apply(null,pts.map(x=>x.latitude));
+    var minLon=Math.min.apply(null,pts.map(x=>x.longitude)),maxLon=Math.max.apply(null,pts.map(x=>x.longitude));
+    var w=640,h=260,pad=24,latSpan=Math.max(maxLat-minLat,0.00001),lonSpan=Math.max(maxLon-minLon,0.00001);
+    var xy=pts.map(x=>({
+      x:pad+((x.longitude-minLon)/lonSpan)*(w-pad*2),
+      y:h-pad-((x.latitude-minLat)/latSpan)*(h-pad*2),
+      value:x
+    }));
+    var poly=xy.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+    var dots=xy.map((p,i)=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="5"><title>'+esc(new Date(p.value.observedAtUtc).toLocaleString())+'</title></circle>').join('');
+    var links=pts.map((p,i)=>'<a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat='+p.latitude+'&mlon='+p.longitude+'#map=17/'+p.latitude+'/'+p.longitude+'">Observation '+(i+1)+'</a>').join(' · ');
+    document.getElementById('map').innerHTML='<div style="width:100%"><b>Field presence trail</b><br><span class="muted">'+pts.length+' observation(s), chronological order. Device evidence only; not proof of employee conduct.</span><svg viewBox="0 0 '+w+' '+h+'" style="width:100%;max-height:300px;margin-top:10px;background:#06111b;border:1px solid #214b67;border-radius:8px"><polyline points="'+poly+'" fill="none" stroke="#50c8ff" stroke-width="3"/>'+dots+'</svg><div style="margin-top:8px">'+links+'</div></div>';
+  }else document.getElementById('map').textContent='No location evidence available.';
  }catch(err){document.getElementById('timeline').textContent='Timeline unavailable: '+err.message;}
 }
 load();
