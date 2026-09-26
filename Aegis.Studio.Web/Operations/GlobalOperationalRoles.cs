@@ -389,8 +389,10 @@ public static class GlobalOperationalRoleEndpoints
     public static void MapGlobalOperationalRoles(this WebApplication app)
     {
         GlobalOperationalRoleStore roles = new(app.Services.GetRequiredService<StudioDatabase>());
-        Common.Security.Options.ActiveDirectoryAuthenticationOptions? directoryOptions = app.Services.GetService<Common.Security.Options.ActiveDirectoryAuthenticationOptions>();
-        roles.EnsureSchema(directoryOptions?.AdministrativeGroups);
+        string[] administratorGroups = app.Configuration
+            .GetSection("AuthenticationPlugin:Settings:AdministrativeGroups")
+            .Get<string[]>() ?? [];
+        roles.EnsureSchema(administratorGroups);
 
         RouteGroupBuilder group = app.MapGroup("/api/security/global-roles").RequireAuthorization(new AuthorizeAttribute { Roles = StudioRoleNames.Administrator });
         group.MapGet("/", () => Results.Ok(roles.GetRoles()));
