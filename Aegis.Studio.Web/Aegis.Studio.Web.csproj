@@ -28,20 +28,22 @@
   </ItemGroup>
   <Target Name="StageAuthenticationPluginAfterBuild" AfterTargets="Build">
     <PropertyGroup>
-      <AuthenticationPluginSource>$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\bin\$(Configuration)\net10.0\Common.Security.Plugin.ActiveDirectory.dll</AuthenticationPluginSource>
+      <AuthenticationPluginOutput>$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\bin\$(Configuration)\net10.0</AuthenticationPluginOutput>
     </PropertyGroup>
     <MakeDir Directories="$(OutDir)plugins" />
-    <Copy SourceFiles="$(AuthenticationPluginSource)"
-          DestinationFolder="$(OutDir)plugins"
-          SkipUnchangedFiles="true"
-          Condition="Exists('$(AuthenticationPluginSource)')" />
+    <ItemGroup>
+      <AuthenticationPluginFiles Include="$(AuthenticationPluginOutput)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AuthenticationPluginFiles)"
+          DestinationFiles="@(AuthenticationPluginFiles->'$(OutDir)plugins\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
     <Error Condition="!Exists('$(OutDir)plugins\Common.Security.Plugin.ActiveDirectory.dll')"
            Text="Authentication plugin was not staged to $(OutDir)plugins." />
   </Target>
 
   <Target Name="StageAuthenticationPluginForPublish" AfterTargets="Publish">
     <PropertyGroup>
-      <AuthenticationPluginSource>$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\bin\$(Configuration)\net10.0\Common.Security.Plugin.ActiveDirectory.dll</AuthenticationPluginSource>
+      <AuthenticationPluginOutput>$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\bin\$(Configuration)\net10.0</AuthenticationPluginOutput>
     </PropertyGroup>
     <MakeDir Directories="$(PublishDir)plugins" />
     <Copy SourceFiles="$(AuthenticationPluginSource)"
