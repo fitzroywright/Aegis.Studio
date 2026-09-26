@@ -46,8 +46,13 @@
       <AuthenticationPluginOutput>$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\bin\$(Configuration)\net10.0</AuthenticationPluginOutput>
     </PropertyGroup>
     <MakeDir Directories="$(PublishDir)plugins" />
-    <Copy SourceFiles="$(AuthenticationPluginSource)"
-          DestinationFolder="$(PublishDir)plugins"
+    <ItemGroup>
+      <AuthenticationPluginPublishFiles Include="$(AuthenticationPluginOutput)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AuthenticationPluginPublishFiles)"
+          DestinationFiles="@(AuthenticationPluginPublishFiles->'$(PublishDir)plugins\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
+    <Error Condition="!Exists('$(PublishDir)plugins\Common.Security.Plugin.ActiveDirectory.dll')"
+           Text="Authentication plugin was not staged to $(PublishDir)plugins." />
   </Target>
 </Project>
