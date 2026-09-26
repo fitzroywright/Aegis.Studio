@@ -1,7 +1,8 @@
 using Common.Diagnostics;
 using Common.Security.Abstractions;
 using Common.Security.Integration;
-using Common.Security.Options;
+using Common.Security.Plugin.ActiveDirectory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -14,13 +15,20 @@ public sealed class CommonSecurityConsumerIntegrationTests
     {
         ServiceCollection services = new();
         services.AddCommonDiagnostics();
-        services.AddCommonSecurity(new ActiveDirectoryAuthenticationOptions
-        {
-            Domain = "example.local",
-            SearchBase = "DC=example,DC=local",
-            Servers = ["dc1.example.local"],
-            Port = 636
-        });
+        services.AddCommonSecurity();
+
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Authentication:ActiveDirectory:Domain"] = "example.local",
+                ["Authentication:ActiveDirectory:SearchBase"] = "DC=example,DC=local",
+                ["Authentication:ActiveDirectory:Servers:0"] = "dc1.example.local",
+                ["Authentication:ActiveDirectory:Port"] = "636"
+            })
+            .Build();
+
+        new ActiveDirectoryAuthenticationPlugin()
+            .Register(services, configuration.GetSection("Authentication:ActiveDirectory"));
         services.AddCommonSecurityDiagnostics();
 
         using ServiceProvider provider = services.BuildServiceProvider();
