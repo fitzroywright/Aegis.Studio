@@ -25,8 +25,7 @@ using Common.Diagnostics;
 using Common.Secrets;
 using Common.Registration;
 using Common.Security.Abstractions;
-using Common.Security.Authenticators;
-using Common.Security.Options;
+using Common.Security.Integration;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
@@ -73,12 +72,13 @@ builder.Services.AddSingleton<StudioFeatureDatabase>();
 builder.Services.AddSingleton<StudioMessagingDatabase>();
 
 MicrosoftGraphEmailOptions graphEmailOptions = builder.Configuration.GetSection("MicrosoftGraphEmail").Get<MicrosoftGraphEmailOptions>() ?? new MicrosoftGraphEmailOptions();
-ActiveDirectoryAuthenticationOptions activeDirectoryOptions = builder.Configuration.GetSection("Authentication:ActiveDirectory").Get<ActiveDirectoryAuthenticationOptions>() ?? throw new InvalidOperationException("Authentication:ActiveDirectory must be configured.");
+AuthenticationPluginLoader.Register(
+    builder.Services,
+    builder.Configuration,
+    builder.Environment.ContentRootPath);
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => { options.Cookie.Name = "Aegis.Studio.Auth"; options.Cookie.HttpOnly = true; options.Cookie.SameSite = SameSiteMode.Strict; options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; options.LoginPath = "/login"; options.AccessDeniedPath = "/login"; options.ExpireTimeSpan = TimeSpan.FromHours(8); options.SlidingExpiration = true; options.Events.OnRedirectToLogin = context => { if (context.Request.Path.StartsWithSegments("/api")) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; } context.Response.Redirect(context.RedirectUri); return Task.CompletedTask; }; });
 builder.Services.AddAuthorization(options => { options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build(); });
 builder.Services.AddHealthChecks();
-builder.Services.AddSingleton(activeDirectoryOptions);
-builder.Services.AddSingleton<IAuthenticator, ActiveDirectory>();
 builder.Services.AddSingleton(graphEmailOptions);
 builder.Services.AddSingleton<MicrosoftGraphEmailClient>();
 builder.Services.AddSingleton<WorkspaceStore>();
