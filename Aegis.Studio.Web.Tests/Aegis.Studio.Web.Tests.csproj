@@ -12,6 +12,7 @@
     <ProjectReference Include="../Aegis.Studio.Web/Aegis.Studio.Web.csproj" />
     <ProjectReference Include="../Aegis.Studio.WorkDay.Core/Aegis.Studio.WorkDay.Core.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.csproj" />
+    <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\Common.Security.Plugin.ActiveDirectory.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Diagnostics\Common.Diagnostics.csproj" />
   </ItemGroup>
 </Project>
