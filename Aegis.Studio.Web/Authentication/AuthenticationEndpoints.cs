@@ -14,6 +14,10 @@ public static class AuthenticationEndpoints
 {
     public static void MapStudioAuthentication(this WebApplication app)
     {
+        string[] administratorGroups = app.Configuration
+            .GetSection("AuthenticationPlugin:Settings:AdministrativeGroups")
+            .Get<string[]>() ?? [];
+
         app.MapPost("/api/auth/login", async (
             LoginRequest request,
             IAuthenticator authenticator,
@@ -36,8 +40,7 @@ public static class AuthenticationEndpoints
             string displayName = string.IsNullOrWhiteSpace(directoryDisplayName) ? userName : directoryDisplayName!;
 
             GlobalOperationalRoleStore roles = new(database);
-            Common.Security.Options.ActiveDirectoryAuthenticationOptions? directoryOptions = app.Services.GetService<Common.Security.Options.ActiveDirectoryAuthenticationOptions>();
-            roles.EnsureSchema(directoryOptions?.AdministrativeGroups);
+            roles.EnsureSchema(administratorGroups);
             roles.EnsureDefaultUserRole(userName, displayName);
 
             PermissionAuthorizer authorizer = new(roles);
