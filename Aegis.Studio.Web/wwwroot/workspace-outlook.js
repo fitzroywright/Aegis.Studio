@@ -1,3 +1,10 @@
+function messageFirstName(author, people, fallback = 'Team member') {
+    const value = String(author || '').trim();
+    const person = people.find(p => String(p.userName || '').toLowerCase() === value.toLowerCase());
+    const name = String(person?.displayName || value).trim();
+    if (!name || name.includes('@') || name.includes('\\')) return fallback;
+    return name.split(/\s+/)[0];
+}
 function mergeJobMessages(teamMessages, customerMessages) {
     return [
         ...teamMessages.map(m => ({ id: 'team-' + m.id, author: m.senderUserName, body: m.body, at: m.createdAtUtc, customer: false })),
@@ -94,12 +101,21 @@ function mergeJobMessages(teamMessages, customerMessages) {
             } else customerNotice = response.status === 403 ? 'Customer messages are restricted by your permissions.' : 'Customer messages could not be loaded. Refresh to retry.';
         }
         if (version !== revision) return;
+        const people = [];
+        if (job) {
+            const responses = await Promise.allSettled([
+                json(`/api/workspaces/${job.workspaceId}/directory`), json('/api/auth/me')
+            ]);
+            if (responses[0].status === 'fulfilled') people.push(...responses[0].value);
+            if (responses[1].status === 'fulfilled') people.push(responses[1].value.user || responses[1].value);
+        }
+        if (version !== revision) return;
         const combined = mergeJobMessages(messages, conversation?.messages || []);
         detailPane.classList.remove('empty');
-        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}</p><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div>${job ? `<label class="customer-filter"><input id="showCustomerMessages" type="checkbox" ${showCustomers ? 'checked' : ''}> Show customer messages</label>` : ''}</div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" required maxlength="10000"></textarea>${job ? '<label><input id="jobInternalNote" type="checkbox" checked> Internal note</label>' : ''}<div class="send-split"><button class="primary" type="submit">${job ? 'Add internal note' : 'Send message'}</button>${identities.length ? `<select id="jobSendingIdentity" aria-label="Send reply as">${identities.map(i => `<option value="${esc(i.type)}" ${i.isDefault ? 'selected' : ''}>${esc(i.label)}</option>`).join('')}</select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
+        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}</p><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div>${job ? `<label class="customer-filter"><input id="showCustomerMessages" type="checkbox" ${showCustomers ? 'checked' : ''}> Show customer messages</label>` : ''}</div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" required maxlength="10000"></textarea>${job ? '<label><input id="jobInternalNote" type="checkbox" checked> Internal note</label>' : ''}<div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${identities.some(i => i.type === 'Workspace') ? '' : 'disabled'}>Reply as Workspace</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as Myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
         const renderMessages = () => {
             const visible = combined.filter(m => showCustomers || !m.customer);
-            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(m.author)} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></article>`).join('') || '<p>No messages to display.</p>';
+            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member'))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
         const filterToggle = document.getElementById('showCustomerMessages');
@@ -107,12 +123,13 @@ function mergeJobMessages(teamMessages, customerMessages) {
         const internal = document.getElementById('jobInternalNote'), sender = document.getElementById('jobSendingIdentity');
         const syncSend = () => {
             const button = document.getElementById('hierarchyCompose').querySelector('button');
-            if (sender) sender.disabled = internal?.checked === true;
-            button.textContent = !job ? 'Send message' : internal.checked ? 'Add internal note' : sender?.value === 'Self' ? 'Send as Myself' : 'Send as Workspace';
+            if (sender) sender.disabled = false;
+            button.textContent = !job ? 'Send message' : internal.checked ? 'Reply · Internal' : sender?.value === 'Self' ? 'Reply as Myself' : 'Reply as Workspace';
             button.disabled = !!job && !internal.checked && (!conversation || (String(conversation.channel).toLowerCase() === 'email' && !identities.length));
         };
         if(internal) internal.onchange = syncSend;
-        if(sender) sender.onchange = syncSend;
+        if(sender) sender.onchange = () => { if(internal) internal.checked = false; syncSend(); };
+        if(sender && identities.length) sender.value = identities.find(i => i.isDefault)?.type || identities[0].type;
         syncSend();
         if (scope === 'Job') {
             detailPane.classList.add('job-reading-view');
