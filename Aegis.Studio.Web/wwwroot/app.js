@@ -81,13 +81,10 @@ async function openConversation(id) {
     }
     const identityOptions = sendingIdentity?.identities || [];
     const identityPicker = identityOptions.length
-        ? `<label class="sending-identity">Send as
-            <select id="sendingIdentity">
+        ? `<div class="send-split"><button id="sendReplyButton" class="primary" onclick="sendMessage()">Send as Workspace</button><select id="sendingIdentity" aria-label="Send reply as" title="Choose Workspace or Myself">
                 ${identityOptions.map(identity => `<option value="${esc(identity.type)}" ${identity.isDefault ? 'selected' : ''}>${esc(identity.label)}</option>`).join('')}
-            </select>
-            <small id="sendingIdentityHint">The selected identity is recorded in the message audit trail.</small>
-          </label>`
-        : '';
+            </select></div>`
+        : '<button class="primary" onclick="sendMessage()">Send</button>';
     detailPane.classList.remove('empty');
     detailPane.innerHTML = `
         <div class="detail-header">
@@ -112,7 +109,6 @@ async function openConversation(id) {
             <div class="composer-row">
                 <label class="toggle"><input id="internalToggle" type="checkbox"> Internal note — customer will not see this</label>
                 ${identityPicker}
-                <button class="primary" onclick="sendMessage()">Send</button>
             </div>
         </div>`;
     const internalToggle = document.getElementById('internalToggle');
@@ -120,12 +116,13 @@ async function openConversation(id) {
     if (internalToggle && identitySelect) {
         const syncIdentityState = () => {
             identitySelect.disabled = internalToggle.checked;
-            const hint = document.getElementById('sendingIdentityHint');
-            if (hint) hint.textContent = internalToggle.checked
-                ? 'Internal notes do not use an external sending identity.'
-                : 'The selected identity is recorded in the message audit trail.';
+            const button = document.getElementById('sendReplyButton');
+            button.textContent = internalToggle.checked ? 'Add internal note' : identitySelect.value === 'Self' ? 'Send as Myself' : 'Send as Workspace';
+            button.title = internalToggle.checked ? 'Visible to staff only' : identitySelect.selectedOptions[0]?.textContent || '';
+
         };
         internalToggle.addEventListener('change', syncIdentityState);
+        identitySelect.addEventListener('change', syncIdentityState);
         syncIdentityState();
     }
 }
