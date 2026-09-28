@@ -75,12 +75,27 @@
         const messages = await json(`/api/messages/threads/${value.id}`);
         if (version !== revision) return;
         detailPane.classList.remove('empty');
-        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}${scope === 'Job' ? ' / ' + esc(selectedJob.title) : ''}</p><h1>${scope === 'Job' ? 'Job messages' : 'Workspace messages'}</h1><p>${scope === 'Job' ? 'Internal discussion for this job' : 'Shared with the workspace team'}</p></div>${scope === 'Job' ? '<div><button class="action" id="hierarchyJobDetails">Job details</button><button class="action" id="hierarchyClientMessages">Customer messages</button></div>' : ''}</div><div class="messages">${messages.map(m => `<article class="message"><div class="message-head">${esc(m.senderUserName)} · ${esc(new Date(m.createdAtUtc).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></article>`).join('') || '<p>No messages yet. Start the discussion below.</p>'}</div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${scope === 'Job' ? 'Message the job team' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" required maxlength="10000"></textarea><button class="primary" type="submit">Send message</button><p id="hierarchyError" role="alert"></p></form>`;
+        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}${scope === 'Job' ? ' / ' + esc(selectedJob.title) : ''}</p><h1>${scope === 'Job' ? 'Job messages' : 'Workspace messages'}</h1><p>${scope === 'Job' ? 'Internal discussion for this job' : 'Shared with the workspace team'}</p></div></div><div class="messages">${messages.map(m => `<article class="message"><div class="message-head">${esc(m.senderUserName)} · ${esc(new Date(m.createdAtUtc).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></article>`).join('') || '<p>No messages yet. Start the discussion below.</p>'}</div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${scope === 'Job' ? 'Message the job team' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" required maxlength="10000"></textarea><button class="primary" type="submit">Send message</button><p id="hierarchyError" role="alert"></p></form>`;
         if (scope === 'Job') {
+            detailPane.classList.add('job-reading-view');
+            const lower = document.createElement('section');
+            lower.className = 'job-lower-pane';
+            lower.innerHTML = '<nav class="workspace-tabs" aria-label="Job information"><button data-job-tab="gallery">Attached files</button><button data-job-tab="details">Job details</button><button data-job-tab="customer">Customer messages</button></nav><div class="job-tab-content"></div>';
+            detailPane.appendChild(lower);
             const job = selectedJob;
-            document.getElementById('hierarchyJobDetails').onclick = () => { ++revision; openJob(job.id).catch(fail); };
-            document.getElementById('hierarchyClientMessages').onclick = () => { ++revision; baseConversation(job.conversationId).catch(fail); };
-        }
+            let tabRevision = 0;
+            const activate = async name => {
+                const token = ++tabRevision;
+                const panel = lower.querySelector('.job-tab-content');
+                const current = () => version === revision && token === tabRevision;
+                lower.querySelectorAll('[data-job-tab]').forEach(button => button.classList.toggle('active', button.dataset.jobTab === name));
+                panel.textContent = 'Loading…';
+                try { await renderJobTab(name, job, panel, current, () => activate(name)); }
+                catch (error) { if (current()) panel.textContent = 'Unable to load: ' + (error.message || error); }
+            };
+            lower.querySelectorAll('[data-job-tab]').forEach(button => button.onclick = () => activate(button.dataset.jobTab));
+            activate('gallery');
+        } else detailPane.classList.remove('job-reading-view');
         document.getElementById('hierarchyCompose').onsubmit = async event => {
             event.preventDefault();
             const form = event.currentTarget, body = form.querySelector('textarea').value.trim();
@@ -91,6 +106,55 @@
                 if (version === revision) await thread(scope, scopeId, version);
             } catch(error) { form.querySelector('[role="alert"]').textContent = error.message || error; }
             finally { button.disabled = false; }
+        };
+    }
+    async function renderJobTab(name, job, panel, current, refresh) {
+        if (name === 'details') {
+            const value = await json('/api/jobs/' + job.id);
+            if (!current()) return;
+            panel.innerHTML = `<h2>${esc(value.title)}</h2><dl class="job-facts"><dt>Client</dt><dd>${esc(value.clientName)}</dd><dt>Status</dt><dd>${esc(value.status)}</dd><dt>Assigned to</dt><dd>${esc(value.assignedTo || 'Unassigned')}</dd><dt>Event date</dt><dd>${esc(value.eventDate || 'Not scheduled')}</dd></dl><button class="action" id="jobFullDetails">Manage job</button>`;
+            panel.querySelector('#jobFullDetails').onclick = () => { ++revision; openJob(job.id).catch(fail); };
+            return;
+        }
+        if (name === 'gallery') {
+            const files = await json(`/api/conversations/${job.conversationId}/attachments`);
+            if (!current()) return;
+            panel.innerHTML = `<h2>Attached files</h2><p>Images and documents attached to this job’s conversation.</p><div class="job-file-gallery">${files.map(file => {
+                const url = '/api/attachments/' + encodeURIComponent(file.id);
+                const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
+                return `<a class="job-file-tile" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}</small><span>Open file ↗</span></a>`;
+            }).join('') || '<p>No files attached yet.</p>'}</div><form class="job-file-upload"><label>Add files to this job<input type="file" multiple required></label><label>Visibility<select name="visibility"><option value="Internal">Internal</option><option value="External">External</option></select></label><button class="primary">Upload files</button><p role="status"></p></form>`;
+            panel.querySelector('form').onsubmit = async event => {
+                event.preventDefault();
+                const form = event.currentTarget, button = form.querySelector('button'); button.disabled = true;
+                try {
+                    for (const file of form.querySelector('input').files) {
+                        const data = new FormData(); data.append('file', file);
+                        const response = await fetch(`/api/conversations/${job.conversationId}/attachments?visibility=${encodeURIComponent(form.querySelector('select').value)}`, {method:'POST',body:data});
+                        if (!response.ok) throw new Error(await response.text());
+                    }
+                    if (current()) await refresh();
+                } catch(error) { form.querySelector('[role="status"]').textContent = 'Upload stopped: ' + (error.message || error); }
+                finally { button.disabled = false; }
+            };
+            return;
+        }
+        const conversation = await json('/api/conversations/' + job.conversationId);
+        const identities = String(conversation.channel).toLowerCase() === 'email'
+            ? (await json(`/api/conversations/${job.conversationId}/sending-identities`)).identities : [];
+        if (!current()) return;
+        panel.innerHTML = `<h2>Customer messages</h2><p>${esc(conversation.contactName)} · ${esc(conversation.contactAddress)}</p>${conversation.messages.map(m => `<article class="message"><div class="message-head">${esc(m.author)} · ${esc(m.visibility)} · ${esc(new Date(m.createdAt).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></article>`).join('')}<form class="job-customer-reply"><label>Reply<textarea required maxlength="10000"></textarea></label><label><input type="checkbox"> Internal note</label><div class="send-split"><button class="primary" type="submit">Send reply</button>${identities.length ? `<select aria-label="Send reply as">${identities.map(i => `<option value="${esc(i.type)}" ${i.isDefault ? 'selected' : ''}>${esc(i.label)}</option>`).join('')}</select>` : ''}</div><p role="status"></p></form>`;
+        const form = panel.querySelector('form'), identity = form.querySelector('select'), internal = form.querySelector('input'), send = form.querySelector('button');
+        const sync = () => { if(identity) identity.disabled = internal.checked; send.textContent = internal.checked ? 'Add internal note' : identity ? (identity.value === 'Self' ? 'Send as Myself' : 'Send as Workspace') : 'Send reply'; };
+        internal.onchange = sync; if(identity) identity.onchange = sync; sync();
+        form.onsubmit = async event => {
+            event.preventDefault(); const body = form.querySelector('textarea').value.trim(); if(!body) return;
+            send.disabled = true;
+            try {
+                await json(`/api/conversations/${job.conversationId}/messages`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body,isInternal:internal.checked,sendingIdentity:identity?.value || 'Workspace'})});
+                if(current()) await refresh();
+            } catch(error) { form.querySelector('[role="status"]').textContent = error.message || error; }
+            finally { send.disabled = false; }
         };
     }
     allButton.textContent = 'Jobs';
