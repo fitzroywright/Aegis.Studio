@@ -426,4 +426,9 @@ document.querySelectorAll('.brand-button').forEach(button => {
     button.onclick = () => activateView(button.dataset.view);
 });
 
-loadWorkspaces().then(loadConversations);
+// Wait until permission-aware script overrides have been installed.
+document.addEventListener('DOMContentLoaded', () => {
+    loadWorkspaces().then(loadConversations).catch(error => {
+        conversationList.textContent = 'Unable to load workspaces: ' + (error.message || error);
+    });
+}, { once: true });

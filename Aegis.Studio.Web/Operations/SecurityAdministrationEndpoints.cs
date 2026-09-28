@@ -32,7 +32,7 @@ public static class SecurityAdministrationEndpoints
             StudioRole role = roles.Get(roleId) ?? throw new KeyNotFoundException("Role was not found.");
             if (!role.Scope.Equals("Workspace", StringComparison.OrdinalIgnoreCase)) return Results.BadRequest(new { error = "A Workspace role is required." });
             WorkspaceMember? member = access.GetMembers(workspaceId).FirstOrDefault(x => x.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase));
-            WorkspacePermissionSet permissions = JsonSerializer.Deserialize<WorkspacePermissionSet>(role.PermissionsJson) ?? WorkspacePermissionSet.None;
+            WorkspacePermissionSet permissions = StudioRolePermissions.ReadWorkspace(role.PermissionsJson);
             WorkspaceMember saved = access.SaveMember(workspaceId, new WorkspaceMemberRequest(userName, member?.DisplayName ?? userName, true, permissions));
             roles.SetWorkspaceRole(workspaceId, userName, role.Id);
             return Results.Ok(new { member = saved, role });
@@ -43,7 +43,7 @@ public static class SecurityAdministrationEndpoints
             StudioRole role = roles.Get(roleId) ?? throw new KeyNotFoundException("Role was not found.");
             if (!role.Scope.Equals("Job", StringComparison.OrdinalIgnoreCase)) return Results.BadRequest(new { error = "A Job role is required." });
             JobMember? member = access.GetMembers(jobId).FirstOrDefault(x => x.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase));
-            JobPermissionSet permissions = JsonSerializer.Deserialize<JobPermissionSet>(role.PermissionsJson) ?? JobPermissionSet.None;
+            JobPermissionSet permissions = StudioRolePermissions.ReadJob(role.PermissionsJson);
             JobMember saved = access.SaveMember(jobId, new JobMemberRequest(userName, member?.DisplayName ?? userName, true, false, permissions));
             roles.SetJobRole(jobId, userName, role.Id);
             return Results.Ok(new { member = saved, role });
@@ -162,15 +162,15 @@ public sealed class StudioRoleStore
     private static void ValidatePermissions(string scope, string json)
     {
         if (string.IsNullOrWhiteSpace(json)) throw new InvalidOperationException("Permissions JSON is required.");
-        if (scope == "Workspace") _ = JsonSerializer.Deserialize<WorkspacePermissionSet>(json) ?? throw new InvalidOperationException("Invalid Workspace permission set.");
-        else _ = JsonSerializer.Deserialize<JobPermissionSet>(json) ?? throw new InvalidOperationException("Invalid Job permission set.");
+        if (scope == "Workspace") _ = StudioRolePermissions.ReadWorkspace(json);
+        else _ = StudioRolePermissions.ReadJob(json);
     }
 
     private static void Propagate(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid roleId, string scope, string json)
     {
         if (scope == "Workspace")
         {
-            WorkspacePermissionSet p = JsonSerializer.Deserialize<WorkspacePermissionSet>(json)!;
+            WorkspacePermissionSet p = StudioRolePermissions.ReadWorkspace(json);
             using NpgsqlCommand command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = "update studio_workspace_members set access_workspace=$2,can_view=$3,reply_requester=$4,view_attachments=$5,add_attachments=$6,create_job=$7,edit_job=$8,manage_schedule=$9,manage_production=$10,notify_members=$11,edit_workspace=$12,manage_members=$13,admin_workspace=$14,send_as_self=$15,updated_at_utc=now() where role_id=$1";
@@ -180,7 +180,7 @@ public sealed class StudioRoleStore
         }
         else
         {
-            JobPermissionSet p = JsonSerializer.Deserialize<JobPermissionSet>(json)!;
+            JobPermissionSet p = StudioRolePermissions.ReadJob(json);
             using NpgsqlCommand command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = "update studio_job_members set inherit_workspace_permissions=false,access_job=$2,view_job=$3,view_conversation=$4,reply_requester=$5,view_attachments=$6,add_attachments=$7,edit_job=$8,change_status=$9,assign_staff=$10,manage_schedule=$11,manage_production=$12,view_financials=$13,record_financial_activity=$14,use_pos=$15,view_pos_transactions=$16,refund_void_pos=$17,notify_job_members=$18,manage_job_members=$19,admin_job=$20,updated_at_utc=now() where role_id=$1";
