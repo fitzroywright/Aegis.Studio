@@ -15,22 +15,8 @@ activateView = function(view) {
     baseActivateView(view);
 };
 
-const baseOpenJob = openJob;
-openJob = async function(id) {
-    await baseOpenJob(id);
-    const actions = genericView.querySelector('.job-actions');
-    if (actions && !actions.querySelector('[data-pos-job]')) {
-        const button = document.createElement('button');
-        button.className = 'primary';
-        button.dataset.posJob = id;
-        button.textContent = 'Take Payment / P O S';
-        button.onclick = () => openPos(id);
-        actions.prepend(button);
-    }
-};
-
 async function showPos() {
-    activateNavigation('pos');
+    activateNavigation('frontdesk');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
 
@@ -49,7 +35,7 @@ async function showPos() {
                 <h1>P O S</h1>
                 <p>Job-linked sales, tenders, receipts, refunds and audit history.</p>
             </div>
-            ${me.isAdministrator ? '<button class="action" onclick="showPosCatalogManager()">Manage Catalog</button>' : ''}
+            ${(me.user || me).isAdministrator ? '<button class="action" onclick="showPosCatalogManager()">Manage Catalog</button>' : ''}
         </div>
         <div class="cards">
             <div class="metric">Completed sales<strong>${sales.completedSales}</strong></div>
@@ -70,7 +56,7 @@ async function showPosCatalogManager() {
         json('/api/admin/pos/catalog/'),
         json('/api/auth/me')
     ]);
-    if (!me.isAdministrator) {
+    if (!(me.user || me).isAdministrator) {
         alert('Administrator access is required.');
         return;
     }
@@ -133,7 +119,7 @@ function editPosCatalogItem(serialized) {
 }
 
 async function openPos(jobId) {
-    activateNavigation('pos');
+    activateNavigation('frontdesk');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
     posJobId = jobId;
@@ -152,7 +138,7 @@ async function openPos(jobId) {
     genericView.innerHTML = `
         <div class="job-detail-header">
             <div>
-                <button class="link-button" onclick="openJob('${jobId}')">← Job</button>
+                <button class="link-button" onclick="showFrontDesk()">← Front Desk</button>
                 <h1>P O S — ${esc(job.clientName)}</h1>
                 <p>${esc(job.title)} · ${job.eventDate ? esc(job.eventDate) + ' · ' : ''}${esc(job.status)}</p>
             </div>

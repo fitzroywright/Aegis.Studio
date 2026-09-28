@@ -183,8 +183,6 @@ async function openJob(id) {
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
     const job = await json('/api/jobs/' + id);
-    const financialEvents = job.financialEvents || [];
-    const recorded = financialEvents.reduce((total, item) => total + item.amount, 0);
     genericView.innerHTML = `
         <div class="job-detail-header">
             <div>
@@ -197,7 +195,6 @@ async function openJob(id) {
         <div class="cards">
             <div class="metric">Stage<strong>${esc(job.status)}</strong></div>
             <div class="metric">Assigned to<strong class="metric-text">${esc(job.assignedTo || 'Unassigned')}</strong></div>
-            <div class="metric">Recorded financial activity<strong>${money(recorded)}</strong></div>
         </div>
         <div class="job-actions">
             <button class="primary" onclick="advanceJob('${job.id}','Scheduled')">Schedule</button>
@@ -206,16 +203,8 @@ async function openJob(id) {
             <button class="action" onclick="advanceJob('${job.id}','Ready for Client')">Ready for Client</button>
             <button class="action" onclick="advanceJob('${job.id}','Completed')">Complete</button>
             <button class="action" onclick="assignJob('${job.id}')">Assign staff</button>
-            <button class="action" onclick="recordMoney('${job.id}')">Record money</button>
         </div>
-        <section class="job-section">
-            <h2>Financial events</h2>
-            ${financialEvents.length ? financialEvents.map(item => `
-                <div class="financial-row">
-                    <div><b>${esc(item.kind)}</b><small>${esc(item.note || '')}</small></div>
-                    <strong>${money(item.amount)}</strong>
-                </div>`).join('') : '<p class="muted">No payments, deposits or adjustments recorded yet.</p>'}
-        </section>`;
+        `;
 }
 
 async function advanceJob(id, status) {
@@ -283,7 +272,7 @@ async function showProduction() {
 }
 
 async function showAccounts() {
-    activateNavigation('accounts');
+    activateNavigation('frontdesk');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
     const [summary, jobs] = await Promise.all([
@@ -307,20 +296,18 @@ async function showManagement() {
     activateNavigation('management');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
-    const [jobs, conversations, summary] = await Promise.all([
+    const [jobs, conversations] = await Promise.all([
         json('/api/jobs'),
-        json('/api/conversations'),
-        json('/api/accounts/summary')
+        json('/api/conversations')
     ]);
     const completed = jobs.filter(job => job.status === 'Completed').length;
     genericView.innerHTML = `
         <h1>Management</h1>
-        <p>One view across customer demand, committed work, production and money.</p>
+        <p>One view across customer demand, committed work, production.</p>
         <div class="cards">
             <div class="metric">Open conversations<strong>${conversations.length}</strong></div>
             <div class="metric">Jobs<strong>${jobs.length}</strong></div>
             <div class="metric">Completed<strong>${completed}</strong></div>
-            <div class="metric">Recorded activity<strong>${money(summary.recordedAmount)}</strong></div>
         </div>`;
 }
 

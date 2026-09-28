@@ -17,7 +17,7 @@ async function loadFrontDeskRole() {
         const button = document.querySelector('.brand-button[data-view="frontdesk"]');
         if (button) {
             const me = await json('/api/auth/me');
-            button.classList.toggle('hidden', !frontDeskRole.frontDesk && !me.isAdministrator);
+            button.classList.toggle('hidden', !frontDeskRole.frontDesk && !(me.user || me).isAdministrator);
         }
     } catch {
         frontDeskRole = { frontDesk: false, permissions: {} };
@@ -27,7 +27,7 @@ async function loadFrontDeskRole() {
 async function showFrontDesk() {
     if (!frontDeskRole) await loadFrontDeskRole();
     const me = await json('/api/auth/me');
-    if (!frontDeskRole?.frontDesk && !me.isAdministrator) {
+    if (!frontDeskRole?.frontDesk && !(me.user || me).isAdministrator) {
         activateNavigation('frontdesk');
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
@@ -56,7 +56,7 @@ function renderFrontDesk() {
                 <h1>Front Desk</h1>
                 <p>One operational workspace for reception: find any job, communicate with the customer or team, and take payment without switching systems.</p>
             </div>
-            <button class="primary" onclick="newRequestButton.click()">New Request</button>
+            <div class="job-actions"><button class="action" onclick="showAccounts()">Accounts / Invoices</button><button class="action" onclick="showPos()">Sales / Payments</button><button class="primary" onclick="newRequestButton.click()">New Request</button></div>
         </div>
         <div class="cards">
             <div class="metric">Active jobs<strong>${active.length}</strong></div>
