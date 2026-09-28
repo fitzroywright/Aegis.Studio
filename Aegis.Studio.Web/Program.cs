@@ -1,3 +1,5 @@
+using Aegis.Studio.Web.WorkspaceJobs;
+using Aegis.Studio.Web.Versioning;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using Aegis.Pos.Core;
@@ -134,6 +136,9 @@ app.MapStudioScheduling();
 app.MapStudioProduction();
 app.MapWorkspaceAccess();
 app.MapStudioDemoData();
+new WorkspaceJobStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
+StudioVersionSchema.EnsureCreated(app.Services.GetRequiredService<StudioDatabase>());
+app.MapWorkspaceJobs();
 app.MapJobAccess();
 app.MapAegisHealth(
     "Aegis.Studio",

@@ -20,6 +20,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
     let showCustomers = true;
     const baseConversation = openConversation;
     function empty(title, message) {
+        detailPane.classList.remove('job-reading-view');
         detailPane.classList.add('empty');
         detailPane.innerHTML = `<div class="empty-state"><h2>${esc(title)}</h2><p>${esc(message)}</p></div>`;
     }
@@ -31,9 +32,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
     const tabs = document.createElement('div');
     tabs.className = 'workspace-tabs';
     tabs.setAttribute('aria-label', 'Workspace views');
-    tabs.innerHTML = '<button data-tab="jobs">Jobs</button><button data-tab="team">Workspace messages</button><button data-tab="members">Members</button><button data-tab="enquiries">Unassigned enquiries</button>';
+    tabs.innerHTML = '<button data-tab="jobs">Jobs</button><button data-tab="announcements">Announcements</button><button data-tab="members">Members</button>';
     document.querySelector('.workspace-toolbar').before(tabs);
-    const display = () => { activateView('conversations'); };
+    const display = () => { activateView('conversations'); activateNavigation('workspaces'); };
     const fail = error => empty('Unable to load', error.message || String(error));
     tabs.querySelectorAll('button').forEach(button => button.onclick = () => { tab = button.dataset.tab; loadConversations().catch(fail); });
     selectWorkspace = async function(id, name) {
@@ -52,11 +53,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
         tabs.querySelectorAll('button').forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
         display();
         conversationList.innerHTML = '';
-        if (!workspaceId) { empty('Select a workspace', 'Choose a workspace on the left to see its jobs, messages and members.'); return; }
+        if (!workspaceId) { empty('Select a workspace', 'Choose a workspace on the left to see its jobs, announcements and members.'); return; }
         empty('Select a job', 'Jobs belong to this workspace. Open a job to read its messages.');
-        if (tab === 'team') {
-            conversationList.innerHTML = '<div class="empty-state"><h3>Workspace messages</h3><p>A shared discussion for the entire workspace.</p></div>';
-            await thread('Workspace', workspaceId, version); return;
+        if (tab === 'announcements') {
+            detailPane.classList.remove('empty', 'job-reading-view');
+            conversationList.innerHTML = '<div class="empty-state"><h3>Workspace announcements</h3><p>Updates for everyone in this workspace.</p></div>';
+            await renderWorkspaceAnnouncements(detailPane,workspaceId,()=>version===revision); return;
         }
         if (tab === 'members') {
             const members = await json(`/api/workspaces/${workspaceId}/directory`);
@@ -65,18 +67,17 @@ function mergeJobMessages(teamMessages, customerMessages) {
             detailPane.innerHTML = `<div class="detail-header"><h1>Workspace members</h1></div><div class="messages">${members.map(m => `<article class="message"><strong>${esc(m.displayName)}</strong><p>${esc(m.userName)} · ${esc(m.role)}</p></article>`).join('') || '<p>No active members assigned.</p>'}</div>`;
             conversationList.innerHTML = `<div class="empty-state"><h3>${members.length} members</h3><p>People with access to this workspace.</p></div>`; return;
         }
-        if (tab === 'enquiries') {
-            const enquiries = await json(`/api/conversations?workspaceId=${workspaceId}`);
-            if (version !== revision) return;
-            conversationList.innerHTML = enquiries.filter(x => !x.jobId).map(x => `<button class="conversation-card hierarchy-row" data-search data-conversation="${x.id}"><strong>${esc(x.subject)}</strong><small>${esc(x.contactName)}</small></button>`).join('') || '<p class="empty-state">No unassigned enquiries.</p>';
-            conversationList.querySelectorAll('[data-conversation]').forEach(button => button.onclick = () => baseConversation(button.dataset.conversation).catch(fail));
-            empty('Unassigned enquiries', 'Open an enquiry to create a job when the work is confirmed.'); filter(); return;
-        }
         const jobs = await json('/api/jobs');
         if (version !== revision) return;
-        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}"><span class="job-row-heading"><strong>${esc(job.title)}</strong><span class="job-status">${esc(job.status)}</span></span><small>${esc(job.clientName)}</small><small>${esc(job.eventDate || "Not scheduled")}</small></button>`).join('') || '<p class="empty-state">No jobs in this workspace. Check Unassigned enquiries to create one.</p>';
+        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}"><span class="job-row-heading"><strong>${esc(job.title)}</strong><span class="job-status">${esc(job.status)}</span></span><small>${esc(job.clientName)}</small><small>${esc(job.eventDate || "Not scheduled")}</small></button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
         conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(jobs.find(x => x.id === button.dataset.job)).catch(fail));
         filter();
+    };
+    window.openWorkspaceJob = async function(id) {
+        const job=await json('/api/jobs/'+id);
+        const workspace=workspaceCache.find(w=>w.id===job.workspaceId);
+        selectedWorkspace=job.workspaceId;currentWorkspacePermissions=workspace?.permissions || {};workspaceTitle.textContent=workspace?.name || 'Workspace';
+        selectedJob=job;tab='jobs';await loadConversations();await showJobMessages(job);
     };
     async function showJobMessages(job) {
         selectedJob = job;
@@ -112,7 +113,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if (version !== revision) return;
         const combined = mergeJobMessages(messages, conversation?.messages || []);
         detailPane.classList.remove('empty');
-        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}</p><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div>${job ? `<label class="customer-filter"><input id="showCustomerMessages" type="checkbox" ${showCustomers ? 'checked' : ''}> Show customer messages</label>` : ''}</div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? '<label><input id="jobInternalNote" type="checkbox" checked> Internal note</label>' : ''}<div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${identities.some(i => i.type === 'Workspace') ? '' : 'disabled'}>Reply as Workspace</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as Myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
+        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}</p><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p>${job ? `<details class="job-details-card"><summary>Details</summary><dl class="job-facts"><dt>Client</dt><dd>${esc(job.clientName)}</dd><dt>Status</dt><dd>${esc(job.status)}</dd><dt>Assigned to</dt><dd>${esc(job.assignedTo || 'Unassigned')}</dd><dt>Event date</dt><dd>${esc(job.eventDate || 'Not scheduled')}</dd></dl></details>` : ''}</div>${job ? `<label class="customer-filter"><input id="showCustomerMessages" type="checkbox" ${showCustomers ? 'checked' : ''}> Show customer messages</label>` : ''}</div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? '<label><input id="jobInternalNote" type="checkbox" checked> Internal note</label>' : ''}<div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${identities.some(i => i.type === 'Workspace') ? '' : 'disabled'}>Reply as Workspace</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as Myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
         const renderMessages = () => {
             const visible = combined.filter(m => showCustomers || !m.customer);
             document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member").slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member'))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
@@ -135,7 +136,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             detailPane.classList.add('job-reading-view');
             const lower = document.createElement('section');
             lower.className = 'job-lower-pane';
-            lower.innerHTML = '<nav class="workspace-tabs" aria-label="Job information"><button data-job-tab="gallery">Attached files</button><button data-job-tab="details">Job details</button></nav><div class="job-tab-content"></div>';
+            lower.innerHTML = '<nav class="workspace-tabs" aria-label="Job information"><button data-job-tab="gallery">Gallery</button><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks / Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="job-tab-content"></div>';
             detailPane.appendChild(lower);
             const job = selectedJob;
             let tabRevision = 0;
@@ -167,21 +168,19 @@ function mergeJobMessages(teamMessages, customerMessages) {
         };
     }
     async function renderJobTab(name, job, panel, current, refresh) {
-        if (name === 'details') {
-            const value = await json('/api/jobs/' + job.id);
-            if (!current()) return;
-            panel.innerHTML = `<h2>${esc(value.title)}</h2><dl class="job-facts"><dt>Client</dt><dd>${esc(value.clientName)}</dd><dt>Status</dt><dd>${esc(value.status)}</dd><dt>Assigned to</dt><dd>${esc(value.assignedTo || 'Unassigned')}</dd><dt>Event date</dt><dd>${esc(value.eventDate || 'Not scheduled')}</dd></dl><button class="action" id="jobFullDetails">Manage job</button>`;
-            panel.querySelector('#jobFullDetails').onclick = () => { ++revision; openJob(job.id).catch(fail); };
-            return;
-        }
+        if (name === 'subjects') return renderJobSubjects(job,panel,current,refresh);
+        if (name === 'tasks') return renderJobTasks(job,panel,current,refresh);
+        if (name === 'activity') return renderJobActivity(job,panel,current);
         if (name === 'gallery') {
             const files = await json(`/api/conversations/${job.conversationId}/attachments`);
             if (!current()) return;
-            panel.innerHTML = `<h2>Attached files</h2><p>Images and documents attached to this job’s conversation.</p><div class="job-file-gallery">${files.map(file => {
+            panel.innerHTML = `<div class="versioned-gallery"></div><details class="legacy-attachments"><summary>Conversation attachments</summary><p>Files attached to this job’s conversation.</p><div class="job-file-gallery">${files.map(file => {
                 const url = '/api/attachments/' + encodeURIComponent(file.id);
                 const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
                 return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}</small><span>Open file ↗</span></a>`;
-            }).join('') || '<p>No files attached yet.</p>'}</div><form class="job-file-upload"><label>Add files to this job<input type="file" multiple required></label><label>Visibility<select name="visibility"><option value="Internal">Internal</option><option value="External">External</option></select></label><button class="primary">Upload files</button><p role="status"></p></form>`;
+            }).join('') || '<p>No files attached yet.</p>'}</div><form class="job-file-upload"><label>Add files to this job<input type="file" multiple required></label><label>Visibility<select name="visibility"><option value="Internal">Internal</option><option value="External">External</option></select></label><button class="primary">Upload files</button><p role="status"></p></form></details>`;
+            const versionHost=panel.querySelector('.versioned-gallery');
+            renderVersionedGallery(job,versionHost,current).catch(error=>{if(current())versionHost.textContent=error.message;});
             panel.querySelectorAll('.job-file-tile').forEach(tile => tile.onclick = event => {
                 const file = files.find(f => f.id === tile.dataset.fileId);
                 if (!/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '')) return;
@@ -193,7 +192,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 dialog.querySelector('button').onclick = () => dialog.close();
                 dialog.addEventListener('close', () => dialog.remove(), {once:true}); dialog.showModal();
             });
-            panel.querySelector('form').onsubmit = async event => {
+            panel.querySelector('.job-file-upload').onsubmit = async event => {
                 event.preventDefault();
                 const form = event.currentTarget, button = form.querySelector('button'); button.disabled = true;
                 try {
@@ -212,8 +211,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
     allButton.textContent = 'Jobs';
     allButton.onclick = () => { tab = 'jobs'; loadConversations().catch(fail); };
     document.getElementById('workspaceRefresh').onclick = () => loadConversations().catch(fail);
-    document.querySelector('.workspace-toolbar label').textContent = 'Search jobs or enquiries';
+    document.querySelector('.workspace-toolbar label').textContent = 'Search jobs';
     search.placeholder = 'Search this list';
     document.querySelector('.workspace-list-caption span').textContent = 'Workspace work';
-    document.querySelector('.pane-heading p').textContent = 'Jobs, team messages and members';
+    document.querySelector('.pane-heading p').textContent = 'Jobs, announcements and members';
 })();
