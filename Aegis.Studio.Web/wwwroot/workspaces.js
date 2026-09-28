@@ -16,7 +16,7 @@ async function showWorkspaces() {
         genericView.innerHTML = `
             <div class="job-detail-header"><div><h1>Workspaces</h1><p>Workspace access is membership based. Permissions control what each member can see and do.</p></div></div>
             <section class="job-section"><h2>Your workspaces</h2>${manageable.length ? manageable.map(item => renderWorkspaceAdminRow(item.workspace, item.permissions, isAdministrator)).join('') : '<p class="muted">You do not administer any workspaces.</p>'}</section>
-            ${isAdministrator ? `<section class="job-section"><h2>Create workspace</h2><p class="muted">Routing uses the exact email address or route key. Membership can be assigned immediately after creation.</p><div class="pos-entry"><label>Name<input id="workspaceName"></label><label>Email address<input id="workspaceEmail" type="email"></label><label>Route key<input id="workspaceRouteKey"></label><button class="primary" onclick="createWorkspace()">Create workspace</button></div></section>` : ''}
+            ${isAdministrator ? `<section class="job-section"><h2>Create workspace</h2><p><button class="action" onclick="seedStudioDemoData(this)">Load demo data</button></p><p class="muted">Routing uses the exact email address or route key. Membership can be assigned immediately after creation.</p><div class="pos-entry"><label>Name<input id="workspaceName"></label><label>Email address<input id="workspaceEmail" type="email"></label><label>Route key<input id="workspaceRouteKey"></label><button class="primary" onclick="createWorkspace()">Create workspace</button></div></section>` : ''}
             <section id="workspaceMemberPanel" class="job-section hidden"></section>
             <section id="workspaceImportPanel" class="job-section hidden"></section>
             ${isAdministrator ? renderSecurityRolesSection() + renderWorkflowSection() : ''}`;
@@ -163,3 +163,18 @@ async function runAuthorizationAudit(){const report=await json('/api/security/au
 
 const workspaceNavigationButton = document.querySelector('.brand-button[data-view="workspaces"]');
 if (workspaceNavigationButton) workspaceNavigationButton.onclick = () => showWorkspaces();
+
+async function seedStudioDemoData(button) {
+    if (!confirm('Add fictional DEMO workspaces, enquiries, jobs, schedules, tasks and deposits to this database? Sample deposits will appear in account totals. Use a demo database.')) return;
+    button.disabled = true;
+    try {
+        const result = await json('/api/admin/demo/seed', { method: 'POST' });
+        await loadWorkspaces();
+        await showWorkspaces();
+        alert(result.message);
+    } catch (error) {
+        alert('Unable to load demo data: ' + (error.message || error));
+    } finally {
+        button.disabled = false;
+    }
+}

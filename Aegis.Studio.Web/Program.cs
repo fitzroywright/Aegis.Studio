@@ -133,6 +133,7 @@ app.MapStudioInAppMessaging();
 app.MapStudioScheduling();
 app.MapStudioProduction();
 app.MapWorkspaceAccess();
+app.MapStudioDemoData();
 app.MapJobAccess();
 app.MapAegisHealth(
     "Aegis.Studio",
