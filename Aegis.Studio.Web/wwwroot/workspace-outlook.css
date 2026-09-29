@@ -248,5 +248,5 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 #trainingButton{display:none!important}
 .studio-top-nav #newRequestButton{flex:none;align-self:center;white-space:nowrap;height:34px;padding:6px 10px;font-size:12px}
 .studio-top-nav #newRequestButton svg{width:16px;height:16px}
-.job-reading-view .job-conversation-row{padding-right:8px}
-.job-reading-view #hierarchyCompose{padding-right:8px}
+.job-reading-view .job-conversation-row{padding-right:3px}
+.job-reading-view #hierarchyCompose{padding-right:3px}
