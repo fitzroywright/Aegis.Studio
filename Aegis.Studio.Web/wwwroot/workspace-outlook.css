@@ -728,3 +728,19 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 .media-toolbar-host:empty{display:none}
 .media-toolbar-host .media-title-filters{width:100%;flex-wrap:nowrap}
 .media-toolbar-host .media-progress{margin-left:auto;white-space:nowrap}
+
+
+.job-reading-view .media-production-layout.has-subject-list{grid-template-columns:minmax(230px,270px) minmax(0,1fr)}
+.job-reading-view .media-subject-rail{max-height:430px;border-radius:8px}
+.job-reading-view .media-subject-rail-heading{display:flex;align-items:center;min-height:32px;padding:7px 10px;background:#f2e3bd;border-bottom:1px solid #d9c69c}
+.job-reading-view .media-subject-rail-heading strong{font-size:12px;font-weight:650}
+.media-subject-search{position:relative;display:flex!important;align-items:stretch!important;gap:0!important;margin:7px;border:1px solid var(--theme-border);border-radius:6px;background:var(--theme-surface);overflow:hidden}
+.media-subject-search .media-search-label{display:flex;align-items:center;padding:0 7px;font-size:10px;font-weight:650;color:var(--theme-muted);border-right:1px solid var(--theme-border);background:var(--theme-surface-2);white-space:nowrap}
+.media-subject-search input{flex:1;border:0!important;border-radius:0!important;padding:6px 7px!important;min-width:0}
+.media-subject-search [data-refresh-subjects]{flex:none;width:32px;min-width:32px;padding:0!important;border:0!important;border-left:1px solid var(--theme-border)!important;border-radius:0!important;background:transparent!important}
+.media-subject-search [data-refresh-subjects] svg{width:15px;height:15px}
+.media-subject-hint{padding:0 9px 7px;font-size:10px;line-height:1.35;color:var(--theme-muted);border-bottom:1px solid var(--theme-border)}
+.media-subject-list button:first-child{font-weight:700;background:var(--theme-surface-2)}
+.media-assign-subject{width:100%;font-weight:650;border-color:var(--theme-accent)!important;background:var(--theme-accent-soft)!important}
+@media(max-width:950px){.job-reading-view .media-production-layout.has-subject-list{grid-template-columns:minmax(200px,235px) minmax(0,1fr)}}
+@media(max-width:650px){.job-reading-view .media-production-layout.has-subject-list{grid-template-columns:1fr}.job-reading-view .media-subject-rail{max-height:260px}}
