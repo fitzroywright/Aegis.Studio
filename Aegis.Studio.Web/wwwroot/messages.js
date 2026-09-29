@@ -135,6 +135,7 @@
                     <textarea id="studioMessageBody" maxlength="10000" placeholder="Write a message… Use @ to mention a Studio user." required></textarea>
                     <div id="mentionSuggestions" class="mention-suggestions" hidden></div>
                 </div>
+                ${thread?.scopeType==='Job'?'<label class="action message-attachment-control">Attach document<input id="studioMessageFile" type="file" hidden></label>':''}
                 <button class="primary" type="submit">Send</button>
             </form>`;
         document.getElementById('studioMessageComposer').onsubmit = sendMessage;
@@ -217,9 +218,22 @@
         event.preventDefault();
         const body = document.getElementById('studioMessageBody').value.trim();
         if (!body || !selectedThread) return;
-        await json(`/api/messages/threads/${selectedThread}`, {
+        const threads=await json('/api/messages/threads');
+        const thread=threads.find(item=>item.id===selectedThread);
+        const sent=await json(`/api/messages/threads/${selectedThread}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body })
         });
+        const file=document.getElementById('studioMessageFile')?.files?.[0];
+        if(file&&thread?.scopeType==='Job'&&thread.scopeId){
+            const job=await json('/api/jobs/'+thread.scopeId);
+            if(!job.conversationId)throw new Error('This job has no linked conversation for Conversation Files.');
+            const data=new FormData();data.append('file',file);
+            const upload=await fetch('/api/conversations/'+job.conversationId+'/attachments?visibility=Internal',{method:'POST',body:data});
+            if(!upload.ok)throw new Error(await upload.text());
+            const attachment=await upload.json();
+            const link=await fetch('/api/attachments/'+attachment.id+'/message-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:sent.id,messageKind:'JobMessage',jobId:thread.scopeId})});
+            if(!link.ok)throw new Error(await link.text());
+        }
         document.getElementById('studioMessageBody').value = '';
         await openThread(selectedThread);
     }
