@@ -586,3 +586,98 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 @media(max-width:1100px){
   .production-hub-grid{grid-template-columns:220px minmax(400px,1fr) 280px}
 }
+
+
+/* Pipeline activity-flow interactions */
+.pipeline-timeline-head,.pipeline-timeline-row{
+  grid-template-columns:250px repeat(14,minmax(64px,1fr));
+}
+.pipeline-job-flow-card{
+  position:sticky;
+  left:0;
+  z-index:1;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:
+    "job actions"
+    "flow actions";
+  align-items:center;
+  gap:3px 6px;
+  padding:5px 7px 6px 9px;
+  border-right:1px solid #e4d8bd;
+  background:#fffaf0;
+}
+.pipeline-job-flow-card .pipeline-job-link{
+  position:static;
+  grid-area:job;
+  min-width:0;
+  padding:0;
+  border:0;
+  background:transparent;
+}
+.pipeline-job-flow{
+  grid-area:flow;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-width:0;
+}
+.pipeline-job-flow>span{
+  flex:1;
+  min-width:60px;
+  height:4px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#dfd3bd;
+}
+.pipeline-job-flow>span i{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:#9a7b3f;
+}
+.pipeline-job-flow small{
+  min-width:28px;
+  color:#766548;
+  font-size:9px;
+  text-align:right;
+}
+.pipeline-job-flow-actions{
+  grid-area:actions;
+  display:flex;
+  gap:3px;
+  align-items:center;
+}
+.pipeline-job-flow-actions .action{
+  min-height:22px;
+  padding:2px 5px;
+  border-radius:5px;
+  font-size:9px;
+}
+.pipeline-event-copy{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.pipeline-event[draggable="true"]{
+  cursor:grab;
+}
+.pipeline-event.dragging{
+  opacity:.45;
+  cursor:grabbing;
+}
+.pipeline-day-cell.drag-target,
+.pipeline-calendar-day.drag-target{
+  outline:2px dashed var(--theme-accent);
+  outline-offset:-3px;
+  background:var(--theme-accent-soft);
+}
+.pipeline-calendar-day{
+  transition:background .12s ease,outline-color .12s ease;
+}
+.pipeline-day-cell{
+  transition:background .12s ease,outline-color .12s ease;
+}
+#pipelineMoveDialog .request-form{
+  min-width:min(460px,80vw);
+}
