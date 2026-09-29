@@ -1,1 +1,24 @@
 .report-bars{display:grid;gap:11px;margin-top:14px}.report-bar-row{display:grid;grid-template-columns:minmax(110px,180px) minmax(160px,1fr) minmax(90px,140px);gap:12px;align-items:center}.report-bar-row>span{font-size:13px;color:#596579}.report-bar-row>strong{text-align:right;font-size:13px}.report-track{height:12px;background:#edf1f5;border-radius:999px;overflow:hidden}.report-fill{height:100%;background:currentColor;border-radius:999px;min-width:2px}.selection-review-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0 20px}.selection-review-item{display:grid;gap:4px;border:1px solid #e0e5ea;border-radius:8px;padding:12px;background:#f8fafc}.selection-review-item span,.selection-review-item small{color:#6f7a8b}.selection-review-item small{font-size:11px}@media(max-width:760px){.report-bar-row{grid-template-columns:1fr}.report-bar-row>strong{text-align:left}}
+
+/* Management job Gantt */
+.management-section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:10px}
+.management-section-heading h2{margin:0}.management-section-heading p{margin:2px 0 0}
+.management-gantt-shell{border:1px solid #dfe4e8;border-radius:10px;background:#fff;overflow:hidden}
+.management-gantt-scroll{max-height:360px;overflow:auto}
+.management-gantt-grid{min-width:calc(260px + var(--gantt-width))}
+.management-gantt-head,.management-gantt-row{display:grid;grid-template-columns:260px var(--gantt-width)}
+.management-gantt-head{position:sticky;top:0;z-index:4;background:#f5f7f9;border-bottom:1px solid #dfe4e8}
+.management-gantt-job-head{position:sticky;left:0;z-index:5;padding:8px 10px;background:#f5f7f9;font-size:11px;font-weight:700}
+.management-gantt-axis{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));min-width:var(--gantt-width)}
+.management-gantt-axis span{padding:8px 6px;border-left:1px solid #e7eaee;font-size:10px;color:#657184}
+.management-gantt-row{min-height:46px;border-bottom:1px solid #edf0f2}.management-gantt-row:last-child{border-bottom:0}
+.management-gantt-job{position:sticky;left:0;z-index:2;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:2px;min-width:0;padding:6px 10px;border:0;border-right:1px solid #e4e8ec;background:#fff;color:inherit;text-align:left;cursor:pointer}
+.management-gantt-job:hover{background:#f8fafb}
+.management-gantt-job strong,.management-gantt-job small{max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.management-gantt-job strong{font-size:11px}.management-gantt-job small{color:#6f7a8b;font-size:9px}
+.management-gantt-track{position:relative;min-width:var(--gantt-width);background-image:linear-gradient(to right,#eef1f4 1px,transparent 1px);background-size:112px 100%}
+.management-gantt-today{position:absolute;top:0;bottom:0;width:2px;background:#8b6f3e;opacity:.5}
+.management-gantt-bar{position:absolute;top:11px;height:24px;min-width:8px;overflow:hidden;border:1px solid #bda77e;border-radius:6px;background:#eee2ca;color:#42382c;cursor:pointer}
+.management-gantt-bar>span{position:absolute;inset:0 auto 0 0;background:rgba(113,83,51,.26)}
+.management-gantt-bar>b{position:relative;z-index:1;display:block;padding:4px 6px;font-size:9px;white-space:nowrap}
+@media(max-width:760px){.management-gantt-head,.management-gantt-row{grid-template-columns:190px var(--gantt-width)}.management-gantt-grid{min-width:calc(190px + var(--gantt-width))}.management-gantt-job strong,.management-gantt-job small{max-width:165px}}
