@@ -376,9 +376,15 @@ app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest
     if (externalEmailReply)
         operationsFlows.TryEnqueueOutbound(correlationId, "Message", businessId: email?.Id.ToString("D"));
     if (request.IsInternal) notifications.PublishToAll("Mention", $"Internal note: {updated.Subject}", request.Body, "Conversation", id.ToString("D"));
+    string messageAuthor = user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.Identity?.Name ?? "unknown";
+    StudioMessage? createdMessage = updated.Messages
+        .Where(x => string.Equals(x.AuthorUserName, messageAuthor, StringComparison.OrdinalIgnoreCase) && string.Equals(x.Body, request.Body.Trim(), StringComparison.Ordinal))
+        .OrderByDescending(x => x.CreatedAt)
+        .FirstOrDefault();
     return Results.Ok(new
     {
         conversation = updated,
+        messageId = createdMessage?.Id,
         outboundEmail = email,
         sendingIdentity = email is null ? null : new
         {
