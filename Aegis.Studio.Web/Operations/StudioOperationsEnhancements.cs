@@ -1,3 +1,4 @@
+using Aegis.Studio.Domain.Contacts;
 using Aegis.Studio.Web.FrontDesk;
 using System.Security.Claims;
 using Aegis.Studio.Web.Messaging;
@@ -44,9 +45,8 @@ public static class StudioOperationsEnhancements
         app.MapGet("/api/workflow/stages", (IConfiguration configuration) =>
         {
             string[] stages = configuration.GetSection("Studio:Workflow:Stages").Get<string[]>() ?? [];
-            return stages.Length == 0
-                ? Results.Problem("Studio workflow stages are not configured.")
-                : Results.Ok(stages);
+            if (stages.Length == 0) return Results.Problem("Studio workflow stages are not configured.");
+            return Results.Ok(stages);
         }).RequireAuthorization();
 
         app.MapPost("/api/frontdesk/clients/{clientId:guid}/jobs", (
