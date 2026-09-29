@@ -112,10 +112,10 @@ function renderManagementGantt(jobs, scheduleEntries, activities) {
         const completed=production.filter(item=>item.status==='Completed').length;
         const progress=production.length?Math.round(completed/production.length*100):0;
         return `<div class="management-gantt-row">
-            <button class="management-gantt-job" type="button" onclick="openJob('${job.id}')"><strong>${esc(job.title)}</strong><small>${esc(job.clientName||'Client not linked')} · ${esc(job.status)}</small></button>
+            <button class="management-gantt-job" type="button" onclick="openWorkspaceJob('${job.id}')"><strong>${esc(job.title)}</strong><small>${esc(job.clientName||'Client not linked')} · ${esc(job.status)}</small></button>
             <div class="management-gantt-track" style="--gantt-width:${width}px">
                 <div class="management-gantt-today" style="left:${todayPct}%"></div>
-                <button class="management-gantt-bar" type="button" onclick="openJob('${job.id}')" style="left:${left}%;width:${span}%">
+                <button class="management-gantt-bar" type="button" onclick="openWorkspaceJob('${job.id}')" style="left:${left}%;width:${span}%">
                     <span style="width:${progress}%"></span><b>${progress}%</b>
                 </button>
             </div>
