@@ -14,14 +14,13 @@ public sealed class AttachmentStore
     public AttachmentStore(
         IWebHostEnvironment environment,
         IConfiguration configuration,
-        StudioDatabase database)
+        StudioDatabase database,
+        IFileStorage storage)
     {
         this.database = database ?? throw new ArgumentNullException(nameof(database));
-        string configuredPath = configuration["Storage:AttachmentsPath"] ?? string.Empty;
-        string storageRoot = string.IsNullOrWhiteSpace(configuredPath)
-            ? Path.Combine(environment.ContentRootPath, "Storage", "attachments")
-            : Path.GetFullPath(configuredPath);
-        storage = new LocalFileStorage(storageRoot);
+        this.storage = new PrefixedFileStorage(
+            storage ?? throw new ArgumentNullException(nameof(storage)),
+            "Storage/attachments");
         deliveryCacheRoot = Path.Combine(environment.ContentRootPath, "Storage", ".delivery-cache");
         Directory.CreateDirectory(deliveryCacheRoot);
 
