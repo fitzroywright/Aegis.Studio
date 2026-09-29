@@ -1,3 +1,4 @@
+using Common.Diagnostics;
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -160,6 +161,35 @@ public sealed class StudioOperationsFlowPublisher(
             await store.LoadOrCreateAsync(ApplicationId, instanceId, ct);
         if (string.IsNullOrWhiteSpace(identity.Credential)) return;
 
+        using HttpClient lifecycleClient = new() { Timeout = TimeSpan.FromSeconds(5) };
+        var lifecycleSink = new HttpLifecycleEventSink(
+            lifecycleClient,
+            new HttpLifecycleEventSinkOptions(new Uri(operationsUrl.TrimEnd('/') + "/api/operations/lifecycle/events")),
+            (request, lifecycleEvent, _) =>
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", identity.Credential);
+                request.Headers.TryAddWithoutValidation("X-Aegis-Application-Id", identity.ApplicationId);
+                request.Headers.TryAddWithoutValidation("X-Aegis-Instance-Id", identity.InstanceId);
+                request.Headers.TryAddWithoutValidation("X-Aegis-Installation-Id", identity.InstallationId);
+                return Task.CompletedTask;
+            });
+        var lifecycle = new LifecycleTelemetry(lifecycleSink);
+        LifecycleEventOutcome lifecycleOutcome = item.Failed
+            ? LifecycleEventOutcome.Failed
+            : string.Equals(item.StateOverride, "Unknown", StringComparison.OrdinalIgnoreCase)
+                ? LifecycleEventOutcome.Warning
+                : LifecycleEventOutcome.Succeeded;
+        await lifecycle.EmitAsync(
+            LifecycleEvent.Create(
+                ApplicationId,
+                instanceId,
+                item.FlowType,
+                item.Stage,
+                lifecycleOutcome,
+                item.CorrelationId,
+                relatedBusinessId: item.BusinessId),
+            ct);
+
         string[] stageNames = StudioFlowSemantics.StageNames(item.FlowType);
         if (stageNames.Length == 0) stageNames = [item.Stage];
         int currentIndex = Array.FindIndex(stageNames, x => x.Equals(item.Stage, StringComparison.OrdinalIgnoreCase));
@@ -258,3 +288,4 @@ public sealed class StudioOperationsFlowPublisher(
             logger.LogDebug("Studio Operations flow publication returned HTTP {StatusCode}.", (int)response.StatusCode);
     }
 }
+
