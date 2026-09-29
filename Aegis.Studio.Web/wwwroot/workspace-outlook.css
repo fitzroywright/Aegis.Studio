@@ -681,3 +681,35 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 #pipelineMoveDialog .request-form{
   min-width:min(460px,80vw);
 }
+
+
+/* Dialog layout cleanup pass */
+.studio-dialog-body{
+  min-width:0;
+  color:var(--theme-text);
+  background:var(--theme-surface);
+}
+.studio-dialog-body>.request-form,
+.studio-dialog-body>.subject-form{
+  padding:0;
+}
+.studio-dialog-body .task-card,
+.studio-dialog-body .job-row,
+.studio-dialog-body .financial-row{
+  background:var(--theme-surface);
+  color:var(--theme-text);
+  border-color:var(--theme-border);
+}
+.studio-dialog-body select[multiple]{
+  min-height:120px;
+}
+.request-form .pos-entry,
+.subject-form .pos-entry{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.request-form input[type="checkbox"],
+.subject-form input[type="checkbox"],
+.request-form input[type="radio"],
+.subject-form input[type="radio"]{
+  width:auto;
+}
