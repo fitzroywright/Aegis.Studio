@@ -87,7 +87,7 @@ function renderFrontDeskRows(){
     host.querySelectorAll('[data-deposit]').forEach(b=>b.onclick=()=>openVerifiedDepositForm(frontDeskRequests.find(r=>r.id===b.dataset.deposit)));
     host.querySelectorAll('[data-deposit-requested]').forEach(b=>b.onclick=async()=>{if(!confirm('Confirm that you have already sent the deposit request to the customer. This records the follow-up status; it does not send a message.'))return;b.disabled=true;try{await json(`/api/frontdesk/booking-requests/${b.dataset.depositRequested}/deposit-requested`,{method:'POST'});await showFrontDesk();}catch(e){alert(e.message);b.disabled=false;}});
 }
-function renderFrontDeskJob(job){return `<article class="front-desk-row"><div><strong>${esc(job.clientName)}</strong><div>${esc(job.title)}</div><div class="meta">${esc(job.status)}${job.eventDate?' · '+esc(job.eventDate):''}</div></div><div class="front-desk-actions"><button class="action" onclick="linkFrontDeskClient('${job.id}')">${job.clientId?'Linked client':'Link client'}</button><button class="action" onclick="openFrontDeskClient('${job.id}')">Customer conversation</button><button class="action" onclick="notifyFrontDeskTeam('${job.id}')">Notify team</button><button class="action" data-frontdesk-job="${job.id}">Open job</button><button class="primary" data-frontdesk-pos="${job.id}">Balance / Billing</button></div></article>`;}
+function renderFrontDeskJob(job){return `<article class="front-desk-row"><div><strong>${esc(job.clientName)}</strong><div>${esc(job.title)}</div><div class="meta">${esc(job.status)}${job.eventDate?' · '+esc(job.eventDate):''}</div></div><div class="front-desk-actions"><button class="action" onclick="linkFrontDeskClient('${job.id}')">${job.clientId?'Linked client':'Link client'}</button><button class="action" onclick="openFrontDeskClient('${job.id}')">Customer conversation</button><button class="action" onclick="showFrontDeskFlow('${job.id}')">Flow</button><button class="action" onclick="messageFrontDeskJob('${job.id}','workspace')">Message Workspace</button><button class="action" onclick="messageFrontDeskJob('${job.id}','escalate')">Escalate</button><button class="action" onclick="messageFrontDeskJob('${job.id}','finance')">Message Accounts / Finance</button><button class="action" data-frontdesk-job="${job.id}">Open job</button><button class="primary" data-frontdesk-pos="${job.id}">Balance / Billing</button></div></article>`;}
 function frontDeskDialog(title,contents){
     const dialog=document.createElement('dialog');dialog.className='frontdesk-dialog';dialog.innerHTML=`<form class="request-form"><h2>${esc(title)}</h2>${contents}<p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`;document.body.appendChild(dialog);dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();return dialog;
 }
@@ -175,4 +175,44 @@ async function showClientQuotes(clientId){
  dialog.querySelectorAll('[data-accept]').forEach(b=>b.onclick=async()=>{const reference=prompt('Customer acceptance reference (email, phone call or signed document):');if(!reference)return;try{await json(`/api/frontdesk/quotes/${b.dataset.accept}/accept`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reference})});await refresh();}catch(e){dialog.querySelector('[role=alert]').textContent=e.message;}});
  dialog.querySelectorAll('[data-convert]').forEach(b=>b.onclick=async()=>{try{await json(`/api/frontdesk/quotes/${b.dataset.convert}/convert`,{method:'POST'});dialog.close();await showFrontDesk();}catch(e){dialog.querySelector('[role=alert]').textContent=e.message;}});
  dialog.querySelector('[data-create]').onclick=()=>{const editor=frontDeskDialog('New client quote',`<label>Workspace<select name="workspace">${frontDeskWorkspaces.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select></label><label>Work / service<input name="title" required maxlength="200"></label><label>Event date<input name="date" type="date" required></label><label>Estimated cost before tax (JMD)<input name="amount" type="number" min="0.01" max="999999999" step="0.01" required></label><label>Tax %<input name="tax" type="number" min="0" max="100" step="0.01" value="0"></label><label>Required deposit (JMD)<input name="deposit" type="number" min="0.01" step="0.01" required></label><label>Instructions<textarea name="notes" maxlength="4000"></textarea></label>`);editor.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;try{await json('/api/frontdesk/quotes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId,workspaceId:f.elements.workspace.value,title:f.elements.title.value,eventDate:f.elements.date.value,instructions:f.elements.notes.value,requiredDeposit:Number(f.elements.deposit.value),estimate:{lines:[{description:f.elements.title.value,quantity:1,unitPrice:Number(f.elements.amount.value)}],taxRatePercent:Number(f.elements.tax.value),dueAtUtc:new Date(f.elements.date.value+'T12:00:00').toISOString(),currency:'JMD'}})});editor.close();await refresh();}catch(error){f.querySelector('[role=alert]').textContent=error.message;}};};
+}
+
+
+async function showFrontDeskFlow(jobId) {
+    const job=await json('/api/jobs/'+jobId);
+    const timeline=await json('/api/jobs/'+jobId+'/timeline?count=200');
+    const events=Array.isArray(timeline)?timeline:(timeline.items||timeline.events||[]);
+    const stageNames=[];
+    for(const event of events){
+        const text=String(event.detail||event.description||event.title||'');
+        const match=text.match(/(?:→|to )\s*([^→]+)$/i);
+        if(match&&!stageNames.includes(match[1].trim()))stageNames.push(match[1].trim());
+    }
+    if(!stageNames.includes(job.status))stageNames.push(job.status);
+    const current=Math.max(0,stageNames.indexOf(job.status));
+    const dialog=studioDialog('Job Flow — '+job.title,`<div class="frontdesk-flow">${stageNames.map((stage,index)=>`<button type="button" class="frontdesk-flow-stage ${index<current?'complete':index===current?'current':'future'}" data-flow-stage="${index}"><small>${index<current?'Completed':index===current?'Current':'Upcoming'}</small><strong>${esc(stage)}</strong></button>`).join('<span>›</span>')}</div><div class="frontdesk-flow-history"><h3>History</h3>${events.slice(0,30).map(event=>`<p><strong>${esc(event.title||event.eventType||'Activity')}</strong><small>${esc(event.detail||event.description||'')} ${event.createdAtUtc||event.occurredAtUtc?' · '+new Date(event.createdAtUtc||event.occurredAtUtc).toLocaleString():''}</small></p>`).join('')||'<p class="muted">No recorded stage history yet.</p>'}</div>`);
+    return dialog;
+}
+
+async function messageFrontDeskJob(jobId, mode) {
+    const job=await json('/api/jobs/'+jobId);
+    const label=mode==='finance'?'Accounts / Finance':mode==='escalate'?'Escalation':'Workspace';
+    const dialog=frontDeskDialog(label+' message',`<p><strong>${esc(job.clientName||'Client')}</strong> · ${esc(job.title)} · ${esc(job.status)}</p>${mode==='escalate'?'<label>Escalate to<select name="target"><option value="Workspace Manager">Workspace Manager</option><option value="Operations Manager">Operations Manager</option></select></label>':''}<label>Message<textarea name="body" required maxlength="4000" placeholder="${mode==='finance'?'Question about quote, invoice, payment, balance or refund':'What is happening with this job?'}"></textarea></label><label>Attach document<input name="file" type="file"></label><p class="muted">The message stays in the job conversation. Any attached file also appears in Conversation Files.</p>`);
+    const form=dialog.querySelector('form');
+    form.onsubmit=async e=>{
+        e.preventDefault();
+        if(!job.conversationId){form.querySelector('[role=alert]').textContent='This job has no linked conversation.';return;}
+        const prefix=mode==='finance'?'[Accounts / Finance] ':mode==='escalate'?`[Escalation — ${form.elements.target.value}] `:'[Workspace query] ';
+        try{
+            await json('/api/conversations/'+job.conversationId+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:prefix+form.elements.body.value,isInternal:true,sendingIdentity:'Workspace'})});
+            const file=form.elements.file.files[0];
+            if(file){
+                const data=new FormData();data.append('file',file);
+                const response=await fetch('/api/conversations/'+job.conversationId+'/attachments?visibility=Internal',{method:'POST',body:data});
+                if(!response.ok)throw new Error(await response.text());
+            }
+            dialog.close();
+            alert(label+' message added to the job conversation.');
+        }catch(error){form.querySelector('[role=alert]').textContent=error.message;}
+    };
 }

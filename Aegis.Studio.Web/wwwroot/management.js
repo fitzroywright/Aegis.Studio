@@ -10,14 +10,15 @@ showManagement = async function() {
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
     try {
-        const [dashboard, statuses, escalations, workflows, jobs, scheduleEntries, activities] = await Promise.all([
+        const [dashboard, statuses, escalations, workflows, jobs, scheduleEntries, activities, resources] = await Promise.all([
             json('/api/management/dashboard'),
             json('/api/management/jobs-by-status'),
             json('/api/escalations/open'),
             json('/api/workflow-operations/summary'),
             json('/api/jobs'),
             json('/api/schedule/entries?from=' + encodeURIComponent(new Date(Date.now()-14*86400000).toISOString()) + '&to=' + encodeURIComponent(new Date(Date.now()+90*86400000).toISOString())),
-            json('/api/operations/activities')
+            json('/api/operations/activities'),
+            json('/api/schedule/resources')
         ]);
         genericView.innerHTML = `
             <div class="job-detail-header"><div><h1>Management Dashboard</h1><p>Live operations, customer demand, production risk, workflow health.</p></div><button class="action" onclick="scanEscalations()">Run escalation scan</button></div>
@@ -29,6 +30,8 @@ showManagement = async function() {
                 <div class="metric">Failed workflows<strong>${dashboard.failedWorkflows}</strong></div>
                 <div class="metric">Open escalations<strong>${escalations.length}</strong></div>
             </div>
+            <section class="job-section"><h2>Pipeline overview</h2>${renderManagementPipelineFlow(jobs, activities)}</section>
+            <section class="job-section"><h2>Photographer workload</h2>${renderPhotographerWorkload(jobs, scheduleEntries, resources)}</section>
             <section class="job-section management-gantt-section"><div class="management-section-heading"><div><h2>Job Gantt</h2><p class="muted">Active jobs, schedule commitments and production activity across the next 90 days.</p></div></div>${renderManagementGantt(jobs, scheduleEntries, activities)}</section>
             <section class="job-section"><h2>Escalations</h2>${renderEscalations(escalations)}</section>
             <section class="job-section"><h2>Jobs by status</h2>${renderBuckets(statuses, false)}</section>
@@ -157,4 +160,35 @@ async function issueClientPortal(jobId) {
     const result = await json(`/api/jobs/${jobId}/client-portal`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expiresInDays:30})});
     await navigator.clipboard?.writeText(result.publicUrl).catch(()=>{});
     prompt('Client portal URL (copied when browser permission allows)', result.publicUrl);
+}
+
+
+function renderManagementPipelineFlow(jobs, activities) {
+    const active=(jobs||[]).filter(job=>job.status!=='Completed');
+    const ordered=[];
+    for(const job of active) if(!ordered.includes(job.status)) ordered.push(job.status);
+    if(!ordered.length) return '<p class="muted">No active jobs.</p>';
+    const now=Date.now();
+    return '<div class="management-flow">'+ordered.map((stage,index)=>{
+        const stageJobs=active.filter(job=>job.status===stage);
+        const overdue=(activities||[]).filter(a=>a.status!=='Completed'&&a.status!=='Cancelled'&&a.dueAtUtc&&new Date(a.dueAtUtc).getTime()<now&&stageJobs.some(j=>j.id===a.jobId)).length;
+        const unassigned=stageJobs.filter(job=>!job.assignedTo).length;
+        return `<button class="management-flow-stage" type="button" onclick="showJobs()"><span>${index+1}</span><strong>${esc(stage)}</strong><b>${stageJobs.length} jobs</b><small>${overdue} overdue · ${unassigned} unassigned</small></button>`;
+    }).join('<span class="management-flow-arrow">›</span>')+'</div>';
+}
+
+function renderPhotographerWorkload(jobs, entries, resources) {
+    const staff=(resources||[]).filter(r=>r.isActive&&String(r.resourceType).toLowerCase()==='staff');
+    if(!staff.length) return '<p class="muted">No active Staff scheduling resources are configured.</p>';
+    const now=new Date(), weekEnd=new Date(now.getTime()+7*86400000);
+    const rows=staff.map(person=>{
+        const scheduled=(entries||[]).filter(e=>(e.resourceIds||[]).includes(person.id)&&new Date(e.endsAtUtc)>=now);
+        const week=scheduled.filter(e=>new Date(e.startsAtUtc)<=weekEnd);
+        const hours=week.reduce((sum,e)=>sum+Math.max(0,(new Date(e.endsAtUtc)-new Date(e.startsAtUtc))/3600000),0);
+        const conflicts=scheduled.reduce((count,e,i)=>count+scheduled.slice(i+1).filter(o=>new Date(e.startsAtUtc)<new Date(o.endsAtUtc)&&new Date(o.startsAtUtc)<new Date(e.endsAtUtc)).length,0);
+        const linked=new Set(scheduled.map(e=>e.jobId).filter(Boolean));
+        const active=(jobs||[]).filter(j=>linked.has(j.id)&&j.status!=='Completed').length;
+        return {person,active,week:week.length,hours,conflicts};
+    }).sort((a,b)=>b.hours-a.hours);
+    return `<div class="management-workload-table"><div class="management-workload-head"><span>Photographer / staff</span><span>Active jobs</span><span>Next 7 days</span><span>Committed</span><span>Conflicts</span></div>${rows.map(x=>`<button type="button" class="management-workload-row" onclick="activateView('schedule')"><strong>${esc(x.person.name)}</strong><span>${x.active}</span><span>${x.week}</span><span>${x.hours.toFixed(1)} h</span><span class="${x.conflicts?'risk':''}">${x.conflicts}</span></button>`).join('')}</div><p class="muted">Committed time is calculated from actual schedule duration; Studio does not infer utilization from job count.</p>`;
 }
