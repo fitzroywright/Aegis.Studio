@@ -326,7 +326,7 @@ public sealed class AttachmentStore
         return reader.Read() ? Read(reader) : null;
     }
 
-    private const string SelectSql = "select id,conversation_id,file_name,stored_name,content_type,size_bytes,visibility,created_at_utc,sha256,uploaded_by,storage_status from studio_attachments";
+    private const string SelectSql = "select id,conversation_id,file_name,stored_name,content_type,size_bytes,visibility,created_at_utc,sha256,uploaded_by,storage_status,(source_key like 'graph:%' or uploaded_by like 'Mailbox import:%') is true as is_email_attachment from studio_attachments";
 
     private static StudioAttachment Read(NpgsqlDataReader reader)
         => new(
@@ -340,7 +340,8 @@ public sealed class AttachmentStore
             reader.GetFieldValue<DateTimeOffset>(7),
             reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
             reader.IsDBNull(9) ? "Unknown" : reader.GetString(9),
-            reader.IsDBNull(10) ? "Stored" : reader.GetString(10));
+            reader.IsDBNull(10) ? "Stored" : reader.GetString(10),
+            reader.GetBoolean(11));
 }
 
 public sealed record StudioAttachment(
@@ -354,4 +355,5 @@ public sealed record StudioAttachment(
     DateTimeOffset CreatedAt,
     string Sha256,
     string UploadedBy,
-    string StorageStatus);
+    string StorageStatus,
+    bool IsEmailAttachment = false);
