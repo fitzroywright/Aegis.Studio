@@ -30,17 +30,29 @@ function mergeJobMessages(teamMessages, customerMessages) {
     }
     search.oninput = filter;
     const tabs = document.createElement('div');
-    tabs.className = 'workspace-tabs';
+    tabs.className = 'workspace-tabs workspace-list-controls';
     tabs.setAttribute('aria-label', 'Workspace views');
     tabs.innerHTML = '<button data-tab="jobs">Jobs</button><button data-tab="members">Members</button>';
     document.querySelector('.workspace-toolbar').before(tabs);
+    const searchBox=document.createElement('div');
+    searchBox.className='workspace-inline-search';
+    search.setAttribute('aria-label','Search jobs');
+    search.placeholder='Search jobs…';
+    const refreshButton=document.getElementById('workspaceRefresh');
+    refreshButton.setAttribute('aria-label','Refresh jobs');
+    refreshButton.title='Refresh jobs';
+    refreshButton.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg>';
+    searchBox.append(search,refreshButton);
+    tabs.querySelector('[data-tab="members"]').before(searchBox);
+    document.querySelector('.workspace-toolbar').remove();
+    allButton.remove();
     const banners = document.createElement('section');
     banners.className = 'workspace-announcement-banners';
     banners.hidden = true;
     document.getElementById('conversationView').prepend(banners);
     const display = () => { activateView('conversations'); activateNavigation('workspaces'); };
     const fail = error => empty('Unable to load', error.message || String(error));
-    tabs.querySelectorAll('button').forEach(button => button.onclick = () => { tab = button.dataset.tab; loadConversations().catch(fail); });
+    tabs.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { tab = button.dataset.tab; loadConversations().catch(fail); });
     selectWorkspace = async function(id, name) {
         const workspace = workspaceCache.find(x => x.id === id);
         if (!workspace?.permissions?.accessWorkspace || !workspace.permissions.view) return alert('You do not have permission to view this workspace.');
@@ -57,7 +69,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         banners.hidden = true;
         banners.innerHTML = '';
         if (workspaceId) renderAnnouncementBanners(banners,workspaceId,()=>selectedWorkspace===workspaceId).catch(error=>{if(selectedWorkspace===workspaceId){banners.hidden=false;banners.textContent='Announcements could not be loaded. Use Refresh to retry.';}});
-        tabs.querySelectorAll('button').forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
+        tabs.querySelectorAll('[data-tab]').forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
         display();
         conversationList.innerHTML = '';
         if (!workspaceId) { empty('Select a workspace', 'Choose a workspace on the left to see its jobs, announcements and members.'); return; }
@@ -230,8 +242,5 @@ function mergeJobMessages(teamMessages, customerMessages) {
     allButton.textContent = 'Jobs';
     allButton.onclick = () => { tab = 'jobs'; loadConversations().catch(fail); };
     document.getElementById('workspaceRefresh').onclick = () => loadConversations().catch(fail);
-    document.querySelector('.workspace-toolbar label').textContent = 'Search jobs';
-    search.placeholder = 'Search this list';
-    document.querySelector('.workspace-list-caption span').textContent = 'Workspace work';
     document.querySelector('.pane-heading p').textContent = 'Jobs, announcements and members';
 })();
