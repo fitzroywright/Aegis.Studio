@@ -205,7 +205,7 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 /* Match the conversation files and gallery upload cards. */
 .job-reading-view{--job-side-card-width:205px;grid-template-rows:auto minmax(120px,36%) auto minmax(0,1fr)}
 .job-conversation-row{display:flex;gap:12px;min-height:0;overflow:hidden;padding:0 12px}
-.job-reading-view .job-conversation-row>.messages{flex:1;min-width:0;min-height:0;max-height:none;overflow:auto;padding:10px 0}
+.job-reading-view .job-conversation-row>.messages{flex:1;min-width:0;min-height:0;max-width:none;max-height:none;overflow:auto;padding:10px 0}
 .job-reading-view .thread-shared-files{flex:0 0 var(--job-side-card-width);width:var(--job-side-card-width);box-sizing:border-box;min-height:0;overflow:auto;margin:6px 0;padding:10px;border:1px solid var(--theme-border);border-radius:10px;background:var(--theme-surface-2)}
 .job-reading-view .gallery-workbench .gallery-upload-card{flex-basis:var(--job-side-card-width);width:var(--job-side-card-width)}
 .job-reading-view .thread-shared-files .legacy-attachments{margin:0}
