@@ -3,3 +3,18 @@
 .frontdesk-flow{display:flex;align-items:stretch;gap:.4rem;overflow:auto;padding:.5rem 0 1rem}.frontdesk-flow>span{align-self:center;font-size:1.5rem;opacity:.5}
 .frontdesk-flow-stage{min-width:135px;padding:.6rem;text-align:left;border:1px solid var(--line);border-radius:.4rem;background:var(--surface)}.frontdesk-flow-stage small,.frontdesk-flow-history small{display:block;opacity:.7}.frontdesk-flow-stage.current{outline:2px solid currentColor;font-weight:800}.frontdesk-flow-stage.complete{opacity:.75}.frontdesk-flow-stage.future{opacity:.55}
 .frontdesk-flow-history{max-height:320px;overflow:auto}.frontdesk-flow-history p{border-bottom:1px solid var(--line);padding:.45rem 0;margin:0}
+
+
+.frontdesk-operational-desk{display:grid;grid-template-columns:minmax(320px,1.15fr) minmax(300px,.85fr);gap:12px;margin:10px 0 14px;min-height:320px}
+.frontdesk-client-desk,.frontdesk-today{border:1px solid var(--theme-border,var(--line));border-radius:10px;background:var(--theme-surface,var(--surface));padding:10px;min-width:0}
+.frontdesk-client-results{max-height:180px;overflow:auto;border-bottom:1px solid var(--theme-border,var(--line));margin:7px 0 10px}
+.frontdesk-client-row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) auto;width:100%;gap:8px;align-items:center;text-align:left;padding:7px;border:0;border-bottom:1px solid var(--theme-border,var(--line));background:transparent}
+.frontdesk-client-row.active{background:var(--theme-accent-soft,#f4eee1)}
+.frontdesk-client-row small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.frontdesk-client-row span{font-size:11px;opacity:.7}
+.frontdesk-client-heading{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.frontdesk-client-heading h2{margin:0;font-size:17px}.frontdesk-client-heading p{margin:2px 0 0}
+.frontdesk-context-actions,.frontdesk-status-strip{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.frontdesk-status-strip span{font-size:11px;padding:5px 7px;border:1px solid var(--theme-border,var(--line));border-radius:6px}.frontdesk-status-strip b{font-size:13px}
+.frontdesk-client-jobs,.frontdesk-today-list{max-height:285px;overflow:auto}.frontdesk-today h2{margin:2px 0 6px}
+.frontdesk-queue-search{margin:8px 0}.frontdesk-queue-search input{min-width:260px}
+.message-attachment-control{display:inline-flex;align-items:center;width:max-content}
+@media(max-width:900px){.frontdesk-operational-desk{grid-template-columns:1fr}.frontdesk-client-row{grid-template-columns:1fr auto}.frontdesk-client-row small{grid-column:1/-1}}
