@@ -81,6 +81,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         string key=AssetKey(c,tx,job,id);
         foreach(Guid subject in request.Subjects??[])
             if(Scalar(c,tx,"select id from studio_job_subjects where id=$1 and job_id=$2",subject,job) is null)throw new ArgumentException("Subject belongs to another job or no longer exists.");
+        if((request.Subjects?.Length??0)>0 && string.IsNullOrWhiteSpace(request.Collection))throw new ArgumentException("Classified images must belong to a collection.");
         Execute(c,tx,"update studio_media_assets set production_status=$2,assigned_to=$3,capture_at_utc=$4 where id=$1",id,request.Status,(object?)request.AssignedTo??DBNull.Value,(object?)request.CaptureAtUtc?.ToUniversalTime()??DBNull.Value);
         Execute(c,tx,"delete from studio_media_asset_subjects where asset_id=$1",id);
         foreach(Guid subject in (request.Subjects??[]).Distinct())Execute(c,tx,"insert into studio_media_asset_subjects values($1,$2)",id,subject);
