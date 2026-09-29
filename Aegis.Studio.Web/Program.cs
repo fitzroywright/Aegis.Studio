@@ -27,6 +27,7 @@ using Aegis.Studio.Web.Storage;
 using Aegis.Studio.Web.WorkDay;
 using Common.Diagnostics;
 using Common.Secrets;
+using Common.Storage;
 using Common.Registration;
 using Common.Security.Abstractions;
 using Common.Security.Integration;
@@ -50,6 +51,27 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFl
 
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
 builder.Services.AddSingleton(secretProvider);
+
+string? sharePointStorageSecret = null;
+if (string.Equals(builder.Configuration["Storage:Provider"], "SharePoint", StringComparison.OrdinalIgnoreCase))
+{
+    string secretName = builder.Configuration["Storage:SharePoint:ClientSecretName"]?.Trim()
+        ?? "storage/sharepoint/client-secret";
+    sharePointStorageSecret = await secretProvider.GetAsync(secretName);
+}
+StorageTargetOptions storageTarget = StorageTargetOptions.FromConfiguration(
+    builder.Configuration,
+    sharePointStorageSecret);
+if (storageTarget.Kind is StorageTargetKind.LocalFolder or StorageTargetKind.NetworkFolder &&
+    !Path.IsPathRooted(storageTarget.RootPath))
+{
+    storageTarget = storageTarget with
+    {
+        RootPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, storageTarget.RootPath!))
+    };
+}
+builder.Services.AddCommonStorage(storageTarget);
+
 builder.Services.AddCommonDiagnostics();
 builder.Services.AddSingleton(new DiagnosticLevelExecutionOptions
 {
