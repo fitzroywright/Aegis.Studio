@@ -440,6 +440,50 @@ app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrin
     return Results.Ok(updated);
 });
 
+
+app.MapPost("/api/jobs/{id:guid}/pipeline-transition", (Guid id, PipelineJobTransitionRequest request, ClaimsPrincipal user, StudioStore store, JobAccessService access, WorkspaceAccessService workspaceAccess, StudioDatabase database, StudioInAppMessageStore messages, JobEventNotifier jobEvents, StudioOperationsFlowPublisher flows) =>
+{
+    StudioJob? before=store.GetJob(id);if(before is null)return Results.NotFound();
+    if(!access.HasPermission(user,id,"EditJob"))return Results.Forbid();
+    bool statusChanged=!string.IsNullOrWhiteSpace(request.Status)&&!string.Equals(before.Status,request.Status,StringComparison.OrdinalIgnoreCase);
+    bool workspaceChanged=request.WorkspaceId.HasValue&&request.WorkspaceId.Value!=before.WorkspaceId;
+    if(statusChanged&&!access.HasPermission(user,id,"ChangeStatus"))return Results.Forbid();
+    if(workspaceChanged&&!workspaceAccess.HasPermission(user,request.WorkspaceId!.Value,"CreateJob"))return Results.Forbid();
+    if(!statusChanged&&!workspaceChanged)return Results.Ok(before);
+    StudioJob updated=before;
+    if(statusChanged)updated=store.UpdateJob(id,new UpdateJobRequest(request.Status,before.AssignedTo,before.EventDate));
+    if(workspaceChanged)updated=store.MoveJobWorkspace(id,request.WorkspaceId!.Value);
+    string actor=user.FindFirstValue("login_name")??user.Identity?.Name??"Studio";
+    string oldWorkspaceName=store.GetWorkspaces().FirstOrDefault(x=>x.Id==before.WorkspaceId)?.Name??"previous workspace";
+    string newWorkspaceName=store.GetWorkspaces().FirstOrDefault(x=>x.Id==updated.WorkspaceId)?.Name??"new workspace";
+    List<string> changes=[];
+    if(statusChanged)changes.Add($"stage/status {before.Status} → {updated.Status}");
+    if(workspaceChanged)changes.Add($"workspace {oldWorkspaceName} → {newWorkspaceName}");
+    string detail=$"Pipeline change for {updated.Title}: {string.Join("; ",changes)}{(string.IsNullOrWhiteSpace(request.Reason)?string.Empty:". "+request.Reason.Trim())}";
+    using(NpgsqlConnection connection=database.OpenConnection())
+    using(NpgsqlCommand audit=connection.CreateCommand())
+    {
+        audit.CommandText="insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'PipelineChanged',$3,$4,now())";
+        audit.Parameters.AddWithValue(Guid.NewGuid());audit.Parameters.AddWithValue(id);audit.Parameters.AddWithValue(actor);audit.Parameters.AddWithValue(detail);audit.ExecuteNonQuery();
+    }
+    foreach(Guid workspaceId in new[]{before.WorkspaceId,updated.WorkspaceId}.Distinct())
+    {
+        try
+        {
+            StudioMessageThread thread=messages.GetOrCreateScoped(user,"Workspace",workspaceId);
+            messages.AddMessage(thread.Id,user,detail);
+        }
+        catch(UnauthorizedAccessException){ }
+    }
+    if(statusChanged)
+    {
+        jobEvents.Publish(id,"JobStatusChanged",$"Job status: {updated.Title}",$"{before.Status} → {updated.Status}",requesterEligible:true);
+        flows.TryEnqueueJobFlow(id.ToString("D"),"InProgress",id.ToString("D"),detail);
+    }
+    if(workspaceChanged)flows.TryEnqueueJobFlow(id.ToString("D"),"Workspace",id.ToString("D"),detail);
+    return Results.Ok(updated);
+});
+
 app.MapGet("/api/bookings", (BookingStore store) => Results.Ok(store.GetAll()));
 app.MapGet("/api/bookings/{id:guid}", (Guid id, HttpContext context, BookingStore store, BookingApiAuthenticator security) => { if (!security.IsAuthorized(context)) return Results.Unauthorized(); return store.Get(id) is Booking booking ? Results.Ok(new { booking, payments = store.GetPayments(id) }) : Results.NotFound(); }).AllowAnonymous();
 app.MapPost("/api/bookings", (CreateBookingIntakeRequest request, HttpContext context, BookingStore bookings, StudioStore studio, BookingApiAuthenticator security, NotificationService notifications) =>
