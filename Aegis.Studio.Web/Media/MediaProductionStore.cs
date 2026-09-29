@@ -24,6 +24,13 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             "update studio_job_subjects set gallery_id=job_id where gallery_id is null",
             "alter table studio_job_subjects add column if not exists production_status text not null default 'Not Photographed'",
             "alter table studio_job_subjects add column if not exists attributes jsonb not null default '{}'::jsonb",
+            "alter table studio_job_subjects add column if not exists collection_name text not null default 'General'",
+            "alter table studio_job_subjects add column if not exists scheduled_at_utc timestamptz null",
+            "alter table studio_job_subjects add column if not exists schedule_location text not null default ''",
+            "alter table studio_job_subjects add column if not exists contact_name text not null default ''",
+            "alter table studio_job_subjects add column if not exists contact_email text not null default ''",
+            "alter table studio_job_subjects add column if not exists contact_phone text not null default ''",
+            "alter table studio_job_subjects add column if not exists photo_notes text not null default ''",
             "create table if not exists studio_media_assets(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,gallery_id uuid not null references studio_media_galleries(id),asset_key text not null,production_status text not null default 'Needs Sorting',assigned_to text null,capture_at_utc timestamptz null,unique(job_id,asset_key))",
             "create table if not exists studio_media_asset_subjects(asset_id uuid not null references studio_media_assets(id) on delete cascade,subject_id uuid not null references studio_job_subjects(id) on delete cascade,primary key(asset_id,subject_id))",
             "create table if not exists studio_media_edit_batches(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,created_by text not null,created_at_utc timestamptz not null default now())",
@@ -60,7 +67,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
               'collection',coalesce(col.collection_name,''),'subjects',coalesce((select jsonb_agg(subject_id) from studio_media_asset_subjects where asset_id=a.id),'[]'::jsonb)))
               from studio_media_assets a join lateral(select * from studio_asset_versions where job_id=a.job_id and asset_key=a.asset_key order by version_number desc limit 1)v on true
               left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key where a.job_id=$1),'[]'::jsonb),
-            'subjects',coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'reference',s.reference,'notes',s.notes,'status',case when s.production_status='Not Photographed' and exists(select 1 from studio_media_asset_subjects where subject_id=s.id) then 'Photographed' else s.production_status end,'attributes',s.attributes,
+            'subjects',coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'reference',s.reference,'notes',s.notes,'collection',s.collection_name,'scheduledAtUtc',s.scheduled_at_utc,'scheduleLocation',s.schedule_location,'contactName',s.contact_name,'contactEmail',s.contact_email,'contactPhone',s.contact_phone,'photoNotes',s.photo_notes,'status',case when s.production_status='Not Photographed' and exists(select 1 from studio_media_asset_subjects where subject_id=s.id) then 'Photographed' else s.production_status end,'attributes',s.attributes,
               'imageCount',(select count(*) from studio_media_asset_subjects where subject_id=s.id))) from studio_job_subjects s where job_id=$1),'[]'::jsonb),
             'unmatched',coalesce((select jsonb_agg(jsonb_build_object('id',u.id,'fileName',v.file_name,'versionId',v.id,'reason',u.reason)) from studio_media_unmatched u join studio_asset_versions v on v.id=u.version_id where u.job_id=$1 and u.resolved_asset_id is null),'[]'::jsonb))::text
             """,c);
@@ -94,6 +101,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         if(!original.Equals(name.Trim(),StringComparison.OrdinalIgnoreCase)&&Scalar(c,tx,"select name from studio_media_collections where job_id=$1 and lower(name)=lower($2)",job,name.Trim()) is not null)throw new ArgumentException("Collection already exists.");
         Execute(c,tx,"update studio_media_collections set name=$3 where job_id=$1 and name=$2",job,original,name.Trim());
         Execute(c,tx,"update studio_job_asset_collections set collection_name=$3 where job_id=$1 and collection_name=$2",job,original,name.Trim());
+        Execute(c,tx,"update studio_job_subjects set collection_name=$3 where job_id=$1 and collection_name=$2",job,original,name.Trim());
         Execute(c,tx,"update studio_media_galleries set default_collection=$3 where id=$1 and default_collection=$2",job,original,name.Trim());
         Audit(c,tx,job,"CollectionRenamed",user,$"Renamed collection {original} to {name.Trim()}");tx.Commit();
     }
@@ -127,7 +135,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             if(ids.Count>1)throw new ArgumentException("Existing Subject ID is ambiguous: "+row.Id);
             Guid id=ids.Count==1?ids[0]:Guid.NewGuid();
             var attributes=headers.Select((h,i)=>(h,v:Cell(row.Row,i))).Where(x=>!string.IsNullOrWhiteSpace(x.h)).GroupBy(x=>x.h).ToDictionary(x=>x.Key,x=>x.First().v);
-            Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,attributes) values($1,$2,$2,$3,$4,'',$5,$6::jsonb) on conflict(id) do update set name=excluded.name,attributes=excluded.attributes,updated_by=excluded.updated_by,updated_at_utc=now()",id,job,row.Name,row.Id,user,JsonSerializer.Serialize(attributes));
+            Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,attributes,collection_name) values($1,$2,$2,$3,$4,'',$5,$6::jsonb,coalesce((select default_collection from studio_media_galleries where id=$2),(select name from studio_media_collections where job_id=$2 order by name limit 1),'General')) on conflict(id) do update set name=excluded.name,attributes=excluded.attributes,updated_by=excluded.updated_by,updated_at_utc=now()",id,job,row.Name,row.Id,user,JsonSerializer.Serialize(attributes));
         }
         Audit(c,tx,job,"RosterImported",user,$"Imported or updated {data.Count} subjects.");tx.Commit();return data.Count;
     }
