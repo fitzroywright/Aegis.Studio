@@ -154,11 +154,15 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const filesPanel=document.createElement('section');
             filesPanel.className='thread-shared-files';
             const messagesPanel=document.getElementById('combinedJobMessages');
+            const composer=document.getElementById('hierarchyCompose');
             const conversationRow=document.createElement('div');
             conversationRow.className='job-conversation-row';
             messagesPanel.before(conversationRow);
+            const messageColumn=document.createElement('div');
+            messageColumn.className='job-message-column';
             const nextPanel=document.createElement('section');nextPanel.className='thread-next-tasks';
-            conversationRow.append(messagesPanel,nextPanel,filesPanel);
+            messageColumn.append(messagesPanel,composer);
+            conversationRow.append(messageColumn,filesPanel,nextPanel);
             const current=()=>version===revision;
             renderCompactTasks(job,nextPanel,current).catch(error=>{if(current())nextPanel.textContent='Upcoming work could not be loaded: '+error.message;});
             const refreshFiles=()=>renderConversationFiles(job,filesPanel,current,refreshFiles);
