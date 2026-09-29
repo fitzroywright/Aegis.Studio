@@ -221,6 +221,30 @@ public sealed class StudioStore
         return GetJob(id)!;
     }
 
+    public StudioJob MoveJobWorkspace(Guid id, Guid workspaceId)
+    {
+        StudioJob current=GetJob(id)??throw new KeyNotFoundException("Job was not found.");
+        if(current.WorkspaceId==workspaceId)return current;
+        using NpgsqlConnection connection=database.OpenConnection();
+        using NpgsqlTransaction transaction=connection.BeginTransaction();
+        using(NpgsqlCommand job=connection.CreateCommand())
+        {
+            job.Transaction=transaction;
+            job.CommandText="update studio_jobs set workspace_id=$2 where id=$1";
+            job.Parameters.AddWithValue(id);job.Parameters.AddWithValue(workspaceId);
+            if(job.ExecuteNonQuery()!=1)throw new KeyNotFoundException("Job was not found.");
+        }
+        using(NpgsqlCommand conversation=connection.CreateCommand())
+        {
+            conversation.Transaction=transaction;
+            conversation.CommandText="update studio_conversations set workspace_id=$2 where id=$1";
+            conversation.Parameters.AddWithValue(current.ConversationId);conversation.Parameters.AddWithValue(workspaceId);
+            conversation.ExecuteNonQuery();
+        }
+        transaction.Commit();
+        return GetJob(id)!;
+    }
+
     public StudioJob AddFinancialEvent(Guid id, AddFinancialEventRequest request)
     {
         if (GetJob(id) is null)
@@ -412,5 +436,6 @@ public sealed record IncomingInteractionRequest(Guid? WorkspaceId, string? Desti
 public sealed record AddMessageRequest(string Body, bool IsInternal, string? SendingIdentity = null);
 public sealed record CreateJobRequest(string Title, DateOnly? EventDate);
 public sealed record UpdateJobRequest(string? Status, string? AssignedTo, DateOnly? EventDate);
+public sealed record PipelineJobTransitionRequest(string? Status, Guid? WorkspaceId, string? Reason);
 public sealed record AddFinancialEventRequest(string Kind, decimal Amount, string? Note);
 public sealed record AccountsSummary(decimal RecordedAmount, int JobsWithFinancialActivity, int TotalJobs);
