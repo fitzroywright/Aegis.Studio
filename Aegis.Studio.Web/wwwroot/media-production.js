@@ -33,7 +33,7 @@ async function renderProductionMedia(job,host,current){
  if(collection&&!collections.includes(collection))collection=null;
  const refresh=()=>renderProductionMedia(job,host,current);
  const focus=window.studioMediaFocus;if(focus?.jobId===job.id){subject=focus.subjectId||null;if(focus.assetId)selected.add(focus.assetId);window.studioMediaFocus=null;}
- host.innerHTML=`<div class="media-production-layout"><aside class="media-subject-rail" aria-label="Subjects" hidden><label>Subjects<input type="search" placeholder="Find subject…" aria-label="Find subject"></label><div class="media-subject-list"></div></aside><section class="media-drop-surface" tabindex="0" aria-label="Media files"><div class="media-filter"></div><div class="media-items"></div><p class="media-result" role="status"></p></section></div>${canEdit&&data.unmatched.length?'<section class="unmatched-uploads"><h3>Unmatched uploads</h3></section>':''}`;
+ host.innerHTML=`<div class="media-production-layout has-subject-list"><aside class="media-subject-rail" aria-label="Subjects"><div class="media-subject-rail-heading"><strong>Subjects</strong><small>Who or what is in this media</small></div><label><span class="sr-only">Find subject</span><input type="search" placeholder="Find subject…" aria-label="Find subject"></label><div class="media-subject-list"></div></aside><section class="media-drop-surface" tabindex="0" aria-label="Media files"><div class="media-filter"></div><div class="media-items"></div><p class="media-result" role="status"></p></section></div>${canEdit&&data.unmatched.length?'<section class="unmatched-uploads"><h3>Unmatched uploads</h3></section>':''}`;
  const filter=host.querySelector('.media-filter'),items=host.querySelector('.media-items'),surface=host.querySelector('.media-drop-surface'),result=host.querySelector('.media-result');
  const tabSlot=host.closest('.job-lower-pane')?.querySelector('.gallery-tab-filter');
  const controls=document.createElement('span');controls.className='media-title-filters';
@@ -44,16 +44,14 @@ async function renderProductionMedia(job,host,current){
  function renderSubjectList(){
   const term=subjectSearch.value.trim().toLocaleLowerCase();
   const shown=data.subjects.filter(person=>(collection===null||person.collection===collection)&&(person.name.toLocaleLowerCase().includes(term)||String(person.reference||'').toLocaleLowerCase().includes(term)||String(person.contactName||'').toLocaleLowerCase().includes(term)));
-  subjectList.innerHTML=`<button type="button" data-subject-id="" class="${subject?'':'active'}">All images</button>`+shown.map(person=>`<button type="button" data-subject-id="${person.id}" class="${subject===person.id?'active':''}"><span>${esc(person.name)}</span><small>${data.assets.filter(asset=>asset.subjects.includes(person.id)&&(collection===null||asset.collection===collection)).length}</small></button>`).join('');
+  const visibleCount=data.assets.filter(asset=>collection===null||asset.collection===collection).length;subjectList.innerHTML=`<button type="button" data-subject-id="" class="${subject?'':'active'}"><span>All Subjects</span><small>${visibleCount}</small></button>`+shown.map(person=>`<button type="button" data-subject-id="${person.id}" class="${subject===person.id?'active':''}"><span>${esc(person.name)}</span><small>${data.assets.filter(asset=>asset.subjects.includes(person.id)&&(collection===null||asset.collection===collection)).length}</small></button>`).join('')+`<p class="media-subject-empty" ${shown.length?'hidden':''}>${term?'No matching subjects.':'No subjects yet.'}</p>`;
   subjectList.querySelectorAll('[data-subject-id]').forEach(button=>button.onclick=()=>{subject=button.dataset.subjectId||null;renderSubjectList();render();});
  }
  subjectSearch.oninput=renderSubjectList;
  function syncSubjectRail(){
-  if(!surface.clientWidth)return;
-  const count=data.assets.filter(asset=>collection===null||asset.collection===collection).length;
-  const overflow=data.subjects.length>1&&count*155+(canEdit?145:0)>surface.clientWidth;
-  subjectRail.hidden=!overflow;host.querySelector('.media-production-layout').classList.toggle('has-subject-list',overflow);
-  if(overflow)renderSubjectList();
+  subjectRail.hidden=false;
+  host.querySelector('.media-production-layout').classList.add('has-subject-list');
+  renderSubjectList();
  }
  collectionSelector.onchange=()=>{collection=collectionSelector.value||null;subject=null;(window.studioMediaCollections??={})[job.id]=collection;syncCollectionActions();render();syncSubjectRail();};
  if(typeof ResizeObserver!=='undefined'){const observer=new ResizeObserver(()=>{if(current()&&host.isConnected)syncSubjectRail();else observer.disconnect();});observer.observe(surface);}
