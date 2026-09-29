@@ -40,6 +40,14 @@ public static class StudioOperationsEnhancements
 
     public static void MapStudioOperationsEnhancements(this WebApplication app)
     {
+        app.MapGet("/api/workflow/stages", (IConfiguration configuration) =>
+        {
+            string[] stages = configuration.GetSection("Studio:Workflow:Stages").Get<string[]>() ?? [];
+            return stages.Length == 0
+                ? Results.Problem("Studio workflow stages are not configured.")
+                : Results.Ok(stages);
+        }).RequireAuthorization();
+
         app.MapPost("/api/frontdesk/jobs/{jobId:guid}/communications", (
             Guid jobId,
             FrontDeskCommunicationRequest request,
