@@ -12,14 +12,12 @@ public sealed class StudioMessageAttachmentStore
     private readonly string deliveryCacheRoot;
     private readonly long maximumBytes;
 
-    public StudioMessageAttachmentStore(IWebHostEnvironment environment,IConfiguration configuration,StudioDatabase database)
+    public StudioMessageAttachmentStore(IWebHostEnvironment environment,IConfiguration configuration,StudioDatabase database,IFileStorage storage)
     {
         this.database=database;
-        string configured=configuration["Storage:AttachmentsPath"]??string.Empty;
-        string root=string.IsNullOrWhiteSpace(configured)
-            ? Path.Combine(environment.ContentRootPath,"Storage","message-attachments")
-            : Path.Combine(Path.GetFullPath(configured),"messages");
-        storage=new LocalFileStorage(root);
+        this.storage=new PrefixedFileStorage(
+            storage??throw new ArgumentNullException(nameof(storage)),
+            "Storage/attachments/messages");
         deliveryCacheRoot=Path.Combine(environment.ContentRootPath,"Storage",".message-delivery-cache");
         Directory.CreateDirectory(deliveryCacheRoot);
         maximumBytes=Math.Clamp(configuration.GetValue<int?>("Storage:MaxAttachmentMegabytes")??100,1,1024)*1024L*1024L;
@@ -116,7 +114,8 @@ public static class StudioMessageAttachmentEndpoints
         StudioMessageAttachmentStore files=new(
             app.Services.GetRequiredService<IWebHostEnvironment>(),
             app.Services.GetRequiredService<IConfiguration>(),
-            app.Services.GetRequiredService<StudioDatabase>());
+            app.Services.GetRequiredService<StudioDatabase>(),
+            app.Services.GetRequiredService<IFileStorage>());
         files.EnsureSchema();
 
         app.MapGet("/api/messages/threads/{threadId:guid}/attachments",(Guid threadId,ClaimsPrincipal user,StudioInAppMessageStore messages)=>{
