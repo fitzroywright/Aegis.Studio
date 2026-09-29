@@ -147,7 +147,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             detailPane.classList.add('job-reading-view');
             const lower = document.createElement('section');
             lower.className = 'job-lower-pane';
-            lower.innerHTML = '<nav class="workspace-tabs" aria-label="Job information"><button data-job-tab="gallery">Gallery</button><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks / Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="job-tab-content"></div>';
+            lower.innerHTML = '<nav class="workspace-tabs" aria-label="Job information"><span class="gallery-tab-group"><button data-job-tab="gallery">Gallery</button><span class="gallery-tab-filter"></span></span><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks / Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="job-tab-content"></div>';
             detailPane.appendChild(lower);
             const job = selectedJob;
             let tabRevision = 0;
@@ -156,6 +156,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 const panel = lower.querySelector('.job-tab-content');
                 const current = () => version === revision && token === tabRevision;
                 lower.querySelectorAll('[data-job-tab]').forEach(button => button.classList.toggle('active', button.dataset.jobTab === name));
+                lower.querySelector('.gallery-tab-filter').replaceChildren();
+                lower.querySelector('.gallery-tab-group').classList.toggle('active',name==='gallery');
                 panel.textContent = 'Loading…';
                 try { await renderJobTab(name, job, panel, current, () => activate(name)); }
                 catch (error) { if (current()) panel.textContent = 'Unable to load: ' + (error.message || error); }

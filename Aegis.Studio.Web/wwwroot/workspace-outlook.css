@@ -172,3 +172,11 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 .job-reading-view .thread-shared-files .job-file-tile img{height:65px}
 .thread-shared-files .job-file-document{height:65px;font-size:26px}
 .thread-shared-files .job-file-upload{font-size:11px;padding-top:6px}
+
+/* Collection selector shares the Gallery tab without nesting controls. */
+.gallery-tab-group{display:inline-flex;align-items:center;flex:1;min-width:0;border-radius:7px;gap:3px;padding-right:5px}
+.gallery-tab-group.active{background:var(--theme-accent-soft)}
+.job-reading-view .job-lower-pane>.workspace-tabs .gallery-tab-group button{flex:none;background:transparent}
+.gallery-tab-filter:empty{display:none}
+.gallery-tab-filter{min-width:0}
+.gallery-tab-filter select{max-width:150px;width:100%;min-width:70px;border:0;border-left:1px solid var(--theme-border);border-radius:0;background:transparent;color:var(--theme-text);font:inherit;font-size:11px;padding:4px;cursor:pointer}
