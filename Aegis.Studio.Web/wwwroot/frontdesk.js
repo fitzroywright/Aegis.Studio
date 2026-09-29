@@ -48,20 +48,21 @@ async function showFrontDesk() {
             json('/api/frontdesk/enquiries'),
             json('/api/frontdesk/workspaces'),
             json('/api/frontdesk/clients'),
-            json('/api/schedule/entries?from='+encodeURIComponent(dayStart.toISOString())+'&to='+encodeURIComponent(dayEnd.toISOString()))
+            json('/api/schedule/entries?from='+encodeURIComponent(dayStart.toISOString())+'&to='+encodeURIComponent(new Date(dayStart.getTime()+90*86400000).toISOString())),
+            json('/api/accounts/invoices').catch(()=>[])
         ]);
-        [frontDeskJobs,frontDeskRequests,frontDeskEnquiries,frontDeskWorkspaces,frontDeskClients,frontDeskSchedule]=results;
+        [frontDeskJobs,frontDeskRequests,frontDeskEnquiries,frontDeskWorkspaces,frontDeskClients,frontDeskSchedule,frontDeskInvoices]=results;
         renderFrontDesk();
     } catch(error){genericView.innerHTML=`<h1>FrontDesk</h1><p role="alert">${esc(error.message)}</p><button class="action" onclick="showFrontDesk()">Retry</button>`;}
 }
 
-let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskClients=[],frontDeskSchedule=[];
+let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskClients=[],frontDeskSchedule=[],frontDeskInvoices=[];
 let frontDeskTab='requests',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelectedClientId=null;
 function frontDeskRequestStage(item){return item.jobId?'Confirmed':item.recordedDeposit>0?'Partial deposit':item.status==='AwaitingDeposit'?'Awaiting deposit':'Pending request';}
 function renderFrontDesk() {
     const pending=frontDeskRequests.filter(r=>!r.jobId),ready=frontDeskJobs.filter(j=>j.status==='Ready for Client');
     const arrivals=frontDeskJobs.filter(j=>j.status==='Arrived');
-    const walkIns=frontDeskEnquiries.filter(e=>String(e.channel).toLowerCase()==='walk-in');
+    const walkIns=frontDeskEnquiries.filter(e=>String(e.channel).toLowerCase()==='walk-in');const todaySchedule=frontDeskSchedule.filter(entry=>{const d=new Date(entry.startsAtUtc);return d>=new Date(new Date().setHours(0,0,0,0))&&d<new Date(new Date().setHours(24,0,0,0));});
     genericView.innerHTML=`<div class="job-detail-header frontdesk-header"><div><h1>Front Desk</h1><p>Client lookup, arrivals, bookings, payments, pickups and job status.</p></div><div class="job-actions"><button class="action" onclick="showAccounts()">Accounts / Invoices</button><button class="action" onclick="showPos()">Sales / Payments</button><button class="primary" id="newBookingRequest">New Booking</button></div></div>
     <section class="frontdesk-operational-desk">
       <div class="frontdesk-client-desk">
@@ -71,8 +72,8 @@ function renderFrontDesk() {
       </div>
       <div class="frontdesk-today">
         <h2>Today</h2>
-        <div class="frontdesk-status-strip"><span><b>${frontDeskSchedule.length}</b> appointments</span><span><b>${arrivals.length}</b> waiting</span><span><b>${walkIns.length}</b> walk-ins</span><span><b>${ready.length}</b> pickups</span><span><b>${pending.length}</b> pending bookings</span></div>
-        <div class="frontdesk-today-list">${frontDeskSchedule.map(entry=>`<button class="job-row" type="button" ${entry.jobId?`data-frontdesk-job="${entry.jobId}"`:''}><div><strong>${esc(entry.title)}</strong><small>${esc(new Date(entry.startsAtUtc).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))} · ${esc(entry.location||'Location not set')}</small></div><span class="status-pill">${esc(entry.status||'Scheduled')}</span></button>`).join('')||'<p class="muted">No appointments scheduled today.</p>'}</div>
+        <div class="frontdesk-status-strip"><span><b>${todaySchedule.length}</b> appointments</span><span><b>${arrivals.length}</b> waiting</span><span><b>${walkIns.length}</b> walk-ins</span><span><b>${ready.length}</b> pickups</span><span><b>${pending.length}</b> pending bookings</span></div>
+        <div class="frontdesk-today-list">${todaySchedule.map(entry=>`<button class="job-row" type="button" ${entry.jobId?`data-frontdesk-job="${entry.jobId}"`:''}><div><strong>${esc(entry.title)}</strong><small>${esc(new Date(entry.startsAtUtc).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))} · ${esc(entry.location||'Location not set')}</small></div><span class="status-pill">${esc(entry.status||'Scheduled')}</span></button>`).join('')||'<p class="muted">No appointments scheduled today.</p>'}</div>
       </div>
     </section>
     <nav class="workspace-tabs" aria-label="Front Desk queues">${[['requests','Booking requests'],['enquiries','Enquiries'],['jobs','Active jobs'],['delivery','Pickup / delivery'],['completed','Completed']].map(([key,label])=>`<button data-frontdesk-tab="${key}" class="${key===frontDeskTab?'active':''}">${label}</button>`).join('')}</nav>
@@ -96,14 +97,23 @@ function renderFrontDeskClientResults(){
     host.querySelectorAll('[data-frontdesk-client]').forEach(b=>b.onclick=()=>selectFrontDeskClient(b.dataset.frontdeskClient));
     if(frontDeskSelectedClientId)renderFrontDeskClientContext();
 }
-function selectFrontDeskClient(clientId){frontDeskSelectedClientId=clientId;renderFrontDeskClientResults();renderFrontDeskClientContext();}
-function renderFrontDeskClientContext(){
+function selectFrontDeskClient(clientId){frontDeskSelectedClientId=clientId;renderFrontDeskClientResults();renderFrontDeskClientContext().catch(error=>{const host=document.getElementById('frontDeskClientContext');if(host)host.innerHTML='<p role="alert">'+esc(error.message)+'</p>';});}
+async function renderFrontDeskClientContext(){
     const host=document.getElementById('frontDeskClientContext');if(!host)return;
     const client=frontDeskClients.find(c=>c.id===frontDeskSelectedClientId);if(!client){host.innerHTML='<p class="muted">Select a client.</p>';return;}
     const jobs=frontDeskJobs.filter(j=>j.clientId===client.id);
-    host.innerHTML=`<div class="frontdesk-client-heading"><div><h2>${esc(client.displayName)}</h2><p>${esc(client.email||'')} ${client.phone?' · '+esc(client.phone):''}</p></div><button class="action" onclick="showFrontDeskClients()">Open Client</button></div>
+    const jobIds=new Set(jobs.map(j=>j.id));
+    const upcoming=frontDeskSchedule.filter(entry=>entry.jobId&&jobIds.has(entry.jobId)&&new Date(entry.startsAtUtc)>=new Date()).sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
+    const invoices=frontDeskInvoices.filter(invoice=>jobIds.has(invoice.jobId));
+    const outstanding=invoices.filter(invoice=>['Issued','Overdue'].includes(invoice.status));
+    const quotes=await json('/api/frontdesk/quotes?clientId='+encodeURIComponent(client.id)).catch(()=>[]);
+    const associated=[...new Set(jobs.map(job=>frontDeskWorkspaces.find(w=>w.id===job.workspaceId)?.name).filter(Boolean))];
+    host.innerHTML=`<div class="frontdesk-client-heading"><div><h2>${esc(client.displayName)}</h2><p>${esc(client.email||'')}${client.phone?' · '+esc(client.phone):''}</p><small>${associated.length?esc(associated.join(' · ')):'No associated workspaces yet'}</small></div><button class="action" onclick="showFrontDeskClients()">Open Client</button></div>
     <div class="frontdesk-context-actions"><button class="primary" onclick="createFrontDeskClientJob('${client.id}')">New Job</button><button class="action" onclick="openPendingBookingForm()">New Booking</button><button class="action" onclick="showClientQuotes('${client.id}')">Create / Send Quote</button><button class="action" onclick="showPos()">Take Payment</button></div>
-    <h3>Jobs → Workspaces</h3><div class="frontdesk-client-jobs">${jobs.map(job=>`<article class="front-desk-row"><div><strong>${esc(job.title)}</strong><small>${esc(frontDeskWorkspaces.find(w=>w.id===job.workspaceId)?.name||'Workspace')} · ${esc(job.status)}${job.eventDate?' · '+esc(job.eventDate):''}</small></div><div class="front-desk-actions"><button class="action" onclick="showFrontDeskFlow('${job.id}')">Flow</button><button class="action" onclick="messageFrontDeskJob('${job.id}','workspace')">Message Workspace</button><button class="action" onclick="messageFrontDeskJob('${job.id}','escalate')">Escalate</button><button class="action" onclick="messageFrontDeskJob('${job.id}','finance')">Accounts / Finance</button><button class="action" onclick="checkInFrontDeskJob('${job.id}')">Check In</button><button class="primary" data-frontdesk-job="${job.id}">Open</button></div></article>`).join('')||'<p class="muted">No linked jobs yet.</p>'}</div>`;
+    <div class="frontdesk-client-summary"><span><b>${jobs.filter(j=>j.status!=='Completed').length}</b> current jobs</span><span><b>${upcoming.length}</b> upcoming bookings / shoots</span><span><b>${quotes.filter(q=>!['Converted'].includes(q.status)).length}</b> open quotes</span><span><b>${outstanding.length}</b> outstanding invoices</span><span><b>${money(outstanding.reduce((sum,x)=>sum+Number(x.totalAmount||0),0))}</b> outstanding</span></div>
+    <h3>Jobs → Workspaces</h3><div class="frontdesk-client-jobs">${jobs.map(job=>`<article class="front-desk-row"><div><strong>${esc(job.title)}</strong><small>${esc(frontDeskWorkspaces.find(w=>w.id===job.workspaceId)?.name||'Workspace')} · ${esc(job.status)}${job.eventDate?' · '+esc(job.eventDate):''}</small></div><div class="front-desk-actions"><button class="action" onclick="showFrontDeskFlow('${job.id}')">Flow</button><button class="action" onclick="messageFrontDeskJob('${job.id}','workspace')">Message Workspace</button><button class="action" onclick="messageFrontDeskJob('${job.id}','escalate')">Escalate</button><button class="action" onclick="messageFrontDeskJob('${job.id}','finance')">Accounts / Finance</button><button class="action" onclick="checkInFrontDeskJob('${job.id}')">Check In</button><button class="primary" data-frontdesk-job="${job.id}">Open</button></div></article>`).join('')||'<p class="muted">No linked jobs yet.</p>'}</div>
+    ${upcoming.length?`<h3>Upcoming</h3><div class="frontdesk-client-jobs">${upcoming.slice(0,8).map(entry=>`<article class="front-desk-row"><div><strong>${esc(entry.title)}</strong><small>${esc(new Date(entry.startsAtUtc).toLocaleString())} · ${esc(entry.location||'Location not set')}</small></div>${entry.jobId?`<button type="button" class="action" data-frontdesk-job="${entry.jobId}">Open job</button>`:''}</article>`).join('')}</div>`:''}
+    ${quotes.length?`<h3>Quotes</h3><div class="frontdesk-client-jobs">${quotes.slice(0,5).map(q=>`<article class="front-desk-row"><div><strong>${esc(q.request?.title||'Quote')}</strong><small>${esc(q.status)} · ${money(q.total)}</small></div></article>`).join('')}</div>`:''}`;
     host.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.frontdeskJob));
 }
 async function createFrontDeskClientJob(clientId){
