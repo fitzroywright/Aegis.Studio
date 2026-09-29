@@ -177,7 +177,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             detailPane.classList.add('job-reading-view');
             const lower = document.createElement('section');
             lower.className = 'job-lower-pane';
-            lower.innerHTML = '<nav class="workspace-tabs" aria-label="Job information"><span class="gallery-tab-group"><button data-job-tab="gallery">Gallery</button><span class="gallery-tab-filter"></span></span><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks / Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="job-tab-content"></div>';
+            lower.innerHTML = '<nav class="workspace-tabs" aria-label="Job information"><span class="gallery-tab-group"><button data-job-tab="gallery">Media</button><span class="gallery-tab-filter"></span></span><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks / Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="job-tab-content"></div>';
             detailPane.appendChild(lower);
             const job = selectedJob;
             let tabRevision = 0;

@@ -70,7 +70,7 @@ test('workspace job renders four lower tabs with details in the job list',async(
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
  assert.equal(w.messageFirstName('fwright',[],'Team member',true),'Team member');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'Team member');
- assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Gallery','Subjects','Tasks / Calendar','Activity']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Media','Subjects','Tasks / Calendar','Activity']);
  assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
 test('top navigation keeps personal actions right and removes redundant destinations',async()=>{

@@ -250,3 +250,10 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 .studio-top-nav #newRequestButton svg{width:16px;height:16px}
 .job-reading-view .job-conversation-row{padding-right:3px}
 .job-reading-view #hierarchyCompose{padding-right:3px}
+
+/* Share the same right inset so the files card and Reply stay aligned. */
+.job-reading-view{--job-reply-right-inset:3px}
+.job-reading-view .job-conversation-row,
+.job-reading-view #hierarchyCompose{padding-right:var(--job-reply-right-inset);margin-right:0;box-sizing:border-box;width:100%;min-width:0}
+.job-reading-view .thread-shared-files,
+.job-reading-view #hierarchyCompose .send-split{margin-right:0}
