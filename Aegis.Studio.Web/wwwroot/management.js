@@ -1,7 +1,7 @@
 if (!document.querySelector('link[href="/management.css"]')) {
     const managementStyles = document.createElement('link');
     managementStyles.rel = 'stylesheet';
-    managementStyles.href = '/management.css';
+    managementStyles.href = '/management.css?v=20260929-gantt';
     document.head.appendChild(managementStyles);
 }
 
@@ -10,11 +10,14 @@ showManagement = async function() {
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
     try {
-        const [dashboard, statuses, escalations, workflows] = await Promise.all([
+        const [dashboard, statuses, escalations, workflows, jobs, scheduleEntries, activities] = await Promise.all([
             json('/api/management/dashboard'),
             json('/api/management/jobs-by-status'),
             json('/api/escalations/open'),
-            json('/api/workflow-operations/summary')
+            json('/api/workflow-operations/summary'),
+            json('/api/jobs'),
+            json('/api/schedule/entries?from=' + encodeURIComponent(new Date(Date.now()-14*86400000).toISOString()) + '&to=' + encodeURIComponent(new Date(Date.now()+90*86400000).toISOString())),
+            json('/api/operations/activities')
         ]);
         genericView.innerHTML = `
             <div class="job-detail-header"><div><h1>Management Dashboard</h1><p>Live operations, customer demand, production risk, workflow health.</p></div><button class="action" onclick="scanEscalations()">Run escalation scan</button></div>
@@ -26,6 +29,7 @@ showManagement = async function() {
                 <div class="metric">Failed workflows<strong>${dashboard.failedWorkflows}</strong></div>
                 <div class="metric">Open escalations<strong>${escalations.length}</strong></div>
             </div>
+            <section class="job-section management-gantt-section"><div class="management-section-heading"><div><h2>Job Gantt</h2><p class="muted">Active jobs, schedule commitments and production activity across the next 90 days.</p></div></div>${renderManagementGantt(jobs, scheduleEntries, activities)}</section>
             <section class="job-section"><h2>Escalations</h2>${renderEscalations(escalations)}</section>
             <section class="job-section"><h2>Jobs by status</h2>${renderBuckets(statuses, false)}</section>
             <section class="job-section"><h2>Workflow engine</h2><div class="cards"><div class="metric">Running<strong>${workflows.running}</strong></div><div class="metric">Waiting<strong>${workflows.waiting}</strong></div><div class="metric">Failed<strong>${workflows.failed}</strong></div><div class="metric">Completed<strong>${workflows.completed}</strong></div></div></section>`;
@@ -53,6 +57,71 @@ showAccounts = async function() {
         genericView.innerHTML = `<h1>Accounts</h1><p class="muted">You do not have billing access.</p>`;
     }
 };
+
+function renderManagementGantt(jobs, scheduleEntries, activities) {
+    const activeJobs=(jobs||[]).filter(job=>job.status!=='Completed');
+    if(!activeJobs.length)return '<p class="muted">No active jobs.</p>';
+
+    const DAY=86400000;
+    const today=new Date(); today.setHours(0,0,0,0);
+    const dated=[];
+    for(const job of activeJobs){
+        const schedule=(scheduleEntries||[]).filter(item=>item.jobId===job.id);
+        const tasks=(activities||[]).filter(item=>item.jobId===job.id);
+        const candidates=[];
+        if(job.eventDate)candidates.push(new Date(job.eventDate+'T12:00:00'));
+        schedule.forEach(item=>{candidates.push(new Date(item.startsAtUtc));candidates.push(new Date(item.endsAtUtc));});
+        tasks.forEach(item=>{if(item.scheduledAtUtc)candidates.push(new Date(item.scheduledAtUtc));if(item.dueAtUtc)candidates.push(new Date(item.dueAtUtc));});
+        candidates.push(new Date(job.createdAt));
+        const valid=candidates.filter(date=>Number.isFinite(+date));
+        const start=new Date(Math.min(...valid.map(date=>+date)));
+        const end=new Date(Math.max(...valid.map(date=>+date)));
+        if(end<start)end.setTime(start.getTime());
+        dated.push({job,start,end,tasks});
+    }
+
+    const earliest=new Date(Math.min(+today,...dated.map(x=>+x.start)));
+    const latestLimit=new Date(today.getTime()+90*DAY);
+    const latest=new Date(Math.max(+latestLimit,...dated.map(x=>+x.end)));
+    earliest.setHours(0,0,0,0); latest.setHours(0,0,0,0);
+    const totalDays=Math.max(1,Math.round((latest-earliest)/DAY)+1);
+    const weekCount=Math.ceil(totalDays/7);
+    const width=Math.max(840,weekCount*112);
+    const weeks=Array.from({length:weekCount},(_,index)=>{
+        const date=new Date(earliest.getTime()+index*7*DAY);
+        return date.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+    });
+    const todayPct=Math.max(0,Math.min(100,((today-earliest)/DAY)/totalDays*100));
+
+    const rows=dated.sort((a,b)=>a.start-b.start).map(({job,start,end,tasks})=>{
+        const left=Math.max(0,((start-earliest)/DAY)/totalDays*100);
+        const span=Math.max(1,((end-start)/DAY+1)/totalDays*100);
+        const production=tasks.filter(item=>item.status!=='Cancelled');
+        const completed=production.filter(item=>item.status==='Completed').length;
+        const progress=production.length?Math.round(completed/production.length*100):0;
+        return \`<div class="management-gantt-row">
+            <button class="management-gantt-job" type="button" onclick="openJob('\${job.id}')"><strong>\${esc(job.title)}</strong><small>\${esc(job.clientName||'Client not linked')} · \${esc(job.status)}</small></button>
+            <div class="management-gantt-track" style="--gantt-width:\${width}px">
+                <div class="management-gantt-today" style="left:\${todayPct}%"></div>
+                <button class="management-gantt-bar" type="button" onclick="openJob('\${job.id}')" style="left:\${left}%;width:\${span}%">
+                    <span style="width:\${progress}%"></span><b>\${progress}%</b>
+                </button>
+            </div>
+        </div>\`;
+    }).join('');
+
+    return \`<div class="management-gantt-shell">
+        <div class="management-gantt-scroll">
+            <div class="management-gantt-grid" style="--gantt-width:\${width}px">
+                <div class="management-gantt-head">
+                    <div class="management-gantt-job-head">Job</div>
+                    <div class="management-gantt-axis">\${weeks.map(label=>\`<span>\${esc(label)}</span>\`).join('')}</div>
+                </div>
+                \${rows}
+            </div>
+        </div>
+    </div>\`;
+}
 
 function renderEscalations(values) {
     if (!values.length) return '<p class="muted">No open escalations.</p>';
