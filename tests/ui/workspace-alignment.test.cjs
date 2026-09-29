@@ -6,7 +6,7 @@ const {JSDOM}=require('jsdom');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
 function environment(){
  const dom=new JSDOM('<div id="panel"></div>',{runScripts:'outside-only',url:'https://studio.test'});
- const w=dom.window;
+ const w=dom.window;w.showWorkspaces=async()=>{};
  w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));
  return {w,panel:w.document.getElementById('panel')};
@@ -50,7 +50,7 @@ test('stale asynchronous subjects response does not overwrite the next tab',asyn
 test('workspace job renders four lower tabs with details in the job list',async()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;
  const job={id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Portraits',clientName:'Client',status:'Scheduled'};
- Object.assign(w,{workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
+ Object.assign(w,{showWorkspaces:async()=>{},workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
  for(const id of ['conversationList','detailPane','workspaceTitle','allButton'])w[id]=w.document.getElementById(id);
  w.fetch=async url=>({ok:true,json:async()=>url.endsWith('/sending-identities')?{identities:[{type:'Workspace'},{type:'Self',isDefault:true}]}:{channel:'Email',messages:[]}});
  w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
@@ -71,7 +71,7 @@ test('workspace job renders four lower tabs with details in the job list',async(
  assert.equal(w.messageFirstName('fwright',[],'Team member',true),'Team member');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'Team member');
  assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Gallery','Subjects','Tasks / Calendar','Activity']);
- assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.ok(w.document.querySelector('[data-tab="announcements"]'));
+ assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
 test('top navigation has the requested order and preserves FrontDesk and WorkDay destinations',async()=>{
  const dom=new JSDOM('<header class="topbar"></header><aside class="rail"></aside><button id="newRequestButton"></button>',{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;let frontDesk=0;
@@ -79,4 +79,13 @@ test('top navigation has the requested order and preserves FrontDesk and WorkDay
  w.eval(fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8'));
  assert.deepEqual(Array.from(w.document.querySelectorAll('.studio-top-nav button'),b=>b.textContent),['My Work','Dashboard','Workspaces','Pipeline','Production','FrontDesk','WorkDay','Admin']);
  w.document.querySelector('[data-view="frontdesk"]').click();await Promise.resolve();assert.equal(frontDesk,1);assert.equal(w.document.getElementById('newRequestButton').hidden,true);
+});
+test('announcement banner disappears only after dismissal succeeds',async()=>{
+ const {w,panel}=environment();const calls=[];let fail=true;
+ w.json=async(url,options)=>{calls.push(url);if(options){if(fail)throw Error('Offline');return null;}return [{id:'notice',title:'Photo day',body:'Bring equipment'}];};
+ await w.renderAnnouncementBanners(panel,'workspace',()=>true);
+ assert.equal(panel.hidden,false);let button=panel.querySelector('[data-dismiss]');
+ await button.onclick();assert.ok(panel.querySelector('article'));assert.equal(button.disabled,false);
+ fail=false;await button.onclick();assert.equal(panel.hidden,true);
+ assert.equal(calls.at(-1),'/api/workspaces/workspace/announcements/notice/dismiss');
 });

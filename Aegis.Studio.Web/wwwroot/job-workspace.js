@@ -67,3 +67,36 @@ async function renderVersionedGallery(job,host,current) {
     };host.querySelector('select').onchange=render;render();
     const form=host.querySelector('form');if(form)form.onsubmit=async e=>{e.preventDefault();const button=form.querySelector('button');button.disabled=true;try{const data=new FormData();data.append('file',form.elements.file.files[0]);data.append('note',form.elements.note.value);const key=form.elements.asset.value.trim()||crypto.randomUUID();const response=await fetch(`/api/jobs/${job.id}/versions/${encodeURIComponent(key)}`,{method:'POST',body:data});if(!response.ok)throw new Error(await response.text());if(current())await renderVersionedGallery(job,host,current);}catch(error){form.querySelector('[role=alert]').textContent=error.message;}finally{button.disabled=false;}};
 }
+
+async function renderAnnouncementBanners(host,workspaceId,current) {
+    const items=await json(`/api/workspaces/${workspaceId}/announcements`);
+    if(!current())return;
+    host.hidden=!items.length;
+    host.innerHTML=items.map(x=>`<article class="workspace-announcement" role="status"><div><strong>${esc(x.title)}</strong><p>${esc(x.body)}</p><small class="dismiss-error" role="alert"></small></div><button class="action" data-dismiss="${esc(x.id)}" aria-label="Dismiss announcement">Dismiss</button></article>`).join('');
+    host.querySelectorAll('[data-dismiss]').forEach(button=>button.onclick=async()=>{
+        button.disabled=true;
+        try {
+            await json(`/api/workspaces/${workspaceId}/announcements/${encodeURIComponent(button.dataset.dismiss)}/dismiss`,{method:'POST'});
+            if(current()){button.closest('article').remove();host.hidden=!host.querySelector('article');}
+        }catch(error){button.closest('article').querySelector('.dismiss-error').textContent='Could not dismiss. Please try again.';button.disabled=false;}
+    });
+}
+
+// Posting remains available in workspace administration, without a navigation tab.
+(() => {
+    const previous=showWorkspaces;
+    showWorkspaces=async function(){
+        await previous();
+        const eligible=workspaceCache.filter(w=>w.permissions?.notifyMembers);
+        if(!eligible.length)return;
+        const section=document.createElement('section');section.className='job-section';
+        section.innerHTML=`<h2>Post workspace announcement</h2><form class="announcement-form"><label>Workspace<select name="workspace">${eligible.map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select></label><label>Title<input name="title" required maxlength="200"></label><label>Announcement<textarea name="body" required maxlength="10000"></textarea></label><button class="primary">Post announcement</button><p role="status"></p></form>`;
+        genericView.appendChild(section);
+        const form=section.querySelector('form');form.onsubmit=async e=>{
+            e.preventDefault();const button=form.querySelector('button');button.disabled=true;
+            try{await json(`/api/workspaces/${form.elements.workspace.value}/announcements`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:form.elements.title.value,body:form.elements.body.value})});form.elements.title.value='';form.elements.body.value='';form.querySelector('[role=status]').textContent='Announcement posted.';}
+            catch(error){form.querySelector('[role=status]').textContent=error.message;}
+            finally{button.disabled=false;}
+        };
+    };
+})();

@@ -32,8 +32,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
     const tabs = document.createElement('div');
     tabs.className = 'workspace-tabs';
     tabs.setAttribute('aria-label', 'Workspace views');
-    tabs.innerHTML = '<button data-tab="jobs">Jobs</button><button data-tab="announcements">Announcements</button><button data-tab="members">Members</button>';
+    tabs.innerHTML = '<button data-tab="jobs">Jobs</button><button data-tab="members">Members</button>';
     document.querySelector('.workspace-toolbar').before(tabs);
+    const banners = document.createElement('section');
+    banners.className = 'workspace-announcement-banners';
+    banners.hidden = true;
+    document.getElementById('conversationView').prepend(banners);
     const display = () => { activateView('conversations'); activateNavigation('workspaces'); };
     const fail = error => empty('Unable to load', error.message || String(error));
     tabs.querySelectorAll('button').forEach(button => button.onclick = () => { tab = button.dataset.tab; loadConversations().catch(fail); });
@@ -50,16 +54,14 @@ function mergeJobMessages(teamMessages, customerMessages) {
     loadConversations = async function() {
         const version = ++revision;
         const workspaceId = selectedWorkspace;
+        banners.hidden = true;
+        banners.innerHTML = '';
+        if (workspaceId) renderAnnouncementBanners(banners,workspaceId,()=>selectedWorkspace===workspaceId).catch(error=>{if(selectedWorkspace===workspaceId){banners.hidden=false;banners.textContent='Announcements could not be loaded. Use Refresh to retry.';}});
         tabs.querySelectorAll('button').forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
         display();
         conversationList.innerHTML = '';
         if (!workspaceId) { empty('Select a workspace', 'Choose a workspace on the left to see its jobs, announcements and members.'); return; }
         empty('Select a job', 'Jobs belong to this workspace. Open a job to read its messages.');
-        if (tab === 'announcements') {
-            detailPane.classList.remove('empty', 'job-reading-view');
-            conversationList.innerHTML = '<div class="empty-state"><h3>Workspace announcements</h3><p>Updates for everyone in this workspace.</p></div>';
-            await renderWorkspaceAnnouncements(detailPane,workspaceId,()=>version===revision); return;
-        }
         if (tab === 'members') {
             const members = await json(`/api/workspaces/${workspaceId}/directory`);
             if (version !== revision) return;

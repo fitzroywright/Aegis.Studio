@@ -12,6 +12,7 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
     {
         string[] statements = [
             "create table if not exists studio_workspace_announcements(id uuid primary key, workspace_id uuid not null references studio_workspaces(id) on delete cascade, title text not null, body text not null, created_by text not null, created_at_utc timestamptz not null default now())",
+            "create table if not exists studio_announcement_dismissals(announcement_id uuid not null references studio_workspace_announcements(id) on delete cascade, user_name text not null, dismissed_at_utc timestamptz not null default now(), primary key(announcement_id,user_name))",
             "create index if not exists ix_workspace_announcements on studio_workspace_announcements(workspace_id, created_at_utc desc)",
             "create table if not exists studio_job_subjects(id uuid primary key, job_id uuid not null references studio_jobs(id) on delete cascade, name text not null, reference text not null default '', notes text not null default '', updated_by text not null, updated_at_utc timestamptz not null default now())",
             "create index if not exists ix_job_subjects on studio_job_subjects(job_id)",
@@ -27,15 +28,24 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
         transaction.Commit();
     }
 
-    public IReadOnlyList<WorkspaceAnnouncement> Announcements(Guid workspaceId)
+    public IReadOnlyList<WorkspaceAnnouncement> Announcements(Guid workspaceId, string user)
     {
         using var connection = database.OpenConnection();
-        using var command = new NpgsqlCommand("select id,title,body,created_by,created_at_utc from studio_workspace_announcements where workspace_id=$1 order by created_at_utc desc", connection);
+        using var command = new NpgsqlCommand("select a.id,a.title,a.body,a.created_by,a.created_at_utc from studio_workspace_announcements a where a.workspace_id=$1 and not exists(select 1 from studio_announcement_dismissals d where d.announcement_id=a.id and d.user_name=lower($2)) order by a.created_at_utc desc", connection);
         command.Parameters.AddWithValue(workspaceId);
+        command.Parameters.AddWithValue(user);
         using var reader = command.ExecuteReader();
         List<WorkspaceAnnouncement> result = [];
         while(reader.Read()) result.Add(new(reader.GetGuid(0),reader.GetString(1),reader.GetString(2),reader.GetString(3),reader.GetFieldValue<DateTimeOffset>(4)));
         return result;
+    }
+
+    public bool DismissAnnouncement(Guid workspaceId, Guid id, string user)
+    {
+        using var connection = database.OpenConnection();
+        using var command = new NpgsqlCommand("insert into studio_announcement_dismissals(announcement_id,user_name) select id,lower($3) from studio_workspace_announcements where id=$1 and workspace_id=$2 on conflict(announcement_id,user_name) do update set dismissed_at_utc=now()", connection);
+        command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(workspaceId); command.Parameters.AddWithValue(user);
+        return command.ExecuteNonQuery() == 1;
     }
 
     public Guid AddAnnouncement(Guid workspaceId, AnnouncementRequest request, string user)
@@ -110,7 +120,12 @@ public static class WorkspaceJobEndpoints
     public static void MapWorkspaceJobs(this WebApplication app)
     {
         app.MapGet("/api/workspaces/{workspaceId:guid}/announcements", (Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access,StudioDatabase db) =>
-            access.HasPermission(user,workspaceId,"AccessWorkspace") && access.HasPermission(user,workspaceId,"View") ? Results.Ok(new WorkspaceJobStore(db).Announcements(workspaceId)) : Results.Forbid()).RequireAuthorization();
+            access.HasPermission(user,workspaceId,"AccessWorkspace") && access.HasPermission(user,workspaceId,"View") ? Results.Ok(new WorkspaceJobStore(db).Announcements(workspaceId,UserName(user))) : Results.Forbid()).RequireAuthorization();
+        app.MapPost("/api/workspaces/{workspaceId:guid}/announcements/{id:guid}/dismiss", (Guid workspaceId,Guid id,ClaimsPrincipal user,WorkspaceAccessService access,StudioDatabase db) =>
+        {
+            if(!access.HasPermission(user,workspaceId,"AccessWorkspace") || !access.HasPermission(user,workspaceId,"View")) return Results.Forbid();
+            return new WorkspaceJobStore(db).DismissAnnouncement(workspaceId,id,UserName(user)) ? Results.NoContent() : Results.NotFound();
+        }).RequireAuthorization();
         app.MapPost("/api/workspaces/{workspaceId:guid}/announcements", (Guid workspaceId,AnnouncementRequest request,ClaimsPrincipal user,WorkspaceAccessService access,StudioDatabase db) =>
         {
             if(!access.HasPermission(user,workspaceId,"AccessWorkspace") || !access.HasPermission(user,workspaceId,"NotifyMembers")) return Results.Forbid();
