@@ -52,10 +52,24 @@ test('workspace job renders four lower tabs with details in the job list',async(
  const job={id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Portraits',clientName:'Client',status:'Scheduled'};
  Object.assign(w,{workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
  for(const id of ['conversationList','detailPane','workspaceTitle','allButton'])w[id]=w.document.getElementById(id);
- w.fetch=async()=>({ok:true,json:async()=>({channel:'Phone',messages:[]})});
+ w.fetch=async url=>({ok:true,json:async()=>url.endsWith('/sending-identities')?{identities:[{type:'Workspace'},{type:'Self',isDefault:true}]}:{channel:'Email',messages:[]}});
  w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
  w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,10));
+ assert.equal(w.document.querySelector('#jobInternalNote'),null);
+ assert.equal(w.document.querySelector('#jobSendingIdentity').value,'Workspace');
+ assert.equal(w.document.querySelector('#hierarchyCompose button').textContent,'Reply');
+ const requests=[];const originalJson=w.json;w.json=async(url,options)=>{if(options?.body)requests.push({url,body:JSON.parse(options.body)});return originalJson(url,options);};
+ for(const mode of ['Workspace','Internal','Self']) {
+   const form=w.document.querySelector('#hierarchyCompose');const sender=w.document.querySelector('#jobSendingIdentity');sender.value=mode;sender.onchange();form.querySelector('textarea').value='Test reply';
+   await form.onsubmit({preventDefault(){},currentTarget:form});
+ }
+ assert.equal(requests[0].url,'/api/conversations/conversation/messages');assert.equal(requests[0].body.sendingIdentity,'Workspace');
+ assert.equal(requests[1].url,'/api/messages/threads/thread');assert.deepEqual(requests[1].body,{body:'Test reply'});
+ assert.equal(requests[2].body.sendingIdentity,'Self');
+ assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
+ assert.equal(w.messageFirstName('fwright',[],'Team member',true),'Team member');
+ assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'Team member');
  assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Gallery','Subjects','Tasks / Calendar','Activity']);
  assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.ok(w.document.querySelector('[data-tab="announcements"]'));
 });

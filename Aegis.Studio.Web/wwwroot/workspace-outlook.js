@@ -1,13 +1,14 @@
-function messageFirstName(author, people, fallback = 'Team member') {
+function messageFirstName(author, people, fallback = 'Team member', loginOnly = false) {
     const value = String(author || '').trim();
-    const person = people.find(p => String(p.userName || '').toLowerCase() === value.toLowerCase());
-    const name = String(person?.displayName || value).trim();
-    if (!name || name.includes('@') || name.includes('\\')) return fallback;
+    const matches = people.filter(p => [p.userName, p.displayName].some(n => String(n || '').toLowerCase() === value.toLowerCase()));
+    const person = matches.find(p => p.givenName || p.firstName || (p.displayName && p.displayName.toLowerCase() !== String(p.userName || '').toLowerCase()));
+    const name = String(person?.givenName || person?.firstName || person?.displayName || (!loginOnly && /\s/.test(value) ? value : '')).trim();
+    if (!name || /[@\\_.0-9]/.test(name)) return fallback;
     return name.split(/\s+/)[0];
 }
 function mergeJobMessages(teamMessages, customerMessages) {
     return [
-        ...teamMessages.map(m => ({ id: 'team-' + m.id, author: m.senderUserName, body: m.body, at: m.createdAtUtc, customer: false })),
+        ...teamMessages.map(m => ({ id: 'team-' + m.id, author: m.senderUserName, body: m.body, at: m.createdAtUtc, customer: false, loginOnly: true })),
         ...customerMessages.map(m => ({ id: 'customer-' + m.id, author: m.author, body: m.body, at: m.createdAt, customer: m.visibility.toLowerCase() !== 'internal' }))
     ].sort((a, b) => new Date(a.at) - new Date(b.at) || a.id.localeCompare(b.id));
 }
@@ -113,24 +114,22 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if (version !== revision) return;
         const combined = mergeJobMessages(messages, conversation?.messages || []);
         detailPane.classList.remove('empty');
-        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}</p><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div>${job ? `<label class="customer-filter"><input id="showCustomerMessages" type="checkbox" ${showCustomers ? 'checked' : ''}> Show customer messages</label>` : ''}</div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? '<label><input id="jobInternalNote" type="checkbox" checked> Internal note</label>' : ''}<div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${identities.some(i => i.type === 'Workspace') ? '' : 'disabled'}>Reply as Workspace</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as Myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
+        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}</p><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div>${job ? `<label class="customer-filter"><input id="showCustomerMessages" type="checkbox" ${showCustomers ? 'checked' : ''}> Show customer messages</label>` : ''}</div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
         const renderMessages = () => {
             const visible = combined.filter(m => showCustomers || !m.customer);
-            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member").slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member'))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
+            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
         const filterToggle = document.getElementById('showCustomerMessages');
         if (filterToggle) filterToggle.onchange = () => { showCustomers = filterToggle.checked; renderMessages(); };
-        const internal = document.getElementById('jobInternalNote'), sender = document.getElementById('jobSendingIdentity');
+        const sender = document.getElementById('jobSendingIdentity');
+        const canSend = () => !job || sender?.value === 'Internal' || (!!conversation && (String(conversation.channel).toLowerCase() !== 'email' ? sender?.value === 'Workspace' : identities.some(i => i.type === sender?.value)));
         const syncSend = () => {
             const button = document.getElementById('hierarchyCompose').querySelector('button');
-            if (sender) sender.disabled = false;
-            button.textContent = !job ? 'Send message' : internal.checked ? 'Reply · Internal' : sender?.value === 'Self' ? 'Reply as Myself' : 'Reply as Workspace';
-            button.disabled = !!job && !internal.checked && (!conversation || (String(conversation.channel).toLowerCase() === 'email' && !identities.length));
+            button.textContent = !job ? 'Send message' : sender?.value === 'Internal' ? 'Reply as internal note' : sender?.value === 'Self' ? 'Reply as myself' : 'Reply';
+            button.disabled = !canSend();
         };
-        if(internal) internal.onchange = syncSend;
-        if(sender) sender.onchange = () => { if(internal) internal.checked = false; syncSend(); };
-        if(sender && identities.length) sender.value = identities.find(i => i.isDefault)?.type || identities[0].type;
+        if(sender) { sender.value = 'Workspace'; sender.onchange = syncSend; }
         syncSend();
         if (scope === 'Job') {
             detailPane.classList.add('job-reading-view');
@@ -155,16 +154,16 @@ function mergeJobMessages(teamMessages, customerMessages) {
         document.getElementById('hierarchyCompose').onsubmit = async event => {
             event.preventDefault();
             const form = event.currentTarget, body = form.querySelector('textarea').value.trim();
-            if (!body) return;
+            if (!body || !canSend()) return;
             const button = form.querySelector('button'); button.disabled = true;
             try {
-                const external = job && !internal.checked;
+                const external = job && sender?.value !== 'Internal';
                 const url = external ? `/api/conversations/${job.conversationId}/messages` : `/api/messages/threads/${value.id}`;
                 const payload = external ? {body, isInternal:false, sendingIdentity:sender?.value || 'Workspace'} : {body};
                 await json(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
                 if (version === revision) await thread(scope, scopeId, version);
             } catch(error) { form.querySelector('[role="alert"]').textContent = error.message || error; }
-            finally { button.disabled = false; }
+            finally { if (form.isConnected) syncSend(); }
         };
     }
     async function renderJobTab(name, job, panel, current, refresh) {
