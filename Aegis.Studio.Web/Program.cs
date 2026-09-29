@@ -1,3 +1,6 @@
+using Aegis.Studio.Web.FrontDesk;
+using Aegis.Studio.Web.WorkspaceJobs;
+using Aegis.Studio.Web.Versioning;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using Aegis.Pos.Core;
@@ -133,6 +136,12 @@ app.MapStudioInAppMessaging();
 app.MapStudioScheduling();
 app.MapStudioProduction();
 app.MapWorkspaceAccess();
+app.MapStudioDemoData();
+new WorkspaceJobStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
+StudioVersionSchema.EnsureCreated(app.Services.GetRequiredService<StudioDatabase>());
+app.MapWorkspaceJobs();
+new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
+app.MapFrontDeskBookingRequests();
 app.MapJobAccess();
 app.MapAegisHealth(
     "Aegis.Studio",
@@ -363,12 +372,13 @@ app.MapPost("/api/conversations/{id:guid}/messages", (Guid id, AddMessageRequest
         }
     });
 });
-app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest request, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService access, StudioOperationsFlowPublisher flows) =>
+app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest request, ClaimsPrincipal user, StudioStore store, WorkspaceAccessService access, StudioOperationsFlowPublisher flows, StudioDatabase database) =>
 {
     StudioConversation? conversation = store.GetConversation(id);
     if (conversation is null) return Results.NotFound();
     if (!access.HasPermission(user, conversation.WorkspaceId, "CreateJob")) return Results.Forbid();
     if (string.IsNullOrWhiteSpace(request.Title)) return Results.BadRequest(new { error = "Job title is required." });
+    if(new FrontDeskBookingRequestStore(database).HasPendingConversation(id)) return Results.Conflict(new { error = "This enquiry has a pending FrontDesk booking request. Record its required deposit through FrontDesk to create the job." });
     StudioJob job=store.CreateJob(id, request);
     flows.TryEnqueueJobFlow(job.Id.ToString("D"),"Created",job.Id.ToString("D"),$"Job created in workspace {job.WorkspaceId:D}.");
     return Results.Ok(job);

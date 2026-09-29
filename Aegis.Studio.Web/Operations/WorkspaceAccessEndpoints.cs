@@ -102,6 +102,16 @@ public static class WorkspaceAccessEndpoints
             return Results.Ok(access.SaveMember(workspaceId, normalized));
         }).RequireAuthorization();
 
+
+        app.MapGet("/api/workspaces/{workspaceId:guid}/directory", (Guid workspaceId, ClaimsPrincipal user, StudioDatabase database) =>
+        {
+            WorkspaceAccessService access = new(database);
+            if (!access.HasPermission(user, workspaceId, "AccessWorkspace") || !access.HasPermission(user, workspaceId, "View")) return Results.Forbid();
+            return Results.Ok(access.GetMembers(workspaceId)
+                .Where(x => x.IsActive && x.Permissions.AccessWorkspace)
+                .Select(x => new { x.UserName, x.DisplayName, role = x.Permissions.AdminWorkspace ? "Administrator" : IsManager(x.Permissions) ? "Manager" : "Member" }));
+        }).RequireAuthorization();
+
         app.MapGet("/api/workspaces/{workspaceId:guid}/members", (Guid workspaceId, ClaimsPrincipal user, StudioDatabase database) =>
         {
             WorkspaceAccessService access = new(database);

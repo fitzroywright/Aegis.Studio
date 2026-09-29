@@ -58,6 +58,14 @@ public sealed class StudioVersionStore
 
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
+        // Serialize the version counter per job and asset, including concurrent uploads.
+        using (NpgsqlCommand guard = connection.CreateCommand())
+        {
+            guard.Transaction = transaction;
+            guard.CommandText = "select pg_advisory_xact_lock(hashtextextended($1,0))";
+            guard.Parameters.AddWithValue(jobId.ToString("D") + ":" + key);
+            guard.ExecuteNonQuery();
+        }
         int version;
         using (NpgsqlCommand next = connection.CreateCommand())
         {
@@ -128,3 +136,4 @@ public sealed class StudioVersionStore
 }
 
 public sealed record StudioAssetVersion(Guid Id, Guid JobId, string AssetKey, int VersionNumber, string FileName, string ContentType, long SizeBytes, string Sha256, string StoredPath, string CreatedBy, DateTimeOffset CreatedAtUtc, Guid? SourceVersionId, string? Note);
+

@@ -9,13 +9,13 @@ public static class StudioVersionEndpoints
     public static void MapStudioVersioning(this WebApplication app)
     {
         app.MapGet("/api/jobs/{jobId:guid}/versions/{assetKey}", (Guid jobId, string assetKey, ClaimsPrincipal user, StudioDatabase db, JobAccessService access, IConfiguration config, IWebHostEnvironment env) =>
-            access.HasPermission(user, jobId, "ViewJob")
+            access.HasPermission(user, jobId, "ViewAttachments")
                 ? Results.Ok(new StudioVersionStore(db, config, env).GetHistory(jobId, assetKey))
                 : Results.Forbid()).RequireAuthorization();
 
         app.MapGet("/api/jobs/{jobId:guid}/versions/by-id/{versionId:guid}/content", (Guid jobId, Guid versionId, ClaimsPrincipal user, StudioDatabase db, JobAccessService access, IConfiguration config, IWebHostEnvironment env) =>
         {
-            if (!access.HasPermission(user, jobId, "ViewJob")) return Results.Forbid();
+            if (!access.HasPermission(user, jobId, "ViewAttachments")) return Results.Forbid();
             try
             {
                 StudioVersionStore store = new(db, config, env);
@@ -55,7 +55,7 @@ public static class StudioVersionEndpoints
 
         app.MapGet("/api/jobs/{jobId:guid}/versions/compare", (Guid jobId, Guid left, Guid right, ClaimsPrincipal user, StudioDatabase db, JobAccessService access, IConfiguration config, IWebHostEnvironment env) =>
         {
-            if (!access.HasPermission(user, jobId, "ViewJob")) return Results.Forbid();
+            if (!access.HasPermission(user, jobId, "ViewAttachments")) return Results.Forbid();
             StudioVersionStore store = new(db, config, env);
             StudioAssetVersion? a = store.Get(jobId, left);
             StudioAssetVersion? b = store.Get(jobId, right);
@@ -74,3 +74,4 @@ public static class StudioVersionEndpoints
 }
 
 public sealed record RestoreVersionRequest(string? Note);
+

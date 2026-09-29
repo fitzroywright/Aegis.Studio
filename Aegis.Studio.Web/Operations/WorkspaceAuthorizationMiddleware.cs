@@ -87,6 +87,10 @@ public sealed class WorkspaceAuthorizationMiddleware
         if (segments.Length >= 3 && segments[1].Equals("jobs", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(segments[2], out Guid jobIdFromPath))
         {
             Guid? workspaceId = ResolveJobWorkspace(database, jobIdFromPath);
+            if (segments.Length >= 5 && segments[3].Equals("operations", StringComparison.OrdinalIgnoreCase) && segments[4].Equals("shoots", StringComparison.OrdinalIgnoreCase) && method == "POST")
+                return new(workspaceId,jobIdFromPath,"ManageSchedule","ManageSchedule");
+            if (segments.Length >= 4 && (segments[3].Equals("versions", StringComparison.OrdinalIgnoreCase) || segments[3].Equals("gallery-assets", StringComparison.OrdinalIgnoreCase)))
+                return new(workspaceId,jobIdFromPath,method == "GET" ? "ViewAttachments" : "ManageProduction",method == "GET" ? "ViewAttachments" : "ManageProduction");
             if (segments.Length >= 4 && segments[3].Equals("financial-events", StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobIdFromPath,"EditJob","RecordFinancialActivity");
             if (segments.Length >= 4 && segments[3].Equals("pos", StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobIdFromPath,"EditJob",method == "GET" ? "ViewPosTransactions" : "UsePos");
             if (segments.Length >= 4 && segments[3].Equals("members", StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobIdFromPath,"ManageMembers","ManageJobMembers");
@@ -163,3 +167,4 @@ public sealed class WorkspaceAuthorizationMiddleware
     private static async Task Forbid(HttpContext context,string message){context.Response.StatusCode=StatusCodes.Status403Forbidden;await context.Response.WriteAsJsonAsync(new{error=message});}
     private sealed record AccessRequirement(Guid? WorkspaceId,Guid? JobId,string? WorkspacePermission,string? JobPermission);
 }
+
