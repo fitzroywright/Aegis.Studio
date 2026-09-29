@@ -245,7 +245,14 @@ async function showFrontDeskFlow(jobId) {
     let current=stageNames.findIndex(stage=>stage.toLowerCase()===normalized);
     if(current<0&&['new','confirmed','inquiry','needs scheduling'].includes(normalized))current=stageNames.findIndex(stage=>stage.toLowerCase()==='needs scheduling');
     if(current<0)current=0;
-    const dialog=studioDialog('Job Flow — '+job.title,`<div class="frontdesk-flow">${stageNames.map((stage,index)=>`<button type="button" class="frontdesk-flow-stage ${index<current?'complete':index===current?'current':'future'}" data-flow-stage="${index}"><small>${index<current?'Completed':index===current?'Current':'Upcoming'}</small><strong>${esc(stage)}</strong></button>`).join('<span>›</span>')}</div><div class="frontdesk-flow-history"><h3>History</h3>${events.slice(0,30).map(event=>`<p><strong>${esc(event.title||event.eventType||'Activity')}</strong><small>${esc(event.detail||event.description||'')} ${event.createdAtUtc||event.occurredAtUtc?' · '+new Date(event.createdAtUtc||event.occurredAtUtc).toLocaleString():''}</small></p>`).join('')||'<p class="muted">No recorded stage history yet.</p>'}</div>`);
+    const eventMarkup=list=>list.slice(0,30).map(event=>`<p><strong>${esc(event.title||event.eventType||'Activity')}</strong><small>${esc(event.detail||event.description||'')} ${event.createdAtUtc||event.occurredAtUtc?' · '+new Date(event.createdAtUtc||event.occurredAtUtc).toLocaleString():''}</small></p>`).join('')||'<p class="muted">No recorded history for this stage.</p>';
+    const dialog=studioDialog('Job Flow — '+job.title,`<div class="frontdesk-flow">${stageNames.map((stage,index)=>`<button type="button" class="frontdesk-flow-stage ${index<current?'complete':index===current?'current':'future'}" data-flow-stage-name="${esc(stage)}"><small>${index<current?'Completed':index===current?'Current':'Upcoming'}</small><strong>${esc(stage)}</strong></button>`).join('<span>›</span>')}</div><div class="frontdesk-flow-history"><h3 data-flow-history-title>History</h3><div data-flow-history>${eventMarkup(events)}</div></div>`);
+    dialog.querySelectorAll('[data-flow-stage-name]').forEach(button=>button.onclick=()=>{
+        const stage=button.dataset.flowStageName;
+        dialog.querySelector('[data-flow-history-title]').textContent=stage+' history';
+        const related=events.filter(event=>[event.title,event.eventType,event.detail,event.description].filter(Boolean).join(' ').toLowerCase().includes(stage.toLowerCase()));
+        dialog.querySelector('[data-flow-history]').innerHTML=eventMarkup(related);
+    });
     return dialog;
 }
 
