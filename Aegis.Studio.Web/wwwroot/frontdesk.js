@@ -120,7 +120,7 @@ async function notifyFrontDeskTeam(jobId) {
         return;
     }
 
-    const choices = members.map((member, index) => `${index + 1}. ${member.displayName || member.userName} (${member.userName}) · ${member.source}`).join('\n');
+    const choices = members.map((member, index) => `${index + 1}. ${studioFirstName(member)} · ${member.source}`).join('\n');
     const selected = Number(prompt(`Notify which member?\n\n${choices}`, '1'));
     if (!Number.isInteger(selected) || selected < 1 || selected > members.length) return;
 
@@ -135,7 +135,7 @@ async function notifyFrontDeskTeam(jobId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userName: member.userName, subject, body })
     });
-    alert(result.message || `Notification request accepted for ${member.displayName || member.userName}. Delivery is not yet confirmed.`);
+    alert(result.message || `Notification request accepted for ${studioFirstName(member)}. Delivery is not yet confirmed.`);
 }
 
 loadFrontDeskRole();

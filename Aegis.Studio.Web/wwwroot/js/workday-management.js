@@ -39,11 +39,12 @@
 
   async function loadSessions() {
     try {
-      const rows = await getJson("/api/workday/management/sessions?count=100");
+      const [rows, people] = await Promise.all([getJson("/api/workday/management/sessions?count=100"),getJson("/api/messages/users").catch(() => [])]);
+      studioRememberPeople(people);
       let html = "<table><thead><tr><th>User</th><th>Started</th><th>Ended</th><th>Source</th><th></th></tr></thead><tbody>";
 
       for (const row of rows) {
-        html += "<tr><td>" + escapeHtml(row.userName) + "</td><td>" +
+        html += "<tr><td>" + escapeHtml(studioFirstName(row.userName)) + "</td><td>" +
           new Date(row.startedAtUtc).toLocaleString() + "</td><td>" +
           (row.endedAtUtc ? new Date(row.endedAtUtc).toLocaleString() : "ACTIVE") +
           "</td><td>" + escapeHtml(row.source) + "</td><td>" +
@@ -153,7 +154,7 @@
         "/api/workday/work-sessions/" + id + "/timeline?userName=" + user
       );
 
-      let html = "<b>" + escapeHtml(timeline.userName) + "</b><br>";
+      let html = "<b>" + escapeHtml(studioFirstName(timeline.userName)) + "</b><br>";
       if (timeline.locationEvidence.length) {
         for (const item of timeline.locationEvidence) {
           html += new Date(item.observedAtUtc).toLocaleString() + " · accuracy " +

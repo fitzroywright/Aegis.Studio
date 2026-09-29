@@ -72,7 +72,7 @@
 
     function renderMember(jobId, member, canNotify) {
         const rights = permissionLabels.filter(([key]) => member.permissions?.[key]).map(([,label]) => label).join(', ');
-        return `<div class="job-row"><div><b>${esc(member.displayName)}</b><div class="meta">${esc(member.userName)} · ${member.isActive ? 'Active' : 'Inactive'} · ${member.inheritWorkspacePermissions ? 'Inherits workspace' : 'Job override'}</div><div class="meta">${esc(rights || 'No explicit job rights')}</div></div><div>${canNotify ? `<button class="action" onclick="notifyJobMember('${jobId}','${esc(member.userName)}','${esc(member.displayName)}')">Notify</button>` : ''}<button class="action" onclick="editJobMember('${jobId}','${esc(member.userName)}','${esc(member.displayName)}')">Permissions</button><button class="action" onclick="removeJobMember('${jobId}','${esc(member.userName)}')">Remove</button></div></div>`;
+        return `<div class="job-row"><div><b>${esc(studioFirstName(member))}</b><div class="meta">${member.isActive ? 'Active' : 'Inactive'} · ${member.inheritWorkspacePermissions ? 'Inherits workspace' : 'Job override'}</div><div class="meta">${esc(rights || 'No explicit job rights')}</div></div><div>${canNotify ? `<button class="action" onclick="notifyJobMember('${jobId}','${esc(member.userName)}','${esc(studioFirstName(member))}')">Notify</button>` : ''}<button class="action" onclick="editJobMember('${jobId}','${esc(member.userName)}','${esc(studioFirstName(member))}')">Permissions</button><button class="action" onclick="removeJobMember('${jobId}','${esc(member.userName)}')">Remove</button></div></div>`;
     }
 
     window.saveJobMember = async function(jobId) {

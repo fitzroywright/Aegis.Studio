@@ -85,7 +85,7 @@
                 <div class="message-dialog-heading"><div><h2>New message</h2><p>Start a private Studio conversation.</p></div><button type="button" class="message-dialog-close" aria-label="Close">×</button></div>
                 <label>Studio user
                     <select id="directMessageUser" required>
-                        ${users.map(user => `<option value="${esc(user.userName)}">${esc(user.displayName || user.userName)}${user.displayName && user.displayName !== user.userName ? ` · ${esc(user.userName)}` : ''}</option>`).join('')}
+                        ${users.map(user => `<option value="${esc(user.userName)}">${esc(studioFirstName(user))}</option>`).join('')}
                     </select>
                 </label>
                 <div class="dialog-actions"><button type="button" class="direct-message-cancel">Cancel</button><button type="submit" class="primary">Open conversation</button></div>
@@ -150,7 +150,7 @@
 
     function renderMessage(message) {
         return `<article class="studio-chat-message">
-            <div class="studio-chat-meta"><strong>${esc(message.senderUserName)}</strong><span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
+            <div class="studio-chat-meta"><strong>${esc(studioFirstName(message.senderUserName))}</strong><span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
             <div class="studio-chat-body">${renderMentions(message.body)}</div>
         </article>`;
     }
@@ -162,7 +162,7 @@
 
     async function loadMentionUsers() {
         if (!mentionUsers.length) {
-            try { mentionUsers = await json('/api/messages/users'); } catch { mentionUsers = []; }
+            try { mentionUsers = await json('/api/messages/users'); studioRememberPeople(mentionUsers); } catch { mentionUsers = []; }
         }
         return mentionUsers;
     }
@@ -177,7 +177,7 @@
         const matches = mentionUsers.filter(user =>
             user.userName.toLowerCase().includes(needle) || (user.displayName || '').toLowerCase().includes(needle)).slice(0, 8);
         if (!matches.length) { box.hidden = true; box.innerHTML = ''; return; }
-        box.innerHTML = matches.map((user, index) => `<button type="button" class="mention-option${index === 0 ? ' active' : ''}" data-mention-user="${esc(user.userName)}"><strong>${esc(user.displayName || user.userName)}</strong><small>${esc(user.userName)}</small></button>`).join('');
+        box.innerHTML = matches.map((user, index) => `<button type="button" class="mention-option${index === 0 ? ' active' : ''}" data-mention-user="${esc(user.userName)}"><strong>${esc(studioFirstName(user))}</strong></button>`).join('');
         box.hidden = false;
         box.querySelectorAll('[data-mention-user]').forEach(button => button.onclick = () => insertMention(textarea, button.dataset.mentionUser));
     }
@@ -250,7 +250,7 @@
     function showMentionToast(payload) {
         recentMentionThread = payload.threadId;
         recentMentionAt = Date.now();
-        const sender = payload.senderUserName || 'A Studio user';
+        const sender = payload.senderUserName ? studioFirstName(payload.senderUserName) : 'A Studio user';
         const preview = String(payload.body || '').replace(/\s+/g, ' ').trim();
         showToast('You were mentioned', sender, preview.length > 110 ? `${preview.slice(0, 107)}…` : preview, payload.threadId);
     }

@@ -1,10 +1,8 @@
 function messageFirstName(author, people, fallback = 'Team member', loginOnly = false) {
     const value = String(author || '').trim();
-    const matches = people.filter(p => [p.userName, p.displayName].some(n => String(n || '').toLowerCase() === value.toLowerCase()));
-    const person = matches.find(p => p.givenName || p.firstName || (p.displayName && p.displayName.toLowerCase() !== String(p.userName || '').toLowerCase()));
-    const name = String(person?.givenName || person?.firstName || person?.displayName || (!loginOnly && /\s/.test(value) ? value : '')).trim();
-    if (!name || /[@\\_.0-9]/.test(name)) return fallback;
-    return name.split(/\s+/)[0];
+    if (!value) return fallback;
+    const match = people.find(p => [p.userName, p.displayName].some(n => String(n || '').toLowerCase() === value.toLowerCase()));
+    return studioFirstName(match || value);
 }
 function mergeJobMessages(teamMessages, customerMessages) {
     return [
@@ -96,7 +94,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
             json('/api/auth/me').catch(() => ({}))
         ]);
         const people = [...directory, profile.user || profile];
-        tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(m.displayName)}">${esc((m.displayName||'?').slice(0,1))}</span>`).join('');
+        studioRememberPeople(people);
+        tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(studioFirstName(m))}">${esc(studioFirstName(m).slice(0,1))}</span>`).join('');
         if (version !== revision) return;
         conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}"><span class="job-row-heading"><strong>${esc(job.title)}</strong></span><small>${esc(job.clientName)}</small><small>Event: ${esc(job.eventDate || "Not scheduled")}</small><small class="job-card-assignment"><span>Assigned to: ${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, "Team member", true) : "Unassigned")}</span><span class="job-status">${esc(job.status)}</span></small></button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
         conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(jobs.find(x => x.id === button.dataset.job)).catch(fail));
@@ -139,6 +138,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             ]);
             if (responses[0].status === 'fulfilled') people.push(...responses[0].value);
             if (responses[1].status === 'fulfilled') people.push(responses[1].value.user || responses[1].value);
+            studioRememberPeople(people);
         }
         if (version !== revision) return;
         const combined = mergeJobMessages(messages, conversation?.messages || []);

@@ -27,7 +27,7 @@
         workday:async()=>{window.location.assign('/workday-management.html');},
         admin:async()=>{await showWorkspaces();activateNavigation('admin');}
     };
-    function jobCard(job){return `<article class="task-card"><button class="link-button" data-open-job="${job.id}">${esc(job.title)}</button><small>${esc(job.clientName)} · ${esc(job.status)}</small><small>${esc(job.eventDate||'Date not set')} · ${esc(job.assignedTo||'Unassigned')}</small><button class="action" data-plan-job="${job.id}">Schedule / availability</button></article>`;}
+    function jobCard(job){return `<article class="task-card"><button class="link-button" data-open-job="${job.id}">${esc(job.title)}</button><small>${esc(job.clientName)} · ${esc(job.status)}</small><small>${esc(job.eventDate||'Date not set')} · ${esc(job.assignedTo?studioFirstName(job.assignedTo):'Unassigned')}</small><button class="action" data-plan-job="${job.id}">Schedule / availability</button></article>`;}
     function bindJobs(){genericView.querySelectorAll('[data-open-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.openJob).catch(showError));}
     const back=rail.querySelector('.studio-back-button'),history=[];
     let current={view:'workspaces',workspaceId:null,jobId:null},restoring=false;

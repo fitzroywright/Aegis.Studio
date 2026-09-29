@@ -203,13 +203,13 @@ async function openJob(id) {
             <div>
                 <button class="link-button" onclick="showJobs()">← Jobs</button>
                 <h1>${esc(job.title)}</h1>
-                <p>${esc(job.clientName)} · ${esc(job.status)}${job.assignedTo ? ' · Assigned to ' + esc(job.assignedTo) : ''}</p>
+                <p>${esc(job.clientName)} · ${esc(job.status)}${job.assignedTo ? ' · Assigned to ' + esc(studioFirstName(job.assignedTo)) : ''}</p>
             </div>
             <button class="action" onclick="openConversation('${job.conversationId}')">Open conversation</button>
         </div>
         <div class="cards">
             <div class="metric">Stage<strong>${esc(job.status)}</strong></div>
-            <div class="metric">Assigned to<strong class="metric-text">${esc(job.assignedTo || 'Unassigned')}</strong></div>
+            <div class="metric">Assigned to<strong class="metric-text">${esc(job.assignedTo ? studioFirstName(job.assignedTo) : 'Unassigned')}</strong></div>
         </div>
         <div class="job-actions">
             <button class="primary" onclick="advanceJob('${job.id}','Scheduled')">Schedule</button>
@@ -335,7 +335,7 @@ function renderJobRows(jobs) {
         <button class="job-row job-button" data-job-id="${job.id}">
             <div>
                 <b>${esc(job.title)}</b>
-                <div class="meta">${esc(job.clientName)}${job.assignedTo ? ' · ' + esc(job.assignedTo) : ''}</div>
+                <div class="meta">${esc(job.clientName)}${job.assignedTo ? ' · ' + esc(studioFirstName(job.assignedTo)) : ''}</div>
             </div>
             <span class="status-pill">${esc(job.status)}</span>
         </button>`).join('');

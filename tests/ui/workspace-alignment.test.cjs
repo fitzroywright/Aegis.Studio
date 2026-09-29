@@ -4,6 +4,17 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {JSDOM}=require('jsdom');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
+test('names prefer given or display first name and fall back to login',async()=>{
+ const dom=new JSDOM('<span id="signedInUser"></span><span id="userAvatar"></span>',{runScripts:'outside-only',url:'https://studio.test'});
+ const w=dom.window;w.fetch=async()=>({ok:true,json:async()=>({user:{userName:'fwright',displayName:'Fitzroy Wright'}})});
+ w.eval(fs.readFileSync(path.join(root,'auth.js'),'utf8'));
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(w.document.getElementById('signedInUser').textContent,'Fitzroy');
+ assert.equal(w.studioFirstName('fwright'),'Fitzroy');
+ w.studioRememberPeople([{userName:'taberfa',firstName:'Taberfa',displayName:'T. Brown'}]);
+ assert.equal(w.studioFirstName('taberfa'),'Taberfa');
+ assert.equal(w.studioFirstName('unknown.login'),'unknown.login');
+});
 function environment(){
  const dom=new JSDOM('<div id="panel"></div>',{runScripts:'outside-only',url:'https://studio.test'});
  const w=dom.window;w.showWorkspaces=async()=>{};
@@ -45,6 +56,7 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;
  const job={id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Portraits',clientName:'Client',status:'Scheduled'};
  Object.assign(w,{showWorkspaces:async()=>{},workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
+ w.studioRememberPeople=()=>{};w.studioFirstName=value=>typeof value==='string'?value:(value.firstName||value.givenName||value.displayName||value.userName).split(' ')[0];
  for(const id of ['conversationList','detailPane','workspaceTitle','allButton'])w[id]=w.document.getElementById(id);
  w.fetch=async url=>({ok:true,json:async()=>url.endsWith('/sending-identities')?{identities:[{type:'Workspace'},{type:'Self',isDefault:true}]}:{channel:'Email',messages:[]}});
  w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.endsWith('/media')?{assets:[],subjects:[],unmatched:[],gallery:{default_lens:'Auto'}}:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
@@ -62,8 +74,8 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  assert.equal(requests[1].url,'/api/messages/threads/thread');assert.deepEqual(requests[1].body,{body:'Test reply'});
  assert.equal(requests[2].body.sendingIdentity,'Self');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
- assert.equal(w.messageFirstName('fwright',[],'Team member',true),'Team member');
- assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'Team member');
+ assert.equal(w.messageFirstName('fwright',[],'Team member',true),'fwright');
+ assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'fwright');
  assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Media']);
  assert.equal(w.document.querySelector('.detail-header .activity-button'),null);
  assert.equal(w.document.querySelector('.job-handoff .activity-button')?.textContent,'Activity');
@@ -140,6 +152,7 @@ test('production media separates subject and collection lenses, including uncoll
 test('Pipeline shows stage groups with schedule and task on timeline and calendar',async()=>{
  const dom=new JSDOM('<div id="generic"></div><div id="conversation"></div>',{runScripts:'outside-only',url:'https://studio.test'});
  const w=dom.window;w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.genericView=dom.window.document.getElementById('generic');w.conversationView=dom.window.document.getElementById('conversation');w.activateNavigation=()=>{};w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ w.studioRememberPeople=()=>{};w.studioFirstName=value=>value;
  const today=new Date();const time=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,10).toISOString();const end=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,12).toISOString();
  const requests=[];
  w.json=async(url,options)=>{requests.push(url);if(options)return {id:'new'};if(url==='/api/jobs')return [{id:'job',title:'Wedding',status:'Needs Scheduling',clientName:'Brown'}];if(url.startsWith('/api/schedule/entries?'))return [{id:'shoot',jobId:'job',title:'Wedding shoot',startsAtUtc:time,endsAtUtc:end,resourceIds:['photographer'],status:'Scheduled'},{id:'general',jobId:null,title:'Studio booking',startsAtUtc:time,endsAtUtc:end,resourceIds:[],status:'Tentative'}];if(url==='/api/operations/activities')return [{id:'task',jobId:'job',title:'Confirm location',scheduledAtUtc:time,dueAtUtc:time,status:'NotStarted'}];if(url==='/api/schedule/resources')return [{id:'photographer',name:'Taberfa',resourceType:'Staff',isActive:true}];if(url==='/api/auth/me')return {user:{isAdministrator:true}};throw Error(url);};

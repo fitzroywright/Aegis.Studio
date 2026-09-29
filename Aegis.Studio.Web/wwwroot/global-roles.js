@@ -22,7 +22,7 @@ async function refreshFrontDeskRoleMembers(roleId) {
     const members = await json(`/api/security/global-roles/${roleId}/members`);
     const target = document.getElementById('frontDeskRoleMembers');
     if (!target) return;
-    target.innerHTML = members.length ? members.map(member => `<div class="job-row"><div><b>${esc(member.displayName)}</b><div class="meta">${esc(member.userName)} · ${member.isActive ? 'Active' : 'Inactive'}</div></div><button class="action" onclick="removeFrontDeskRoleMember('${roleId}','${esc(member.userName)}')">Remove</button></div>`).join('') : '<p class="muted">No Front Desk users assigned yet.</p>';
+    target.innerHTML = members.length ? members.map(member => `<div class="job-row"><div><b>${esc(studioFirstName(member))}</b><div class="meta">${member.isActive ? 'Active' : 'Inactive'}</div></div><button class="action" onclick="removeFrontDeskRoleMember('${roleId}','${esc(member.userName)}')">Remove</button></div>`).join('') : '<p class="muted">No Front Desk users assigned yet.</p>';
 }
 
 async function saveFrontDeskRoleMember(roleId) {

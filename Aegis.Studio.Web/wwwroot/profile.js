@@ -23,7 +23,7 @@
     };
 
     function apply(profile) {
-        identity.innerHTML = `<strong>${escapeHtml(profile.displayName || profile.userName)}</strong><span>${escapeHtml(profile.userName)}</span><span>${escapeHtml(profile.email || 'No email in directory')}</span><span>${escapeHtml([profile.title, profile.department].filter(Boolean).join(' · ') || 'No directory role details')}</span>`;
+        identity.innerHTML = `<strong>${escapeHtml(studioFirstName(profile))}</strong><span>${escapeHtml(profile.email || 'No email in directory')}</span><span>${escapeHtml([profile.title, profile.department].filter(Boolean).join(' · ') || 'No directory role details')}</span>`;
         const messaging = profile.messaging || {};
         for (const [key, element] of Object.entries(fields)) element.checked = !!messaging[key];
         document.getElementById('prefDelivery').value = messaging.deliveryMode || 'Immediate';
