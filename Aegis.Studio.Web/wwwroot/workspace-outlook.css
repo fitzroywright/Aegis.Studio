@@ -713,3 +713,5 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 .subject-form input[type="radio"]{
   width:auto;
 }
+
+.conversation-file-source{text-decoration:underline;cursor:pointer}.source-message-highlight{outline:2px solid currentColor;outline-offset:2px;border-radius:8px}
