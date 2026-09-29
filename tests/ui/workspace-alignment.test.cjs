@@ -167,6 +167,15 @@ test('Media collection controls persist names and dropped files target the selec
  panel.querySelector('[data-rename-collection]').click();form=w.document.querySelectorAll('dialog form')[1];form.elements.name.value='Portraits edited';await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.ok(calls.some(x=>x.url.includes('/collections/Portraits')));
 });
+test('upcoming tasks keep the Add task action outside the scrolling task list',async()=>{
+ const {w,panel}=environment();w.studioFirstName=value=>value;
+ w.json=async url=>url.endsWith('/access')?{permissions:{manageProduction:true}}:Array.from({length:8},(_,i)=>({id:'task'+i,title:'Task '+i,status:'NotStarted',assignedTo:'staff'}));
+ w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
+ await w.renderCompactTasks({id:'job'},panel,()=>true);
+ assert.equal(panel.querySelector('.thread-task-list .compact-task')?.textContent.includes('Task 0'),true);
+ assert.equal(panel.querySelector('.thread-task-list [data-all]'),null);
+ assert.equal(panel.querySelector('.thread-task-footer [data-all]')?.textContent,'Add task / View all');
+});
 test('large Media jobs show a searchable subject list beside overflowing images',async()=>{
  const {w,panel}=environment();
  Object.defineProperty(w.HTMLElement.prototype,'clientWidth',{configurable:true,get(){return this.classList.contains('media-drop-surface')?310:0;}});
