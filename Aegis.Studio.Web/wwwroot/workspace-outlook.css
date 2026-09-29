@@ -340,9 +340,9 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 }
 .job-reading-view .job-message-column #hierarchyBody{
   grid-column:1;
-  min-height:24px;
-  height:24px;
-  max-height:72px;
+  min-height:34px;
+  height:34px;
+  max-height:84px;
   width:100%;
   resize:vertical;
   box-sizing:border-box;
@@ -365,7 +365,7 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
   margin:0;
 }
 .job-reading-view .job-message-column>#hierarchyCompose .send-split .primary{
-  min-width:155px;
+  min-width:108px;
   border-radius:8px 0 0 8px;
 }
 .job-reading-view .job-message-column>#hierarchyCompose .send-split select{
