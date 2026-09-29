@@ -22,3 +22,7 @@
 
 .frontdesk-client-summary{display:flex;flex-wrap:wrap;gap:6px 12px;padding:7px 0;font-size:12px;border-top:1px solid var(--theme-border);border-bottom:1px solid var(--theme-border);margin:7px 0 10px}
 .frontdesk-client-summary span{display:inline-flex;gap:4px;align-items:baseline}.frontdesk-client-summary b{font-size:13px}
+
+
+.frontdesk-message-history{max-height:280px;overflow:auto;border:1px solid var(--theme-border);border-radius:8px;padding:6px;margin:6px 0 10px;background:var(--theme-surface)}
+.frontdesk-message-history article{padding:6px 4px;border-bottom:1px solid var(--theme-border)}.frontdesk-message-history article:last-child{border-bottom:0}.frontdesk-message-history small{display:block;color:var(--theme-muted)}.frontdesk-message-history p{margin:4px 0 0;white-space:pre-wrap}
