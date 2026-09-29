@@ -102,28 +102,28 @@ function renderManagementGantt(jobs, scheduleEntries, activities) {
         const production=tasks.filter(item=>item.status!=='Cancelled');
         const completed=production.filter(item=>item.status==='Completed').length;
         const progress=production.length?Math.round(completed/production.length*100):0;
-        return \`<div class="management-gantt-row">
-            <button class="management-gantt-job" type="button" onclick="openJob('\${job.id}')"><strong>\${esc(job.title)}</strong><small>\${esc(job.clientName||'Client not linked')} · \${esc(job.status)}</small></button>
-            <div class="management-gantt-track" style="--gantt-width:\${width}px">
-                <div class="management-gantt-today" style="left:\${todayPct}%"></div>
-                <button class="management-gantt-bar" type="button" onclick="openJob('\${job.id}')" style="left:\${left}%;width:\${span}%">
-                    <span style="width:\${progress}%"></span><b>\${progress}%</b>
+        return `<div class="management-gantt-row">
+            <button class="management-gantt-job" type="button" onclick="openJob('${job.id}')"><strong>${esc(job.title)}</strong><small>${esc(job.clientName||'Client not linked')} · ${esc(job.status)}</small></button>
+            <div class="management-gantt-track" style="--gantt-width:${width}px">
+                <div class="management-gantt-today" style="left:${todayPct}%"></div>
+                <button class="management-gantt-bar" type="button" onclick="openJob('${job.id}')" style="left:${left}%;width:${span}%">
+                    <span style="width:${progress}%"></span><b>${progress}%</b>
                 </button>
             </div>
-        </div>\`;
+        </div>`;
     }).join('');
 
-    return \`<div class="management-gantt-shell">
+    return `<div class="management-gantt-shell">
         <div class="management-gantt-scroll">
-            <div class="management-gantt-grid" style="--gantt-width:\${width}px">
+            <div class="management-gantt-grid" style="--gantt-width:${width}px">
                 <div class="management-gantt-head">
                     <div class="management-gantt-job-head">Job</div>
-                    <div class="management-gantt-axis">\${weeks.map(label=>\`<span>\${esc(label)}</span>\`).join('')}</div>
+                    <div class="management-gantt-axis">${weeks.map(label=>`<span>${esc(label)}</span>`).join('')}</div>
                 </div>
-                \${rows}
+                ${rows}
             </div>
         </div>
-    </div>\`;
+    </div>`;
 }
 
 function renderEscalations(values) {
