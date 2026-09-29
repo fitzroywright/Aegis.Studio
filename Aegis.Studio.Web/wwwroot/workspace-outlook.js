@@ -153,6 +153,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 catch (error) { if (current()) panel.textContent = 'Unable to load: ' + (error.message || error); }
             };
             lower.querySelectorAll('[data-job-tab]').forEach(button => button.onclick = () => activate(button.dataset.jobTab));
+            const handoff=document.createElement('div');handoff.className='job-handoff';
+            lower.prepend(handoff);
+            renderJobHandoff(job,handoff,()=>version===revision).catch(error=>{if(version===revision)handoff.textContent='Job progress could not be loaded. Refresh to retry.';});
             activate('gallery');
         } else detailPane.classList.remove('job-reading-view');
         document.getElementById('hierarchyCompose').onsubmit = async event => {

@@ -36,6 +36,11 @@ public sealed class ShootCoordinator
 
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
+        foreach(Guid resourceId in resources.OrderBy(x=>x))
+        {
+            using var resourceLock=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",connection,transaction);
+            resourceLock.Parameters.AddWithValue(resourceId.ToString("D"));resourceLock.ExecuteNonQuery();
+        }
         EnsureNoConflicts(connection, transaction, resources, request.CallTimeUtc, request.PlannedEndUtc);
 
         Guid scheduleId = Guid.NewGuid();
@@ -71,6 +76,8 @@ public sealed class ShootCoordinator
             audit.Transaction = transaction; audit.CommandText="insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,'ShootScheduled',$3,$4,now())";
             audit.Parameters.AddWithValue(Guid.NewGuid()); audit.Parameters.AddWithValue(jobId); audit.Parameters.AddWithValue(userName); audit.Parameters.AddWithValue($"{photographer.DisplayName} at {request.CallTimeUtc:u}; schedule {scheduleId}"); audit.ExecuteNonQuery();
         }
+        using(var jobUpdate=new NpgsqlCommand("update studio_jobs set assigned_to=coalesce(nullif(assigned_to,''),$2),status=case when status in ('New','Needs Scheduling','Confirmed') then 'Scheduled' else status end where id=$1",connection,transaction))
+        {jobUpdate.Parameters.AddWithValue(jobId);jobUpdate.Parameters.AddWithValue(photographer.UserName);jobUpdate.ExecuteNonQuery();}
         transaction.Commit();
         return new OperationalWorkStore(database).GetShoots(jobId).Single(x => x.Id == shootId);
     }
@@ -94,3 +101,4 @@ public sealed class ShootCoordinator
 }
 
 public sealed record IntegratedShootRequest(string PhotographerUserName,string? AssistantUserName,DateTimeOffset CallTimeUtc,DateTimeOffset PlannedEndUtc,string? Location,string? CoverageNotes,string? EquipmentNotes,IReadOnlyList<Guid>? ResourceIds);
+

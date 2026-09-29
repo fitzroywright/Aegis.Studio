@@ -54,7 +54,7 @@ test('workspace job renders four lower tabs with details in the job list',async(
  for(const id of ['conversationList','detailPane','workspaceTitle','allButton'])w[id]=w.document.getElementById(id);
  w.fetch=async url=>({ok:true,json:async()=>url.endsWith('/sending-identities')?{identities:[{type:'Workspace'},{type:'Self',isDefault:true}]}:{channel:'Email',messages:[]}});
  w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
- w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
+ w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,10));
  assert.equal(w.document.querySelector('#jobInternalNote'),null);
  assert.equal(w.document.querySelector('#jobSendingIdentity').value,'Workspace');
@@ -88,4 +88,20 @@ test('announcement banner disappears only after dismissal succeeds',async()=>{
  await button.onclick();assert.ok(panel.querySelector('article'));assert.equal(button.disabled,false);
  fail=false;await button.onclick();assert.equal(panel.hidden,true);
  assert.equal(calls.at(-1),'/api/workspaces/workspace/announcements/notice/dismiss');
+});
+test('job handoff uses shoot completion, never first upload, and shows blocked work',()=>{
+ const {w}=environment();w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));
+ const job={status:'Photography'};
+ let summary=w.jobHandoffSummary(job,[{checkedOutAtUtc:null}],[],[{id:'image'}]);
+ assert.equal(summary.finishedCount,0);assert.equal(summary.next,'Complete the scheduled shoot');
+ summary=w.jobHandoffSummary(job,[{checkedOutAtUtc:'2026-09-29T17:00:00Z'}],[{status:'Blocked'}],[{id:'image'}]);
+ assert.equal(summary.blockedTasks,1);assert.equal(summary.next,'Resolve blocked tasks');
+ assert.equal(w.jobHandoffSummary({status:'Completed'},[],[],[]).next,'Completed');
+});
+test('FrontDesk search preserves focus and separates enquiry and booking queues',()=>{
+ const {w,panel}=environment();panel.id='genericView';
+ Object.assign(w,{activateView(){},activateNavigation(){},conversationView:{classList:{add(){}}},genericView:panel,money:n=>'JMD '+n,openWorkspaceJob(){},openPos(){},json:async()=>({frontDesk:true,user:{isAdministrator:true}})});
+ w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nfrontDeskJobs=[{id:'job',clientName:'Campbell',title:'Wedding',status:'Needs Scheduling'}];frontDeskRequests=[{id:'request',request:{clientName:'Campbell',title:'Wedding',eventDate:'2026-10-10',requiredDeposit:100,workspaceId:'workspace'},recordedDeposit:40,status:'AwaitingDeposit'}];frontDeskWorkspaces=[{id:'workspace',name:'Weddings'}];renderFrontDesk();");
+ const input=panel.querySelector('#frontDeskSearch');input.focus();input.value='Campbell';input.oninput({target:input});assert.equal(panel.querySelector('#frontDeskSearch'),input);assert.equal(w.document.activeElement,input);
+ assert.match(panel.textContent,/Partial deposit/);assert.match(panel.textContent,/Record verified deposit/);assert.equal(panel.querySelector('[data-frontdesk-job]'),null);
 });
