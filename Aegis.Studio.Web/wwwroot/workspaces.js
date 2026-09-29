@@ -16,11 +16,11 @@ async function showWorkspaces() {
         genericView.innerHTML = `
             <div class="job-detail-header"><div><h1>Workspaces</h1><p>Workspace access is membership based. Permissions control what each member can see and do.</p></div></div>
             <section class="job-section"><h2>Your workspaces</h2>${manageable.length ? manageable.map(item => renderWorkspaceAdminRow(item.workspace, item.permissions, isAdministrator)).join('') : '<p class="muted">You do not administer any workspaces.</p>'}</section>
-            ${isAdministrator ? `<section class="job-section"><h2>Create workspace</h2><p><button class="action" onclick="seedStudioDemoData(this)">Load demo data</button></p><p class="muted">Routing uses the exact email address or route key. Membership can be assigned immediately after creation.</p><div class="pos-entry"><label>Name<input id="workspaceName"></label><label>Email address<input id="workspaceEmail" type="email"></label><label>Route key<input id="workspaceRouteKey"></label><button class="primary" onclick="createWorkspace()">Create workspace</button></div></section>` : ''}
+            ${isAdministrator ? `<section class="job-section"><h2>Create workspace</h2><p><button class="action" onclick="seedStudioDemoData(this)">Load demo data</button></p><p class="muted">Routing uses the exact email address or route key. Every operational workspace requires a Workspace Manager.</p><div class="pos-entry"><label>Name<input id="workspaceName"></label><label>Email address<input id="workspaceEmail" type="email"></label><label>Route key<input id="workspaceRouteKey"></label><label>Manager user name<input id="workspaceManagerUser" placeholder="domain user name"></label><label>Manager display name<input id="workspaceManagerDisplay"></label><button class="primary" onclick="createWorkspace()">Create workspace</button></div></section>` : ''}
             <section id="workspaceMemberPanel" class="job-section hidden"></section>
             <section id="workspaceImportPanel" class="job-section hidden"></section>
             ${isAdministrator ? renderSecurityRolesSection() + renderWorkflowSection() : ''}`;
-        if (isAdministrator) await refreshWorkflowList();
+        await hydrateWorkspaceManagers(manageable);if (isAdministrator) await refreshWorkflowList();
     } catch (error) {
         genericView.innerHTML = `<h1>Workspaces</h1><div class="empty-state" style="text-align:left"><h2>Unable to load workspace administration</h2><p>${esc(error.message || error)}</p></div>`;
     }
@@ -29,14 +29,33 @@ async function showWorkspaces() {
 function renderWorkspaceAdminRow(workspace, permissions, isAdministrator) {
     const canEdit = isAdministrator || permissions.editWorkspace || permissions.adminWorkspace;
     const canMembers = isAdministrator || permissions.manageMembers || permissions.adminWorkspace;
-    return `<div class="job-row"><div><b>${esc(workspace.name)}</b><div class="meta">${esc(workspace.emailAddress || 'No email')} · route ${esc(workspace.routeKey || 'none')} · ${workspace.isEnabled ? 'Enabled' : 'Disabled'}</div></div><div>${canMembers ? `<button class="action" onclick="manageWorkspaceMembers('${workspace.id}','${esc(workspace.name)}')">Members & permissions</button>` : ''}${canEdit ? `<button class="action" onclick="showMailboxImport('${workspace.id}','${esc(workspace.name)}')">Import old email</button><button class="action" onclick="editWorkspace('${workspace.id}')">Edit</button>` : ''}</div></div>`;
+    return `<div class="job-row"><div><b>${esc(workspace.name)}</b><div class="meta">${esc(workspace.emailAddress || 'No email')} · route ${esc(workspace.routeKey || 'none')} · ${workspace.isEnabled ? 'Enabled' : 'Disabled'}</div><div class="meta" data-workspace-managers="${workspace.id}">Manager: loading…</div></div><div>${canMembers ? `<button class="action" onclick="manageWorkspaceMembers('${workspace.id}','${esc(workspace.name)}')">Members & permissions</button>` : ''}${canEdit ? `<button class="action" onclick="showMailboxImport('${workspace.id}','${esc(workspace.name)}')">Import old email</button><button class="action" onclick="editWorkspace('${workspace.id}')">Edit</button>` : ''}</div></div>`;
 }
 
 async function createWorkspace() {
     const name = document.getElementById('workspaceName').value.trim();
+    const managerUser=document.getElementById('workspaceManagerUser').value.trim();
+    const managerDisplay=document.getElementById('workspaceManagerDisplay').value.trim()||managerUser;
     if (!name) return alert('Workspace name is required.');
+    if (!managerUser) return alert('A Workspace Manager user name is required.');
     const workspace = await json('/api/admin/workspaces/', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, emailAddress:document.getElementById('workspaceEmail').value.trim()||null, routeKey:document.getElementById('workspaceRouteKey').value.trim()||null, isEnabled:true, sortOrder:0 }) });
+    try{
+        await json('/api/workspaces/'+workspace.id+'/managers/'+encodeURIComponent(managerUser),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:managerUser,displayName:managerDisplay,isActive:true,permissions:null})});
+    }catch(error){
+        alert('Workspace was created, but its manager could not be assigned: '+error.message+' Assign the manager before using this workspace.');
+    }
     await loadWorkspaces(); await showWorkspaces(); await manageWorkspaceMembers(workspace.id, workspace.name);
+}
+
+async function hydrateWorkspaceManagers(items){
+    await Promise.all(items.map(async item=>{
+        const target=document.querySelector('[data-workspace-managers="'+item.workspace.id+'"]');if(!target)return;
+        try{
+            const managers=await json('/api/workspaces/'+item.workspace.id+'/managers');
+            target.textContent=managers.length?'Manager: '+managers.map(m=>studioFirstName(m)).join(', '):'Manager required';
+            target.classList.toggle('risk',!managers.length);
+        }catch{target.textContent='Manager status unavailable';}
+    }));
 }
 
 async function editWorkspace(id) {
