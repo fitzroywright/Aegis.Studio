@@ -155,7 +155,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if(job){
             const filesPanel=document.createElement('section');
             filesPanel.className='thread-shared-files';
-            document.getElementById('combinedJobMessages').appendChild(filesPanel);
+            const messagesPanel=document.getElementById('combinedJobMessages');
+            const conversationRow=document.createElement('div');
+            conversationRow.className='job-conversation-row';
+            messagesPanel.before(conversationRow);
+            conversationRow.append(messagesPanel,filesPanel);
             const current=()=>version===revision;
             const refreshFiles=()=>renderConversationFiles(job,filesPanel,current,refreshFiles);
             refreshFiles().catch(error=>{if(current())filesPanel.textContent='Conversation files could not be loaded: '+error.message;});
