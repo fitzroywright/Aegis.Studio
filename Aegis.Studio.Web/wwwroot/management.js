@@ -1,7 +1,7 @@
 if (!document.querySelector('link[href="/management.css"]')) {
     const managementStyles = document.createElement('link');
     managementStyles.rel = 'stylesheet';
-    managementStyles.href = '/management.css?v=20260929-gantt';
+    managementStyles.href = '/management.css?v=20260929-formpass';
     document.head.appendChild(managementStyles);
 }
 
