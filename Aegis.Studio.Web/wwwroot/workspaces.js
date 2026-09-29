@@ -165,7 +165,7 @@ const workspaceNavigationButton = document.querySelector('.brand-button[data-vie
 if (workspaceNavigationButton) workspaceNavigationButton.onclick = () => showWorkspaces();
 
 async function seedStudioDemoData(button) {
-    if (!confirm('Add fictional DEMO workspaces, enquiries, jobs, schedules, tasks and deposits to this database? Sample deposits will appear in account totals. Use a demo database.')) return;
+    if (!confirm('Load or upgrade the DEMO workspaces with gallery illustrations, versions, subjects, appointments and scheduled tasks? Existing demo data will be kept and duplicates skipped. The initial demo includes fictional deposits in account totals. Use a demo database.')) return;
     button.disabled = true;
     try {
         const result = await json('/api/admin/demo/seed', { method: 'POST' });

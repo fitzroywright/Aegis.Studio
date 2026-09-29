@@ -9,7 +9,7 @@ public static class DemoDataEndpoints
 {
     public static void MapStudioDemoData(this WebApplication app)
     {
-        app.MapPost("/api/admin/demo/seed", (ClaimsPrincipal user, StudioDatabase database) =>
+        app.MapPost("/api/admin/demo/seed", (ClaimsPrincipal user, StudioDatabase database, IConfiguration configuration, IWebHostEnvironment environment) =>
         {
             string? login = user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrWhiteSpace(login)) return Results.BadRequest(new { error = "A login identifier is required." });
@@ -20,8 +20,8 @@ public static class DemoDataEndpoints
             command.CommandText = "select pg_advisory_xact_lock(72709128)";
             command.ExecuteNonQuery();
             command.CommandText = "select exists(select 1 from studio_state where key='demo-data-v1')";
-            if ((bool)command.ExecuteScalar()!) return Results.Ok(new { message = "Demo data is already loaded. Open the DEMO workspaces." });
-            foreach (string statement in SeedStatements)
+            bool originalLoaded = (bool)command.ExecuteScalar()!;
+            foreach (string statement in originalLoaded ? Array.Empty<string>() : SeedStatements)
             {
                 using var seedCommand = connection.CreateCommand();
                 seedCommand.Transaction = transaction;
@@ -29,8 +29,9 @@ public static class DemoDataEndpoints
                 if (statement.Contains("$1", StringComparison.Ordinal)) seedCommand.Parameters.AddWithValue(login);
                 seedCommand.ExecuteNonQuery();
             }
+            bool expanded = DemoDataExpansion.Seed(connection, transaction, login, configuration, environment);
             transaction.Commit();
-            return Results.Ok(new { message = "Demo data loaded: 3 workspaces, 9 conversations, 6 jobs, 6 schedules, 6 production tasks and 6 sample deposits. Open a DEMO workspace to explore." });
+            return Results.Ok(new { message = expanded ? "Demo data expanded: 24 gallery illustrations (30 versions), 12 upcoming appointments, 24 scheduled tasks, 16 subjects, 3 announcements and 3 room resources added to the DEMO workspaces. Open Jobs → Gallery or Tasks / Calendar; appointments are under Pipeline → Open scheduling. No images were published." : "Demo data is already up to date. Open a DEMO workspace to explore Gallery, Subjects and Tasks / Calendar." });
         }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
     }
 
