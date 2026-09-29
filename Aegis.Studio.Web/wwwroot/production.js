@@ -3,40 +3,152 @@ let shootCache = new Map();
 let operationalJobs = new Map();
 let photographerCache = [];
 let scheduleResourceCache = [];
+let productionSelectedJob = '';
 
 showProduction = async function() {
     activateNavigation('production');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
 
-    const [summary, activities, shoots, jobs, photographers, resources] = await Promise.all([
-        json('/api/operations/summary'), json('/api/operations/activities'), json('/api/operations/shoots'), json('/api/jobs'), json('/api/photographers'), json('/api/schedule/resources')
+    const [activities, shoots, jobs, photographers, resources] = await Promise.all([
+        json('/api/operations/activities'), json('/api/operations/shoots'), json('/api/jobs'), json('/api/photographers'), json('/api/schedule/resources')
     ]);
     operationalActivityCache = new Map(activities.map(item => [item.id,item]));
     shootCache = new Map(shoots.map(item => [item.id,item]));
     operationalJobs = new Map(jobs.map(job => [job.id,job]));
     photographerCache = photographers; studioRememberPeople(photographers);
     scheduleResourceCache = resources;
-    const openActivities = activities.filter(item => item.status !== 'Completed' && item.status !== 'Cancelled');
+
+    const activeJobs=jobs.filter(job=>job.status!=='Completed');
+    if(!productionSelectedJob||!jobs.some(job=>job.id===productionSelectedJob))
+        productionSelectedJob=activeJobs[0]?.id||jobs[0]?.id||'';
+    const selectedJob=jobs.find(job=>job.id===productionSelectedJob)||null;
+    const selectedActivities=selectedJob?activities.filter(item=>item.jobId===selectedJob.id):[];
+    const selectedShoots=selectedJob?shoots.filter(item=>item.jobId===selectedJob.id):[];
+    const completed=selectedActivities.filter(item=>item.status==='Completed').length;
+    const progress=selectedActivities.length?Math.round(completed/selectedActivities.length*100):0;
+    const activeCount=activities.filter(item=>!['Completed','Cancelled'].includes(item.status)).length;
+    const blockedCount=activities.filter(item=>item.status==='Blocked').length;
 
     genericView.innerHTML = `
-      <div class="job-detail-header"><div><h1>Production & Photography</h1><p>One operational system for photographer assignments, scheduling, resources, verified media, production, delivery and archive.</p></div></div>
-      <div class="cards">
-        <div class="metric">Shoots today<strong>${summary.shootsToday}</strong></div><div class="metric">On shoot now<strong>${summary.shootsInProgress}</strong></div>
-        <div class="metric">Awaiting verified backup<strong>${summary.shootsAwaitingBackup}</strong></div><div class="metric">Reshoots<strong>${summary.reshootsRequired}</strong></div>
-        <div class="metric">Open activities<strong>${summary.openActivities}</strong></div><div class="metric">Blocked<strong>${summary.blockedActivities}</strong></div><div class="metric">Overdue<strong>${summary.overdueActivities}</strong></div>
-      </div>
-      <section class="job-section"><div class="job-detail-header"><div><h2>Photographers</h2><p class="muted">Profiles, skills, availability and linked staff schedule resources.</p></div><button class="action" onclick="createPhotographerProfile()">+ Photographer</button></div>
-        ${photographers.length ? photographers.map(renderPhotographer).join('') : '<p class="muted">No photographer profiles yet.</p>'}
+      <section class="production-hub">
+        <header class="production-hub-header">
+          <div><h1>Production</h1><p>Live work, ownership, progress, handoffs and team communication.</p></div>
+          <div class="production-header-actions">
+            <span class="production-status-summary">${activeCount} active · ${blockedCount} blocked</span>
+            <button class="action" onclick="createPhotographerProfile()">+ Photographer</button>
+            <button class="action" onclick="openShootForm(productionSelectedJob)">+ Shoot</button>
+            <button class="primary" onclick="openActivityForm(productionSelectedJob)">+ Activity</button>
+          </div>
+        </header>
+        <div class="production-hub-grid">
+          <aside class="production-queue">
+            <div class="production-pane-title"><strong>Activity Hub</strong><span>${activeJobs.length} jobs</span></div>
+            <div class="production-queue-scroll">
+              ${activeJobs.map(job=>productionJobCard(job,activities,shoots)).join('')||'<p class="muted">No active production jobs.</p>'}
+            </div>
+          </aside>
+          <main class="production-workspace">
+            ${selectedJob?productionWorkspaceMarkup(selectedJob,selectedActivities,selectedShoots,progress):'<div class="empty-state"><h2>No production job selected</h2></div>'}
+          </main>
+          <aside class="production-comms">
+            ${selectedJob?productionCommsMarkup(selectedJob):'<div class="production-pane-title"><strong>Communication</strong></div>'}
+          </aside>
+        </div>
       </section>
-      <section class="job-section"><div class="job-detail-header"><div><h2>Shoots</h2><p class="muted">Each shoot is created together with its schedule entry and resource reservations.</p></div><button class="primary" onclick="openShootForm()">+ Schedule shoot</button></div>${shoots.length ? shoots.map(renderShootRow).join('') : '<p class="muted">No shoots scheduled.</p>'}</section>
-      <section class="job-section"><div class="job-detail-header"><div><h2>Production activities</h2><p class="muted">The single production engine: ingest, backup, cull, edit, retouch, proof, print, QC, delivery and archive.</p></div><button class="primary" onclick="openActivityForm()">+ Activity</button></div>${openActivities.length ? openActivities.map(renderActivityRow).join('') : '<p class="muted">No open activities.</p>'}</section>
-      <section class="job-section"><h2>Workflow templates</h2>${jobs.map(job => `<div class="job-row"><div><b>${esc(job.title)}</b><div class="meta">${esc(job.clientName)} · ${esc(job.status)}</div></div><div><button class="action" onclick="applyProductionTemplate('${job.id}','standard')">Standard</button><button class="action" onclick="applyProductionTemplate('${job.id}','graduation')">Graduation</button><button class="action" onclick="applyProductionTemplate('${job.id}','id')">ID</button><button class="action" onclick="openJobOperations('${job.id}')">Operations</button></div></div>`).join('') || '<p class="muted">No jobs yet.</p>'}</section>
       ${buildActivityDialog(jobs)}${buildShootDialog(jobs,photographers,resources)}`;
 
     activityForm.onsubmit = createOperationalActivity;
     shootForm.onsubmit = createShootSession;
+    genericView.querySelectorAll('[data-production-job]').forEach(button=>button.onclick=()=>{productionSelectedJob=button.dataset.productionJob;showProduction().catch(error=>alert(error.message||error));});
+    if(selectedJob) await loadProductionComms(selectedJob);
 };
+
+function productionJobProgress(job,activities){
+    const list=activities.filter(item=>item.jobId===job.id&&!['Cancelled'].includes(item.status));
+    if(!list.length)return 0;
+    return Math.round(list.filter(item=>item.status==='Completed').length/list.length*100);
+}
+function productionJobCard(job,activities,shoots){
+    const mine=activities.filter(item=>item.jobId===job.id&&!['Completed','Cancelled'].includes(item.status));
+    const next=mine.slice().sort((a,b)=>new Date(a.dueAtUtc||a.scheduledAtUtc||'2999-01-01')-new Date(b.dueAtUtc||b.scheduledAtUtc||'2999-01-01'))[0];
+    const progress=productionJobProgress(job,activities);
+    const active=job.id===productionSelectedJob;
+    const owner=next?.assignedTo?studioFirstName(next.assignedTo):job.assignedTo?studioFirstName(job.assignedTo):'Unassigned';
+    return `<button class="production-job-card ${active?'active':''}" data-production-job="${job.id}">
+      <span class="production-card-top"><strong>${esc(job.title)}</strong><small>${progress}%</small></span>
+      <span class="production-card-client">${esc(job.clientName||'Client not linked')}</span>
+      <span class="production-card-flow"><i style="width:${progress}%"></i></span>
+      <span class="production-card-next">${next?`${esc(next.activityType)} · ${esc(next.title)}`:'No open activity'}</span>
+      <span class="production-card-owner">${esc(owner)} · ${esc(job.status)}</span>
+    </button>`;
+}
+function productionActivityPercent(activity){
+    if(activity.status==='Completed')return 100;
+    if(activity.status==='InProgress')return 55;
+    if(activity.status==='Blocked')return 35;
+    return 10;
+}
+function productionWorkspaceMarkup(job,activities,shoots,progress){
+    const ordered=activities.slice().sort((a,b)=>new Date(a.scheduledAtUtc||a.dueAtUtc||a.createdAtUtc||0)-new Date(b.scheduledAtUtc||b.dueAtUtc||b.createdAtUtc||0));
+    return `<div class="production-workspace-head">
+      <div><span class="production-kicker">Selected job</span><h2>${esc(job.title)}</h2><p>${esc(job.clientName)} · ${esc(job.status)}</p></div>
+      <div class="production-job-progress"><strong>${progress}%</strong><span><i style="width:${progress}%"></i></span></div>
+    </div>
+    <div class="production-flow-scroll">
+      <section class="production-flow">
+        <div class="production-pane-title"><strong>Activity Flow</strong><span>Who is doing what, for this job</span></div>
+        ${ordered.length?ordered.map((activity,index)=>productionFlowItem(activity,index,ordered.length)).join(''):'<p class="muted">No production activities yet.</p>'}
+      </section>
+      <section class="production-shoot-strip">
+        <div class="production-pane-title"><strong>Photography / Shoots</strong><span>${shoots.length}</span></div>
+        ${shoots.length?shoots.map(renderShootRow).join(''):'<p class="muted">No shoots scheduled.</p>'}
+      </section>
+    </div>`;
+}
+function productionFlowItem(activity,index,total){
+    const owner=activity.assignedTo?studioFirstName(activity.assignedTo):'Unassigned';
+    const percent=productionActivityPercent(activity);
+    return `<article class="production-flow-item ${String(activity.status).toLowerCase()}">
+      <div class="production-flow-rail"><span>${index+1}</span>${index<total-1?'<i></i>':''}</div>
+      <div class="production-flow-body">
+        <div class="production-flow-heading"><div><strong>${esc(activity.activityType)} · ${esc(activity.title)}</strong><small>${esc(owner)}${activity.dueAtUtc?' · due '+esc(new Date(activity.dueAtUtc).toLocaleString()):''}</small></div><span class="status-pill">${esc(activity.status)}</span></div>
+        <div class="production-mini-progress"><i style="width:${percent}%"></i></div>
+        ${activity.blockedReason?`<p class="production-blocked">Blocked: ${esc(activity.blockedReason)}</p>`:activity.description?`<p>${esc(activity.description)}</p>`:''}
+        <div class="production-inline-actions"><button class="action" onclick="setOperationalActivityStatus('${activity.id}','InProgress')">Start</button><button class="action" onclick="blockOperationalActivity('${activity.id}')">Block</button><button class="action" onclick="setOperationalActivityStatus('${activity.id}','Completed')">Complete</button></div>
+      </div>
+    </article>`;
+}
+function productionCommsMarkup(job){
+    return `<div class="production-pane-title"><strong>Communication & Actions</strong><span>Job team</span></div>
+      <div class="production-action-bar">
+        <button class="action" onclick="openWorkspaceJob('${job.id}')">Open Job</button>
+        <button class="action" onclick="openActivityForm('${job.id}')">Add Activity</button>
+        <button class="action" onclick="openShootForm('${job.id}')">Schedule Shoot</button>
+        <button class="action" onclick="openMediaArchive('${job.id}','')">Media</button>
+      </div>
+      <div class="production-comms-tabs"><button class="active" data-production-message-scope="job">Job messages</button><button data-production-message-scope="workspace">Workspace</button></div>
+      <div id="productionMessageHistory" class="production-message-history"><p class="muted">Loading messages…</p></div>
+      <form id="productionMessageComposer" class="production-message-composer"><textarea name="body" placeholder="Message the team…" required></textarea><button class="primary" type="submit">Send</button></form>
+      <details class="production-people"><summary>People & resources</summary>
+        <div>${photographerCache.filter(p=>p.isActive).map(p=>`<span>${esc(studioFirstName(p))}</span>`).join('')||'<span>No active photographers</span>'}</div>
+      </details>`;
+}
+async function loadProductionComms(job,scope='job'){
+    const history=document.getElementById('productionMessageHistory'),form=document.getElementById('productionMessageComposer');
+    if(!history||!form)return;
+    try{
+        const scopeType=scope==='workspace'?'Workspace':'Job';
+        const scopeId=scope==='workspace'?job.workspaceId:job.id;
+        const thread=await json(`/api/messages/threads/${scopeType}/${scopeId}`,{method:'POST'});
+        const messages=await json(`/api/messages/threads/${thread.id}`);
+        history.innerHTML=messages.length?messages.map(message=>`<article class="production-message"><strong>${esc(studioFirstName(message.senderUserName))}</strong><small>${esc(new Date(message.createdAtUtc).toLocaleString())}</small><p>${esc(message.body)}</p></article>`).join(''):'<p class="muted">No messages yet.</p>';
+        history.scrollTop=history.scrollHeight;
+        form.dataset.threadId=thread.id;
+    }catch(error){history.innerHTML=`<p class="muted">${esc(error.message||'Messages unavailable.')}</p>`;}
+    genericView.querySelectorAll('[data-production-message-scope]').forEach(button=>button.onclick=async()=>{genericView.querySelectorAll('[data-production-message-scope]').forEach(x=>x.classList.toggle('active',x===button));await loadProductionComms(job,button.dataset.productionMessageScope);});
+    form.onsubmit=async event=>{event.preventDefault();const body=form.elements.body.value.trim();if(!body||!form.dataset.threadId)return;const button=form.querySelector('button');button.disabled=true;try{await json(`/api/messages/threads/${form.dataset.threadId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body})});form.reset();await loadProductionComms(job,genericView.querySelector('[data-production-message-scope].active')?.dataset.productionMessageScope||'job');}catch(error){alert(error.message||error);}finally{button.disabled=false;}};
+}
 
 function renderPhotographer(p) {
     return `<div class="job-row"><div><b>${esc(studioFirstName(p))}</b><div class="meta">${esc(p.employmentType)} · ${p.isActive ? 'Active' : 'Inactive'}</div><div class="meta">${esc((p.skills||[]).join(', ') || 'No skills listed')}</div></div><div><button class="action" onclick="addPhotographerAvailability('${esc(p.userName)}')">Availability</button></div></div>`;
