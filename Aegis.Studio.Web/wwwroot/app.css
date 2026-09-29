@@ -18,3 +18,7 @@
 .frontdesk-queue-search{margin:8px 0}.frontdesk-queue-search input{min-width:260px}
 .message-attachment-control{display:inline-flex;align-items:center;width:max-content}
 @media(max-width:900px){.frontdesk-operational-desk{grid-template-columns:1fr}.frontdesk-client-row{grid-template-columns:1fr auto}.frontdesk-client-row small{grid-column:1/-1}}
+
+
+.frontdesk-client-summary{display:flex;flex-wrap:wrap;gap:6px 12px;padding:7px 0;font-size:12px;border-top:1px solid var(--theme-border);border-bottom:1px solid var(--theme-border);margin:7px 0 10px}
+.frontdesk-client-summary span{display:inline-flex;gap:4px;align-items:baseline}.frontdesk-client-summary b{font-size:13px}
