@@ -6,6 +6,13 @@ const pipelineStages = [
     ['Production', ['Production']],
     ['Delivery', ['Ready for Client', 'Completed']]
 ];
+const pipelineStageTargets = {
+    'Needs scheduling':'Needs Scheduling',
+    'Scheduled':'Scheduled',
+    'Photography':'Photography',
+    'Production':'Production',
+    'Delivery':'Ready for Client'
+};
 let pipelineView = 'timeline';
 let pipelineAnchor = new Date();
 let pipelineSelectedJob = '';
@@ -40,7 +47,8 @@ function pipelineItems(entries, tasks, jobs) {
 }
 function pipelineItemMarkup(item, resourceMap) {
     const staff = item.type === 'task' ? studioFirstName(item.assignedTo) : item.resourceIds.map(id => resourceMap.get(id)?.name).filter(Boolean).join(', ');
-    return `<button class="pipeline-event ${item.type}" data-open-job="${esc(item.jobId || '')}" title="${esc(item.title)} · ${esc(staff || 'Unassigned')}${item.location ? ' · ' + esc(item.location) : ''}"><span class="pipeline-event-symbol">${item.type === 'task' ? '✓' : '◉'}</span>${esc(item.title)}<small>${esc(staff || item.status || '')}</small></button>`;
+    const draggable = item.jobId ? ' draggable="true" data-pipeline-item="'+item.id+'" data-pipeline-item-type="'+item.type+'"' : '';
+    return `<button class="pipeline-event ${item.type}"${draggable} data-open-job="${esc(item.jobId || '')}" title="${esc(item.title)} · ${esc(staff || 'Unassigned')}${item.location ? ' · ' + esc(item.location) : ''}"><span class="pipeline-event-symbol">${item.type === 'task' ? '✓' : '◉'}</span><span class="pipeline-event-copy">${esc(item.title)}<small>${esc(staff || item.status || '')}</small></span></button>`;
 }
 function pipelineTimeline(jobs, items, resourceMap) {
     const start = new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth(), pipelineAnchor.getDate());
@@ -52,11 +60,12 @@ function pipelineTimeline(jobs, items, resourceMap) {
         if (!grouped.length) return '';
         return `<section class="pipeline-stage-lane"><h3>${esc(stage)} <small>${grouped.length}</small></h3>${grouped.map(job => {
             const byDay = days.map(day => items.filter(item => item.jobId === job.id && pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day));
-            return `<div class="pipeline-timeline-row"><button class="pipeline-job-link" data-open-job="${job.id}"><strong>${esc(job.title)}</strong><small>${esc(job.clientName || 'Client not linked')} · ${esc(job.status)}</small></button>${byDay.map((events, i) => `<div class="pipeline-day-cell ${days[i] === today ? 'today' : ''}">${events.map(event => pipelineItemMarkup(event,resourceMap)).join('')}</div>`).join('')}</div>`;
+            const jobItems=items.filter(item=>item.jobId===job.id),done=jobItems.filter(item=>['Completed','Ready'].includes(item.status)).length,progress=jobItems.length?Math.round(done/jobItems.length*100):0;
+            return `<div class="pipeline-timeline-row"><div class="pipeline-job-flow-card"><button class="pipeline-job-link" data-open-job="${job.id}"><strong>${esc(job.title)}</strong><small>${esc(job.clientName || 'Client not linked')} · ${esc(job.status)}</small></button><div class="pipeline-job-flow"><span><i style="width:${progress}%"></i></span><small>${progress}%</small></div><div class="pipeline-job-flow-actions"><button type="button" class="action" data-pipeline-advance="${job.id}" title="Move to next stage">Next</button><button type="button" class="action" data-pipeline-manage="${job.id}" title="Change stage or workspace">Move</button></div></div>${byDay.map((events, i) => `<div class="pipeline-day-cell ${days[i] === today ? 'today' : ''}" data-pipeline-day="${days[i]}">${events.map(event => pipelineItemMarkup(event,resourceMap)).join('')}</div>`).join('')}</div>`;
         }).join('')}</section>`;
     }).join('');
     const unlinked = items.filter(item => !item.jobId);
-    const other = unlinked.length ? `<section class="pipeline-stage-lane"><h3>Unlinked schedule <small>${unlinked.length}</small></h3><div class="pipeline-timeline-row"><span class="pipeline-job-link"><strong>General bookings and resources</strong></span>${days.map(day => `<div class="pipeline-day-cell ${day === today ? 'today' : ''}">${unlinked.filter(item => pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day).map(item => pipelineItemMarkup(item,resourceMap)).join('')}</div>`).join('')}</div></section>` : '';
+    const other = unlinked.length ? `<section class="pipeline-stage-lane"><h3>Unlinked schedule <small>${unlinked.length}</small></h3><div class="pipeline-timeline-row"><span class="pipeline-job-link"><strong>General bookings and resources</strong></span>${days.map(day => `<div class="pipeline-day-cell ${day === today ? 'today' : ''}" data-pipeline-day="${day}">${unlinked.filter(item => pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day).map(item => pipelineItemMarkup(item,resourceMap)).join('')}</div>`).join('')}</div></section>` : '';
     return `<div class="pipeline-timeline-scroll"><div class="pipeline-timeline">${head}${rows || '<p>No jobs in this pipeline.</p>'}${other}</div></div>`;
 }
 function pipelineCalendar(items, resourceMap) {
@@ -66,7 +75,7 @@ function pipelineCalendar(items, resourceMap) {
     return `<div class="pipeline-calendar"><div class="pipeline-calendar-days">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x => `<span>${x}</span>`).join('')}</div><div class="pipeline-calendar-grid">${dates.map(date => {
         const day = pipelineLocalDay(date);
         const events = items.filter(item => pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day);
-        return `<section class="pipeline-calendar-day ${date.getMonth() !== first.getMonth() ? 'outside' : ''} ${day === pipelineLocalDay(new Date()) ? 'today' : ''}"><time datetime="${day}">${date.getDate()}</time>${events.map(item => pipelineItemMarkup(item, resourceMap)).join('')}</section>`;
+        return `<section class="pipeline-calendar-day ${date.getMonth() !== first.getMonth() ? 'outside' : ''} ${day === pipelineLocalDay(new Date()) ? 'today' : ''}" data-pipeline-day="${day}"><time datetime="${day}">${date.getDate()}</time>${events.map(item => pipelineItemMarkup(item, resourceMap)).join('')}</section>`;
     }).join('')}</div></div>`;
 }
 
@@ -77,13 +86,14 @@ async function showPipeline() {
     genericView.innerHTML = '<p>Loading Pipeline…</p>';
     const from = new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth() - 1, 1);
     const to = new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth() + 3, 1);
-    const [jobs, entries, tasks, resources, profile, people] = await Promise.all([
+    const [jobs, entries, tasks, resources, profile, people, workspaces] = await Promise.all([
         json('/api/jobs'),
         json(`/api/schedule/entries?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`),
         json('/api/operations/activities'),
         json('/api/schedule/resources'),
         json('/api/auth/me'),
-        json('/api/messages/users').catch(() => [])
+        json('/api/messages/users').catch(() => []),
+        json('/api/workspaces')
     ]);
     studioRememberPeople(people);
     const selected = jobs.filter(job => (!pipelineSelectedJob || job.id === pipelineSelectedJob) && (!pipelineSelectedStage || pipelineStage(job) === pipelineSelectedStage));
@@ -101,6 +111,7 @@ async function showPipeline() {
         <p class="pipeline-key"><span>◉ Scheduled work</span><span>✓ Task / deadline</span><span>${nearby.length} items in the next 7 days</span></p>
         <section class="pipeline-planning-surface">${pipelineView === 'calendar' ? pipelineCalendar(items, resourceMap) : pipelineTimeline(selected, items, resourceMap)}</section>${undated.length?`<details class="pipeline-resource-panel"><summary>${undated.length} tasks without dates</summary>${undated.map(task=>`<article class="task-card"><button class="link-button" data-open-job="${task.jobId}">${esc(task.title)}</button><small>${esc(task.assignedTo?studioFirstName(task.assignedTo):'Unassigned')} · ${esc(task.status)}</small></article>`).join('')}</details>`:''}
         <details class="pipeline-resource-panel"><summary>Resources (${resources.length})</summary><div id="scheduleResources">${resources.map(resource => `<div class="job-row"><div><b>${esc(resource.name)}</b><small>${esc(resource.resourceType)} · ${resource.isActive ? 'Active' : 'Inactive'}</small></div></div>`).join('') || '<p>No resources configured.</p>'}</div>${isAdmin ? '<div class="pos-entry"><label>Name<input id="scheduleResourceName"></label><label>Type<select id="scheduleResourceType"><option>Staff</option><option>Room</option><option>Equipment</option><option>Vehicle</option></select></label><button class="action" id="scheduleAddResource">Add resource</button></div>' : ''}</details>
+        <dialog id="pipelineMoveDialog"><form id="pipelineMoveForm" class="request-form"><h2>Move job</h2><input type="hidden" id="pipelineMoveJob"><label>Stage<select id="pipelineMoveStage">${pipelineStages.map(([stage])=>`<option value="${esc(stage)}">${esc(stage)}</option>`).join('')}</select></label><label>Workspace<select id="pipelineMoveWorkspace">${workspaces.map(workspace=>`<option value="${workspace.id}">${esc(workspace.name)}</option>`).join('')}</select></label><label>Reason<textarea id="pipelineMoveReason" maxlength="1000" placeholder="Optional reason or handoff note"></textarea></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-pipeline-move-cancel>Cancel</button><button type="submit" class="primary">Apply move</button></div></form></dialog>
         <dialog id="scheduleEntryDialog"><form id="scheduleEntryForm" class="request-form"><h2>Schedule item</h2><label>Job<select id="scheduleJob"><option value="">No linked job (administrators only)</option>${jobs.map(job => `<option value="${job.id}">${esc(job.title)} · ${esc(job.clientName)}</option>`).join('')}</select></label><label>Title<input id="scheduleTitle" required></label><div class="row"><label>Starts<input id="scheduleStart" type="datetime-local" required></label><label>Ends<input id="scheduleEnd" type="datetime-local" required></label></div><label>Location<input id="scheduleLocation"></label><label>Resources<select id="scheduleResourceIds" multiple size="6">${resources.map(resource => `<option value="${resource.id}">${esc(resource.resourceType)} · ${esc(resource.name)}</option>`).join('')}</select></label><label>Notes<textarea id="scheduleNotes"></textarea></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save</button></div></form></dialog>`;
     genericView.querySelectorAll('[data-open-job]').forEach(button => button.onclick = () => button.dataset.openJob && openWorkspaceJob(button.dataset.openJob).catch(error => alert(error.message)));
     genericView.querySelectorAll('[data-pipeline-view]').forEach(button => button.onclick = () => { pipelineView = button.dataset.pipelineView; showPipeline().catch(pipelineError); });
@@ -110,10 +121,89 @@ async function showPipeline() {
     genericView.querySelector('#pipelineJobFilter').onchange = event => { pipelineSelectedJob = event.target.value; showPipeline().catch(pipelineError); };
     genericView.querySelectorAll('[data-stage]').forEach(button => button.onclick = () => {pipelineSelectedStage = pipelineSelectedStage === button.dataset.stage ? '' : button.dataset.stage; showPipeline().catch(pipelineError);});
     genericView.querySelector('#pipelineNewSchedule').onclick = () => openScheduleEntryForm();
+    genericView.querySelectorAll('[data-pipeline-manage]').forEach(button=>button.onclick=event=>{event.stopPropagation();openPipelineMove(button.dataset.pipelineManage,jobs,workspaces);});
+    genericView.querySelectorAll('[data-pipeline-advance]').forEach(button=>button.onclick=async event=>{event.stopPropagation();await advancePipelineJob(button.dataset.pipelineAdvance,jobs);});
+    genericView.querySelector('#pipelineMoveForm').onsubmit = event => savePipelineMove(event,jobs);
+    genericView.querySelector('#pipelineMoveDialog [data-pipeline-move-cancel]').onclick = () => genericView.querySelector('#pipelineMoveDialog').close();
+    installPipelineDrag(entries,tasks);
     genericView.querySelector('#scheduleEntryForm').onsubmit = saveScheduleEntry;
     genericView.querySelector('#scheduleEntryDialog [data-cancel]').onclick = () => genericView.querySelector('#scheduleEntryDialog').close();
     if (isAdmin) genericView.querySelector('#scheduleAddResource').onclick = () => createScheduleResource().catch(pipelineError);
 }
+function openPipelineMove(jobId,jobs,workspaces){
+    const job=jobs.find(x=>x.id===jobId);if(!job)return;
+    const dialog=genericView.querySelector('#pipelineMoveDialog');
+    dialog.querySelector('#pipelineMoveJob').value=job.id;
+    dialog.querySelector('#pipelineMoveStage').value=pipelineStage(job);
+    dialog.querySelector('#pipelineMoveWorkspace').value=job.workspaceId;
+    dialog.querySelector('#pipelineMoveReason').value='';
+    dialog.querySelector('[role="alert"]').textContent='';
+    dialog.showModal();
+}
+async function savePipelineMove(event,jobs){
+    event.preventDefault();
+    const form=event.currentTarget,job=jobs.find(x=>x.id===form.querySelector('#pipelineMoveJob').value);
+    if(!job)return;
+    const stage=form.querySelector('#pipelineMoveStage').value,workspaceId=form.querySelector('#pipelineMoveWorkspace').value;
+    const body={status:pipelineStageTargets[stage]||job.status,workspaceId:workspaceId||null,reason:form.querySelector('#pipelineMoveReason').value.trim()||null};
+    const button=form.querySelector('[type="submit"]');button.disabled=true;
+    try{await json(`/api/jobs/${job.id}/pipeline-transition`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});form.closest('dialog').close();await showPipeline();}
+    catch(error){form.querySelector('[role="alert"]').textContent=error.message||error;button.disabled=false;}
+}
+async function advancePipelineJob(jobId,jobs){
+    const job=jobs.find(x=>x.id===jobId);if(!job)return;
+    const stages=pipelineStages.map(([name])=>name),current=stages.indexOf(pipelineStage(job));
+    if(current<0||current>=stages.length-1)return;
+    const next=stages[current+1];
+    await json(`/api/jobs/${job.id}/pipeline-transition`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:pipelineStageTargets[next],workspaceId:null,reason:`Advanced in Pipeline to ${next}`})});
+    await showPipeline();
+}
+function installPipelineDrag(entries,tasks){
+    const scheduleMap=new Map(entries.map(item=>[item.id,item])),taskMap=new Map(tasks.map(item=>[item.id,item]));
+    genericView.querySelectorAll('[data-pipeline-item]').forEach(element=>{
+        element.addEventListener('dragstart',event=>{
+            event.stopPropagation();
+            event.dataTransfer.effectAllowed='move';
+            event.dataTransfer.setData('text/plain',JSON.stringify({id:element.dataset.pipelineItem,type:element.dataset.pipelineItemType}));
+            element.classList.add('dragging');
+        });
+        element.addEventListener('dragend',()=>element.classList.remove('dragging'));
+    });
+    genericView.querySelectorAll('[data-pipeline-day]').forEach(cell=>{
+        cell.addEventListener('dragover',event=>{event.preventDefault();event.dataTransfer.dropEffect='move';cell.classList.add('drag-target');});
+        cell.addEventListener('dragleave',()=>cell.classList.remove('drag-target'));
+        cell.addEventListener('drop',async event=>{
+            event.preventDefault();cell.classList.remove('drag-target');
+            let payload;try{payload=JSON.parse(event.dataTransfer.getData('text/plain'));}catch{return;}
+            try{
+                if(payload.type==='schedule')await reschedulePipelineEntry(scheduleMap.get(payload.id),cell.dataset.pipelineDay);
+                else if(payload.type==='task')await reschedulePipelineTask(taskMap.get(payload.id),cell.dataset.pipelineDay);
+                await showPipeline();
+            }catch(error){alert(error.message||error);}
+        });
+    });
+}
+function movePipelineDate(value,targetDay){
+    const original=new Date(value),target=new Date(targetDay+'T00:00:00');
+    target.setHours(original.getHours(),original.getMinutes(),original.getSeconds(),original.getMilliseconds());
+    return target;
+}
+async function reschedulePipelineEntry(entry,targetDay){
+    if(!entry)return;
+    const start=new Date(entry.startsAtUtc),end=new Date(entry.endsAtUtc),duration=end-start,newStart=movePipelineDate(entry.startsAtUtc,targetDay),newEnd=new Date(newStart.getTime()+duration);
+    await json(`/api/schedule/entries/${entry.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({jobId:entry.jobId||null,bookingId:entry.bookingId||null,title:entry.title,startsAtUtc:newStart.toISOString(),endsAtUtc:newEnd.toISOString(),location:entry.location||null,status:entry.status,notes:entry.notes||null,resourceIds:entry.resourceIds||[],allowConflicts:false})});
+}
+async function reschedulePipelineTask(task,targetDay){
+    if(!task)return;
+    const scheduled=task.scheduledAtUtc?movePipelineDate(task.scheduledAtUtc,targetDay):null;
+    let due=task.dueAtUtc?movePipelineDate(task.dueAtUtc,targetDay):null;
+    if(task.scheduledAtUtc&&task.dueAtUtc){
+        const duration=new Date(task.dueAtUtc)-new Date(task.scheduledAtUtc);
+        due=new Date(scheduled.getTime()+Math.max(0,duration));
+    }
+    await json(`/api/operations/activities/${task.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({activityType:task.activityType,title:task.title,description:task.description||null,status:task.status,priority:task.priority,assignedTo:task.assignedTo||null,scheduledAtUtc:scheduled?scheduled.toISOString():null,dueAtUtc:due?due.toISOString():null,location:task.location||null,blockedReason:task.blockedReason||null,handoffTo:task.handoffTo||null})});
+}
+
 function pipelineError(error) { genericView.innerHTML = `<h1>Pipeline could not be loaded</h1><p role="alert">${esc(error.message || error)}</p><button class="action" id="pipelineRetry">Retry</button>`; genericView.querySelector('#pipelineRetry').onclick = () => showPipeline().catch(pipelineError); }
 function shiftPipeline(direction) {
     pipelineAnchor = pipelineView === 'calendar'
