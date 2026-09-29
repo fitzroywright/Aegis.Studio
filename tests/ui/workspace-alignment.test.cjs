@@ -140,14 +140,32 @@ test('shared request helper accepts empty successes and dismissal removes the ba
  assert.equal(panel.hidden,true);
 });
 
-test('production media separates subject and collection lenses, including uncollected images',async()=>{
+test('Media shows all images by default and collection and subject filters live in the title bar',async()=>{
  const {w,panel}=environment();w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
  const data={subjects:[],unmatched:[],assets:[{id:'a',assetKey:'a',versionId:'v1',fileName:'Ceremony.jpg',contentType:'image/jpeg',version:1,status:'Needs Editing',subjects:[],collection:'Ceremony'},{id:'b',assetKey:'b',versionId:'v2',fileName:'Other.jpg',contentType:'image/jpeg',version:1,status:'Needs Sorting',subjects:[],collection:''}]};
  w.json=async url=>url.endsWith('/media')?data:url.endsWith('/access')?{permissions:{manageProduction:false}}:[];
  await w.renderProductionMedia({id:'job'},panel,()=>true);
  assert.equal(panel.querySelector('[data-add]'),null);assert.ok(panel.querySelector('.media-tasks'));assert.equal(panel.querySelector('input[type=file]'),null);
- const uncollected=Array.from(panel.querySelectorAll('[data-collection-index]')).find(b=>b.textContent.includes('Uncollected'));uncollected.click();
- assert.equal(panel.querySelectorAll('.job-file-tile').length,1);assert.match(panel.querySelector('.job-file-tile').textContent,/Other.jpg/);
+ assert.equal(panel.querySelectorAll('.job-file-tile').length,2);
+ assert.equal(panel.querySelector('[data-lens]'),null);
+ const collection=panel.querySelector('[data-collection]');collection.value='Ceremony';collection.onchange();
+ assert.equal(panel.querySelectorAll('.job-file-tile').length,1);assert.match(panel.querySelector('.job-file-tile').textContent,/Ceremony.jpg/);
+ collection.value='';collection.onchange();assert.equal(panel.querySelectorAll('.job-file-tile').length,2);
+});
+test('Media collection controls persist names and dropped files target the selected collection',async()=>{
+ const {w,panel}=environment();w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
+ w.FormData=class {entries=[];append(key,value){this.entries.push([key,value]);}get(key){return this.entries.find(x=>x[0]===key)?.[1];}};
+ const data={gallery:{default_collection:'General'},collections:['General'],subjects:[],assets:[],unmatched:[]},calls=[];
+ w.json=async(url,options)=>{if(url.endsWith('/media'))return data;if(url.endsWith('/access'))return {permissions:{manageProduction:true}};if(url.includes('/activities?'))return [];if(options){calls.push({url,options});if(url.endsWith('/collections'))data.collections.push(JSON.parse(options.body).name);if(url.includes('/collections/General'))data.collections=data.collections.map(x=>x==='General'?JSON.parse(options.body).name:x);return {assetId:'image'};}return [];};
+ w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
+ await w.renderProductionMedia({id:'job'},panel,()=>true);
+ panel.querySelector('[data-new-collection]').click();let form=w.document.querySelector('dialog form');form.elements.name.value='Portraits';await form.onsubmit({preventDefault(){},currentTarget:form});
+ assert.equal(panel.querySelector('[data-collection]').value,'Portraits');
+ panel.querySelector('.media-drop-surface').ondrop({preventDefault(){},dataTransfer:{files:[{name:'portrait.jpg'}]}});
+ await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(calls.find(x=>x.url.endsWith('/uploads')).options.body.get('collection'),'Portraits');
+ panel.querySelector('[data-rename-collection]').click();form=w.document.querySelectorAll('dialog form')[1];form.elements.name.value='Portraits edited';await form.onsubmit({preventDefault(){},currentTarget:form});
+ assert.ok(calls.some(x=>x.url.includes('/collections/Portraits')));
 });
 test('Pipeline shows stage groups with schedule and task on timeline and calendar',async()=>{
  const dom=new JSDOM('<div id="generic"></div><div id="conversation"></div>',{runScripts:'outside-only',url:'https://studio.test'});

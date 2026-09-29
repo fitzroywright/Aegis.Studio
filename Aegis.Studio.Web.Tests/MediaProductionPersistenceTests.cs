@@ -42,6 +42,13 @@ public sealed class MediaProductionPersistenceTests
             byte[] jpeg=[0xff,0xd8,0xff,0xda,0,2,12,34,0xff,0xd9];
             store.Ingest(job,File(jpeg,"original.jpg"),false,null,"editor",null);
             var snapshot=store.Snapshot(job);var asset=snapshot.GetProperty("assets")[0];Guid assetId=asset.GetProperty("id").GetGuid();string key=asset.GetProperty("assetKey").GetString()!;
+            Assert.Equal("General",asset.GetProperty("collection").GetString());
+            store.CreateCollection(job,"ID portraits","editor");store.SetDefaultCollection(job,"ID portraits","editor");
+            store.Ingest(job,File(jpeg,"second.jpg"),false,null,"editor",null);
+            Assert.Contains(store.Snapshot(job).GetProperty("assets").EnumerateArray(),x=>x.GetProperty("fileName").GetString()=="second.jpg"&&x.GetProperty("collection").GetString()=="ID portraits");
+            store.RenameCollection(job,"ID portraits","School portraits","editor");
+            Assert.Contains(store.Snapshot(job).GetProperty("collections").EnumerateArray(),x=>x.GetString()=="School portraits");
+            Assert.Equal("School portraits",store.Snapshot(job).GetProperty("gallery").GetProperty("default_collection").GetString());
             Guid subject=snapshot.GetProperty("subjects")[0].GetProperty("id").GetGuid();
             store.UpdateAsset(job,assetId,new("Needs Editing","ID portraits",[subject],"editor"),"editor");
             Assert.Equal(1,store.Snapshot(job).GetProperty("assets")[0].GetProperty("subjects").GetArrayLength());

@@ -15,6 +15,10 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         string[] statements = [
             "create table if not exists studio_media_migrations(version integer primary key,applied_at timestamptz not null default now())",
             "create table if not exists studio_media_galleries(id uuid primary key references studio_jobs(id) on delete cascade,name text not null default 'Media',default_lens text not null default 'Auto')",
+            "alter table studio_media_galleries add column if not exists default_collection text null",
+            "create table if not exists studio_job_asset_collections(job_id uuid not null references studio_jobs(id) on delete cascade,asset_key text not null,collection_name text not null,primary key(job_id,asset_key))",
+            "create table if not exists studio_media_collections(job_id uuid not null references studio_jobs(id) on delete cascade,name text not null,primary key(job_id,name))",
+            "insert into studio_media_collections(job_id,name) select distinct job_id,collection_name from studio_job_asset_collections where trim(collection_name)<>'' on conflict do nothing",
             "insert into studio_media_galleries(id) select id from studio_jobs on conflict do nothing",
             "alter table studio_job_subjects add column if not exists gallery_id uuid null references studio_media_galleries(id)",
             "update studio_job_subjects set gallery_id=job_id where gallery_id is null",
@@ -37,6 +41,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
     {
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
         Execute(c,tx,"insert into studio_media_galleries(id) select id from studio_jobs where id=$1 on conflict do nothing",job);
+        Execute(c,tx,"insert into studio_media_collections(job_id,name) select $1,'General' where not exists(select 1 from studio_media_collections where job_id=$1) on conflict do nothing",job);
         Execute(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key) select md5($1::text||':'||v.asset_key)::uuid,$1,$1,v.asset_key from studio_asset_versions v where v.job_id=$1 and v.asset_key not like 'unmatched/%' and not exists(select 1 from studio_media_unmatched u where u.version_id=v.id) group by v.asset_key on conflict(job_id,asset_key) do nothing",job);
         Execute(c,tx,"update studio_job_subjects set gallery_id=$1 where job_id=$1 and gallery_id is null",job);
         tx.Commit();
@@ -48,6 +53,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         using var cmd=new NpgsqlCommand("""
             select jsonb_build_object(
             'gallery',(select to_jsonb(g) from studio_media_galleries g where id=$1),
+            'collections',coalesce((select jsonb_agg(name order by name) from studio_media_collections where job_id=$1),'[]'::jsonb),
             'assets',coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'assetKey',a.asset_key,'status',a.production_status,'assignedTo',a.assigned_to,'captureAtUtc',a.capture_at_utc,
               'versionId',v.id,'fileName',v.file_name,'contentType',v.content_type,'sizeBytes',v.size_bytes,'version',v.version_number,'uploadedAtUtc',v.created_at_utc,'uploadedBy',v.created_by,'photographer',(select assigned_to from studio_jobs where id=$1),'shootDate',(select event_date from studio_jobs where id=$1),
               'originalFileName',(select file_name from studio_asset_versions where job_id=$1 and asset_key=a.asset_key order by version_number limit 1),
@@ -72,9 +78,37 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         Execute(c,tx,"delete from studio_media_asset_subjects where asset_id=$1",id);
         foreach(Guid subject in (request.Subjects??[]).Distinct())Execute(c,tx,"insert into studio_media_asset_subjects values($1,$2)",id,subject);
         if(string.IsNullOrWhiteSpace(request.Collection))Execute(c,tx,"delete from studio_job_asset_collections where job_id=$1 and asset_key=$2",job,key);
-        else Execute(c,tx,"insert into studio_job_asset_collections values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",job,key,request.Collection.Trim());
+        else {EnsureCollection(c,tx,job,request.Collection.Trim());Execute(c,tx,"insert into studio_job_asset_collections values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",job,key,request.Collection.Trim());}
         Audit(c,tx,job,"MediaChanged",user,"Updated image subjects, collection and production state.");tx.Commit();
     }
+    public void CreateCollection(Guid job,string name,string user)
+    {
+        ValidateCollection(name);Sync(job);using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        if(Scalar(c,tx,"select name from studio_media_collections where job_id=$1 and lower(name)=lower($2)",job,name.Trim()) is not null)throw new ArgumentException("Collection already exists.");
+        EnsureCollection(c,tx,job,name.Trim());Audit(c,tx,job,"CollectionCreated",user,"Created collection "+name.Trim());tx.Commit();
+    }
+    public void RenameCollection(Guid job,string previous,string name,string user)
+    {
+        ValidateCollection(previous);ValidateCollection(name);using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        if(Scalar(c,tx,"select name from studio_media_collections where job_id=$1 and lower(name)=lower($2)",job,previous.Trim()) is not string original)throw new KeyNotFoundException();
+        if(!original.Equals(name.Trim(),StringComparison.OrdinalIgnoreCase)&&Scalar(c,tx,"select name from studio_media_collections where job_id=$1 and lower(name)=lower($2)",job,name.Trim()) is not null)throw new ArgumentException("Collection already exists.");
+        Execute(c,tx,"update studio_media_collections set name=$3 where job_id=$1 and name=$2",job,original,name.Trim());
+        Execute(c,tx,"update studio_job_asset_collections set collection_name=$3 where job_id=$1 and collection_name=$2",job,original,name.Trim());
+        Execute(c,tx,"update studio_media_galleries set default_collection=$3 where id=$1 and default_collection=$2",job,original,name.Trim());
+        Audit(c,tx,job,"CollectionRenamed",user,$"Renamed collection {original} to {name.Trim()}");tx.Commit();
+    }
+    public void SetDefaultCollection(Guid job,string name,string user)
+    {
+        ValidateCollection(name);using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        if(Scalar(c,tx,"select name from studio_media_collections where job_id=$1 and name=$2",job,name) is null)throw new KeyNotFoundException();
+        Execute(c,tx,"update studio_media_galleries set default_collection=$2 where id=$1",job,name);
+        Audit(c,tx,job,"DefaultCollectionChanged",user,"Default collection: "+name);tx.Commit();
+    }
+    private static void ValidateCollection(string? name)
+    {
+        if(string.IsNullOrWhiteSpace(name)||name.Trim().Length>100)throw new ArgumentException("Choose a collection name of at most 100 characters.");
+    }
+    private static void EnsureCollection(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,string name)=>Execute(c,tx,"insert into studio_media_collections(job_id,name) values($1,$2) on conflict do nothing",job,name);
     public int ImportSubjects(Guid job,RosterImport request,string user)
     {
         var rows=MediaProductionRules.ReadRoster(request.Csv);var headers=rows[0];
@@ -125,9 +159,10 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         output.Position=0;using(var zip=new ZipArchive(output,ZipArchiveMode.Update,true))using(var writer=new StreamWriter(zip.CreateEntry("studio-editing-manifest.json").Open()))writer.Write(JsonSerializer.Serialize(manifest));
         Audit(c,tx,job,"EditingBatchExported",user,$"Exported {manifest.Count} images for editing.");tx.Commit();return output.ToArray();
     }
-    public object Ingest(Guid job,IFormFile file,bool returned,Guid? explicitAsset,string user,string? note)
+    public object Ingest(Guid job,IFormFile file,bool returned,Guid? explicitAsset,string user,string? note,string? collection=null)
     {
         if(file.Length<=0||file.Length>100_000_000)throw new ArgumentException("Files must be between 1 byte and 100 MB.");
+        if(!string.IsNullOrWhiteSpace(collection))ValidateCollection(collection);
         Sync(job);using var memory=new MemoryStream();using(var source=file.OpenReadStream())source.CopyTo(memory);
         byte[] bytes=memory.ToArray();string hash=Convert.ToHexString(SHA256.HashData(bytes));Guid? asset=explicitAsset;Guid? sourceVersion=null;
         using(var c=database.OpenConnection())
@@ -160,8 +195,17 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             memory.Position=0;var version=versions.Add(c,tx,job,key,file.FileName,file.ContentType,memory,user,note,sourceVersion);
             Guid mediaId=asset??Guid.NewGuid();
             Execute(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key) values($1,$2,$2,$3) on conflict(job_id,asset_key) do nothing",mediaId,job,key);
+            if(!asset.HasValue)
+            {
+                string? destination=string.IsNullOrWhiteSpace(collection)?Scalar(c,tx,"select coalesce(default_collection,(select name from studio_media_collections where job_id=$1 order by name limit 1)) from studio_media_galleries where id=$1",job) as string:collection.Trim();
+                if(destination is not null)
+                {
+                    if(Scalar(c,tx,"select name from studio_media_collections where job_id=$1 and name=$2",job,destination) is null)throw new ArgumentException("Collection was not found.");
+                    Execute(c,tx,"insert into studio_job_asset_collections values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",job,key,destination);
+                }
+            }
             if(asset.HasValue){Execute(c,tx,"insert into studio_media_returns values($1,$2,$3,$4)",job,hash,asset.Value,version.Id);Execute(c,tx,"update studio_media_assets set production_status='Needs Review' where id=$1",asset.Value);}
-            Audit(c,tx,job,asset.HasValue?"EditedVersionReturned":"MediaUploaded",user,Path.GetFileName(file.FileName));tx.Commit();return new{unmatched=false,id=version.Id};
+            Audit(c,tx,job,asset.HasValue?"EditedVersionReturned":"MediaUploaded",user,Path.GetFileName(file.FileName));tx.Commit();return new{unmatched=false,id=version.Id,assetId=mediaId};
         }
     }
     public void Resolve(Guid job,Guid unmatched,Guid asset,string user)
