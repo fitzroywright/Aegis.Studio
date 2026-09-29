@@ -122,20 +122,20 @@
         await joinRealtimeThread(id, previousThread);
         const threads = await json('/api/messages/threads');
         const thread = threads.find(item => item.id === id);
-        const messages = await json(`/api/messages/threads/${id}`);
+        const [messages,threadAttachments] = await Promise.all([json(`/api/messages/threads/${id}`),json(`/api/messages/threads/${id}/attachments`).catch(()=>[])]);
         const pane = document.getElementById('messageConversationPane');
         if (!pane) return;
         pane.innerHTML = `
             <div class="message-conversation-header"><div><h2>${esc(thread?.title || 'Messages')}</h2><p>${esc(thread?.scopeType || '')}</p></div></div>
             <div id="studioMessageHistory" class="studio-message-history">
-                ${messages.map(renderMessage).join('') || '<div class="empty-state compact"><p>No messages yet. Start the conversation.</p></div>'}
+                ${messages.map(message=>renderMessage(message,threadAttachments)).join('') || '<div class="empty-state compact"><p>No messages yet. Start the conversation.</p></div>'}
             </div>
             <form id="studioMessageComposer" class="studio-message-composer">
                 <div class="message-composer-input-wrap">
                     <textarea id="studioMessageBody" maxlength="10000" placeholder="Write a message… Use @ to mention a Studio user." required></textarea>
                     <div id="mentionSuggestions" class="mention-suggestions" hidden></div>
                 </div>
-                ${thread?.scopeType==='Job'?'<label class="action message-attachment-control">Attach document<input id="studioMessageFile" type="file" hidden></label>':''}
+                <label class="action message-attachment-control">Attach document<input id="studioMessageFile" type="file" hidden></label>
                 <button class="primary" type="submit">Send</button>
             </form>`;
         document.getElementById('studioMessageComposer').onsubmit = sendMessage;
@@ -149,10 +149,12 @@
         if (history) history.scrollTop = history.scrollHeight;
     }
 
-    function renderMessage(message) {
+    function renderMessage(message, attachments = []) {
+        const files=(attachments||[]).filter(file=>file.messageId===message.id);
         return `<article class="studio-chat-message">
             <div class="studio-chat-meta"><strong>${esc(studioFirstName(message.senderUserName))}</strong><span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
             <div class="studio-chat-body">${renderMentions(message.body)}</div>
+            ${files.length?`<div class="studio-message-files">${files.map(file=>`<a href="/api/message-attachments/${file.id}" target="_blank" rel="noopener"><strong>${esc(file.fileName)}</strong><small>${formatBytes(file.size)}</small></a>`).join('')}</div>`:''}
         </article>`;
     }
 
@@ -224,15 +226,21 @@
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body })
         });
         const file=document.getElementById('studioMessageFile')?.files?.[0];
-        if(file&&thread?.scopeType==='Job'&&thread.scopeId){
-            const job=await json('/api/jobs/'+thread.scopeId);
-            if(!job.conversationId)throw new Error('This job has no linked conversation for Conversation Files.');
-            const data=new FormData();data.append('file',file);
-            const upload=await fetch('/api/conversations/'+job.conversationId+'/attachments?visibility=Internal',{method:'POST',body:data});
-            if(!upload.ok)throw new Error(await upload.text());
-            const attachment=await upload.json();
-            const link=await fetch('/api/attachments/'+attachment.id+'/message-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:sent.id,messageKind:'JobMessage',jobId:thread.scopeId})});
-            if(!link.ok)throw new Error(await link.text());
+        if(file){
+            if(thread?.scopeType==='Job'&&thread.scopeId){
+                const job=await json('/api/jobs/'+thread.scopeId);
+                if(!job.conversationId)throw new Error('This job has no linked conversation for Conversation Files.');
+                const data=new FormData();data.append('file',file);
+                const upload=await fetch('/api/conversations/'+job.conversationId+'/attachments?visibility=Internal',{method:'POST',body:data});
+                if(!upload.ok)throw new Error(await upload.text());
+                const attachment=await upload.json();
+                const link=await fetch('/api/attachments/'+attachment.id+'/message-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:sent.id,messageKind:'JobMessage',jobId:thread.scopeId})});
+                if(!link.ok)throw new Error(await link.text());
+            }else{
+                const data=new FormData();data.append('file',file);
+                const upload=await fetch('/api/messages/'+sent.id+'/attachments',{method:'POST',body:data});
+                if(!upload.ok)throw new Error(await upload.text());
+            }
         }
         document.getElementById('studioMessageBody').value = '';
         await openThread(selectedThread);
@@ -322,10 +330,10 @@
 
     async function refreshSelectedThread(markRead) {
         if (!selectedThread) return;
-        const messages = await json(`/api/messages/threads/${selectedThread}`);
+        const [messages,threadAttachments] = await Promise.all([json(`/api/messages/threads/${selectedThread}`),json(`/api/messages/threads/${selectedThread}/attachments`).catch(()=>[])]);
         const history = document.getElementById('studioMessageHistory');
         if (history) {
-            history.innerHTML = messages.map(renderMessage).join('');
+            history.innerHTML = messages.map(message=>renderMessage(message,threadAttachments)).join('');
             history.scrollTop = history.scrollHeight;
         }
         if (markRead) {
