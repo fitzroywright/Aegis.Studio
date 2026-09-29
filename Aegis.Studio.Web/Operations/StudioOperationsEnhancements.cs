@@ -1,3 +1,4 @@
+using Aegis.Studio.Web.FrontDesk;
 using System.Security.Claims;
 using Aegis.Studio.Web.Messaging;
 using Aegis.Studio.Web.Notifications;
@@ -46,6 +47,55 @@ public static class StudioOperationsEnhancements
             return stages.Length == 0
                 ? Results.Problem("Studio workflow stages are not configured.")
                 : Results.Ok(stages);
+        }).RequireAuthorization();
+
+        app.MapPost("/api/frontdesk/clients/{clientId:guid}/jobs", (
+            Guid clientId,
+            FrontDeskCreateJobRequest request,
+            ClaimsPrincipal user,
+            StudioDatabase database,
+            StudioStore studio) =>
+        {
+            GlobalOperationalRoleStore roles = new(database);
+            if (!user.IsInRole(StudioRoleNames.Administrator) && !roles.HasPermission(user, StudioPermissions.ViewAllJobs))
+                return Results.Forbid();
+            Contact? client = new StudioClientStore(database).List().FirstOrDefault(x => x.Id == clientId);
+            if (client is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(request.Title)) return Results.BadRequest(new { error = "Job title is required." });
+            StudioConversation conversation = studio.ReceiveInteraction(new IncomingInteractionRequest(
+                request.WorkspaceId,
+                null,
+                client.DisplayName,
+                client.Email ?? client.Phone ?? "Front Desk",
+                request.Title.Trim(),
+                "Job created by Front Desk.",
+                "Manual"));
+            StudioJob job = studio.CreateJob(conversation.Id, new CreateJobRequest(request.Title.Trim(), request.EventDate));
+            new StudioClientStore(database).Link(job.Id, clientId, user.FindFirstValue("login_name") ?? user.Identity?.Name ?? "Front Desk");
+            return Results.Ok(studio.GetJob(job.Id));
+        }).RequireAuthorization();
+
+        app.MapPost("/api/frontdesk/jobs/{jobId:guid}/check-in", (
+            Guid jobId,
+            ClaimsPrincipal user,
+            StudioDatabase database,
+            StudioStore studio) =>
+        {
+            GlobalOperationalRoleStore roles = new(database);
+            if (!user.IsInRole(StudioRoleNames.Administrator) && !roles.HasPermission(user, StudioPermissions.ViewAllJobs))
+                return Results.Forbid();
+            StudioJob? job = studio.GetJob(jobId);
+            if (job is null) return Results.NotFound();
+            StudioJob updated = studio.UpdateJob(jobId, new UpdateJobRequest("Arrived", null, null));
+            using NpgsqlConnection connection = database.OpenConnection();
+            using NpgsqlCommand audit = connection.CreateCommand();
+            audit.CommandText = "insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,'FrontDeskCheckIn',$3,$4,now())";
+            audit.Parameters.AddWithValue(Guid.NewGuid());
+            audit.Parameters.AddWithValue(jobId);
+            audit.Parameters.AddWithValue(user.FindFirstValue("login_name") ?? user.Identity?.Name ?? "Front Desk");
+            audit.Parameters.AddWithValue("Client checked in at Front Desk.");
+            audit.ExecuteNonQuery();
+            return Results.Ok(updated);
         }).RequireAuthorization();
 
         app.MapPost("/api/frontdesk/jobs/{jobId:guid}/communications", (
@@ -243,5 +293,6 @@ public static class StudioOperationsEnhancements
         !permissions.AdminWorkspace;
 }
 
+public sealed record FrontDeskCreateJobRequest(Guid WorkspaceId,string Title,DateOnly? EventDate);
 public sealed record FrontDeskCommunicationRequest(string? Kind,string Body,string? EscalationTarget=null);
 public sealed record MessageAttachmentLinkRequest(Guid MessageId,string? MessageKind,Guid? JobId);
