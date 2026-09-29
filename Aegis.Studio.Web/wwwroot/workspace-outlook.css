@@ -143,3 +143,23 @@ body[data-theme="studio-default"] .workspace-announcement{background:linear-grad
 body[data-theme="studio-default"] .job-file-tile{box-shadow:0 2px 8px #795a1710}
 body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 @media(max-width:800px){.studio-nav-icon{width:23px;height:23px}.studio-top-nav .brand-button{gap:5px}}
+
+/* Short conversation and a horizontal image strip beside the upload card. */
+.job-reading-view{grid-template-rows:auto minmax(70px,22%) auto minmax(0,1fr)}
+.gallery-workbench{display:flex;align-items:flex-start;gap:12px;min-width:0;margin-top:8px}
+.job-reading-view .gallery-workbench>.job-file-gallery{display:flex;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;gap:9px;margin:0;padding:2px 2px 10px;scroll-snap-type:x proximity}
+.gallery-workbench .job-file-tile{flex:0 0 155px;min-width:0;scroll-snap-align:start}
+.gallery-workbench .job-file-tile strong,.gallery-workbench .job-file-tile small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job-reading-view .gallery-workbench .job-file-tile img{height:125px}
+.gallery-image-actions{display:flex;gap:4px;align-items:center;margin-top:2px}
+.gallery-image-actions .action{display:inline-grid;place-items:center;width:28px;height:28px;min-height:28px;padding:5px;border-radius:6px;color:var(--theme-accent);text-decoration:none}
+.gallery-image-actions svg{width:16px;height:16px}
+.gallery-workbench .gallery-upload-card{display:grid;flex:0 0 205px;width:205px;box-sizing:border-box;gap:6px;padding:10px;margin:0;background:var(--theme-surface-2);border:1px solid var(--theme-border);border-radius:10px}
+.gallery-upload-card h3{margin:0}.gallery-upload-card label{gap:2px}.gallery-upload-card input{width:100%;box-sizing:border-box;font-size:11px;padding:4px}.gallery-upload-card p:empty{display:none}
+.gallery-history-dialog{width:min(640px,85vw);max-height:75vh;overflow:auto;border:1px solid var(--theme-border);border-radius:12px;background:var(--theme-surface);color:var(--theme-text);padding:16px}
+.gallery-history-dialog::backdrop{background:#201a1466}
+.job-reading-view .legacy-attachments{margin-top:6px}
+.job-reading-view .legacy-attachments .job-file-gallery{display:flex;overflow-x:auto;flex-wrap:nowrap}
+.legacy-attachments .job-file-tile{flex:0 0 155px}
+@media(max-width:800px){.job-reading-view{height:760px;grid-template-rows:auto minmax(70px,18%) auto minmax(0,1fr)}}
+@media(max-width:480px){.gallery-workbench .gallery-upload-card{flex-basis:165px;width:165px}.gallery-workbench{gap:7px}.gallery-workbench .job-file-tile{flex-basis:130px}}
