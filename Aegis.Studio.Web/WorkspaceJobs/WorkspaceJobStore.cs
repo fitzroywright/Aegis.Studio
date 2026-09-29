@@ -22,6 +22,8 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
             "alter table studio_job_subjects add column if not exists contact_email text not null default ''",
             "alter table studio_job_subjects add column if not exists contact_phone text not null default ''",
             "alter table studio_job_subjects add column if not exists photo_notes text not null default ''",
+            "alter table studio_job_subjects add column if not exists is_system boolean not null default false",
+            "create unique index if not exists ux_job_system_subject_name on studio_job_subjects(job_id,lower(name)) where is_system",
             "create index if not exists ix_job_subjects on studio_job_subjects(job_id)",
             "create table if not exists studio_job_asset_collections(job_id uuid not null references studio_jobs(id) on delete cascade, asset_key text not null, collection_name text not null, primary key(job_id,asset_key))"
         ];
@@ -31,6 +33,20 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
         {
             using var command = new NpgsqlCommand(sql, connection, transaction);
             command.ExecuteNonQuery();
+        }
+        using (var jobs = new NpgsqlCommand("select id from studio_jobs", connection, transaction))
+        using (var reader = jobs.ExecuteReader())
+        {
+            List<Guid> jobIds = [];
+            while (reader.Read()) jobIds.Add(reader.GetGuid(0));
+            reader.Close();
+            foreach (Guid jobId in jobIds)
+            {
+                using var ensure = new NpgsqlCommand("insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by,collection_name,is_system) select $1,$2,'Unclassified','','','System','General',true where not exists(select 1 from studio_job_subjects where job_id=$2 and is_system and lower(name)='unclassified')", connection, transaction);
+                ensure.Parameters.AddWithValue(Guid.NewGuid());
+                ensure.Parameters.AddWithValue(jobId);
+                ensure.ExecuteNonQuery();
+            }
         }
         transaction.Commit();
     }
@@ -68,11 +84,11 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
     public IReadOnlyList<JobSubject> Subjects(Guid jobId)
     {
         using var connection = database.OpenConnection();
-        using var command = new NpgsqlCommand("select id,name,reference,notes,collection_name,scheduled_at_utc,schedule_location,contact_name,contact_email,contact_phone,photo_notes from studio_job_subjects where job_id=$1 order by collection_name,name,id", connection);
+        using var command = new NpgsqlCommand("select id,name,reference,notes,collection_name,scheduled_at_utc,schedule_location,contact_name,contact_email,contact_phone,photo_notes,is_system from studio_job_subjects where job_id=$1 order by collection_name,name,id", connection);
         command.Parameters.AddWithValue(jobId);
         using var reader = command.ExecuteReader();
         List<JobSubject> result = [];
-        while(reader.Read()) result.Add(new(reader.GetGuid(0),reader.GetString(1),reader.GetString(2),reader.GetString(3),reader.GetString(4),reader.IsDBNull(5)?null:reader.GetFieldValue<DateTimeOffset>(5),reader.GetString(6),reader.GetString(7),reader.GetString(8),reader.GetString(9),reader.GetString(10)));
+        while(reader.Read()) result.Add(new(reader.GetGuid(0),reader.GetString(1),reader.GetString(2),reader.GetString(3),reader.GetString(4),reader.IsDBNull(5)?null:reader.GetFieldValue<DateTimeOffset>(5),reader.GetString(6),reader.GetString(7),reader.GetString(8),reader.GetString(9),reader.GetString(10),reader.GetBoolean(11)));
         return result;
     }
 
@@ -83,6 +99,15 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
         RequireText(collection,100,"Collection");
         if ((request.Reference?.Length ?? 0)>200 || (request.Notes?.Length ?? 0)>4000 || (request.ScheduleLocation?.Length ?? 0)>300 || (request.ContactName?.Length ?? 0)>200 || (request.ContactEmail?.Length ?? 0)>320 || (request.ContactPhone?.Length ?? 0)>100 || (request.PhotoNotes?.Length ?? 0)>4000) throw new ArgumentException("Subject details are too long.");
         using var connection = database.OpenConnection();
+        if (!create)
+        {
+            using var systemCheck = new NpgsqlCommand("select is_system from studio_job_subjects where id=$1 and job_id=$2", connection);
+            systemCheck.Parameters.AddWithValue(id);
+            systemCheck.Parameters.AddWithValue(jobId);
+            object? systemValue = systemCheck.ExecuteScalar();
+            if (systemValue is true && !string.Equals(request.Name.Trim(), "Unclassified", StringComparison.Ordinal))
+                throw new InvalidOperationException("The Unclassified system Subject cannot be renamed.");
+        }
         string sql = create
             ? "insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by,collection_name,scheduled_at_utc,schedule_location,contact_name,contact_email,contact_phone,photo_notes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)"
             : "update studio_job_subjects set name=$3,reference=$4,notes=$5,updated_by=$6,collection_name=$7,scheduled_at_utc=$8,schedule_location=$9,contact_name=$10,contact_email=$11,contact_phone=$12,photo_notes=$13,updated_at_utc=now() where id=$1 and job_id=$2";
@@ -120,7 +145,7 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
 
 public sealed record WorkspaceAnnouncement(Guid Id,string Title,string Body,string CreatedBy,DateTimeOffset CreatedAtUtc);
 public sealed record AnnouncementRequest(string Title,string Body);
-public sealed record JobSubject(Guid Id,string Name,string Reference,string Notes,string Collection,DateTimeOffset? ScheduledAtUtc,string ScheduleLocation,string ContactName,string ContactEmail,string ContactPhone,string PhotoNotes);
+public sealed record JobSubject(Guid Id,string Name,string Reference,string Notes,string Collection,DateTimeOffset? ScheduledAtUtc,string ScheduleLocation,string ContactName,string ContactEmail,string ContactPhone,string PhotoNotes,bool IsSystem);
 public sealed record SubjectRequest(string Name,string? Reference,string? Notes,string? Collection=null,DateTimeOffset? ScheduledAtUtc=null,string? ScheduleLocation=null,string? ContactName=null,string? ContactEmail=null,string? ContactPhone=null,string? PhotoNotes=null);
 public sealed record CollectionRequest(string Name);
 public sealed record JobGalleryAsset(string AssetKey,Guid Id,int VersionNumber,string FileName,string CreatedBy,DateTimeOffset CreatedAtUtc,string Sha256,Guid? SourceVersionId,string Collection);
