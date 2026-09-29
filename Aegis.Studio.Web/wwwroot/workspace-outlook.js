@@ -143,7 +143,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if (version !== revision) return;
         const combined = mergeJobMessages(messages, conversation?.messages || []);
         detailPane.classList.remove('empty');
-        detailPane.innerHTML = `<div class="detail-header"><div><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
+        detailPane.innerHTML = `<div class="detail-header"><div><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? `<label class="action message-attachment-control">Attach document<input type="file" data-message-file hidden></label>` : ``}<div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
         const renderMessages = () => {
             const visible = combined;
             document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
@@ -213,19 +213,34 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 const external = job && sender?.value !== 'Internal';
                 const url = external ? `/api/conversations/${job.conversationId}/messages` : `/api/messages/threads/${value.id}`;
                 const payload = external ? {body, isInternal:false, sendingIdentity:sender?.value || 'Workspace'} : {body};
-                await json(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+                const sent = await json(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+                const file = job ? form.querySelector('[data-message-file]')?.files?.[0] : null;
+                if (file) {
+                    const messageId = external ? sent.messageId : sent.id;
+                    if (!messageId) throw new Error('Message was sent but Studio did not return its message id, so the attachment was not uploaded.');
+                    const data = new FormData(); data.append('file', file);
+                    const upload = await fetch('/api/conversations/' + job.conversationId + '/attachments?visibility=' + encodeURIComponent(external ? 'External' : 'Internal'), { method:'POST', body:data });
+                    if (!upload.ok) throw new Error(await upload.text());
+                    const attachment = await upload.json();
+                    const link = await fetch('/api/attachments/' + attachment.id + '/message-link', {
+                        method:'POST',
+                        headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({messageId, messageKind:external?'ConversationMessage':'JobMessage', jobId:job.id})
+                    });
+                    if (!link.ok) throw new Error(await link.text());
+                }
                 if (version === revision) await thread(scope, scopeId, version);
             } catch(error) { form.querySelector('[role="alert"]').textContent = error.message || error; }
             finally { if (form.isConnected) syncSend(); }
         };
     }
     async function renderConversationFiles(job,panel,current,refresh) {
-            const files = (await json(`/api/conversations/${job.conversationId}/attachments`)).filter(file=>file.isEmailAttachment===true);
+            const files = await json(`/api/conversations/${job.conversationId}/files`);
             if (!current()) return;
-            panel.innerHTML = `<section class="legacy-attachments"><header class="conversation-files-title">Files from email messages</header><div class="conversation-file-actions"><button class="action" data-preview-file disabled>Preview</button><a class="action" data-download-file hidden>Download</a></div><div class="job-file-gallery">${files.map(file => {
+            panel.innerHTML = `<section class="legacy-attachments"><header class="conversation-files-title">Conversation Files</header><div class="conversation-file-actions"><button class="action" data-preview-file disabled>Preview</button><a class="action" data-download-file hidden>Download</a></div><div class="job-file-gallery">${files.map(file => {
                 const url = '/api/attachments/' + encodeURIComponent(file.id);
                 const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
-                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}</small><span>Double-click to preview</span></a>`;
+                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}${file.messageId?' · linked to '+esc(file.messageKind||'message'):''}</small><span>${file.messageId?'Open file · source message '+esc(String(file.messageId).slice(0,8)):'Open file'}</span></a>`;
             }).join('') || '<p>No files attached yet.</p>'}</div></section>`;
             panel.querySelectorAll('.job-file-tile').forEach(tile => tile.ondblclick = event => {
                 const file = files.find(f => f.id === tile.dataset.fileId);
