@@ -118,6 +118,9 @@ app.MapDiagnosticLevelRuntime();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioFeatureDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioMessagingDatabase>().InitializeAsync();
+StudioOperationsEnhancements.EnsureSchema(
+    app.Services.GetRequiredService<StudioDatabase>(),
+    app.Services.GetRequiredService<WorkspaceStore>());
 WorkDayStore workDayStore=app.Services.GetRequiredService<WorkDayStore>();
 workDayStore.EnsureSchema();
 int workDayLocationRetentionDays=Math.Clamp(app.Configuration.GetValue<int?>("WorkDay:LocationRetentionDays")??30,1,3650);
@@ -142,6 +145,7 @@ app.MapStudioAuthentication();
 app.MapStudioUserProfiles();
 app.MapStudioNotifications();
 app.MapStudioInAppMessaging();
+app.MapStudioOperationsEnhancements();
 app.MapStudioScheduling();
 app.MapStudioProduction();
 app.MapWorkspaceAccess();
