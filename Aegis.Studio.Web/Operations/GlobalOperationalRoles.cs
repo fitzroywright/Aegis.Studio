@@ -11,6 +11,7 @@ public static class StudioRoleNames
 {
     public const string User = "User";
     public const string FrontDesk = "Front Desk";
+    public const string OperationsManager = "Operations Manager";
     public const string Administrator = "Administrator";
 }
 
@@ -31,6 +32,7 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
     private static readonly Guid UserRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc002");
     private static readonly Guid FrontDeskRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc001");
     private static readonly Guid AdministratorRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc003");
+    private static readonly Guid OperationsManagerRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc004");
 
     private readonly StudioDatabase database;
 
@@ -90,6 +92,7 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
 
         EnsureRole(UserRoleId, StudioRoleNames.User, "Baseline role for authenticated Studio users.");
         EnsureRole(FrontDeskRoleId, StudioRoleNames.FrontDesk, "Cross-workspace reception and client-service operations.");
+        EnsureRole(OperationsManagerRoleId, StudioRoleNames.OperationsManager, "Overall Studio operational escalation manager.");
         EnsureRole(AdministratorRoleId, StudioRoleNames.Administrator, "Application security and unrestricted administration.");
 
         EnsurePermission(UserRoleId, StudioPermissions.Access);
@@ -105,6 +108,16 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         })
         {
             EnsurePermission(FrontDeskRoleId, permission);
+        }
+
+        foreach (string permission in new[]
+        {
+            StudioPermissions.Access,
+            StudioPermissions.ViewAllJobs,
+            StudioPermissions.NotifyJobMembers
+        })
+        {
+            EnsurePermission(OperationsManagerRoleId, permission);
         }
 
         EnsurePermission(AdministratorRoleId, PermissionAuthorizer.AllPermissions);
