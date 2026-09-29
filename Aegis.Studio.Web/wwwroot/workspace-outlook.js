@@ -126,6 +126,14 @@ function mergeJobMessages(teamMessages, customerMessages) {
             document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
+        if(job){
+            const filesPanel=document.createElement('section');
+            filesPanel.className='thread-shared-files';
+            document.getElementById('combinedJobMessages').appendChild(filesPanel);
+            const current=()=>version===revision;
+            const refreshFiles=()=>renderConversationFiles(job,filesPanel,current,refreshFiles);
+            refreshFiles().catch(error=>{if(current())filesPanel.textContent='Conversation files could not be loaded: '+error.message;});
+        }
         const sender = document.getElementById('jobSendingIdentity');
         const canSend = () => !job || sender?.value === 'Internal' || (!!conversation && (String(conversation.channel).toLowerCase() !== 'email' ? sender?.value === 'Workspace' : identities.some(i => i.type === sender?.value)));
         const syncSend = () => {
@@ -173,20 +181,14 @@ function mergeJobMessages(teamMessages, customerMessages) {
             finally { if (form.isConnected) syncSend(); }
         };
     }
-    async function renderJobTab(name, job, panel, current, refresh) {
-        if (name === 'subjects') return renderJobSubjects(job,panel,current,refresh);
-        if (name === 'tasks') return renderJobTasks(job,panel,current,refresh);
-        if (name === 'activity') return renderJobActivity(job,panel,current);
-        if (name === 'gallery') {
+    async function renderConversationFiles(job,panel,current,refresh) {
             const files = await json(`/api/conversations/${job.conversationId}/attachments`);
             if (!current()) return;
-            panel.innerHTML = `<div class="versioned-gallery"></div><details class="legacy-attachments"><summary>Conversation attachments</summary><p>Files attached to this job’s conversation.</p><div class="job-file-gallery">${files.map(file => {
+            panel.innerHTML = `<details class="legacy-attachments" open><summary>Files shared in this conversation</summary><div class="job-file-gallery">${files.map(file => {
                 const url = '/api/attachments/' + encodeURIComponent(file.id);
                 const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
                 return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}</small><span>Open file ↗</span></a>`;
-            }).join('') || '<p>No files attached yet.</p>'}</div><form class="job-file-upload"><label>Add files to this job<input type="file" multiple required></label><label>Visibility<select name="visibility"><option value="Internal">Internal</option><option value="External">External</option></select></label><button class="primary">Upload files</button><p role="status"></p></form></details>`;
-            const versionHost=panel.querySelector('.versioned-gallery');
-            renderVersionedGallery(job,versionHost,current).catch(error=>{if(current())versionHost.textContent=error.message;});
+            }).join('') || '<p>No files attached yet.</p>'}</div><form class="job-file-upload"><label>Attach files to conversation<input type="file" multiple required></label><label>Visibility<select name="visibility"><option value="Internal">Internal</option><option value="External">External</option></select></label><button class="primary">Upload files</button><p role="status"></p></form></details>`;
             panel.querySelectorAll('.job-file-tile').forEach(tile => tile.onclick = event => {
                 const file = files.find(f => f.id === tile.dataset.fileId);
                 if (!/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '')) return;
@@ -211,6 +213,15 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 } catch(error) { form.querySelector('[role="status"]').textContent = 'Upload stopped: ' + (error.message || error); }
                 finally { button.disabled = false; }
             };
+
+    }
+    async function renderJobTab(name, job, panel, current, refresh) {
+        if (name === 'subjects') return renderJobSubjects(job,panel,current,refresh);
+        if (name === 'tasks') return renderJobTasks(job,panel,current,refresh);
+        if (name === 'activity') return renderJobActivity(job,panel,current);
+        if (name === 'gallery') {
+            panel.innerHTML='<div class="versioned-gallery"></div>';
+            await renderVersionedGallery(job,panel.querySelector('.versioned-gallery'),current);
             return;
         }
     }

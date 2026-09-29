@@ -163,3 +163,12 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 .legacy-attachments .job-file-tile{flex:0 0 155px}
 @media(max-width:800px){.job-reading-view{height:760px;grid-template-rows:auto minmax(70px,18%) auto minmax(0,1fr)}}
 @media(max-width:480px){.gallery-workbench .gallery-upload-card{flex-basis:165px;width:165px}.gallery-workbench{gap:7px}.gallery-workbench .job-file-tile{flex-basis:130px}}
+
+/* Conversation files belong with the message thread. */
+.thread-shared-files{padding:8px 0;border-top:1px solid var(--theme-border)}
+.thread-shared-files summary{font-size:12px;font-weight:600;cursor:pointer}
+.job-reading-view .thread-shared-files .job-file-gallery{display:flex;overflow-x:auto;margin:7px 0;gap:7px}
+.thread-shared-files .job-file-tile{flex:0 0 110px}
+.job-reading-view .thread-shared-files .job-file-tile img{height:65px}
+.thread-shared-files .job-file-document{height:65px;font-size:26px}
+.thread-shared-files .job-file-upload{font-size:11px;padding-top:6px}
