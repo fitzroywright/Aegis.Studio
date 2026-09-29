@@ -56,10 +56,10 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;
  const job={id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Portraits',clientName:'Client',status:'Scheduled'};
  Object.assign(w,{showWorkspaces:async()=>{},workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
- w.studioRememberPeople=()=>{};w.studioFirstName=value=>typeof value==='string'?value:(value.firstName||value.givenName||value.displayName||value.userName).split(' ')[0];
  for(const id of ['conversationList','detailPane','workspaceTitle','allButton'])w[id]=w.document.getElementById(id);
  w.fetch=async url=>({ok:true,json:async()=>url.endsWith('/sending-identities')?{identities:[{type:'Workspace'},{type:'Self',isDefault:true}]}:{channel:'Email',messages:[]}});
  w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.endsWith('/media')?{assets:[],subjects:[],unmatched:[],gallery:{default_lens:'Auto'}}:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
+ w.eval(fs.readFileSync(path.join(root,'auth.js'),'utf8'));
  w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,10));
  assert.equal(w.document.querySelector('#jobInternalNote'),null);
