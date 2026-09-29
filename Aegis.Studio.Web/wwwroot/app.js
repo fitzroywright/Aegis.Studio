@@ -16,7 +16,9 @@ async function json(url, options) {
         throw new Error(await response.text());
     }
 
-    return response.json();
+    if (response.status === 204 || response.status === 205) return null;
+    const body = await response.text();
+    return body.trim() ? JSON.parse(body) : null;
 }
 
 async function loadWorkspaces() {

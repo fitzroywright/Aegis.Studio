@@ -105,3 +105,23 @@ test('FrontDesk search preserves focus and separates enquiry and booking queues'
  const input=panel.querySelector('#frontDeskSearch');input.focus();input.value='Campbell';input.oninput({target:input});assert.equal(panel.querySelector('#frontDeskSearch'),input);assert.equal(w.document.activeElement,input);
  assert.match(panel.textContent,/Partial deposit/);assert.match(panel.textContent,/Record verified deposit/);assert.equal(panel.querySelector('[data-frontdesk-job]'),null);
 });
+
+test('shared request helper accepts empty successes and dismissal removes the banner',async()=>{
+ const {w,panel}=environment();
+ const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+ const helper=source.slice(source.indexOf('async function json('),source.indexOf('async function loadWorkspaces('));
+ w.eval(helper);
+ for(const status of [200,204,205]){
+  w.fetch=async()=>new Response(null,{status});
+  assert.equal(await w.json('/empty',{method:'POST'}),null);
+ }
+ w.fetch=async()=>new Response('{"ok":true}',{status:200});
+ assert.equal((await w.json('/data')).ok,true);
+ w.fetch=async()=>new Response('Denied',{status:403});
+ await assert.rejects(w.json('/denied'),/Denied/);
+ w.fetch=async(url,options)=>options?.method==='POST'?new Response(null,{status:204}):new Response(JSON.stringify([{id:'a',title:'Notice',body:'Message'}]),{status:200});
+ await w.renderAnnouncementBanners(panel,'workspace',()=>true);
+ await panel.querySelector('[data-dismiss]').onclick();
+ assert.equal(panel.querySelector('article'),null);
+ assert.equal(panel.hidden,true);
+});
