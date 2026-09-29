@@ -145,6 +145,7 @@ app.MapStudioAuthentication();
 app.MapStudioUserProfiles();
 app.MapStudioNotifications();
 app.MapStudioInAppMessaging();
+app.MapStudioMessageAttachments();
 app.MapStudioOperationsEnhancements();
 app.MapStudioScheduling();
 app.MapStudioProduction();
