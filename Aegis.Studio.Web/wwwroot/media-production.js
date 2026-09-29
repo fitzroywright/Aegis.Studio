@@ -45,7 +45,11 @@ async function renderProductionMedia(job,host,current){
  function renderSubjectList(){
   const term=subjectSearch.value.trim().toLocaleLowerCase();
   const shown=data.subjects.filter(person=>(collection===null||person.collection===collection)&&(person.name.toLocaleLowerCase().includes(term)||String(person.reference||'').toLocaleLowerCase().includes(term)||String(person.contactName||'').toLocaleLowerCase().includes(term))).sort((a,b)=>{const au=String(a.name).toLowerCase()==='unclassified'||a.isSystem;const bu=String(b.name).toLowerCase()==='unclassified'||b.isSystem;if(au!==bu)return au?-1:1;return String(a.name).localeCompare(String(b.name),undefined,{sensitivity:'base'});});
-  const visibleCount=data.assets.filter(asset=>collection===null||asset.collection===collection).length;subjectList.innerHTML=`<button type="button" data-subject-id="" class="${subject?'':'active'}"><span>All Subjects</span><small>${visibleCount}</small></button>`+shown.map(person=>`<button type="button" data-subject-id="${person.id}" class="${subject===person.id?'active':''}"><span>${esc(person.name)}</span><small>${data.assets.filter(asset=>asset.subjects.includes(person.id)&&(collection===null||asset.collection===collection)).length}</small></button>`).join('')+`<p class="media-subject-empty" ${shown.length?'hidden':''}>${term?'No matching subjects.':'No subjects yet.'}</p>`;
+  const visibleCount=data.assets.filter(asset=>collection===null||asset.collection===collection).length;
+  const unclassified=shown.find(person=>person.id===unclassifiedSubject?.id||String(person.name).toLowerCase()==='unclassified');
+  const regular=shown.filter(person=>person!==unclassified);
+  const subjectRow=person=>`<button type="button" data-subject-id="${person.id}" class="${subject===person.id?'active':''}"><span>${esc(person.name)}</span><small>${data.assets.filter(asset=>asset.subjects.includes(person.id)&&(collection===null||asset.collection===collection)).length}</small></button>`;
+  subjectList.innerHTML=(unclassified?subjectRow(unclassified):'')+`<button type="button" data-subject-id="" class="${subject?'':'active'}"><span>All Subjects</span><small>${visibleCount}</small></button>`+regular.map(subjectRow).join('')+`<p class="media-subject-empty" ${shown.length?'hidden':''}>${term?'No matching subjects.':'No subjects yet.'}</p>`;
   subjectList.querySelectorAll('[data-subject-id]').forEach(button=>{
    button.onclick=()=>{subject=button.dataset.subjectId||null;renderSubjectList();render();};
    if(canEdit&&button.dataset.subjectId){
