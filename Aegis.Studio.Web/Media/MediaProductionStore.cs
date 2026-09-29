@@ -31,6 +31,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             "alter table studio_job_subjects add column if not exists contact_email text not null default ''",
             "alter table studio_job_subjects add column if not exists contact_phone text not null default ''",
             "alter table studio_job_subjects add column if not exists photo_notes text not null default ''",
+            "alter table studio_job_subjects add column if not exists is_system boolean not null default false",
             "create table if not exists studio_media_assets(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,gallery_id uuid not null references studio_media_galleries(id),asset_key text not null,production_status text not null default 'Needs Sorting',assigned_to text null,capture_at_utc timestamptz null,unique(job_id,asset_key))",
             "create table if not exists studio_media_asset_subjects(asset_id uuid not null references studio_media_assets(id) on delete cascade,subject_id uuid not null references studio_job_subjects(id) on delete cascade,primary key(asset_id,subject_id))",
             "create table if not exists studio_media_edit_batches(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,created_by text not null,created_at_utc timestamptz not null default now())",
@@ -51,6 +52,8 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         Execute(c,tx,"insert into studio_media_collections(job_id,name) select $1,'General' where not exists(select 1 from studio_media_collections where job_id=$1) on conflict do nothing",job);
         Execute(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key) select md5($1::text||':'||v.asset_key)::uuid,$1,$1,v.asset_key from studio_asset_versions v where v.job_id=$1 and v.asset_key not like 'unmatched/%' and not exists(select 1 from studio_media_unmatched u where u.version_id=v.id) group by v.asset_key on conflict(job_id,asset_key) do nothing",job);
         Execute(c,tx,"update studio_job_subjects set gallery_id=$1 where job_id=$1 and gallery_id is null",job);
+        Guid unclassified = EnsureUnclassifiedSubject(c,tx,job);
+        Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) select a.id,$2 from studio_media_assets a where a.job_id=$1 and not exists(select 1 from studio_media_asset_subjects x where x.asset_id=a.id) on conflict do nothing",job,unclassified);
         tx.Commit();
     }
     public JsonElement Snapshot(Guid job)
@@ -67,7 +70,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
               'collection',coalesce(col.collection_name,''),'subjects',coalesce((select jsonb_agg(subject_id) from studio_media_asset_subjects where asset_id=a.id),'[]'::jsonb)))
               from studio_media_assets a join lateral(select * from studio_asset_versions where job_id=a.job_id and asset_key=a.asset_key order by version_number desc limit 1)v on true
               left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key where a.job_id=$1),'[]'::jsonb),
-            'subjects',coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'reference',s.reference,'notes',s.notes,'collection',s.collection_name,'scheduledAtUtc',s.scheduled_at_utc,'scheduleLocation',s.schedule_location,'contactName',s.contact_name,'contactEmail',s.contact_email,'contactPhone',s.contact_phone,'photoNotes',s.photo_notes,'status',case when s.production_status='Not Photographed' and exists(select 1 from studio_media_asset_subjects where subject_id=s.id) then 'Photographed' else s.production_status end,'attributes',s.attributes,
+            'subjects',coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'reference',s.reference,'notes',s.notes,'collection',s.collection_name,'scheduledAtUtc',s.scheduled_at_utc,'scheduleLocation',s.schedule_location,'contactName',s.contact_name,'contactEmail',s.contact_email,'contactPhone',s.contact_phone,'photoNotes',s.photo_notes,'isSystem',s.is_system,'status',case when s.production_status='Not Photographed' and exists(select 1 from studio_media_asset_subjects where subject_id=s.id) then 'Photographed' else s.production_status end,'attributes',s.attributes,
               'imageCount',(select count(*) from studio_media_asset_subjects where subject_id=s.id))) from studio_job_subjects s where job_id=$1),'[]'::jsonb),
             'unmatched',coalesce((select jsonb_agg(jsonb_build_object('id',u.id,'fileName',v.file_name,'versionId',v.id,'reason',u.reason)) from studio_media_unmatched u join studio_asset_versions v on v.id=u.version_id where u.job_id=$1 and u.resolved_asset_id is null),'[]'::jsonb))::text
             """,c);
@@ -84,11 +87,28 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         if((request.Subjects?.Length??0)>0 && string.IsNullOrWhiteSpace(request.Collection))throw new ArgumentException("Classified images must belong to a collection.");
         Execute(c,tx,"update studio_media_assets set production_status=$2,assigned_to=$3,capture_at_utc=$4 where id=$1",id,request.Status,(object?)request.AssignedTo??DBNull.Value,(object?)request.CaptureAtUtc?.ToUniversalTime()??DBNull.Value);
         Execute(c,tx,"delete from studio_media_asset_subjects where asset_id=$1",id);
-        foreach(Guid subject in (request.Subjects??[]).Distinct())Execute(c,tx,"insert into studio_media_asset_subjects values($1,$2)",id,subject);
+        Guid[] requestedSubjects=(request.Subjects??[]).Distinct().ToArray();
+        if(requestedSubjects.Length==0)
+            requestedSubjects=[EnsureUnclassifiedSubject(c,tx,job)];
+        else
+        {
+            Guid unclassified=EnsureUnclassifiedSubject(c,tx,job);
+            if(requestedSubjects.Any(x=>x!=unclassified))requestedSubjects=requestedSubjects.Where(x=>x!=unclassified).ToArray();
+        }
+        foreach(Guid subject in requestedSubjects)Execute(c,tx,"insert into studio_media_asset_subjects values($1,$2)",id,subject);
         if(string.IsNullOrWhiteSpace(request.Collection))Execute(c,tx,"delete from studio_job_asset_collections where job_id=$1 and asset_key=$2",job,key);
         else {EnsureCollection(c,tx,job,request.Collection.Trim());Execute(c,tx,"insert into studio_job_asset_collections values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",job,key,request.Collection.Trim());}
         Audit(c,tx,job,"MediaChanged",user,"Updated image subjects, collection and production state.");tx.Commit();
     }
+    private static Guid EnsureUnclassifiedSubject(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
+    {
+        object? existing=Scalar(c,tx,"select id from studio_job_subjects where job_id=$1 and is_system and lower(name)='unclassified' limit 1",job);
+        if(existing is Guid id)return id;
+        Guid created=Guid.NewGuid();
+        Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,collection_name,is_system) values($1,$2,$2,'Unclassified','','','System','General',true)",created,job);
+        return created;
+    }
+
     public void CreateCollection(Guid job,string name,string user)
     {
         ValidateCollection(name);Sync(job);using var c=database.OpenConnection();using var tx=c.BeginTransaction();
