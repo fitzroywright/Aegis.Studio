@@ -258,44 +258,80 @@ public sealed class GalleryStore
 
     public async Task<GalleryItem> AddImageAsync(WorkspaceGallery gallery, IFormFile file, CancellationToken cancellationToken)
     {
-        if (file.Length <= 0 || file.Length > maximumBytes) throw new InvalidOperationException($"Gallery images must be between 1 byte and {maximumBytes / 1024L / 1024L} MB.");
-        if (string.IsNullOrWhiteSpace(file.ContentType) || !file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException($"{file.FileName} is not an image.");
+        if (file.Length <= 0 || file.Length > maximumBytes)
+            throw new InvalidOperationException($"Gallery images must be between 1 byte and {maximumBytes / 1024L / 1024L} MB.");
+        if (string.IsNullOrWhiteSpace(file.ContentType) || !file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"{file.FileName} is not an image.");
+
         string fileName = Path.GetFileName(file.FileName);
         Guid itemId = Guid.NewGuid();
         string extension = Path.GetExtension(fileName).ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(extension)) extension = ".img";
         string storedName = itemId.ToString("N") + extension;
-        string folder = GalleryDirectory(gallery);
-        Directory.CreateDirectory(Path.Combine(folder, "originals"));
-        Directory.CreateDirectory(Path.Combine(folder, "previews"));
-        Directory.CreateDirectory(Path.Combine(folder, "thumbnails"));
-        string original = Path.Combine(folder, "originals", storedName);
-        string preview = Path.Combine(folder, "previews", itemId.ToString("N") + ".jpg");
-        string thumbnail = Path.Combine(folder, "thumbnails", itemId.ToString("N") + ".jpg");
-        string temporary = original + ".uploading";
+        string galleryRoot = GalleryKey(gallery);
+        string originalKey = $"{galleryRoot}/originals/{storedName}";
+        string previewKey = $"{galleryRoot}/previews/{itemId:N}.jpg";
+        string thumbnailKey = $"{galleryRoot}/thumbnails/{itemId:N}.jpg";
+
+        string tempRoot = Path.Combine(Path.GetTempPath(), "aegis-studio-gallery", itemId.ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string originalTemp = Path.Combine(tempRoot, storedName);
+        string previewTemp = Path.Combine(tempRoot, itemId.ToString("N") + "-preview.jpg");
+        string thumbnailTemp = Path.Combine(tempRoot, itemId.ToString("N") + "-thumb.jpg");
+
         try
         {
-            await using (FileStream output = new(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous)) await file.CopyToAsync(output, cancellationToken);
-            await using FileStream verify = File.OpenRead(temporary);
-            byte[] sha = await SHA256.HashDataAsync(verify, cancellationToken);
-            verify.Position = 0;
-            using Image image = await Image.LoadAsync(temporary, cancellationToken);
+            await using (FileStream output = new(originalTemp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+                await file.CopyToAsync(output, cancellationToken);
+
+            using Image image = await Image.LoadAsync(originalTemp, cancellationToken);
             using Image previewImage = image.Clone(x => x.AutoOrient().Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(1600, 1600) }));
             using Image thumbnailImage = image.Clone(x => x.AutoOrient().Resize(new ResizeOptions { Mode = ResizeMode.Crop, Size = new Size(360, 240) }));
-            await previewImage.SaveAsJpegAsync(preview, new JpegEncoder { Quality = 86 }, cancellationToken);
-            await thumbnailImage.SaveAsJpegAsync(thumbnail, new JpegEncoder { Quality = 80 }, cancellationToken);
-            File.Move(temporary, original);
+            await previewImage.SaveAsJpegAsync(previewTemp, new JpegEncoder { Quality = 86 }, cancellationToken);
+            await thumbnailImage.SaveAsJpegAsync(thumbnailTemp, new JpegEncoder { Quality = 80 }, cancellationToken);
+
+            IReadOnlyDictionary<string,string> metadata = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Application"] = "Aegis.Studio",
+                ["WorkspaceId"] = gallery.WorkspaceId.ToString("D"),
+                ["GalleryId"] = gallery.Id.ToString("D"),
+                ["GalleryItemId"] = itemId.ToString("D")
+            };
+
+            StoredFile originalStored;
+            await using (FileStream input = File.OpenRead(originalTemp))
+                originalStored = await storage.StoreAsync(new StorageWriteRequest(originalKey,input,file.ContentType,fileName,"Studio",metadata,maximumBytes),cancellationToken);
+            await using (FileStream input = File.OpenRead(previewTemp))
+                await storage.StoreAsync(new StorageWriteRequest(previewKey,input,"image/jpeg",Path.GetFileName(previewKey),"Studio",metadata),cancellationToken);
+            await using (FileStream input = File.OpenRead(thumbnailTemp))
+                await storage.StoreAsync(new StorageWriteRequest(thumbnailKey,input,"image/jpeg",Path.GetFileName(thumbnailKey),"Studio",metadata),cancellationToken);
+
             int order = NextSortOrder(gallery.Id);
             using NpgsqlConnection connection = database.OpenConnection();
             using NpgsqlCommand command = connection.CreateCommand();
             command.CommandText = "insert into studio_gallery_items(id,gallery_id,file_name,stored_name,content_type,size_bytes,sha256,caption,sort_order,is_visible,created_at_utc) values($1,$2,$3,$4,$5,$6,$7,null,$8,true,now())";
-            command.Parameters.AddWithValue(itemId); command.Parameters.AddWithValue(gallery.Id); command.Parameters.AddWithValue(fileName); command.Parameters.AddWithValue(storedName); command.Parameters.AddWithValue(file.ContentType); command.Parameters.AddWithValue(file.Length); command.Parameters.AddWithValue(Convert.ToHexString(sha).ToLowerInvariant()); command.Parameters.AddWithValue(order); command.ExecuteNonQuery();
+            command.Parameters.AddWithValue(itemId);
+            command.Parameters.AddWithValue(gallery.Id);
+            command.Parameters.AddWithValue(fileName);
+            command.Parameters.AddWithValue(storedName);
+            command.Parameters.AddWithValue(originalStored.ContentType);
+            command.Parameters.AddWithValue(originalStored.Length);
+            command.Parameters.AddWithValue(originalStored.Sha256);
+            command.Parameters.AddWithValue(order);
+            command.ExecuteNonQuery();
             return GetItems(gallery.Id).First(x => x.Id == itemId);
         }
         catch
         {
-            foreach (string path in new[] { temporary, original, preview, thumbnail }) if (File.Exists(path)) File.Delete(path);
+            foreach (string key in new[] { originalKey, previewKey, thumbnailKey })
+            {
+                try { await storage.DeleteAsync(key, cancellationToken); } catch { }
+            }
             throw;
+        }
+        finally
+        {
+            try { Directory.Delete(tempRoot, true); } catch { }
         }
     }
 
@@ -325,7 +361,11 @@ public sealed class GalleryStore
         if (item is null) return;
         using NpgsqlConnection connection = database.OpenConnection(); using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = "delete from studio_gallery_items where id=$1 and gallery_id=$2"; command.Parameters.AddWithValue(itemId); command.Parameters.AddWithValue(gallery.Id); command.ExecuteNonQuery();
-        foreach (string variant in new[] { "original", "preview", "thumbnail" }) { GalleryFile? file = ResolveFile(gallery, item, variant); if (file is not null && File.Exists(file.Path)) File.Delete(file.Path); }
+        foreach (string variant in new[] { "original", "preview", "thumbnail" })
+        {
+            GalleryFile? file = ResolveFile(gallery, item, variant);
+            if (file is not null) storage.DeleteAsync(file.StorageKey).GetAwaiter().GetResult();
+        }
     }
 
     public WorkspaceGallery Publish(Guid workspaceId)
@@ -348,15 +388,18 @@ public sealed class GalleryStore
 
     public GalleryFile? ResolveFile(WorkspaceGallery gallery, GalleryItem item, string variant)
     {
-        string folder = GalleryDirectory(gallery);
+        string folder = GalleryKey(gallery);
         return variant.ToLowerInvariant() switch
         {
-            "original" => new GalleryFile(SafePath(Path.Combine(folder, "originals", item.StoredName)), item.ContentType),
-            "preview" => new GalleryFile(SafePath(Path.Combine(folder, "previews", item.Id.ToString("N") + ".jpg")), "image/jpeg"),
-            "thumbnail" => new GalleryFile(SafePath(Path.Combine(folder, "thumbnails", item.Id.ToString("N") + ".jpg")), "image/jpeg"),
+            "original" => new GalleryFile($"{folder}/originals/{item.StoredName}", item.ContentType),
+            "preview" => new GalleryFile($"{folder}/previews/{item.Id:N}.jpg", "image/jpeg"),
+            "thumbnail" => new GalleryFile($"{folder}/thumbnails/{item.Id:N}.jpg", "image/jpeg"),
             _ => null
         };
     }
+
+    public Task<Stream> OpenFileAsync(GalleryFile file, CancellationToken cancellationToken = default) =>
+        storage.OpenReadAsync(file.StorageKey, cancellationToken);
 
     private IReadOnlyList<GalleryItem> GetItems(Guid galleryId)
     {
@@ -375,9 +418,35 @@ public sealed class GalleryStore
         using NpgsqlConnection connection=database.OpenConnection(); using NpgsqlCommand command=connection.CreateCommand(); command.CommandText="select name from studio_workspaces where id=$1"; command.Parameters.AddWithValue(workspaceId); return command.ExecuteScalar() as string;
     }
 
-    private string GalleryDirectory(WorkspaceGallery gallery) => SafePath(Path.Combine(root, gallery.WorkspaceId.ToString("N"), gallery.Id.ToString("N")));
-    private string SafePath(string path) { string full=Path.GetFullPath(path); string safeRoot=Path.GetFullPath(root)+Path.DirectorySeparatorChar; if(!full.StartsWith(safeRoot,StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Gallery path escaped storage root."); return full; }
-    private void WriteManifest(WorkspaceGallery gallery) { string folder=GalleryDirectory(gallery); Directory.CreateDirectory(folder); File.WriteAllText(Path.Combine(folder,"published.json"), System.Text.Json.JsonSerializer.Serialize(new { gallery.Id,gallery.WorkspaceId,gallery.Title,gallery.Description,gallery.PublicToken,gallery.PublishedAtUtc,items=gallery.Items.Where(x=>x.IsVisible).OrderBy(x=>x.SortOrder).Select(x=>new{x.Id,x.FileName,x.Caption,x.SortOrder,x.Sha256}) }, new System.Text.Json.JsonSerializerOptions { WriteIndented=true })); }
+    private static string GalleryKey(WorkspaceGallery gallery) => $"{gallery.WorkspaceId:N}/{gallery.Id:N}";
+    private void WriteManifest(WorkspaceGallery gallery)
+    {
+        byte[] bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new
+            {
+                gallery.Id,
+                gallery.WorkspaceId,
+                gallery.Title,
+                gallery.Description,
+                gallery.PublicToken,
+                gallery.PublishedAtUtc,
+                items = gallery.Items.Where(x=>x.IsVisible).OrderBy(x=>x.SortOrder).Select(x=>new{x.Id,x.FileName,x.Caption,x.SortOrder,x.Sha256})
+            },
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        using MemoryStream stream = new(bytes, writable:false);
+        storage.StoreAsync(new StorageWriteRequest(
+            $"{GalleryKey(gallery)}/published.json",
+            stream,
+            "application/json",
+            "published.json",
+            "Studio",
+            new Dictionary<string,string>
+            {
+                ["Application"] = "Aegis.Studio",
+                ["WorkspaceId"] = gallery.WorkspaceId.ToString("D"),
+                ["GalleryId"] = gallery.Id.ToString("D")
+            })).GetAwaiter().GetResult();
+    }
     private static WorkspaceGallery ReadGallery(NpgsqlDataReader reader,IReadOnlyList<GalleryItem> items) => new(reader.GetGuid(0),reader.GetGuid(1),reader.GetString(2),reader.IsDBNull(3)?null:reader.GetString(3),reader.GetString(4),reader.GetBoolean(5),reader.IsDBNull(6)?null:reader.GetFieldValue<DateTimeOffset>(6),reader.GetFieldValue<DateTimeOffset>(7),reader.GetFieldValue<DateTimeOffset>(8),items);
 }
 
@@ -385,4 +454,4 @@ public sealed record WorkspaceGallery(Guid Id,Guid WorkspaceId,string Title,stri
 public sealed record GalleryItem(Guid Id,Guid GalleryId,string FileName,string StoredName,string ContentType,long SizeBytes,string Sha256,string? Caption,int SortOrder,bool IsVisible,DateTimeOffset CreatedAtUtc);
 public sealed record GalleryUpdateRequest(string? Title,string? Description);
 public sealed record GalleryItemUpdateRequest(string? Caption,int SortOrder,bool IsVisible=true);
-public sealed record GalleryFile(string Path,string ContentType);
+public sealed record GalleryFile(string StorageKey,string ContentType);
