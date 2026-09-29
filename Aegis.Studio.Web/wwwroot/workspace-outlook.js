@@ -18,7 +18,6 @@ function mergeJobMessages(teamMessages, customerMessages) {
     let revision = 0;
     let selectedJob = null;
     let tab = 'jobs';
-    let showCustomers = true;
     const baseConversation = openConversation;
     function empty(title, message) {
         detailPane.classList.remove('job-reading-view');
@@ -119,14 +118,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if (version !== revision) return;
         const combined = mergeJobMessages(messages, conversation?.messages || []);
         detailPane.classList.remove('empty');
-        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}</p><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div>${job ? `<label class="customer-filter"><input id="showCustomerMessages" type="checkbox" ${showCustomers ? 'checked' : ''}> Show customer messages</label>` : ''}</div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
+        detailPane.innerHTML = `<div class="detail-header"><div><p>${esc(workspaceTitle.textContent)}</p><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
         const renderMessages = () => {
-            const visible = combined.filter(m => showCustomers || !m.customer);
+            const visible = combined;
             document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
-        const filterToggle = document.getElementById('showCustomerMessages');
-        if (filterToggle) filterToggle.onchange = () => { showCustomers = filterToggle.checked; renderMessages(); };
         const sender = document.getElementById('jobSendingIdentity');
         const canSend = () => !job || sender?.value === 'Internal' || (!!conversation && (String(conversation.channel).toLowerCase() !== 'email' ? sender?.value === 'Workspace' : identities.some(i => i.type === sender?.value)));
         const syncSend = () => {
