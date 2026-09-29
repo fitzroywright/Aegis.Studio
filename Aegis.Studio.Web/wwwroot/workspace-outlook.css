@@ -241,3 +241,12 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 .job-reading-view #hierarchyCompose{padding-right:0}
 .job-reading-view .thread-shared-files{margin-right:0}
 .thread-shared-files .conversation-files-title{position:sticky;top:0;z-index:1;padding:8px 9px;border-bottom:2px solid #c3a044;background:linear-gradient(#f7df83,#eac95e);color:#493c20;font-size:11px;font-weight:650}
+
+/* Workspace folders remain available across the main Studio views. */
+.shell>.navigation-pane{display:flex!important;visibility:visible}
+.navigation-pane>.workspaces{display:block!important;visibility:visible}
+#trainingButton{display:none!important}
+.studio-top-nav #newRequestButton{flex:none;align-self:center;white-space:nowrap;height:34px;padding:6px 10px;font-size:12px}
+.studio-top-nav #newRequestButton svg{width:16px;height:16px}
+.job-reading-view .job-conversation-row{padding-right:8px}
+.job-reading-view #hierarchyCompose{padding-right:8px}

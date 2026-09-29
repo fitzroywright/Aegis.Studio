@@ -3,7 +3,7 @@
     const rail=document.querySelector('.rail');
     rail.className='studio-top-nav';rail.setAttribute('role','navigation');rail.setAttribute('aria-label','Main navigation');
     document.querySelector('.topbar').after(rail);
-    const items=[['dashboard','Dashboard'],['workspaces','Workspaces'],['pipeline','Pipeline'],['production','Production'],['frontdesk','FrontDesk'],['workday','WorkDay'],['mywork','My Work'],['admin','Admin']];
+    const items=[['dashboard','Dashboard'],['pipeline','Pipeline'],['production','Production'],['frontdesk','FrontDesk'],['mywork','My Work'],['admin','Admin']];
     const icons={
         mywork:'<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3h6v2M8 12l2 2 5-5M8 18h8"/>',
         dashboard:'<path d="M4 20V11h4v9M10 20V5h4v15M16 20V8h4v12"/>',
@@ -31,6 +31,7 @@
     function bindJobs(){genericView.querySelectorAll('[data-open-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.openJob).catch(showError));}
     rail.querySelectorAll('button').forEach(b=>b.onclick=()=>Promise.resolve(routes[b.dataset.view]()).catch(showError));
     loadFrontDeskRole();
-    // Request creation belongs to FrontDesk, not the global workspace header.
-    document.getElementById('newRequestButton').hidden=true;
+    const newRequest=document.getElementById('newRequestButton');
+    newRequest.hidden=false;
+    rail.querySelector('[data-view="mywork"]').after(newRequest);
 })();
