@@ -131,3 +131,22 @@ test('production media separates subject and collection lenses, including uncoll
  const uncollected=Array.from(panel.querySelectorAll('[data-collection-index]')).find(b=>b.textContent.includes('Uncollected'));uncollected.click();
  assert.equal(panel.querySelectorAll('.job-file-tile').length,1);assert.match(panel.querySelector('.job-file-tile').textContent,/Other.jpg/);
 });
+test('Pipeline shows stage groups with schedule and task on timeline and calendar',async()=>{
+ const dom=new JSDOM('<div id="generic"></div><div id="conversation"></div>',{runScripts:'outside-only',url:'https://studio.test'});
+ const w=dom.window;w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.genericView=dom.window.document.getElementById('generic');w.conversationView=dom.window.document.getElementById('conversation');w.activateNavigation=()=>{};w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const today=new Date();const time=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,10).toISOString();const end=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,12).toISOString();
+ const requests=[];
+ w.json=async(url,options)=>{requests.push(url);if(options)return {id:'new'};if(url==='/api/jobs')return [{id:'job',title:'Wedding',status:'Needs Scheduling',clientName:'Brown'}];if(url.startsWith('/api/schedule/entries?'))return [{id:'shoot',jobId:'job',title:'Wedding shoot',startsAtUtc:time,endsAtUtc:end,resourceIds:['photographer'],status:'Scheduled'},{id:'general',jobId:null,title:'Studio booking',startsAtUtc:time,endsAtUtc:end,resourceIds:[],status:'Tentative'}];if(url==='/api/operations/activities')return [{id:'task',jobId:'job',title:'Confirm location',scheduledAtUtc:time,dueAtUtc:time,status:'NotStarted'}];if(url==='/api/schedule/resources')return [{id:'photographer',name:'Taberfa',resourceType:'Staff',isActive:true}];if(url==='/api/auth/me')return {user:{isAdministrator:true}};throw Error(url);};
+ w.eval(fs.readFileSync(path.join(root,'scheduling.js'),'utf8'));
+ await w.showPipeline();
+ assert.match(w.genericView.textContent,/Needs scheduling/);assert.match(w.genericView.textContent,/Wedding shoot/);assert.match(w.genericView.textContent,/Confirm location/);assert.match(w.genericView.textContent,/Unlinked schedule/);
+ assert.equal(w.genericView.querySelectorAll('.pipeline-stage-lane').length,2);
+ w.genericView.querySelector('[data-pipeline-view="calendar"]').click();await new Promise(resolve=>setTimeout(resolve,10));
+ assert.ok(w.genericView.querySelector('.pipeline-calendar'));assert.match(w.genericView.textContent,/Wedding shoot/);
+ w.genericView.querySelector('[data-stage="Needs scheduling"]').click();await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(w.genericView.querySelector('[data-stage="Needs scheduling"]').getAttribute('aria-pressed'),'true');
+ w.genericView.querySelector('#pipelineNewSchedule').click();const form=w.genericView.querySelector('#scheduleEntryForm');
+ form.querySelector('#scheduleJob').value='job';form.querySelector('#scheduleTitle').value='Extra shoot';
+ await form.onsubmit({preventDefault(){},currentTarget:form});
+ assert.ok(requests.some(url=>url==='/api/schedule/entries'));
+});

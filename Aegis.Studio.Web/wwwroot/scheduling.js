@@ -1,75 +1,157 @@
-async function showSchedule() {
-    activateNavigation('schedule');
+// Pipeline is the planning home: stage groups, schedule entries and job tasks share one page.
+const pipelineStages = [
+    ['Needs scheduling', ['New', 'Confirmed', 'Inquiry', 'Needs Scheduling']],
+    ['Scheduled', ['Scheduled']],
+    ['Photography', ['Photography', 'Shoot Complete']],
+    ['Production', ['Production']],
+    ['Delivery', ['Ready for Client', 'Completed']]
+];
+let pipelineView = 'timeline';
+let pipelineAnchor = new Date();
+let pipelineSelectedJob = '';
+let pipelineSelectedStage = '';
+
+function pipelineStage(job) {
+    return pipelineStages.find(([, statuses]) => statuses.includes(job.status))?.[0] || 'Other';
+}
+function pipelineLocalDay(value) {
+    const date = new Date(value);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+function pipelineDayAt(date, offset) {
+    const result = new Date(date.getFullYear(), date.getMonth(), date.getDate() + offset);
+    return pipelineLocalDay(result);
+}
+function pipelineItems(entries, tasks, jobs) {
+    const visible = new Set(jobs.map(job => job.id));
+    return [
+        ...entries.filter(item => !item.jobId || visible.has(item.jobId)).map(item => ({
+            id: item.id, jobId: item.jobId, type: 'schedule', title: item.title,
+            start: item.startsAtUtc, end: item.endsAtUtc, location: item.location,
+            status: item.status, resourceIds: item.resourceIds || []
+        })),
+        ...tasks.filter(task => visible.has(task.jobId) && (task.scheduledAtUtc || task.dueAtUtc)).map(task => ({
+            id: task.id, jobId: task.jobId, type: 'task', title: task.title,
+            start: new Date(Math.min(new Date(task.scheduledAtUtc || task.dueAtUtc),new Date(task.dueAtUtc || task.scheduledAtUtc))).toISOString(),
+            end: new Date(Math.max(new Date(task.scheduledAtUtc || task.dueAtUtc),new Date(task.dueAtUtc || task.scheduledAtUtc))).toISOString(),
+            location: task.location, status: task.status, assignedTo: task.assignedTo
+        }))
+    ];
+}
+function pipelineItemMarkup(item, resourceMap) {
+    const staff = item.type === 'task' ? item.assignedTo : item.resourceIds.map(id => resourceMap.get(id)?.name).filter(Boolean).join(', ');
+    return `<button class="pipeline-event ${item.type}" data-open-job="${esc(item.jobId || '')}" title="${esc(item.title)} · ${esc(staff || 'Unassigned')}${item.location ? ' · ' + esc(item.location) : ''}"><span class="pipeline-event-symbol">${item.type === 'task' ? '✓' : '◉'}</span>${esc(item.title)}<small>${esc(staff || item.status || '')}</small></button>`;
+}
+function pipelineTimeline(jobs, items, resourceMap) {
+    const start = new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth(), pipelineAnchor.getDate());
+    const days = Array.from({ length: 14 }, (_, i) => pipelineDayAt(start, i));
+    const today = pipelineLocalDay(new Date());
+    const head = `<div class="pipeline-timeline-head"><span>Job / stage</span>${days.map(day => `<span class="${day === today ? 'today' : ''}">${new Date(day + 'T12:00:00').toLocaleDateString(undefined, { weekday:'short', day:'numeric' })}</span>`).join('')}</div>`;
+    const rows = [...pipelineStages.map(([name]) => name), 'Other'].map(stage => {
+        const grouped = jobs.filter(job => pipelineStage(job) === stage);
+        if (!grouped.length) return '';
+        return `<section class="pipeline-stage-lane"><h3>${esc(stage)} <small>${grouped.length}</small></h3>${grouped.map(job => {
+            const byDay = days.map(day => items.filter(item => item.jobId === job.id && pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day));
+            return `<div class="pipeline-timeline-row"><button class="pipeline-job-link" data-open-job="${job.id}"><strong>${esc(job.title)}</strong><small>${esc(job.clientName || 'Client not linked')} · ${esc(job.status)}</small></button>${byDay.map((events, i) => `<div class="pipeline-day-cell ${days[i] === today ? 'today' : ''}">${events.map(event => pipelineItemMarkup(event,resourceMap)).join('')}</div>`).join('')}</div>`;
+        }).join('')}</section>`;
+    }).join('');
+    const unlinked = items.filter(item => !item.jobId);
+    const other = unlinked.length ? `<section class="pipeline-stage-lane"><h3>Unlinked schedule <small>${unlinked.length}</small></h3><div class="pipeline-timeline-row"><span class="pipeline-job-link"><strong>General bookings and resources</strong></span>${days.map(day => `<div class="pipeline-day-cell ${day === today ? 'today' : ''}">${unlinked.filter(item => pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day).map(item => pipelineItemMarkup(item,resourceMap)).join('')}</div>`).join('')}</div></section>` : '';
+    return `<div class="pipeline-timeline-scroll"><div class="pipeline-timeline">${head}${rows || '<p>No jobs in this pipeline.</p>'}${other}</div></div>`;
+}
+function pipelineCalendar(items, resourceMap) {
+    const first = new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth(), 1);
+    const offset = first.getDay();
+    const dates = Array.from({ length: Math.ceil((offset + new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()) / 7) * 7 }, (_, i) => new Date(first.getFullYear(), first.getMonth(), 1 - offset + i));
+    return `<div class="pipeline-calendar"><div class="pipeline-calendar-days">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x => `<span>${x}</span>`).join('')}</div><div class="pipeline-calendar-grid">${dates.map(date => {
+        const day = pipelineLocalDay(date);
+        const events = items.filter(item => pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day);
+        return `<section class="pipeline-calendar-day ${date.getMonth() !== first.getMonth() ? 'outside' : ''} ${day === pipelineLocalDay(new Date()) ? 'today' : ''}"><time datetime="${day}">${date.getDate()}</time>${events.map(item => pipelineItemMarkup(item, resourceMap)).join('')}</section>`;
+    }).join('')}</div></div>`;
+}
+
+async function showPipeline() {
+    activateNavigation('pipeline');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
-    const from = new Date();
-    from.setDate(from.getDate() - 7);
-    const to = new Date();
-    to.setDate(to.getDate() + 60);
-    const [entries, resources, jobs] = await Promise.all([
+    genericView.innerHTML = '<p>Loading Pipeline…</p>';
+    const from = new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth() - 1, 1);
+    const to = new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth() + 3, 1);
+    const [jobs, entries, tasks, resources, profile] = await Promise.all([
+        json('/api/jobs'),
         json(`/api/schedule/entries?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`),
+        json('/api/operations/activities'),
         json('/api/schedule/resources'),
-        json('/api/jobs')
+        json('/api/auth/me')
     ]);
-
+    const selected = jobs.filter(job => (!pipelineSelectedJob || job.id === pipelineSelectedJob) && (!pipelineSelectedStage || pipelineStage(job) === pipelineSelectedStage));
     const resourceMap = new Map(resources.map(resource => [resource.id, resource]));
+    const items = pipelineItems(entries, tasks, selected).filter(item => item.jobId || (!pipelineSelectedJob && !pipelineSelectedStage));
+    const undated = tasks.filter(task => selected.some(job => job.id===task.jobId) && !task.scheduledAtUtc && !task.dueAtUtc && !['Completed','Cancelled'].includes(task.status));
+    const stages = [...pipelineStages.map(([name]) => name), 'Other'];
+    const today = pipelineLocalDay(new Date());
+    const nearby = items.filter(item => pipelineLocalDay(item.end) >= today && pipelineLocalDay(item.start) <= pipelineDayAt(new Date(), 7));
+    const isAdmin = (profile.user || profile).isAdministrator === true;
     genericView.innerHTML = `
-        <div class="job-detail-header"><div><h1>Schedule</h1><p>Bookings, jobs, staff, rooms and equipment in one conflict-aware schedule.</p></div><button class="primary" onclick="openScheduleEntryForm()">+ Schedule item</button></div>
-        <div class="cards">
-            <div class="metric">Upcoming<strong>${entries.filter(item => new Date(item.endsAtUtc) >= new Date()).length}</strong></div>
-            <div class="metric">Resources<strong>${resources.length}</strong></div>
-            <div class="metric">Next 7 days<strong>${entries.filter(item => new Date(item.startsAtUtc) <= new Date(Date.now()+7*86400000) && new Date(item.endsAtUtc) >= new Date()).length}</strong></div>
-        </div>
-        <section class="job-section"><h2>Upcoming schedule</h2>${entries.length ? entries.map(entry => {
-            const assigned = (entry.resourceIds || []).map(id => resourceMap.get(id)?.name).filter(Boolean).join(', ');
-            return `<div class="job-row"><div><b>${esc(entry.title)}</b><div class="meta">${new Date(entry.startsAtUtc).toLocaleString()} → ${new Date(entry.endsAtUtc).toLocaleString()}${entry.location ? ' · '+esc(entry.location) : ''}</div><small>${esc(assigned || 'No resources assigned')} · ${esc(entry.status)}</small></div></div>`;
-        }).join('') : '<p class="muted">Nothing scheduled yet.</p>'}</section>
-        <section class="job-section"><h2>Resources</h2><div id="scheduleResources">${resources.length ? resources.map(resource => `<div class="job-row"><div><b>${esc(resource.name)}</b><div class="meta">${esc(resource.resourceType)} · ${resource.isActive ? 'Active' : 'Inactive'}</div></div></div>`).join('') : '<p class="muted">No staff, rooms or equipment configured yet.</p>'}</div><div class="pos-entry" style="margin-top:16px"><label>Name<input id="scheduleResourceName"></label><label>Type<select id="scheduleResourceType"><option>Staff</option><option>Room</option><option>Equipment</option><option>Vehicle</option></select></label><button class="action" onclick="createScheduleResource()">Add resource</button></div></section>
-        <dialog id="scheduleEntryDialog"><form id="scheduleEntryForm" method="dialog" class="request-form"><h2>Schedule item</h2><label>Job<select id="scheduleJob"><option value="">No linked job</option>${jobs.map(job => `<option value="${job.id}">${esc(job.title)} · ${esc(job.clientName)}</option>`).join('')}</select></label><label>Title<input id="scheduleTitle" required></label><div class="row"><label>Starts<input id="scheduleStart" type="datetime-local" required></label><label>Ends<input id="scheduleEnd" type="datetime-local" required></label></div><label>Location<input id="scheduleLocation"></label><label>Resources<select id="scheduleResourceIds" multiple size="6">${resources.map(resource => `<option value="${resource.id}">${esc(resource.resourceType)} · ${esc(resource.name)}</option>`).join('')}</select></label><label>Notes<textarea id="scheduleNotes"></textarea></label><div class="dialog-actions"><button type="button" onclick="scheduleEntryDialog.close()">Cancel</button><button type="submit" class="primary">Save</button></div></form></dialog>`;
-
-    scheduleEntryForm.onsubmit = saveScheduleEntry;
+        <div class="job-detail-header"><div><h1>Pipeline</h1><p>Plan jobs, shoots, resources and upcoming tasks in one place.</p></div><button class="primary" id="pipelineNewSchedule">+ Schedule item</button></div>
+        <div class="pipeline-stage-summary">${stages.map(stage => `<button class="pipeline-stage-tile ${pipelineSelectedStage===stage?'active':''}" data-stage="${esc(stage)}" aria-pressed="${pipelineSelectedStage===stage}"><strong>${esc(stage)}</strong><span>${jobs.filter(job => (!pipelineSelectedJob || job.id===pipelineSelectedJob) && pipelineStage(job) === stage).length}</span></button>`).join('')}</div>
+        <div class="pipeline-planning-toolbar"><div class="pipeline-view-switch"><button data-pipeline-view="timeline" class="${pipelineView === 'timeline' ? 'active' : ''}">Timeline</button><button data-pipeline-view="calendar" class="${pipelineView === 'calendar' ? 'active' : ''}">Calendar</button></div><button class="action" data-pipeline-prev aria-label="Previous period">‹</button><button class="action" data-pipeline-today>Today</button><button class="action" data-pipeline-next aria-label="Next period">›</button><strong>${esc(pipelineView === 'calendar' ? pipelineAnchor.toLocaleDateString(undefined,{month:'long',year:'numeric'}) : pipelineAnchor.toLocaleDateString() + ' – ' + new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),pipelineAnchor.getDate()+13).toLocaleDateString())}</strong><label>Job <select id="pipelineJobFilter"><option value="">All jobs</option>${jobs.map(job => `<option value="${job.id}" ${pipelineSelectedJob === job.id ? 'selected' : ''}>${esc(job.title)}</option>`).join('')}</select></label></div>
+        <p class="pipeline-key"><span>◉ Scheduled work</span><span>✓ Task / deadline</span><span>${nearby.length} items in the next 7 days</span></p>
+        <section class="pipeline-planning-surface">${pipelineView === 'calendar' ? pipelineCalendar(items, resourceMap) : pipelineTimeline(selected, items, resourceMap)}</section>${undated.length?`<details class="pipeline-resource-panel"><summary>${undated.length} tasks without dates</summary>${undated.map(task=>`<article class="task-card"><button class="link-button" data-open-job="${task.jobId}">${esc(task.title)}</button><small>${esc(task.assignedTo||'Unassigned')} · ${esc(task.status)}</small></article>`).join('')}</details>`:''}
+        <details class="pipeline-resource-panel"><summary>Resources (${resources.length})</summary><div id="scheduleResources">${resources.map(resource => `<div class="job-row"><div><b>${esc(resource.name)}</b><small>${esc(resource.resourceType)} · ${resource.isActive ? 'Active' : 'Inactive'}</small></div></div>`).join('') || '<p>No resources configured.</p>'}</div>${isAdmin ? '<div class="pos-entry"><label>Name<input id="scheduleResourceName"></label><label>Type<select id="scheduleResourceType"><option>Staff</option><option>Room</option><option>Equipment</option><option>Vehicle</option></select></label><button class="action" id="scheduleAddResource">Add resource</button></div>' : ''}</details>
+        <dialog id="scheduleEntryDialog"><form id="scheduleEntryForm" class="request-form"><h2>Schedule item</h2><label>Job<select id="scheduleJob"><option value="">No linked job (administrators only)</option>${jobs.map(job => `<option value="${job.id}">${esc(job.title)} · ${esc(job.clientName)}</option>`).join('')}</select></label><label>Title<input id="scheduleTitle" required></label><div class="row"><label>Starts<input id="scheduleStart" type="datetime-local" required></label><label>Ends<input id="scheduleEnd" type="datetime-local" required></label></div><label>Location<input id="scheduleLocation"></label><label>Resources<select id="scheduleResourceIds" multiple size="6">${resources.map(resource => `<option value="${resource.id}">${esc(resource.resourceType)} · ${esc(resource.name)}</option>`).join('')}</select></label><label>Notes<textarea id="scheduleNotes"></textarea></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save</button></div></form></dialog>`;
+    genericView.querySelectorAll('[data-open-job]').forEach(button => button.onclick = () => button.dataset.openJob && openWorkspaceJob(button.dataset.openJob).catch(error => alert(error.message)));
+    genericView.querySelectorAll('[data-pipeline-view]').forEach(button => button.onclick = () => { pipelineView = button.dataset.pipelineView; showPipeline().catch(pipelineError); });
+    genericView.querySelector('[data-pipeline-prev]').onclick = () => shiftPipeline(-1);
+    genericView.querySelector('[data-pipeline-next]').onclick = () => shiftPipeline(1);
+    genericView.querySelector('[data-pipeline-today]').onclick = () => { pipelineAnchor = new Date(); showPipeline().catch(pipelineError); };
+    genericView.querySelector('#pipelineJobFilter').onchange = event => { pipelineSelectedJob = event.target.value; showPipeline().catch(pipelineError); };
+    genericView.querySelectorAll('[data-stage]').forEach(button => button.onclick = () => {pipelineSelectedStage = pipelineSelectedStage === button.dataset.stage ? '' : button.dataset.stage; showPipeline().catch(pipelineError);});
+    genericView.querySelector('#pipelineNewSchedule').onclick = () => openScheduleEntryForm();
+    genericView.querySelector('#scheduleEntryForm').onsubmit = saveScheduleEntry;
+    genericView.querySelector('#scheduleEntryDialog [data-cancel]').onclick = () => genericView.querySelector('#scheduleEntryDialog').close();
+    if (isAdmin) genericView.querySelector('#scheduleAddResource').onclick = () => createScheduleResource().catch(pipelineError);
 }
-
-function openScheduleEntryForm() {
-    const start = new Date(Date.now() + 3600000);
-    start.setMinutes(0,0,0);
-    const end = new Date(start.getTime() + 3600000);
+function pipelineError(error) { genericView.innerHTML = `<h1>Pipeline could not be loaded</h1><p role="alert">${esc(error.message || error)}</p><button class="action" id="pipelineRetry">Retry</button>`; genericView.querySelector('#pipelineRetry').onclick = () => showPipeline().catch(pipelineError); }
+function shiftPipeline(direction) {
+    pipelineAnchor = pipelineView === 'calendar'
+        ? new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth() + direction, 1)
+        : new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth(), pipelineAnchor.getDate() + direction * 14);
+    showPipeline().catch(pipelineError);
+}
+function openScheduleEntryForm(jobId) {
+    const dialog = genericView.querySelector('#scheduleEntryDialog');
+    const start = new Date(Date.now() + 3600000); start.setMinutes(0,0,0);
     const local = date => new Date(date.getTime() - date.getTimezoneOffset()*60000).toISOString().slice(0,16);
-    scheduleStart.value = local(start);
-    scheduleEnd.value = local(end);
-    scheduleEntryDialog.showModal();
+    dialog.querySelector('#scheduleJob').value = jobId || pipelineSelectedJob || '';
+    dialog.querySelector('#scheduleStart').value = local(start);
+    dialog.querySelector('#scheduleEnd').value = local(new Date(start.getTime() + 3600000));
+    dialog.showModal();
 }
-
 async function saveScheduleEntry(event) {
     event.preventDefault();
-    const resourceIds = Array.from(scheduleResourceIds.selectedOptions).map(option => option.value);
-    const payload = {
-        jobId: scheduleJob.value || null,
-        bookingId: null,
-        title: scheduleTitle.value.trim(),
-        startsAtUtc: new Date(scheduleStart.value).toISOString(),
-        endsAtUtc: new Date(scheduleEnd.value).toISOString(),
-        location: scheduleLocation.value.trim() || null,
-        status: 'Scheduled',
-        notes: scheduleNotes.value.trim() || null,
-        resourceIds,
-        allowConflicts: false
-    };
+    const form = event.currentTarget;
+    const selected = id => form.querySelector('#' + id);
+    const start = new Date(selected('scheduleStart').value), end = new Date(selected('scheduleEnd').value);
+    const error = form.querySelector('[role="alert"]');
+    if (!Number.isFinite(+start) || !Number.isFinite(+end) || end <= start) { error.textContent = 'Choose a valid start and end time.'; return; }
+    const button = form.querySelector('[type="submit"]'); button.disabled = true;
     try {
-        await json('/api/schedule/entries', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-        scheduleEntryDialog.close();
-        await showSchedule();
-    } catch (error) {
-        alert('Unable to schedule item. ' + (error.message || error));
-    }
+        await json('/api/schedule/entries', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+            jobId:selected('scheduleJob').value || null, bookingId:null, title:selected('scheduleTitle').value.trim(),
+            startsAtUtc:start.toISOString(), endsAtUtc:end.toISOString(), location:selected('scheduleLocation').value.trim() || null,
+            status:'Scheduled', notes:selected('scheduleNotes').value.trim() || null,
+            resourceIds:Array.from(selected('scheduleResourceIds').selectedOptions, option => option.value), allowConflicts:false
+        }) });
+        form.closest('dialog').close();
+        await showPipeline();
+    } catch (cause) { error.textContent = cause.message || String(cause); button.disabled = false; }
 }
-
 async function createScheduleResource() {
-    const name = scheduleResourceName.value.trim();
+    const name = genericView.querySelector('#scheduleResourceName').value.trim();
     if (!name) return alert('Resource name is required.');
-    await json('/api/schedule/resources', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, resourceType:scheduleResourceType.value, isActive:true, notes:null }) });
-    await showSchedule();
+    await json('/api/schedule/resources', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, resourceType:genericView.querySelector('#scheduleResourceType').value, isActive:true, notes:null }) });
+    await showPipeline();
 }
-
-const scheduleNavigationButton = document.querySelector('.brand-button[data-view="schedule"]');
-if (scheduleNavigationButton) scheduleNavigationButton.onclick = () => showSchedule();
+// Older calls and bookmarks now open the same planning surface.
+async function showSchedule() { return showPipeline(); }
