@@ -293,7 +293,7 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 
 /* Conversation layout: message composer belongs to the message column; files sit left of tasks. */
 .job-reading-view{
-  grid-template-rows:auto minmax(0,1fr) minmax(200px,40%);
+  grid-template-rows:auto minmax(120px,36%) minmax(0,1fr);
 }
 .job-reading-view .job-conversation-row{
   align-items:stretch;
@@ -340,13 +340,13 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 }
 .job-reading-view .job-message-column #hierarchyBody{
   grid-column:1;
-  min-height:58px;
-  height:58px;
-  max-height:120px;
+  min-height:48px;
+  height:48px;
+  max-height:100px;
   width:100%;
   resize:vertical;
   box-sizing:border-box;
-  padding:10px 12px;
+  padding:8px 10px;
   border:1px solid var(--theme-border);
   border-radius:8px;
   background:var(--theme-surface);
@@ -365,7 +365,7 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
   margin:0;
 }
 .job-reading-view .job-message-column>#hierarchyCompose .send-split .primary{
-  min-width:128px;
+  min-width:155px;
   border-radius:8px 0 0 8px;
 }
 .job-reading-view .job-message-column>#hierarchyCompose .send-split select{
@@ -383,7 +383,7 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 }
 @media(max-width:800px){
   .job-reading-view{
-    grid-template-rows:auto minmax(0,1fr) 300px;
+    grid-template-rows:auto minmax(120px,36%) 300px;
   }
   .job-reading-view .job-conversation-row{
     overflow-x:auto;
