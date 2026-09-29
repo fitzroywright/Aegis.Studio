@@ -4,7 +4,17 @@
     rail.className='studio-top-nav';rail.setAttribute('role','navigation');rail.setAttribute('aria-label','Main navigation');
     document.querySelector('.topbar').after(rail);
     const items=[['mywork','My Work'],['dashboard','Dashboard'],['workspaces','Workspaces'],['pipeline','Pipeline'],['production','Production'],['frontdesk','FrontDesk'],['workday','WorkDay'],['admin','Admin']];
-    rail.innerHTML=items.map(([id,label])=>`<button class="brand-button" data-view="${id}">${label}</button>`).join('');
+    const icons={
+        mywork:'<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3h6v2M8 12l2 2 5-5M8 18h8"/>',
+        dashboard:'<path d="M4 20V11h4v9M10 20V5h4v15M16 20V8h4v12"/>',
+        workspaces:'<path d="M3 7V5h7l2 2h9v13H3z"/><path d="M3 10h18"/>',
+        pipeline:'<circle cx="5" cy="6" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="18" r="2"/><path d="M7 6h5v6h5M7 18h5v-6"/>',
+        production:'<path d="M3 20V9l6 3V8l6 4V4h4l2 16zM7 16h1m4 0h1m4 0h1"/>',
+        frontdesk:'<path d="M4 15a8 8 0 0 1 16 0M2 18h20M12 7V4m-2 0h4"/>',
+        workday:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18M8 14h3m3 0h3m-9 4h3"/>',
+        admin:'<path d="M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="M8 12l3 3 5-6"/>'
+    };
+    rail.innerHTML=items.map(([id,label])=>`<button class="brand-button" data-view="${id}"><span class="studio-nav-icon icon-${id}" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[id]}</svg></span><span>${label}</span></button>`).join('');
     const showError=e=>{genericView.innerHTML=`<h1>Unable to load view</h1><p>${esc(e.message)}</p>`;};
     const generic=view=>{activateNavigation(view);conversationView.classList.add('hidden');genericView.classList.remove('hidden');genericView.innerHTML='<p>Loading…</p>';};
     const routes={
