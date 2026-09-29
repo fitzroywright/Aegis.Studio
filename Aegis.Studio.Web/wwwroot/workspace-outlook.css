@@ -190,3 +190,14 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 .workspace-inline-search #workspaceRefresh{position:absolute;right:2px;top:2px;width:26px;height:26px;min-height:0;padding:5px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--theme-accent)}
 .workspace-inline-search #workspaceRefresh:hover{background:var(--theme-accent-soft)}
 .workspace-inline-search svg{width:16px;height:16px}
+
+/* The shared field always follows the active Jobs or Members selector. */
+.workspace-list-controls[data-search-scope="members"]>[data-tab="members"]{margin-left:0}
+.workspace-list-controls .workspace-inline-search{border-radius:8px}
+.workspace-list-controls:focus-within .workspace-inline-search{box-shadow:0 0 0 1px var(--theme-accent)}
+.detail-pane [data-search][hidden]{display:none!important}
+
+.workspace-list-controls{margin:6px;padding:3px;border:1px solid var(--theme-border);border-radius:10px;background:var(--theme-surface)}
+.workspace-list-controls .workspace-inline-search input{border:0;background:transparent}
+.workspace-list-controls>[data-tab]{border:0;background:transparent;border-radius:7px}
+.workspace-list-controls>[data-tab].active{background:var(--theme-accent-soft)}

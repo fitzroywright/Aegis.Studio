@@ -26,7 +26,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
     }
     function filter() {
         const term = search.value.trim().toLocaleLowerCase();
-        conversationList.querySelectorAll('[data-search]').forEach(row => row.hidden = !row.textContent.toLocaleLowerCase().includes(term));
+        const container=tab==='members'?detailPane:conversationList;
+        container.querySelectorAll('[data-search]').forEach(row => row.hidden = !row.textContent.toLocaleLowerCase().includes(term));
+        const noMatches=container.querySelector('[data-no-member-matches]');
+        if(noMatches)noMatches.hidden=!container.querySelector('[data-search]')||!!container.querySelector('[data-search]:not([hidden])');
     }
     search.oninput = filter;
     const tabs = document.createElement('div');
@@ -46,13 +49,23 @@ function mergeJobMessages(teamMessages, customerMessages) {
     tabs.querySelector('[data-tab="members"]').before(searchBox);
     document.querySelector('.workspace-toolbar').remove();
     allButton.remove();
+    function syncSearchField(){
+        const active=tabs.querySelector('[data-tab="'+tab+'"]');
+        active.after(searchBox);
+        tabs.dataset.searchScope=tab;
+        search.placeholder=tab==='members'?'Search members…':'Search jobs…';
+        search.setAttribute('aria-label',tab==='members'?'Search workspace members':'Search jobs');
+        refreshButton.title=tab==='members'?'Refresh members':'Refresh jobs';
+        refreshButton.setAttribute('aria-label',refreshButton.title);
+    }
+    syncSearchField();
     const banners = document.createElement('section');
     banners.className = 'workspace-announcement-banners';
     banners.hidden = true;
     document.getElementById('conversationView').prepend(banners);
     const display = () => { activateView('conversations'); activateNavigation('workspaces'); };
     const fail = error => empty('Unable to load', error.message || String(error));
-    tabs.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { tab = button.dataset.tab; loadConversations().catch(fail); });
+    tabs.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { tab = button.dataset.tab; search.value=''; syncSearchField(); search.focus(); loadConversations().catch(fail); });
     selectWorkspace = async function(id, name) {
         const workspace = workspaceCache.find(x => x.id === id);
         if (!workspace?.permissions?.accessWorkspace || !workspace.permissions.view) return alert('You do not have permission to view this workspace.');
@@ -64,6 +77,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         try { await loadConversations(); } catch (error) { fail(error); }
     };
     loadConversations = async function() {
+        syncSearchField();
         const version = ++revision;
         const workspaceId = selectedWorkspace;
         banners.hidden = true;
@@ -78,8 +92,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const members = await json(`/api/workspaces/${workspaceId}/directory`);
             if (version !== revision) return;
             detailPane.classList.remove('empty');
-            detailPane.innerHTML = `<div class="detail-header"><h1>Workspace members</h1></div><div class="messages">${members.map(m => `<article class="message"><strong>${esc(m.displayName)}</strong><p>${esc(m.userName)} · ${esc(m.role)}</p></article>`).join('') || '<p>No active members assigned.</p>'}</div>`;
-            conversationList.innerHTML = `<div class="empty-state"><h3>${members.length} members</h3><p>People with access to this workspace.</p></div>`; return;
+            detailPane.innerHTML = `<div class="detail-header"><h1>Workspace members</h1></div><div class="messages">${members.map(m => `<article class="message" data-search><strong>${esc(m.displayName)}</strong><p>${esc(m.userName)} · ${esc(m.role)}</p></article>`).join('') || '<p>No active members assigned.</p>'}<p data-no-member-matches hidden>No matching members.</p></div>`;
+            conversationList.innerHTML = `<div class="empty-state"><h3>${members.length} members</h3><p>People with access to this workspace.</p></div>`; filter(); return;
         }
         const [jobs, directory, profile] = await Promise.all([
             json('/api/jobs'),
