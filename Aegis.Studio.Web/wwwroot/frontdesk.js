@@ -257,9 +257,13 @@ async function showFrontDeskFlow(jobId) {
 }
 
 async function messageFrontDeskJob(jobId, mode) {
-    const job=await json('/api/jobs/'+jobId);
+    const [job,thread]=await Promise.all([
+        json('/api/jobs/'+jobId),
+        json('/api/messages/threads/Job/'+jobId,{method:'POST'})
+    ]);
+    const history=await json('/api/messages/threads/'+thread.id+'?count=80');
     const label=mode==='finance'?'Accounts / Finance':mode==='escalate'?'Escalation':'Workspace';
-    const dialog=frontDeskDialog(label+' message',`<p><strong>${esc(job.clientName||'Client')}</strong> · ${esc(job.title)} · ${esc(job.status)}</p>${mode==='escalate'?'<label>Escalate to<select name="target"><option value="Workspace Manager">Workspace Manager</option><option value="Operations Manager">Operations Manager</option></select></label>':''}<label>Message<textarea name="body" required maxlength="4000" placeholder="${mode==='finance'?'Question about quote, invoice, payment, balance or refund':'What is happening with this job?'}"></textarea></label><label>Attach document<input name="file" type="file"></label><p class="muted">The message stays in the job conversation. Any attached file also appears in Conversation Files.</p>`);
+    const dialog=frontDeskDialog(label+' message',`<p><strong>${esc(job.clientName||'Client')}</strong> · ${esc(job.title)} · ${esc(job.status)}</p><div class="frontdesk-message-history">${history.map(message=>`<article><strong>${esc(studioFirstName(message.senderUserName))}</strong><small>${esc(new Date(message.createdAtUtc).toLocaleString())}</small><p>${esc(message.body)}</p></article>`).join('')||'<p class="muted">No job-team messages yet.</p>'}</div>${mode==='escalate'?'<label>Escalate to<select name="target"><option value="Workspace Manager">Workspace Manager</option><option value="Operations Manager">Operations Manager</option></select></label>':''}<label>Message<textarea name="body" required maxlength="4000" placeholder="${mode==='finance'?'Question about quote, invoice, payment, balance or refund':'What is happening with this job?'}"></textarea></label><label>Attach document<input name="file" type="file"></label><p class="muted">This is the job conversation. Replies remain here and in the job view. Any attached file also appears in Conversation Files.</p>`);
     const form=dialog.querySelector('form');
     form.onsubmit=async e=>{
         e.preventDefault();
@@ -276,7 +280,7 @@ async function messageFrontDeskJob(jobId, mode) {
                 if(!link.ok)throw new Error(await link.text());
             }
             dialog.close();
-            alert(label+' message routed to '+routed.target+' and retained in the job conversation.');
+            await messageFrontDeskJob(jobId,mode);
         }catch(error){form.querySelector('[role=alert]').textContent=error.message;}
     };
 }
