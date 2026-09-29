@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
+using Common.Storage;
 using Npgsql;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -14,8 +15,8 @@ public static class GalleryEndpoints
     {
         GalleryStore store = new(
             app.Services.GetRequiredService<StudioDatabase>(),
-            app.Services.GetRequiredService<IWebHostEnvironment>(),
-            app.Services.GetRequiredService<IConfiguration>());
+            app.Services.GetRequiredService<IConfiguration>(),
+            app.Services.GetRequiredService<IFileStorage>());
         store.EnsureSchema();
 
         app.MapGet("/api/workspaces/{workspaceId:guid}/gallery", (Guid workspaceId, HttpContext context, WorkspaceAccessService access) =>
@@ -133,15 +134,22 @@ public static class GalleryEndpoints
             });
         }).AllowAnonymous();
 
-        app.MapGet("/public/galleries/{token}/items/{itemId:guid}/{variant}", (string token, Guid itemId, string variant) =>
+        app.MapGet("/public/galleries/{token}/items/{itemId:guid}/{variant}", async (string token, Guid itemId, string variant, CancellationToken cancellationToken) =>
         {
             WorkspaceGallery? gallery = store.GetPublished(token);
             GalleryItem? item = gallery?.Items.FirstOrDefault(x => x.Id == itemId && x.IsVisible);
             if (gallery is null || item is null) return Results.NotFound();
             GalleryFile? file = store.ResolveFile(gallery, item, variant);
-            return file is null || !File.Exists(file.Path)
-                ? Results.NotFound()
-                : Results.File(file.Path, file.ContentType, enableRangeProcessing: true);
+            if (file is null) return Results.NotFound();
+            try
+            {
+                Stream content = await store.OpenFileAsync(file, cancellationToken);
+                return Results.Stream(content, file.ContentType, enableRangeProcessing: true);
+            }
+            catch (StorageException exception) when (exception.Code == "STORAGE-MISSING-001")
+            {
+                return Results.NotFound();
+            }
         }).AllowAnonymous();
     }
 
@@ -158,16 +166,16 @@ public static class GalleryEndpoints
 public sealed class GalleryStore
 {
     private readonly StudioDatabase database;
-    private readonly string root;
+    private readonly IFileStorage storage;
     private readonly long maximumBytes;
 
-    public GalleryStore(StudioDatabase database, IWebHostEnvironment environment, IConfiguration configuration)
+    public GalleryStore(StudioDatabase database, IConfiguration configuration, IFileStorage storage)
     {
         this.database = database;
-        string configured = configuration["Storage:GalleriesPath"] ?? string.Empty;
-        root = string.IsNullOrWhiteSpace(configured) ? Path.Combine(environment.ContentRootPath, "Storage", "galleries") : Path.GetFullPath(configured);
+        this.storage = new PrefixedFileStorage(
+            storage ?? throw new ArgumentNullException(nameof(storage)),
+            "Storage/galleries");
         maximumBytes = Math.Clamp(configuration.GetValue<int?>("Storage:MaxGalleryImageMegabytes") ?? 50, 1, 250) * 1024L * 1024L;
-        Directory.CreateDirectory(root);
     }
 
     public void EnsureSchema()
