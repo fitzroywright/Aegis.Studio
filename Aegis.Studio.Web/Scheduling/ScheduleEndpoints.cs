@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using Aegis.Studio.Web.Notifications;
+using Aegis.Studio.Web.Messaging;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Production;
+using Npgsql;
 
 namespace Aegis.Studio.Web.Scheduling;
 
@@ -55,7 +57,8 @@ public static class ScheduleEndpoints
             ScheduleStore store,
             JobAccessService access,
             StudioDatabase database,
-            StudioOperationsFlowPublisher flows) =>
+            StudioOperationsFlowPublisher flows,
+            StudioInAppMessageStore messages) =>
         {
             ScheduleEntry? current=store.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10)).FirstOrDefault(x=>x.Id==id);
             if(current is null) return Results.NotFound();
@@ -66,8 +69,9 @@ public static class ScheduleEndpoints
                 ScheduleAssignmentChange change=store.Reassign(id,request.ResourceIds??[],CurrentUser(user),request.Reason);
                 ScheduleEntry updated=store.GetEntries(current.StartsAtUtc.AddMinutes(-1),current.EndsAtUtc.AddMinutes(1)).First(x=>x.Id==id);
                 EnsureAssignedPhotographers(updated,database,access);
-                flows.TryEnqueueJobFlow(effectiveJobId.ToString("D"),"Assigned",effectiveJobId.ToString("D"),
-                    string.IsNullOrWhiteSpace(request.Reason)?"Job reassigned.":"Job reassigned: "+request.Reason.Trim());
+                string detail=string.IsNullOrWhiteSpace(request.Reason)?"Schedule resources reassigned.":"Schedule resources reassigned: "+request.Reason.Trim();
+                flows.TryEnqueueJobFlow(effectiveJobId.ToString("D"),"Assigned",effectiveJobId.ToString("D"),detail);
+                RecordScheduleChange(effectiveJobId,user,database,messages,detail);
                 return Results.Ok(new{assignment=updated,change});
             }
             catch(ScheduleConflictException ex){return Results.Conflict(new{error=ex.Message,conflicts=ex.Conflicts});}
@@ -101,7 +105,8 @@ public static class ScheduleEndpoints
             JobAccessService access,
             JobEventNotifier notifier,
             StudioDatabase database,
-            StudioOperationsFlowPublisher flows) =>
+            StudioOperationsFlowPublisher flows,
+            StudioInAppMessageStore messages) =>
         {
             if (!request.JobId.HasValue)
             {
@@ -123,12 +128,14 @@ public static class ScheduleEndpoints
                 }
                 if (value.JobId.HasValue)
                 {
+                    string detail=$"{value.Title} scheduled for {value.StartsAtUtc:u} to {value.EndsAtUtc:u}{(string.IsNullOrWhiteSpace(value.Location)?string.Empty:$" at {value.Location}")}.";
                     notifier.Publish(
                         value.JobId.Value,
                         "ScheduleChanged",
                         $"Scheduled: {value.Title}",
-                        $"{value.Title} is scheduled for {value.StartsAtUtc:u} to {value.EndsAtUtc:u}{(string.IsNullOrWhiteSpace(value.Location) ? string.Empty : $" at {value.Location}")}.",
+                        detail,
                         requesterEligible: true);
+                    RecordScheduleChange(value.JobId.Value,user,database,messages,detail);
                 }
                 return Results.Created($"/api/schedule/entries/{value.Id}", value);
             }
@@ -144,7 +151,8 @@ public static class ScheduleEndpoints
             JobAccessService access,
             JobEventNotifier notifier,
             StudioDatabase database,
-            StudioOperationsFlowPublisher flows) =>
+            StudioOperationsFlowPublisher flows,
+            StudioInAppMessageStore messages) =>
         {
             ScheduleEntry? current = store.GetEntries(DateTimeOffset.UtcNow.AddYears(-5), DateTimeOffset.UtcNow.AddYears(5)).FirstOrDefault(x => x.Id == id);
             Guid? jobId = request.JobId ?? current?.JobId;
@@ -166,12 +174,14 @@ public static class ScheduleEndpoints
                 if (value.JobId.HasValue)
                 {
                     string verb = value.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) ? "Cancelled" : "Schedule updated";
+                    string detail=$"{value.Title} is {value.Status} for {value.StartsAtUtc:u} to {value.EndsAtUtc:u}{(string.IsNullOrWhiteSpace(value.Location)?string.Empty:$" at {value.Location}")}.";
                     notifier.Publish(
                         value.JobId.Value,
                         "ScheduleChanged",
                         $"{verb}: {value.Title}",
-                        $"{value.Title} is {value.Status} for {value.StartsAtUtc:u} to {value.EndsAtUtc:u}{(string.IsNullOrWhiteSpace(value.Location) ? string.Empty : $" at {value.Location}")}.",
+                        detail,
                         requesterEligible: true);
+                    RecordScheduleChange(value.JobId.Value,user,database,messages,detail);
                 }
                 return Results.Ok(value);
             }
@@ -179,6 +189,29 @@ public static class ScheduleEndpoints
             catch (ScheduleConflictException exception) { return Results.Conflict(new { error = exception.Message, conflicts = exception.Conflicts }); }
             catch (Exception exception) { return Results.BadRequest(new { error = exception.Message }); }
         }).RequireAuthorization();
+    }
+
+    private static void RecordScheduleChange(Guid jobId, ClaimsPrincipal user, StudioDatabase database, StudioInAppMessageStore messages, string detail)
+    {
+        string actor=CurrentUser(user);
+        using(NpgsqlConnection connection=database.OpenConnection())
+        {
+            using NpgsqlCommand audit=connection.CreateCommand();
+            audit.CommandText="insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'ScheduleChanged',$3,$4,now())";
+            audit.Parameters.AddWithValue(Guid.NewGuid());audit.Parameters.AddWithValue(jobId);audit.Parameters.AddWithValue(actor);audit.Parameters.AddWithValue(detail);audit.ExecuteNonQuery();
+            using NpgsqlCommand workspace=connection.CreateCommand();
+            workspace.CommandText="select workspace_id from studio_jobs where id=$1";
+            workspace.Parameters.AddWithValue(jobId);
+            if(workspace.ExecuteScalar() is Guid workspaceId)
+            {
+                try
+                {
+                    StudioMessageThread thread=messages.GetOrCreateScoped(user,"Workspace",workspaceId);
+                    messages.AddMessage(thread.Id,user,$"Schedule change: {detail}");
+                }
+                catch(UnauthorizedAccessException){ }
+            }
+        }
     }
 
     private static void EnsureAssignedPhotographers(ScheduleEntry entry, StudioDatabase database, JobAccessService access)
