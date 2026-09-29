@@ -176,6 +176,8 @@ public sealed class StudioAccountsStore
                 created_at_utc timestamptz not null,
                 updated_at_utc timestamptz not null
             );
+            create table if not exists studio_account_invoice_jobs(invoice_id uuid not null references studio_account_invoices(id) on delete cascade,job_id uuid not null references studio_jobs(id),primary key(invoice_id,job_id));
+            insert into studio_account_invoice_jobs(invoice_id,job_id) select id,job_id from studio_account_invoices on conflict do nothing;
             create index if not exists ix_studio_account_invoices_job on studio_account_invoices(job_id,created_at_utc desc);
             create index if not exists ix_studio_account_invoices_due on studio_account_invoices(status,due_at_utc);
             create table if not exists studio_account_invoice_lines
@@ -191,16 +193,28 @@ public sealed class StudioAccountsStore
             """;command.ExecuteNonQuery();
     }
 
-    public AccountInvoice CreateInvoice(Guid jobId,InvoiceRequest request,string userName)
+    public AccountInvoice CreateInvoice(Guid jobId,InvoiceRequest request,string userName,Guid[]? additionalJobs=null)
     {
         if(request.Lines is null||request.Lines.Count==0)throw new InvalidOperationException("At least one invoice line is required.");
-        foreach(InvoiceLineRequest line in request.Lines) if(string.IsNullOrWhiteSpace(line.Description)||line.Quantity<=0||line.UnitPrice<0) throw new InvalidOperationException("Invoice lines require description, positive quantity and non-negative price.");
+        foreach(InvoiceLineRequest line in request.Lines) if(string.IsNullOrWhiteSpace(line.Description)||line.Quantity<=0||line.Quantity>100000||line.UnitPrice<0||line.UnitPrice>999999999||decimal.Round(line.UnitPrice,2)!=line.UnitPrice) throw new InvalidOperationException("Invoice lines require description, positive quantity and non-negative price.");
         using NpgsqlConnection connection=database.OpenConnection();string clientName;string? clientEmail;
         using(NpgsqlCommand lookup=connection.CreateCommand()){lookup.CommandText="select j.client_name,c.contact_address from studio_jobs j join studio_conversations c on c.id=j.conversation_id where j.id=$1";lookup.Parameters.AddWithValue(jobId);using NpgsqlDataReader reader=lookup.ExecuteReader();if(!reader.Read())throw new KeyNotFoundException();clientName=reader.GetString(0);clientEmail=reader.GetString(1).Contains('@')?reader.GetString(1):null;}
-        decimal subtotal=request.Lines.Sum(x=>x.UnitPrice*x.Quantity);decimal tax=Math.Round(subtotal*Math.Max(0,request.TaxRatePercent)/100m,2);decimal total=subtotal+tax;Guid id=Guid.NewGuid();string number=NextInvoiceNumber(connection);
+        Guid[] jobIds=new[]{jobId}.Concat(additionalJobs??[]).Distinct().ToArray();
+        if(jobIds.Length>100)throw new InvalidOperationException("An invoice can contain at most 100 jobs.");
         using NpgsqlTransaction transaction=connection.BeginTransaction();
+        using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended('studio-invoice-number',0))",connection,transaction))guard.ExecuteNonQuery();
+        if(jobIds.Length>1)
+        {
+            using var clients=new NpgsqlCommand("select client_id from studio_jobs where id=any($1) for update",connection,transaction);clients.Parameters.AddWithValue(jobIds);
+            var clientIds=new List<Guid?>();using(var r=clients.ExecuteReader()){while(r.Read())clientIds.Add(r.IsDBNull(0)?null:r.GetGuid(0));}
+            if(clientIds.Count!=jobIds.Length||clientIds.Any(x=>!x.HasValue)||clientIds.Distinct().Count()!=1)throw new InvalidOperationException("All jobs on a combined invoice must link to the same client.");
+            using var client=new NpgsqlCommand("select display_name,email from studio_clients where id=$1",connection,transaction);client.Parameters.AddWithValue(clientIds[0]!.Value);using var reader=client.ExecuteReader();if(!reader.Read())throw new InvalidOperationException("Client not found.");clientName=reader.GetString(0);clientEmail=reader.IsDBNull(1)?null:reader.GetString(1);
+        }
+        if(request.TaxRatePercent<0||request.TaxRatePercent>100||request.Lines.Sum(x=>x.UnitPrice*x.Quantity)>999999999)throw new InvalidOperationException("Invoice amount or tax rate is out of range.");
+        decimal subtotal=request.Lines.Sum(x=>x.UnitPrice*x.Quantity);decimal tax=Math.Round(subtotal*Math.Max(0,request.TaxRatePercent)/100m,2);decimal total=subtotal+tax;Guid id=Guid.NewGuid();string number=NextInvoiceNumber(connection);
         using(NpgsqlCommand insert=connection.CreateCommand()){insert.Transaction=transaction;insert.CommandText="insert into studio_account_invoices(id,invoice_number,job_id,client_name,client_email,currency,subtotal,tax_amount,total_amount,status,due_at_utc,issued_at_utc,paid_at_utc,created_by,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'Draft',$10,null,null,$11,now(),now())";object?[] values=[id,number,jobId,clientName,(object?)clientEmail??DBNull.Value,string.IsNullOrWhiteSpace(request.Currency)?"JMD":request.Currency.Trim().ToUpperInvariant(),subtotal,tax,total,request.DueAtUtc.ToUniversalTime(),userName];foreach(object? value in values)insert.Parameters.AddWithValue(value??DBNull.Value);insert.ExecuteNonQuery();}
         for(int i=0;i<request.Lines.Count;i++){InvoiceLineRequest line=request.Lines[i];using NpgsqlCommand insert=connection.CreateCommand();insert.Transaction=transaction;insert.CommandText="insert into studio_account_invoice_lines(id,invoice_id,description,quantity,unit_price,line_total,sort_order) values($1,$2,$3,$4,$5,$6,$7)";insert.Parameters.AddWithValue(Guid.NewGuid());insert.Parameters.AddWithValue(id);insert.Parameters.AddWithValue(line.Description.Trim());insert.Parameters.AddWithValue(line.Quantity);insert.Parameters.AddWithValue(line.UnitPrice);insert.Parameters.AddWithValue(line.UnitPrice*line.Quantity);insert.Parameters.AddWithValue(i);insert.ExecuteNonQuery();}
+        foreach(Guid linkedJob in jobIds){using var link=new NpgsqlCommand("insert into studio_account_invoice_jobs values($1,$2)",connection,transaction);link.Parameters.AddWithValue(id);link.Parameters.AddWithValue(linkedJob);link.ExecuteNonQuery();}
         transaction.Commit();return GetInvoices().First(x=>x.Id==id);
     }
 
@@ -212,7 +226,7 @@ public sealed class StudioAccountsStore
 
     public IReadOnlyList<AccountInvoice> GetInvoices(Guid? jobId=null)
     {
-        using NpgsqlConnection connection=database.OpenConnection();using NpgsqlCommand command=connection.CreateCommand();command.CommandText="select id,invoice_number,job_id,client_name,client_email,currency,subtotal,tax_amount,total_amount,status,due_at_utc,issued_at_utc,paid_at_utc,created_by,created_at_utc,updated_at_utc from studio_account_invoices where ($1::uuid is null or job_id=$1) order by created_at_utc desc";command.Parameters.AddWithValue((object?)jobId??DBNull.Value);using NpgsqlDataReader reader=command.ExecuteReader();List<AccountInvoice> values=[];while(reader.Read()){Guid id=reader.GetGuid(0);values.Add(new(id,reader.GetString(1),reader.GetGuid(2),reader.GetString(3),reader.IsDBNull(4)?null:reader.GetString(4),reader.GetString(5),reader.GetDecimal(6),reader.GetDecimal(7),reader.GetDecimal(8),reader.GetString(9),reader.GetFieldValue<DateTimeOffset>(10),reader.IsDBNull(11)?null:reader.GetFieldValue<DateTimeOffset>(11),reader.IsDBNull(12)?null:reader.GetFieldValue<DateTimeOffset>(12),reader.GetString(13),reader.GetFieldValue<DateTimeOffset>(14),reader.GetFieldValue<DateTimeOffset>(15),[]));}reader.Close();return values.Select(x=>x with{Lines=GetLines(connection,x.Id)}).ToList();
+        using NpgsqlConnection connection=database.OpenConnection();using NpgsqlCommand command=connection.CreateCommand();command.CommandText="select id,invoice_number,job_id,client_name,client_email,currency,subtotal,tax_amount,total_amount,status,due_at_utc,issued_at_utc,paid_at_utc,created_by,created_at_utc,updated_at_utc from studio_account_invoices where ($1::uuid is null or job_id=$1 or exists(select 1 from studio_account_invoice_jobs ij where ij.invoice_id=studio_account_invoices.id and ij.job_id=$1)) order by created_at_utc desc";command.Parameters.AddWithValue((object?)jobId??DBNull.Value);using NpgsqlDataReader reader=command.ExecuteReader();List<AccountInvoice> values=[];while(reader.Read()){Guid id=reader.GetGuid(0);values.Add(new(id,reader.GetString(1),reader.GetGuid(2),reader.GetString(3),reader.IsDBNull(4)?null:reader.GetString(4),reader.GetString(5),reader.GetDecimal(6),reader.GetDecimal(7),reader.GetDecimal(8),reader.GetString(9),reader.GetFieldValue<DateTimeOffset>(10),reader.IsDBNull(11)?null:reader.GetFieldValue<DateTimeOffset>(11),reader.IsDBNull(12)?null:reader.GetFieldValue<DateTimeOffset>(12),reader.GetString(13),reader.GetFieldValue<DateTimeOffset>(14),reader.GetFieldValue<DateTimeOffset>(15),[]));}reader.Close();return values.Select(x=>x with{Lines=GetLines(connection,x.Id)}).ToList();
     }
 
     private IReadOnlyList<AccountInvoiceLine> GetLines(NpgsqlConnection connection,Guid invoiceId){using NpgsqlCommand command=connection.CreateCommand();command.CommandText="select id,description,quantity,unit_price,line_total,sort_order from studio_account_invoice_lines where invoice_id=$1 order by sort_order";command.Parameters.AddWithValue(invoiceId);using NpgsqlDataReader reader=command.ExecuteReader();List<AccountInvoiceLine> values=[];while(reader.Read())values.Add(new(reader.GetGuid(0),reader.GetString(1),reader.GetInt32(2),reader.GetDecimal(3),reader.GetDecimal(4),reader.GetInt32(5)));return values;}

@@ -87,6 +87,7 @@ public sealed class WorkspaceAuthorizationMiddleware
         if (segments.Length >= 3 && segments[1].Equals("jobs", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(segments[2], out Guid jobIdFromPath))
         {
             Guid? workspaceId = ResolveJobWorkspace(database, jobIdFromPath);
+            if(segments.Length>=4 && segments[3].Equals("media",StringComparison.OrdinalIgnoreCase)) return new(workspaceId,jobIdFromPath,method=="GET"?"ViewAttachments":"ManageProduction",method=="GET"?"ViewAttachments":"ManageProduction");
             if (segments.Length >= 5 && segments[3].Equals("operations", StringComparison.OrdinalIgnoreCase) && segments[4].Equals("shoots", StringComparison.OrdinalIgnoreCase) && method == "POST")
                 return new(workspaceId,jobIdFromPath,"ManageSchedule","ManageSchedule");
             if (segments.Length >= 4 && (segments[3].Equals("versions", StringComparison.OrdinalIgnoreCase) || segments[3].Equals("gallery-assets", StringComparison.OrdinalIgnoreCase)))

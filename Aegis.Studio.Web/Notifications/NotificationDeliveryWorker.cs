@@ -200,6 +200,9 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
 
         IReadOnlyList<MessageRecipient> resolved = await this.recipientDirectory.ResolveAsync([item.UserName], cancellationToken);
         MessageRecipient? recipient = resolved.FirstOrDefault();
+        // Quotes use an explicitly selected persisted client and the destination captured at send time.
+        if(item.ReferenceType=="ClientQuote" && item.UserName.StartsWith("client:",StringComparison.Ordinal) && Guid.TryParse(item.UserName[7..],out _) && System.Net.Mail.MailAddress.TryCreate(item.Destination,out _))
+            recipient=new MessageRecipient(item.UserName,item.UserName,item.Destination,PreferredChannels:MessageChannel.MsEmail);
         if (recipient is null)
         {
             MarkRetry(item.Id, "Recipient profile could not be resolved.");

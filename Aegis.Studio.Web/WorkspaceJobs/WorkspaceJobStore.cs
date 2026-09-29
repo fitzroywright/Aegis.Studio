@@ -85,7 +85,7 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
     public IReadOnlyList<JobGalleryAsset> Assets(Guid jobId)
     {
         using var connection = database.OpenConnection();
-        using var command = new NpgsqlCommand("select distinct on(v.asset_key) v.asset_key,v.id,v.version_number,v.file_name,v.created_by,v.created_at_utc,v.sha256,v.source_version_id,coalesce(c.collection_name,'Uncollected') from studio_asset_versions v left join studio_job_asset_collections c on c.job_id=v.job_id and c.asset_key=v.asset_key where v.job_id=$1 order by v.asset_key,v.version_number desc", connection);
+        using var command = new NpgsqlCommand("select distinct on(v.asset_key) v.asset_key,v.id,v.version_number,v.file_name,v.created_by,v.created_at_utc,v.sha256,v.source_version_id,coalesce(c.collection_name,'Uncollected') from studio_asset_versions v left join studio_job_asset_collections c on c.job_id=v.job_id and c.asset_key=v.asset_key where v.job_id=$1 and v.asset_key not like 'unmatched/%' order by v.asset_key,v.version_number desc", connection);
         command.Parameters.AddWithValue(jobId);
         using var reader = command.ExecuteReader();
         List<JobGalleryAsset> result = [];

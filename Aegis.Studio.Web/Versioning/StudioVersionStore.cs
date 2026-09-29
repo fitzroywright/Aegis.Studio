@@ -46,6 +46,16 @@ public sealed class StudioVersionStore
 
     public StudioAssetVersion Add(Guid jobId, string assetKey, string fileName, string contentType, Stream source, string createdBy, string? note = null, Guid? sourceVersionId = null)
     {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
+        StudioAssetVersion value = Add(connection, transaction, jobId, assetKey, fileName, contentType, source, createdBy, note, sourceVersionId);
+        transaction.Commit();
+        return value;
+    }
+
+    // Callers can enlist version metadata and their workflow state in the same transaction.
+    internal StudioAssetVersion Add(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid jobId, string assetKey, string fileName, string contentType, Stream source, string createdBy, string? note = null, Guid? sourceVersionId = null)
+    {
         string key = NormalizeKey(assetKey);
         Guid id = Guid.NewGuid();
         string directory = Path.Combine(root, jobId.ToString("N"), SafeKey(key));
@@ -56,8 +66,6 @@ public sealed class StudioVersionStore
         long size = new FileInfo(full).Length;
         string hash = Hash(full);
 
-        using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlTransaction transaction = connection.BeginTransaction();
         // Serialize the version counter per job and asset, including concurrent uploads.
         using (NpgsqlCommand guard = connection.CreateCommand())
         {
@@ -78,9 +86,16 @@ public sealed class StudioVersionStore
 
         StudioAssetVersion value = new(id, jobId, key, version, Path.GetFileName(fileName), string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType, size, hash, stored, createdBy, DateTimeOffset.UtcNow, sourceVersionId, note);
         Insert(connection, transaction, value);
-        transaction.Commit();
         return value;
     }
+
+    internal StudioAssetVersion GetWithinTransaction(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid jobId, string? assetKey = null, Guid? versionId = null)
+    {
+        using var command=new NpgsqlCommand("select id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note from studio_asset_versions where job_id=$1 and ($2::text is null or asset_key=$2) and ($3::uuid is null or id=$3) order by version_number desc limit 1",connection,transaction);
+        command.Parameters.AddWithValue(jobId);command.Parameters.AddWithValue((object?)assetKey??DBNull.Value);command.Parameters.AddWithValue((object?)versionId??DBNull.Value);
+        using var reader=command.ExecuteReader();return reader.Read()?Read(reader):throw new KeyNotFoundException("Version not found.");
+    }
+    internal FileStream OpenStored(StudioAssetVersion version)=>new(Resolve(version.StoredPath),FileMode.Open,FileAccess.Read,FileShare.Read);
 
     public StudioAssetVersion Restore(Guid jobId, Guid versionId, string createdBy, string? note)
     {

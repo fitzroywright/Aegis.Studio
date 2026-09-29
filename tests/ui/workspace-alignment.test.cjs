@@ -37,24 +37,18 @@ test('announcement submission uses a dedicated workspace endpoint, never a messa
  await form.onsubmit({preventDefault(){}});
  const post=calls.find(c=>c.options);assert.equal(post.url,'/api/workspaces/workspace/announcements');assert.deepEqual(JSON.parse(post.options.body),{title:'Tomorrow',body:'Team briefing'});
 });
-test('gallery collection filtering and provenance use job-scoped versions',async()=>{
- const {w,panel}=environment();w.json=async url=>url.endsWith('/access')?{permissions:{manageProduction:false}}:[{assetKey:'one',id:'v1',versionNumber:2,fileName:'Portrait.jpg',collection:'Portraits'},{assetKey:'two',id:'v2',versionNumber:1,fileName:'Group.jpg',collection:'Groups'}];
- await w.renderVersionedGallery({id:'job'},panel,()=>true);
- assert.equal(panel.querySelectorAll('.job-file-tile').length,2);assert.equal(panel.querySelector('form'),null);
- panel.querySelector('select').value='Groups';panel.querySelector('select').onchange();assert.equal(panel.querySelectorAll('.job-file-tile').length,1);assert.match(panel.querySelector('img').src,/\/api\/jobs\/job\/versions\/by-id\/v2\/content$/);
-});
 test('stale asynchronous subjects response does not overwrite the next tab',async()=>{
  const {w,panel}=environment();panel.textContent='Next tab';w.json=async url=>url.endsWith('/access')?{permissions:{}}:[];
  await w.renderJobSubjects({id:'job'},panel,()=>false,()=>{});assert.equal(panel.textContent,'Next tab');
 });
-test('workspace job renders four lower tabs with details in the job list',async()=>{
+test('workspace job keeps Media dominant with header activity and workspace settings',async()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;
  const job={id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Portraits',clientName:'Client',status:'Scheduled'};
  Object.assign(w,{showWorkspaces:async()=>{},workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
  for(const id of ['conversationList','detailPane','workspaceTitle','allButton'])w[id]=w.document.getElementById(id);
  w.fetch=async url=>({ok:true,json:async()=>url.endsWith('/sending-identities')?{identities:[{type:'Workspace'},{type:'Self',isDefault:true}]}:{channel:'Email',messages:[]}});
- w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
- w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
+ w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.endsWith('/media')?{assets:[],subjects:[],unmatched:[],gallery:{default_lens:'Auto'}}:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
+ w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,10));
  assert.equal(w.document.querySelector('#jobInternalNote'),null);
  assert.equal(w.document.querySelector('#jobSendingIdentity').value,'Workspace');
@@ -70,7 +64,9 @@ test('workspace job renders four lower tabs with details in the job list',async(
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
  assert.equal(w.messageFirstName('fwright',[],'Team member',true),'Team member');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'Team member');
- assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Media','Subjects','Tasks / Calendar','Activity']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Media']);
+ await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.media-tasks'));assert.equal(w.document.querySelector('.gallery-upload-card'),null);
+ assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
  assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
 test('top navigation keeps personal actions right and removes redundant destinations',async()=>{
@@ -124,4 +120,14 @@ test('shared request helper accepts empty successes and dismissal removes the ba
  await panel.querySelector('[data-dismiss]').onclick();
  assert.equal(panel.querySelector('article'),null);
  assert.equal(panel.hidden,true);
+});
+
+test('production media separates subject and collection lenses, including uncollected images',async()=>{
+ const {w,panel}=environment();w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
+ const data={subjects:[],unmatched:[],assets:[{id:'a',assetKey:'a',versionId:'v1',fileName:'Ceremony.jpg',contentType:'image/jpeg',version:1,status:'Needs Editing',subjects:[],collection:'Ceremony'},{id:'b',assetKey:'b',versionId:'v2',fileName:'Other.jpg',contentType:'image/jpeg',version:1,status:'Needs Sorting',subjects:[],collection:''}]};
+ w.json=async url=>url.endsWith('/media')?data:url.endsWith('/access')?{permissions:{manageProduction:false}}:[];
+ await w.renderProductionMedia({id:'job'},panel,()=>true);
+ assert.equal(panel.querySelector('[data-add]'),null);assert.ok(panel.querySelector('.media-tasks'));assert.equal(panel.querySelector('input[type=file]'),null);
+ const uncollected=Array.from(panel.querySelectorAll('[data-collection-index]')).find(b=>b.textContent.includes('Uncollected'));uncollected.click();
+ assert.equal(panel.querySelectorAll('.job-file-tile').length,1);assert.match(panel.querySelector('.job-file-tile').textContent,/Other.jpg/);
 });

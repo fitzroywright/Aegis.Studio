@@ -6,7 +6,7 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.FrontDesk;
 
-public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null);
+public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null);
 public sealed record VerifiedDepositRequest(decimal Amount,string Currency,string Provider,string Reference);
 public sealed record FrontDeskRequest(Guid Id,PendingBookingRequest Request,string Status,Guid? JobId,decimal RecordedDeposit,DateTimeOffset CreatedAtUtc);
 
@@ -56,6 +56,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         using var connection=database.OpenConnection();using var tx=connection.BeginTransaction();
         using(var workspace=new NpgsqlCommand("select id from studio_workspaces where id=$1 and is_enabled for share",connection,tx))
         {workspace.Parameters.AddWithValue(request.WorkspaceId);if(workspace.ExecuteScalar() is null)throw new ArgumentException("Choose an enabled workspace.");}
+        if(request.ClientId.HasValue){using var client=new NpgsqlCommand("select id from studio_clients where id=$1",connection,tx);client.Parameters.AddWithValue(request.ClientId.Value);if(client.ExecuteScalar() is null)throw new ArgumentException("Client not found.");}
         if(request.ConversationId.HasValue)
         {
             using var source=new NpgsqlCommand("select id from studio_conversations where id=$1 and workspace_id=$2 and job_id is null for update",connection,tx);
@@ -120,6 +121,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
             }
             else Execute(connection,tx,"insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values($1,$2,$3,$4,$5,'Email',false,now())",conversation,r.WorkspaceId,r.Title,r.ClientName,r.ClientEmail);
             Execute(connection,tx,"insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc) values($1,$2,$3,$4,$5,'Needs Scheduling',$6,now())",job,r.WorkspaceId,conversation,r.Title,r.ClientName,r.EventDate);
+            if(r.ClientId.HasValue)Execute(connection,tx,"update studio_jobs set client_id=$2 where id=$1",job,r.ClientId.Value);
             Execute(connection,tx,"update studio_conversations set job_id=$2 where id=$1",conversation,job);
             Execute(connection,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'FrontDesk','Internal','Booking confirmed by FrontDesk. Job created and ready for manager scheduling.',now())",Guid.NewGuid(),conversation);
             Execute(connection,tx,"insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) select id,$2,'Deposit',amount,currency||' / '||provider||' / '||reference,created_at_utc from studio_frontdesk_deposits where request_id=$1",id,job);

@@ -1,3 +1,4 @@
+using Aegis.Studio.Web.Media;
 using Aegis.Studio.Web.FrontDesk;
 using Aegis.Studio.Web.WorkspaceJobs;
 using Aegis.Studio.Web.Versioning;
@@ -140,8 +141,11 @@ app.MapStudioDemoData();
 new WorkspaceJobStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
 StudioVersionSchema.EnsureCreated(app.Services.GetRequiredService<StudioDatabase>());
 app.MapWorkspaceJobs();
+app.MapMediaProduction();
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
 app.MapFrontDeskBookingRequests();
+app.MapStudioClients();
+app.MapStudioQuotes();
 app.MapJobAccess();
 app.MapAegisHealth(
     "Aegis.Studio",

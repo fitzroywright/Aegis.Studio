@@ -9,7 +9,7 @@ async function renderJobHandoff(job,host,current){
     const [shoots,tasks,assets,access]=await Promise.all([json(`/api/operations/shoots?jobId=${job.id}`),json(`/api/operations/activities?jobId=${job.id}`),json(`/api/jobs/${job.id}/gallery-assets`).catch(()=>null),json(`/api/jobs/${job.id}/access`)]);
     if(!current())return;
     const summary=jobHandoffSummary(job,shoots,tasks,assets),permissions=access.permissions||access;
-    host.innerHTML=`<strong>Next: ${esc(summary.next)}</strong><span>${summary.finishedCount}/${summary.shootCount} shoots finished · ${summary.openTasks} open tasks${summary.blockedTasks?' · '+summary.blockedTasks+' blocked':''}${summary.assets===null?'':' · '+summary.assets+' gallery assets'}</span>${permissions.manageSchedule?'<button class="action" data-schedule-job>Schedule shoot</button>':''}`;
+    host.innerHTML=`<strong>Next: ${esc(summary.next)}</strong><span>${summary.finishedCount}/${summary.shootCount} shoots finished · ${summary.openTasks} open tasks${summary.blockedTasks?' · '+summary.blockedTasks+' blocked':''}${summary.assets===null?'':' · '+summary.assets+' gallery assets'}</span>`;
     const button=host.querySelector('[data-schedule-job]');if(button)button.onclick=()=>openJobShootScheduler(job).catch(error=>alert(error.message));
 }
 async function openJobShootScheduler(job){

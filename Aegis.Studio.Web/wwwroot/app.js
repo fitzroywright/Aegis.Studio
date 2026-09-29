@@ -36,6 +36,14 @@ async function loadWorkspaces() {
             <small>${esc(workspace.address)}</small>
         </button>`).join('');
 
+    await Promise.all(data.map(async workspace=>{
+        const button=workspaceList.querySelector(`[data-id="${workspace.id}"]`);
+        try{const appearance=await json(`/api/workspaces/${workspace.id}/appearance`);if(!button.isConnected)return;
+            if(/^#[0-9a-f]{6}$/i.test(appearance.color)&&appearance.color.toLowerCase()!=='#b99750')button.style.background=`linear-gradient(105deg,${appearance.color}66,${appearance.color}15)`;
+            const icon=document.createElement('span');icon.className='workspace-identity-icon';icon.setAttribute('aria-hidden','true');icon.textContent=({folder:'▰',camera:'📷',portrait:'👤',wedding:'💍',id:'▣'})[appearance.icon]||'▰';button.prepend(icon);
+        }catch(error){button.title='Workspace appearance could not be loaded: '+error.message;}
+    }));
+
     requestWorkspace.innerHTML = data.map(workspace =>
         `<option value="${workspace.id}">${esc(workspace.name)}</option>`).join('');
 

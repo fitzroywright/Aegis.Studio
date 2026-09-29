@@ -35,7 +35,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
     const tabs = document.createElement('div');
     tabs.className = 'workspace-tabs workspace-list-controls';
     tabs.setAttribute('aria-label', 'Workspace views');
-    tabs.innerHTML = '<button data-tab="jobs">Jobs</button><button data-tab="members">Members</button>';
+    tabs.innerHTML = '<button data-tab="jobs">Jobs</button><span class="workspace-member-avatars" aria-label="Workspace members"></span><button class="workspace-settings-action" aria-label="Workspace settings" title="Workspace settings">⚙</button>';
     document.querySelector('.workspace-toolbar').before(tabs);
     const searchBox=document.createElement('div');
     searchBox.className='workspace-inline-search';
@@ -46,7 +46,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
     refreshButton.title='Refresh jobs';
     refreshButton.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg>';
     searchBox.append(search,refreshButton);
-    tabs.querySelector('[data-tab="members"]').before(searchBox);
+    tabs.querySelector('.workspace-member-avatars').before(searchBox);
+    tabs.querySelector('.workspace-settings-action').onclick=()=>{if(selectedWorkspace)openWorkspaceSettings(selectedWorkspace).catch(fail);};
     document.querySelector('.workspace-toolbar').remove();
     allButton.remove();
     function syncSearchField(){
@@ -88,19 +89,13 @@ function mergeJobMessages(teamMessages, customerMessages) {
         conversationList.innerHTML = '';
         if (!workspaceId) { empty('Select a workspace', 'Choose a workspace on the left to see its jobs, announcements and members.'); return; }
         empty('Select a job', 'Jobs belong to this workspace. Open a job to read its messages.');
-        if (tab === 'members') {
-            const members = await json(`/api/workspaces/${workspaceId}/directory`);
-            if (version !== revision) return;
-            detailPane.classList.remove('empty');
-            detailPane.innerHTML = `<div class="detail-header"><h1>Workspace members</h1></div><div class="messages">${members.map(m => `<article class="message" data-search><strong>${esc(m.displayName)}</strong><p>${esc(m.userName)} · ${esc(m.role)}</p></article>`).join('') || '<p>No active members assigned.</p>'}<p data-no-member-matches hidden>No matching members.</p></div>`;
-            conversationList.innerHTML = `<div class="empty-state"><h3>${members.length} members</h3><p>People with access to this workspace.</p></div>`; filter(); return;
-        }
         const [jobs, directory, profile] = await Promise.all([
             json('/api/jobs'),
             json(`/api/workspaces/${workspaceId}/directory`).catch(() => []),
             json('/api/auth/me').catch(() => ({}))
         ]);
         const people = [...directory, profile.user || profile];
+        tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(m.displayName)}">${esc((m.displayName||'?').slice(0,1))}</span>`).join('');
         if (version !== revision) return;
         conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}"><span class="job-row-heading"><strong>${esc(job.title)}</strong></span><small>${esc(job.clientName)}</small><small>Event: ${esc(job.eventDate || "Not scheduled")}</small><small class="job-card-assignment"><span>Assigned to: ${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, "Team member", true) : "Unassigned")}</span><span class="job-status">${esc(job.status)}</span></small></button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
         conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(jobs.find(x => x.id === button.dataset.job)).catch(fail));
@@ -152,6 +147,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
+        if(job){const action=document.createElement('button');action.className='action';action.textContent='Activity';action.onclick=()=>showJobActivityFlyout(job);detailPane.querySelector('.detail-header').appendChild(action);detailPane.querySelector('.detail-header p').textContent=[job.linkedClientName||'Client not linked',job.status,job.eventDate].filter(Boolean).join(' · ');}
         if(job){
             const filesPanel=document.createElement('section');
             filesPanel.className='thread-shared-files';
@@ -177,7 +173,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             detailPane.classList.add('job-reading-view');
             const lower = document.createElement('section');
             lower.className = 'job-lower-pane';
-            lower.innerHTML = '<nav class="workspace-tabs" aria-label="Job information"><span class="gallery-tab-group"><button data-job-tab="gallery">Media</button><span class="gallery-tab-filter"></span></span><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks / Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="job-tab-content"></div>';
+            lower.innerHTML = '<nav class="workspace-tabs" aria-label="Job information"><span class="gallery-tab-group"><button data-job-tab="gallery">Media</button><span class="gallery-tab-filter"></span></span></nav><div class="job-tab-content"></div>';
             detailPane.appendChild(lower);
             const job = selectedJob;
             let tabRevision = 0;
@@ -216,12 +212,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
     async function renderConversationFiles(job,panel,current,refresh) {
             const files = (await json(`/api/conversations/${job.conversationId}/attachments`)).filter(file=>file.isEmailAttachment===true);
             if (!current()) return;
-            panel.innerHTML = `<section class="legacy-attachments"><header class="conversation-files-title">Files from email messages</header><div class="job-file-gallery">${files.map(file => {
+            panel.innerHTML = `<section class="legacy-attachments"><header class="conversation-files-title">Files from email messages</header><div class="conversation-file-actions"><button class="action" data-preview-file disabled>Preview</button><a class="action" data-download-file hidden>Download</a></div><div class="job-file-gallery">${files.map(file => {
                 const url = '/api/attachments/' + encodeURIComponent(file.id);
                 const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
-                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}</small><span>Open file ↗</span></a>`;
+                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}</small><span>Double-click to preview</span></a>`;
             }).join('') || '<p>No files attached yet.</p>'}</div></section>`;
-            panel.querySelectorAll('.job-file-tile').forEach(tile => tile.onclick = event => {
+            panel.querySelectorAll('.job-file-tile').forEach(tile => tile.ondblclick = event => {
                 const file = files.find(f => f.id === tile.dataset.fileId);
                 if (!/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '')) return;
                 event.preventDefault();
@@ -233,6 +229,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 dialog.addEventListener('close', () => dialog.remove(), {once:true}); dialog.showModal();
             });
 
+            panel.querySelectorAll('.job-file-tile').forEach(tile=>{
+                tile.onclick=event=>{event.preventDefault();panel.querySelectorAll('.job-file-tile').forEach(x=>x.classList.toggle('selected',x===tile));const preview=panel.querySelector('[data-preview-file]'),download=panel.querySelector('[data-download-file]');preview.disabled=false;preview.onclick=()=>{const file=files.find(x=>x.id===tile.dataset.fileId);if(/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName||''))tile.ondblclick({preventDefault(){}});else window.open(tile.href,'_blank','noopener');};download.hidden=false;download.href=tile.href;download.download=files.find(x=>x.id===tile.dataset.fileId).fileName;};
+                tile.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();tile.click();panel.querySelector('[data-preview-file]').click();}};
+            });
     }
     async function renderJobTab(name, job, panel, current, refresh) {
         if (name === 'subjects') return renderJobSubjects(job,panel,current,refresh);
@@ -240,7 +240,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if (name === 'activity') return renderJobActivity(job,panel,current);
         if (name === 'gallery') {
             panel.innerHTML='<div class="versioned-gallery"></div>';
-            await renderVersionedGallery(job,panel.querySelector('.versioned-gallery'),current);
+            await renderProductionMedia(job,panel.querySelector('.versioned-gallery'),current);
             return;
         }
     }
