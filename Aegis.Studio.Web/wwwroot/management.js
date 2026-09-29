@@ -10,7 +10,7 @@ showManagement = async function() {
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
     try {
-        const [dashboard, statuses, escalations, workflows, jobs, scheduleEntries, activities, resources] = await Promise.all([
+        const [dashboard, statuses, escalations, workflows, jobs, scheduleEntries, activities, resources, workflowStages] = await Promise.all([
             json('/api/management/dashboard'),
             json('/api/management/jobs-by-status'),
             json('/api/escalations/open'),
@@ -18,7 +18,8 @@ showManagement = async function() {
             json('/api/jobs'),
             json('/api/schedule/entries?from=' + encodeURIComponent(new Date(Date.now()-14*86400000).toISOString()) + '&to=' + encodeURIComponent(new Date(Date.now()+90*86400000).toISOString())),
             json('/api/operations/activities'),
-            json('/api/schedule/resources')
+            json('/api/schedule/resources'),
+            json('/api/workflow/stages')
         ]);
         genericView.innerHTML = `
             <div class="job-detail-header"><div><h1>Management Dashboard</h1><p>Live operations, customer demand, production risk, workflow health.</p></div><button class="action" onclick="scanEscalations()">Run escalation scan</button></div>
@@ -30,7 +31,7 @@ showManagement = async function() {
                 <div class="metric">Failed workflows<strong>${dashboard.failedWorkflows}</strong></div>
                 <div class="metric">Open escalations<strong>${escalations.length}</strong></div>
             </div>
-            <section class="job-section"><h2>Pipeline overview</h2>${renderManagementPipelineFlow(jobs, activities)}</section>
+            <section class="job-section"><h2>Pipeline overview</h2>${renderManagementPipelineFlow(jobs, activities, workflowStages)}</section>
             <section class="job-section"><h2>Photographer workload</h2>${renderPhotographerWorkload(jobs, scheduleEntries, resources)}</section>
             <section class="job-section management-gantt-section"><div class="management-section-heading"><div><h2>Job Gantt</h2><p class="muted">Active jobs, schedule commitments and production activity across the next 90 days.</p></div></div>${renderManagementGantt(jobs, scheduleEntries, activities)}</section>
             <section class="job-section"><h2>Escalations</h2>${renderEscalations(escalations)}</section>
@@ -163,14 +164,20 @@ async function issueClientPortal(jobId) {
 }
 
 
-function renderManagementPipelineFlow(jobs, activities) {
+function renderManagementPipelineFlow(jobs, activities, workflowStages) {
     const active=(jobs||[]).filter(job=>job.status!=='Completed');
-    const ordered=[];
-    for(const job of active) if(!ordered.includes(job.status)) ordered.push(job.status);
-    if(!ordered.length) return '<p class="muted">No active jobs.</p>';
+    const ordered=(workflowStages||[]).filter(stage=>String(stage).toLowerCase()!=='completed');
+    if(!ordered.length) return '<p class="muted">Workflow stages are not configured.</p>';
+    const stageFor=status=>{
+        const value=String(status||'').toLowerCase();
+        const exact=ordered.find(stage=>stage.toLowerCase()===value);
+        if(exact)return exact;
+        if(['new','confirmed','inquiry','needs scheduling'].includes(value))return ordered.find(stage=>stage.toLowerCase()==='needs scheduling')||ordered[0];
+        return ordered.find(stage=>stage.toLowerCase()==='production'&&value.includes('production'))||null;
+    };
     const now=Date.now();
     return '<div class="management-flow">'+ordered.map((stage,index)=>{
-        const stageJobs=active.filter(job=>job.status===stage);
+        const stageJobs=active.filter(job=>stageFor(job.status)===stage);
         const overdue=(activities||[]).filter(a=>a.status!=='Completed'&&a.status!=='Cancelled'&&a.dueAtUtc&&new Date(a.dueAtUtc).getTime()<now&&stageJobs.some(j=>j.id===a.jobId)).length;
         const unassigned=stageJobs.filter(job=>!job.assignedTo).length;
         return `<button class="management-flow-stage" type="button" onclick="showJobs()"><span>${index+1}</span><strong>${esc(stage)}</strong><b>${stageJobs.length} jobs</b><small>${overdue} overdue · ${unassigned} unassigned</small></button>`;
