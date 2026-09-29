@@ -167,6 +167,20 @@ test('Media collection controls persist names and dropped files target the selec
  panel.querySelector('[data-rename-collection]').click();form=w.document.querySelectorAll('dialog form')[1];form.elements.name.value='Portraits edited';await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.ok(calls.some(x=>x.url.includes('/collections/Portraits')));
 });
+test('large Media jobs show a searchable subject list beside overflowing images',async()=>{
+ const {w,panel}=environment();
+ Object.defineProperty(w.HTMLElement.prototype,'clientWidth',{configurable:true,get(){return this.classList.contains('media-drop-surface')?310:0;}});
+ const subjects=Array.from({length:100},(_,i)=>({id:'s'+i,name:'Subject '+i,reference:'R'+i,status:'Photographed',imageCount:1}));
+ const assets=Array.from({length:6},(_,i)=>({id:'a'+i,assetKey:'a'+i,versionId:'v'+i,fileName:'Photo'+i+'.jpg',contentType:'image/jpeg',version:1,status:'Ready',subjects:['s'+i],collection:'General'}));
+ w.json=async url=>url.endsWith('/media')?{subjects,assets,collections:['General'],gallery:{},unmatched:[]}:url.endsWith('/access')?{permissions:{manageProduction:false}}:[];
+ w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
+ await w.renderProductionMedia({id:'job'},panel,()=>true);
+ assert.equal(panel.querySelector('[data-subject]'),null);
+ const rail=panel.querySelector('.media-subject-rail');assert.equal(rail.hidden,false);assert.equal(rail.querySelectorAll('[data-subject-id]').length,101);
+ rail.querySelector('input').value='Subject 42';rail.querySelector('input').oninput();assert.equal(rail.querySelectorAll('[data-subject-id]').length,2);
+ rail.querySelector('[data-subject-id="s42"]').click();assert.equal(panel.querySelectorAll('.job-file-tile').length,0);
+ rail.querySelector('[data-subject-id=""]').click();assert.equal(panel.querySelectorAll('.job-file-tile').length,6);
+});
 test('Pipeline shows stage groups with schedule and task on timeline and calendar',async()=>{
  const dom=new JSDOM('<div id="generic"></div><div id="conversation"></div>',{runScripts:'outside-only',url:'https://studio.test'});
  const w=dom.window;w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.genericView=dom.window.document.getElementById('generic');w.conversationView=dom.window.document.getElementById('conversation');w.activateNavigation=()=>{};w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
