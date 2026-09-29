@@ -56,6 +56,12 @@ function renderFrontDesk() {
     <div class="cards"><div class="metric">Pending requests<strong>${pending.length}</strong></div><div class="metric">Awaiting deposit<strong>${pending.filter(r=>r.status==='AwaitingDeposit').length}</strong></div><div class="metric">Needs scheduling<strong>${frontDeskJobs.filter(j=>['New','Needs Scheduling'].includes(j.status)).length}</strong></div><div class="metric">Ready for delivery<strong>${ready.length}</strong></div></div>
     <nav class="workspace-tabs" aria-label="FrontDesk queues">${[['requests','Booking requests'],['enquiries','Enquiries'],['jobs','Active jobs'],['delivery','Delivery / balance'],['completed','Completed']].map(([key,label])=>`<button data-frontdesk-tab="${key}" class="${key===frontDeskTab?'active':''}">${label}</button>`).join('')}</nav>
     <div class="front-desk-tools"><input id="frontDeskSearch" type="search" placeholder="Search customer, request or job" value="${esc(frontDeskTerm)}"><button class="action" onclick="showFrontDesk()">Refresh</button></div><div id="frontDeskJobList"></div>`;
+    const newRequestAction=document.getElementById('newRequestButton');
+    const frontDeskActions=genericView.querySelector('.job-actions');
+    if(newRequestAction&&frontDeskActions){
+        newRequestAction.hidden=false;
+        frontDeskActions.insertBefore(newRequestAction,genericView.querySelector('#newBookingRequest'));
+    }
     genericView.querySelector('#newBookingRequest').onclick=()=>openPendingBookingForm();
     genericView.querySelectorAll('[data-frontdesk-tab]').forEach(b=>b.onclick=()=>{frontDeskTab=b.dataset.frontdeskTab;renderFrontDesk();});
     genericView.querySelector('#frontDeskSearch').oninput=e=>{frontDeskTerm=e.target.value;renderFrontDeskRows();};
