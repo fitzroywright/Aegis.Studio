@@ -127,6 +127,11 @@ public static class WorkspaceAccessEndpoints
             WorkspacePermissionSet requested = request.Permissions ?? WorkspacePermissionSet.ViewOnly;
             if (!user.IsInRole("Administrator") && !PermissionsWithin(requested, caller)) return Results.Forbid();
             WorkspaceMemberRequest normalized = request with { UserName = userName };
+            WorkspaceMember? existing = access.GetMembers(workspaceId).FirstOrDefault(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
+            bool removingManager = existing is not null && existing.IsActive && IsManager(existing.Permissions)
+                && (!normalized.IsActive || !IsManager(normalized.Permissions ?? WorkspacePermissionSet.ViewOnly));
+            if (removingManager && access.GetMembers(workspaceId).Count(x => x.IsActive && IsManager(x.Permissions)) <= 1)
+                return Results.BadRequest(new { error = "Assign another Workspace Manager before removing or changing the current manager." });
             return Results.Ok(access.SaveMember(workspaceId, normalized));
         }).RequireAuthorization();
 
@@ -137,6 +142,9 @@ public static class WorkspaceAccessEndpoints
             if (!user.IsInRole("Administrator") && !caller.ManageMembers && !caller.AdminWorkspace) return Results.Forbid();
             WorkspaceMember? target = access.GetMembers(workspaceId).FirstOrDefault(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
             if (target is not null && !user.IsInRole("Administrator") && !PermissionsWithin(target.Permissions, caller)) return Results.Forbid();
+            if (target is not null && target.IsActive && IsManager(target.Permissions)
+                && access.GetMembers(workspaceId).Count(x => x.IsActive && IsManager(x.Permissions)) <= 1)
+                return Results.BadRequest(new { error = "Assign another Workspace Manager before removing the current manager." });
             access.RemoveMember(workspaceId, userName);
             return Results.NoContent();
         }).RequireAuthorization();
