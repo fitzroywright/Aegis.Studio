@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Aegis.Studio.Web.Notifications;
+using Aegis.Studio.Web.Messaging;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 
@@ -39,7 +40,7 @@ public static class OperationalWorkEndpoints
             catch(Exception exception){ return Results.BadRequest(new { error=exception.Message }); }
         }).RequireAuthorization();
 
-        app.MapPut("/api/operations/activities/{id:guid}", (Guid id,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,IConfiguration configuration,IWebHostEnvironment environment,JobEventNotifier notifier) =>
+        app.MapPut("/api/operations/activities/{id:guid}", (Guid id,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,IConfiguration configuration,IWebHostEnvironment environment,JobEventNotifier notifier,StudioInAppMessageStore messages) =>
         {
             OperationalWorkStore store=new(database); JobActivity? current=store.GetActivities().FirstOrDefault(x=>x.Id==id); if(current is null) return Results.NotFound(); if(!access.HasPermission(user,current.JobId,"ManageProduction")) return Results.Forbid();
             try
@@ -54,6 +55,24 @@ public static class OperationalWorkEndpoints
                     if(current.ActivityType=="Backup"&&!backup) return Results.BadRequest(new { error="Backup cannot be completed until Studio verifies the backup directory." });
                 }
                 JobActivity updated=store.UpdateActivity(id,request,UserName(user));
+                bool scheduleChanged=current.ScheduledAtUtc!=updated.ScheduledAtUtc||current.DueAtUtc!=updated.DueAtUtc;
+                if(scheduleChanged)
+                {
+                    using var connection=database.OpenConnection();
+                    using var workspace=connection.CreateCommand();
+                    workspace.CommandText="select workspace_id from studio_jobs where id=$1";
+                    workspace.Parameters.AddWithValue(updated.JobId);
+                    if(workspace.ExecuteScalar() is Guid workspaceId)
+                    {
+                        try
+                        {
+                            StudioMessageThread thread=messages.GetOrCreateScoped(user,"Workspace",workspaceId);
+                            string detail=$"Production activity rescheduled: {updated.Title}{(updated.ScheduledAtUtc.HasValue?$" · starts {updated.ScheduledAtUtc.Value:u}":string.Empty)}{(updated.DueAtUtc.HasValue?$" · due {updated.DueAtUtc.Value:u}":string.Empty)}.";
+                            messages.AddMessage(thread.Id,user,detail);
+                        }
+                        catch(UnauthorizedAccessException){ }
+                    }
+                }
                 if(updated.Status=="Blocked") notifications.PublishToUser(updated.AssignedTo??UserName(user),"JobStatusChanged",$"Blocked: {updated.Title}",updated.BlockedReason??"Production activity is blocked.","Job",updated.JobId.ToString("D"));
                 bool requesterMilestone=updated.Status=="Completed" && (updated.ActivityType=="Proof" || updated.ActivityType=="Delivery");
                 string eventType=updated.ActivityType=="Delivery" && updated.Status=="Completed" ? "DeliveryChanged" : "ProductionChanged";
