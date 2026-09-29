@@ -389,3 +389,37 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
     overflow-x:auto;
   }
 }
+
+
+/* Media title toolbar */
+.media-title-toolbar{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex-wrap:wrap;
+  min-width:0;
+}
+.media-title-toolbar .media-progress{
+  margin-left:auto;
+  margin-right:6px;
+  font-size:11px;
+  color:var(--theme-muted);
+  white-space:nowrap;
+}
+.media-title-toolbar .action{
+  min-height:28px;
+  padding:4px 7px;
+  border-radius:6px;
+  font-size:11px;
+}
+.gallery-tab-filter .media-title-toolbar select{
+  min-height:28px;
+  max-width:170px;
+}
+@media(max-width:900px){
+  .media-title-toolbar .media-progress{
+    order:2;
+    width:100%;
+    margin-left:0;
+  }
+}
