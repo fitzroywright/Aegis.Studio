@@ -6,8 +6,8 @@ function messageFirstName(author, people, fallback = 'Team member', loginOnly = 
 }
 function mergeJobMessages(teamMessages, customerMessages) {
     return [
-        ...teamMessages.map(m => ({ id: 'team-' + m.id, author: m.senderUserName, body: m.body, at: m.createdAtUtc, customer: false, loginOnly: true })),
-        ...customerMessages.map(m => ({ id: 'customer-' + m.id, author: m.author, body: m.body, at: m.createdAt, customer: m.visibility.toLowerCase() !== 'internal' }))
+        ...teamMessages.map(m => ({ id: 'team-' + m.id, sourceId:m.id, sourceKind:'JobMessage', author: m.senderUserName, body: m.body, at: m.createdAtUtc, customer: false, loginOnly: true })),
+        ...customerMessages.map(m => ({ id: 'customer-' + m.id, sourceId:m.id, sourceKind:'ConversationMessage', author: m.author, body: m.body, at: m.createdAt, customer: m.visibility.toLowerCase() !== 'internal' }))
     ].sort((a, b) => new Date(a.at) - new Date(b.at) || a.id.localeCompare(b.id));
 }
 // Workspace -> job -> messages. Workspace discussions and membership stay in context.
@@ -146,7 +146,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         detailPane.innerHTML = `<div class="detail-header"><div><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? `<label class="action message-attachment-control">Attach document<input type="file" data-message-file hidden></label>` : ``}<div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
         const renderMessages = () => {
             const visible = combined;
-            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
+            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}" data-message-id="${esc(m.sourceId||'')}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
         if(job)detailPane.querySelector('.detail-header p').textContent=[job.linkedClientName||'Client not linked',job.status,job.eventDate].filter(Boolean).join(' · ');
@@ -240,8 +240,16 @@ function mergeJobMessages(teamMessages, customerMessages) {
             panel.innerHTML = `<section class="legacy-attachments"><header class="conversation-files-title">Conversation Files</header><div class="conversation-file-actions"><button class="action" data-preview-file disabled>Preview</button><a class="action" data-download-file hidden>Download</a></div><div class="job-file-gallery">${files.map(file => {
                 const url = '/api/attachments/' + encodeURIComponent(file.id);
                 const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
-                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}${file.messageId?' · linked to '+esc(file.messageKind||'message'):''}</small><span>${file.messageId?'Open file · source message '+esc(String(file.messageId).slice(0,8)):'Open file'}</span></a>`;
+                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}${file.messageId?' · linked to '+esc(file.messageKind||'message'):''}</small><span>${file.messageId?'<span class="conversation-file-source" data-source-message="'+esc(file.messageId)+'">Source message '+esc(String(file.messageId).slice(0,8))+'</span>':'Open file'}</span></a>`;
             }).join('') || '<p>No files attached yet.</p>'}</div></section>`;
+            panel.querySelectorAll('[data-source-message]').forEach(source=>source.onclick=event=>{
+                event.preventDefault();event.stopPropagation();
+                const message=document.querySelector('[data-message-id="'+source.dataset.sourceMessage+'"]');
+                if(!message){alert('The source message is outside the currently loaded message history.');return;}
+                message.scrollIntoView({behavior:'smooth',block:'center'});
+                message.classList.add('source-message-highlight');setTimeout(()=>message.classList.remove('source-message-highlight'),1800);
+            });
+
             panel.querySelectorAll('.job-file-tile').forEach(tile => tile.ondblclick = event => {
                 const file = files.find(f => f.id === tile.dataset.fileId);
                 if (!/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '')) return;
