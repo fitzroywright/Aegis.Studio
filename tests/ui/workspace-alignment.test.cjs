@@ -47,7 +47,7 @@ test('stale asynchronous subjects response does not overwrite the next tab',asyn
  const {w,panel}=environment();panel.textContent='Next tab';w.json=async url=>url.endsWith('/access')?{permissions:{}}:[];
  await w.renderJobSubjects({id:'job'},panel,()=>false,()=>{});assert.equal(panel.textContent,'Next tab');
 });
-test('workspace job renders exactly four lower tabs and a collapsible details card',async()=>{
+test('workspace job renders four lower tabs with details in the job list',async()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;
  const job={id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Portraits',clientName:'Client',status:'Scheduled'};
  Object.assign(w,{workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
@@ -57,7 +57,7 @@ test('workspace job renders exactly four lower tabs and a collapsible details ca
  w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,10));
  assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Gallery','Subjects','Tasks / Calendar','Activity']);
- assert.ok(w.document.querySelector('details.job-details-card'));assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.ok(w.document.querySelector('[data-tab="announcements"]'));
+ assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.ok(w.document.querySelector('[data-tab="announcements"]'));
 });
 test('top navigation has the requested order and preserves FrontDesk and WorkDay destinations',async()=>{
  const dom=new JSDOM('<header class="topbar"></header><aside class="rail"></aside><button id="newRequestButton"></button>',{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;let frontDesk=0;
