@@ -14,7 +14,7 @@
         workday:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18M8 14h3m3 0h3m-9 4h3"/>',
         admin:'<path d="M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="M8 12l3 3 5-6"/>'
     };
-    rail.innerHTML=items.map(([id,label])=>`<button class="brand-button" data-view="${id}"><span class="studio-nav-icon icon-${id}" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[id]}</svg></span><span>${label}</span></button>`).join('');
+    rail.innerHTML='<button class="brand-button studio-back-button" type="button" aria-label="Back to previous view" title="Back" disabled>← Back</button>'+items.map(([id,label])=>`<button class="brand-button" data-view="${id}"><span class="studio-nav-icon icon-${id}" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[id]}</svg></span><span>${label}</span></button>`).join('');
     const showError=e=>{genericView.innerHTML=`<h1>Unable to load view</h1><p>${esc(e.message)}</p>`;};
     const generic=view=>{activateNavigation(view);conversationView.classList.add('hidden');genericView.classList.remove('hidden');genericView.innerHTML='<p>Loading…</p>';};
     const routes={
@@ -29,7 +29,25 @@
     };
     function jobCard(job){return `<article class="task-card"><button class="link-button" data-open-job="${job.id}">${esc(job.title)}</button><small>${esc(job.clientName)} · ${esc(job.status)}</small><small>${esc(job.eventDate||'Date not set')} · ${esc(job.assignedTo||'Unassigned')}</small><button class="action" data-plan-job="${job.id}">Schedule / availability</button></article>`;}
     function bindJobs(){genericView.querySelectorAll('[data-open-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.openJob).catch(showError));}
-    rail.querySelectorAll('button').forEach(b=>b.onclick=()=>Promise.resolve(routes[b.dataset.view]()).catch(showError));
+    const back=rail.querySelector('.studio-back-button'),history=[];
+    let current={view:'workspaces',workspaceId:null,jobId:null},restoring=false;
+    const same=(a,b)=>a.view===b.view&&a.workspaceId===b.workspaceId&&a.jobId===b.jobId;
+    window.studioRememberView=next=>{if(restoring||same(current,next))return;history.push(current);current=next;back.disabled=false;};
+    rail.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
+        const view=b.dataset.view;
+        window.studioRememberView({view,workspaceId:null,jobId:null});
+        Promise.resolve(routes[view]()).catch(showError);
+    });
+    back.onclick=async()=>{
+        if(!history.length)return;
+        const target=history.pop();back.disabled=!history.length;restoring=true;
+        try{
+            current=target;
+            if(target.jobId)await openWorkspaceJob(target.jobId);
+            else if(target.view==='workspaces'&&target.workspaceId){const workspace=workspaceCache.find(x=>x.id===target.workspaceId);await selectWorkspace(target.workspaceId,workspace?.name||'Workspace');}
+            else await routes[target.view]();
+        }catch(error){showError(error);}finally{restoring=false;}
+    };
     loadFrontDeskRole();
     const newRequest=document.getElementById('newRequestButton');
     newRequest.hidden=false;

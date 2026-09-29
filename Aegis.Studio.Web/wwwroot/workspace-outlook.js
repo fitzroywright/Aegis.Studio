@@ -70,6 +70,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
     selectWorkspace = async function(id, name) {
         const workspace = workspaceCache.find(x => x.id === id);
         if (!workspace?.permissions?.accessWorkspace || !workspace.permissions.view) return alert('You do not have permission to view this workspace.');
+        window.studioRememberView?.({view:'workspaces',workspaceId:id,jobId:null});
         selectedWorkspace = id; selectedJob = null; selectedConversation = null;
         currentWorkspacePermissions = workspace.permissions;
         tab = 'jobs'; search.value = ''; workspaceTitle.textContent = name;
@@ -108,6 +109,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         selectedJob=job;tab='jobs';await loadConversations();await showJobMessages(job);
     };
     async function showJobMessages(job) {
+        window.studioRememberView?.({view:'workspaces',workspaceId:job.workspaceId,jobId:job.id});
         selectedJob = job;
         const version = ++revision;
         conversationList.querySelectorAll('[data-job]').forEach(row => row.classList.toggle('active', row.dataset.job === job.id));
@@ -147,7 +149,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
-        if(job){const action=document.createElement('button');action.className='action';action.textContent='Activity';action.onclick=()=>showJobActivityFlyout(job);detailPane.querySelector('.detail-header').appendChild(action);detailPane.querySelector('.detail-header p').textContent=[job.linkedClientName||'Client not linked',job.status,job.eventDate].filter(Boolean).join(' · ');}
+        if(job)detailPane.querySelector('.detail-header p').textContent=[job.linkedClientName||'Client not linked',job.status,job.eventDate].filter(Boolean).join(' · ');
         if(job){
             const filesPanel=document.createElement('section');
             filesPanel.className='thread-shared-files';
@@ -191,7 +193,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
             lower.querySelectorAll('[data-job-tab]').forEach(button => button.onclick = () => activate(button.dataset.jobTab));
             const handoff=document.createElement('div');handoff.className='job-handoff';
             lower.prepend(handoff);
-            renderJobHandoff(job,handoff,()=>version===revision).catch(error=>{if(version===revision)handoff.textContent='Job progress could not be loaded. Refresh to retry.';});
+            const summary=document.createElement('div');summary.className='job-handoff-summary';handoff.appendChild(summary);
+            const activity=document.createElement('button');activity.className='action activity-button';activity.type='button';activity.textContent='Activity';activity.onclick=()=>showJobActivityFlyout(job,lower);handoff.appendChild(activity);
+            renderJobHandoff(job,summary,()=>version===revision).catch(error=>{if(version===revision)summary.textContent='Job progress could not be loaded. Refresh to retry.';});
             activate('gallery');
         } else detailPane.classList.remove('job-reading-view');
         document.getElementById('hierarchyCompose').onsubmit = async event => {

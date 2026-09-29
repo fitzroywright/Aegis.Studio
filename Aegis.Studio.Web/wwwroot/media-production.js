@@ -13,8 +13,9 @@ async function openWorkspaceSettings(id){
  if(members){const old=document.getElementById('workspaceMemberPanel');if(old)old.remove();const panel=dialog.querySelector('[data-members]');panel.id='workspaceMemberPanel';await manageWorkspaceMembers(id,workspace.name);}
  else{const list=await json(`/api/workspaces/${id}/directory`);dialog.querySelector('[data-members]').innerHTML='<h3>Members</h3>'+list.map(m=>`<p>${esc(m.displayName)} · ${esc(m.role)}</p>`).join('');}
 }
-async function showJobActivityFlyout(job){
+async function showJobActivityFlyout(job,section){
  const dialog=studioDialog('Activity','<p>Loading…</p>',true),host=dialog.querySelector('.studio-dialog-body');
+ if(section){const bounds=section.getBoundingClientRect();dialog.classList.add('job-activity-flyout');dialog.style.top=`${Math.max(0,bounds.top)}px`;dialog.style.height=`${Math.max(0,Math.min(bounds.height,innerHeight-Math.max(0,bounds.top)))}px`;}
  try{const items=await json(`/api/jobs/${job.id}/operations/audit`);if(!dialog.isConnected)return;let last='';host.innerHTML=items.sort((a,b)=>new Date(b.createdAtUtc)-new Date(a.createdAtUtc)).map(item=>{const day=new Date(item.createdAtUtc).toLocaleDateString();const today=new Date().toLocaleDateString();const yesterday=new Date(Date.now()-86400000).toLocaleDateString();const heading=day!==last?`<h3>${day===today?'Today':day===yesterday?'Yesterday':esc(day)}</h3>`:'';last=day;return heading+`<article class="task-card"><strong>${esc(item.action)}</strong><p>${esc(item.detail||'')}</p><small>${esc(new Date(item.createdAtUtc).toLocaleTimeString())} · ${esc(item.userName)}</small></article>`;}).join('')||'<p>No activity yet.</p>';}catch(e){host.textContent=e.message;}
 }
 async function renderCompactTasks(job,host,current){
