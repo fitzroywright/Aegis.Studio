@@ -31,3 +31,9 @@
 .management-workload-table{display:grid;gap:.25rem}.management-workload-head,.management-workload-row{display:grid;grid-template-columns:minmax(180px,2fr) repeat(4,minmax(80px,1fr));gap:.6rem;align-items:center}
 .management-workload-head{font-size:.75rem;font-weight:700;opacity:.7;padding:.4rem .65rem}.management-workload-row{width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);padding:.6rem .65rem;border-radius:.4rem}.management-workload-row .risk{font-weight:800}
 @media(max-width:760px){.management-workload-head{display:none}.management-workload-row{grid-template-columns:1fr 1fr}.management-workload-row strong{grid-column:1/-1}}
+
+
+.management-summary-strip{display:flex;flex-wrap:wrap;gap:6px 14px;padding:8px 10px;border:1px solid var(--theme-border);border-radius:8px;background:var(--theme-surface);font-size:12px}
+.management-summary-strip span{display:inline-flex;gap:4px;align-items:baseline;white-space:nowrap}.management-summary-strip b{font-size:14px}.management-summary-strip .risk{font-weight:700}
+.management-workload-head,.management-workload-row{grid-template-columns:minmax(170px,2fr) repeat(7,minmax(70px,1fr))}
+.management-person-work{display:grid;gap:6px}
