@@ -179,17 +179,17 @@ async function showClientQuotes(clientId){
 
 
 async function showFrontDeskFlow(jobId) {
-    const job=await json('/api/jobs/'+jobId);
-    const timeline=await json('/api/jobs/'+jobId+'/timeline?count=200');
+    const [job,timeline,configuredStages]=await Promise.all([
+        json('/api/jobs/'+jobId),
+        json('/api/jobs/'+jobId+'/timeline?count=200'),
+        json('/api/workflow/stages')
+    ]);
     const events=Array.isArray(timeline)?timeline:(timeline.items||timeline.events||[]);
-    const stageNames=[];
-    for(const event of events){
-        const text=String(event.detail||event.description||event.title||'');
-        const match=text.match(/(?:→|to )\s*([^→]+)$/i);
-        if(match&&!stageNames.includes(match[1].trim()))stageNames.push(match[1].trim());
-    }
-    if(!stageNames.includes(job.status))stageNames.push(job.status);
-    const current=Math.max(0,stageNames.indexOf(job.status));
+    const stageNames=configuredStages;
+    const normalized=String(job.status||'').toLowerCase();
+    let current=stageNames.findIndex(stage=>stage.toLowerCase()===normalized);
+    if(current<0&&['new','confirmed','inquiry','needs scheduling'].includes(normalized))current=stageNames.findIndex(stage=>stage.toLowerCase()==='needs scheduling');
+    if(current<0)current=0;
     const dialog=studioDialog('Job Flow — '+job.title,`<div class="frontdesk-flow">${stageNames.map((stage,index)=>`<button type="button" class="frontdesk-flow-stage ${index<current?'complete':index===current?'current':'future'}" data-flow-stage="${index}"><small>${index<current?'Completed':index===current?'Current':'Upcoming'}</small><strong>${esc(stage)}</strong></button>`).join('<span>›</span>')}</div><div class="frontdesk-flow-history"><h3>History</h3>${events.slice(0,30).map(event=>`<p><strong>${esc(event.title||event.eventType||'Activity')}</strong><small>${esc(event.detail||event.description||'')} ${event.createdAtUtc||event.occurredAtUtc?' · '+new Date(event.createdAtUtc||event.occurredAtUtc).toLocaleString():''}</small></p>`).join('')||'<p class="muted">No recorded stage history yet.</p>'}</div>`);
     return dialog;
 }
@@ -202,17 +202,19 @@ async function messageFrontDeskJob(jobId, mode) {
     form.onsubmit=async e=>{
         e.preventDefault();
         if(!job.conversationId){form.querySelector('[role=alert]').textContent='This job has no linked conversation.';return;}
-        const prefix=mode==='finance'?'[Accounts / Finance] ':mode==='escalate'?`[Escalation — ${form.elements.target.value}] `:'[Workspace query] ';
         try{
-            await json('/api/conversations/'+job.conversationId+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:prefix+form.elements.body.value,isInternal:true,sendingIdentity:'Workspace'})});
+            const routed=await json('/api/frontdesk/jobs/'+jobId+'/communications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:mode,body:form.elements.body.value,escalationTarget:mode==='escalate'?form.elements.target.value:null})});
             const file=form.elements.file.files[0];
             if(file){
                 const data=new FormData();data.append('file',file);
                 const response=await fetch('/api/conversations/'+job.conversationId+'/attachments?visibility=Internal',{method:'POST',body:data});
                 if(!response.ok)throw new Error(await response.text());
+                const attachment=await response.json();
+                const link=await fetch('/api/attachments/'+attachment.id+'/message-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:routed.messageId,messageKind:'JobMessage',jobId:job.id})});
+                if(!link.ok)throw new Error(await link.text());
             }
             dialog.close();
-            alert(label+' message added to the job conversation.');
+            alert(label+' message routed to '+routed.target+' and retained in the job conversation.');
         }catch(error){form.querySelector('[role=alert]').textContent=error.message;}
     };
 }
