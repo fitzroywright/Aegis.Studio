@@ -216,11 +216,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
     async function renderConversationFiles(job,panel,current,refresh) {
             const files = (await json(`/api/conversations/${job.conversationId}/attachments`)).filter(file=>file.isEmailAttachment===true);
             if (!current()) return;
-            panel.innerHTML = `<details class="legacy-attachments" open><summary>Files from email messages</summary><div class="job-file-gallery">${files.map(file => {
+            panel.innerHTML = `<section class="legacy-attachments"><header class="conversation-files-title">Files from email messages</header><div class="job-file-gallery">${files.map(file => {
                 const url = '/api/attachments/' + encodeURIComponent(file.id);
                 const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
                 return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}</small><span>Open file ↗</span></a>`;
-            }).join('') || '<p>No files attached yet.</p>'}</div></details>`;
+            }).join('') || '<p>No files attached yet.</p>'}</div></section>`;
             panel.querySelectorAll('.job-file-tile').forEach(tile => tile.onclick = event => {
                 const file = files.find(f => f.id === tile.dataset.fileId);
                 if (!/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '')) return;

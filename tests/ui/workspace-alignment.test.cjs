@@ -77,7 +77,7 @@ test('top navigation has the requested order and preserves FrontDesk and WorkDay
  const dom=new JSDOM('<header class="topbar"></header><aside class="rail"></aside><button id="newRequestButton"></button>',{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;let frontDesk=0;
  Object.assign(w,{loadFrontDeskRole(){},showFrontDesk:async()=>frontDesk++,showProduction(){},showWorkspaces(){},showManagement(){}});
  w.eval(fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8'));
- assert.deepEqual(Array.from(w.document.querySelectorAll('.studio-top-nav button'),b=>b.textContent),['My Work','Dashboard','Workspaces','Pipeline','Production','FrontDesk','WorkDay','Admin']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('.studio-top-nav button'),b=>b.textContent),['Dashboard','Workspaces','Pipeline','Production','FrontDesk','WorkDay','My Work','Admin']);
  w.document.querySelector('[data-view="frontdesk"]').click();await Promise.resolve();assert.equal(frontDesk,1);assert.equal(w.document.getElementById('newRequestButton').hidden,true);
 });
 test('announcement banner disappears only after dismissal succeeds',async()=>{
