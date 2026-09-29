@@ -157,8 +157,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const conversationRow=document.createElement('div');
             conversationRow.className='job-conversation-row';
             messagesPanel.before(conversationRow);
-            conversationRow.append(messagesPanel,filesPanel);
+            const nextPanel=document.createElement('section');nextPanel.className='thread-next-tasks';
+            conversationRow.append(messagesPanel,nextPanel,filesPanel);
             const current=()=>version===revision;
+            renderCompactTasks(job,nextPanel,current).catch(error=>{if(current())nextPanel.textContent='Upcoming work could not be loaded: '+error.message;});
             const refreshFiles=()=>renderConversationFiles(job,filesPanel,current,refreshFiles);
             refreshFiles().catch(error=>{if(current())filesPanel.textContent='Conversation files could not be loaded: '+error.message;});
         }

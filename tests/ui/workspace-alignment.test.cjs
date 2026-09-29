@@ -80,7 +80,7 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  assert.equal(w.document.querySelector('.detail-header .activity-button'),null);
  assert.equal(w.document.querySelector('.job-handoff .activity-button')?.textContent,'Activity');
  assert.ok(w.document.querySelector('.job-handoff-summary'));
- await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.media-tasks'));assert.equal(w.document.querySelector('.gallery-upload-card'),null);
+ await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-conversation-row .thread-next-tasks'));assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
  assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
  assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
@@ -145,7 +145,7 @@ test('Media shows all images by default and collection and subject filters live 
  const data={subjects:[],unmatched:[],assets:[{id:'a',assetKey:'a',versionId:'v1',fileName:'Ceremony.jpg',contentType:'image/jpeg',version:1,status:'Needs Editing',subjects:[],collection:'Ceremony'},{id:'b',assetKey:'b',versionId:'v2',fileName:'Other.jpg',contentType:'image/jpeg',version:1,status:'Needs Sorting',subjects:[],collection:''}]};
  w.json=async url=>url.endsWith('/media')?data:url.endsWith('/access')?{permissions:{manageProduction:false}}:[];
  await w.renderProductionMedia({id:'job'},panel,()=>true);
- assert.equal(panel.querySelector('[data-add]'),null);assert.ok(panel.querySelector('.media-tasks'));assert.equal(panel.querySelector('input[type=file]'),null);
+ assert.equal(panel.querySelector('[data-add]'),null);assert.equal(panel.querySelector('.media-tasks'),null);assert.equal(panel.querySelector('input[type=file]'),null);
  assert.equal(panel.querySelectorAll('.job-file-tile').length,2);
  assert.equal(panel.querySelector('[data-lens]'),null);
  const collection=panel.querySelector('[data-collection]');collection.value='Ceremony';collection.onchange();
