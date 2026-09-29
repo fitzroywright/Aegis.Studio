@@ -30,7 +30,7 @@ showManagement = async function() {
         const conflictCount=managementScheduleConflictCount(scheduleEntries);
         const stuckJobs=new Set(overdue.map(x=>x.jobId).filter(Boolean));
         genericView.innerHTML = `
-            <div class="job-detail-header"><div><h1>Management Dashboard</h1><p>Work, status, responsibility and exceptions from Studio's live operational data.</p></div><button class="action" onclick="scanEscalations()">Run escalation scan</button></div>
+            <div class="job-detail-header"><div><h1>Management Dashboard</h1><p>Work, status, responsibility and exceptions from Studio's live operational data.</p></div></div>
             <div class="management-summary-strip">
                 <span><b>${active.length}</b> active jobs</span>
                 <span><b>${overdue.length}</b> overdue tasks</span>
