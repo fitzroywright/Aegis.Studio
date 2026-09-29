@@ -68,9 +68,14 @@ function mergeJobMessages(teamMessages, customerMessages) {
             detailPane.innerHTML = `<div class="detail-header"><h1>Workspace members</h1></div><div class="messages">${members.map(m => `<article class="message"><strong>${esc(m.displayName)}</strong><p>${esc(m.userName)} · ${esc(m.role)}</p></article>`).join('') || '<p>No active members assigned.</p>'}</div>`;
             conversationList.innerHTML = `<div class="empty-state"><h3>${members.length} members</h3><p>People with access to this workspace.</p></div>`; return;
         }
-        const jobs = await json('/api/jobs');
+        const [jobs, directory, profile] = await Promise.all([
+            json('/api/jobs'),
+            json(`/api/workspaces/${workspaceId}/directory`).catch(() => []),
+            json('/api/auth/me').catch(() => ({}))
+        ]);
+        const people = [...directory, profile.user || profile];
         if (version !== revision) return;
-        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}"><span class="job-row-heading"><strong>${esc(job.title)}</strong><span class="job-status">${esc(job.status)}</span></span><small>${esc(job.clientName)}</small><small>Event: ${esc(job.eventDate || "Not scheduled")}</small><small class="job-card-assignment">Assigned to: ${esc(job.assignedTo || "Unassigned")}</small></button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
+        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}"><span class="job-row-heading"><strong>${esc(job.title)}</strong></span><small>${esc(job.clientName)}</small><small>Event: ${esc(job.eventDate || "Not scheduled")}</small><small class="job-card-assignment"><span>Assigned to: ${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, "Team member", true) : "Unassigned")}</span><span class="job-status">${esc(job.status)}</span></small></button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
         conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(jobs.find(x => x.id === button.dataset.job)).catch(fail));
         filter();
     };
