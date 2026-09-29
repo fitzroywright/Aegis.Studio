@@ -220,3 +220,15 @@ body[data-theme="studio-default"] .topbar{border-bottom-color:#bd974b}
 .thread-shared-files .job-file-upload input,.thread-shared-files .job-file-upload select{width:100%;min-width:0;box-sizing:border-box}
 @media(max-width:800px){.job-reading-view{grid-template-rows:auto minmax(120px,36%) auto minmax(0,1fr)}}
 @media(max-width:480px){.job-reading-view{--job-side-card-width:165px}.job-conversation-row{gap:7px;padding:0 7px}}
+
+/* Stable workspace colors and a small note window beside the conversation. */
+#workspaceList .workspace{border-top:5px solid transparent;background-image:linear-gradient(var(--theme-surface),var(--theme-surface)),linear-gradient(100deg,hsl(var(--workspace-hue,38) 58% 42%),hsl(calc(var(--workspace-hue,38) + 35) 72% 77%));background-origin:border-box;background-clip:padding-box,border-box;margin-bottom:6px;border-radius:8px}
+#workspaceList .workspace.active,#workspaceList .workspace:hover{background-image:linear-gradient(var(--theme-accent-soft),var(--theme-accent-soft)),linear-gradient(100deg,hsl(var(--workspace-hue,38) 58% 42%),hsl(calc(var(--workspace-hue,38) + 35) 72% 77%));border-top-color:transparent}
+.job-reading-view .job-conversation-row{padding-left:12px;padding-right:12px}
+.job-reading-view #hierarchyCompose{padding-left:12px;padding-right:12px}
+.job-reading-view .thread-shared-files{padding:0;border:3px solid #c3a044;border-radius:8px;background:linear-gradient(145deg,#fff8c5,#f7e794);color:#493c20;box-shadow:0 3px 7px #70531826}
+.thread-shared-files .legacy-attachments>summary{position:sticky;top:0;z-index:1;padding:8px 9px;border-bottom:2px solid #c3a044;background:linear-gradient(#f7df83,#eac95e);color:#493c20;font-size:11px;font-weight:650}
+.job-reading-view .thread-shared-files .job-file-gallery{padding:6px;margin:0}
+.job-reading-view .thread-shared-files .job-file-tile{background:#fff9d6;color:#493c20;border-bottom:1px solid #d9be6e;border-radius:4px}
+.thread-shared-files .legacy-attachments>p{padding:8px;font-size:11px}
+.thread-shared-files .job-file-tile small{color:#6a5934}

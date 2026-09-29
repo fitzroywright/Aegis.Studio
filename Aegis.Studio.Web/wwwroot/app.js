@@ -21,11 +21,16 @@ async function json(url, options) {
     return body.trim() ? JSON.parse(body) : null;
 }
 
+function workspaceBandHue(id) {
+    let hash=0;
+    for(const character of String(id)) hash=(hash*31+character.charCodeAt(0))>>>0;
+    return hash%360;
+}
 async function loadWorkspaces() {
     const data = await json('/api/workspaces');
     workspaceCache = data;
     workspaceList.innerHTML = data.map(workspace => `
-        <button class="workspace" data-id="${workspace.id}">
+        <button class="workspace" data-id="${workspace.id}" style="--workspace-hue:${workspaceBandHue(workspace.id)}">
             <span class="badge">${workspace.openCount}</span>
             <b>${esc(workspace.name)}</b>
             <small>${esc(workspace.address)}</small>
