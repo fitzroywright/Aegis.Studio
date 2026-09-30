@@ -16,3 +16,6 @@ appsettings.Local.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Studio runtime media/version store
+/Aegis.Studio.Web/VersionStore/
