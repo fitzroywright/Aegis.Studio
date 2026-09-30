@@ -123,6 +123,26 @@ public static class StudioProductionHardening
             return report.IsReady ? Results.Ok(report) : Results.Json(report, statusCode: StatusCodes.Status503ServiceUnavailable);
         });
 
+        admin.MapGet("/msgraph", async (MicrosoftGraphEmailClient graphClient, MicrosoftGraphEmailOptions graphOptions, CancellationToken cancellationToken) =>
+        {
+            MicrosoftGraphEmailVerification verification = await graphClient.VerifyConfigurationAsync(cancellationToken);
+            return Results.Ok(new
+            {
+                enabled = graphOptions.Enabled,
+                tenantId = graphOptions.TenantId,
+                clientId = graphOptions.ClientId,
+                mailbox = graphOptions.Mailbox,
+                pollSeconds = (int)graphClient.PollInterval.TotalSeconds,
+                pageSize = graphOptions.PageSize,
+                secretPresent = verification.ClientSecretConfigured,
+                state = verification.State,
+                authenticationSucceeded = verification.AuthenticationSucceeded,
+                mailboxAccessible = verification.MailboxAccessible,
+                graphStatusCode = verification.GraphStatusCode,
+                detail = verification.Detail
+            });
+        });
+
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" })).AllowAnonymous();
         app.MapGet("/health/ready", () =>
         {
