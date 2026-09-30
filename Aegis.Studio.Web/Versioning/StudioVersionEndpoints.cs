@@ -57,7 +57,7 @@ public static class StudioVersionEndpoints
         app.MapGet("/api/jobs/{jobId:guid}/versions/compare", (Guid jobId, Guid left, Guid right, ClaimsPrincipal user, StudioDatabase db, JobAccessService access, IFileStorage storage) =>
         {
             if (!access.HasPermission(user, jobId, "ViewAttachments")) return Results.Forbid();
-            StudioVersionStore store = new(db, config, env);
+            StudioVersionStore store = new(db, storage);
             StudioAssetVersion? a = store.Get(jobId, left);
             StudioAssetVersion? b = store.Get(jobId, right);
             if (a is null || b is null) return Results.NotFound();
