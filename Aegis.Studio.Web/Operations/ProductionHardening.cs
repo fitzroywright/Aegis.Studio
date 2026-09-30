@@ -5,6 +5,7 @@ using System.Text;
 using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Bookings;
 using Aegis.Studio.Web.Persistence;
+using Common.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
 
@@ -369,8 +370,22 @@ public static class ProductionReadiness
         bool graphReady = !graphOptions.Enabled || graphClient.IsConfigured;
         checks.Add(new ProductionReadinessCheck("Microsoft Graph email", graphReady, graphReady ? (graphOptions.Enabled ? "Enabled and configured." : "Disabled by configuration.") : "Enabled but missing required credentials."));
 
-        checks.Add(CheckStorage("Attachments storage", configuration["Storage:AttachmentsPath"], Path.Combine(environment.ContentRootPath,"Storage","attachments")));
-        checks.Add(CheckStorage("Gallery storage", configuration["Storage:GalleriesPath"], Path.Combine(environment.ContentRootPath,"Storage","galleries")));
+        try
+        {
+            IFileStorage storage = services.GetRequiredService<IFileStorage>();
+            StorageHealth health = storage.CheckHealthAsync().GetAwaiter().GetResult();
+            checks.Add(new ProductionReadinessCheck(
+                "Common.Storage target",
+                health.Available && health.Writable,
+                health.Available && health.Writable
+                    ? $"{health.Provider} is available and writable at {health.Root}."
+                    : health.Error ?? $"{health.Provider} storage is not ready."));
+        }
+        catch (Exception exception)
+        {
+            checks.Add(new ProductionReadinessCheck("Common.Storage target", false, exception.Message));
+        }
+
         checks.Add(CheckStorage("Media archive", configuration["Storage:MediaArchivePath"], Path.Combine(environment.ContentRootPath,"Storage","media")));
 
         bool production = !environment.IsDevelopment();
