@@ -148,6 +148,7 @@ public sealed class ConfigurationContractPublisher(
                     "storage-network-root" => OptionalDependencyState(storageNetwork, storageNetworkConfigured, "ST-CONFIG-STORAGE-NET-001: NetworkFolder storage requires Storage:NetworkFolder:RootPath."),
                     "storage-sharepoint-tenant" => OptionalDependencyState(storageSharePoint, HasValue(configuration["Storage:SharePoint:TenantId"]), "ST-CONFIG-STORAGE-SP-001: SharePoint storage requires Storage:SharePoint:TenantId."),
                     "storage-sharepoint-client" => OptionalDependencyState(storageSharePoint, HasValue(configuration["Storage:SharePoint:ClientId"]), "ST-CONFIG-STORAGE-SP-002: SharePoint storage requires Storage:SharePoint:ClientId."),
+                    "storage-sharepoint-site-id" => OptionalFeatureState(storageSharePoint && HasValue(configuration["Storage:SharePoint:SiteId"])),
                     "storage-sharepoint-host" => OptionalDependencyState(storageSharePoint && !HasValue(configuration["Storage:SharePoint:SiteId"]), HasValue(configuration["Storage:SharePoint:HostName"]), "ST-CONFIG-STORAGE-SP-003: SharePoint storage requires HostName when SiteId is not configured."),
                     "storage-sharepoint-site" => OptionalFeatureState(storageSharePoint),
                     "storage-sharepoint-drive" => OptionalDependencyState(storageSharePoint, HasValue(configuration["Storage:SharePoint:DriveId"]) || HasValue(configuration["Storage:SharePoint:DriveName"]), "ST-CONFIG-STORAGE-SP-004: SharePoint storage requires DriveId or DriveName."),
