@@ -160,6 +160,8 @@ public sealed class ConfigurationContractPublisher(
                     _ => (false, "Unknown", "No runtime commissioning evaluator is defined for this requirement.")
                 };
 
+                if (id == "storage-sharepoint-client-secret")
+                    requirement["secretName"] = storageSecretName;
                 requirement["isConfigured"] = configured;
                 requirement["configurationState"] = state;
                 requirement["effectiveValueAvailable"] = configured;
