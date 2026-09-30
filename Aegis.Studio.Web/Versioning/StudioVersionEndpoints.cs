@@ -19,7 +19,7 @@ public static class StudioVersionEndpoints
             if (!access.HasPermission(user, jobId, "ViewAttachments")) return Results.Forbid();
             try
             {
-                StudioVersionStore store = new(db, config, env);
+                StudioVersionStore store = new(db, storage);
                 Stream stream = store.Open(jobId, versionId, out StudioAssetVersion version);
                 return Results.File(stream, version.ContentType, version.FileName, enableRangeProcessing: true);
             }
