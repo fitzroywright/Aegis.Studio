@@ -198,9 +198,7 @@ public sealed class StudioEngineeringDiagnosticCatalog
                 "studio-l3-email",
                 "Studio Microsoft Graph email",
                 EngineeringDiagnosticLevel.Level3Verification,
-                _ => Task.FromResult(graphOptions.Enabled && graphClient.IsConfigured
-                    ? Passed("studio-l3-email", "Studio Microsoft Graph email", "Microsoft Graph email routing is enabled and configured.")
-                    : Warning("studio-l3-email", "Studio Microsoft Graph email", "Microsoft Graph email routing is not fully configured."))),
+                CheckGraphEmailAsync),
 
             new EngineeringDiagnosticCheckDefinition(
                 "studio-l2-common-platform",
@@ -225,6 +223,20 @@ public sealed class StudioEngineeringDiagnosticCatalog
                     "Studio full-system readiness",
                     "Level 1 executes the complete cumulative Studio diagnostic set; component warnings/failures determine final readiness.")))
         ];
+    }
+
+    private async Task<EngineeringDiagnosticCheckResult> CheckGraphEmailAsync(CancellationToken cancellationToken)
+    {
+        MicrosoftGraphEmailVerification verification = await graphClient.VerifyConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        string evidence = $"State={verification.State}; Authentication={verification.AuthenticationSucceeded}; MailboxAccessible={verification.MailboxAccessible}; SecretPresent={verification.ClientSecretConfigured}; GraphStatus={verification.GraphStatusCode?.ToString() ?? "none"}";
+        if (!graphOptions.Enabled)
+        {
+            return Warning("studio-l3-email", "Studio Microsoft Graph email", "Microsoft Graph email routing is disabled.", evidence);
+        }
+
+        return verification.AuthenticationSucceeded && verification.MailboxAccessible
+            ? Passed("studio-l3-email", "Studio Microsoft Graph email", "Microsoft Graph credentials are valid and the configured mailbox is accessible.", evidence)
+            : Failed("studio-l3-email", "Studio Microsoft Graph email", verification.Detail, evidence);
     }
 
     private async Task<EngineeringDiagnosticCheckResult> CheckDatabaseAsync(CancellationToken cancellationToken)
