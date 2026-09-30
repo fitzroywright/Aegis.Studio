@@ -340,11 +340,11 @@ public sealed class StudioEngineeringDiagnosticCatalog
             : Warning("studio-l4-storage", "Common.Storage", $"Common.Storage provider {result.Provider} is reachable but not writable.");
     }
 
-    private static EngineeringDiagnosticCheckResult Passed(string id, string name, string summary) =>
-        new(id, name, EngineeringDiagnosticStatus.Passed, summary);
+    private static EngineeringDiagnosticCheckResult Passed(string id, string name, string summary, string? evidence = null) =>
+        new(id, name, EngineeringDiagnosticStatus.Passed, summary, evidence);
 
-    private static EngineeringDiagnosticCheckResult Warning(string id, string name, string summary) =>
-        new(id, name, EngineeringDiagnosticStatus.Warning, summary);
+    private static EngineeringDiagnosticCheckResult Warning(string id, string name, string summary, string? evidence = null) =>
+        new(id, name, EngineeringDiagnosticStatus.Warning, summary, evidence);
 
     private static EngineeringDiagnosticCheckResult Failed(string id, string name, string summary, string evidence) =>
         new(id, name, EngineeringDiagnosticStatus.Failed, summary, evidence);
