@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Aegis.Studio.Web.Persistence;
+using Common.Storage;
 using Npgsql;
 
 namespace Aegis.Studio.Web.Versioning;
@@ -7,17 +8,15 @@ namespace Aegis.Studio.Web.Versioning;
 public sealed class StudioVersionStore
 {
     private readonly StudioDatabase database;
-    private readonly string root;
+    private readonly IFileStorage storage;
 
-    public StudioVersionStore(StudioDatabase database, IConfiguration configuration, IWebHostEnvironment environment)
+    public StudioVersionStore(StudioDatabase database, IFileStorage storage)
     {
         this.database = database;
+        this.storage = new PrefixedFileStorage(
+            storage ?? throw new ArgumentNullException(nameof(storage)),
+            "VersionStore");
         StudioVersionSchema.EnsureCreated(database);
-        string configured = configuration["Storage:VersionStorePath"] ?? string.Empty;
-        root = Path.GetFullPath(string.IsNullOrWhiteSpace(configured)
-            ? Path.Combine(environment.ContentRootPath, "VersionStore")
-            : configured);
-        Directory.CreateDirectory(root);
     }
 
     public IReadOnlyList<StudioAssetVersion> GetHistory(Guid jobId, string assetKey)
@@ -58,13 +57,22 @@ public sealed class StudioVersionStore
     {
         string key = NormalizeKey(assetKey);
         Guid id = Guid.NewGuid();
-        string directory = Path.Combine(root, jobId.ToString("N"), SafeKey(key));
-        Directory.CreateDirectory(directory);
-        string stored = Path.Combine(jobId.ToString("N"), SafeKey(key), id.ToString("N") + Path.GetExtension(fileName));
-        string full = Resolve(stored);
-        using (FileStream output = new(full, FileMode.CreateNew, FileAccess.Write, FileShare.None)) source.CopyTo(output);
-        long size = new FileInfo(full).Length;
-        string hash = Hash(full);
+        string stored = $"{jobId:N}/{SafeKey(key)}/{id:N}{Path.GetExtension(fileName)}";
+        StoredFile storedFile = storage.StoreAsync(new StorageWriteRequest(
+            stored,
+            source,
+            string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
+            Path.GetFileName(fileName),
+            createdBy,
+            new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Application"] = "Aegis.Studio",
+                ["JobId"] = jobId.ToString("D"),
+                ["AssetKey"] = key,
+                ["VersionId"] = id.ToString("D")
+            })).GetAwaiter().GetResult();
+        long size = storedFile.Length;
+        string hash = storedFile.Sha256;
 
         // Serialize the version counter per job and asset, including concurrent uploads.
         using (NpgsqlCommand guard = connection.CreateCommand())
@@ -95,21 +103,21 @@ public sealed class StudioVersionStore
         command.Parameters.AddWithValue(jobId);command.Parameters.AddWithValue((object?)assetKey??DBNull.Value);command.Parameters.AddWithValue((object?)versionId??DBNull.Value);
         using var reader=command.ExecuteReader();return reader.Read()?Read(reader):throw new KeyNotFoundException("Version not found.");
     }
-    internal FileStream OpenStored(StudioAssetVersion version)=>new(Resolve(version.StoredPath),FileMode.Open,FileAccess.Read,FileShare.Read);
+    internal Stream OpenStored(StudioAssetVersion version)=>storage.OpenReadAsync(version.StoredPath).GetAwaiter().GetResult();
 
     public StudioAssetVersion Restore(Guid jobId, Guid versionId, string createdBy, string? note)
     {
         StudioAssetVersion source = Get(jobId, versionId) ?? throw new KeyNotFoundException("Version was not found.");
-        using FileStream input = new(Resolve(source.StoredPath), FileMode.Open, FileAccess.Read, FileShare.Read);
+        using Stream input = storage.OpenReadAsync(source.StoredPath).GetAwaiter().GetResult();
         return Add(jobId, source.AssetKey, source.FileName, source.ContentType, input, createdBy,
             string.IsNullOrWhiteSpace(note) ? $"Restored from version {source.VersionNumber}" : note,
             source.Id);
     }
 
-    public FileStream Open(Guid jobId, Guid versionId, out StudioAssetVersion version)
+    public Stream Open(Guid jobId, Guid versionId, out StudioAssetVersion version)
     {
         version = Get(jobId, versionId) ?? throw new KeyNotFoundException("Version was not found.");
-        return new FileStream(Resolve(version.StoredPath), FileMode.Open, FileAccess.Read, FileShare.Read);
+        return storage.OpenReadAsync(version.StoredPath).GetAwaiter().GetResult();
     }
 
     private static void Insert(NpgsqlConnection connection, NpgsqlTransaction transaction, StudioAssetVersion version)
@@ -122,14 +130,6 @@ public sealed class StudioVersionStore
         command.ExecuteNonQuery();
     }
 
-    private string Resolve(string relative)
-    {
-        string full = Path.GetFullPath(Path.Combine(root, relative));
-        if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Version path escapes the version store.");
-        return full;
-    }
-
     private static string NormalizeKey(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException("Asset key is required.");
@@ -137,12 +137,6 @@ public sealed class StudioVersionStore
     }
 
     private static string SafeKey(string key) => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key))).ToLowerInvariant();
-
-    private static string Hash(string path)
-    {
-        using FileStream stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream));
-    }
 
     private static StudioAssetVersion Read(NpgsqlDataReader reader) => new(
         reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetInt32(3), reader.GetString(4), reader.GetString(5),
