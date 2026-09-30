@@ -283,14 +283,48 @@ public sealed class StudioEngineeringDiagnosticCatalog
         }
 
         ExternalDeliveryQueueHealth result = await health.CheckHealthAsync(cancellationToken).ConfigureAwait(false);
+        string queueEvidence = $"Queue={result.QueueName ?? "default"}; Pending={result.Pending}; Retrying={result.Retrying}; DeadLettered={result.DeadLettered}; ExpiredLeases={result.ExpiredLeases}; OldestPending={result.OldestPendingAge?.ToString() ?? "none"}";
         if (!result.IsAvailable)
         {
-            return Failed("studio-l4-messaging", "Common.Messaging", "The Common.Messaging delivery queue is unavailable.", result.Message);
+            return Failed("studio-l4-messaging", "Common.Messaging", "The Common.Messaging delivery queue is unavailable.", queueEvidence);
+        }
+
+        IExternalMessageChannelDiagnostic[] providerDiagnostics = services
+            .GetServices<IExternalMessageChannel>()
+            .OfType<IExternalMessageChannelDiagnostic>()
+            .ToArray();
+
+        if (providerDiagnostics.Length == 0)
+        {
+            return result.DeadLettered > 0
+                ? Warning("studio-l4-messaging", "Common.Messaging", $"Messaging queue is available with {result.DeadLettered} dead-lettered item(s); no external channel exposes live verification.")
+                : Passed("studio-l4-messaging", "Common.Messaging", $"Messaging queue is available; pending={result.Pending}. No external channel exposes a live verification probe.");
+        }
+
+        List<MessagingProviderHealth> providers = [];
+        foreach (IExternalMessageChannelDiagnostic diagnostic in providerDiagnostics)
+            providers.Add(await diagnostic.VerifyAsync(cancellationToken).ConfigureAwait(false));
+
+        MessagingProviderHealth[] failed = providers
+            .Where(provider => !provider.Configured || !provider.Reachable)
+            .ToArray();
+        string providerEvidence = string.Join(
+            "; ",
+            providers.Select(provider =>
+                $"{provider.Provider}: Configured={provider.Configured}, Reachable={provider.Reachable}, State={provider.State}, Reason={provider.Reason ?? "none"}"));
+
+        if (failed.Length > 0)
+        {
+            return Failed(
+                "studio-l4-messaging",
+                "Common.Messaging",
+                $"{failed.Length} Common.Messaging provider verification check(s) failed.",
+                $"{queueEvidence}; {providerEvidence}");
         }
 
         return result.DeadLettered > 0
-            ? Warning("studio-l4-messaging", "Common.Messaging", $"Messaging queue is available with {result.DeadLettered} dead-lettered item(s).")
-            : Passed("studio-l4-messaging", "Common.Messaging", $"Messaging queue is available; pending={result.Pending}.");
+            ? Warning("studio-l4-messaging", "Common.Messaging", $"Messaging queue is available and provider verification passed, but {result.DeadLettered} item(s) are dead-lettered.")
+            : Passed("studio-l4-messaging", "Common.Messaging", $"Messaging queue is healthy and {providers.Count} live provider verification check(s) passed. {queueEvidence}");
     }
 
     private async Task<EngineeringDiagnosticCheckResult> CheckStorageAsync(CancellationToken cancellationToken)
