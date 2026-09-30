@@ -9,6 +9,7 @@ using Aegis.Studio.Web.WorkspaceJobs;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Common.Storage;
 using Microsoft.Extensions.FileProviders;
 using Npgsql;
 using Xunit;
@@ -32,7 +33,7 @@ public sealed class MediaProductionPersistenceTests
                 Sql(c,"create table studio_workspaces(id uuid primary key)");Sql(c,"create table studio_jobs(id uuid primary key,workspace_id uuid,title text,assigned_to text,event_date date)");
                 Sql(c,"create table studio_operational_audit(id uuid primary key,job_id uuid,action text,user_name text,detail text,created_at_utc timestamptz)");
             }
-            new WorkspaceJobStore(db).EnsureSchema();var versions=new StudioVersionStore(db,new ConfigurationBuilder().Build(),new TestEnvironment(root));
+            new WorkspaceJobStore(db).EnsureSchema();var versions=new StudioVersionStore(db,new LocalFileStorage(Path.Combine(root,"storage")));
             MediaProductionStore.Migrate(db);MediaProductionStore.Migrate(db);var store=new MediaProductionStore(db,versions);
             Guid job=Guid.NewGuid(),wedding=Guid.NewGuid();using(var c=db.OpenConnection()){Sql(c,"insert into studio_jobs(id,workspace_id,title) values($1,$2,'Employee IDs'),($3,$4,'Brown wedding')",job,Guid.NewGuid(),wedding,Guid.NewGuid());}
             string csv="Subject ID,Name,Department\n"+string.Join("\n",Enumerable.Range(1,50).Select(i=>$"{i},Employee {i},Operations"));
