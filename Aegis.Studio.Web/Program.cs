@@ -86,8 +86,8 @@ builder.Services.AddSingleton(new DiagnosticLevelStoreOptions
         ?? Path.Combine(builder.Environment.ContentRootPath, "data", "diagnostic-level", "studio.db")
 });
 builder.Services.AddSingleton<IDiagnosticLevelRequestCredentialProvider, CommonSecretsDiagnosticLevelRequestCredentialProvider>();
-builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BasicRuntimeIdentityDiagnosticLevelTest>();
-builder.Services.AddSingleton<IDiagnosticLevelLocalTest, BasicControlPlaneConfigurationDiagnosticLevelTest>();
+builder.Services.AddDiagnosticLevelTest<BasicRuntimeIdentityDiagnosticLevelTest>();
+builder.Services.AddDiagnosticLevelTest<BasicControlPlaneConfigurationDiagnosticLevelTest>();
 
 string studioConnectionString = await secretProvider.GetRequiredAsync("ConnectionStrings:Studio");
 
