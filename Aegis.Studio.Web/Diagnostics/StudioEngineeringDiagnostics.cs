@@ -303,7 +303,7 @@ public sealed class StudioEngineeringDiagnosticCatalog
 
         List<MessagingProviderHealth> providers = [];
         foreach (IExternalMessageChannelDiagnostic diagnostic in providerDiagnostics)
-            providers.Add(await diagnostic.VerifyAsync(cancellationToken).ConfigureAwait(false));
+            providers.Add(await diagnostic.VerifyProviderAsync(cancellationToken).ConfigureAwait(false));
 
         MessagingProviderHealth[] failed = providers
             .Where(provider => !provider.Configured || !provider.Reachable)
