@@ -37,6 +37,108 @@ public sealed class MicrosoftGraphEmailClient
 
     public TimeSpan PollInterval => TimeSpan.FromSeconds(Math.Max(5, options.PollSeconds));
 
+    public async Task<MicrosoftGraphEmailVerification> VerifyConfigurationAsync(CancellationToken cancellationToken)
+    {
+        bool tenantConfigured = !string.IsNullOrWhiteSpace(options.TenantId);
+        bool clientConfigured = !string.IsNullOrWhiteSpace(options.ClientId);
+        bool secretConfigured = !string.IsNullOrWhiteSpace(clientSecret);
+        bool mailboxConfigured = !string.IsNullOrWhiteSpace(options.Mailbox);
+
+        if (!options.Enabled)
+        {
+            return new MicrosoftGraphEmailVerification(
+                "Disabled",
+                false,
+                false,
+                tenantConfigured,
+                clientConfigured,
+                secretConfigured,
+                mailboxConfigured,
+                null,
+                "Microsoft Graph email ingestion is disabled.");
+        }
+
+        if (!tenantConfigured || !clientConfigured || !secretConfigured || !mailboxConfigured)
+        {
+            return new MicrosoftGraphEmailVerification(
+                "Incomplete",
+                false,
+                false,
+                tenantConfigured,
+                clientConfigured,
+                secretConfigured,
+                mailboxConfigured,
+                null,
+                "One or more required Microsoft Graph settings are missing.");
+        }
+
+        string accessToken;
+        try
+        {
+            accessToken = await GetAccessTokenAsync(cancellationToken);
+        }
+        catch (HttpRequestException exception)
+        {
+            return new MicrosoftGraphEmailVerification(
+                "Authentication failed",
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                exception.StatusCode.HasValue ? (int)exception.StatusCode.Value : null,
+                "Microsoft Entra ID rejected the configured tenant/client/secret credentials.");
+        }
+        catch (Exception)
+        {
+            return new MicrosoftGraphEmailVerification(
+                "Authentication failed",
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                null,
+                "The configured Microsoft Graph credentials could not obtain an access token.");
+        }
+
+        string mailbox = Uri.EscapeDataString(options.Mailbox);
+        string probeUrl = $"https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/inbox?$select=id,displayName,totalItemCount,unreadItemCount";
+        using HttpRequestMessage request = new(HttpMethod.Get, probeUrl);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return new MicrosoftGraphEmailVerification(
+                "Mailbox access failed",
+                true,
+                false,
+                true,
+                true,
+                true,
+                true,
+                (int)response.StatusCode,
+                $"Microsoft Graph returned {(int)response.StatusCode} {response.ReasonPhrase} while opening the configured Inbox.");
+        }
+
+        GraphMailFolderProbe? folder = await response.Content.ReadFromJsonAsync<GraphMailFolderProbe>(cancellationToken: cancellationToken);
+        return new MicrosoftGraphEmailVerification(
+            "Verified",
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            (int)response.StatusCode,
+            folder is null
+                ? "Credentials are valid and the configured mailbox Inbox is accessible."
+                : $"Credentials are valid. Inbox is accessible with {folder.TotalItemCount} total item(s) and {folder.UnreadItemCount} unread item(s).");
+    }
+
     public async Task<GraphInboxDeltaBatch> GetInboxChangesAsync(
         string? deltaLink,
         CancellationToken cancellationToken)
@@ -289,6 +391,15 @@ public sealed class MicrosoftGraphEmailClient
             .ToList();
     }
 
+    private sealed class GraphMailFolderProbe
+    {
+        [JsonPropertyName("totalItemCount")]
+        public int TotalItemCount { get; init; }
+
+        [JsonPropertyName("unreadItemCount")]
+        public int UnreadItemCount { get; init; }
+    }
+
     private sealed class GraphTokenResponse
     {
         [JsonPropertyName("access_token")]
@@ -420,3 +531,15 @@ public sealed class GraphDeltaTokenExpiredException : Exception
     {
     }
 }
+
+
+public sealed record MicrosoftGraphEmailVerification(
+    string State,
+    bool AuthenticationSucceeded,
+    bool MailboxAccessible,
+    bool TenantConfigured,
+    bool ClientConfigured,
+    bool ClientSecretConfigured,
+    bool MailboxConfigured,
+    int? GraphStatusCode,
+    string Detail);
