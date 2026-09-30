@@ -101,6 +101,23 @@ public sealed class ConfigurationContractPublisher(
             bool graphTeamsEnabled = configuration.GetValue("Messaging:MicrosoftGraph:Teams:Enabled", false);
             bool messagingGraphSecretConfigured = !graphEmailEnabled || HasValue(await secrets.GetAsync(configuration["Messaging:MicrosoftGraph:ClientSecretName"] ?? "messaging/msgraph/client-secret", cancellationToken));
             bool messagingTeamsTokenConfigured = !graphTeamsEnabled || HasValue(await secrets.GetAsync(configuration["Messaging:MicrosoftGraph:Teams:DelegatedAccessTokenSecretName"] ?? "messaging/msgraph/teams/delegated-access-token", cancellationToken));
+            string storageProvider = configuration["Storage:Provider"]?.Trim() ?? "LocalFolder";
+            bool storageLocal = storageProvider.Equals("LocalFolder", StringComparison.OrdinalIgnoreCase);
+            bool storageNetwork = storageProvider.Equals("NetworkFolder", StringComparison.OrdinalIgnoreCase);
+            bool storageSharePoint = storageProvider.Equals("SharePoint", StringComparison.OrdinalIgnoreCase);
+            string storageSecretName = configuration["Storage:SharePoint:ClientSecretName"]?.Trim()
+                ?? "storage/sharepoint/client-secret";
+            bool storageSharePointSecretConfigured =
+                !storageSharePoint || HasValue(await secrets.GetAsync(storageSecretName, cancellationToken));
+            bool storageProviderKnown = storageLocal || storageNetwork || storageSharePoint;
+            bool storageLocalConfigured = storageLocal && HasValue(configuration["Storage:Local:RootPath"]);
+            bool storageNetworkConfigured = storageNetwork && HasValue(configuration["Storage:NetworkFolder:RootPath"]);
+            bool storageSharePointConfigured = storageSharePoint
+                && HasValue(configuration["Storage:SharePoint:TenantId"])
+                && HasValue(configuration["Storage:SharePoint:ClientId"])
+                && HasValue(configuration["Storage:SharePoint:HostName"])
+                && (HasValue(configuration["Storage:SharePoint:DriveId"]) || HasValue(configuration["Storage:SharePoint:DriveName"]))
+                && storageSharePointSecretConfigured;
 
             JsonArray requirements = contract["requirements"] as JsonArray
                 ?? throw new InvalidDataException("Configuration contract has no requirements array.");
@@ -126,9 +143,17 @@ public sealed class ConfigurationContractPublisher(
                     "messaging-graph-teams-enabled" => OptionalFeatureState(graphTeamsEnabled),
                     "messaging-graph-teams-sender" => OptionalDependencyState(graphTeamsEnabled, HasValue(configuration["Messaging:MicrosoftGraph:Teams:SenderUpn"]), "ST-MSG-GRAPH-TEAMS-001: Graph Teams requires a sender UPN when enabled."),
                     "messaging-graph-teams-token" => OptionalDependencyState(graphTeamsEnabled, messagingTeamsTokenConfigured, "ST-MSG-GRAPH-TEAMS-002: Graph Teams requires its delegated token through Common.Secrets."),
-                    "attachments-storage" => State(HasValue(configuration["Storage:AttachmentsPath"]), required, "ST-CONFIG-STORAGE-001: Storage:AttachmentsPath must be configured."),
-                    "gallery-storage" => State(HasValue(configuration["Storage:GalleriesPath"]), required, "ST-CONFIG-STORAGE-002: Storage:GalleriesPath must be configured."),
-                    "media-archive" => State(HasValue(configuration["Storage:MediaArchivePath"]), required, "ST-CONFIG-STORAGE-003: Storage:MediaArchivePath must be configured."),
+                    "storage-provider" => State(storageProviderKnown, required, "ST-CONFIG-STORAGE-001: Storage:Provider must be LocalFolder, NetworkFolder, or SharePoint."),
+                    "storage-local-root" => OptionalDependencyState(storageLocal, storageLocalConfigured, "ST-CONFIG-STORAGE-LOCAL-001: LocalFolder storage requires Storage:Local:RootPath."),
+                    "storage-network-root" => OptionalDependencyState(storageNetwork, storageNetworkConfigured, "ST-CONFIG-STORAGE-NET-001: NetworkFolder storage requires Storage:NetworkFolder:RootPath."),
+                    "storage-sharepoint-tenant" => OptionalDependencyState(storageSharePoint, HasValue(configuration["Storage:SharePoint:TenantId"]), "ST-CONFIG-STORAGE-SP-001: SharePoint storage requires Storage:SharePoint:TenantId."),
+                    "storage-sharepoint-client" => OptionalDependencyState(storageSharePoint, HasValue(configuration["Storage:SharePoint:ClientId"]), "ST-CONFIG-STORAGE-SP-002: SharePoint storage requires Storage:SharePoint:ClientId."),
+                    "storage-sharepoint-host" => OptionalDependencyState(storageSharePoint, HasValue(configuration["Storage:SharePoint:HostName"]), "ST-CONFIG-STORAGE-SP-003: SharePoint storage requires Storage:SharePoint:HostName."),
+                    "storage-sharepoint-site" => OptionalFeatureState(storageSharePoint),
+                    "storage-sharepoint-drive" => OptionalDependencyState(storageSharePoint, HasValue(configuration["Storage:SharePoint:DriveId"]) || HasValue(configuration["Storage:SharePoint:DriveName"]), "ST-CONFIG-STORAGE-SP-004: SharePoint storage requires DriveId or DriveName."),
+                    "storage-sharepoint-root" => OptionalDependencyState(storageSharePoint, HasValue(configuration["Storage:SharePoint:RootFolder"]), "ST-CONFIG-STORAGE-SP-005: SharePoint storage requires Storage:SharePoint:RootFolder."),
+                    "storage-sharepoint-client-secret" => OptionalDependencyState(storageSharePoint, storageSharePointSecretConfigured, "ST-CONFIG-STORAGE-SP-006: SharePoint storage client secret must resolve through Common.Secrets."),
+                    "media-archive" => State(HasValue(configuration["Storage:MediaArchivePath"]), required, "ST-CONFIG-STORAGE-ARCHIVE-001: Storage:MediaArchivePath must identify the raw media archive filesystem."),
                     "site-id" => State(HasValue(configuration["Site:Id"]), required, "ST-CONFIG-SITE-001: Site:Id must identify this deployment."),
                     "service-identity" => State(HasValue(configuration["Service:Identity"]), required, "ST-CONFIG-IDENTITY-001: Service:Identity must identify this Studio instance."),
                     "public-url" => State(HasValue(configuration["Aegis:PublicUrl"]), required, "ST-CONFIG-PUBLIC-URL-001: Aegis:PublicUrl must identify the externally reachable Studio endpoint."),
