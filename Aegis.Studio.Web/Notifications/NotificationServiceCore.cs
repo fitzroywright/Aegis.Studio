@@ -91,6 +91,7 @@ public sealed class NotificationService
         if (preferences.EmailEnabled && !string.IsNullOrWhiteSpace(profile.Email)) Insert(profile.UserName, "Email", eventType, subject, body, referenceType, referenceId, "Pending", profile.Email);
         if (preferences.SlackEnabled) Insert(profile.UserName, "Slack", eventType, subject, body, referenceType, referenceId, "Pending", null);
         if (preferences.TeamsEnabled) Insert(profile.UserName, "Teams", eventType, subject, body, referenceType, referenceId, "Pending", null);
+        if (preferences.WhatsAppEnabled && !string.IsNullOrWhiteSpace(profile.Messaging.WhatsAppMobile)) Insert(profile.UserName, "WhatsApp", eventType, subject, body, referenceType, referenceId, "Pending", profile.Messaging.WhatsAppMobile);
     }
 
     private Guid Insert(string userName, string channel, string eventType, string subject, string body, string? referenceType, string? referenceId, string status, string? destination)
