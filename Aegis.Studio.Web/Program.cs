@@ -52,16 +52,22 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFl
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
 builder.Services.AddSingleton(secretProvider);
 
-string? sharePointStorageSecret = null;
-if (string.Equals(builder.Configuration["Storage:Provider"], "SharePoint", StringComparison.OrdinalIgnoreCase))
+string storageProvider = builder.Configuration["Storage:Provider"]?.Trim() ?? "NetworkFolder";
+string? storageProviderSecret = null;
+string? storageSecretName = storageProvider.ToLowerInvariant() switch
 {
-    string secretName = builder.Configuration["Storage:SharePoint:ClientSecretName"]?.Trim()
-        ?? "storage/sharepoint/client-secret";
-    sharePointStorageSecret = await secretProvider.GetAsync(secretName);
+    "sharepoint" => builder.Configuration["Storage:SharePoint:ClientSecretName"]?.Trim() ?? "storage/sharepoint/client-secret",
+    "azureblob" => builder.Configuration["Storage:AzureBlob:ConnectionStringSecretName"]?.Trim() ?? "storage/azureblob/connection-string",
+    "amazons3" => builder.Configuration["Storage:AmazonS3:SecretAccessKeyName"]?.Trim() ?? "storage/amazons3/secret-access-key",
+    _ => null
+};
+if (!string.IsNullOrWhiteSpace(storageSecretName))
+{
+    storageProviderSecret = await secretProvider.GetAsync(storageSecretName);
 }
 StorageTargetOptions storageTarget = StorageTargetOptions.FromConfiguration(
     builder.Configuration,
-    sharePointStorageSecret);
+    storageProviderSecret);
 if (storageTarget.Kind is StorageTargetKind.LocalFolder or StorageTargetKind.NetworkFolder &&
     !Path.IsPathRooted(storageTarget.RootPath))
 {
