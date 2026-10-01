@@ -29,6 +29,7 @@ internal sealed class StudioMessageRecipientDirectory : IMessageRecipientDirecto
                 profile.UserName,
                 profile.DisplayName,
                 profile.Email,
+                Mobile: profile.Messaging.WhatsAppMobile,
                 PreferredChannels: ToCommonChannels(profile.Messaging)))
             .ToList();
 
