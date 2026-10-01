@@ -155,6 +155,8 @@ public sealed class StudioFeatureDatabase
             create unique index if not exists ux_studio_attachments_stored_name on studio_attachments(stored_name);
             create unique index if not exists ux_studio_attachments_source_key on studio_attachments(source_key) where source_key is not null;
             alter table studio_user_profiles add column if not exists theme_name text not null default 'studio-default';
+            alter table studio_user_profiles add column if not exists whatsapp_enabled boolean not null default false;
+            alter table studio_user_profiles add column if not exists whatsapp_mobile text null;
             alter table studio_outbound_email add column if not exists sent_by_user_name text null;
             alter table studio_outbound_email add column if not exists sending_identity_type text not null default 'Workspace';
             alter table studio_outbound_email add column if not exists attempts integer not null default 0;
