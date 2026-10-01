@@ -136,9 +136,10 @@
                     <div id="mentionSuggestions" class="mention-suggestions" hidden></div>
                 </div>
                 <label class="action message-attachment-control">Attach document<input id="studioMessageFile" type="file" hidden></label>
-                <button class="primary" type="submit">Send</button>
+                <button class="action" id="studioWhatsAppSend" type="button" title="Send this message to the photographer via WhatsApp">WhatsApp</button><button class="primary" type="submit">Send</button>
             </form>`;
         document.getElementById('studioMessageComposer').onsubmit = sendMessage;
+        document.getElementById('studioWhatsAppSend').onclick = sendWhatsApp;
         const textarea = document.getElementById('studioMessageBody');
         textarea.addEventListener('input', () => updateMentionSuggestions(textarea));
         textarea.addEventListener('keydown', handleMentionKeys);
@@ -214,6 +215,22 @@
         textarea.selectionStart = textarea.selectionEnd = replaced.length;
         const box = document.getElementById('mentionSuggestions');
         if (box) box.hidden = true;
+    }
+
+    async function sendWhatsApp() {
+        const body = document.getElementById('studioMessageBody')?.value.trim();
+        if (!body || !selectedThread) return;
+        const response = await fetch(`/api/messages/threads/${selectedThread}/whatsapp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body })
+        });
+        if (!response.ok) {
+            const detail = await response.text();
+            alert(detail || 'The WhatsApp message could not be queued.');
+            return;
+        }
+        document.getElementById('studioMessageBody').value = '';
     }
 
     async function sendMessage(event) {
