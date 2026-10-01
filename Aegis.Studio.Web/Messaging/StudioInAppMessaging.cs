@@ -314,6 +314,30 @@ public static class StudioInAppMessagingEndpoints
         group.MapPost("/threads/direct", (StartDirectMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.CreateDirect(user, request.UserName))));
         group.MapPost("/threads/{scopeType}/{scopeId:guid}", (string scopeType, Guid scopeId, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetOrCreateScoped(user, scopeType, scopeId))));
         group.MapGet("/threads/{threadId:guid}", (Guid threadId, int? count, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetMessages(threadId, user, count ?? 100))));
+        group.MapPost("/threads/{threadId:guid}/whatsapp", (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, NotificationService notifications) =>
+        {
+            try
+            {
+                store.AssertThreadAccess(threadId, user);
+                string current = user.FindFirstValue("login_name") ?? user.Identity?.Name ?? throw new UnauthorizedAccessException();
+                string recipient = store.GetThreadParticipants(threadId)
+                    .FirstOrDefault(name => !string.Equals(name, current, StringComparison.OrdinalIgnoreCase))
+                    ?? throw new InvalidOperationException("A photographer recipient could not be identified.");
+
+                notifications.SendWhatsAppToUser(
+                    recipient,
+                    "Studio message",
+                    request.Body,
+                    "MessageThread",
+                    threadId.ToString("D"));
+
+                return Results.Accepted();
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+        });
+
         group.MapPost("/threads/{threadId:guid}", async (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, NotificationService notifications, IHubContext<StudioMessageHub> hub) =>
         {
             try
