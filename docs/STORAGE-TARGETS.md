@@ -16,6 +16,8 @@ Set `Storage:Provider` to one of:
 - `LocalFolder`
 - `NetworkFolder`
 - `SharePoint`
+- `AzureBlob`
+- `AmazonS3`
 
 The application is otherwise provider-neutral.
 
@@ -88,3 +90,36 @@ The same logical keys are used regardless of selected provider.
 ## Health
 
 The Studio readiness check calls `IFileStorage.CheckHealthAsync` against the selected target. SharePoint health therefore proves Graph authentication plus write/read/delete access to the configured document library rather than checking a local folder.
+
+### Azure Blob
+
+```json
+"Storage": {
+  "Provider": "AzureBlob",
+  "AzureBlob": {
+    "ConnectionStringSecretName": "storage/azureblob/connection-string",
+    "ContainerName": "aegis-studio",
+    "RootFolder": "Aegis/Studio"
+  }
+}
+```
+
+The connection string is resolved through Common.Secrets. The same logical storage keys are used as the other targets.
+
+### Amazon S3
+
+```json
+"Storage": {
+  "Provider": "AmazonS3",
+  "AmazonS3": {
+    "BucketName": "example-studio",
+    "Region": "us-east-1",
+    "AccessKeyId": "",
+    "SecretAccessKeyName": "storage/amazons3/secret-access-key",
+    "RootFolder": "Aegis/Studio",
+    "ServiceUrl": ""
+  }
+}
+```
+
+When access-key settings are empty, the AWS SDK default credential chain may be used, including an IAM role. For S3-compatible endpoints, set `ServiceUrl` and use path-style addressing.
