@@ -94,6 +94,7 @@ builder.Services.AddSingleton(new DiagnosticLevelStoreOptions
 builder.Services.AddSingleton<IDiagnosticLevelRequestCredentialProvider, CommonSecretsDiagnosticLevelRequestCredentialProvider>();
 builder.Services.AddDiagnosticLevelTest<BasicRuntimeIdentityDiagnosticLevelTest>();
 builder.Services.AddDiagnosticLevelTest<BasicControlPlaneConfigurationDiagnosticLevelTest>();
+builder.Services.AddDiagnosticLevelTest<CommonSecretsAvailabilityDiagnosticLevelTest>();
 
 string studioConnectionString = await secretProvider.GetRequiredAsync("ConnectionStrings:Studio");
 
