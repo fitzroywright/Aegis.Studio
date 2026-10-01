@@ -134,6 +134,8 @@ public sealed class StudioDatabase
                 in_app_enabled boolean not null,
                 slack_enabled boolean not null,
                 teams_enabled boolean not null,
+                whatsapp_enabled boolean not null default false,
+                whatsapp_mobile text null,
                 new_workspace_message boolean not null,
                 job_assigned boolean not null,
                 booking_changed boolean not null,
