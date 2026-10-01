@@ -142,7 +142,7 @@
       "purpose": "Selects the Common.Storage target used for Studio attachments, messages, galleries, and media versions.",
       "configurationKey": "Storage:Provider",
       "isConfigured": false,
-      "example": "LocalFolder | NetworkFolder | SharePoint"
+      "example": "LocalFolder | NetworkFolder | SharePoint | AzureBlob | AmazonS3"
     },
     {
       "id": "storage-local-root",
@@ -232,6 +232,53 @@
       "required": false,
       "purpose": "Authenticates Common.Storage to Microsoft Graph when SharePoint is the selected provider.",
       "secretName": "storage/sharepoint/client-secret",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "storage-azureblob-container",
+      "displayName": "Azure Blob container",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Selects the Azure Blob container used by Common.Storage when AzureBlob is selected.",
+      "configurationKey": "Storage:AzureBlob:ContainerName",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-azureblob-connection",
+      "displayName": "Azure Blob connection",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Provides the Azure Blob connection string through Common.Secrets.",
+      "secretName": "storage/azureblob/connection-string",
+      "isConfigured": false,
+      "sensitive": true
+    },
+    {
+      "id": "storage-s3-bucket",
+      "displayName": "Amazon S3 bucket",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Selects the S3 bucket used by Common.Storage when AmazonS3 is selected.",
+      "configurationKey": "Storage:AmazonS3:BucketName",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-s3-region",
+      "displayName": "Amazon S3 region",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Selects the AWS region used by Common.Storage.",
+      "configurationKey": "Storage:AmazonS3:Region",
+      "isConfigured": false
+    },
+    {
+      "id": "storage-s3-secret",
+      "displayName": "Amazon S3 secret access key",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "Provides the optional S3 secret access key through Common.Secrets. IAM roles/default credentials may be used instead.",
+      "secretName": "storage/amazons3/secret-access-key",
       "isConfigured": false,
       "sensitive": true
     },
