@@ -118,9 +118,24 @@ public sealed class UserProfileStore
 
     private static StudioUserProfile Read(NpgsqlDataReader r)
     {
-        string? quietStart = r.IsDBNull(18) ? null : r.GetFieldValue<TimeOnly>(18).ToString("HH:mm");
-        string? quietEnd = r.IsDBNull(19) ? null : r.GetFieldValue<TimeOnly>(19).ToString("HH:mm");
-        UserMessagingPreferences messaging = new(r.GetBoolean(7),r.GetBoolean(8),r.GetBoolean(9),r.GetBoolean(10),r.GetBoolean(11),r.GetBoolean(12),r.GetBoolean(13),r.GetBoolean(14),r.GetBoolean(15),r.GetBoolean(16),r.GetBoolean(17),r.IsDBNull(18) ? null : r.GetString(18),r.GetString(19),quietStart,quietEnd);
+        string? quietStart = r.IsDBNull(20) ? null : r.GetFieldValue<TimeOnly>(20).ToString("HH:mm");
+        string? quietEnd = r.IsDBNull(21) ? null : r.GetFieldValue<TimeOnly>(21).ToString("HH:mm");
+        UserMessagingPreferences messaging = new(
+            EmailEnabled: r.GetBoolean(7),
+            InAppEnabled: r.GetBoolean(8),
+            SlackEnabled: r.GetBoolean(9),
+            TeamsEnabled: r.GetBoolean(10),
+            WhatsAppEnabled: r.GetBoolean(11),
+            WhatsAppMobile: r.IsDBNull(12) ? null : r.GetString(12),
+            NewWorkspaceMessage: r.GetBoolean(13),
+            JobAssigned: r.GetBoolean(14),
+            BookingChanged: r.GetBoolean(15),
+            PaymentChanged: r.GetBoolean(16),
+            JobStatusChanged: r.GetBoolean(17),
+            MentionsAndReplies: r.GetBoolean(18),
+            DeliveryMode: r.GetString(19),
+            QuietHoursStart: quietStart,
+            QuietHoursEnd: quietEnd);
         return new StudioUserProfile(r.GetGuid(0),r.GetString(1),r.GetString(2),r.IsDBNull(3)?null:r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),r.IsDBNull(5)?null:r.GetString(5),NormalizeTheme(r.IsDBNull(6)?null:r.GetString(6)),messaging,r.GetFieldValue<DateTimeOffset>(22),r.GetFieldValue<DateTimeOffset>(23));
     }
 
@@ -146,7 +161,22 @@ public sealed class UserProfileStore
 public sealed record StudioUserProfile(Guid Id,string UserName,string DisplayName,string? Email,string? Department,string? Title,string ThemeName,UserMessagingPreferences Messaging,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc);
 public sealed record UserMessagingPreferences(bool EmailEnabled,bool InAppEnabled,bool SlackEnabled,bool TeamsEnabled,bool WhatsAppEnabled,string? WhatsAppMobile,bool NewWorkspaceMessage,bool JobAssigned,bool BookingChanged,bool PaymentChanged,bool JobStatusChanged,bool MentionsAndReplies,string DeliveryMode,string? QuietHoursStart,string? QuietHoursEnd)
 {
-    public static UserMessagingPreferences Default => new(true,true,false,false,false,null,true,true,true,true,true,"Immediate",null,null);
+    public static UserMessagingPreferences Default => new(
+        EmailEnabled: true,
+        InAppEnabled: true,
+        SlackEnabled: false,
+        TeamsEnabled: false,
+        WhatsAppEnabled: false,
+        WhatsAppMobile: null,
+        NewWorkspaceMessage: true,
+        JobAssigned: true,
+        BookingChanged: true,
+        PaymentChanged: true,
+        JobStatusChanged: true,
+        MentionsAndReplies: true,
+        DeliveryMode: "Immediate",
+        QuietHoursStart: null,
+        QuietHoursEnd: null);
 }
 
 public sealed record UpdateThemeRequest(string ThemeName);
