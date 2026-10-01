@@ -14,6 +14,7 @@
         inAppEnabled: document.getElementById('prefInApp'),
         slackEnabled: document.getElementById('prefSlack'),
         teamsEnabled: document.getElementById('prefTeams'),
+        whatsappEnabled: document.getElementById('prefWhatsApp'),
         newWorkspaceMessage: document.getElementById('prefWorkspaceMessage'),
         jobAssigned: document.getElementById('prefJobAssigned'),
         bookingChanged: document.getElementById('prefBookingChanged'),
@@ -26,6 +27,7 @@
         identity.innerHTML = `<strong>${escapeHtml(studioFirstName(profile))}</strong><span>${escapeHtml(profile.email || 'No email in directory')}</span><span>${escapeHtml([profile.title, profile.department].filter(Boolean).join(' · ') || 'No directory role details')}</span>`;
         const messaging = profile.messaging || {};
         for (const [key, element] of Object.entries(fields)) element.checked = !!messaging[key];
+        document.getElementById('prefWhatsAppMobile').value = messaging.whatsAppMobile || '';
         document.getElementById('prefDelivery').value = messaging.deliveryMode || 'Immediate';
         document.getElementById('prefQuietStart').value = messaging.quietHoursStart || '';
         document.getElementById('prefQuietEnd').value = messaging.quietHoursEnd || '';
@@ -34,6 +36,7 @@
     function payload() {
         const value = {};
         for (const [key, element] of Object.entries(fields)) value[key] = element.checked;
+        value.whatsAppMobile = document.getElementById('prefWhatsAppMobile').value.trim() || null;
         value.deliveryMode = document.getElementById('prefDelivery').value;
         value.quietHoursStart = document.getElementById('prefQuietStart').value || null;
         value.quietHoursEnd = document.getElementById('prefQuietEnd').value || null;
