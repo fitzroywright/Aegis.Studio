@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Messaging.Channels.MicrosoftGraph;
 using Common.Messaging.Channels.Slack;
 using Common.Messaging.Channels.Teams;
+using Common.Messaging.Channels.WhatsApp;
 using Common.Secrets;
 using Npgsql;
 
@@ -50,6 +51,22 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         IChannelSecretResolver secretResolver = new StudioCommonSecretsChannelSecretResolver(secrets);
         List<IExternalMessageChannel> channels = [];
         List<HttpClient> clients = [];
+
+        if (configuration.GetValue("Messaging:WhatsApp:Enabled", false))
+        {
+            HttpClient client = new();
+            clients.Add(client);
+            channels.Add(new WhatsAppMessageChannel(
+                client,
+                new WhatsAppMessageOptions
+                {
+                    Enabled = true,
+                    GraphApiVersion = configuration["Messaging:WhatsApp:GraphApiVersion"] ?? "v23.0",
+                    PhoneNumberId = configuration["Messaging:WhatsApp:PhoneNumberId"] ?? string.Empty,
+                    AccessTokenSecretName = configuration["Messaging:WhatsApp:AccessTokenSecretName"] ?? "messaging/whatsapp/access-token"
+                },
+                secretResolver));
+        }
 
         if (configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false))
         {
@@ -177,6 +194,7 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
             "Email" => MessageChannel.MsEmail,
             "Slack" => MessageChannel.Slack,
             "Teams" => MessageChannel.MsTeams,
+            "WhatsApp" => MessageChannel.WhatsApp,
             _ => MessageChannel.None
         };
 
