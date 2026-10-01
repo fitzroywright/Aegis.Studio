@@ -42,6 +42,7 @@ internal sealed class StudioMessageRecipientDirectory : IMessageRecipientDirecto
         if (preferences.EmailEnabled) channels |= MessageChannel.MsEmail;
         if (preferences.SlackEnabled) channels |= MessageChannel.Slack;
         if (preferences.TeamsEnabled) channels |= MessageChannel.MsTeams;
+        if (preferences.WhatsAppEnabled) channels |= MessageChannel.WhatsApp;
         return channels;
     }
 }
