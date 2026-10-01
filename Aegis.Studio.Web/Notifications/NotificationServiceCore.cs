@@ -39,6 +39,31 @@ public sealed class NotificationService
         }
     }
 
+    public void SendWhatsAppToUser(
+        string userName,
+        string subject,
+        string body,
+        string? referenceType = null,
+        string? referenceId = null)
+    {
+        StudioUserProfile? profile = profiles.GetAll().FirstOrDefault(x =>
+            string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(x.DisplayName, userName, StringComparison.OrdinalIgnoreCase));
+        if (profile is null || string.IsNullOrWhiteSpace(profile.Messaging.WhatsAppMobile))
+            throw new InvalidOperationException("The photographer does not have a WhatsApp number configured.");
+
+        Insert(
+            profile.UserName,
+            "WhatsApp",
+            "DirectWhatsAppMessage",
+            subject,
+            body,
+            referenceType,
+            referenceId,
+            "Pending",
+            profile.Messaging.WhatsAppMobile);
+    }
+
     public void PublishToUser(string userName, string eventType, string subject, string body, string? referenceType = null, string? referenceId = null)
     {
         StudioUserProfile? profile = profiles.GetAll().FirstOrDefault(x =>
