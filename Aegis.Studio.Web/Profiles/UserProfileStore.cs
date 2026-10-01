@@ -121,7 +121,7 @@ public sealed class UserProfileStore
         string? quietStart = r.IsDBNull(18) ? null : r.GetFieldValue<TimeOnly>(18).ToString("HH:mm");
         string? quietEnd = r.IsDBNull(19) ? null : r.GetFieldValue<TimeOnly>(19).ToString("HH:mm");
         UserMessagingPreferences messaging = new(r.GetBoolean(7),r.GetBoolean(8),r.GetBoolean(9),r.GetBoolean(10),r.GetBoolean(11),r.GetBoolean(12),r.GetBoolean(13),r.GetBoolean(14),r.GetBoolean(15),r.GetBoolean(16),r.GetBoolean(17),r.IsDBNull(18) ? null : r.GetString(18),r.GetString(19),quietStart,quietEnd);
-        return new StudioUserProfile(r.GetGuid(0),r.GetString(1),r.GetString(2),r.IsDBNull(3)?null:r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),r.IsDBNull(5)?null:r.GetString(5),NormalizeTheme(r.IsDBNull(6)?null:r.GetString(6)),messaging,r.GetFieldValue<DateTimeOffset>(21),r.GetFieldValue<DateTimeOffset>(22));
+        return new StudioUserProfile(r.GetGuid(0),r.GetString(1),r.GetString(2),r.IsDBNull(3)?null:r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),r.IsDBNull(5)?null:r.GetString(5),NormalizeTheme(r.IsDBNull(6)?null:r.GetString(6)),messaging,r.GetFieldValue<DateTimeOffset>(22),r.GetFieldValue<DateTimeOffset>(23));
     }
 
     private static UserMessagingPreferences Normalize(UserMessagingPreferences value)
