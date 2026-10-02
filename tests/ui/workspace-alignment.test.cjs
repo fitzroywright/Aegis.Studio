@@ -88,7 +88,7 @@ test('top navigation keeps personal actions right and removes redundant destinat
  const dom=new JSDOM('<header class="topbar"></header><aside class="rail"></aside><button id="newRequestButton">New Request</button>',{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;let frontDesk=0;
  Object.assign(w,{loadFrontDeskRole(){},showFrontDesk:async()=>frontDesk++,showProduction(){},showWorkspaces(){},showManagement(){}});
  w.eval(fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8'));
- assert.deepEqual(Array.from(w.document.querySelectorAll('.studio-top-nav button'),b=>b.textContent),['← Back','Dashboard','Pipeline','Production','FrontDesk','My Work','New Request','Admin']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('.studio-top-nav button'),b=>b.textContent),['← Back','Dashboard','Workspaces','Pipeline','Production','FrontDesk','New Request','My Work','Admin']);
  w.document.querySelector('[data-view="frontdesk"]').click();await Promise.resolve();assert.equal(frontDesk,1);assert.equal(w.document.getElementById('newRequestButton').hidden,false);
  const back=w.document.querySelector('.studio-back-button');assert.equal(back.disabled,false);
  w.activateView=()=>{};w.activateNavigation=()=>{};w.loadConversations=async()=>{};
