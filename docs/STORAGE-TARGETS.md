@@ -17,7 +17,7 @@ Set `Storage:Provider` to one of:
 - `NetworkFolder`
 - `SharePoint`
 - `AzureBlob`
-- `AmazonS3`
+- `S3` (S3-compatible; TrueNAS/Synology/AWS-compatible endpoints)
 
 The application is otherwise provider-neutral.
 
@@ -106,20 +106,24 @@ The Studio readiness check calls `IFileStorage.CheckHealthAsync` against the sel
 
 The connection string is resolved through Common.Secrets. The same logical storage keys are used as the other targets.
 
-### Amazon S3
+### S3-compatible object storage
 
 ```json
 "Storage": {
-  "Provider": "AmazonS3",
-  "AmazonS3": {
-    "BucketName": "example-studio",
+  "Provider": "S3",
+  "S3": {
+    "Endpoint": "https://truenas.example.internal:9000",
     "Region": "us-east-1",
-    "AccessKeyId": "",
-    "SecretAccessKeyName": "storage/amazons3/secret-access-key",
+    "Bucket": "aegis-studio",
+    "AccessKeyIdSecretName": "storage/s3/access-key-id",
+    "SecretAccessKeySecretName": "storage/s3/secret-access-key",
     "RootFolder": "Aegis/Studio",
-    "ServiceUrl": ""
+    "ForcePathStyle": true,
+    "RequireHttps": true
   }
 }
 ```
 
-When access-key settings are empty, the AWS SDK default credential chain may be used, including an IAM role. For S3-compatible endpoints, set `ServiceUrl` and use path-style addressing.
+Both S3 credentials are resolved through Common.Secrets. The endpoint is deployment configuration: TrueNAS is the initial target, but Studio does not depend on TrueNAS or AWS APIs directly.
+
+For a local S3-compatible endpoint that intentionally uses HTTP, set `RequireHttps` to `false`. Production deployments should prefer HTTPS.
