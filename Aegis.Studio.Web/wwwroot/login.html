@@ -26,25 +26,50 @@
   <main class="card">
     <div class="brand"><strong>AEGIS</strong><span>STUDIO</span></div>
     <h1>Sign in</h1>
-    <p>Enter your Windows/Active Directory user name and password. Aegis requires an explicit sign-in before any Studio workspace or customer data is shown.</p>
+    <p id="signInHelp">Enter your Windows/Active Directory user name and password. Aegis requires an explicit sign-in before any Studio workspace or customer data is shown.</p>
     <form id="loginForm">
       <label>User name
         <input id="userName" autocomplete="username" autofocus required placeholder="FWright or FFPJM\\FWright">
       </label>
-      <label>Password
+      <label id="passwordLabel">Password
         <input id="password" type="password" autocomplete="current-password" required>
       </label>
       <button id="signInButton" type="submit">Sign in</button>
       <div id="error" class="error" role="alert"></div>
     </form>
-    <div class="environment">Development/testing directory: FFP Active Directory over LDAPS.</div>
+    <div id="environment" class="environment">Development/testing directory: FFP Active Directory over LDAPS.</div>
   </main>
   <script>
     const loginForm = document.getElementById('loginForm');
     const userName = document.getElementById('userName');
     const password = document.getElementById('password');
+    const passwordLabel = document.getElementById('passwordLabel');
     const signInButton = document.getElementById('signInButton');
+    const signInHelp = document.getElementById('signInHelp');
+    const environment = document.getElementById('environment');
     const error = document.getElementById('error');
+    let mockAuthentication = false;
+
+    async function loadAuthenticationOptions() {
+        try {
+            const response = await fetch('/api/auth/options', { cache: 'no-store' });
+            if (!response.ok) return;
+            const options = await response.json();
+            mockAuthentication = options.mockAuthentication === true;
+            if (!mockAuthentication) return;
+
+            signInHelp.textContent = 'Mock authentication is enabled for this Development environment. Sign in with the development identity below; no directory password is required.';
+            environment.textContent = 'Development mode: Mock Authentication enabled. Active Directory credentials are not used.';
+            password.required = false;
+            password.value = '';
+            passwordLabel.style.display = 'none';
+            if (options.defaultUserName) userName.value = options.defaultUserName;
+        } catch {
+            // Keep the normal Active Directory login experience if the options endpoint is unavailable.
+        }
+    }
+
+    loadAuthenticationOptions();
 
     loginForm.addEventListener('submit', async event => {
         event.preventDefault();
@@ -58,19 +83,23 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     userName: userName.value.trim(),
-                    password: password.value
+                    password: mockAuthentication ? '' : password.value
                 })
             });
 
             if (response.status === 401) {
-                error.textContent = 'The user name or password was not accepted.';
+                error.textContent = mockAuthentication
+                    ? 'The mock sign-in identity was not accepted.'
+                    : 'The user name or password was not accepted.';
                 password.value = '';
-                password.focus();
+                if (!mockAuthentication) password.focus();
                 return;
             }
 
             if (!response.ok) {
-                error.textContent = 'Aegis could not complete sign in. Check the server log and Active Directory connection.';
+                error.textContent = mockAuthentication
+                    ? 'Aegis could not complete mock sign in. Check the server log.'
+                    : 'Aegis could not complete sign in. Check the server log and Active Directory connection.';
                 return;
             }
 

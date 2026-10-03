@@ -17,6 +17,17 @@ public static class AuthenticationEndpoints
         string[] administratorGroups = app.Configuration
             .GetSection("AuthenticationPlugin:Settings:AdministrativeGroups")
             .Get<string[]>() ?? [];
+        bool mockAuthenticationEnabled = MockAuthenticationPolicy.IsEnabled(
+            app.Configuration,
+            app.Environment.EnvironmentName);
+
+        app.MapGet("/api/auth/options", () => Results.Ok(new
+        {
+            mockAuthentication = mockAuthenticationEnabled,
+            defaultUserName = mockAuthenticationEnabled
+                ? app.Configuration["MockAuthentication:UserName"]?.Trim() ?? "studio.admin"
+                : string.Empty
+        })).AllowAnonymous();
 
         app.MapPost("/api/auth/login", async (
             LoginRequest request,
@@ -24,20 +35,51 @@ public static class AuthenticationEndpoints
             StudioDatabase database,
             HttpContext httpContext) =>
         {
-            if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password))
+            if (string.IsNullOrWhiteSpace(request.UserName))
             {
-                return Results.BadRequest(new { error = "User name and password are required." });
-            }
-
-            AuthenticationResult result = authenticator.Authenticate(request.UserName.Trim(), request.Password);
-            if (!result.IsAuthenticated)
-            {
-                return Results.Unauthorized();
+                return Results.BadRequest(new { error = "User name is required." });
             }
 
             string userName = request.UserName.Trim();
-            string? directoryDisplayName = result.UserInfo?.DisplayName;
-            string displayName = string.IsNullOrWhiteSpace(directoryDisplayName) ? userName : directoryDisplayName!;
+            string displayName;
+            string? email;
+            string? department;
+            string? title;
+            IReadOnlyCollection<string> groupNames;
+
+            if (mockAuthenticationEnabled)
+            {
+                MockAuthenticationIdentity mockIdentity = MockAuthenticationPolicy.CreateIdentity(
+                    app.Configuration,
+                    userName,
+                    administratorGroups);
+                userName = mockIdentity.UserName;
+                displayName = mockIdentity.DisplayName;
+                email = mockIdentity.Email;
+                department = mockIdentity.Department;
+                title = mockIdentity.Title;
+                groupNames = mockIdentity.GroupNames;
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(request.Password))
+                {
+                    return Results.BadRequest(new { error = "User name and password are required." });
+                }
+
+                AuthenticationResult result = authenticator.Authenticate(userName, request.Password);
+                if (!result.IsAuthenticated)
+                {
+                    return Results.Unauthorized();
+                }
+
+                string? directoryDisplayName = result.UserInfo?.DisplayName;
+                displayName = string.IsNullOrWhiteSpace(directoryDisplayName) ? userName : directoryDisplayName!;
+                email = result.UserInfo?.Mail;
+                department = result.UserInfo?.Department;
+                title = result.UserInfo?.Title;
+                groupNames = result.GroupNames;
+            }
 
             GlobalOperationalRoleStore roles = new(database);
             roles.EnsureSchema(administratorGroups);
@@ -45,7 +87,7 @@ public static class AuthenticationEndpoints
 
             PermissionAuthorizer authorizer = new(roles);
             AuthorizationDecision roleDecision = await authorizer.AuthorizeAsync(
-                AuthorizationSubject.Create(userName, result.GroupNames),
+                AuthorizationSubject.Create(userName, groupNames),
                 StudioPermissions.Access,
                 httpContext.RequestAborted);
 
@@ -55,11 +97,11 @@ public static class AuthenticationEndpoints
                 new Claim(ClaimTypes.Name, displayName),
                 new Claim("login_name", userName)
             ];
-            AddOptionalClaim(claims, ClaimTypes.Email, result.UserInfo?.Mail);
-            AddOptionalClaim(claims, "department", result.UserInfo?.Department);
-            AddOptionalClaim(claims, "title", result.UserInfo?.Title);
+            AddOptionalClaim(claims, ClaimTypes.Email, email);
+            AddOptionalClaim(claims, "department", department);
+            AddOptionalClaim(claims, "title", title);
 
-            foreach (string groupName in result.GroupNames.Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (string groupName in groupNames.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 claims.Add(new Claim("directory_group", groupName));
             }
