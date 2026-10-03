@@ -54,20 +54,42 @@ builder.Services.AddSingleton(secretProvider);
 
 string storageProvider = builder.Configuration["Storage:Provider"]?.Trim() ?? "NetworkFolder";
 string? storageProviderSecret = null;
-string? storageSecretName = storageProvider.ToLowerInvariant() switch
+string? s3AccessKeyId = null;
+string? s3SecretAccessKey = null;
+
+if (storageProvider.Equals("SharePoint", StringComparison.OrdinalIgnoreCase))
 {
-    "sharepoint" => builder.Configuration["Storage:SharePoint:ClientSecretName"]?.Trim() ?? "storage/sharepoint/client-secret",
-    "azureblob" => builder.Configuration["Storage:AzureBlob:ConnectionStringSecretName"]?.Trim() ?? "storage/azureblob/connection-string",
-    "amazons3" => builder.Configuration["Storage:AmazonS3:SecretAccessKeyName"]?.Trim() ?? "storage/amazons3/secret-access-key",
-    _ => null
-};
-if (!string.IsNullOrWhiteSpace(storageSecretName))
-{
-    storageProviderSecret = await secretProvider.GetAsync(storageSecretName);
+    string secretName = builder.Configuration["Storage:SharePoint:ClientSecretName"]?.Trim()
+        ?? "storage/sharepoint/client-secret";
+    storageProviderSecret = await secretProvider.GetAsync(secretName);
 }
+else if (storageProvider.Equals("AzureBlob", StringComparison.OrdinalIgnoreCase))
+{
+    string secretName = builder.Configuration["Storage:AzureBlob:ConnectionStringSecretName"]?.Trim()
+        ?? "storage/azureblob/connection-string";
+    storageProviderSecret = await secretProvider.GetAsync(secretName);
+}
+else if (storageProvider.Equals("S3", StringComparison.OrdinalIgnoreCase))
+{
+    string accessKeySecretName = builder.Configuration["Storage:S3:AccessKeyIdSecretName"]?.Trim()
+        ?? "storage/s3/access-key-id";
+    string secretKeySecretName = builder.Configuration["Storage:S3:SecretAccessKeySecretName"]?.Trim()
+        ?? "storage/s3/secret-access-key";
+    s3AccessKeyId = await secretProvider.GetAsync(accessKeySecretName);
+    s3SecretAccessKey = await secretProvider.GetAsync(secretKeySecretName);
+}
+else if (storageProvider.Equals("AmazonS3", StringComparison.OrdinalIgnoreCase))
+{
+    string secretName = builder.Configuration["Storage:AmazonS3:SecretAccessKeyName"]?.Trim()
+        ?? "storage/amazons3/secret-access-key";
+    storageProviderSecret = await secretProvider.GetAsync(secretName);
+}
+
 StorageTargetOptions storageTarget = StorageTargetOptions.FromConfiguration(
     builder.Configuration,
-    storageProviderSecret);
+    storageProviderSecret,
+    s3AccessKeyId: s3AccessKeyId,
+    s3SecretAccessKey: s3SecretAccessKey);
 if (storageTarget.Kind is StorageTargetKind.LocalFolder or StorageTargetKind.NetworkFolder &&
     !Path.IsPathRooted(storageTarget.RootPath))
 {
@@ -114,6 +136,26 @@ builder.Services.AddAuthorization(options => { options.FallbackPolicy = new Auth
 builder.Services.AddHealthChecks();
 builder.Services.AddSingleton(graphEmailOptions);
 builder.Services.AddSingleton<MicrosoftGraphEmailClient>();
+
+global::Common.Messaging.Hosting.ServiceCollectionExtensions
+    .AddCommonMessagingSecrets(builder.Services);
+if (builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false))
+{
+    global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
+        .AddMicrosoftGraphEmailMessagingChannel(
+            builder.Services,
+            new global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphEmailOptions
+            {
+                TenantId = builder.Configuration["Messaging:MicrosoftGraph:TenantId"] ?? string.Empty,
+                ClientId = builder.Configuration["Messaging:MicrosoftGraph:ClientId"] ?? string.Empty,
+                SenderUpn = builder.Configuration["Messaging:MicrosoftGraph:Email:SenderUpn"] ?? string.Empty,
+                ClientSecretName = builder.Configuration["Messaging:MicrosoftGraph:ClientSecretName"]
+                    ?? "messaging/msgraph/client-secret",
+                SkipSenderRecipient = false
+            });
+}
+global::Common.Messaging.Hosting.ServiceCollectionExtensions
+    .AddCommonMessagingDiagnostics(builder.Services);
 builder.Services.AddSingleton<WorkspaceStore>();
 builder.Services.AddSingleton<WorkspaceAccessService>();
 builder.Services.AddSingleton<JobAccessService>();
