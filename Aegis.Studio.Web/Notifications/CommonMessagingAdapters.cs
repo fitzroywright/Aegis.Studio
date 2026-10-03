@@ -48,43 +48,6 @@ internal sealed class StudioMessageRecipientDirectory : IMessageRecipientDirecto
     }
 }
 
-internal sealed class StudioGraphEmailChannel : IExternalMessageChannel
-{
-    private readonly MicrosoftGraphEmailClient graph;
-    private readonly MicrosoftGraphEmailOptions options;
-
-    public StudioGraphEmailChannel(MicrosoftGraphEmailClient graph, MicrosoftGraphEmailOptions options)
-    {
-        this.graph = graph;
-        this.options = options;
-    }
-
-    public MessageChannel Channel => MessageChannel.MsEmail;
-
-    public async Task SendAsync(
-        MessageRecipient recipient,
-        MessageRequest request,
-        Guid notificationId,
-        CancellationToken cancellationToken = default)
-    {
-        if (!graph.IsConfigured)
-        {
-            throw new StudioMessageConfigurationException("Microsoft Graph email is not configured.");
-        }
-
-        string? destination = GetMetadata(request, "Destination") ?? recipient.Email;
-        if (string.IsNullOrWhiteSpace(destination))
-        {
-            throw new StudioMessageConfigurationException("Recipient email is not configured.");
-        }
-
-        await graph.SendEmailAsync(options.Mailbox, destination, request.Title, request.Body, cancellationToken);
-    }
-
-    private static string? GetMetadata(MessageRequest request, string key)
-        => request.Metadata is not null && request.Metadata.TryGetValue(key, out string? value) ? value : null;
-}
-
 internal sealed class StudioWebhookMessageChannel : IExternalMessageChannel, IDisposable
 {
     private readonly ISecretProvider secrets;
