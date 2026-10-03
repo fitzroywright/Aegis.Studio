@@ -14,6 +14,7 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="$(CommonRoot)\Common.Secrets\Common.Secrets.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.csproj" AdditionalProperties="Configuration=$(Configuration)" />
+    <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.Hosting\Common.Messaging.Hosting.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Diagnostics\Common.Diagnostics.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Storage\Common.Storage.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Registration\Common.Registration.csproj" AdditionalProperties="Configuration=$(Configuration)" />
