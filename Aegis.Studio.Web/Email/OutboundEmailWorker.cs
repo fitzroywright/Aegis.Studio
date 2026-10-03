@@ -1,24 +1,29 @@
-using Aegis.Studio.Infrastructure.Email;
+using Common.Messaging;
 
 namespace Aegis.Studio.Web.Email;
 
 public sealed class OutboundEmailWorker : BackgroundService
 {
-    private readonly MicrosoftGraphEmailClient graphClient;
+    private readonly IExternalMessageChannel? emailChannel;
     private readonly OutboundEmailStore outbox;
     private readonly StudioOperationsFlowPublisher operationsFlows;
     private readonly ILogger<OutboundEmailWorker> logger;
+    private readonly TimeSpan pollInterval;
 
     public OutboundEmailWorker(
-        MicrosoftGraphEmailClient graphClient,
+        IEnumerable<IExternalMessageChannel> externalChannels,
+        IConfiguration configuration,
         OutboundEmailStore outbox,
         StudioOperationsFlowPublisher operationsFlows,
         ILogger<OutboundEmailWorker> logger)
     {
-        this.graphClient = graphClient;
+        emailChannel = externalChannels.FirstOrDefault(channel => channel.Channel == MessageChannel.MsEmail);
         this.outbox = outbox;
         this.operationsFlows = operationsFlows;
         this.logger = logger;
+        pollInterval = TimeSpan.FromSeconds(Math.Max(
+            5,
+            configuration.GetValue<int?>("Messaging:DeliveryPollSeconds") ?? 30));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -26,17 +31,17 @@ public sealed class OutboundEmailWorker : BackgroundService
         bool configurationWarningLogged = false;
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (!graphClient.IsConfigured)
+            if (emailChannel is null)
             {
                 if (!configurationWarningLogged)
                 {
-                    logger.LogWarning("Microsoft Graph outbound email is waiting for configuration. Pending messages will remain queued.");
+                    logger.LogWarning("Common.Messaging Microsoft 365 email is waiting for configuration. Pending messages will remain queued.");
                     configurationWarningLogged = true;
                 }
 
                 try
                 {
-                    await Task.Delay(graphClient.PollInterval, stoppingToken);
+                    await Task.Delay(pollInterval, stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -53,11 +58,25 @@ public sealed class OutboundEmailWorker : BackgroundService
                 {
                     try
                     {
-                        await graphClient.SendEmailAsync(
-                            message.FromAddress,
+                        MessageRecipient recipient = new(
                             message.ToAddress,
-                            message.Subject,
-                            message.Body,
+                            message.ToAddress,
+                            message.ToAddress,
+                            PreferredChannels: MessageChannel.MsEmail);
+                        MessageRequest request = new()
+                        {
+                            RecipientIds = [message.ToAddress],
+                            Title = message.Subject,
+                            Body = message.Body,
+                            Channels = MessageChannel.MsEmail,
+                            Source = "Aegis.Studio",
+                            CorrelationId = message.ConversationId.ToString("D")
+                        };
+
+                        await emailChannel.SendAsync(
+                            recipient,
+                            request,
+                            message.Id,
                             stoppingToken);
 
                         outbox.MarkProviderAccepted(message.Id, null);
@@ -72,9 +91,8 @@ public sealed class OutboundEmailWorker : BackgroundService
                             businessId: message.Id.ToString("D"),
                             detail: "DeliveryReceiptUnavailable");
                         logger.LogInformation(
-                            "Sent outbound email {MessageId} from {FromAddress} to {ToAddress}.",
+                            "Common.Messaging accepted outbound email {MessageId} to {ToAddress}.",
                             message.Id,
-                            message.FromAddress,
                             message.ToAddress);
                     }
                     catch (Exception exception)
@@ -94,10 +112,8 @@ public sealed class OutboundEmailWorker : BackgroundService
 
                         logger.LogError(
                             exception,
-                            "Failed sending outbound email {MessageId} from {FromAddress} to {ToAddress}. Attempt={Attempt}; State={State}.",
+                            "Failed sending outbound email {MessageId} through Common.Messaging. Attempt={Attempt}; State={State}.",
                             message.Id,
-                            message.FromAddress,
-                            message.ToAddress,
                             (updated?.Attempts ?? message.Attempts + 1),
                             updated?.Status ?? "Unknown");
                     }
@@ -114,7 +130,7 @@ public sealed class OutboundEmailWorker : BackgroundService
 
             try
             {
-                await Task.Delay(graphClient.PollInterval, stoppingToken);
+                await Task.Delay(pollInterval, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
