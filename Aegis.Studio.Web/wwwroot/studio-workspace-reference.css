@@ -1373,3 +1373,243 @@ body[data-theme="studio-default"] .navigation-pane .workspaces{
   position:relative!important;
   z-index:1!important;
 }
+
+
+/* Literal reference pass — shapes, proportions and hierarchy match the approved screenshot. */
+body[data-theme="studio-default"] .three-pane{
+  grid-template-columns:278px minmax(0,1fr)!important;
+}
+body[data-theme="studio-default"] .list-pane{
+  background:#fff!important;
+  border-right:1px solid #dfe4e9!important;
+}
+body[data-theme="studio-default"] .pane-heading{
+  min-height:42px!important;
+  padding:9px 11px!important;
+  background:#fff4df!important;
+  border-bottom:1px solid #e2e6ea!important;
+}
+body[data-theme="studio-default"] .pane-heading h2{
+  font-size:14px!important;
+  line-height:1.2!important;
+  font-weight:750!important;
+}
+body[data-theme="studio-default"] .workspace-list-controls{
+  min-height:38px!important;
+  padding:5px 7px!important;
+}
+body[data-theme="studio-default"] .compact-job-row{
+  min-height:64px!important;
+  padding:8px 10px!important;
+}
+body[data-theme="studio-default"] .compact-job-row .job-row-heading strong{
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .compact-job-row .job-row-client{
+  font-size:9px!important;
+  margin-top:3px!important;
+}
+body[data-theme="studio-default"] .compact-job-row .job-row-meta{
+  font-size:8px!important;
+  margin-top:3px!important;
+}
+
+/* Header: compact identity block, not a banner. */
+body[data-theme="studio-default"] .detail-pane.job-reading-view{
+  grid-template-rows:29px 100px 45px minmax(0,1fr)!important;
+  padding:0 14px 12px!important;
+}
+body[data-theme="studio-default"] .job-breadcrumb{
+  height:29px!important;
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .studio-job-header,
+body[data-theme="studio-default"] .job-reading-view>.detail-header{
+  height:100px!important;
+  min-height:100px!important;
+  padding:8px 12px!important;
+  align-items:center!important;
+}
+body[data-theme="studio-default"] .studio-job-thumb{
+  flex:0 0 78px!important;
+  width:78px!important;
+  height:78px!important;
+  border-radius:7px!important;
+}
+body[data-theme="studio-default"] .studio-job-copy h1{
+  font-size:24px!important;
+  line-height:1.05!important;
+}
+body[data-theme="studio-default"] .studio-job-copy p{
+  margin-top:6px!important;
+  gap:12px!important;
+  font-size:10.5px!important;
+}
+body[data-theme="studio-default"] .job-header-actions{
+  gap:7px!important;
+}
+body[data-theme="studio-default"] .job-header-actions .action,
+body[data-theme="studio-default"] .job-header-actions .primary{
+  min-height:35px!important;
+  padding:6px 11px!important;
+  font-size:9.5px!important;
+}
+
+/* Tabs are a single strip immediately under the job header. */
+body[data-theme="studio-default"] .job-section-tabs{
+  height:45px!important;
+  min-height:45px!important;
+}
+body[data-theme="studio-default"] .job-section-tabs button{
+  height:44px!important;
+  min-width:94px!important;
+  padding:0 12px!important;
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .job-section-tabs button.active{
+  border-bottom-color:#c99634!important;
+  background:#fffaf2!important;
+}
+
+/* Reference body: Messages | Media/active content | contextual right rail. */
+body[data-theme="studio-default"] .job-work-board{
+  grid-template-columns:minmax(250px,28fr) minmax(500px,49fr) minmax(270px,23fr)!important;
+  gap:9px!important;
+  padding-top:9px!important;
+}
+body[data-theme="studio-default"] .job-message-column,
+body[data-theme="studio-default"] .job-lower-pane,
+body[data-theme="studio-default"] .job-context-sidebar>section{
+  border:1px solid #dde3e8!important;
+  border-radius:9px!important;
+  background:#fff!important;
+  box-shadow:0 2px 8px rgba(23,33,43,.035)!important;
+}
+body[data-theme="studio-default"] .job-panel-heading,
+body[data-theme="studio-default"] .context-card-header{
+  min-height:43px!important;
+  padding:7px 10px!important;
+}
+body[data-theme="studio-default"] .job-panel-heading strong,
+body[data-theme="studio-default"] .context-card-header strong{
+  font-size:13px!important;
+}
+body[data-theme="studio-default"] .job-message-column .message{
+  padding:9px!important;
+}
+body[data-theme="studio-default"] .message-avatar{
+  width:31px!important;
+  height:31px!important;
+}
+body[data-theme="studio-default"] .message-content p{
+  font-size:9px!important;
+}
+body[data-theme="studio-default"] #hierarchyCompose{
+  padding:7px!important;
+}
+body[data-theme="studio-default"] #hierarchyBody{
+  height:36px!important;
+  min-height:36px!important;
+  max-height:36px!important;
+}
+
+/* Media is visually dominant and uses four image columns. */
+body[data-theme="studio-default"] .media-toolbar-host{
+  min-height:44px!important;
+  padding:6px 8px!important;
+}
+body[data-theme="studio-default"] .job-tab-content{
+  padding:8px!important;
+}
+body[data-theme="studio-default"] .media-items.image-lens{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:8px!important;
+}
+body[data-theme="studio-default"] .media-items.image-lens .job-file-tile>img{
+  aspect-ratio:1.45/1!important;
+  object-fit:cover!important;
+  border-radius:6px!important;
+}
+body[data-theme="studio-default"] .media-items.image-lens .job-file-tile>strong{
+  margin-top:3px!important;
+  font-size:8.5px!important;
+}
+
+/* Literal right-rail hierarchy. */
+body[data-theme="studio-default"] .job-context-sidebar{
+  gap:8px!important;
+}
+body[data-theme="studio-default"] .thread-next-tasks,
+body[data-theme="studio-default"] .job-details-card,
+body[data-theme="studio-default"] .thread-shared-files{
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"] .job-details-card dl{
+  grid-template-columns:82px minmax(0,1fr)!important;
+  gap:6px 7px!important;
+  padding:8px 10px 9px!important;
+  font-size:9px!important;
+}
+body[data-theme="studio-default"] .studio-status-pill{
+  min-height:21px!important;
+  padding:2px 8px!important;
+  font-size:8px!important;
+}
+
+/* Existing real task panel is compressed into the reference's What's Next card. */
+body[data-theme="studio-default"] .thread-next-tasks>h3{
+  margin:0!important;
+  padding:9px 10px!important;
+  font-size:13px!important;
+  border-bottom:1px solid #edf0f3!important;
+}
+body[data-theme="studio-default"] .job-workflow-summary{
+  padding:6px 10px!important;
+}
+body[data-theme="studio-default"] .job-workflow-summary strong{
+  font-size:9px!important;
+}
+body[data-theme="studio-default"] .job-workflow-summary small{
+  font-size:8px!important;
+}
+body[data-theme="studio-default"] .workflow-actions{
+  padding:4px 10px!important;
+}
+body[data-theme="studio-default"] .compact-task{
+  padding:6px 0!important;
+}
+body[data-theme="studio-default"] .compact-task strong,
+body[data-theme="studio-default"] .compact-task small{
+  font-size:8.5px!important;
+}
+
+/* Conversation files are a compact list, not a gallery. */
+body[data-theme="studio-default"] .conversation-files-title{
+  padding:9px 10px!important;
+  font-size:12px!important;
+}
+body[data-theme="studio-default"] .conversation-file-actions{
+  padding:5px 8px!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-gallery{
+  padding:3px 8px 7px!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-tile{
+  min-height:29px!important;
+  padding:4px 0!important;
+}
+
+/* Preserve desktop fidelity instead of squeezing columns. */
+@media(max-width:1400px){
+  body[data-theme="studio-default"] main{overflow:auto!important}
+  body[data-theme="studio-default"] .three-pane{
+    min-width:1180px!important;
+    grid-template-columns:278px minmax(0,1fr)!important;
+  }
+  body[data-theme="studio-default"] .job-work-board{
+    grid-template-columns:270px 520px 280px!important;
+  }
+  body[data-theme="studio-default"] .media-items.image-lens{
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  }
+}
