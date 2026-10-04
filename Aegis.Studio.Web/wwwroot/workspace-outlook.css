@@ -1940,3 +1940,447 @@ body .has-open-job .media-items.image-lens{
 .has-open-job .job-work-board.focus-mode .job-context-sidebar{
   grid-column:2;
 }
+
+
+/* Studio mockup fidelity pass: icons, summary cards, status charts, image cover and dense operational chrome. */
+.has-open-job .detail-pane.job-reading-view{
+  grid-template-rows:16px 48px 72px 36px minmax(0,1fr)!important;
+}
+.studio-ui-icon{
+  width:15px;
+  height:15px;
+  flex:0 0 15px;
+  display:inline-block;
+  vertical-align:middle;
+}
+.has-open-job .studio-job-header{
+  height:48px!important;
+  min-height:48px!important;
+}
+.has-open-job .studio-job-identity{
+  gap:10px!important;
+}
+.has-open-job .studio-job-thumb{
+  flex:0 0 38px!important;
+  width:38px!important;
+  height:38px!important;
+  border-radius:8px!important;
+  background:#2f281f!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.has-open-job .studio-job-thumb img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.has-open-job .studio-job-title-line{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.has-open-job .studio-job-title-line h1{
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.has-open-job .studio-status-pill{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  min-height:19px;
+  padding:2px 7px;
+  border-radius:999px;
+  background:#e8f4ec;
+  color:#2f6b4b;
+  border:1px solid #cee4d5;
+  font-size:9px;
+  line-height:1;
+  font-weight:750;
+  letter-spacing:.01em;
+}
+.has-open-job .studio-status-pill[data-status*="Production"],
+.has-open-job .studio-status-pill[data-status*="production"]{
+  background:#f7edd5;
+  border-color:#ead7a9;
+  color:#8b6517;
+}
+.has-open-job .studio-status-pill[data-status*="Await"],
+.has-open-job .studio-status-pill[data-status*="await"]{
+  background:#fff3dd;
+  border-color:#f1ddae;
+  color:#8c6412;
+}
+.has-open-job .studio-status-pill[data-status*="Block"],
+.has-open-job .studio-status-pill[data-status*="block"]{
+  background:#fae7e4;
+  border-color:#efc5be;
+  color:#9c4037;
+}
+.has-open-job .job-header-actions .action,
+.has-open-job .job-header-actions .primary{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:5px!important;
+}
+.has-open-job .compact-primary{
+  min-height:27px!important;
+  height:27px!important;
+  padding:3px 9px!important;
+  border:1px solid #72500d!important;
+  border-radius:7px!important;
+  background:#30281e!important;
+  color:#fff!important;
+  font-size:10px!important;
+}
+
+.has-open-job .studio-job-summary{
+  box-sizing:border-box;
+  height:72px;
+  min-height:72px;
+  display:grid;
+  grid-template-columns:1.18fr .92fr 1.08fr .92fr;
+  gap:7px;
+  padding:5px 0 7px;
+}
+.has-open-job .studio-summary-card{
+  min-width:0;
+  height:60px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:8px 10px;
+  border:1px solid #e6dfd5;
+  border-radius:9px;
+  background:#fff;
+  box-shadow:0 1px 4px rgba(53,44,31,.025);
+}
+.has-open-job .studio-summary-card>div:not(.studio-progress-ring){
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+}
+.has-open-job .studio-summary-card span{
+  color:#8b8276;
+  font-size:9px;
+  line-height:1.1;
+}
+.has-open-job .studio-summary-card strong{
+  margin-top:2px;
+  color:#29251f;
+  font-size:13px;
+  line-height:1.08;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.has-open-job .studio-summary-card small{
+  margin-top:2px;
+  color:#91887d;
+  font-size:8.5px;
+  line-height:1.1;
+}
+.has-open-job .studio-summary-icon{
+  width:29px;
+  height:29px;
+  flex:0 0 29px;
+  display:grid;
+  place-items:center;
+  border-radius:8px;
+  background:#f3ecdf;
+  color:#9b7328;
+}
+.has-open-job .studio-summary-icon .studio-ui-icon{
+  width:16px;
+  height:16px;
+}
+.has-open-job .studio-summary-grow{flex:1}
+.has-open-job .studio-mini-progress{
+  height:3px;
+  margin-top:5px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#eee8de;
+}
+.has-open-job .studio-mini-progress i{
+  display:block;
+  width:0;
+  height:100%;
+  border-radius:inherit;
+  background:#b38535;
+}
+.has-open-job .studio-progress-ring{
+  --progress:0;
+  position:relative;
+  flex:0 0 42px;
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:conic-gradient(#af7e25 calc(var(--progress)*1%),#eee7dc 0);
+}
+.has-open-job .studio-progress-ring:after{
+  content:"";
+  position:absolute;
+  inset:5px;
+  border-radius:50%;
+  background:#fff;
+}
+.has-open-job .studio-progress-ring strong{
+  position:relative;
+  z-index:1;
+  margin:0;
+  font-size:9px;
+  color:#5a4630;
+}
+
+.has-open-job .studio-job-tabs{
+  height:36px!important;
+  min-height:36px!important;
+  gap:5px!important;
+  padding:0!important;
+  border-bottom:1px solid #dfd7cd!important;
+}
+.has-open-job .studio-job-tabs button{
+  height:36px!important;
+  min-height:36px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:5px!important;
+  padding:0 10px 7px!important;
+  color:#5a544b!important;
+}
+.has-open-job .studio-job-tabs button .studio-ui-icon{
+  width:13px;
+  height:13px;
+}
+.has-open-job .studio-job-tabs button.active{
+  color:#2d281f!important;
+}
+.has-open-job .studio-job-tabs button.active .studio-ui-icon{
+  color:#a67620;
+}
+
+.has-open-job .job-work-board{
+  padding-top:8px!important;
+  grid-template-columns:minmax(250px,.8fr) minmax(430px,1.55fr) minmax(250px,.8fr)!important;
+  gap:8px!important;
+}
+.has-open-job .job-message-column,
+.has-open-job .job-lower-pane,
+.has-open-job .job-context-sidebar>section,
+.has-open-job .job-details-card{
+  border-radius:9px!important;
+  border-color:#e4ddd3!important;
+  box-shadow:0 1px 4px rgba(53,44,31,.025)!important;
+}
+.has-open-job .job-panel-heading{
+  min-height:36px!important;
+  padding:6px 9px!important;
+  background:#fbfaf8!important;
+}
+.has-open-job .job-panel-heading>div{
+  display:flex!important;
+  align-items:center!important;
+  gap:5px!important;
+}
+.has-open-job .job-panel-heading .studio-ui-icon{
+  width:13px;
+  height:13px;
+  color:#9d742a;
+}
+.has-open-job .studio-panel-status{
+  min-height:17px;
+  padding:2px 6px;
+  border-radius:999px;
+  background:#e8f4ec;
+  color:#2f6b4b;
+  font-size:8px!important;
+  font-weight:700;
+}
+
+.has-open-job .job-message-column>.messages{
+  background:
+    linear-gradient(#fff,#fff) padding-box,
+    linear-gradient(180deg,#faf8f4,#fff) border-box;
+}
+.has-open-job .job-message-column .message{
+  position:relative;
+}
+.has-open-job .job-message-column .message:after{
+  content:"";
+  position:absolute;
+  left:41px;
+  right:0;
+  bottom:0;
+  height:1px;
+  background:#f1ece5;
+}
+.has-open-job .message-avatar{
+  box-shadow:0 0 0 2px #f2eee8;
+}
+
+.has-open-job .workspace-media-overview{
+  border-radius:0!important;
+}
+.has-open-job .workspace-media-heading{
+  min-height:36px!important;
+  padding:5px 7px!important;
+  background:#fbfaf8!important;
+}
+.has-open-job .workspace-media-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:6px!important;
+  padding:7px!important;
+}
+.has-open-job .workspace-media-tile{
+  overflow:hidden;
+  border:1px solid #e9e2d9!important;
+  border-radius:7px!important;
+  background:#fff!important;
+}
+.has-open-job .workspace-media-tile img{
+  aspect-ratio:1.48/1!important;
+  border-radius:0!important;
+}
+.has-open-job .workspace-media-tile span{
+  margin:0!important;
+  padding:4px 5px 5px!important;
+  background:#fff;
+}
+.has-open-job .workspace-media-tile:hover{
+  border-color:#c6a76d!important;
+  box-shadow:0 0 0 1px #c6a76d;
+}
+.has-open-job .workspace-media-collections{
+  padding:5px 7px!important;
+  background:#fffdf9!important;
+}
+
+.has-open-job .thread-next-tasks{
+  padding:0!important;
+}
+.has-open-job .thread-next-tasks>.job-panel-heading{
+  margin:0!important;
+}
+.has-open-job .thread-next-tasks .studio-next-loading{
+  padding:10px;
+  color:#8c8378;
+  font-size:10px;
+}
+.has-open-job .thread-next-tasks .task-card{
+  position:relative;
+  margin:0!important;
+  padding:9px 8px 9px 25px!important;
+  border:0!important;
+  border-bottom:1px solid #f0ebe4!important;
+  border-left:0!important;
+  background:#fff!important;
+}
+.has-open-job .thread-next-tasks .task-card:before{
+  content:"";
+  position:absolute;
+  left:9px;
+  top:13px;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#c28c2a;
+  box-shadow:0 0 0 3px #f6eddc;
+}
+.has-open-job .thread-next-tasks .task-card:after{
+  content:"";
+  position:absolute;
+  left:12px;
+  top:23px;
+  bottom:-10px;
+  width:1px;
+  background:#e1d8ca;
+}
+.has-open-job .thread-next-tasks .task-card:last-child:after{display:none}
+.has-open-job .thread-next-tasks .task-card strong{
+  font-size:10.5px;
+}
+.has-open-job .thread-next-tasks .task-card small{
+  font-size:8.5px;
+}
+
+.has-open-job .job-details-card dl{
+  padding:8px 9px!important;
+}
+.has-open-job .job-details-card dt,
+.has-open-job .job-details-card dd{
+  padding:2px 0;
+  border-bottom:1px dotted #eee8df;
+}
+.has-open-job .job-details-card dt:nth-last-of-type(1),
+.has-open-job .job-details-card dd:nth-last-of-type(1){
+  border-bottom:0;
+}
+
+.has-open-job .thread-shared-files{
+  padding:0!important;
+}
+.has-open-job .thread-shared-files .legacy-attachments{
+  padding:8px!important;
+}
+.has-open-job .conversation-files-title{
+  display:flex;
+  align-items:center;
+  min-height:26px;
+  font-size:11px!important;
+  font-weight:750!important;
+}
+.has-open-job .conversation-file-actions{
+  display:flex;
+  gap:5px;
+  margin:4px 0 7px;
+}
+.has-open-job .conversation-file-actions .action{
+  min-height:24px;
+  padding:3px 7px;
+  font-size:9px;
+}
+.has-open-job .thread-shared-files .job-file-gallery{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:5px!important;
+}
+.has-open-job .thread-shared-files .job-file-tile{
+  border:1px solid #ece5dc!important;
+  border-radius:6px!important;
+  overflow:hidden;
+}
+.has-open-job .thread-shared-files .job-file-tile img{
+  height:68px!important;
+  border-radius:0!important;
+}
+
+@media(max-width:1400px){
+  .has-open-job .studio-job-summary{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  .has-open-job .job-work-board{
+    grid-template-columns:minmax(235px,.8fr) minmax(380px,1.45fr) minmax(235px,.8fr)!important;
+  }
+}
+@media(max-width:1180px){
+  .has-open-job .detail-pane.job-reading-view{
+    grid-template-rows:16px 48px auto 36px minmax(0,1fr)!important;
+  }
+  .has-open-job .studio-job-summary{
+    height:auto;
+    min-height:0;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .has-open-job .job-work-board{
+    grid-template-columns:minmax(230px,.85fr) minmax(360px,1.35fr)!important;
+  }
+  .has-open-job .job-context-sidebar{
+    grid-column:1/-1!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+}
