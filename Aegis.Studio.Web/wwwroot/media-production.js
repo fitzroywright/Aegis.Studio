@@ -114,7 +114,7 @@ function details(asset){const selectedSubject=asset.subjects?.[0]||unclassifiedS
  async function upload(files,returned,note='',dialog=null,subjectId=null){
   if(!files.length)return;
   const person=subjectId?data.subjects.find(x=>x.id===subjectId):null;
-  const targetCollection=person?.collection||'Unclassified';
+  const targetCollection=person?.collection||collection||data.gallery?.default_collection||'Unclassified';
   let completed=0;const failed=[];surface.classList.remove('drag-over');
   for(const file of files){if(!current())break;result.textContent=`Uploading ${completed+1}/${files.length}: ${file.name}`;try{const form=new FormData();form.append('file',file);form.append('returned',String(returned));form.append('note',note);form.append('collection',targetCollection);const uploaded=await json(`/api/jobs/${job.id}/media/uploads`,{method:'POST',body:form});if(uploaded.assetId){await put(`/api/jobs/${job.id}/media/assets/${uploaded.assetId}`,{status:'Needs Sorting',collection:targetCollection,subjects:person?[subjectId]:[],assignedTo:null});}completed++;}catch(e){failed.push(file.name+': '+e.message);}}
   if(dialog)dialog.close();if(current()){await refresh();host.querySelector('.media-result').textContent=failed.length?`${completed} uploaded. Failed: ${failed.join('; ')}`:`${completed} files uploaded.`;}
