@@ -234,6 +234,21 @@ body[data-theme="studio-default"] .studio-storage-card{
   background:#fff;
 }
 body[data-theme="studio-default"][data-studio-view="workspaces"] .studio-storage-card{display:block}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .shell-brand-icon{
+  background:#17120b;
+  color:#d39b36;
+  box-shadow:none;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .brand-button[data-view="workspaces"]{
+  background:var(--workspace-gold-soft);
+  color:#6d4311;
+  box-shadow:none;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .brand-button[data-view="mywork"]{
+  background:transparent;
+  color:#344156;
+  box-shadow:none;
+}
 body[data-theme="studio-default"] .studio-storage-card>div{
   display:flex;
   align-items:center;
