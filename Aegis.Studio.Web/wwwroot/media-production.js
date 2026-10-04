@@ -19,55 +19,12 @@ async function showJobActivityFlyout(job,section){
  try{const items=await json(`/api/jobs/${job.id}/operations/audit`);if(!dialog.isConnected)return;let last='';host.innerHTML=items.sort((a,b)=>new Date(b.createdAtUtc)-new Date(a.createdAtUtc)).map(item=>{const day=new Date(item.createdAtUtc).toLocaleDateString();const today=new Date().toLocaleDateString();const yesterday=new Date(Date.now()-86400000).toLocaleDateString();const heading=day!==last?`<h3>${day===today?'Today':day===yesterday?'Yesterday':esc(day)}</h3>`:'';last=day;return heading+`<article class="task-card"><strong>${esc(item.action)}</strong><p>${esc(item.detail||'')}</p><small>${esc(new Date(item.createdAtUtc).toLocaleTimeString())} · ${esc(studioFirstName(item.userName))}</small></article>`;}).join('')||'<p>No activity yet.</p>';}catch(e){host.textContent=e.message;}
 }
 async function renderCompactTasks(job,host,current){
- const [tasks,access,workflow]=await Promise.all([
-  json(`/api/operations/activities?jobId=${job.id}`),
-  json(`/api/jobs/${job.id}/access`),
-  json(`/api/jobs/${job.id}/workflow`)
- ]);
- if(!current())return;
- const canEdit=(access.permissions||access).manageProduction;
- const open=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status)).sort((a,b)=>new Date(a.dueAtUtc||'9999-01-01')-new Date(b.dueAtUtc||'9999-01-01'));
- const due=t=>t.dueAtUtc?new Date(t.dueAtUtc).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
- host.innerHTML=`
-  <header class="context-card-header">
-   <strong>What's Next</strong>
-   <button type="button" class="primary context-add-task" data-all>${canEdit?'+ Add Task':'View All'}</button>
-  </header>
-  <div class="next-task-list">
-   ${open.slice(0,5).map(t=>`
-    <article class="next-task-row">
-     <button type="button" class="task-checkbox" ${canEdit?`data-complete="${t.id}"`:''} aria-label="Mark ${esc(t.title)} complete"></button>
-     <span class="next-task-title">${esc(t.title)}</span>
-     <time>${esc(due(t))}</time>
-    </article>`).join('')||'<p class="context-empty">No open tasks.</p>'}
-  </div>
-  <div class="workflow-actions" hidden>
-   ${(workflow.actions||[]).map(a=>`<button class="action" data-workflow="${a}">${esc({'submit-review':'Submit for review','request-changes':'Request changes','approve':'Approve for production','finish-production':'Finish production','publish':'Send to gallery provider'}[a]||a)}</button>`).join('')}
-  </div>
-  <p role="alert"></p>`;
- host.querySelector('[data-all]').onclick=()=>{
-  const dialog=studioDialog('Job tasks','<div class="all-tasks"></div>');
-  const panel=dialog.querySelector('.all-tasks');
-  const refresh=()=>renderJobTasks(job,panel,()=>dialog.isConnected,refresh);
-  refresh().catch(e=>panel.textContent=e.message);
- };
- host.querySelectorAll('[data-complete]').forEach(b=>b.onclick=async()=>{
-  b.disabled=true;
-  try{
-   const task=tasks.find(t=>t.id===b.dataset.complete);
-   await json(`/api/operations/activities/${task.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...task,status:'Completed'})});
-   await renderCompactTasks(job,host,current);
-  }catch(e){host.querySelector('[role=alert]').textContent=e.message;b.disabled=false;}
- });
- host.querySelectorAll('[data-workflow]').forEach(button=>button.onclick=async()=>{
-  const operationId=button.dataset.operationId||(button.dataset.operationId=crypto.randomUUID());
-  let note=null;if(button.dataset.workflow==='request-changes'){note=prompt('Describe the changes needed');if(!note)return;}
-  button.disabled=true;
-  try{
-   await json(`/api/jobs/${job.id}/workflow`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:button.dataset.workflow,note,expectedStatus:workflow.status,operationId})});
-   await openWorkspaceJob(job.id);
-  }catch(error){host.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}
- });
+ const [tasks,access,workflow,shoots]=await Promise.all([json(`/api/operations/activities?jobId=${job.id}`),json(`/api/jobs/${job.id}/access`),json(`/api/jobs/${job.id}/workflow`),json(`/api/operations/shoots?jobId=${job.id}`)]);if(!current())return;
+ const canEdit=(access.permissions||access).manageProduction;const open=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status)).sort((a,b)=>new Date(a.dueAtUtc||'9999-01-01')-new Date(b.dueAtUtc||'9999-01-01'));
+ host.innerHTML=`<h3>What's Next</h3><div class="job-workflow-summary"><strong>${esc(workflow.status)}</strong><small>${shoots.filter(s=>s.checkedOutAtUtc).length}/${shoots.filter(s=>s.status!=='Cancelled').length} shoots finished · ${tasks.filter(t=>t.status==='Completed').length} tasks completed</small></div><div class="workflow-actions">${(workflow.actions||[]).map(a=>`<button class="action" data-workflow="${a}">${esc({'submit-review':'Submit for review','request-changes':'Request changes','approve':'Approve for production','finish-production':'Finish production','publish':'Send to gallery provider'}[a])}</button>`).join('')}</div><div class="thread-task-list">${open.slice(0,5).map(t=>`<article class="compact-task"><strong>${esc(t.title)}</strong><small>${esc(t.assignedTo?studioFirstName(t.assignedTo):'Unassigned')} · ${esc(t.status)}</small>${t.dueAtUtc?`<small class="${new Date(t.dueAtUtc)<new Date()?'overdue':''}">${new Date(t.dueAtUtc)<new Date()?'Overdue · ':''}${esc(new Date(t.dueAtUtc).toLocaleDateString())}</small>`:''}${canEdit?`<button class="action" data-complete="${t.id}">Complete</button>`:''}</article>`).join('')||'<p>No open tasks.</p>'}</div><footer class="thread-task-footer"><button class="action" data-all>${canEdit?'Add task / View all':'View all'}</button><p role="alert"></p></footer>`;
+ host.querySelectorAll('[data-workflow]').forEach(button=>button.onclick=async()=>{const operationId=button.dataset.operationId||(button.dataset.operationId=crypto.randomUUID());let note=null;if(button.dataset.workflow==='request-changes'){note=prompt('Describe the changes needed');if(!note)return;}button.disabled=true;try{await json(`/api/jobs/${job.id}/workflow`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:button.dataset.workflow,note,expectedStatus:workflow.status,operationId})});await openWorkspaceJob(job.id);}catch(error){host.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}});
+ host.querySelector('[data-all]').onclick=()=>{const dialog=studioDialog('Job tasks','<div class="all-tasks"></div>');const panel=dialog.querySelector('.all-tasks');const refresh=()=>renderJobTasks(job,panel,()=>dialog.isConnected,refresh);refresh().catch(e=>panel.textContent=e.message);dialog.addEventListener('close',()=>renderCompactTasks(job,host,current));};
+ host.querySelectorAll('[data-complete]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const task=tasks.find(t=>t.id===b.dataset.complete);await json(`/api/operations/activities/${task.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...task,status:'Completed'})});await renderCompactTasks(job,host,current);}catch(e){host.querySelector('[role=alert]').textContent=e.message;b.disabled=false;}});
 }
 async function renderProductionMedia(job,host,current){
  const [data,access]=await Promise.all([json(`/api/jobs/${job.id}/media`),json(`/api/jobs/${job.id}/access`)]);if(!current())return;
