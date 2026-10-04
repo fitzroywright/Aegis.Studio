@@ -355,7 +355,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const nav=document.createElement('nav');
             nav.className='job-section-tabs';
             nav.setAttribute('aria-label','Job information');
-            nav.innerHTML='<button data-job-scroll="messages" class="active">Messages</button><button data-job-scroll="media">Media</button><button data-job-scroll="subjects">Subjects</button><button data-job-scroll="tasks">Tasks</button><button data-job-scroll="calendar">Calendar</button><button data-job-scroll="activity">Activity</button><button data-job-scroll="details">Details</button>';
+            nav.innerHTML='<button data-job-scroll="messages" class="active">Messages</button><button data-job-scroll="media">Media</button><button data-job-scroll="subjects">Subjects</button><button data-job-scroll="tasks">Tasks</button><button data-job-scroll="calendar">Calendar</button><button data-job-scroll="activity">Activity</button>';
             meta.after(nav,board);
 
             board.append(messageColumn,lower,side);
@@ -394,7 +394,6 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     else if(name==='media')lower.querySelector('.job-media-section').scrollIntoView({block:'nearest'});
                     else if(name==='subjects')lower.querySelector('.job-subjects-section').scrollIntoView({block:'nearest'});
                     else if(name==='tasks')lower.querySelector('.job-tasks-section').scrollIntoView({block:'nearest'});
-                    else if(name==='details')details.scrollIntoView({block:'nearest'});
                     else if(name==='calendar')await renderJobTab('calendar',job,tasksPanel,current,refreshTasks);
                     else if(name==='activity')await renderJobTab('activity',job,tasksPanel,current,refreshTasks);
                 };
