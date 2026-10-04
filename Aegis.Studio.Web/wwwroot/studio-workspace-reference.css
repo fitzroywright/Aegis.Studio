@@ -4419,3 +4419,25 @@ body[data-theme="studio-default"] .workspace-quick-action{
     justify-content:flex-end!important;
   }
 }
+
+
+/* Keep My Work cards content-height instead of stretching to their grid neighbor. */
+body[data-theme="studio-default"] .mw-two-col{
+  align-items:start!important;
+}
+body[data-theme="studio-default"] .mw-two-col>.mw-card{
+  height:auto!important;
+  align-self:start!important;
+}
+body[data-theme="studio-default"] .mw-session-row{
+  min-height:66px!important;
+  padding-top:6px!important;
+  padding-bottom:6px!important;
+}
+body[data-theme="studio-default"] .mw-session-thumb{
+  width:52px!important;
+  height:52px!important;
+}
+body[data-theme="studio-default"] .mw-session-row{
+  grid-template-columns:68px 52px minmax(0,1fr) auto 14px!important;
+}
