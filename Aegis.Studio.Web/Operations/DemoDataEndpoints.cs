@@ -41,9 +41,9 @@ public static class DemoDataEndpoints
             bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
             transaction.Commit();
             return Results.Ok(new { message = presentationExpanded
-                ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see the reference-style messages, production status, subjects, tasks, schedule and gallery."
+                ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see 50 wedding photos, linked People, messages, tasks, schedule and production status."
                 : expanded
-                    ? "Demo data expanded. Open a DEMO workspace to explore Gallery, Subjects and Tasks / Calendar."
+                    ? "Demo data expanded. Open Carter Wedding to explore Media, People and Tasks / Calendar."
                     : "Demo data is already up to date. Open DEMO - Weddings and Events, then Carter Wedding." });
         }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
     }
