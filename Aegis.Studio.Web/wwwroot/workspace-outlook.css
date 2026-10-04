@@ -1393,3 +1393,90 @@ body .has-open-job .media-items.image-lens{
     max-height:none!important;
   }
 }
+
+
+/* 2026-10-04 compact job workspace correction.
+   Keep the approved three-column work board visible immediately below the job heading. */
+body .has-open-job .detail-pane{
+  padding:10px 14px 16px!important;
+}
+body .has-open-job .job-breadcrumb{
+  margin:0 0 4px!important;
+  font-size:10px!important;
+  line-height:1.2!important;
+}
+body .has-open-job .job-reading-view>.detail-header{
+  min-height:0!important;
+  height:auto!important;
+  margin:0!important;
+  padding:0 0 6px!important;
+  align-items:center!important;
+}
+body .has-open-job .job-reading-view>.detail-header>div{
+  margin:0!important;
+  padding:0!important;
+  min-height:0!important;
+}
+body .has-open-job .job-reading-view>.detail-header h1{
+  margin:0!important;
+  font-size:24px!important;
+  line-height:1.08!important;
+}
+body .has-open-job .job-reading-view>.detail-header p{
+  margin:3px 0 0!important;
+  font-size:11px!important;
+  line-height:1.2!important;
+}
+body .has-open-job .job-header-actions .action{
+  min-height:30px!important;
+  padding:5px 9px!important;
+  font-size:11px!important;
+}
+body .has-open-job .job-section-tabs{
+  min-height:34px!important;
+  margin:0 0 8px!important;
+  gap:16px!important;
+}
+body .has-open-job .job-section-tabs button{
+  min-height:34px!important;
+  padding:0 1px 7px!important;
+  font-size:12px!important;
+}
+body .has-open-job .job-work-board{
+  margin:0!important;
+  align-items:stretch!important;
+}
+body .has-open-job .job-message-column,
+body .has-open-job .job-lower-pane{
+  height:calc(100dvh - 175px)!important;
+  min-height:430px!important;
+  max-height:760px!important;
+}
+body .has-open-job .job-tab-content{
+  padding:8px!important;
+}
+body .has-open-job .media-items.image-lens{
+  grid-template-columns:repeat(auto-fill,minmax(135px,1fr))!important;
+  gap:10px!important;
+  align-content:start!important;
+}
+body .has-open-job .media-items.image-lens .job-file-tile img{
+  width:100%!important;
+  height:118px!important;
+  object-fit:cover!important;
+  display:block!important;
+}
+body .has-open-job .media-production-layout{
+  min-height:0!important;
+}
+body .has-open-job .media-drop-surface{
+  min-height:0!important;
+}
+@media(max-width:980px){
+  body .has-open-job .job-message-column,
+  body .has-open-job .job-lower-pane{
+    height:auto!important;
+    min-height:360px!important;
+    max-height:none!important;
+  }
+}
