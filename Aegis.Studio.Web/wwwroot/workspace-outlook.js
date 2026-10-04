@@ -481,38 +481,46 @@ function mergeJobMessages(teamMessages, customerMessages) {
     }
 
     async function renderConversationFiles(job,panel,current,refresh) {
-            const files = (await json(`/api/conversations/${job.conversationId}/files`)).filter(f=>f.messageId);
-            if (!current()) return;
-            panel.innerHTML = `<section class="legacy-attachments"><header class="conversation-files-title">Conversation Files</header><div class="conversation-file-actions"><button class="action" data-preview-file disabled>Preview</button><a class="action" data-download-file hidden>Download</a></div><div class="job-file-gallery">${files.map(file => {
-                const url = '/api/attachments/' + encodeURIComponent(file.id);
-                const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
-                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}${file.messageId?' · linked to '+esc(file.messageKind||'message'):''}</small><span>${file.messageId?'<span class="conversation-file-source" data-source-message="'+esc(file.messageId)+'">View source message</span>':'Open file'}</span></a>`;
-            }).join('') || '<p>No files attached yet.</p>'}</div></section>`;
-            panel.querySelectorAll('[data-source-message]').forEach(source=>source.onclick=event=>{
-                event.preventDefault();event.stopPropagation();
-                const message=document.querySelector('[data-message-id="'+source.dataset.sourceMessage+'"]');
-                if(!message){alert('The source message is outside the currently loaded message history.');return;}
-                message.scrollIntoView({behavior:'smooth',block:'center'});
-                message.classList.add('source-message-highlight');setTimeout(()=>message.classList.remove('source-message-highlight'),1800);
-            });
+        const files = (await json(`/api/conversations/${job.conversationId}/files`)).filter(f=>f.messageId);
+        if (!current()) return;
+        const fileIcon=file=>{
+            const name=String(file.fileName||'').toLowerCase();
+            if(name.endsWith('.pdf'))return '<span class="file-type-icon pdf">PDF</span>';
+            if(name.endsWith('.doc')||name.endsWith('.docx'))return '<span class="file-type-icon doc">D</span>';
+            if(/\.(jpe?g|png|gif|webp|avif)$/.test(name))return '<span class="file-type-icon img">▧</span>';
+            return '<span class="file-type-icon file">▤</span>';
+        };
+        const dateLabel=file=>{
+            const value=file.createdAtUtc||file.createdAt||file.uploadedAtUtc||file.uploadedAt;
+            return value?new Date(value).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
+        };
+        panel.innerHTML = `
+            <header class="context-card-header">
+                <strong>Conversation Files</strong>
+                <button type="button" class="text-button" data-view-all>View All</button>
+            </header>
+            <div class="conversation-file-list">
+                ${files.slice(0,5).map(file=>`
+                    <button type="button" class="conversation-file-row" data-file-id="${esc(file.id)}">
+                        ${fileIcon(file)}
+                        <span class="conversation-file-name">${esc(file.fileName)}</span>
+                        <time>${esc(dateLabel(file))}</time>
+                    </button>`).join('') || '<p class="context-empty">No files attached yet.</p>'}
+            </div>`;
 
-            panel.querySelectorAll('.job-file-tile').forEach(tile => tile.ondblclick = event => {
-                const file = files.find(f => f.id === tile.dataset.fileId);
-                if (!/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '')) return;
-                event.preventDefault();
-                const dialog = document.createElement('dialog'); dialog.className = 'job-preview-dialog';
-                const url = '/api/attachments/' + encodeURIComponent(file.id);
-                dialog.innerHTML = `<header><strong>${esc(file.fileName)}</strong><button type="button" aria-label="Close preview">Close</button></header><img src="${url}" alt="${esc(file.fileName)}"><a href="${url}" target="_blank" rel="noopener">Open original</a>`;
-                document.body.appendChild(dialog);
-                dialog.querySelector('button').onclick = () => dialog.close();
-                dialog.addEventListener('close', () => dialog.remove(), {once:true}); dialog.showModal();
-            });
-
-            panel.querySelectorAll('.job-file-tile').forEach(tile=>{
-                tile.onclick=event=>{event.preventDefault();panel.querySelectorAll('.job-file-tile').forEach(x=>x.classList.toggle('selected',x===tile));const preview=panel.querySelector('[data-preview-file]'),download=panel.querySelector('[data-download-file]');preview.disabled=false;preview.onclick=()=>{const file=files.find(x=>x.id===tile.dataset.fileId);if(/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName||''))tile.ondblclick({preventDefault(){}});else window.open(tile.href,'_blank','noopener');};download.hidden=false;download.href=tile.href;download.download=files.find(x=>x.id===tile.dataset.fileId).fileName;};
-                tile.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();tile.click();panel.querySelector('[data-preview-file]').click();}};
-            });
+        const openFile=file=>window.open('/api/attachments/'+encodeURIComponent(file.id),'_blank','noopener');
+        panel.querySelectorAll('[data-file-id]').forEach(row=>{
+            row.onclick=()=>{const file=files.find(f=>f.id===row.dataset.fileId);if(file)openFile(file);};
+        });
+        const viewAll=panel.querySelector('[data-view-all]');
+        if(viewAll)viewAll.onclick=()=>{
+            const dialog=studioDialog('Conversation Files','<div class="conversation-file-dialog-list"></div>');
+            const host=dialog.querySelector('.conversation-file-dialog-list');
+            host.innerHTML=files.map(file=>`<button type="button" class="conversation-file-row" data-file-id="${esc(file.id)}">${fileIcon(file)}<span class="conversation-file-name">${esc(file.fileName)}</span><time>${esc(dateLabel(file))}</time></button>`).join('')||'<p>No files attached yet.</p>';
+            host.querySelectorAll('[data-file-id]').forEach(row=>row.onclick=()=>{const file=files.find(f=>f.id===row.dataset.fileId);if(file)openFile(file);});
+        };
     }
+
     async function renderJobMediaOverview(job,panel,current){
         const data=await json(`/api/jobs/${job.id}/media`);
         if(!current())return;
