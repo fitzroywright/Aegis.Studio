@@ -73,6 +73,7 @@ internal static class DemoFullStudioData
 
     internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IFileStorage storage)
     {
+        var versionStorage=new PrefixedFileStorage(storage,"VersionStore");
         foreach(var workspace in Workspaces)
         {
             Guid id=Id(1,workspace.Number);
@@ -115,7 +116,7 @@ internal static class DemoFullStudioData
 
             SeedConversation(connection,transaction,job,client,conversationId,ordinal);
             SeedSubjectsAndCollections(connection,transaction,job,jobId,ordinal,start);
-            SeedMedia(connection,transaction,storage,job,jobId,login,ordinal);
+            SeedMedia(connection,transaction,versionStorage,job,jobId,login,ordinal);
             SeedSchedule(connection,transaction,job,jobId,start,end,ordinal);
             SeedFinance(connection,transaction,job,jobId,ordinal);
             SeedActivities(connection,transaction,job,jobId,ordinal);
@@ -232,8 +233,8 @@ internal static class DemoFullStudioData
             else
             {
                 Guid sourceVersionId=Id(64,job.Number*100+(i%12));
-                Execute(c,tx,"insert into studio_asset_versions(id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note) select $1,job_id,$2,1,$3,content_type,size_bytes,sha256,stored_path,$4,now(),null,'Synthetic demo asset reusing a seeded illustration for scalable demo volume.' from studio_asset_versions where id=$5 on conflict(job_id,asset_key,version_number) do update set file_name=excluded.file_name,content_type=excluded.content_type,size_bytes=excluded.size_bytes,sha256=excluded.sha256,stored_path=excluded.stored_path,created_by=excluded.created_by,note=excluded.note",
-                    versionId,key,$"Demo-{job.Number}-{i+1:000}.png",login,sourceVersionId);
+                Execute(c,tx,"insert into studio_asset_versions(id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note) select $1,job_id,$2,1,$3,content_type,size_bytes,sha256,stored_path,$4,now(),null,'Demo asset reusing a verified real public-domain photograph for scalable demo volume.' from studio_asset_versions where id=$5 on conflict(job_id,asset_key,version_number) do update set file_name=excluded.file_name,content_type=excluded.content_type,size_bytes=excluded.size_bytes,sha256=excluded.sha256,stored_path=excluded.stored_path,created_by=excluded.created_by,note=excluded.note",
+                    versionId,key,$"Demo-{job.Number}-{i+1:000}.jpg",login,sourceVersionId);
             }
             Guid assetId=Id(65,job.Number*100+i);
             string status=statuses[(ordinal+i)%statuses.Length];
