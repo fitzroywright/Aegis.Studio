@@ -4,6 +4,34 @@ function messageFirstName(author, people, fallback = 'Team member', loginOnly = 
     const match = people.find(p => [p.userName, p.displayName].some(n => String(n || '').toLowerCase() === value.toLowerCase()));
     return studioFirstName(match || value);
 }
+function studioWorkspaceIcon(name) {
+    const paths={
+        messages:'<path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h5"/>',
+        media:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m4 17 5-5 4 4 3-3 4 4"/>',
+        subjects:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-4 2.4-6 6-6s6 2 6 6M14 15c3.5.2 5 1.8 5 5"/>',
+        tasks:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 9 2 2 4-4M8 15h8"/>',
+        calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/>',
+        activity:'<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+        clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        camera:'<path d="M4 7h3l1.5-2h7L17 7h3a2 2 0 0 1 2 2v9H2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="4"/>',
+        user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c.7-5 3.3-7 8-7s7.3 2 8 7"/>',
+        trend:'<path d="M4 18 9 13l4 3 7-9"/><path d="M15 7h5v5"/>',
+        files:'<path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h5"/>'
+    };
+    return '<svg class="studio-ui-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+(paths[name]||paths.activity)+'</svg>';
+}
+
+function studioStatusProgress(status) {
+    const value=String(status||'').toLowerCase();
+    if(value.includes('deliver')||value.includes('publish')||value.includes('complete'))return 100;
+    if(value.includes('production')||value.includes('approved'))return 82;
+    if(value.includes('review')||value.includes('select'))return 68;
+    if(value.includes('upload')||value.includes('shoot'))return 50;
+    if(value.includes('schedul'))return 32;
+    if(value.includes('confirm')||value.includes('deposit'))return 22;
+    return 12;
+}
+
 function mergeJobMessages(teamMessages, customerMessages) {
     return [
         ...teamMessages.map(m => ({ id: 'team-' + m.id, sourceId:m.id, sourceKind:'JobMessage', author: m.senderUserName, body: m.body, at: m.createdAtUtc, customer: false, loginOnly: true })),
@@ -178,37 +206,62 @@ function mergeJobMessages(teamMessages, customerMessages) {
 
                 <header class="studio-job-header">
                     <div class="studio-job-identity">
-                        <div class="studio-job-thumb" aria-hidden="true">
+                        <div class="studio-job-thumb" data-job-cover aria-hidden="true">
                             <span>${esc((job.title || 'J').slice(0,1))}</span>
                         </div>
                         <div>
-                            <h1>${esc(job.title)}</h1>
+                            <div class="studio-job-title-line">
+                                <h1>${esc(job.title)}</h1>
+                                <span class="studio-status-pill" data-status="${esc(job.status)}">${esc(job.status)}</span>
+                            </div>
                             <p>${esc([
                                 job.linkedClientName || job.clientName || 'Client not linked',
                                 job.eventDate || 'Needs scheduling',
-                                job.status
+                                workspaceName
                             ].filter(Boolean).join(' · '))}</p>
                         </div>
                     </div>
                     <div class="job-header-actions">
-                        <button class="action" type="button" data-job-list>Jobs</button>
-                        <button class="action" type="button" data-edit-details>Edit Details</button>
+                        <button class="action" type="button" data-job-list>${studioWorkspaceIcon('tasks')}<span>Jobs</span></button>
+                        <button class="primary compact-primary" type="button" data-edit-details>${studioWorkspaceIcon('activity')}<span>Edit Details</span></button>
                     </div>
                 </header>
 
+                <section class="studio-job-summary" aria-label="Job status summary">
+                    <article class="studio-summary-card studio-summary-progress">
+                        <div class="studio-progress-ring" data-progress-ring style="--progress:${studioStatusProgress(job.status)}">
+                            <strong>${studioStatusProgress(job.status)}%</strong>
+                        </div>
+                        <div><span>Workflow</span><strong>${esc(job.status)}</strong><small>Current job stage</small></div>
+                    </article>
+                    <article class="studio-summary-card">
+                        <span class="studio-summary-icon">${studioWorkspaceIcon('media')}</span>
+                        <div><span>Media</span><strong data-media-count>—</strong><small data-media-note>Loading photographs</small></div>
+                    </article>
+                    <article class="studio-summary-card">
+                        <span class="studio-summary-icon">${studioWorkspaceIcon('tasks')}</span>
+                        <div class="studio-summary-grow"><span>Tasks</span><strong data-task-count>—</strong><small data-task-note>Loading workflow tasks</small><div class="studio-mini-progress"><i data-task-progress></i></div></div>
+                    </article>
+                    <article class="studio-summary-card">
+                        <span class="studio-summary-icon">${studioWorkspaceIcon('subjects')}</span>
+                        <div><span>Subjects</span><strong data-subject-count>—</strong><small>People / roster</small></div>
+                    </article>
+                </section>
+
                 <nav class="studio-job-tabs job-section-tabs" aria-label="Job information">
-                    <button data-job-tab="messages">Messages</button>
-                    <button data-job-tab="gallery">Media</button>
-                    <button data-job-tab="subjects">Subjects</button>
-                    <button data-job-tab="tasks">Tasks</button>
-                    <button data-job-tab="calendar">Calendar</button>
-                    <button data-job-tab="activity">Activity</button>
+                    <button data-job-tab="messages">${studioWorkspaceIcon('messages')}<span>Messages</span></button>
+                    <button data-job-tab="gallery">${studioWorkspaceIcon('media')}<span>Media</span></button>
+                    <button data-job-tab="subjects">${studioWorkspaceIcon('subjects')}<span>Subjects</span></button>
+                    <button data-job-tab="tasks">${studioWorkspaceIcon('tasks')}<span>Tasks</span></button>
+                    <button data-job-tab="calendar">${studioWorkspaceIcon('calendar')}<span>Calendar</span></button>
+                    <button data-job-tab="activity">${studioWorkspaceIcon('activity')}<span>Activity</span></button>
                 </nav>
 
                 <div class="studio-job-board job-work-board">
                     <section class="studio-job-messages job-message-column" aria-label="Messages">
                         <header class="job-panel-heading">
-                            <div><strong>Messages</strong><span>Conversation</span></div>
+                            <div>${studioWorkspaceIcon('messages')}<strong>Messages</strong><span>Conversation</span></div>
+                            <span class="studio-panel-status">Live</span>
                         </header>
                         <div id="combinedJobMessages" class="messages" aria-live="polite"></div>
                         <form id="hierarchyCompose" class="composer">
@@ -239,11 +292,14 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     </section>
 
                     <aside class="studio-job-context job-context-sidebar">
-                        <section class="thread-next-tasks"></section>
+                        <section class="thread-next-tasks">
+                            <header class="job-panel-heading"><div>${studioWorkspaceIcon('trend')}<strong>What's Next</strong><span>Workflow</span></div></header>
+                            <div class="studio-next-loading">Loading workflow…</div>
+                        </section>
 
                         <section class="job-details-card">
                             <header class="job-panel-heading">
-                                <div><strong>Job Details</strong><span>Current booking</span></div>
+                                <div>${studioWorkspaceIcon('camera')}<strong>Job Details</strong><span>Current booking</span></div>
                             </header>
                             <dl>
                                 <dt>Customer</dt><dd>${esc(job.linkedClientName || job.clientName || 'Not linked')}</dd>
@@ -307,6 +363,35 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const nextPanel = detailPane.querySelector('.thread-next-tasks');
             const filesPanel = detailPane.querySelector('.thread-shared-files');
             const current = () => version === revision;
+
+            Promise.allSettled([
+                json(`/api/jobs/${job.id}/media`),
+                json(`/api/operations/activities?jobId=${job.id}`),
+                json(`/api/jobs/${job.id}/subjects`)
+            ]).then(results => {
+                if(!current()) return;
+                const media = results[0].status === 'fulfilled' ? (results[0].value.assets || []) : [];
+                const tasks = results[1].status === 'fulfilled' ? results[1].value : [];
+                const subjects = results[2].status === 'fulfilled' ? results[2].value : [];
+                const images = media.filter(a => String(a.contentType || '').startsWith('image/'));
+                const completed = tasks.filter(t => String(t.status || '').toLowerCase() === 'completed').length;
+                const taskPct = tasks.length ? Math.round(completed / tasks.length * 100) : 0;
+                const mediaCount = detailPane.querySelector('[data-media-count]');
+                const mediaNote = detailPane.querySelector('[data-media-note]');
+                const taskCount = detailPane.querySelector('[data-task-count]');
+                const taskNote = detailPane.querySelector('[data-task-note]');
+                const taskProgress = detailPane.querySelector('[data-task-progress]');
+                const subjectCount = detailPane.querySelector('[data-subject-count]');
+                if(mediaCount) mediaCount.textContent=String(images.length);
+                if(mediaNote) mediaNote.textContent=images.length === 1 ? '1 photograph' : images.length + ' photographs';
+                if(taskCount) taskCount.textContent=completed + ' / ' + tasks.length;
+                if(taskNote) taskNote.textContent=tasks.length ? taskPct + '% complete' : 'No tasks yet';
+                if(taskProgress) taskProgress.style.width=taskPct + '%';
+                if(subjectCount) subjectCount.textContent=String(subjects.length);
+                const cover=detailPane.querySelector('[data-job-cover]');
+                const first=images[0];
+                if(cover && first?.versionId) cover.innerHTML=`<img src="/api/jobs/${job.id}/versions/by-id/${first.versionId}/content" alt="">`;
+            });
 
             renderCompactTasks(job, nextPanel, current)
                 .catch(error => { if (current()) nextPanel.textContent = 'Upcoming work could not be loaded: ' + error.message; });
