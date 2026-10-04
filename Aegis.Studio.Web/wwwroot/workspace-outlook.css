@@ -1642,3 +1642,118 @@ body .has-open-job .media-items.image-lens .job-file-tile small{
   body .has-open-job .job-lower-pane{height:auto!important;min-height:420px!important}
   body .has-open-job .job-context-sidebar{grid-template-columns:1fr!important}
 }
+
+
+/* Photo-first workspace media overview used on the default job screen. */
+body .has-open-job .workspace-media-overview{
+  height:100%;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  background:#fff;
+}
+body .has-open-job .workspace-media-heading{
+  flex:0 0 auto;
+  min-height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:8px 10px;
+  border-bottom:1px solid #ece6de;
+}
+body .has-open-job .workspace-media-heading h2{
+  margin:0;
+  font-size:17px;
+  line-height:1;
+}
+body .has-open-job .workspace-media-count{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:24px;
+  height:20px;
+  margin-left:4px;
+  padding:0 6px;
+  border-radius:999px;
+  background:#eee3cb;
+  font-size:11px;
+}
+body .has-open-job .workspace-media-actions{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+body .has-open-job .workspace-media-actions .action,
+body .has-open-job .workspace-media-actions .primary{
+  min-height:30px;
+  padding:5px 9px;
+  font-size:11px;
+}
+body .has-open-job .workspace-media-collections{
+  flex:0 0 auto;
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  padding:7px 10px;
+  border-bottom:1px solid #efe9e2;
+}
+body .has-open-job .workspace-media-collections button{
+  border:0;
+  border-radius:999px;
+  background:#f4f2ee;
+  padding:5px 10px;
+  font:600 11px/1.2 "Segoe UI",system-ui,sans-serif;
+  color:#5d574e;
+  white-space:nowrap;
+}
+body .has-open-job .workspace-media-collections button.active{
+  background:#f1dfb2;
+  color:#2d2417;
+}
+body .has-open-job .workspace-media-grid{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  align-content:start;
+  padding:10px;
+}
+body .has-open-job .workspace-media-tile{
+  appearance:none;
+  border:0;
+  background:transparent;
+  padding:0;
+  text-align:left;
+  min-width:0;
+  cursor:pointer;
+}
+body .has-open-job .workspace-media-tile img{
+  display:block;
+  width:100%;
+  aspect-ratio:1.45/1;
+  object-fit:cover;
+  border-radius:7px;
+  background:#f4f0e8;
+}
+body .has-open-job .workspace-media-tile span{
+  display:block;
+  margin-top:4px;
+  font-size:10px;
+  color:#5f594f;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+body .has-open-job .workspace-media-empty{
+  grid-column:1/-1;
+  padding:24px;
+  text-align:center;
+  color:#7a7369;
+}
+@media(max-width:1100px){
+  body .has-open-job .workspace-media-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
