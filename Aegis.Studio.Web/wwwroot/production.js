@@ -19,9 +19,9 @@ showProduction = async function() {
     photographerCache = photographers; studioRememberPeople(photographers);
     scheduleResourceCache = resources;
 
-    const activeJobs=jobs.filter(job=>job.status!=='Completed');
+    const activeJobs=jobs.filter(job=>['In Production','Production','Ready for Client','Published'].includes(job.status));
     if(!productionSelectedJob||!jobs.some(job=>job.id===productionSelectedJob))
-        productionSelectedJob=activeJobs[0]?.id||jobs[0]?.id||'';
+        productionSelectedJob=activeJobs[0]?.id||'';
     const selectedJob=jobs.find(job=>job.id===productionSelectedJob)||null;
     const selectedActivities=selectedJob?activities.filter(item=>item.jobId===selectedJob.id):[];
     const selectedShoots=selectedJob?shoots.filter(item=>item.jobId===selectedJob.id):[];
@@ -228,3 +228,4 @@ async function openJobOperations(jobId) {
 
 async function applyProductionTemplate(jobId,templateName) { await json(`/api/jobs/${jobId}/operations/template/${encodeURIComponent(templateName)}`,{method:'POST'}); await showProduction(); }
 const productionNavigationButton=document.querySelector('.brand-button[data-view="production"]'); if(productionNavigationButton) productionNavigationButton.onclick=()=>showProduction();
+
