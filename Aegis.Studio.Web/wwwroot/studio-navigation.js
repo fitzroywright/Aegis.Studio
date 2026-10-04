@@ -31,7 +31,7 @@
         const me=auth.user||auth;
         const user=String(me.userName||me.loginName||'').toLowerCase();
         const roles=[...(Array.isArray(me.roles)?me.roles:[]),...(Array.isArray(auth.roles)?auth.roles:[])].map(x=>String(x).toLowerCase());
-        const isManager=roles.some(r=>/administrator|manager|owner|finance/.test(r));
+        const isManager=me.isAdministrator===true||auth.isAdministrator===true||roles.some(r=>/administrator|manager|owner|finance/.test(r));
         const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status) && (!user || String(t.assignedTo||'').toLowerCase()===user));
         const todaySchedule=schedule
             .filter(s=>{const d=new Date(s.startsAtUtc||s.start||s.startsAt);return d>=startOfDay&&d<endOfDay;})
