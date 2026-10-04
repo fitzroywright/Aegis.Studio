@@ -4831,3 +4831,195 @@ body[data-theme="studio-default"] .workspace-quick-action{
     flex-basis:38px!important;
   }
 }
+
+
+/* === MY WORK SINGLE-VIEWPORT LAYOUT ======================================= */
+/* The page itself never scrolls. Cards own their overflow. */
+body[data-theme="studio-default"][data-studio-view="mywork"] main,
+body[data-theme="studio-default"][data-studio-view="mywork"] #genericView{
+  min-height:0!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] #genericView{
+  height:100%!important;
+  padding:16px 18px 18px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-page{
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  padding:0!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-page-header{
+  flex:0 0 auto!important;
+  min-height:62px!important;
+  margin:0 0 12px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-page-header h1{
+  font-size:32px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-layout{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  height:auto!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 320px!important;
+  gap:14px!important;
+  align-items:stretch!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-main{
+  min-width:0!important;
+  min-height:0!important;
+  display:grid!important;
+  grid-template-rows:86px minmax(0,1.18fr) minmax(0,.92fr)!important;
+  gap:12px!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-metrics{
+  min-height:0!important;
+  height:86px!important;
+  margin:0!important;
+  gap:9px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-metric{
+  min-height:0!important;
+  height:86px!important;
+  padding:12px 14px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-metric-icon{
+  width:38px!important;
+  height:38px!important;
+  flex-basis:38px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-metric strong{
+  font-size:22px!important;
+}
+
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col.lower{
+  min-width:0!important;
+  min-height:0!important;
+  height:100%!important;
+  margin:0!important;
+  gap:12px!important;
+  align-items:stretch!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col:not(.lower){
+  grid-template-columns:minmax(390px,.88fr) minmax(0,1.12fr)!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col.lower{
+  grid-template-columns:minmax(0,1.12fr) minmax(330px,.88fr)!important;
+}
+
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col>.mw-card,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-side>.mw-card{
+  min-width:0!important;
+  min-height:0!important;
+  height:100%!important;
+  align-self:stretch!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-card>header{
+  flex:0 0 44px!important;
+  min-height:44px!important;
+  height:44px!important;
+  padding:0 13px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-card>header h2{
+  font-size:14px!important;
+}
+
+/* Every data body scrolls inside its own card. */
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col>.mw-card>div:last-child,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-side>.mw-card>div{
+  min-height:0!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  scrollbar-width:thin!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-recent-grid{
+  flex:1 1 auto!important;
+  align-content:start!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-task-tabs,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-pipeline-stats,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-card h3,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-link-button{
+  flex:0 0 auto!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-active-jobs{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+}
+
+/* Keep session rows dense so the card reads like the approved reference. */
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-session-row{
+  min-height:61px!important;
+  grid-template-columns:62px 48px minmax(0,1fr) auto 12px!important;
+  gap:8px!important;
+  padding:5px 10px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-session-thumb{
+  width:48px!important;
+  height:48px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-session-time strong,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-session-main strong{
+  font-size:11px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-session-time span,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-session-main span{
+  font-size:9px!important;
+}
+
+/* Right rail stays on the same screen. Each card scrolls independently. */
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-side{
+  min-width:0!important;
+  min-height:0!important;
+  display:grid!important;
+  grid-template-rows:minmax(0,1.15fr) minmax(0,.82fr) minmax(0,.95fr)!important;
+  gap:12px!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-schedule-row{
+  min-height:49px!important;
+  padding:5px 10px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-message-row,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-activity-row{
+  min-height:48px!important;
+  padding:5px 10px!important;
+}
+
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col>.mw-card>div:last-child::-webkit-scrollbar,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-side>.mw-card>div::-webkit-scrollbar,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-active-jobs::-webkit-scrollbar{
+  width:6px!important;
+}
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col>.mw-card>div:last-child::-webkit-scrollbar-thumb,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-side>.mw-card>div::-webkit-scrollbar-thumb,
+body[data-theme="studio-default"][data-studio-view="mywork"] .mw-active-jobs::-webkit-scrollbar-thumb{
+  border-radius:999px!important;
+  background:#cfd6df!important;
+}
+
+@media(max-width:1350px){
+  body[data-theme="studio-default"][data-studio-view="mywork"] .mw-layout{
+    grid-template-columns:minmax(0,1fr) 286px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col:not(.lower){
+    grid-template-columns:minmax(340px,.84fr) minmax(0,1.16fr)!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="mywork"] .mw-two-col.lower{
+    grid-template-columns:minmax(0,1.08fr) minmax(290px,.92fr)!important;
+  }
+}
