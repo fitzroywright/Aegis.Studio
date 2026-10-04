@@ -279,8 +279,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
             side.className='job-context-sidebar';
             side.append(nextPanel);
 
-            const details=document.createElement('section');
+            const details=document.createElement('details');
             details.className='job-details-card';
+            details.open=true;
             const detailRows=[
                 ['Status','<span class="studio-status-pill">'+esc(job.status||'')+'</span>'],
                 ['Priority',esc(job.priority||'Normal')],
@@ -295,7 +296,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 ['Remaining',job.remaining==null?'—':esc(String(job.remaining))],
                 ['Job Code',esc(job.jobCode||job.code||String(job.id).slice(0,12))]
             ];
-            details.innerHTML='<header class="context-card-header"><strong>Job Details</strong><button class="text-button" type="button" data-edit-details>✎ Edit</button></header><dl>'+detailRows.map(([label,value])=>'<dt>'+label+'</dt><dd>'+value+'</dd>').join('')+'</dl>';
+            details.innerHTML='<summary class="context-card-header"><strong>Job Details</strong><button class="text-button" type="button" data-edit-details>✎ Edit</button></summary><dl>'+detailRows.map(([label,value])=>'<dt>'+label+'</dt><dd>'+value+'</dd>').join('')+'</dl>';
             details.querySelector('[data-edit-details]').onclick=()=>openJobDetailsEditor(job);
             side.append(details,filesPanel);
 
