@@ -486,5 +486,7 @@
     const topNew=document.getElementById('topNewButton');
     if(topNew) topNew.onclick=()=>document.getElementById('newRequestDialog')?.showModal();
 
-    setActive('mywork');
+    window.studioNavigate('mywork').catch(error=>{
+        console.error('Studio startup navigation failed.',error);
+    });
 })();
