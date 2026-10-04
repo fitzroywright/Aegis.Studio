@@ -33,7 +33,33 @@
         production:()=>showProduction(),
         frontdesk:()=>showFrontDesk(),
         workday:async()=>{window.location.assign('/workday-management.html');},
-        admin:async()=>{await showWorkspaces();activateNavigation('admin');}
+        admin:async()=>{
+            await showWorkspaces();
+            activateNavigation('admin');
+            const me=await json('/api/auth/me').catch(()=>null);
+            if(me?.user?.isAdministrator!==true)return;
+            if(document.getElementById('studioDemoLoader'))return;
+            const panel=document.createElement('section');
+            panel.id='studioDemoLoader';
+            panel.className='job-section studio-demo-loader';
+            panel.innerHTML='<div class="job-detail-header"><div><h2>Demo Data</h2><p class="muted">Load or upgrade the complete Studio demonstration set: workspaces, Carter Wedding, messages, subjects, tasks, appointments and synthetic gallery images.</p></div><button class="primary" type="button" data-load-demo>Load Demo Data</button></div><p class="muted" data-demo-status></p>';
+            genericView.prepend(panel);
+            panel.querySelector('[data-load-demo]').onclick=async()=>{
+                const button=panel.querySelector('[data-load-demo]');
+                const status=panel.querySelector('[data-demo-status]');
+                button.disabled=true;
+                status.textContent='Loading demo data...';
+                try{
+                    const result=await json('/api/admin/demo/seed',{method:'POST'});
+                    status.textContent=result.message||'Demo data loaded.';
+                    await loadWorkspaces();
+                }catch(error){
+                    status.textContent='Demo data could not be loaded: '+(error.message||error);
+                }finally{
+                    button.disabled=false;
+                }
+            };
+        }
     };
     function jobCard(job){return `<article class="task-card"><button class="link-button" data-open-job="${job.id}">${esc(job.title)}</button><small>${esc(job.clientName)} · ${esc(job.status)}</small><small>${esc(job.eventDate||'Date not set')} · ${esc(job.assignedTo?studioFirstName(job.assignedTo):'Unassigned')}</small><button class="action" data-plan-job="${job.id}">Schedule / availability</button></article>`;}
     function bindJobs(){genericView.querySelectorAll('[data-open-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.openJob).catch(showError));}
