@@ -30,6 +30,8 @@
 
         const me=auth.user||auth;
         const user=String(me.userName||me.loginName||'').toLowerCase();
+        const roles=[...(Array.isArray(me.roles)?me.roles:[]),...(Array.isArray(auth.roles)?auth.roles:[])].map(x=>String(x).toLowerCase());
+        const isManager=roles.some(r=>/administrator|manager|owner|finance/.test(r));
         const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status) && (!user || String(t.assignedTo||'').toLowerCase()===user));
         const todaySchedule=schedule
             .filter(s=>{const d=new Date(s.startsAtUtc||s.start||s.startsAt);return d>=startOfDay&&d<endOfDay;})
@@ -126,6 +128,16 @@
             review:jobs.filter(j=>/review|approval/i.test(j.status||'')).length,
             deliver:jobs.filter(j=>/deliver|ready|complete/i.test(j.status||'')).length
         };
+        const overdueTasks=myTasks.filter(t=>t.dueAtUtc&&new Date(t.dueAtUtc)<now).length;
+        const blockedTasks=myTasks.filter(t=>/blocked|waiting/i.test(String(t.status||'')+' '+String(t.blockedReason||''))).length;
+        const attentionJobs=jobs.filter(j=>/blocked|overdue|needs scheduling|awaiting upload/i.test(j.status||'')).length;
+        const quickLinks=[
+            ['workspaces','Workspaces',jobs.length],
+            ['pipeline','Pipeline',todaySchedule.length],
+            ['production','Production',myTasks.filter(t=>/edit|retouch|qc|print|deliver|production/i.test(t.activityType||'')).length],
+            ['frontdesk','Front Desk',messageNotifications.length],
+            ...(isManager?[['finance','Finance',''],['management','Management','']]:[])
+        ];
 
         genericView.innerHTML=`
             <section class="mw-page">
@@ -184,8 +196,21 @@
                             <div>${messageRows}</div>
                             <button class="mw-link-button" data-nav="workspaces">Open workspace jobs →</button>
                         </section>
+                        ${isManager?`<section class="mw-card">
+                            <header><h2>Operations Attention</h2><button data-nav="management">Management →</button></header>
+                            <div class="mw-pipeline-stats">
+                                <div class="orange"><strong>${overdueTasks}</strong><span>Overdue</span></div>
+                                <div class="purple"><strong>${blockedTasks}</strong><span>Blocked</span></div>
+                                <div class="blue"><strong>${attentionJobs}</strong><span>Jobs</span></div>
+                                <div class="green"><strong>${messageNotifications.length}</strong><span>Messages</span></div>
+                            </div>
+                        </section>`:''}
                         <section class="mw-card">
-                            <header><h2>Studio Activity</h2><button data-nav="reports">View All →</button></header>
+                            <header><h2>Quick Links</h2></header>
+                            <div class="mw-active-jobs">${quickLinks.map(link=>`<button data-nav="${link[0]}"><span>${link[1]}</span><b>${link[2]}</b></button>`).join('')}</div>
+                        </section>
+                        <section class="mw-card">
+                            <header><h2>Studio Activity</h2><button data-nav="${isManager?'management':'workspaces'}">View All →</button></header>
                             <div>${activityRows}</div>
                         </section>
                     </aside>
