@@ -1,8 +1,6 @@
 using System.Security.Cryptography;
 using System.Net.Http;
 using Npgsql;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using Common.Storage;
 
 namespace Aegis.Studio.Web.Operations;
@@ -170,7 +168,7 @@ internal static class DemoDataExpansion
             }
             string mediaMessage=number==4
                 ?"Demo gallery ready: fifty wedding photographs across Getting Ready, Ceremony, Portraits and Reception, linked to the people and groups in the People roster."
-                :"Demo gallery ready: four sample illustrations across Selects and Proofs, with two versions of the first image.";
+                :"Demo gallery ready: four real public-domain photographs across Selects and Proofs, with two versions of the first image.";
             Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Studio','Internal',$3,now())",Id(28,number),Id(2,number),mediaMessage);
         }
         Execute(connection,transaction,"insert into studio_state(key,value,updated_at_utc) values('demo-data-v3',$1,now()) on conflict(key) do update set value=excluded.value,updated_at_utc=excluded.updated_at_utc",login);
@@ -328,23 +326,6 @@ internal static class DemoDataExpansion
         return (Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo photograph upsert did not return an id."));
     }
 
-    internal static Image<Rgb24> CreateIllustration(int variant)
-    {
-        var image=new Image<Rgb24>(640,420);
-        for(int y=0;y<420;y++)for(int x=0;x<640;x++)
-        {
-            double t=y/420d;int warmth=variant%6*8;
-            Rgb24 colour=new((byte)(210-t*70),(byte)(190-t*55),(byte)(160+warmth-t*35));
-            int sunX=100+variant%4*125;
-            if((x-sunX)*(x-sunX)+(y-105)*(y-105)<42*42)colour=new(255,236,178);
-            double ridge=220+45*Math.Sin(x/100d+variant)+25*Math.Cos(x/43d);
-            if(y>ridge)colour=new((byte)(75+warmth),(byte)(103+warmth/2),(byte)(91+warmth/3));
-            if(y>305+20*Math.Sin(x/80d))colour=new(51,76,65);
-            if(y>395)colour=new((byte)(130+warmth),107,77);
-            image[x,y]=colour;
-        }
-        return image;
-    }
     private static Guid ExecuteGuid(NpgsqlConnection connection,NpgsqlTransaction transaction,string sql,params object[] values)
     {
         using var command=new NpgsqlCommand(sql,connection,transaction);
