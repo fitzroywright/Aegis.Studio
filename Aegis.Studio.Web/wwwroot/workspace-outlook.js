@@ -181,7 +181,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             detailPane.classList.add('job-reading-view'); document.getElementById('conversationView').classList.add('has-open-job');
             const lower = document.createElement('section');
             lower.className = 'job-lower-pane';
-            lower.innerHTML = '<nav class="workspace-tabs job-section-tabs" aria-label="Job information"><button data-job-tab="messages">Messages</button><button data-job-tab="gallery">Media</button><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks</button><button data-job-tab="calendar">Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="media-toolbar-host" aria-label="Media toolbar"></div><div class="gallery-tab-filter"></div><div class="job-tab-content"></div>';
+            lower.innerHTML = '<nav class="workspace-tabs job-section-tabs" aria-label="Job information"><button data-job-tab="messages">Messages</button><button data-job-tab="gallery">Media</button><button data-job-tab="subjects">People</button><button data-job-tab="tasks">Tasks</button><button data-job-tab="calendar">Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="media-toolbar-host" aria-label="Media toolbar"></div><div class="gallery-tab-filter"></div><div class="job-tab-content"></div>';
             detailPane.appendChild(lower);
             const job = selectedJob;
             let tabRevision = 0;
