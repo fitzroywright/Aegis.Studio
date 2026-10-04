@@ -222,17 +222,18 @@ internal static class DemoFullStudioData
             job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)?["Executives","Team","Selects","Unclassified"]:
             ["Selects","Proofs","Finals","Unclassified"];
 
+        int sourceCount=PhysicalSourceCount(job);
         for(int i=0;i<count;i++)
         {
             string key=$"demo-full/{job.Number}/asset-{i+1:000}";
             Guid versionId=Id(64,job.Number*100+i);
-            if(i<12)
+            if(i<sourceCount)
             {
                 DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i),null,login);
             }
             else
             {
-                Guid sourceVersionId=Id(64,job.Number*100+(i%12));
+                Guid sourceVersionId=Id(64,job.Number*100+(i%sourceCount));
                 Execute(c,tx,"insert into studio_asset_versions(id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note) select $1,job_id,$2,1,$3,content_type,size_bytes,sha256,stored_path,$4,now(),null,'Demo asset reusing a verified real public-domain photograph for scalable demo volume.' from studio_asset_versions where id=$5 on conflict(job_id,asset_key,version_number) do update set file_name=excluded.file_name,content_type=excluded.content_type,size_bytes=excluded.size_bytes,sha256=excluded.sha256,stored_path=excluded.stored_path,created_by=excluded.created_by,note=excluded.note",
                     versionId,key,$"Demo-{job.Number}-{i+1:000}.jpg",login,sourceVersionId);
             }
@@ -245,6 +246,15 @@ internal static class DemoFullStudioData
             Guid subjectId=Id(59,job.Number*100+(i%Math.Max(1,job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?8:job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?24:job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4)));
             Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) values($1,$2) on conflict do nothing",assetId,subjectId);
         }
+    }
+
+    private static int PhysicalSourceCount(DemoJob job)
+    {
+        if(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return 2;
+        if(job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)) return 4;
+        if(job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)) return 2;
+        if(job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return 2;
+        return 1;
     }
 
     private static int SelectPhotoVariant(DemoJob job,int index)
