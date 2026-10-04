@@ -52,15 +52,6 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFl
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
 builder.Services.AddSingleton(secretProvider);
 
-if (builder.Environment.IsDevelopment())
-{
-    builder.Configuration["Storage:Provider"] = "LocalFolder";
-    builder.Configuration["Storage:Local:RootPath"] =
-        builder.Configuration["Storage:Local:RootPath"]?.Trim() is { Length: > 0 } configuredDevelopmentRoot
-            ? configuredDevelopmentRoot
-            : "D:/Studio";
-}
-
 string storageProvider = builder.Configuration["Storage:Provider"]?.Trim() ?? "NetworkFolder";
 string? storageProviderSecret = null;
 string? s3AccessKeyId = null;
