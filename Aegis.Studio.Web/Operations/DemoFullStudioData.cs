@@ -106,12 +106,14 @@ internal static class DemoFullStudioData
             DateTimeOffset end=start.AddHours(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?6:job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)?3:2);
 
             Execute(connection,transaction,
-                "insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc,job_id) values($1,$2,$3,$4,$5,$6,false,now()-($7 || ' days')::interval,$8) on conflict(id) do update set subject=excluded.subject,contact_name=excluded.contact_name,contact_address=excluded.contact_address,job_id=excluded.job_id",
-                conversationId,workspaceId,job.Title,client.Name,client.Email,ordinal%4==0?"Phone":ordinal%3==0?"Website":"Email",Math.Abs(job.DayOffset)+2,jobId);
+                "insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values($1,$2,$3,$4,$5,$6,false,now()-($7 || ' days')::interval) on conflict(id) do update set subject=excluded.subject,contact_name=excluded.contact_name,contact_address=excluded.contact_address,channel=excluded.channel",
+                conversationId,workspaceId,job.Title,client.Name,client.Email,ordinal%4==0?"Phone":ordinal%3==0?"Website":"Email",Math.Abs(job.DayOffset)+2);
 
             Execute(connection,transaction,
                 "insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,client_id) values($1,$2,$3,$4,$5,$6,$7,now()-($8 || ' days')::interval,$9,$10) on conflict(id) do update set workspace_id=excluded.workspace_id,conversation_id=excluded.conversation_id,title=excluded.title,client_name=excluded.client_name,status=excluded.status,event_date=excluded.event_date,assigned_to=excluded.assigned_to,client_id=excluded.client_id",
-                jobId,workspaceId,conversationId,job.Title,client.Name,job.Status,start.Date,Math.Abs(job.DayOffset)+5,job.Photographer,clientId);
+                jobId,workspaceId,conversationId,job.Title,client.Name,job.Status,DateOnly.FromDateTime(start.UtcDateTime),Math.Abs(job.DayOffset)+5,job.Photographer,clientId);
+
+            Execute(connection,transaction,"update studio_conversations set job_id=$2 where id=$1",conversationId,jobId);
 
             SeedConversation(connection,transaction,job,client,conversationId,ordinal);
             SeedSubjectsAndCollections(connection,transaction,job,jobId,ordinal,start);
