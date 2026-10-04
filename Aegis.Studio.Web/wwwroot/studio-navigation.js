@@ -1,9 +1,8 @@
 // Keep the existing FrontDesk, WorkDay and administration screens as destinations.
 (() => {
     const rail=document.querySelector('.rail');
-    rail.className='studio-top-nav';rail.setAttribute('role','navigation');rail.setAttribute('aria-label','Main navigation');
-    document.querySelector('.topbar').after(rail);
-    const items=[['dashboard','Dashboard'],['pipeline','Pipeline'],['production','Production'],['frontdesk','FrontDesk'],['mywork','My Work'],['admin','Admin']];
+    rail.className='rail';rail.setAttribute('role','navigation');rail.setAttribute('aria-label','Main navigation');
+    const items=[['mywork','My Work'],['workspaces','Workspaces'],['pipeline','Pipeline'],['production','Production'],['frontdesk','FrontDesk'],['dashboard','Dashboard'],['admin','Admin']];
     const icons={
         mywork:'<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3h6v2M8 12l2 2 5-5M8 18h8"/>',
         dashboard:'<path d="M4 20V11h4v9M10 20V5h4v15M16 20V8h4v12"/>',
@@ -20,7 +19,16 @@
     const routes={
         mywork:async()=>{generic('mywork');const auth=await json('/api/auth/me');const me=auth.user||auth;const user=String(me.userName||me.loginName||'').toLowerCase();const [tasks,workdayResponse]=await Promise.all([json('/api/operations/activities?assignedTo='+encodeURIComponent(user)),fetch('/api/workday/bootstrap')]);const mine=tasks.filter(t=>user&&String(t.assignedTo||'').toLowerCase()===user&&!['Completed','Cancelled'].includes(t.status));let assignments=[],notice='';if(workdayResponse.ok){const workday=await workdayResponse.json();assignments=[...(workday.today||[]),...(workday.upcoming||[])].filter(a=>a.jobId);}else if(workdayResponse.status!==404)notice='WorkDay assignments could not be loaded.';genericView.innerHTML=`<h1>My Work</h1><h2>My shoots / WorkDay</h2>${assignments.map(a=>`<article class="task-card"><button class="link-button" data-open-job="${a.jobId}">${esc(a.title)}</button><small>${esc(new Date(a.startsAtUtc).toLocaleString())} · ${esc(a.status)}</small><small>${esc(a.location||'Location not set')}</small><p>${esc(a.instructions||'')}</p></article>`).join('')||`<p>${esc(notice||'No upcoming WorkDay assignments.')}</p>`}<h2>My tasks</h2>${mine.map(t=>`<article class="task-card"><button class="link-button" data-open-job="${t.jobId}">${esc(t.title)}</button><small>${esc(t.status)}${t.dueAtUtc?' · Due '+esc(new Date(t.dueAtUtc).toLocaleString()):''}</small></article>`).join('')||'<p>No open tasks assigned to you.</p>'}`;bindJobs();await renderMediaAttentionQueue(genericView);},
         dashboard:async()=>{await showManagement();activateNavigation('dashboard');const h=genericView.querySelector('h1');if(h)h.textContent='Dashboard';},
-        workspaces:async()=>{activateView('conversations');activateNavigation('workspaces');await loadConversations();},
+        workspaces:async()=>{
+            generic('workspaces');
+            const workspaces=await json('/api/workspaces');
+            genericView.innerHTML='<div class="reference-page-heading"><div><span class="reference-eyebrow">STUDIO</span><h1>Workspaces</h1><p>Open a workspace to view its jobs, conversations and production work.</p></div></div><div class="reference-workspace-grid">'+workspaces.map(w=>`<button class="reference-workspace-card" data-open-workspace="${w.id}"><span class="reference-workspace-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5h7l2 2h9v13H3z"/><path d="M3 10h18"/></svg></span><span><strong>${esc(w.name)}</strong><small>Open workspace</small></span><span aria-hidden="true">›</span></button>`).join('')+'</div>';
+            genericView.querySelectorAll('[data-open-workspace]').forEach(button=>button.onclick=async()=>{
+                const workspace=workspaces.find(x=>x.id===button.dataset.openWorkspace);
+                activateView('conversations');activateNavigation('workspaces');
+                await selectWorkspace(workspace.id,workspace.name);
+            });
+        },
         pipeline:()=>showPipeline(),
         production:()=>showProduction(),
         frontdesk:()=>showFrontDesk(),
@@ -50,6 +58,5 @@
     };
     loadFrontDeskRole();
     const newRequest=document.getElementById('newRequestButton');
-    newRequest.hidden=false;
-    rail.querySelector('[data-view="mywork"]').after(newRequest);
+    newRequest.hidden=true;
 })();
