@@ -114,6 +114,7 @@ internal static class DemoFullStudioData
                 jobId,workspaceId,conversationId,job.Title,client.Name,job.Status,start.Date,Math.Abs(job.DayOffset)+5,job.Photographer,clientId);
 
             SeedConversation(connection,transaction,job,client,conversationId,ordinal);
+            SeedSubjectsAndCollections(connection,transaction,job,jobId,ordinal,start);
             SeedSchedule(connection,transaction,job,jobId,start,end,ordinal);
             SeedFinance(connection,transaction,job,jobId,ordinal);
             SeedActivities(connection,transaction,job,jobId,ordinal);
@@ -148,6 +149,43 @@ internal static class DemoFullStudioData
         Execute(c,tx,"insert into studio_photographer_availability(id,user_name,starts_at_utc,ends_at_utc,availability_type,note,created_at_utc) values($1,'demo.anna',date_trunc('day',now())+interval '1 day',date_trunc('day',now())+interval '2 day','Unavailable','Day off',now()) on conflict(id) do nothing",Id(44,1));
         Execute(c,tx,"insert into studio_photographer_availability(id,user_name,starts_at_utc,ends_at_utc,availability_type,note,created_at_utc) values($1,'demo.jason',date_trunc('day',now())+interval '3 day 8 hours',date_trunc('day',now())+interval '3 day 13 hours','Unavailable','External assignment',now()) on conflict(id) do nothing",Id(44,2));
         Execute(c,tx,"insert into studio_photographer_availability(id,user_name,starts_at_utc,ends_at_utc,availability_type,note,created_at_utc) values($1,'demo.michael',date_trunc('day',now())+interval '2 day 12 hours',date_trunc('day',now())+interval '2 day 17 hours','Unavailable','Equipment service window',now()) on conflict(id) do nothing",Id(44,3));
+
+        var resources=new[]
+        {
+            (10,"Studio A","Room","Primary portrait studio"),
+            (11,"Studio B","Room","Headshots and ID studio"),
+            (12,"Canon PRO-1000","Equipment","Large photo printer - Available"),
+            (13,"ID Card Printer","Equipment","ID output device - In Use"),
+            (14,"Retouch Workstation 1","Equipment","Production workstation - Available"),
+            (15,"Photo Printer 2","Equipment","Maintenance / error demo state")
+        };
+        foreach(var r in resources)
+            Execute(c,tx,"insert into studio_schedule_resources(id,name,resource_type,is_active,notes,created_at_utc) values($1,$2,$3,true,$4,now()) on conflict(id) do update set name=excluded.name,resource_type=excluded.resource_type,is_active=true,notes=excluded.notes",Id(43,r.Item1),r.Item2,r.Item3,r.Item4);
+    }
+
+    private static void SeedSubjectsAndCollections(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,int ordinal,DateTimeOffset scheduled)
+    {
+        Execute(c,tx,"insert into studio_media_galleries(id,name,default_lens,default_collection) values($1,'Media','Auto','Unclassified') on conflict(id) do nothing",jobId);
+        string[] collections=job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
+            job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Roster","Stage","Groups","Unclassified"]:
+            job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)?["Executives","Team","Selects","Unclassified"]:
+            ["Selects","Proofs","Finals","Unclassified"];
+        foreach(string collection in collections)
+            Execute(c,tx,"insert into studio_media_collections(job_id,name) values($1,$2) on conflict do nothing",jobId,collection);
+
+        int subjectCount=job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?24:
+            job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?8:
+            job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:
+            job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4;
+        for(int i=0;i<subjectCount;i++)
+        {
+            Guid subject=Id(59,job.Number*100+i);
+            string name=subjectCount>=10?$"Subject {i+1:00} - {job.Title}":i switch{0=>"Primary Client",1=>"Partner / Parent",2=>"Child / Group Member",_=>"Additional Subject"};
+            string reference=$"{job.Number}-{i+1:000}";
+            string attributes=JsonSerializer.Serialize(new { rosterId=reference, category=job.Type, demo=true });
+            Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,production_status,attributes,collection_name,scheduled_at_utc,schedule_location,contact_name,contact_email,contact_phone,photo_notes,is_system) values($1,$2,$2,$3,$4,$5,'demo-seed',$6,$7::jsonb,$8,$9,$10,'','','',$11,false) on conflict(id) do update set name=excluded.name,reference=excluded.reference,production_status=excluded.production_status,attributes=excluded.attributes,collection_name=excluded.collection_name,scheduled_at_utc=excluded.scheduled_at_utc,schedule_location=excluded.schedule_location,photo_notes=excluded.photo_notes,updated_at_utc=now()",
+                subject,jobId,name,reference,$"DEMO roster / subject for {job.Type}",job.DayOffset<0?"Photographed":"Not Photographed",attributes,collections[Math.Min(i%collections.Length,collections.Length-1)],scheduled,job.Location,$"Capture requirements for {job.Type}");
+        }
     }
 
     private static void SeedConversation(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,DemoClient client,Guid conversation,int ordinal)
