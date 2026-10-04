@@ -13,8 +13,6 @@ internal static class DemoDataExpansion
 
     internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IConfiguration config,IWebHostEnvironment environment)
     {
-        using(var check=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v2')",connection,transaction))
-            if((bool)check.ExecuteScalar()!)return false;
         string configured=config["Storage:VersionStorePath"] ?? "";
         string root=Path.GetFullPath(string.IsNullOrWhiteSpace(configured)?Path.Combine(environment.ContentRootPath,"VersionStore"):configured);
         DateTimeOffset today=new(DateTime.UtcNow.Date,TimeSpan.Zero);
@@ -98,7 +96,11 @@ internal static class DemoDataExpansion
     }
     private static void Execute(NpgsqlConnection connection,NpgsqlTransaction transaction,string sql,params object[] values)
     {
-        using var command=new NpgsqlCommand(sql,connection,transaction);
+        string commandText=sql.Trim();
+        if(commandText.StartsWith("insert into ",StringComparison.OrdinalIgnoreCase)
+            && !commandText.Contains(" on conflict ",StringComparison.OrdinalIgnoreCase))
+            commandText=commandText.TrimEnd(';')+" on conflict do nothing;";
+        using var command=new NpgsqlCommand(commandText,connection,transaction);
         foreach(object value in values)command.Parameters.AddWithValue(value);
         command.ExecuteNonQuery();
     }
