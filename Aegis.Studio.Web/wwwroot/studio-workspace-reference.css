@@ -4190,3 +4190,232 @@ body[data-theme="studio-default"] .workspace-quick-action:hover{
   body[data-theme="studio-default"] .workspace-reference-previews img,
   body[data-theme="studio-default"] .workspace-reference-previews i{width:42px;flex-basis:42px;height:34px}
 }
+
+
+/* === WORKSPACES PIXEL REFERENCE CORRECTION ================================ */
+body[data-theme="studio-default"] .workspace-reference-page{
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+}
+body[data-theme="studio-default"] .workspace-reference-header{
+  min-height:64px!important;
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:space-between!important;
+  margin:0 0 10px!important;
+  padding:0 2px 0 0!important;
+}
+body[data-theme="studio-default"] .workspace-reference-header h1{
+  font-size:33px!important;
+  line-height:1.05!important;
+}
+body[data-theme="studio-default"] .workspace-reference-header p{
+  margin-top:4px!important;
+  font-size:13px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-layout{
+  width:100%!important;
+  min-width:0!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 300px!important;
+  gap:14px!important;
+  align-items:start!important;
+}
+body[data-theme="studio-default"] .workspace-reference-center{
+  width:100%!important;
+  min-width:0!important;
+  overflow:visible!important;
+  background:transparent!important;
+}
+body[data-theme="studio-default"] .workspace-reference-side{
+  width:300px!important;
+  min-width:300px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-toolbar{
+  width:100%!important;
+  min-height:42px!important;
+  margin:0 0 8px!important;
+  padding:0!important;
+}
+body[data-theme="studio-default"] .workspace-reference-tabs{
+  gap:5px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-tabs button{
+  height:34px!important;
+  min-height:34px!important;
+  padding:0 12px!important;
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-tools{
+  margin-left:auto!important;
+}
+body[data-theme="studio-default"] .workspace-view-toggle{
+  display:flex!important;
+  align-items:center!important;
+  gap:2px!important;
+}
+body[data-theme="studio-default"] .workspace-view-toggle button{
+  height:34px!important;
+  min-width:66px!important;
+  padding:0 10px!important;
+  border:1px solid #e1e6ec!important;
+  border-radius:7px!important;
+  background:#fff!important;
+  color:#4f5b6b!important;
+  font-size:10px!important;
+  cursor:pointer!important;
+}
+body[data-theme="studio-default"] .workspace-view-toggle button.active{
+  border-color:#9d6a23!important;
+  background:#9d6a23!important;
+  color:#fff!important;
+}
+body[data-theme="studio-default"] .workspace-reference-tools select{
+  min-width:158px!important;
+  height:34px!important;
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-list{
+  width:100%!important;
+  min-width:0!important;
+  display:grid!important;
+  gap:5px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-row{
+  width:100%!important;
+  min-width:0!important;
+  border-radius:7px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-main{
+  width:100%!important;
+  min-width:0!important;
+  min-height:102px!important;
+  grid-template-columns:110px minmax(210px,1.25fr) 52px 58px 58px minmax(190px,255px) 112px 16px!important;
+  gap:10px!important;
+  padding:8px 10px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-hero{
+  width:110px!important;
+  height:84px!important;
+  border-radius:7px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-copy strong{
+  font-size:14px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-copy small{
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-stat b{
+  font-size:14px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-stat small{
+  font-size:9px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-previews{
+  justify-content:flex-start!important;
+}
+body[data-theme="studio-default"] .workspace-reference-previews img,
+body[data-theme="studio-default"] .workspace-reference-previews i{
+  width:50px!important;
+  height:42px!important;
+  flex-basis:50px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-activity{
+  min-width:0!important;
+}
+body[data-theme="studio-default"] .workspace-reference-pill{
+  font-size:9px!important;
+  padding:4px 8px!important;
+}
+body[data-theme="studio-default"] .workspace-reference-more{
+  align-self:start!important;
+  padding-top:5px!important;
+}
+body[data-theme="studio-default"] .workspace-side-card{
+  width:100%!important;
+  border-radius:8px!important;
+}
+body[data-theme="studio-default"] .workspace-side-card>header{
+  min-height:48px!important;
+  padding:0 14px!important;
+}
+body[data-theme="studio-default"] .workspace-side-card>header h2{
+  font-size:14px!important;
+}
+body[data-theme="studio-default"] .workspace-announcement-list article{
+  padding:12px 14px!important;
+}
+body[data-theme="studio-default"] .workspace-announcement-list strong{
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .workspace-announcement-list p{
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .workspace-side-card>label{
+  padding:10px 14px 0!important;
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .workspace-side-card>label input,
+body[data-theme="studio-default"] .workspace-side-card>label select{
+  height:34px!important;
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .workspace-clear-filters{
+  width:calc(100% - 28px)!important;
+  margin:10px 14px 14px!important;
+}
+body[data-theme="studio-default"] .workspace-quick-action{
+  min-height:39px!important;
+  padding:0 14px!important;
+  font-size:10px!important;
+}
+
+/* Do not force a giant desktop canvas when Studio is beside Visual Studio.
+   Keep the reference composition intact and scroll only when physically necessary. */
+@media(max-width:1500px){
+  body[data-theme="studio-default"] .workspace-reference-page{
+    min-width:0!important;
+  }
+  body[data-theme="studio-default"] .workspace-reference-layout{
+    grid-template-columns:minmax(0,1fr) 270px!important;
+  }
+  body[data-theme="studio-default"] .workspace-reference-side{
+    width:270px!important;
+    min-width:270px!important;
+  }
+  body[data-theme="studio-default"] .workspace-reference-main{
+    grid-template-columns:92px minmax(165px,1fr) 42px 46px 46px minmax(140px,190px) 92px 14px!important;
+    gap:7px!important;
+    min-height:84px!important;
+  }
+  body[data-theme="studio-default"] .workspace-reference-hero{
+    width:92px!important;
+    height:68px!important;
+  }
+  body[data-theme="studio-default"] .workspace-reference-previews img,
+  body[data-theme="studio-default"] .workspace-reference-previews i{
+    width:40px!important;
+    height:34px!important;
+    flex-basis:40px!important;
+  }
+}
+@media(max-width:1050px){
+  body[data-theme="studio-default"] .workspace-reference-layout{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  body[data-theme="studio-default"] .workspace-reference-side{
+    width:100%!important;
+    min-width:0!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+  body[data-theme="studio-default"] .workspace-reference-toolbar{
+    align-items:flex-start!important;
+    flex-direction:column!important;
+  }
+  body[data-theme="studio-default"] .workspace-reference-tools{
+    width:100%!important;
+    margin-left:0!important;
+    justify-content:flex-end!important;
+  }
+}
