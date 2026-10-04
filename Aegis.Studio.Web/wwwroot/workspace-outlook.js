@@ -119,6 +119,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         const messages = await json(`/api/messages/threads/${value.id}?count=500`);
         const job = scope === 'Job' ? selectedJob : null;
         let conversation = null, identities = [], customerNotice = '';
+
         if (job) {
             const response = await fetch('/api/conversations/' + job.conversationId);
             if (response.ok) {
@@ -128,126 +129,298 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     if (senderResponse.ok) identities = (await senderResponse.json()).identities || [];
                     else customerNotice = 'Sending identities unavailable. You can still post internal messages.';
                 }
-            } else customerNotice = response.status === 403 ? 'Customer messages are restricted by your permissions.' : 'Customer messages could not be loaded. Refresh to retry.';
+            } else {
+                customerNotice = response.status === 403
+                    ? 'Customer messages are restricted by your permissions.'
+                    : 'Customer messages could not be loaded. Refresh to retry.';
+            }
         }
+
         if (version !== revision) return;
+
         const people = [];
         if (job) {
             const responses = await Promise.allSettled([
-                json(`/api/workspaces/${job.workspaceId}/directory`), json('/api/auth/me')
+                json(`/api/workspaces/${job.workspaceId}/directory`),
+                json('/api/auth/me')
             ]);
             if (responses[0].status === 'fulfilled') people.push(...responses[0].value);
             if (responses[1].status === 'fulfilled') people.push(responses[1].value.user || responses[1].value);
             studioRememberPeople(people);
         }
+
         if (version !== revision) return;
+
         const combined = mergeJobMessages(messages, conversation?.messages || []);
+        const workspaceName = job
+            ? (workspaceCache.find(w => w.id === job.workspaceId)?.name || 'Workspace')
+            : 'Workspace';
+
         detailPane.classList.remove('empty');
-        detailPane.innerHTML = `<div class="detail-header"><div><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><div class="reply-textbox-shell"><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? `<label class="reply-paperclip" title="Attach document" aria-label="Attach document"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8l9.2-9.2"/></svg><input type="file" data-message-file hidden></label>` : ``}</div><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
-        const renderMessages = () => {
-            const visible = combined;
-            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}" data-message-id="${esc(m.sourceId||'')}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
-        };
-        renderMessages();
-        if(job)detailPane.querySelector('.detail-header p').textContent=[job.linkedClientName||'Client not linked',job.status,job.eventDate].filter(Boolean).join(' · ');
-        if(job){
-            const filesPanel=document.createElement('section');
-            filesPanel.className='thread-shared-files';
-            const messagesPanel=document.getElementById('combinedJobMessages');
-            const composer=document.getElementById('hierarchyCompose');
-            const conversationRow=document.createElement('div');
-            conversationRow.className='job-conversation-row';
-            messagesPanel.before(conversationRow);
-            const messageColumn=document.createElement('div');
-            messageColumn.className='job-message-column';
-            const nextPanel=document.createElement('section');nextPanel.className='thread-next-tasks';
-            messageColumn.append(messagesPanel,composer);
-            conversationRow.append(messageColumn,filesPanel,nextPanel);
-            const current=()=>version===revision;
-            renderCompactTasks(job,nextPanel,current).catch(error=>{if(current())nextPanel.textContent='Upcoming work could not be loaded: '+error.message;});
-            const refreshFiles=()=>renderConversationFiles(job,filesPanel,current,refreshFiles);
-            refreshFiles().catch(error=>{if(current())filesPanel.textContent='Conversation files could not be loaded: '+error.message;});
+        document.getElementById('conversationView').classList.toggle('has-open-job', !!job);
+        detailPane.classList.toggle('job-reading-view', !!job);
+
+        if (!job) {
+            detailPane.innerHTML = `
+                <div class="detail-header">
+                    <div><h1>Workspace messages</h1><p>Shared with the workspace team</p></div>
+                </div>
+                <div id="combinedJobMessages" class="messages" aria-live="polite"></div>
+                <form id="hierarchyCompose" class="composer">
+                    <label for="hierarchyBody">Message the entire workspace</label>
+                    <div class="reply-textbox-shell"><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea></div>
+                    <div class="send-split"><button class="primary" type="submit">Send message</button></div>
+                    <p id="hierarchyError" role="alert"></p>
+                </form>`;
+        } else {
+            detailPane.innerHTML = `
+                <div class="job-breadcrumb">Workspaces / ${esc(workspaceName)}</div>
+
+                <header class="studio-job-header">
+                    <div class="studio-job-identity">
+                        <div class="studio-job-thumb" aria-hidden="true">
+                            <span>${esc((job.title || 'J').slice(0,1))}</span>
+                        </div>
+                        <div>
+                            <h1>${esc(job.title)}</h1>
+                            <p>${esc([
+                                job.linkedClientName || job.clientName || 'Client not linked',
+                                job.eventDate || 'Needs scheduling',
+                                job.status
+                            ].filter(Boolean).join(' · '))}</p>
+                        </div>
+                    </div>
+                    <div class="job-header-actions">
+                        <button class="action" type="button" data-job-list>Jobs</button>
+                        <button class="action" type="button" data-edit-details>Edit Details</button>
+                    </div>
+                </header>
+
+                <nav class="studio-job-tabs job-section-tabs" aria-label="Job information">
+                    <button data-job-tab="messages">Messages</button>
+                    <button data-job-tab="gallery">Media</button>
+                    <button data-job-tab="subjects">Subjects</button>
+                    <button data-job-tab="tasks">Tasks</button>
+                    <button data-job-tab="calendar">Calendar</button>
+                    <button data-job-tab="activity">Activity</button>
+                </nav>
+
+                <div class="studio-job-board job-work-board">
+                    <section class="studio-job-messages job-message-column" aria-label="Messages">
+                        <header class="job-panel-heading">
+                            <div><strong>Messages</strong><span>Conversation</span></div>
+                        </header>
+                        <div id="combinedJobMessages" class="messages" aria-live="polite"></div>
+                        <form id="hierarchyCompose" class="composer">
+                            <div class="reply-textbox-shell">
+                                <textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>
+                                <label class="reply-paperclip" title="Attach document" aria-label="Attach document">
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8l9.2-9.2"/></svg>
+                                    <input type="file" data-message-file hidden>
+                                </label>
+                            </div>
+                            <div class="send-split">
+                                <button class="primary" type="submit">Reply</button>
+                                <select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply">
+                                    <option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option>
+                                    <option value="Internal">Reply as internal note</option>
+                                    <option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option>
+                                </select>
+                            </div>
+                            <p class="muted">${esc(customerNotice)}</p>
+                            <p id="hierarchyError" role="alert"></p>
+                        </form>
+                    </section>
+
+                    <section class="studio-job-main job-lower-pane" aria-label="Job content">
+                        <div class="media-toolbar-host" aria-label="Media toolbar"></div>
+                        <div class="gallery-tab-filter"></div>
+                        <div class="job-tab-content"></div>
+                    </section>
+
+                    <aside class="studio-job-context job-context-sidebar">
+                        <section class="thread-next-tasks"></section>
+
+                        <section class="job-details-card">
+                            <header class="job-panel-heading">
+                                <div><strong>Job Details</strong><span>Current booking</span></div>
+                            </header>
+                            <dl>
+                                <dt>Customer</dt><dd>${esc(job.linkedClientName || job.clientName || 'Not linked')}</dd>
+                                <dt>Date</dt><dd>${esc(job.eventDate || 'Needs scheduling')}</dd>
+                                <dt>Status</dt><dd>${esc(job.status)}</dd>
+                                <dt>Workspace</dt><dd>${esc(workspaceName)}</dd>
+                                <dt>Assigned to</dt><dd>${esc(job.assignedTo ? studioFirstName(job.assignedTo) : 'Unassigned')}</dd>
+                            </dl>
+                            <button class="action" type="button" data-edit-details>Edit Details</button>
+                        </section>
+
+                        <section class="thread-shared-files"></section>
+                    </aside>
+                </div>`;
         }
+
+        const messagesHost = document.getElementById('combinedJobMessages');
+        messagesHost.innerHTML = combined.map(m => `
+            <article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}" data-message-id="${esc(m.sourceId || '')}">
+                <span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly).slice(0,1))}</span>
+                <div class="message-content">
+                    <div class="message-head">${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div>
+                    <p style="white-space:pre-wrap">${esc(m.body)}</p>
+                </div>
+            </article>`).join('') || '<p>No messages to display.</p>';
+
         const sender = document.getElementById('jobSendingIdentity');
-        const canSend = () => !job || sender?.value === 'Internal' || (!!conversation && (String(conversation.channel).toLowerCase() !== 'email' ? sender?.value === 'Workspace' : identities.some(i => i.type === sender?.value)));
+        const canSend = () => !job
+            || sender?.value === 'Internal'
+            || (!!conversation && (String(conversation.channel).toLowerCase() !== 'email'
+                ? sender?.value === 'Workspace'
+                : identities.some(i => i.type === sender?.value)));
+
         const syncSend = () => {
             const button = document.getElementById('hierarchyCompose').querySelector('button');
-            button.textContent = !job ? 'Send message' : sender?.value === 'Internal' ? 'Reply as internal note' : sender?.value === 'Self' ? 'Reply as myself' : 'Reply';
+            button.textContent = !job
+                ? 'Send message'
+                : sender?.value === 'Internal'
+                    ? 'Reply as internal note'
+                    : sender?.value === 'Self'
+                        ? 'Reply as myself'
+                        : 'Reply';
             button.disabled = !canSend();
         };
-        if(sender) { sender.value = 'Workspace'; sender.onchange = syncSend; }
+
+        if (sender) {
+            sender.value = 'Workspace';
+            sender.onchange = syncSend;
+        }
         syncSend();
-        if (scope === 'Job') {
-            detailPane.classList.add('job-reading-view'); document.getElementById('conversationView').classList.add('has-open-job');
-            const lower = document.createElement('section');
-            lower.className = 'job-lower-pane';
-            lower.innerHTML = '<nav class="workspace-tabs job-section-tabs" aria-label="Job information"><button data-job-tab="messages">Messages</button><button data-job-tab="gallery">Media</button><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks</button><button data-job-tab="calendar">Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="media-toolbar-host" aria-label="Media toolbar"></div><div class="gallery-tab-filter"></div><div class="job-tab-content"></div>';
-            detailPane.appendChild(lower);
-            const job = selectedJob;
+
+        if (job) {
+            detailPane.querySelector('[data-job-list]').onclick = () => {
+                document.getElementById('conversationView').classList.remove('has-open-job');
+                loadConversations().catch(fail);
+            };
+            detailPane.querySelectorAll('[data-edit-details]').forEach(button => {
+                button.onclick = () => openJobDetailsEditor(job);
+            });
+
+            const nextPanel = detailPane.querySelector('.thread-next-tasks');
+            const filesPanel = detailPane.querySelector('.thread-shared-files');
+            const current = () => version === revision;
+
+            renderCompactTasks(job, nextPanel, current)
+                .catch(error => { if (current()) nextPanel.textContent = 'Upcoming work could not be loaded: ' + error.message; });
+
+            const refreshFiles = () => renderConversationFiles(job, filesPanel, current, refreshFiles);
+            refreshFiles()
+                .catch(error => { if (current()) filesPanel.textContent = 'Conversation files could not be loaded: ' + error.message; });
+
             let tabRevision = 0;
+            const board = detailPane.querySelector('.job-work-board');
+            const lower = detailPane.querySelector('.job-lower-pane');
             const activate = async name => {
                 const token = ++tabRevision;
                 const panel = lower.querySelector('.job-tab-content');
-                const current = () => version === revision && token === tabRevision;
-                lower.querySelectorAll('[data-job-tab]').forEach(button => button.classList.toggle('active', button.dataset.jobTab === name));
+                const tabCurrent = () => version === revision && token === tabRevision;
+
+                detailPane.querySelectorAll('[data-job-tab]').forEach(button => {
+                    button.classList.toggle('active', button.dataset.jobTab === name);
+                });
+
+                detailPane.dataset.jobSection = name;
+                board.classList.toggle('focus-mode', name !== 'messages');
+                detailPane.querySelector('.job-message-column').hidden = name !== 'messages';
+                lower.querySelector('.media-toolbar-host').hidden = !['messages','gallery'].includes(name);
                 lower.querySelector('.gallery-tab-filter').replaceChildren();
-                detailPane.dataset.jobSection=name; const row=detailPane.querySelector('.job-conversation-row'); if(row)row.querySelector('.job-message-column').hidden=name!=='messages'; lower.querySelector('.media-toolbar-host').hidden=!['messages','gallery'].includes(name);
                 panel.textContent = 'Loading…';
+
                 try {
-                    if(name==='messages') await renderJobMediaOverview(job,panel,current);
-                    else await renderJobTab(name, job, panel, current, () => activate(name));
+                    if (name === 'messages') await renderJobMediaOverview(job, panel, tabCurrent);
+                    else await renderJobTab(name, job, panel, tabCurrent, () => activate(name));
+                } catch (error) {
+                    if (tabCurrent()) panel.textContent = 'Unable to load: ' + (error.message || error);
                 }
-                catch (error) { if (current()) panel.textContent = 'Unable to load: ' + (error.message || error); }
             };
-            lower.querySelectorAll('[data-job-tab]').forEach(button => button.onclick = () => activate(button.dataset.jobTab));
-            const conversationRow=detailPane.querySelector('.job-conversation-row');
-            const side=document.createElement('aside'); side.className='job-context-sidebar';
-            side.append(conversationRow.querySelector('.thread-next-tasks'));
-            const details=document.createElement('details');details.className='job-details-card';details.open=true;
-            details.innerHTML=`<summary>Details</summary><dl><dt>Customer</dt><dd>${esc(job.linkedClientName||job.clientName||'Not linked')}</dd><dt>Date</dt><dd>${esc(job.eventDate||'Needs scheduling')}</dd><dt>Status</dt><dd>${esc(job.status)}</dd><dt>Workspace</dt><dd>${esc(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace')}</dd><dt>Assigned to</dt><dd>${esc(job.assignedTo?studioFirstName(job.assignedTo):'Unassigned')}</dd></dl><button class="action" data-edit-details>Edit Details</button>`;
-            details.querySelector('[data-edit-details]').onclick=()=>openJobDetailsEditor(job);
-            side.append(details,conversationRow.querySelector('.thread-shared-files'));
-            const board=document.createElement('div');board.className='job-work-board';
-            const header=detailPane.querySelector('.detail-header');
-            const breadcrumb=document.createElement('p');breadcrumb.className='job-breadcrumb';breadcrumb.textContent='Workspaces / '+(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace');
-            header.before(breadcrumb);
-            const actions=document.createElement('div');actions.className='job-header-actions';actions.innerHTML='<button class="action" data-job-list>Jobs</button><button class="action" data-edit-details>Edit Details</button>';
-            actions.querySelector('[data-job-list]').onclick=()=>{document.getElementById('conversationView').classList.remove('has-open-job');loadConversations().catch(fail);};
-            actions.querySelector('[data-edit-details]').onclick=()=>openJobDetailsEditor(job);header.append(actions);
-            const nav=lower.querySelector('.job-section-tabs');header.after(nav,board);
-            board.append(conversationRow.querySelector('.job-message-column'),lower,side);conversationRow.remove();
+
+            detailPane.querySelectorAll('[data-job-tab]').forEach(button => {
+                button.onclick = () => activate(button.dataset.jobTab);
+            });
+
             activate('messages');
-        } else detailPane.classList.remove('job-reading-view'); document.getElementById('conversationView').classList.remove('has-open-job');
-        let pendingSend=null,pendingAttachment=null;
+        }
+
+        let pendingSend = null, pendingAttachment = null;
         document.getElementById('hierarchyCompose').onsubmit = async event => {
             event.preventDefault();
-            const form = event.currentTarget, body = form.querySelector('textarea').value.trim();
-            if ((!body&&!pendingSend) || !canSend()) return;
-            const button = form.querySelector('button'); button.disabled = true;
+            const form = event.currentTarget;
+            const body = form.querySelector('textarea').value.trim();
+            if ((!body && !pendingSend) || !canSend()) return;
+
+            const button = form.querySelector('button');
+            button.disabled = true;
+
             try {
                 const external = job && sender?.value !== 'Internal';
-                const url = external ? `/api/conversations/${job.conversationId}/messages` : `/api/messages/threads/${value.id}`;
-                const payload = external ? {body, isInternal:false, sendingIdentity:sender?.value || 'Workspace'} : {body};
-                const sent = pendingSend || await json(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); pendingSend=sent; form.querySelector('textarea').readOnly=true; if(sender)sender.disabled=true;
+                const url = external
+                    ? `/api/conversations/${job.conversationId}/messages`
+                    : `/api/messages/threads/${value.id}`;
+                const payload = external
+                    ? { body, isInternal:false, sendingIdentity:sender?.value || 'Workspace' }
+                    : { body };
+
+                const sent = pendingSend || await json(url, {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(payload)
+                });
+
+                pendingSend = sent;
+                form.querySelector('textarea').readOnly = true;
+                if (sender) sender.disabled = true;
+
                 const file = job ? form.querySelector('[data-message-file]')?.files?.[0] : null;
                 if (file) {
                     const messageId = external ? sent.messageId : sent.id;
                     if (!messageId) throw new Error('Message was sent but Studio did not return its message id, so the attachment was not uploaded.');
-                    const data = new FormData(); data.append('file', file);
-                    if(!pendingAttachment)pendingAttachment=await json('/api/conversations/' + job.conversationId + '/attachments?visibility=' + encodeURIComponent(external ? 'External' : 'Internal'),{method:'POST',body:data});
-                    const attachment=pendingAttachment;
-                    const link = await fetch('/api/attachments/' + attachment.id + '/message-link', {
+
+                    const data = new FormData();
+                    data.append('file', file);
+
+                    if (!pendingAttachment) {
+                        pendingAttachment = await json(
+                            '/api/conversations/' + job.conversationId + '/attachments?visibility=' + encodeURIComponent(external ? 'External' : 'Internal'),
+                            { method:'POST', body:data });
+                    }
+
+                    const link = await fetch('/api/attachments/' + pendingAttachment.id + '/message-link', {
                         method:'POST',
                         headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({messageId, messageKind:external?'ConversationMessage':'JobMessage', jobId:job.id})
+                        body:JSON.stringify({
+                            messageId,
+                            messageKind:external ? 'ConversationMessage' : 'JobMessage',
+                            jobId:job.id
+                        })
                     });
                     if (!link.ok) throw new Error(await link.text());
                 }
+
                 if (version === revision) await thread(scope, scopeId, version);
-            } catch(error) { form.querySelector('[role="alert"]').textContent = pendingSend ? 'Message saved. Attachment could not be linked; retry to finish attaching it.' : (error.message || error); }
-            finally { if (form.isConnected) { syncSend(); if(pendingSend) {button.textContent='Retry attachment';form.querySelector('textarea').required=false;} } }
+            } catch(error) {
+                form.querySelector('[role="alert"]').textContent = pendingSend
+                    ? 'Message saved. Attachment could not be linked; retry to finish attaching it.'
+                    : (error.message || error);
+            } finally {
+                if (form.isConnected) {
+                    syncSend();
+                    if (pendingSend) {
+                        button.textContent = 'Retry attachment';
+                        form.querySelector('textarea').required = false;
+                    }
+                }
+            }
         };
     }
+
     async function renderConversationFiles(job,panel,current,refresh) {
             const files = (await json(`/api/conversations/${job.conversationId}/files`)).filter(f=>f.messageId);
             if (!current()) return;
