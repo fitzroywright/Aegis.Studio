@@ -46,15 +46,22 @@ internal static class DemoDataExpansion
             int subjects=index>=4?6:1;
             for(int subject=0;subject<subjects;subject++)
                 Execute(connection,transaction,"insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by) values($1,$2,$3,$4,'Fictional demo subject',$5)",Id(25,number*10+subject),job,names[(index+subject)%names.Length],$"DEMO-{number}-{subject+1:00}",login);
-            for(int asset=0;asset<4;asset++)
+            int assetCount=number==4?12:4;
+            string[] weddingCollections=["Getting Ready","Getting Ready","Ceremony","Ceremony","Ceremony","Ceremony","Portraits","Portraits","Portraits","Reception","Reception","Reception"];
+            for(int asset=0;asset<assetCount;asset++)
             {
                 string key=$"demo-{number}-{asset}";
-                Guid original=Id(26,number*10+asset);
-                AddImage(connection,transaction,root,job,key,original,1,index*4+asset,null,login);
-                if(asset==0)AddImage(connection,transaction,root,job,key,Id(27,number),2,index*4+asset+1,original,login);
-                Execute(connection,transaction,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,$3)",job,key,asset<2?"Demo selects":"Demo proofs");
+                Guid original=Id(26,number*100+asset);
+                AddImage(connection,transaction,root,job,key,original,1,index*16+asset,null,login);
+                if(asset==0)AddImage(connection,transaction,root,job,key,Id(27,number),2,index*16+asset+1,original,login);
+                string collection=number==4?weddingCollections[asset]:(asset<2?"Demo selects":"Demo proofs");
+                Execute(connection,transaction,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,$3)",job,key,collection);
+                Execute(connection,transaction,"update studio_job_asset_collections set collection_name=$3 where job_id=$1 and asset_key=$2",job,key,collection);
             }
-            Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Studio','Internal',$3,now())",Id(28,number),Id(2,number),"Demo gallery ready: four sample illustrations across Selects and Proofs, with two versions of the first image. Explore the scheduled tasks and subject records below.");
+            string mediaMessage=number==4
+                ?"Demo gallery ready: twelve sample wedding illustrations across Getting Ready, Ceremony, Portraits and Reception."
+                :"Demo gallery ready: four sample illustrations across Selects and Proofs, with two versions of the first image.";
+            Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Studio','Internal',$3,now())",Id(28,number),Id(2,number),mediaMessage);
         }
         Execute(connection,transaction,"insert into studio_state(key,value,updated_at_utc) values('demo-data-v2',$1,now())",login);
         return true;
