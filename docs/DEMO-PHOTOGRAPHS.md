@@ -20,6 +20,7 @@ Only photographs verified as CC0 or public domain are included in the curated ca
 | Product / commercial | Product photo.jpg | CC0 |
 | Wedding | People at Wedding ceremony.jpg | CC0 |
 | Wedding | A group picture together with the groom at Wedding ceremony.jpg | CC0 |
+| Family portrait | Family portrait.jpg | U.S. federal government public domain |
 
 The existing Carter Wedding catalogue also uses Wikimedia Commons photographs and records the Commons source URL in Common.Storage metadata.
 
