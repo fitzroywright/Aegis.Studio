@@ -317,7 +317,7 @@
                             </div>
                         </div>
                         <div class="workspace-reference-list" data-workspace-list>${renderRows(workspaceData)}</div>
-                    </main>
+                    </div>
 
                     <aside class="workspace-reference-side">
                         <section class="workspace-side-card">
