@@ -253,7 +253,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     <div class="job-media-content"></div>
                 </section>
                 <section class="job-center-panel job-subjects-section">
-                    <header class="job-center-heading"><h2>Subjects</h2></header>
+                    <header class="job-center-heading"><h2>Subjects</h2><button type="button" class="text-button" data-job-add-subject>＋ Add Subject</button></header>
                     <div class="job-subjects-content"></div>
                 </section>
                 <section class="job-center-panel job-tasks-section">
@@ -373,6 +373,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 refreshTasks(),
                 renderCompactTasks(job,nextPanel,current)
             ]).then(()=>{});
+
+            lower.querySelector('[data-job-add-subject]').onclick=()=>{
+                const add=subjectsPanel.querySelector('#addJobSubject');
+                if(add)add.click();
+            };
 
             lower.querySelector('[data-job-add-task]').onclick=()=>{
                 const dialog=studioDialog('Job tasks','<div class="all-tasks"></div>');
