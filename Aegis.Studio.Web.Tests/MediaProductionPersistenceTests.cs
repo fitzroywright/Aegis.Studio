@@ -30,7 +30,7 @@ public sealed class MediaProductionPersistenceTests
         {
             using(var c=db.OpenConnection())
             {
-                Sql(c,"create table studio_workspaces(id uuid primary key)");Sql(c,"create table studio_jobs(id uuid primary key,workspace_id uuid,title text,assigned_to text,event_date date)");
+                Sql(c,"create table studio_workspaces(id uuid primary key)");Sql(c,"create table studio_jobs(id uuid primary key,workspace_id uuid,title text,assigned_to text,event_date date,status text not null default 'New')");
                 Sql(c,"create table studio_operational_audit(id uuid primary key,job_id uuid,action text,user_name text,detail text,created_at_utc timestamptz)");
             }
             new WorkspaceJobStore(db).EnsureSchema();var versions=new StudioVersionStore(db,new LocalFileStorage(Path.Combine(root,"storage")));
@@ -39,9 +39,11 @@ public sealed class MediaProductionPersistenceTests
             string csv="Subject ID,Name,Department\n"+string.Join("\n",Enumerable.Range(1,50).Select(i=>$"{i},Employee {i},Operations"));
             Assert.Equal(50,store.ImportSubjects(job,new(csv,"Name","Subject ID"),"editor"));
             store.ImportSubjects(job,new(csv.Replace("Employee 1,","Updated Employee 1,"),"Name","Subject ID"),"editor");
-            Assert.Equal(50,store.Snapshot(job).GetProperty("subjects").GetArrayLength());
+            Assert.Equal(50,store.Snapshot(job).GetProperty("subjects").EnumerateArray().Count(x=>!x.GetProperty("isSystem").GetBoolean()));
             byte[] jpeg=[0xff,0xd8,0xff,0xda,0,2,12,34,0xff,0xd9];
             store.Ingest(job,File(jpeg,"original.jpg"),false,null,"editor",null);
+            store.Ingest(job,File(jpeg,"original.jpg"),false,null,"editor",null);
+            Assert.Single(store.Snapshot(job).GetProperty("assets").EnumerateArray());
             var snapshot=store.Snapshot(job);var asset=snapshot.GetProperty("assets")[0];Guid assetId=asset.GetProperty("id").GetGuid();string key=asset.GetProperty("assetKey").GetString()!;
             Assert.Equal("General",asset.GetProperty("collection").GetString());
             store.CreateCollection(job,"ID portraits","editor");store.SetDefaultCollection(job,"ID portraits","editor");
@@ -65,7 +67,7 @@ public sealed class MediaProductionPersistenceTests
             byte[] stale=bytes.ToArray().Concat(new byte[]{0}).ToArray();store.Ingest(job,File(stale,"old-edit.jpg"),true,null,"editor",null);
             Assert.Equal(3,versions.GetHistory(job,key).Count);Assert.Single(store.Snapshot(job).GetProperty("unmatched").EnumerateArray());
             store.ImportSubjects(wedding,new("ID,Name\nbride,Bride\ngroom,Groom","Name","ID"),"editor");store.Ingest(wedding,File(jpeg,"ceremony.jpg"),false,null,"editor",null);
-            var weddingData=store.Snapshot(wedding);Guid weddingAsset=weddingData.GetProperty("assets")[0].GetProperty("id").GetGuid();Guid[] weddingSubjects=weddingData.GetProperty("subjects").EnumerateArray().Select(x=>x.GetProperty("id").GetGuid()).ToArray();
+            var weddingData=store.Snapshot(wedding);Guid weddingAsset=weddingData.GetProperty("assets")[0].GetProperty("id").GetGuid();Guid[] weddingSubjects=weddingData.GetProperty("subjects").EnumerateArray().Where(x=>!x.GetProperty("isSystem").GetBoolean()).Select(x=>x.GetProperty("id").GetGuid()).ToArray();
             store.UpdateAsset(wedding,weddingAsset,new("Ready","Ceremony",weddingSubjects,null),"editor");Assert.Single(store.Snapshot(wedding).GetProperty("assets").EnumerateArray());Assert.Equal(2,store.Snapshot(wedding).GetProperty("assets")[0].GetProperty("subjects").GetArrayLength());
             var clients=new StudioClientStore(db);clients.Migrate();var client=clients.Save(null,new("Shared client","client@example.invalid",null));clients.Link(job,client.Id,"frontdesk");clients.Link(wedding,client.Id,"frontdesk");Assert.Single(clients.List());clients.Link(job,null,"frontdesk");
             using(var c=db.OpenConnection()){
@@ -95,3 +97,4 @@ public sealed class MediaProductionPersistenceTests
         public IFileProvider ContentRootFileProvider {get;set;}=new NullFileProvider();public IFileProvider WebRootFileProvider {get;set;}=new NullFileProvider();
     }
 }
+
