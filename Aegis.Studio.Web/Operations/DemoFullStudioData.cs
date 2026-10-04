@@ -101,7 +101,7 @@ internal static class DemoFullStudioData
             Guid workspaceId=Id(1,job.Workspace);
             Guid clientId=Id(40,job.Client);
             var client=Clients.Single(x=>x.Number==job.Client);
-            DateTimeOffset start=DateTimeOffset.UtcNow.Date.AddDays(job.DayOffset).AddHours(14+(ordinal%5));
+            DateTimeOffset start=new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero).AddDays(job.DayOffset).AddHours(14+(ordinal%5));
             DateTimeOffset end=start.AddHours(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?6:job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)?3:2);
 
             Execute(connection,transaction,
@@ -365,7 +365,7 @@ internal static class DemoFullStudioData
             decimal subtotal=job.Price;
             decimal tax=0m;
             decimal total=subtotal+tax;
-            DateTimeOffset due=DateTimeOffset.UtcNow.Date.AddDays(i%3==0?-3:7+i);
+            DateTimeOffset due=new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero).AddDays(i%3==0?-3:7+i);
             string status=statuses[i];
             Execute(c,tx,"insert into studio_account_invoices(id,invoice_number,job_id,client_name,client_email,currency,subtotal,tax_amount,total_amount,status,due_at_utc,issued_at_utc,paid_at_utc,created_by,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,'JMD',$6,$7,$8,$9,$10,$11,$12,'demo-seed',now()-interval '10 days',now()) on conflict(id) do update set client_name=excluded.client_name,client_email=excluded.client_email,subtotal=excluded.subtotal,tax_amount=excluded.tax_amount,total_amount=excluded.total_amount,status=excluded.status,due_at_utc=excluded.due_at_utc,issued_at_utc=excluded.issued_at_utc,paid_at_utc=excluded.paid_at_utc,updated_at_utc=now()",
                 invoice,$"DEMO-{DateTime.UtcNow:yyyy}-{job.Number}",Id(41,job.Number),client.Name,client.Email,subtotal,tax,total,status,due,
@@ -402,8 +402,8 @@ internal static class DemoFullStudioData
                 notes="DEMO front desk booking request",
                 clientId=Id(40,item.Item3),
                 externalBookingId=$"DEMO-{item.Item1}",
-                startsAtUtc=DateTimeOffset.UtcNow.Date.AddDays(item.Item8).AddHours(15),
-                endsAtUtc=DateTimeOffset.UtcNow.Date.AddDays(item.Item8).AddHours(17),
+                startsAtUtc=new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero).AddDays(item.Item8).AddHours(15),
+                endsAtUtc=new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero).AddDays(item.Item8).AddHours(17),
                 location="Demo location",
                 clientPhone=client.Phone
             };
@@ -420,7 +420,7 @@ internal static class DemoFullStudioData
     private static void Execute(NpgsqlConnection c,NpgsqlTransaction tx,string sql,params object[] values)
     {
         using var command=new NpgsqlCommand(sql,c,tx);
-        foreach(object value in values) command.Parameters.AddWithValue(value);
+        foreach(object value in values) command.Parameters.AddWithValue(value is DateTimeOffset timestamp?timestamp.ToUniversalTime():value);
         command.ExecuteNonQuery();
     }
 }
