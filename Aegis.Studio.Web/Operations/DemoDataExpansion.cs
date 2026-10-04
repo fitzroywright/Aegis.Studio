@@ -232,7 +232,7 @@ internal static class DemoDataExpansion
         return (Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo wedding media upsert did not return an id."));
     }
 
-    private static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login)
+    internal static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login)
     {
         using Image<Rgb24> image=CreateIllustration(variant);
         using var content=new MemoryStream();
