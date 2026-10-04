@@ -6,7 +6,7 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.FrontDesk;
 
-public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null);
+public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null,string? ExternalBookingId=null,DateTimeOffset? StartsAtUtc=null,DateTimeOffset? EndsAtUtc=null,string? Location=null,string? ClientPhone=null);
 public sealed record VerifiedDepositRequest(decimal Amount,string Currency,string Provider,string Reference);
 public sealed record FrontDeskRequest(Guid Id,PendingBookingRequest Request,string Status,Guid? JobId,decimal RecordedDeposit,DateTimeOffset CreatedAtUtc);
 
@@ -18,6 +18,8 @@ public static class FrontDeskRequestRules
             throw new ArgumentException("Workspace, customer and job title are required (maximum 200 characters).");
         if(!System.Net.Mail.MailAddress.TryCreate(request.ClientEmail,out _) || request.ClientEmail.Length>320) throw new ArgumentException("A valid customer email is required.");
         if(request.EventDate==default || (request.Notes?.Length ?? 0)>4000) throw new ArgumentException("Event date is required and notes must be at most 4000 characters.");
+        if((request.ExternalBookingId?.Length??0)>200 || (request.Location?.Length??0)>500 || (request.ClientPhone?.Length??0)>80)throw new ArgumentException("Booking reference or location is too long.");
+        if(request.StartsAtUtc.HasValue != request.EndsAtUtc.HasValue || (request.StartsAtUtc.HasValue && request.EndsAtUtc<=request.StartsAtUtc))throw new ArgumentException("Choose a valid booking time range.");
         ValidateMoney(request.RequiredDeposit,request.Currency);
         if(!string.Equals(request.Currency.Trim(),"JMD",StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("The current Studio deposit ledger supports JMD only.");
     }
@@ -37,7 +39,8 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         string[] sql=[
             "create table if not exists studio_frontdesk_requests(id uuid primary key,workspace_id uuid not null references studio_workspaces(id),payload jsonb not null,status text not null default 'Pending',job_id uuid null references studio_jobs(id),created_by text not null,created_at_utc timestamptz not null default now(),deposit_requested_at_utc timestamptz null)",
             "create table if not exists studio_frontdesk_deposits(id uuid primary key,request_id uuid not null references studio_frontdesk_requests(id),amount numeric(18,2) not null check(amount>0),currency text not null,provider text not null,reference text not null,recorded_by text not null,created_at_utc timestamptz not null default now(),unique(provider,reference))",
-            "create index if not exists ix_frontdesk_request_deposits on studio_frontdesk_deposits(request_id)"
+            "create index if not exists ix_frontdesk_request_deposits on studio_frontdesk_deposits(request_id)",
+            "create unique index if not exists ux_frontdesk_external_booking on studio_frontdesk_requests((payload->>'externalBookingId')) where payload->>'externalBookingId' is not null"
         ];
         using var connection=database.OpenConnection();using var tx=connection.BeginTransaction();
         foreach(string statement in sql)Execute(connection,tx,statement);
@@ -52,8 +55,21 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
     public FrontDeskRequest Create(PendingBookingRequest request,string user)
     {
         FrontDeskRequestRules.Validate(request);
-        request=request with{ClientName=request.ClientName.Trim(),ClientEmail=request.ClientEmail.Trim(),Title=request.Title.Trim(),Currency=request.Currency.Trim().ToUpperInvariant()};
+        request=request with{ClientName=request.ClientName.Trim(),ClientEmail=request.ClientEmail.Trim(),Title=request.Title.Trim(),Currency=request.Currency.Trim().ToUpperInvariant(),ExternalBookingId=string.IsNullOrWhiteSpace(request.ExternalBookingId)?null:request.ExternalBookingId.Trim()};
         using var connection=database.OpenConnection();using var tx=connection.BeginTransaction();
+        if(request.ExternalBookingId is not null)
+        {
+            Execute(connection,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","booking:"+request.ExternalBookingId);
+            using var existing=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0),r.created_at_utc from studio_frontdesk_requests r where payload->>'externalBookingId'=$1",connection,tx);
+            existing.Parameters.AddWithValue(request.ExternalBookingId);using var reader=existing.ExecuteReader();
+            if(reader.Read())
+            {
+                FrontDeskRequest prior=Read(reader);
+                // The server's deposit policy can change between retries; compare the submitted booking facts.
+                if((prior.Request with { RequiredDeposit=request.RequiredDeposit }) != request)throw new ArgumentException("This booking reference was already used with different details.");
+                return prior;
+            }
+        }
         using(var workspace=new NpgsqlCommand("select id from studio_workspaces where id=$1 and is_enabled for share",connection,tx))
         {workspace.Parameters.AddWithValue(request.WorkspaceId);if(workspace.ExecuteScalar() is null)throw new ArgumentException("Choose an enabled workspace.");}
         if(request.ClientId.HasValue){using var client=new NpgsqlCommand("select id from studio_clients where id=$1",connection,tx);client.Parameters.AddWithValue(request.ClientId.Value);if(client.ExecuteScalar() is null)throw new ArgumentException("Client not found.");}
@@ -121,7 +137,19 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
             }
             else Execute(connection,tx,"insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values($1,$2,$3,$4,$5,'Email',false,now())",conversation,r.WorkspaceId,r.Title,r.ClientName,r.ClientEmail);
             Execute(connection,tx,"insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc) values($1,$2,$3,$4,$5,'Needs Scheduling',$6,now())",job,r.WorkspaceId,conversation,r.Title,r.ClientName,r.EventDate);
-            if(r.ClientId.HasValue)Execute(connection,tx,"update studio_jobs set client_id=$2 where id=$1",job,r.ClientId.Value);
+            Guid clientId=r.ClientId??Guid.Empty;
+            if(clientId==Guid.Empty)
+            {
+                Execute(connection,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","client:"+r.ClientEmail.ToLowerInvariant()+":"+r.ClientName.ToLowerInvariant());
+                using var client=new NpgsqlCommand("select id from studio_clients where lower(email)=lower($1) and lower(display_name)=lower($2) order by updated_at_utc desc limit 1",connection,tx);
+                client.Parameters.AddWithValue(r.ClientEmail);client.Parameters.AddWithValue(r.ClientName);
+                if(client.ExecuteScalar() is Guid existingClient)clientId=existingClient;
+                else{clientId=Guid.NewGuid();Execute(connection,tx,"insert into studio_clients(id,display_name,email,phone) values($1,$2,$3,$4)",clientId,r.ClientName,r.ClientEmail,(object?)r.ClientPhone??DBNull.Value);}
+            }
+            Execute(connection,tx,"update studio_jobs set client_id=$2 where id=$1",job,clientId);
+            if(r.StartsAtUtc.HasValue && r.EndsAtUtc.HasValue)
+                Execute(connection,tx,"insert into studio_schedule_entries(id,job_id,booking_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,null,$3,$4,$5,$6,'Requested',$7,now())",Guid.NewGuid(),job,r.Title,r.StartsAtUtc.Value.ToUniversalTime(),r.EndsAtUtc.Value.ToUniversalTime(),(object?)r.Location??DBNull.Value,(object?)r.Notes??DBNull.Value);
+            Execute(connection,tx,"insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,'BookingConfirmed',$3,'Deposit verified; job ready for scheduling.',now())",Guid.NewGuid(),job,user);
             Execute(connection,tx,"update studio_conversations set job_id=$2 where id=$1",conversation,job);
             Execute(connection,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'FrontDesk','Internal','Booking confirmed by FrontDesk. Job created and ready for manager scheduling.',now())",Guid.NewGuid(),conversation);
             Execute(connection,tx,"insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) select id,$2,'Deposit',amount,currency||' / '||provider||' / '||reference,created_at_utc from studio_frontdesk_deposits where request_id=$1",id,job);
@@ -160,3 +188,4 @@ public static class FrontDeskBookingRequestEndpoints
     private static IResult Run(Func<IResult> action)
     {try{return action();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}}
 }
+
