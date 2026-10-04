@@ -1461,18 +1461,28 @@ body[data-theme="studio-default"] .navigation-pane .brand-name{
 body[data-theme="studio-default"] .navigation-pane .brand-mark{
   color:#f2c671!important;
 }
-body[data-theme="studio-default"] .navigation-pane .workspaces{
-  display:none!important;
-}
 body[data-theme="studio-default"] .navigation-pane .rail{
-  flex:1 1 auto!important;
+  order:1!important;
+  flex:0 0 auto!important;
   display:flex!important;
   flex-direction:column!important;
   justify-content:flex-start!important;
   gap:2px!important;
-  padding:clamp(120px,38vh,350px) 7px 10px!important;
+  padding:8px 7px 6px!important;
   border:0!important;
   background:#171612!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspaces{
+  order:2!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  display:block!important;
+  visibility:visible!important;
+  overflow:auto!important;
+  margin:6px 8px 10px!important;
+  padding:7px 0 0!important;
+  border-top:1px solid rgba(255,255,255,.10)!important;
+  background:transparent!important;
 }
 body[data-theme="studio-default"] .navigation-pane .brand-button{
   min-height:40px!important;
@@ -1510,9 +1520,10 @@ body[data-theme="studio-default"] .navigation-pane .brand-button.active .nav-ico
   color:#956d23!important;
 }
 body[data-theme="studio-default"] .navigation-pane .studio-back-button{
-  order:-1!important;
-  margin:0 0 10px!important;
+  order:99!important;
+  margin:6px 0 0!important;
   background:transparent!important;
+  opacity:.72!important;
 }
 
 body[data-theme="studio-default"] main{
@@ -2419,4 +2430,75 @@ body[data-theme="studio-default"] .mockup-more-actions{
 }
 body[data-theme="studio-default"] .mockup-more-actions .action{
   justify-content:flex-start!important;
+}
+
+
+/* Functional navigation recovery: workspace selection is part of the product, not decoration. */
+body[data-theme="studio-default"] .navigation-pane .section-title{
+  display:block!important;
+  padding:8px 8px 6px!important;
+  border:0!important;
+  background:transparent!important;
+  color:#9d978e!important;
+  font-size:9px!important;
+  font-weight:750!important;
+  letter-spacing:.12em!important;
+  text-transform:uppercase!important;
+}
+body[data-theme="studio-default"] #workspaceList{
+  display:block!important;
+  padding:0!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspace{
+  position:relative!important;
+  width:100%!important;
+  min-height:38px!important;
+  margin:1px 0!important;
+  padding:7px 7px 7px 27px!important;
+  display:block!important;
+  overflow:hidden!important;
+  border:0!important;
+  border-radius:7px!important;
+  background:transparent!important;
+  color:#ddd9d3!important;
+  text-align:left!important;
+  box-shadow:none!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspace::before{
+  left:8px!important;
+  top:11px!important;
+  width:12px!important;
+  height:9px!important;
+  border:1px solid #7d6a52!important;
+  border-radius:2px!important;
+  background:#675744!important;
+  box-shadow:none!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspace b{
+  display:block!important;
+  overflow:hidden!important;
+  color:#f3f1ed!important;
+  font-size:10.5px!important;
+  font-weight:650!important;
+  white-space:nowrap!important;
+  text-overflow:ellipsis!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspace small{
+  display:block!important;
+  margin-top:2px!important;
+  overflow:hidden!important;
+  color:#8f8980!important;
+  font-size:8.5px!important;
+  white-space:nowrap!important;
+  text-overflow:ellipsis!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspace:hover{
+  background:rgba(255,255,255,.06)!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspace.active{
+  background:rgba(242,140,40,.16)!important;
+  box-shadow:inset 3px 0 #f28c28!important;
+}
+body[data-theme="studio-default"] .workspace-brand-card{
+  display:none!important;
 }
