@@ -170,7 +170,16 @@ body[data-theme="studio-default"] .navigation-pane .studio-back-button{
 
 /* Real workspace selector stays visible and usable. */
 body[data-theme="studio-default"] .navigation-pane .workspaces{
-  display:none!important;
+  order:2!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  display:block!important;
+  visibility:visible!important;
+  overflow:auto!important;
+  margin:5px 8px 8px!important;
+  padding-top:7px!important;
+  border-top:1px solid rgba(255,255,255,.08)!important;
+  background:transparent!important;
 }
 body[data-theme="studio-default"] .navigation-pane .section-title{
   padding:7px 8px 5px!important;
