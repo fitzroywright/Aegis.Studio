@@ -260,7 +260,7 @@ internal static class DemoFullStudioData
         if(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return 2;
         if(job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)) return 4;
         if(job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)) return 2;
-        if(job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return 2;
+        if(job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return 1;
         return 1;
     }
 
@@ -273,7 +273,9 @@ internal static class DemoFullStudioData
         if(job.Type.Contains("Product",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Campaign",StringComparison.OrdinalIgnoreCase)) return 9;
         if(job.Type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)) return 8;
         if(job.Type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)) return 7;
-        return 6+(index%2);
+        if(job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return 12;
+        if(job.Type.Contains("Portrait",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Senior",StringComparison.OrdinalIgnoreCase)) return 4+(index%2);
+        return 4+(index%2);
     }
 
     private static void SeedConversation(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,DemoClient client,Guid conversation,int ordinal)
