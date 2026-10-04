@@ -502,9 +502,9 @@
                             <div class="admin-form-stack">
                                 <label>Name<input id="workspaceName"></label>
                                 <label>Email address<input id="workspaceEmail" type="email"></label>
-                                <label>Route key<input id="workspaceRouteKey"></label>
                                 <label>Manager user name<input id="workspaceManagerUser" placeholder="domain user name"></label>
                                 <label>Manager display name<input id="workspaceManagerDisplay"></label>
+                                <details><summary>Advanced / Integration Settings</summary><label>Route key<input id="workspaceRouteKey" placeholder="Generated automatically"></label><small>Used by website booking and incoming-message integrations. Leave blank to generate automatically.</small></details>
                                 <button class="primary" type="button" onclick="createWorkspace()">Create Workspace</button>
                             </div>
                         </section>
@@ -512,7 +512,7 @@
                         <section class="admin-card admin-help-card">
                             <header class="admin-card-header"><div><h2>Administration</h2></div></header>
                             <p>Workspace access remains membership-based. Use reusable roles where possible and one-off permissions only when required.</p>
-                            <p>Routing uses the exact email address or route key. Every operational workspace requires a Workspace Manager.</p>
+                            <p>Every operational workspace requires a Workspace Manager. Integration routing is configured under Advanced / Integration Settings.</p>
                         </section>
                     </aside>
                 </div>

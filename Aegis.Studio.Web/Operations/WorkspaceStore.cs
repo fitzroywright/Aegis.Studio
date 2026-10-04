@@ -66,18 +66,20 @@ public sealed class WorkspaceStore
 
     public StudioWorkspaceDefinition Create(SaveWorkspaceRequest request)
     {
-        StudioWorkspaceDefinition workspace = new(Guid.NewGuid(), request.Name.Trim(), Clean(request.EmailAddress), Clean(request.RouteKey), request.IsEnabled, request.SortOrder);
+        Guid id = Guid.NewGuid();
+        StudioWorkspaceDefinition workspace = new(id, request.Name.Trim(), Clean(request.EmailAddress), Clean(request.RouteKey) ?? GenerateRouteKey(id), request.IsEnabled, request.SortOrder);
         Save(workspace);
         return workspace;
     }
 
     public StudioWorkspaceDefinition Update(Guid id, SaveWorkspaceRequest request)
     {
-        if (Get(id) is null)
+        StudioWorkspaceDefinition? existing = Get(id);
+        if (existing is null)
         {
             throw new KeyNotFoundException("Workspace was not found.");
         }
-        StudioWorkspaceDefinition workspace = new(id, request.Name.Trim(), Clean(request.EmailAddress), Clean(request.RouteKey), request.IsEnabled, request.SortOrder);
+        StudioWorkspaceDefinition workspace = new(id, request.Name.Trim(), Clean(request.EmailAddress), Clean(request.RouteKey) ?? existing.RouteKey ?? GenerateRouteKey(id), request.IsEnabled, request.SortOrder);
         Save(workspace);
         return workspace;
     }
@@ -114,9 +116,12 @@ public sealed class WorkspaceStore
     private static StudioWorkspaceDefinition Read(NpgsqlDataReader reader)
         => new(reader.GetGuid(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3), reader.GetBoolean(4), reader.GetInt32(5));
 
+    private static string GenerateRouteKey(Guid id) => $"workspace-{id:N}";
+
     private static string Normalize(string value) => value.Trim().Trim('<', '>').ToLowerInvariant();
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 public sealed record StudioWorkspaceDefinition(Guid Id, string Name, string? EmailAddress, string? RouteKey, bool IsEnabled, int SortOrder);
 public sealed record SaveWorkspaceRequest(string Name, string? EmailAddress, string? RouteKey, bool IsEnabled, int SortOrder);
+

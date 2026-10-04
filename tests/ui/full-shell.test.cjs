@@ -39,6 +39,7 @@ test('the full shell loads every operational screen with a shared data graph',as
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));w.fetch=async url=>({ok:true,status:200,json:async()=>api(new URL(url,'http://studio.test')),text:async()=>JSON.stringify(api(new URL(url,'http://studio.test')))});
  for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
  await new Promise(r=>setTimeout(r,25));
- for(const view of ['mywork','workspaces','pipeline','production','frontdesk','finance','management']){try{await w.studioNavigate(view);assert.ok(w.document.querySelector('#genericView h1'),view);}catch(e){errors.push(view+': '+e.message)}}
+ for(const view of ['mywork','workspaces','pipeline','production','frontdesk','finance','management','admin']){try{await w.studioNavigate(view);assert.ok(w.document.querySelector('#genericView h1'),view);}catch(e){errors.push(view+': '+e.message)}}
+ const routeField=w.document.getElementById('workspaceRouteKey');assert.ok(routeField.closest('details'));assert.equal(routeField.closest('details').open,false);
  try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-work-board'));assert.equal(w.document.querySelectorAll('.job-file-tile').length,20)}catch(e){errors.push('job: '+e.message)}
  dom.window.close();assert.deepEqual(errors,[]);});

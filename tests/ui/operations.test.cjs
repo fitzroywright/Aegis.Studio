@@ -30,3 +30,12 @@ test('folder ingest drains repeated directory batches and ignores non-photo file
  const w=setup(['media-production.js']);const file=name=>({isFile:true,file:done=>done({name,type:'image/jpeg'})});const batches=[[file('one.jpg')],[file('two.png'),file('notes.txt')],[]];
  const directory={isDirectory:true,createReader:()=>({readEntries:done=>done(batches.shift())})};const files=await w.studioDroppedPhotos({items:[{webkitGetAsEntry:()=>directory}],files:[]});assert.deepEqual(Array.from(files,f=>f.name),['one.jpg','two.png']);assert.equal(batches.length,0);
 });
+
+test('workspace integration settings are collapsed and save a routing override',async()=>{
+ const w=setup(['workspaces.js']);const calls=[];
+ w.json=async(u,o)=>{if(o){calls.push(JSON.parse(o.body));return {};}return {id:'workspace',name:'Weddings',emailAddress:'weddings@example.invalid',routeKey:'existing-route',isEnabled:true,sortOrder:7};};
+ w.studioDialog=(title,body)=>{const dialog=w.document.createElement('dialog');dialog.innerHTML=body;dialog.close=()=>dialog.remove();w.document.body.append(dialog);return dialog;};w.loadWorkspaces=async()=>{};w.studioNavigate=async()=>{};
+ await w.editWorkspace('workspace');const dialog=w.document.querySelector('dialog'),form=dialog.querySelector('form'),route=form.elements.routeKey;
+ assert.equal(route.value,'existing-route');assert.equal(route.closest('details').open,false);route.value='wedding-bookings';
+ await form.onsubmit({preventDefault(){}});assert.equal(calls[0].routeKey,'wedding-bookings');assert.equal(calls[0].name,'Weddings');assert.equal(calls[0].sortOrder,7);assert.equal(w.document.querySelector('dialog'),null);
+});

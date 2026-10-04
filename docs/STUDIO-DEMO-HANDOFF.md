@@ -17,6 +17,8 @@ The `studio-full-demo-ui` implementation follows the supplied Studio briefs and 
 | Finance | `showAccounts` in `management.js` |
 | Management Dashboard | `showManagement` in `management.js` |
 
+New workspaces receive a stable route key automatically on the server. Route key overrides are available only in collapsed Advanced / Integration Settings on creation and editing; normal edits preserve existing integration keys.
+
 The navigation controller owns routing and startup. Global roles and announcements are Admin components, rather than wrappers that replace the Workspaces renderer.
 
 ## Demo graph
@@ -37,7 +39,7 @@ Folder drops traverse nested directory batches. Subject drops target the selecte
 
 - Release solution build: zero warnings and errors.
 - Solution tests: 151 Web tests and three Domain tests pass; three PostgreSQL integration tests skip without `STUDIO_TEST_POSTGRES`.
-- UI suite: 21 tests, including a complete shared-shell smoke test, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
+- UI suite: 22 tests, including a complete shared-shell smoke test, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
 - JavaScript syntax and whitespace checks pass.
 
 This environment cannot launch Chromium because socket creation is prohibited. Browser screenshot comparison and a live database seed were not verified here. The DOM smoke test exercises all eight screen renderers with an interconnected API fixture; it does not establish pixel-level equivalence or database seed execution.
