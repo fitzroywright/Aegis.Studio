@@ -225,22 +225,22 @@ internal static class DemoFullStudioData
                 clientName=client.Name,
                 clientEmail=client.Email,
                 title=item.Item4,
-                eventDate=DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(item.Item7)),
+                eventDate=DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(item.Item8)),
                 requiredDeposit=item.Item6,
                 currency="JMD",
                 notes="DEMO front desk booking request",
                 clientId=Id(40,item.Item3),
                 externalBookingId=$"DEMO-{item.Item1}",
-                startsAtUtc=DateTimeOffset.UtcNow.Date.AddDays(item.Item7).AddHours(15),
-                endsAtUtc=DateTimeOffset.UtcNow.Date.AddDays(item.Item7).AddHours(17),
+                startsAtUtc=DateTimeOffset.UtcNow.Date.AddDays(item.Item8).AddHours(15),
+                endsAtUtc=DateTimeOffset.UtcNow.Date.AddDays(item.Item8).AddHours(17),
                 location="Demo location",
                 clientPhone=client.Phone
             };
             Execute(c,tx,"insert into studio_frontdesk_requests(id,workspace_id,payload,status,job_id,created_by,created_at_utc) values($1,$2,$3::jsonb,$4,null,'demo-seed',now()-interval '1 day') on conflict(id) do update set payload=excluded.payload,status=excluded.status",
                 id,Id(1,item.Item2),JsonSerializer.Serialize(payload),item.Item5);
-            if(item.Item6>0)
+            if(item.Item7>0)
                 Execute(c,tx,"insert into studio_frontdesk_deposits(id,request_id,amount,currency,provider,reference,recorded_by,created_at_utc) values($1,$2,$3,'JMD','demo','DEMO-RECEIPT-'||$4,'demo-seed',now()) on conflict(id) do update set amount=excluded.amount",
-                    Id(58,item.Item1),id,item.Item6,item.Item1.ToString());
+                    Id(58,item.Item1),id,item.Item7,item.Item1.ToString());
         }
     }
 
