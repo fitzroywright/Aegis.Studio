@@ -10,22 +10,24 @@ namespace Aegis.Studio.Web.Operations;
 // Only deterministic DEMO identifiers are used; no real jobs or files are changed.
 internal static class DemoDataExpansion
 {
-    private static readonly HttpClient demoPhotoClient = new()
+    private static readonly HttpClient demoPhotoClient = CreateDemoPhotoClient();
+
+    private static HttpClient CreateDemoPhotoClient()
     {
-        Timeout = TimeSpan.FromSeconds(30)
-    };
+        var client=new HttpClient { Timeout=TimeSpan.FromSeconds(30) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Aegis.Studio/1.0 (demo-data)");
+        client.DefaultRequestHeaders.Accept.ParseAdd("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
+        return client;
+    }
 
     private static readonly string[] weddingPhotoUrls =
     [
-        "https://upload.wikimedia.org/wikipedia/commons/a/a2/People_at_Wedding_ceremony.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/a/ab/Wedding_photo.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/b/bd/Wedding_couple_%281294004%29.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/2/20/Catholic_Wedding.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/e/ec/Wedding_Day_%28Unsplash%29.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/e/e5/Christian_wedding_ceremony_%285%29.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/0/06/Christian_white_wedding_ceremony_-_Bride_holding_flower_-_Maiduguri_-_2026_%281%29.jpg"
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bride_and_bridegroom.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bride_and_Groom_at_their_introduction_ceremony.1.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1294168).jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1293933).jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1294004).jpg"
     ];
-
     private static readonly Dictionary<string,byte[]> weddingPhotoCache = new(StringComparer.OrdinalIgnoreCase);
     internal static readonly int[] JobNumbers = [1,2,4,5,7,8];
     internal static Guid Id(int group,int number) => Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
@@ -93,12 +95,32 @@ internal static class DemoDataExpansion
 
     private static Guid AddWeddingPhoto(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int photoIndex,Guid? source,string login)
     {
-        string url=weddingPhotoUrls[photoIndex%weddingPhotoUrls.Length];
-        if(!weddingPhotoCache.TryGetValue(url,out byte[]? bytes))
+        byte[]? bytes=null;
+        string? selectedUrl=null;
+        Exception? lastError=null;
+        for(int attempt=0;attempt<weddingPhotoUrls.Length;attempt++)
         {
-            bytes=demoPhotoClient.GetByteArrayAsync(url).GetAwaiter().GetResult();
-            weddingPhotoCache[url]=bytes;
+            string url=weddingPhotoUrls[(photoIndex+attempt)%weddingPhotoUrls.Length];
+            try
+            {
+                if(!weddingPhotoCache.TryGetValue(url,out bytes))
+                {
+                    using HttpResponseMessage response=demoPhotoClient.GetAsync(url).GetAwaiter().GetResult();
+                    response.EnsureSuccessStatusCode();
+                    bytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                    weddingPhotoCache[url]=bytes;
+                }
+                selectedUrl=url;
+                break;
+            }
+            catch(Exception error)
+            {
+                lastError=error;
+                bytes=null;
+            }
         }
+        if(bytes is null)
+            throw new InvalidOperationException("Unable to download any configured CC0 wedding demo photograph.",lastError);
 
         using var content=new MemoryStream(bytes,false);
         string stored=$"{job:N}/demo/{id:N}.jpg";
@@ -116,7 +138,8 @@ internal static class DemoDataExpansion
                 ["AssetKey"]=key,
                 ["VersionId"]=id.ToString("D"),
                 ["Demo"]="true",
-                ["DemoSource"]="Wikimedia Commons CC0"
+                ["DemoSource"]="Wikimedia Commons CC0",
+                ["DemoSourceUrl"]=selectedUrl??string.Empty
             })).GetAwaiter().GetResult();
 
         const string sql="""
