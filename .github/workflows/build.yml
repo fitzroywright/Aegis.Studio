@@ -71,3 +71,15 @@ jobs:
         run: dotnet build Aegis.Studio.slnx --no-restore --configuration Release
       - name: Test Release
         run: dotnet test Aegis.Studio.slnx --no-build --configuration Release
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install UI test dependencies
+        working-directory: tests/ui
+        run: npm ci
+
+      - name: Test Studio UI behavior
+        working-directory: tests/ui
+        run: npm test
