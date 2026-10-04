@@ -170,5 +170,12 @@
     },true);
 
     window.studioNavigate=navigate;
+
+    const topNew=document.getElementById('topNewButton');
+    if(topNew)topNew.addEventListener('click',()=>{
+        const dialog=document.getElementById('newRequestDialog');
+        if(dialog?.showModal)dialog.showModal();
+    });
+
     setActive('workspaces');
 })();
