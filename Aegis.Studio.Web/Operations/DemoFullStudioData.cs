@@ -176,18 +176,7 @@ internal static class DemoFullStudioData
         foreach(string collection in collections)
             Execute(c,tx,"insert into studio_media_collections(job_id,name) values($1,$2) on conflict do nothing",jobId,collection);
 
-        int subjectCount=job.Number switch
-        {
-            106 => 50,
-            401 => 80,
-            303 => 60,
-            301 => 24,
-            201 => 8,
-            _ => job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?24:
-                 job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?8:
-                 job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:
-                 job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4
-        };
+        int subjectCount=DemoSubjectCount(job);
         for(int i=0;i<subjectCount;i++)
         {
             Guid subject=Id(59,job.Number*100+i);
@@ -243,9 +232,27 @@ internal static class DemoFullStudioData
                 assetId,jobId,key,status,job.Photographer,(i+1).ToString());
             Execute(c,tx,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",
                 jobId,key,collections[i%collections.Length]);
-            Guid subjectId=Id(59,job.Number*100+(i%Math.Max(1,job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?8:job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?24:job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4)));
+            int subjectCount=DemoSubjectCount(job);
+            int subjectIndex=job.Number==106 ? 4+(i%Math.Max(1,subjectCount-4)) : i%Math.Max(1,subjectCount);
+            Guid subjectId=Id(59,job.Number*100+subjectIndex);
             Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) values($1,$2) on conflict do nothing",assetId,subjectId);
         }
+    }
+
+    private static int DemoSubjectCount(DemoJob job)
+    {
+        return job.Number switch
+        {
+            106 => 50,
+            401 => 80,
+            303 => 60,
+            301 => 24,
+            201 => 8,
+            _ => job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?24:
+                 job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?8:
+                 job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:
+                 job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4
+        };
     }
 
     private static int PhysicalSourceCount(DemoJob job)
