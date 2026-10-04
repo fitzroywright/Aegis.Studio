@@ -98,11 +98,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
         tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(studioFirstName(m))}">${esc(studioFirstName(m).slice(0,1))}</span>`).join('');
         if (version !== revision) return;
         conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row compact-job-row" data-search data-job="${job.id}">
-            <span class="job-row-heading"><strong>${esc(job.title)}</strong><span class="job-status">${esc(job.status)}</span></span>
+            <span class="job-row-heading"><strong>${esc(job.title)}</strong></span>
             <span class="job-row-client">${esc(job.clientName || job.linkedClientName || 'Client not linked')}</span>
             <span class="job-row-meta">
                 <span>${esc(job.eventDate || 'Not scheduled')}</span>
                 <span>${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, 'Team member', true) : 'Unassigned')}</span>
+                <span class="job-status">${esc(job.status)}</span>
             </span>
         </button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
         conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(jobs.find(x => x.id === button.dataset.job)).catch(fail));
@@ -264,7 +265,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             header.before(breadcrumb);
             const actions=document.createElement('div');
             actions.className='job-header-actions';
-            actions.innerHTML='<button class="action" data-message-action>Message</button><button class="primary" data-add-task>＋ Add Task</button><button class="action" data-more-action>More⌄</button>';
+            actions.innerHTML='<button class="action" data-message-action><span aria-hidden="true">✉</span> Message</button><button class="primary" data-add-task><span aria-hidden="true">＋</span> Add Task</button><button class="action more-action" data-more-action>More <span aria-hidden="true">⌄</span></button>';
             actions.querySelector('[data-message-action]').onclick=()=>document.getElementById('hierarchyBody')?.focus();
             actions.querySelector('[data-add-task]').onclick=()=>{
                 const dialog=studioDialog('Job tasks','<div class="all-tasks"></div>');
