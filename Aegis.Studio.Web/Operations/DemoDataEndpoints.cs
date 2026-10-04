@@ -10,48 +10,87 @@ public static class DemoDataEndpoints
 {
     public static void MapStudioDemoData(this WebApplication app)
     {
-        app.MapPost("/api/admin/demo/seed", (ClaimsPrincipal user, StudioDatabase database, IWebHostEnvironment environment, IFileStorage storage) =>
+        app.MapPost("/api/admin/demo/seed", async Task<IResult> (HttpContext context, StudioDatabase database, IWebHostEnvironment environment, IFileStorage storage, ILoggerFactory logs) =>
         {
-            if(!environment.IsDevelopment())return Results.NotFound();
-            string? login = user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!environment.IsDevelopment()) return Results.NotFound();
+            string? login = context.User.FindFirstValue("login_name") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrWhiteSpace(login)) return Results.BadRequest(new { error = "A login identifier is required." });
-            using var connection = database.OpenConnection();
-            using var transaction = connection.BeginTransaction();
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = "select pg_advisory_xact_lock(72709128)";
-            command.ExecuteNonQuery();
-            using(var current=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v6-full-studio')",connection,transaction))
-                if((bool)current.ExecuteScalar()!)
-                    return Results.Ok(new { message="Full Studio demo is already loaded. Existing demo work and edits have been preserved." });
-            // Re-run the deterministic base seed on every request so a stale marker cannot
-            // hide deleted or partially-created DEMO records. Inserts are made idempotent;
-            // updates remain updates. Real workspaces are never matched by these fixed DEMO ids.
-            foreach (string statement in SeedStatements)
+            bool streaming = context.Request.Headers.Accept.ToString().Contains("application/x-ndjson", StringComparison.OrdinalIgnoreCase);
+            if (!streaming) return Results.Ok(new { message = Seed(database, storage, login) });
+            context.Response.ContentType = "application/x-ndjson";
+            context.Response.Headers.CacheControl = "no-store";
+            context.Response.Headers["X-Accel-Buffering"] = "no";
+            async Task Write(DemoSeedProgress progress)
             {
-                using var seedCommand = connection.CreateCommand();
-                seedCommand.Transaction = transaction;
-                string sql = statement.Trim();
-                if (sql.StartsWith("insert into ", StringComparison.OrdinalIgnoreCase))
-                    sql = sql.TrimEnd(';') + " on conflict do nothing;";
-                seedCommand.CommandText = sql;
-                if (statement.Contains("$1", StringComparison.Ordinal)) seedCommand.Parameters.AddWithValue(login);
-                seedCommand.ExecuteNonQuery();
+                context.RequestAborted.ThrowIfCancellationRequested();
+                await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(progress, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) + "\n", context.RequestAborted);
+                await context.Response.Body.FlushAsync(context.RequestAborted);
             }
-
-            RepairDemoWorkspaces(connection, transaction, login);
-            bool expanded = DemoDataExpansion.Seed(connection, transaction, login, storage);
-            bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
-            bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage);
-            transaction.Commit();
-            return Results.Ok(new { message = fullStudioExpanded
-                ? "Full Studio demo loaded: 27 interconnected jobs across 6 workspaces, including over 1,000 media assets across the flagship ID, graduation, wedding, school, corporate-headshot and commercial jobs, plus clients, bookings, schedules, photographers, availability, payments, production stages and history."
-                : presentationExpanded
-                    ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see wedding media and linked workflow data."
-                    : expanded
-                        ? "Demo data expanded. Open Carter Wedding to explore Media, People and Tasks / Calendar."
-                        : "Demo data is already up to date." });
+            bool saved = false;
+            try
+            {
+                string message = Seed(database, storage, login, progress => Write(progress).GetAwaiter().GetResult());
+                saved = true;
+                await Write(new(100, "Complete", 0, 0, message, Completed: true));
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
+            catch (Exception error)
+            {
+                logs.CreateLogger("Studio.DemoSeed").LogError(error, "Demo seed failed Trace={Trace}", context.TraceIdentifier);
+                if (!context.RequestAborted.IsCancellationRequested)
+                    await Write(new(0, "Failed", 0, 0, saved
+                        ? "Demo data was saved, but progress delivery failed. Reload Admin to check the dataset."
+                        : "Demo data could not be loaded. Database changes were rolled back. See server logs for details.", Failed: true));
+            }
+            return Results.Empty;
         }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
+    }
+
+    private static string Seed(StudioDatabase database, IFileStorage storage, string login, Action<DemoSeedProgress>? report = null)
+    {
+        report?.Invoke(new(0, "Preparing", 0, 0, "Connecting to the database."));
+        using var connection = database.OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "select pg_advisory_xact_lock(72709128)";
+        report?.Invoke(new(1, "Waiting for seed lock", 0, 0, "Waiting for any other demo loader to finish."));
+        command.ExecuteNonQuery();
+        using(var current=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v6-full-studio')",connection,transaction))
+            if((bool)current.ExecuteScalar()!)
+                return "Full Studio demo is already loaded. Existing demo work and edits have been preserved.";
+        // Re-run the deterministic base seed on every request so a stale marker cannot
+        // hide deleted or partially-created DEMO records. Inserts are made idempotent;
+        // updates remain updates. Real workspaces are never matched by these fixed DEMO ids.
+        int statementNumber = 0;
+        foreach (string statement in SeedStatements)
+        {
+            using var seedCommand = connection.CreateCommand();
+            seedCommand.Transaction = transaction;
+            string sql = statement.Trim();
+            if (sql.StartsWith("insert into ", StringComparison.OrdinalIgnoreCase))
+                sql = sql.TrimEnd(';') + " on conflict do nothing;";
+            seedCommand.CommandText = sql;
+            if (statement.Contains("$1", StringComparison.Ordinal)) seedCommand.Parameters.AddWithValue(login);
+            seedCommand.ExecuteNonQuery();
+            statementNumber++;
+            report?.Invoke(new(2 + 8 * statementNumber / SeedStatements.Length, "Base records", statementNumber, SeedStatements.Length, "Creating workspaces, conversations and jobs."));
+        }
+
+        RepairDemoWorkspaces(connection, transaction, login);
+        bool expanded = DemoDataExpansion.Seed(connection, transaction, login, storage, report);
+        report?.Invoke(new(30, "Presentation records", 0, 0, "Linking wedding people, tasks and announcements."));
+        bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
+        bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage, report);
+        report?.Invoke(new(99, "Committing", 0, 0, "Saving the complete demo dataset."));
+        transaction.Commit();
+        return fullStudioExpanded
+            ? "Full Studio demo loaded: 27 interconnected jobs across 6 workspaces, including over 1,000 media assets across the flagship ID, graduation, wedding, school, corporate-headshot and commercial jobs, plus clients, bookings, schedules, photographers, availability, payments, production stages and history."
+            : presentationExpanded
+                ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see wedding media and linked workflow data."
+                : expanded
+                    ? "Demo data expanded. Open Carter Wedding to explore Media, People and Tasks / Calendar."
+                    : "Demo data is already up to date.";
     }
 
     private static void RepairDemoWorkspaces(NpgsqlConnection connection, NpgsqlTransaction transaction, string login)
@@ -161,4 +200,3 @@ public static class DemoDataEndpoints
         """insert into studio_state(key,value,updated_at_utc) values('demo-data-v1',$1,now());"""
     ];
 }
-

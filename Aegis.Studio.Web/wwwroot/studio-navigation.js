@@ -513,7 +513,9 @@
                                 <button class="primary" type="button" data-load-demo>Load Demo Data</button>
                             </header>
                             <p class="admin-card-note">Creates interconnected workspaces, clients, jobs, schedules, photographers, payments, media, production states, messages and history.</p>
-                            <p class="admin-demo-status" data-demo-status></p>
+                            <progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress>
+                            <p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p>
+                            <small data-demo-elapsed hidden></small>
                         </section>
 
                         <section class="admin-card">
@@ -563,16 +565,25 @@
         panel.querySelector('[data-load-demo]').onclick=async()=>{
             const button=panel.querySelector('[data-load-demo]');
             const status=panel.querySelector('[data-demo-status]');
-            button.disabled=true;
-            status.textContent='Loading demo data…';
+            const meter=panel.querySelector('[data-demo-progress]'),elapsed=panel.querySelector('[data-demo-elapsed]');
+            button.disabled=true;panel.setAttribute('aria-busy','true');
+            meter.hidden=false;meter.value=0;elapsed.hidden=false;
+            status.textContent='Starting demo loader…';
+            const started=Date.now();
+            const tick=()=>{elapsed.textContent='Elapsed: '+Math.floor((Date.now()-started)/1000)+' seconds. Progress follows completed seed steps; photo downloads may pause the meter.';};
+            tick();const timer=setInterval(tick,1000);
             try{
-                const result=await json('/api/admin/demo/seed',{method:'POST'});
+                const result=await window.studioLoadDemoData(progress=>{
+                    meter.value=progress.percent;
+                    meter.setAttribute('aria-valuetext',progress.percent+'% — '+progress.stage);
+                    status.textContent=progress.completed?progress.message:progress.percent+'% · '+progress.stage+' — '+progress.message;
+                });
                 status.textContent=result.message||'Demo data loaded.';
-                await loadWorkspaces();
+                try{await loadWorkspaces();}catch{status.textContent+=' Workspace refresh failed; reopen Workspaces to refresh.';}
             }catch(error){
                 status.textContent='Demo data could not be loaded: '+(error.message||error);
             }finally{
-                button.disabled=false;
+                clearInterval(timer);tick();panel.setAttribute('aria-busy','false');button.disabled=false;
             }
         };
     }

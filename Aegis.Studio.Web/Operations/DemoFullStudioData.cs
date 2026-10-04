@@ -74,10 +74,11 @@ internal static class DemoFullStudioData
         new(206,2,11,"Harbour Awards Ceremony","Cancelled",7,"Jamaica Pegasus",0,0,"demo.michael","Awards")
     ];
 
-    internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IFileStorage storage)
+    internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IFileStorage storage,Action<DemoSeedProgress>? report=null)
     {
         using(var check=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v6-full-studio')",connection,transaction))
             if((bool)check.ExecuteScalar()!)return false;
+        report?.Invoke(new(31, "Studio setup", 0, 0, "Creating clients, photographers, availability and workspaces."));
         var versionStorage=new PrefixedFileStorage(storage,"VersionStore");
         foreach(var workspace in Workspaces)
         {
@@ -101,6 +102,7 @@ internal static class DemoFullStudioData
         foreach(var job in Jobs)
         {
             ordinal++;
+            report?.Invoke(new(32 + 63 * (ordinal-1) / Jobs.Length, "Studio jobs", ordinal-1, Jobs.Length, $"Job {ordinal}/{Jobs.Length}: {job.Title}"));
             Guid jobId=Id(41,job.Number);
             Guid conversationId=Id(42,job.Number);
             Guid workspaceId=Id(1,job.Workspace);
@@ -121,7 +123,7 @@ internal static class DemoFullStudioData
 
             SeedConversation(connection,transaction,job,client,conversationId,ordinal);
             SeedSubjectsAndCollections(connection,transaction,job,jobId,ordinal,start);
-            SeedMedia(connection,transaction,versionStorage,job,jobId,login,ordinal);
+            SeedMedia(connection,transaction,versionStorage,job,jobId,login,ordinal,report);
             SeedSchedule(connection,transaction,job,jobId,start,end,ordinal);
             SeedFinance(connection,transaction,job,jobId,ordinal);
             SeedActivities(connection,transaction,job,jobId,ordinal,login);
@@ -131,6 +133,7 @@ internal static class DemoFullStudioData
             SeedDocument(connection,transaction,storage,job,conversationId,login);
         }
 
+        report?.Invoke(new(96, "Front Desk and Finance", Jobs.Length, Jobs.Length, "Creating pending enquiries, bookings and invoices."));
         SeedFrontDeskRequests(connection,transaction);
         SeedInvoices(connection,transaction);
 
@@ -201,7 +204,7 @@ internal static class DemoFullStudioData
         }
     }
 
-    private static void SeedMedia(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,DemoJob job,Guid jobId,string login,int ordinal)
+    private static void SeedMedia(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,DemoJob job,Guid jobId,string login,int ordinal,Action<DemoSeedProgress>? report)
     {
         int count=job.Number switch
         {
@@ -224,6 +227,7 @@ internal static class DemoFullStudioData
         int sourceCount=PhysicalSourceCount(job);
         for(int i=0;i<count;i++)
         {
+            report?.Invoke(new(32 + (int)(63 * (ordinal-1 + (double)i / count) / Jobs.Length), "Studio photographs", i, count, $"Job {ordinal}/{Jobs.Length}: {job.Title} — downloading and storing photo {i+1}/{count}."));
             string key=$"demo-full/{job.Number}/asset-{i+1:000}";
             Guid versionId=MediaId(64,job.Number,i);
             // Each asset-version owns a unique stored object/path. DemoDataExpansion caches

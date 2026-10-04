@@ -50,7 +50,7 @@ internal static class DemoDataExpansion
     internal static readonly int[] JobNumbers = [1,2,4,5,7,8];
     internal static Guid Id(int group,int number) => Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
 
-    internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IFileStorage storage)
+    internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IFileStorage storage,Action<DemoSeedProgress>? report=null)
     {
         var versionStorage=new PrefixedFileStorage(storage,"VersionStore");
         DateTimeOffset today=new(DateTime.UtcNow.Date,TimeSpan.Zero);
@@ -64,6 +64,7 @@ internal static class DemoDataExpansion
         }
         for(int index=0;index<JobNumbers.Length;index++)
         {
+            report?.Invoke(new(10 + 20 * index / JobNumbers.Length, "Legacy demo jobs", index, JobNumbers.Length, "Preparing schedules, subjects and real photographs."));
             int number=JobNumbers[index],workspace=number<=2?1:number<=5?2:3;
             Guid job=Id(3,number);
             for(int task=0;task<4;task++)
@@ -126,6 +127,7 @@ internal static class DemoDataExpansion
             int assetCount=number==4?50:4;
             for(int asset=0;asset<assetCount;asset++)
             {
+                report?.Invoke(new(10 + (int)(20 * (index + (double)asset / assetCount) / JobNumbers.Length), "Legacy photographs", asset, assetCount, $"Job {index+1}/{JobNumbers.Length}: downloading and storing photo {asset+1}/{assetCount}."));
                 string key=$"demo-{number}-{asset}";
                 Guid requestedOriginal=Id(26,number*100+asset);
                 Guid original=number==4

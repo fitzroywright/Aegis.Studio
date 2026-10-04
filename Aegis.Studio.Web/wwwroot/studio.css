@@ -2029,6 +2029,11 @@ dialog::backdrop {
   display:flex;
   gap:10px
 }
+.admin-demo-card progress {
+  width:100%;
+  height:12px;
+  accent-color:#b99750
+}
 .workspace-admin-grid {
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -2228,4 +2233,3 @@ dialog::backdrop {
 }
 
 }
-

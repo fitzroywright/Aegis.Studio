@@ -39,7 +39,7 @@ Folder drops traverse nested directory batches. Subject drops target the selecte
 
 - Release solution build: zero warnings and errors.
 - Solution tests: 153 Web tests and three Domain tests pass; four PostgreSQL integration tests skip without `STUDIO_TEST_POSTGRES`.
-- UI suite: 25 tests, including a complete shared-shell smoke test, progressive My Work startup, cancellation, working retries, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
+- UI suite: 28 tests, including a complete shared-shell smoke test, streamed demo progress and failure handling, progressive My Work startup, cancellation, working retries, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
 - JavaScript syntax and whitespace checks pass.
 
 This environment cannot launch Chromium because socket creation is prohibited. Browser screenshot comparison and a live database seed were not verified here. The DOM smoke test exercises all eight screen renderers with an interconnected API fixture; it does not establish pixel-level equivalence or database seed execution.
@@ -54,6 +54,12 @@ npm --prefix tests/ui test
 ```
 
 Set `STUDIO_TEST_POSTGRES` to a disposable PostgreSQL database to include the transactional persistence tests. In Development, use Admin's demo loader once, then walk from My Work through a job, its subjects/media/tasks, Pipeline, Production, Front Desk and Finance. Check persisted actions and photo downloads against the configured storage provider.
+
+## Demo loader progress
+
+Admin's Load Demo Data shows a native progress meter, the current stage, job and photo number, and elapsed seconds. Progress follows actual seed steps, with photo downloads/storage reported before each asset. Percentages describe completed work, not estimated remaining time. The button stays disabled during the load and becomes available again on completion or failure. Existing v6 datasets immediately report that they are already loaded without resetting edits.
+
+The existing POST endpoint supports `Accept: application/x-ndjson` for flushed progress records, with proxy buffering disabled through `X-Accel-Buffering: no`. Ordinary JSON callers retain their existing response. Completion is emitted after the seed transaction commits; failures are logged under `Studio.DemoSeed` and returned as failure records. A stream that ends without completion is shown as interrupted, with a retry instruction. Configure any additional reverse proxy to permit streaming if it buffers responses despite that header.
 
 ## My Work startup diagnostics
 

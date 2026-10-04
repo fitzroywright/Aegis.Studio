@@ -43,5 +43,11 @@ test('the full shell loads every operational screen with a shared data graph',as
  await new Promise(r=>setTimeout(r,25));await w.studioMyWorkReady;
  for(const view of ['mywork','workspaces','pipeline','production','frontdesk','finance','management','admin']){try{await w.studioNavigate(view);assert.ok(w.document.querySelector('#genericView h1'),view);}catch(e){errors.push(view+': '+e.message)}}
  const routeField=w.document.getElementById('workspaceRouteKey');assert.ok(routeField.closest('details'));assert.equal(routeField.closest('details').open,false);
+ let finishDemo;const demoHeld=new Promise(resolve=>finishDemo=resolve);
+ w.studioLoadDemoData=async report=>{report({percent:52,stage:'Studio photographs',message:'Carter Wedding — photo 17/320'});await demoHeld;report({percent:100,completed:true,message:'Full Studio demo loaded.'});return {message:'Full Studio demo loaded.'};};
+ const demoButton=w.document.querySelector('[data-load-demo]'),loadingDemo=demoButton.onclick();
+ assert.equal(demoButton.disabled,true);assert.equal(w.document.querySelector('[data-demo-progress]').value,52);assert.match(w.document.querySelector('[data-demo-status]').textContent,/photo 17\/320/);assert.equal(w.document.getElementById('studioDemoLoader').getAttribute('aria-busy'),'true');
+ finishDemo();await loadingDemo;assert.equal(demoButton.disabled,false);assert.equal(w.document.querySelector('[data-demo-progress]').value,100);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Full Studio demo loaded/);
+ w.studioLoadDemoData=async()=>{throw Error('Rolled back');};await demoButton.onclick();assert.equal(demoButton.disabled,false);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Rolled back/);
  try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-work-board'));assert.equal(w.document.querySelectorAll('.job-file-tile').length,20)}catch(e){errors.push('job: '+e.message)}
  dom.window.close();assert.deepEqual(errors,[]);});
