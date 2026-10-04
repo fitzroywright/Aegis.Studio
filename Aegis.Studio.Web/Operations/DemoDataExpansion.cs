@@ -29,6 +29,26 @@ internal static class DemoDataExpansion
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1294004).jpg"
     ];
     private static readonly Dictionary<string,byte[]> weddingPhotoCache = new(StringComparer.OrdinalIgnoreCase);
+    // Curated real photographs only. Each file is CC0 or public domain on Wikimedia Commons.
+    // Keep the Commons file URL in storage metadata so every seeded image retains provenance.
+    private static readonly string[] realPhotoUrls =
+    [
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Graduating_pupils.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Graduating_Students(GN11751).jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Graduation_pictures.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Ceremony_graduation.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Headshot.Corporate.2023.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Woman_(headshot).jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Portrait_of_woman.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Family_portrait_(1293715).jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Erin_O%27Toole_-_Family_Portrait_(51178622573).jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Parents_and_their_baby.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/New_born_baby_with_father.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Team_picture_time.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Product_photo.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/People_at_Wedding_ceremony.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/A_group_picture_together_with_the_groom_at_Wedding_ceremony.jpg"
+    ];
     internal static readonly int[] JobNumbers = [1,2,4,5,7,8];
     internal static Guid Id(int group,int number) => Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
 
@@ -234,17 +254,42 @@ internal static class DemoDataExpansion
 
     internal static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login)
     {
-        using Image<Rgb24> image=CreateIllustration(variant);
-        using var content=new MemoryStream();
-        image.SaveAsPng(content);
-        content.Position=0;
+        byte[]? bytes=null;
+        string? selectedUrl=null;
+        Exception? lastError=null;
+        for(int attempt=0;attempt<realPhotoUrls.Length;attempt++)
+        {
+            string url=realPhotoUrls[(variant+attempt)%realPhotoUrls.Length];
+            try
+            {
+                if(!weddingPhotoCache.TryGetValue(url,out bytes))
+                {
+                    using HttpResponseMessage response=demoPhotoClient.GetAsync(url).GetAwaiter().GetResult();
+                    response.EnsureSuccessStatusCode();
+                    bytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                    weddingPhotoCache[url]=bytes;
+                }
+                selectedUrl=url;
+                break;
+            }
+            catch(Exception error)
+            {
+                lastError=error;
+                bytes=null;
+            }
+        }
+        if(bytes is null)
+            throw new InvalidOperationException("Unable to download any configured public-domain demo photograph.",lastError);
 
-        string stored=$"{job:N}/demo/{id:N}.png";
-        string fileName=$"Demo-landscape-{variant+1:00}-v{version}.png";
+        string extension=selectedUrl?.EndsWith(".png",StringComparison.OrdinalIgnoreCase)==true?".png":".jpg";
+        string contentType=extension==".png"?"image/png":"image/jpeg";
+        using var content=new MemoryStream(bytes,false);
+        string stored=$"{job:N}/demo/{id:N}{extension}";
+        string fileName=$"Demo-photo-{variant+1:000}-v{version}{extension}";
         StoredFile storedFile=storage.StoreAsync(new StorageWriteRequest(
             stored,
             content,
-            "image/png",
+            contentType,
             fileName,
             login,
             new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase)
@@ -253,13 +298,15 @@ internal static class DemoDataExpansion
                 ["JobId"]=job.ToString("D"),
                 ["AssetKey"]=key,
                 ["VersionId"]=id.ToString("D"),
-                ["Demo"]="true"
+                ["Demo"]="true",
+                ["DemoSource"]="Wikimedia Commons - CC0/Public Domain",
+                ["DemoSourceUrl"]=selectedUrl??string.Empty
             })).GetAwaiter().GetResult();
 
         const string sql="""
             insert into studio_asset_versions
             (id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note)
-            values($1,$2,$3,$4,$5,'image/png',$6,$7,$8,$9,now(),$10,$11)
+            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12)
             on conflict(job_id,asset_key,version_number) do update set
               file_name=excluded.file_name,
               content_type=excluded.content_type,
@@ -271,15 +318,14 @@ internal static class DemoDataExpansion
               note=excluded.note
             returning id
             """;
-
         using var command=new NpgsqlCommand(sql,connection,transaction);
         object[] values=[
-            id,job,key,version,fileName,storedFile.Length,storedFile.Sha256,stored,login,
+            id,job,key,version,fileName,contentType,storedFile.Length,storedFile.Sha256,stored,login,
             (object?)source??DBNull.Value,
-            "Synthetic demo illustration generated by Studio; not a client photograph. "+(version==1?"Original demo version.":"Alternate synthetic proof linked to the original demo version.")
+            "Real CC0/public-domain photograph from Wikimedia Commons. Source URL retained in Common.Storage metadata."
         ];
         foreach(object value in values)command.Parameters.AddWithValue(value);
-        return (Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo media version upsert did not return an id."));
+        return (Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo photograph upsert did not return an id."));
     }
 
     internal static Image<Rgb24> CreateIllustration(int variant)
