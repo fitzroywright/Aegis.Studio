@@ -46,7 +46,7 @@
             const panel=document.createElement('section');
             panel.id='studioDemoLoader';
             panel.className='job-section studio-demo-loader';
-            panel.innerHTML='<div class="job-detail-header"><div><h2>Demo Data</h2><p class="muted">Load or upgrade the complete Studio demonstration set: workspaces, Carter Wedding, messages, subjects, tasks, appointments and synthetic gallery images.</p></div><button class="primary" type="button" data-load-demo>Load Demo Data</button></div><p class="muted" data-demo-status></p>';
+            panel.innerHTML='<div class="job-detail-header"><div><h2>Demo Data</h2><p class="muted">Load or upgrade the Studio demonstration set: Carter Wedding includes 50 wedding photos linked to named people/groups, plus messages, tasks, appointments and production data.</p></div><button class="primary" type="button" data-load-demo>Load Demo Data</button></div><p class="muted" data-demo-status></p>';
             genericView.prepend(panel);
             panel.querySelector('[data-load-demo]').onclick=async()=>{
                 const button=panel.querySelector('[data-load-demo]');
