@@ -20,13 +20,17 @@ public static class DemoDataEndpoints
             command.Transaction = transaction;
             command.CommandText = "select pg_advisory_xact_lock(72709128)";
             command.ExecuteNonQuery();
-            command.CommandText = "select exists(select 1 from studio_state where key='demo-data-v1')";
-            bool originalLoaded = (bool)command.ExecuteScalar()!;
-            foreach (string statement in originalLoaded ? Array.Empty<string>() : SeedStatements)
+            // Re-run the deterministic base seed on every request so a stale marker cannot
+            // hide deleted or partially-created DEMO records. Inserts are made idempotent;
+            // updates remain updates. Real workspaces are never matched by these fixed DEMO ids.
+            foreach (string statement in SeedStatements)
             {
                 using var seedCommand = connection.CreateCommand();
                 seedCommand.Transaction = transaction;
-                seedCommand.CommandText = statement;
+                string sql = statement.Trim();
+                if (sql.StartsWith("insert into ", StringComparison.OrdinalIgnoreCase))
+                    sql = sql.TrimEnd(';') + " on conflict do nothing;";
+                seedCommand.CommandText = sql;
                 if (statement.Contains("$1", StringComparison.Ordinal)) seedCommand.Parameters.AddWithValue(login);
                 seedCommand.ExecuteNonQuery();
             }
