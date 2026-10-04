@@ -220,6 +220,7 @@ app.Use(async(context,next)=>
         await context.Response.WriteAsJsonAsync(new{error=error is ArgumentException?error.Message:"This action could not be completed. Your saved data is retained; refresh and retry."});
     }
 });
+app.UseMiddleware<StorageFailureMiddleware>();
 app.UseMiddleware<MyWorkStartupTimingMiddleware>();
 app.UseAuthentication();
 app.UseMiddleware<WorkDayDeviceTokenMiddleware>();
@@ -692,4 +693,3 @@ app.MapGet("/api/attachments/{id:guid}", (Guid id, ClaimsPrincipal user, Attachm
 app.MapGet("/api/accounts/summary", (StudioStore store) => Results.Ok(store.GetAccountsSummary()));
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
-

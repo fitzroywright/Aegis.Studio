@@ -177,8 +177,51 @@ internal static class DemoDataExpansion
         return true;
     }
 
-    private static Guid AddWeddingPhoto(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int photoIndex,Guid? source,string login)
+    // Retrying a seed checks bytes, not only its database marker or sidecar metadata.
+    private static Guid? ReusableVersion(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,Guid job,string key,int version,ref Guid id,bool repairOnly)
     {
+        Guid existingId;string path;string? note;
+        using(var command=new NpgsqlCommand("select id,stored_path,note from studio_asset_versions where job_id=$1 and asset_key=$2 and version_number=$3",c,tx))
+        {
+            command.Parameters.AddWithValue(job);command.Parameters.AddWithValue(key);command.Parameters.AddWithValue(version);
+            using var reader=command.ExecuteReader();
+            if(!reader.Read())return repairOnly?Guid.Empty:null;
+            existingId=reader.GetGuid(0);path=reader.GetString(1);note=reader.IsDBNull(2)?null:reader.GetString(2);
+        }
+        // A later user upload at the same tuple is not ours to replace.
+        bool owned=existingId==id || (note?.StartsWith("CC0 wedding photograph from Wikimedia Commons, seeded for Studio demonstration data.",StringComparison.Ordinal)==true) || (note?.StartsWith("Real CC0/public-domain photograph from Wikimedia Commons.",StringComparison.Ordinal)==true);
+        if(!owned)return existingId;
+        id=existingId;
+        try { using Stream file=storage.OpenReadAsync(path).GetAwaiter().GetResult();return existingId; }
+        catch(StorageException error) when(error.Code=="STORAGE-MISSING-001") { return null; }
+    }
+
+    internal static int RepairMedia(NpgsqlConnection c,NpgsqlTransaction tx,string login,IFileStorage storage,Action<DemoSeedProgress>? report)
+    {
+        int restored=0;var versions=new PrefixedFileStorage(storage,"VersionStore");
+        for(int index=0;index<JobNumbers.Length;index++)
+        {
+            int number=JobNumbers[index],count=number==4?50:4;Guid job=Id(3,number);
+            for(int asset=0;asset<count;asset++)
+            {
+                report?.Invoke(new(10+(int)(20*(index+(double)asset/count)/JobNumbers.Length),"Checking demo photographs",asset,count,$"Legacy job {index+1}/{JobNumbers.Length}: checking photo {asset+1}/{count}."));
+                string key=$"demo-{number}-{asset}";Guid original=number==4
+                    ?AddWeddingPhoto(c,tx,versions,job,key,Id(26,number*100+asset),1,asset,null,login,true,()=>restored++)
+                    :AddImage(c,tx,versions,job,key,Id(26,number*100+asset),1,index*16+asset,null,login,true,()=>restored++);
+                if(asset==0 && original!=Guid.Empty)
+                {
+                    if(number==4)AddWeddingPhoto(c,tx,versions,job,key,Id(27,number),2,asset+1,original,login,true,()=>restored++);
+                    else AddImage(c,tx,versions,job,key,Id(27,number),2,index*16+asset+1,original,login,true,()=>restored++);
+                }
+            }
+        }
+        return restored;
+    }
+
+    private static Guid AddWeddingPhoto(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int photoIndex,Guid? source,string login,bool repairOnly=false,Action? restored=null)
+    {
+        Guid? reusable=ReusableVersion(connection,transaction,storage,job,key,version,ref id,repairOnly);
+        if(reusable.HasValue)return reusable.Value;
         byte[]? bytes=null;
         string? selectedUrl=null;
         Exception? lastError=null;
@@ -254,11 +297,15 @@ internal static class DemoDataExpansion
             "CC0 wedding photograph from Wikimedia Commons, seeded for Studio demonstration data."
         ];
         foreach(object value in values)command.Parameters.AddWithValue(value);
-        return (Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo wedding media upsert did not return an id."));
+        Guid result=(Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo wedding media upsert did not return an id."));
+        restored?.Invoke();
+        return result;
     }
 
-    internal static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login)
+    internal static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login,bool repairOnly=false,Action? restored=null)
     {
+        Guid? reusable=ReusableVersion(connection,transaction,storage,job,key,version,ref id,repairOnly);
+        if(reusable.HasValue)return reusable.Value;
         byte[]? bytes=null;
         string? selectedUrl=null;
         Exception? lastError=null;
@@ -291,8 +338,8 @@ internal static class DemoDataExpansion
         if(bytes is null)
             throw new InvalidOperationException("Unable to download any configured public-domain demo photograph.",lastError);
 
-        string extension=selectedUrl?.EndsWith(".png",StringComparison.OrdinalIgnoreCase)==true?".png":".jpg";
-        string contentType=extension==".png"?"image/png":"image/jpeg";
+        string extension=".jpg";
+        string contentType="image/jpeg";
         using var content=new MemoryStream(bytes,false);
         string stored=$"{job:N}/demo/{id:N}{extension}";
         string fileName=$"Demo-photo-{variant+1:000}-v{version}{extension}";
@@ -335,7 +382,9 @@ internal static class DemoDataExpansion
             "Real CC0/public-domain photograph from Wikimedia Commons. Source URL retained in Common.Storage metadata."
         ];
         foreach(object value in values)command.Parameters.AddWithValue(value);
-        return (Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo photograph upsert did not return an id."));
+        Guid result=(Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo photograph upsert did not return an id."));
+        restored?.Invoke();
+        return result;
     }
 
     private static Guid ExecuteGuid(NpgsqlConnection connection,NpgsqlTransaction transaction,string sql,params object[] values)

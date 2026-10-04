@@ -2034,6 +2034,19 @@ dialog::backdrop {
   height:12px;
   accent-color:#b99750
 }
+.studio-photo-unavailable {
+  display:grid;
+  place-content:center;
+  gap:6px;
+  min-height:0;
+  width:100%;
+  height:100%;
+  padding:8px;
+  text-align:center;
+  color:#69758b;
+  background:#f4f6f8;
+  font-size:12px
+}
 .workspace-admin-grid {
   display:grid;
   grid-template-columns:1fr 1fr;

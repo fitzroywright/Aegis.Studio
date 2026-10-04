@@ -14,13 +14,14 @@ public static class StudioVersionEndpoints
                 ? Results.Ok(new StudioVersionStore(db, storage).GetHistory(jobId, assetKey))
                 : Results.Forbid()).RequireAuthorization();
 
-        app.MapGet("/api/jobs/{jobId:guid}/versions/by-id/{versionId:guid}/content", (Guid jobId, Guid versionId, ClaimsPrincipal user, StudioDatabase db, JobAccessService access, IFileStorage storage) =>
+        app.MapGet("/api/jobs/{jobId:guid}/versions/by-id/{versionId:guid}/content", async (Guid jobId, Guid versionId, HttpContext context, ClaimsPrincipal user, StudioDatabase db, JobAccessService access, IFileStorage storage, IWebHostEnvironment environment) =>
         {
             if (!access.HasPermission(user, jobId, "ViewAttachments")) return Results.Forbid();
             try
             {
                 StudioVersionStore store = new(db, storage);
-                Stream stream = store.Open(jobId, versionId, out StudioAssetVersion version);
+                StudioAssetVersion version = store.Get(jobId, versionId) ?? throw new KeyNotFoundException("Version was not found.");
+                Stream stream = await new StoredVersionRecovery(storage, environment).OpenAsync(version, context.RequestAborted);
                 return Results.File(stream, version.ContentType, version.FileName, enableRangeProcessing: true);
             }
             catch (KeyNotFoundException)

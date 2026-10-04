@@ -206,18 +206,7 @@ internal static class DemoFullStudioData
 
     private static void SeedMedia(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,DemoJob job,Guid jobId,string login,int ordinal,Action<DemoSeedProgress>? report)
     {
-        int count=job.Number switch
-        {
-            106 => 180, // employee ID job
-            201 => 320, // wedding
-            303 => 100, // school portraits
-            301 => 120, // executive headshots
-            401 => 220, // graduation
-            501 => 60,  // product catalogue
-            _ => job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?12:
-                 job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?10:
-                 job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?8:6
-        };
+        int count=MediaCount(job);
         string[] statuses=["Needs Sorting","Needs Editing","Needs Review","Needs Approval","Ready","Ready for Production","Needs Print","Needs QC","Needs Delivery","Completed","Blocked","Needs Retake"];
         string[] collections=job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
             job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Roster","Stage","Groups","Unclassified"]:
@@ -246,6 +235,39 @@ internal static class DemoFullStudioData
             Guid subjectId=MediaId(59,job.Number,subjectIndex);
             Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) values($1,$2) on conflict do nothing",assetId,subjectId);
         }
+    }
+
+    private static int MediaCount(DemoJob job)
+    {
+        return job.Number switch
+        {
+            106 => 180, // employee ID job
+            201 => 320, // wedding
+            303 => 100, // school portraits
+            301 => 120, // executive headshots
+            401 => 220, // graduation
+            501 => 60,  // product catalogue
+            _ => job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?12:
+                 job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?10:
+                 job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?8:6
+        };
+    }
+
+    internal static int RepairMedia(NpgsqlConnection c,NpgsqlTransaction tx,string login,IFileStorage storage,Action<DemoSeedProgress>? report)
+    {
+        int restored=0,ordinal=0;var versions=new PrefixedFileStorage(storage,"VersionStore");
+        foreach(var job in Jobs)
+        {
+            ordinal++;int count=MediaCount(job),sourceCount=PhysicalSourceCount(job);Guid jobId=Id(41,job.Number);
+            for(int asset=0;asset<count;asset++)
+            {
+                report?.Invoke(new(32+(int)(63*(ordinal-1+(double)asset/count)/Jobs.Length),"Checking demo photographs",asset,count,$"{job.Title}: checking photo {asset+1}/{count}."));
+                string key=$"demo-full/{job.Number}/asset-{asset+1:000}";
+                Guid original=DemoDataExpansion.AddImage(c,tx,versions,jobId,key,MediaId(64,job.Number,asset),1,SelectPhotoVariant(job,asset%sourceCount),null,login,true,()=>restored++);
+                if(asset%50==0 && original!=Guid.Empty)DemoDataExpansion.AddImage(c,tx,versions,jobId,key,MediaId(66,job.Number,asset),2,SelectPhotoVariant(job,asset%sourceCount),original,login,true,()=>restored++);
+            }
+        }
+        return restored;
     }
 
     private static int DemoSubjectCount(DemoJob job)

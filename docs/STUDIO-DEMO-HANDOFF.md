@@ -38,8 +38,8 @@ Folder drops traverse nested directory batches. Subject drops target the selecte
 ## Validation
 
 - Release solution build: zero warnings and errors.
-- Solution tests: 153 Web tests and three Domain tests pass; four PostgreSQL integration tests skip without `STUDIO_TEST_POSTGRES`.
-- UI suite: 28 tests, including a complete shared-shell smoke test, streamed demo progress and failure handling, progressive My Work startup, cancellation, working retries, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
+- Solution tests: 161 Web tests and three Domain tests pass; five PostgreSQL integration tests skip without `STUDIO_TEST_POSTGRES`.
+- UI suite: 29 tests, including a complete shared-shell smoke test, streamed demo progress and failure handling, progressive My Work startup, cancellation, working retries, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
 - JavaScript syntax and whitespace checks pass.
 
 This environment cannot launch Chromium because socket creation is prohibited. Browser screenshot comparison and a live database seed were not verified here. The DOM smoke test exercises all eight screen renderers with an interconnected API fixture; it does not establish pixel-level equivalence or database seed execution.
@@ -57,7 +57,7 @@ Set `STUDIO_TEST_POSTGRES` to a disposable PostgreSQL database to include the tr
 
 ## Demo loader progress
 
-Admin's Load Demo Data shows a native progress meter, the current stage, job and photo number, and elapsed seconds. Progress follows actual seed steps, with photo downloads/storage reported before each asset. Percentages describe completed work, not estimated remaining time. The button stays disabled during the load and becomes available again on completion or failure. Existing v6 datasets immediately report that they are already loaded without resetting edits.
+Admin's Load Demo Data shows a native progress meter, the current stage, job and photo number, and elapsed seconds. Progress follows actual seed steps, with photo downloads/storage reported before each asset. Percentages describe completed work, not estimated remaining time. The button stays disabled during the load and becomes available again on completion or failure. Existing v6 datasets check their seeded media files and restore missing seed-owned versions without resetting job edits. Healthy files are reused; user uploads and deliberately removed version records are preserved.
 
 The existing POST endpoint supports `Accept: application/x-ndjson` for flushed progress records, with proxy buffering disabled through `X-Accel-Buffering: no`. Ordinary JSON callers retain their existing response. Completion is emitted after the seed transaction commits; failures are logged under `Studio.DemoSeed` and returned as failure records. A stream that ends without completion is shown as interrupted, with a retry instruction. Configure any additional reverse proxy to permit streaming if it buffers responses despite that header.
 
@@ -79,3 +79,11 @@ The current run records shell, essential-card and complete times, plus each comp
 Server logs contain `MyWork startup begin`, request completion/failure and authorization/job-list/assigned-tasks/media-summary phase timings. Match `Run` with the console run and `Trace` with individual requests. Response headers include `X-Studio-Trace` and `Server-Timing`. Request failures retain their exception and elapsed time, including SQL timeouts. The Npgsql data source now uses the application logger factory; temporarily setting `Logging:LogLevel:Npgsql.Command` to `Information` records command durations and SQL for deeper diagnosis. Parameter logging remains disabled. Restore the normal Npgsql warning level after collecting the slow run.
 
 The PostgreSQL startup regression compares bulk permission results with individual checks for inheritance, explicit overrides, inactive membership, directory groups, global roles and administrators. Enable it with `STUDIO_TEST_POSTGRES` when validating against PostgreSQL locally.
+
+## Missing-file recovery
+
+Storage exceptions on API routes now return a controlled problem response (404 for missing objects, 409 for integrity errors, 503 for other storage failures), with a correlation trace and server warning rather than an unhandled request exception. Photo previews show an unavailable state and a working retry. Failure after a download has started terminates that download; other requests continue normally.
+
+The version content endpoint first restores a matching archived provider version when an interruption leaves the current object missing. It can also copy a byte-identical original from the previous `VersionStore` or `Storage/VersionStore` folder beneath the application's content root into the configured provider. Size and SHA-256 must match the database record. It never substitutes a demo photo for a real upload. If no matching original exists, the user sees an unavailable file and can restore storage from backup.
+
+Retry Admin's Load Demo Data after an interruption. Existing seed-owned photos are checked by opening the stored object, so a leftover metadata sidecar does not hide a missing file. Missing demo photos are downloaded again from the real photo catalogue, retaining version identities and linked records. This repair path does not rerun workspace/job/status/financial edits. JPEG derivatives now consistently use JPEG filenames and content types. The opt-in `DemoMediaRecoveryTests` verifies recovery with a surviving sidecar, identity preservation, retained job edits and protection of user uploads.

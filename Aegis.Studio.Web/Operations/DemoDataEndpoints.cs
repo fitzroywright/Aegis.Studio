@@ -56,9 +56,18 @@ public static class DemoDataEndpoints
         command.CommandText = "select pg_advisory_xact_lock(72709128)";
         report?.Invoke(new(1, "Waiting for seed lock", 0, 0, "Waiting for any other demo loader to finish."));
         command.ExecuteNonQuery();
+        bool loaded;
         using(var current=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v6-full-studio')",connection,transaction))
-            if((bool)current.ExecuteScalar()!)
-                return "Full Studio demo is already loaded. Existing demo work and edits have been preserved.";
+            loaded=(bool)current.ExecuteScalar()!;
+        if(loaded)
+        {
+            report?.Invoke(new(2,"Checking storage",0,0,"Checking existing demo photographs without resetting job edits."));
+            int restored=DemoDataExpansion.RepairMedia(connection,transaction,login,storage,report)
+                +DemoFullStudioData.RepairMedia(connection,transaction,login,storage,report);
+            report?.Invoke(new(99,"Committing repairs",0,0,"Saving repaired demo photo references."));
+            transaction.Commit();
+            return $"Full Studio demo verified. Restored {restored} missing seeded photo versions; existing work and edits have been preserved.";
+        }
         // Re-run the deterministic base seed on every request so a stale marker cannot
         // hide deleted or partially-created DEMO records. Inserts are made idempotent;
         // updates remain updates. Real workspaces are never matched by these fixed DEMO ids.
