@@ -1,9 +1,10 @@
 // Keep the existing FrontDesk, WorkDay and administration screens as destinations.
 (() => {
     const rail=document.querySelector('.rail');
-    rail.className='studio-top-nav';rail.setAttribute('role','navigation');rail.setAttribute('aria-label','Main navigation');
-    document.querySelector('.topbar').after(rail);
-    const items=[['dashboard','Dashboard'],['pipeline','Pipeline'],['production','Production'],['frontdesk','FrontDesk'],['mywork','My Work'],['admin','Admin']];
+    rail.className='studio-side-nav';rail.setAttribute('role','navigation');rail.setAttribute('aria-label','Main navigation');
+    document.querySelector('.shell').prepend(rail);
+    document.querySelector('.navigation-pane').replaceWith(document.querySelector('.workspaces'));
+    const items=[['mywork','My Work'],['workspaces','Workspaces'],['pipeline','Pipeline'],['production','Production'],['frontdesk','FrontDesk'],['dashboard','Dashboard'],['admin','Admin']];
     const icons={
         mywork:'<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3h6v2M8 12l2 2 5-5M8 18h8"/>',
         dashboard:'<path d="M4 20V11h4v9M10 20V5h4v15M16 20V8h4v12"/>',

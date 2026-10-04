@@ -13,7 +13,9 @@ const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
 async function json(url, options) {
     const response = await fetch(url, options);
     if (!response.ok) {
-        throw new Error(await response.text());
+        let error=null;try{error=await response.json();}catch{}
+        const fallback=response.status===403?'You do not have permission for this action.':response.status===401?'Your session has expired. Sign in again.':response.status===404?'This item is no longer available.':'This action could not be completed. Please retry.';
+        throw new Error(response.status>=500?fallback:(error?.error||error?.detail||fallback));
     }
 
     if (response.status === 204 || response.status === 205) return null;
@@ -431,3 +433,4 @@ document.addEventListener('DOMContentLoaded', () => {
         conversationList.textContent = 'Unable to load workspaces: ' + (error.message || error);
     });
 }, { once: true });
+

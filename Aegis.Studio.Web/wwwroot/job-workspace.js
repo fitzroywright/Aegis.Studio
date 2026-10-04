@@ -13,11 +13,12 @@ async function renderWorkspaceAnnouncements(host, workspaceId, current) {
 }
 
 async function renderJobSubjects(job, panel, current, refresh) {
-    const [subjects, permissions] = await Promise.all([json(`/api/jobs/${job.id}/subjects`),json(`/api/jobs/${job.id}/access`)]);
+    const [originalSubjects, permissions, media] = await Promise.all([json(`/api/jobs/${job.id}/subjects`),json(`/api/jobs/${job.id}/access`),json(`/api/jobs/${job.id}/media`).catch(()=>null)]);
+    const subjects=media?.subjects||originalSubjects;
     if(!current()) return;
     const canEdit = (permissions.permissions || permissions).editJob;
-    const editButton = subject => canEdit ? `<button class="action" data-edit-subject="${subject.id}">Edit</button>` : '';
-    panel.innerHTML = `${subjects.length===1 ? `<article class="subject-card"><h3>${esc(subjects[0].name)}</h3><p>${esc(subjects[0].reference)}</p><p>${esc(subjects[0].notes)}</p>${editButton(subjects[0])}</article>` : subjects.length ? `<table class="subject-roster"><thead><tr><th>Name</th><th>Reference</th><th>Notes</th><th></th></tr></thead><tbody>${subjects.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.reference)}</td><td>${esc(s.notes)}</td><td>${editButton(s)}</td></tr>`).join('')}</tbody></table>` : '<p>No subjects added. Add the person being photographed; additional people form a roster.</p>'}${canEdit ? '<button class="action" id="addJobSubject">Add subject</button><form class="subject-form" hidden><input name="subjectId" type="hidden"><label>Name<input name="name" maxlength="200" required></label><label>Reference<input name="reference" maxlength="200"></label><label>Notes<textarea name="notes" maxlength="4000"></textarea></label><button class="primary">Save subject</button><button type="button" data-cancel>Cancel</button><p role="alert"></p></form>' : ''}`;
+    const editButton = subject => canEdit && !subject.isSystem ? `<button class="action" data-edit-subject="${subject.id}">Edit</button>` : '';
+    panel.innerHTML = `${subjects.length===1 ? `<article class="subject-card"><h3>${esc(subjects[0].name)}</h3><p>${esc(subjects[0].reference)}</p><p>${esc(subjects[0].notes)}</p>${editButton(subjects[0])}</article>` : subjects.length ? `<table class="subject-roster"><thead><tr><th>Name</th><th>Reference</th><th>Images</th><th>Notes</th><th></th></tr></thead><tbody>${subjects.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.reference)}</td><td>${esc(s.imageCount??"—")}</td><td>${esc(s.notes)}</td><td>${editButton(s)}</td></tr>`).join('')}</tbody></table>` : '<p>No subjects added. Add the person being photographed; additional people form a roster.</p>'}${canEdit ? '<button class="action" id="addJobSubject">Add subject</button><form class="subject-form" hidden><input name="subjectId" type="hidden"><label>Name<input name="name" maxlength="200" required></label><label>Reference<input name="reference" maxlength="200"></label><label>Notes<textarea name="notes" maxlength="4000"></textarea></label><button class="primary">Save subject</button><button type="button" data-cancel>Cancel</button><p role="alert"></p></form>' : ''}`;
     if(!canEdit) return;
     const form=panel.querySelector('form');
     const edit=subject=>{form.hidden=false;form.elements.subjectId.value=subject?.id || ''; for(const key of ['name','reference','notes']) form.elements[key].value=subject?.[key] || '';form.elements.name.focus();};
@@ -93,3 +94,4 @@ async function renderAnnouncementBanners(host,workspaceId,current) {
         };
     };
 })();
+
