@@ -115,7 +115,18 @@ function mergeJobMessages(teamMessages, customerMessages) {
         tabs.querySelectorAll('[data-tab]').forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
         display();
         conversationList.innerHTML = '';
-        if (!workspaceId) { empty('Select a workspace', 'Choose a workspace on the left to see its jobs, announcements and members.'); return; }
+        if (!workspaceId) {
+            const first = workspaceCache.find(x => x.permissions?.accessWorkspace && x.permissions?.view);
+            if (first) {
+                selectedWorkspace = first.id;
+                currentWorkspacePermissions = first.permissions;
+                workspaceTitle.textContent = first.name;
+                document.querySelectorAll('.workspace').forEach(button => button.classList.toggle('active', button.dataset.id === first.id));
+                return loadConversations();
+            }
+            empty('Select a workspace', 'Choose a workspace on the left to see its jobs.');
+            return;
+        }
         empty('Select a job', 'Jobs belong to this workspace. Open a job to read its messages.');
         const [jobs, directory, profile] = await Promise.all([
             json('/api/jobs'),
