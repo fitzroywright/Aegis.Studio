@@ -42,7 +42,8 @@ internal static class DemoDataExpansion
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/Team_picture_time.jpg",
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/Product_photo.jpg",
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/People_at_Wedding_ceremony.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/A_group_picture_together_with_the_groom_at_Wedding_ceremony.jpg"
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/A_group_picture_together_with_the_groom_at_Wedding_ceremony.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Family_portrait.jpg"
     ];
     internal static readonly int[] JobNumbers = [1,2,4,5,7,8];
     internal static Guid Id(int group,int number) => Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
