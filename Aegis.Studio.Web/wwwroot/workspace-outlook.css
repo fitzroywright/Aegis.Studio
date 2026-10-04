@@ -1040,7 +1040,7 @@ body .has-open-job .job-reading-view{
   color:#8c7a5d!important;
   font-size:12px!important;
 }
-body .has-open-job .job-reading-view>.detail-header{
+body .has-open-job .studio-job-header{
   display:flex!important;
   align-items:flex-start!important;
   justify-content:space-between!important;
@@ -1049,13 +1049,13 @@ body .has-open-job .job-reading-view>.detail-header{
   border:0!important;
   background:transparent!important;
 }
-body .has-open-job .job-reading-view>.detail-header h1{
+body .has-open-job .studio-job-header h1{
   margin:0 0 6px!important;
   font:750 30px/1.12 Inter,"Segoe UI",system-ui,sans-serif!important;
   letter-spacing:-.03em!important;
   color:#201f1c!important;
 }
-body .has-open-job .job-reading-view>.detail-header p{
+body .has-open-job .studio-job-header p{
   display:block!important;
   margin:0!important;
   font-size:13px!important;
@@ -1439,7 +1439,7 @@ body .has-open-job .media-items.image-lens{
   text-overflow:ellipsis;
 }
 
-.has-open-job .job-reading-view>.detail-header{
+.has-open-job .studio-job-header{
   box-sizing:border-box;
   height:46px!important;
   min-height:46px!important;
@@ -1452,18 +1452,18 @@ body .has-open-job .media-items.image-lens{
   border:0;
   background:transparent;
 }
-.has-open-job .job-reading-view>.detail-header>div{
+.has-open-job .studio-job-header>div{
   min-width:0;
   margin:0;
   padding:0;
 }
-.has-open-job .job-reading-view>.detail-header h1{
+.has-open-job .studio-job-header h1{
   margin:0;
   font:750 22px/1 "Segoe UI",system-ui,sans-serif;
   letter-spacing:-.02em;
   color:#201f1c;
 }
-.has-open-job .job-reading-view>.detail-header p{
+.has-open-job .studio-job-header p{
   margin:3px 0 0;
   font-size:10px;
   line-height:1.1;
@@ -1854,4 +1854,89 @@ body .has-open-job .media-items.image-lens{
     grid-column:auto;
     grid-template-columns:1fr;
   }
+}
+
+
+.has-open-job .studio-job-header{
+  box-sizing:border-box!important;
+  height:46px!important;
+  min-height:46px!important;
+  margin:0!important;
+  padding:2px 4px 4px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  border:0!important;
+  background:transparent!important;
+}
+.has-open-job .studio-job-identity{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:9px;
+}
+.has-open-job .studio-job-thumb{
+  flex:0 0 34px;
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  border-radius:7px;
+  background:#2f281f;
+  color:#fff;
+  font-weight:750;
+  font-size:13px;
+}
+.has-open-job .studio-job-header h1{
+  margin:0!important;
+  font:750 22px/1 "Segoe UI",system-ui,sans-serif!important;
+  letter-spacing:-.02em!important;
+  color:#201f1c!important;
+}
+.has-open-job .studio-job-header p{
+  margin:3px 0 0!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+  color:#746f67!important;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.has-open-job .job-panel-heading{
+  min-height:38px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:7px 10px;
+  border-bottom:1px solid #eee8df;
+  background:#fff;
+}
+.has-open-job .job-panel-heading>div{
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  gap:7px;
+}
+.has-open-job .job-panel-heading strong{
+  font-size:13px;
+  color:#26221d;
+}
+.has-open-job .job-panel-heading span{
+  font-size:9px;
+  color:#8a8176;
+}
+.has-open-job .job-details-card{
+  display:block!important;
+}
+.has-open-job .job-work-board.focus-mode{
+  grid-template-columns:minmax(0,1fr) minmax(245px,.76fr)!important;
+}
+.has-open-job .job-work-board.focus-mode .job-lower-pane{
+  grid-column:1;
+}
+.has-open-job .job-work-board.focus-mode .job-context-sidebar{
+  grid-column:2;
 }
