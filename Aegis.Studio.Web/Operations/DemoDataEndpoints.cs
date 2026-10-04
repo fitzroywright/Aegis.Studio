@@ -42,7 +42,7 @@ public static class DemoDataEndpoints
             bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage);
             transaction.Commit();
             return Results.Ok(new { message = fullStudioExpanded
-                ? "Full Studio demo loaded: 24 interconnected jobs across 6 workspaces with clients, bookings, schedules, photographers, availability, payments, production stages and history."
+                ? "Full Studio demo loaded: 24 interconnected jobs across 6 workspaces, including roughly 1,000 media assets across the flagship ID, graduation, wedding, school, corporate-headshot and commercial jobs, plus clients, bookings, schedules, photographers, availability, payments, production stages and history."
                 : presentationExpanded
                     ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see wedding media and linked workflow data."
                     : expanded
