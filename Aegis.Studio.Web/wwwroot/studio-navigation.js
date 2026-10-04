@@ -207,63 +207,206 @@
             json('/api/jobs').catch(()=>[])
         ]);
 
-        const activeJobs=jobs.filter(job=>String(job.status||'').toLowerCase()!=='completed');
-        const completedJobs=jobs.length-activeJobs.length;
-        const unassignedJobs=activeJobs.filter(job=>!job.assignedTo).length;
-
-        const workspaceCards=workspaces.map(workspace=>{
+        const workspaceData=await Promise.all(workspaces.map(async workspace=>{
             const workspaceJobs=jobs.filter(job=>String(job.workspaceId)===String(workspace.id));
-            const current=workspaceJobs.filter(job=>String(job.status||'').toLowerCase()!=='completed');
-            const recent=[...workspaceJobs]
-                .sort((a,b)=>new Date(b.eventDate||b.createdAtUtc||b.createdAt||0)-new Date(a.eventDate||a.createdAtUtc||a.createdAt||0))
-                .slice(0,5);
+            const media=await Promise.all(workspaceJobs.map(async job=>({
+                job,
+                snapshot:await json('/api/jobs/'+job.id+'/media').catch(()=>({assets:[]}))
+            })));
+            const announcements=await json('/api/workspaces/'+workspace.id+'/announcements').catch(()=>[]);
+            return {workspace,jobs:workspaceJobs,media,announcements};
+        }));
 
-            return `<article class="workspace-hub-card">
-                <header>
-                    <div>
-                        <span class="workspace-hub-icon">▦</span>
-                        <div><h2>${esc(workspace.name)}</h2><p>${esc(workspace.emailAddress||workspace.routeKey||'Studio workspace')}</p></div>
-                    </div>
-                    <button type="button" class="action" data-open-workspace="${workspace.id}" data-workspace-name="${esc(workspace.name)}">Open Workspace</button>
-                </header>
-                <div class="workspace-hub-stats">
-                    <span><strong>${current.length}</strong> Active Jobs</span>
-                    <span><strong>${workspaceJobs.length-current.length}</strong> Completed</span>
-                    <span><strong>${current.filter(job=>!job.assignedTo).length}</strong> Unassigned</span>
-                </div>
-                <div class="workspace-job-list">
-                    ${recent.length?recent.map(job=>`<button type="button" class="workspace-job-row" data-open-job="${job.id}">
-                        <span><strong>${esc(job.title)}</strong><small>${esc(job.clientName||'Client')} · ${esc(job.status||'Active')}</small></span>
-                        <span class="workspace-job-status">${esc(job.status||'Active')}</span>
-                        <span class="workspace-job-arrow">›</span>
-                    </button>`).join(''):'<div class="mw-empty">No jobs in this workspace yet.</div>'}
-                </div>
+        const photoCount=item=>item.media.reduce((sum,x)=>sum+(x.snapshot.assets?.length||0),0);
+        const latestJob=item=>[...item.jobs].sort((a,b)=>new Date(b.eventDate||b.createdAtUtc||b.createdAt||0)-new Date(a.eventDate||a.createdAtUtc||a.createdAt||0))[0];
+        const thumbFor=(job,snapshot)=>{
+            const asset=(snapshot.assets||[]).find(a=>String(a.contentType||'').startsWith('image/'))||(snapshot.assets||[])[0];
+            return asset?.versionId?'/api/jobs/'+job.id+'/versions/by-id/'+asset.versionId+'/content':'';
+        };
+        const heroFor=item=>{
+            for(const pair of item.media){
+                const url=thumbFor(pair.job,pair.snapshot);
+                if(url)return url;
+            }
+            return '';
+        };
+        const previewsFor=item=>{
+            const values=[];
+            for(const pair of item.media){
+                for(const asset of (pair.snapshot.assets||[])){
+                    if(!asset.versionId)continue;
+                    values.push('/api/jobs/'+pair.job.id+'/versions/by-id/'+asset.versionId+'/content');
+                    if(values.length===3)return values;
+                }
+            }
+            return values;
+        };
+
+        const activeCount=workspaceData.filter(item=>item.jobs.some(job=>String(job.status||'').toLowerCase()!=='completed')).length;
+        const completedWorkspaceCount=workspaceData.filter(item=>item.jobs.length&&item.jobs.every(job=>String(job.status||'').toLowerCase()==='completed')).length;
+        const announcements=workspaceData
+            .flatMap(item=>(item.announcements||[]).map(a=>({...a,workspaceName:item.workspace.name})))
+            .sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0))
+            .slice(0,4);
+
+        const renderRows=items=>items.map(item=>{
+            const current=item.jobs.filter(job=>String(job.status||'').toLowerCase()!=='completed');
+            const latest=latestJob(item);
+            const photos=photoCount(item);
+            const hero=heroFor(item);
+            const previews=previewsFor(item);
+            const status=current.length?'Active':item.jobs.length?'Completed':'Ready';
+            const statusClass=status.toLowerCase();
+            const subtitle=latest?.clientName||item.workspace.emailAddress||item.workspace.routeKey||'Studio workspace';
+            const location=latest?.location||latest?.eventLocation||'';
+            const lastActivity=latest?.eventDate||latest?.createdAtUtc||latest?.createdAt;
+            return `<article class="workspace-reference-row" data-workspace-row data-status="${statusClass}" data-search="${esc((item.workspace.name+' '+subtitle+' '+status).toLowerCase())}">
+                <button type="button" class="workspace-reference-main" data-open-workspace="${item.workspace.id}" data-workspace-name="${esc(item.workspace.name)}">
+                    <span class="workspace-reference-hero">${hero?`<img src="${hero}" alt="">`:'<span class="workspace-photo-fallback">📷</span>'}</span>
+                    <span class="workspace-reference-copy">
+                        <strong><span class="workspace-folder">▰</span>${esc(item.workspace.name)}</strong>
+                        <small>${esc(subtitle)}</small>
+                        ${location?`<small>⌖ ${esc(location)}</small>`:''}
+                    </span>
+                    <span class="workspace-reference-stat"><b>${item.jobs.length}</b><small>Jobs</small></span>
+                    <span class="workspace-reference-stat"><b>${photos}</b><small>Photos</small></span>
+                    <span class="workspace-reference-stat"><b>${current.length}</b><small>Active</small></span>
+                    <span class="workspace-reference-previews">
+                        ${previews.map(url=>`<img src="${url}" alt="">`).join('')}
+                        ${photos>previews.length?`<i>+${photos-previews.length}</i>`:''}
+                    </span>
+                    <span class="workspace-reference-activity">
+                        <em class="workspace-reference-pill ${statusClass}">${status}</em>
+                        <small>Last activity</small>
+                        <b>${lastActivity?esc(new Date(lastActivity).toLocaleDateString()):'—'}</b>
+                    </span>
+                    <span class="workspace-reference-more">⋮</span>
+                </button>
             </article>`;
         }).join('');
 
         genericView.innerHTML=`
-            <section class="studio-reference-page workspace-hub-page">
-                <header class="studio-reference-header">
-                    <div><h1>Workspaces</h1><p>Jobs live inside workspaces. Open a job for its messages, media, subjects, tasks, calendar and activity.</p></div>
+            <section class="workspace-reference-page">
+                <header class="workspace-reference-header">
+                    <div><h1>Workspaces</h1><p>Organize jobs, clients, and conversations.</p></div>
+                    <button type="button" class="primary workspace-new-button" data-workspace-admin>＋ New Workspace</button>
                 </header>
-                <div class="studio-reference-metrics">
-                    <article><span class="metric-glyph blue">▦</span><div><strong>${workspaces.length}</strong><b>Workspaces</b><small>Operational teams</small></div></article>
-                    <article><span class="metric-glyph green">✓</span><div><strong>${activeJobs.length}</strong><b>Active Jobs</b><small>Across all workspaces</small></div></article>
-                    <article><span class="metric-glyph purple">●</span><div><strong>${completedJobs}</strong><b>Completed</b><small>Finished jobs</small></div></article>
-                    <article><span class="metric-glyph orange">!</span><div><strong>${unassignedJobs}</strong><b>Unassigned</b><small>Needs ownership</small></div></article>
+
+                <div class="workspace-reference-layout">
+                    <main class="workspace-reference-center">
+                        <div class="workspace-reference-toolbar">
+                            <div class="workspace-reference-tabs" role="tablist">
+                                <button class="active" data-workspace-filter="all">All Workspaces <b>${workspaceData.length}</b></button>
+                                <button data-workspace-filter="active">Active <b>${activeCount}</b></button>
+                                <button data-workspace-filter="completed">Completed <b>${completedWorkspaceCount}</b></button>
+                            </div>
+                            <div class="workspace-reference-tools">
+                                <label class="workspace-reference-search">⌕ <input type="search" placeholder="Search workspaces…" data-workspace-search></label>
+                                <select data-workspace-sort aria-label="Sort workspaces">
+                                    <option value="name">Name (A–Z)</option>
+                                    <option value="jobs">Most jobs</option>
+                                    <option value="photos">Most photos</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="workspace-reference-list" data-workspace-list>${renderRows(workspaceData)}</div>
+                    </main>
+
+                    <aside class="workspace-reference-side">
+                        <section class="workspace-side-card">
+                            <header><h2>Announcements</h2><span>Recent</span></header>
+                            <div class="workspace-announcement-list">
+                                ${announcements.length?announcements.map(a=>`<article><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p><small>${esc(a.workspaceName)} · ${a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString():''}</small></article>`).join(''):'<p class="mw-empty">No workspace announcements.</p>'}
+                            </div>
+                        </section>
+
+                        <section class="workspace-side-card">
+                            <header><h2>Workspace Filters</h2></header>
+                            <label>Search<input type="search" placeholder="Search workspaces…" data-workspace-search-side></label>
+                            <label>Status<select data-workspace-status-side><option value="all">All Statuses</option><option value="active">Active</option><option value="completed">Completed</option><option value="ready">Ready</option></select></label>
+                            <button type="button" class="action workspace-clear-filters">Clear Filters</button>
+                        </section>
+
+                        <section class="workspace-side-card">
+                            <header><h2>Quick Actions</h2></header>
+                            <button type="button" class="workspace-quick-action" data-workspace-admin>＋ New Workspace</button>
+                            <button type="button" class="workspace-quick-action" data-nav-quick="pipeline">▣ View Calendar</button>
+                            <button type="button" class="workspace-quick-action" data-nav-quick="frontdesk">＋ Create Booking</button>
+                        </section>
+                    </aside>
                 </div>
-                <div class="workspace-hub-grid">${workspaceCards||'<div class="studio-reference-card"><p>No workspaces are available.</p></div>'}</div>
             </section>`;
 
-        genericView.querySelectorAll('[data-open-job]').forEach(button=>{
-            button.onclick=()=>openWorkspaceJob(button.dataset.openJob);
+        const allRows=()=>[...genericView.querySelectorAll('[data-workspace-row]')];
+        let filter='all';
+        let term='';
+        let sort='name';
+
+        const refresh=()=>{
+            const list=genericView.querySelector('[data-workspace-list]');
+            const rows=allRows();
+            rows.forEach(row=>{
+                const status=row.dataset.status;
+                const matchesFilter=filter==='all'||status===filter;
+                const matchesTerm=!term||row.dataset.search.includes(term);
+                row.hidden=!(matchesFilter&&matchesTerm);
+            });
+
+            rows.sort((a,b)=>{
+                const ai=workspaceData.find(x=>String(x.workspace.id)===String(a.querySelector('[data-open-workspace]').dataset.openWorkspace));
+                const bi=workspaceData.find(x=>String(x.workspace.id)===String(b.querySelector('[data-open-workspace]').dataset.openWorkspace));
+                if(sort==='jobs')return (bi?.jobs.length||0)-(ai?.jobs.length||0);
+                if(sort==='photos')return photoCount(bi||{media:[]})-photoCount(ai||{media:[]});
+                return String(ai?.workspace.name||'').localeCompare(String(bi?.workspace.name||''));
+            }).forEach(row=>list.appendChild(row));
+        };
+
+        genericView.querySelectorAll('[data-workspace-filter]').forEach(button=>{
+            button.onclick=()=>{
+                filter=button.dataset.workspaceFilter;
+                genericView.querySelectorAll('[data-workspace-filter]').forEach(x=>x.classList.toggle('active',x===button));
+                const side=genericView.querySelector('[data-workspace-status-side]');
+                if(side)side.value=filter;
+                refresh();
+            };
         });
+        const search=genericView.querySelector('[data-workspace-search]');
+        const searchSide=genericView.querySelector('[data-workspace-search-side]');
+        const updateTerm=value=>{
+            term=String(value||'').trim().toLowerCase();
+            if(search&&search.value!==value)search.value=value;
+            if(searchSide&&searchSide.value!==value)searchSide.value=value;
+            refresh();
+        };
+        search.oninput=e=>updateTerm(e.target.value);
+        searchSide.oninput=e=>updateTerm(e.target.value);
+        genericView.querySelector('[data-workspace-sort]').onchange=e=>{sort=e.target.value;refresh();};
+        genericView.querySelector('[data-workspace-status-side]').onchange=e=>{
+            filter=e.target.value;
+            genericView.querySelectorAll('[data-workspace-filter]').forEach(x=>x.classList.toggle('active',x.dataset.workspaceFilter===filter));
+            refresh();
+        };
+        genericView.querySelector('.workspace-clear-filters').onclick=()=>{
+            filter='all';term='';sort='name';
+            search.value='';searchSide.value='';
+            genericView.querySelector('[data-workspace-sort]').value='name';
+            genericView.querySelector('[data-workspace-status-side]').value='all';
+            genericView.querySelectorAll('[data-workspace-filter]').forEach(x=>x.classList.toggle('active',x.dataset.workspaceFilter==='all'));
+            refresh();
+        };
+
         genericView.querySelectorAll('[data-open-workspace]').forEach(button=>{
             button.onclick=async()=>{
                 conversationView.classList.remove('hidden');
                 genericView.classList.add('hidden');
                 await selectWorkspace(button.dataset.openWorkspace,button.dataset.workspaceName);
             };
+        });
+        genericView.querySelectorAll('[data-workspace-admin]').forEach(button=>{
+            button.onclick=()=>window.studioNavigate('admin');
+        });
+        genericView.querySelectorAll('[data-nav-quick]').forEach(button=>{
+            button.onclick=()=>window.studioNavigate(button.dataset.navQuick);
         });
     }
 
