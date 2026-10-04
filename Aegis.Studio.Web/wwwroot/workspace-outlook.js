@@ -303,6 +303,28 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 </div>
             </article>`).join('') || '<p>No messages to display.</p>';
 
+        if(job){
+            const searchButton=detailPane.querySelector('[data-message-search]');
+            if(searchButton) searchButton.onclick=()=>{
+                const term=prompt('Search this conversation');
+                if(term===null)return;
+                const value=term.trim().toLowerCase();
+                detailPane.querySelectorAll('#combinedJobMessages .message').forEach(row=>{
+                    row.hidden=!!value && !row.textContent.toLowerCase().includes(value);
+                });
+            };
+            const moreButton=detailPane.querySelector('.panel-heading-actions .icon-button:last-child');
+            if(moreButton) moreButton.onclick=()=>{
+                const dialog=studioDialog('Message options',`
+                    <div class="job-actions">
+                        <button type="button" class="action" data-focus-compose>Write message</button>
+                        <button type="button" class="action" data-show-all>Show all messages</button>
+                    </div>`);
+                dialog.querySelector('[data-focus-compose]').onclick=()=>{dialog.close();detailPane.querySelector('#hierarchyBody')?.focus();};
+                dialog.querySelector('[data-show-all]').onclick=()=>{detailPane.querySelectorAll('#combinedJobMessages .message').forEach(row=>row.hidden=false);dialog.close();};
+            };
+        }
+
         const sender = document.getElementById('jobSendingIdentity');
         const canSend = () => !job
             || sender?.value === 'Internal'
@@ -525,49 +547,125 @@ function mergeJobMessages(teamMessages, customerMessages) {
     async function renderJobMediaOverview(job,panel,current){
         const data=await json(`/api/jobs/${job.id}/media`);
         if(!current())return;
+
         const assets=(data.assets||[]).filter(a=>String(a.contentType||'').startsWith('image/'));
         const collections=[...new Set(assets.map(a=>a.collection||'Unclassified'))];
+        let selected=new Set();
+        let selectMode=false;
+        let activeCollection='';
+
         panel.innerHTML=`
             <section class="workspace-media-overview">
                 <header class="workspace-media-heading">
                     <div><h2>Media <span class="workspace-media-count">${assets.length}</span></h2></div>
                     <div class="workspace-media-actions">
-                        <button type="button" class="primary" data-manage-media>Upload</button>
-                        <button type="button" class="action" data-manage-media>Select</button>
-                        <button type="button" class="action" data-manage-media>Download</button>
-                        <button type="button" class="action" data-manage-media>Import Roster</button>
-                        <button type="button" class="action media-more-button" data-manage-media aria-label="More media actions">•••</button>
+                        <button type="button" class="primary" data-media-upload>Upload</button>
+                        <button type="button" class="action" data-media-select>Select</button>
+                        <button type="button" class="action" data-media-download>Download</button>
+                        <button type="button" class="action" data-media-roster>Import Roster</button>
+                        <button type="button" class="action media-more-button" data-media-more aria-label="More media actions">•••</button>
                     </div>
                 </header>
                 <div class="workspace-media-collections">
                     <button type="button" class="active" data-collection-filter="">All (${assets.length})</button>
                     ${collections.map(name=>`<button type="button" data-collection-filter="${esc(name)}">${esc(name)} (${assets.filter(a=>(a.collection||'Unclassified')===name).length})</button>`).join('')}
                 </div>
+                <div class="workspace-media-selection" hidden><strong data-selected-count>0 selected</strong><button type="button" class="text-button" data-clear-selection>Clear</button></div>
                 <div class="workspace-media-grid"></div>
             </section>`;
+
         const grid=panel.querySelector('.workspace-media-grid');
-        const draw=filter=>{
-            const visible=filter?assets.filter(a=>(a.collection||'Unclassified')===filter):assets;
+        const selectionBar=panel.querySelector('.workspace-media-selection');
+        const selectButton=panel.querySelector('[data-media-select]');
+
+        const syncSelection=()=>{
+            selectionBar.hidden=!selectMode && !selected.size;
+            selectionBar.querySelector('[data-selected-count]').textContent=`${selected.size} selected`;
+            selectButton.classList.toggle('active',selectMode);
+            grid.querySelectorAll('[data-preview-media]').forEach(tile=>tile.classList.toggle('selected',selected.has(tile.dataset.previewMedia)));
+        };
+
+        const draw=()=>{
+            const visible=activeCollection?assets.filter(a=>(a.collection||'Unclassified')===activeCollection):assets;
             grid.innerHTML=visible.slice(0,24).map(a=>`
-                <button type="button" class="workspace-media-tile" data-preview-media="${a.id}">
+                <button type="button" class="workspace-media-tile ${selected.has(a.id)?'selected':''}" data-preview-media="${a.id}">
+                    <span class="media-select-indicator" aria-hidden="true">✓</span>
                     <img loading="lazy" src="/api/jobs/${job.id}/versions/by-id/${a.versionId}/content" alt="${esc(a.fileName)}">
-                    <span>${esc(a.fileName)}</span>
+                    <span class="workspace-media-filename">${esc(a.fileName)}</span>
                 </button>`).join('') || '<div class="workspace-media-empty">No images are available in this collection.</div>';
+
             grid.querySelectorAll('[data-preview-media]').forEach(button=>button.onclick=()=>{
                 const asset=assets.find(a=>a.id===button.dataset.previewMedia);
                 if(!asset)return;
+                if(selectMode){
+                    selected.has(asset.id)?selected.delete(asset.id):selected.add(asset.id);
+                    syncSelection();
+                    return;
+                }
                 studioDialog(asset.fileName,`<img style="max-width:100%;max-height:72vh;object-fit:contain" src="/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content" alt="${esc(asset.fileName)}">`);
             });
+            syncSelection();
         };
-        draw('');
+
+        const openFullMedia=async action=>{
+            panel.innerHTML='<div class="versioned-gallery"></div>';
+            const host=panel.querySelector('.versioned-gallery');
+            await renderProductionMedia(job,host,current);
+            if(!current())return;
+            const selector={
+                upload:'[data-add]',
+                roster:'[data-roster]'
+            }[action];
+            if(selector){
+                const target=(detailPane.querySelector('.media-toolbar-host')||panel).querySelector(selector) || document.querySelector(selector);
+                target?.click();
+            }
+        };
+
         panel.querySelectorAll('[data-collection-filter]').forEach(button=>button.onclick=()=>{
             panel.querySelectorAll('[data-collection-filter]').forEach(x=>x.classList.toggle('active',x===button));
-            draw(button.dataset.collectionFilter||'');
+            activeCollection=button.dataset.collectionFilter||'';
+            draw();
         });
-        panel.querySelectorAll('[data-manage-media]').forEach(button=>button.onclick=async()=>{
-            panel.innerHTML='<div class="versioned-gallery"></div>';
-            await renderProductionMedia(job,panel.querySelector('.versioned-gallery'),current);
-        });
+
+        panel.querySelector('[data-media-upload]').onclick=()=>openFullMedia('upload').catch(error=>alert(error.message));
+        panel.querySelector('[data-media-roster]').onclick=()=>openFullMedia('roster').catch(error=>alert(error.message));
+        panel.querySelector('[data-media-more]').onclick=()=>openFullMedia('manage').catch(error=>alert(error.message));
+
+        selectButton.onclick=()=>{
+            selectMode=!selectMode;
+            if(!selectMode)selected.clear();
+            syncSelection();
+        };
+        panel.querySelector('[data-clear-selection]').onclick=()=>{selected.clear();selectMode=false;syncSelection();};
+
+        panel.querySelector('[data-media-download]').onclick=async event=>{
+            if(!selected.size){
+                selectMode=true;
+                syncSelection();
+                alert('Select one or more images, then click Download again.');
+                return;
+            }
+            const button=event.currentTarget;
+            button.disabled=true;
+            try{
+                const response=await fetch(`/api/jobs/${job.id}/media/export`,{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({assets:[...selected]})
+                });
+                if(!response.ok)throw Error(await response.text());
+                const url=URL.createObjectURL(await response.blob());
+                const link=document.createElement('a');
+                link.href=url;
+                link.download='studio-media.zip';
+                link.click();
+                setTimeout(()=>URL.revokeObjectURL(url),60000);
+            }catch(error){alert(error.message);}
+            finally{button.disabled=false;}
+        };
+
+        draw();
     }
 
     async function renderJobTab(name, job, panel, current, refresh) {
