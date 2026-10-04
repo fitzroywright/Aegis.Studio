@@ -2172,3 +2172,723 @@ body[data-theme="studio-default"] .thread-shared-files .job-file-tile strong{
     grid-template-columns:245px 470px 235px!important;
   }
 }
+
+
+/* === APPROVED LIGHT REFERENCE RESET ========================================
+   Final authority for the current Studio UI. This intentionally matches the
+   supplied Aegis.Studio reference: light chrome, blue active navigation,
+   readable typography, white cards, pale page background.
+   ========================================================================== */
+
+body[data-theme="studio-default"]{
+  --ref-blue:#1677ff;
+  --ref-blue-dark:#0d63d8;
+  --ref-blue-soft:#eaf3ff;
+  --ref-page:#f5f7fb;
+  --ref-panel:#ffffff;
+  --ref-sidebar:#f1f4f8;
+  --ref-line:#e3e8ef;
+  --ref-text:#151922;
+  --ref-muted:#6b7585;
+  --ref-green:#24b36b;
+  --ref-orange:#ff8a00;
+  --ref-purple:#8b5cf6;
+  --ref-danger:#ef3340;
+  background:var(--ref-page)!important;
+  color:var(--ref-text)!important;
+  font-family:Inter,"Segoe UI",Arial,sans-serif!important;
+  font-size:15px!important;
+  line-height:1.4!important;
+}
+
+/* Top chrome */
+body[data-theme="studio-default"] .topbar{
+  height:64px!important;
+  min-height:64px!important;
+  padding:0 24px!important;
+  gap:20px!important;
+  background:#fff!important;
+  border-bottom:1px solid var(--ref-line)!important;
+  box-shadow:0 1px 8px rgba(19,33,48,.04)!important;
+}
+body[data-theme="studio-default"] .studio-global-search{
+  width:min(520px,42vw)!important;
+  height:40px!important;
+  min-height:40px!important;
+  padding:0 14px!important;
+  border:1px solid #dce2ea!important;
+  border-radius:8px!important;
+  background:#f7f9fc!important;
+  color:#637083!important;
+  font-size:14px!important;
+  box-shadow:none!important;
+}
+body[data-theme="studio-default"] .studio-global-search svg{
+  width:17px!important;height:17px!important;
+}
+body[data-theme="studio-default"] .top-actions{
+  gap:10px!important;
+}
+body[data-theme="studio-default"] .top-new-button{
+  min-height:38px!important;
+  height:38px!important;
+  padding:0 16px!important;
+  border:1px solid var(--ref-blue)!important;
+  border-radius:8px!important;
+  background:var(--ref-blue)!important;
+  color:#fff!important;
+  font-size:14px!important;
+  font-weight:600!important;
+  box-shadow:0 2px 6px rgba(22,119,255,.18)!important;
+}
+body[data-theme="studio-default"] .top-actions .action,
+body[data-theme="studio-default"] .profile-button{
+  min-height:36px!important;
+  color:#303847!important;
+  font-size:13px!important;
+}
+body[data-theme="studio-default"] .profile-button .avatar{
+  width:32px!important;height:32px!important;
+  font-size:11px!important;
+}
+
+/* Shell + left navigation */
+body[data-theme="studio-default"] .shell{
+  height:calc(100dvh - 64px)!important;
+  grid-template-columns:214px minmax(0,1fr)!important;
+  background:var(--ref-page)!important;
+}
+body[data-theme="studio-default"] .navigation-pane{
+  position:relative!important;
+  display:flex!important;
+  flex-direction:column!important;
+  min-height:0!important;
+  overflow:hidden!important;
+  background:linear-gradient(180deg,#f7f9fc 0%,#edf1f6 100%)!important;
+  border-right:1px solid var(--ref-line)!important;
+  color:var(--ref-text)!important;
+}
+body[data-theme="studio-default"] .bryan-brand{
+  min-height:64px!important;
+  height:64px!important;
+  padding:0 24px!important;
+  gap:12px!important;
+  border-bottom:1px solid var(--ref-line)!important;
+  background:transparent!important;
+}
+body[data-theme="studio-default"] .studio-brand-icon{
+  width:38px!important;
+  height:38px!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:9px!important;
+  background:linear-gradient(145deg,#0c7cff,#0756b8)!important;
+  color:#fff!important;
+  box-shadow:0 2px 6px rgba(22,119,255,.22)!important;
+}
+body[data-theme="studio-default"] .studio-brand-icon svg{
+  width:25px!important;height:25px!important;
+  stroke:currentColor!important;fill:none!important;
+}
+body[data-theme="studio-default"] .bryan-brand .brand-name{
+  color:#121722!important;
+  font-family:Inter,"Segoe UI",Arial,sans-serif!important;
+  font-size:20px!important;
+  font-weight:750!important;
+  letter-spacing:-.02em!important;
+}
+body[data-theme="studio-default"] .bryan-brand .brand-subtitle{display:none!important}
+
+/* The approved screenshot does not show the workspace folder list in the rail.
+   Workspace selection remains fully available through the Workspaces route. */
+body[data-theme="studio-default"] .navigation-pane .workspaces{
+  display:none!important;
+}
+
+body[data-theme="studio-default"] .navigation-pane .rail{
+  order:1!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+  display:flex!important;
+  flex-direction:column!important;
+  gap:4px!important;
+  padding:18px 14px 110px!important;
+  background:transparent!important;
+  border:0!important;
+  pointer-events:auto!important;
+}
+body[data-theme="studio-default"] .navigation-pane .brand-button{
+  min-height:44px!important;
+  padding:0 14px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:12px!important;
+  border:0!important;
+  border-radius:8px!important;
+  background:transparent!important;
+  color:#313b4a!important;
+  font-size:14px!important;
+  font-weight:500!important;
+  text-align:left!important;
+  box-shadow:none!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+}
+body[data-theme="studio-default"] .navigation-pane .brand-button:hover{
+  background:#e9eef5!important;
+  color:#101722!important;
+}
+body[data-theme="studio-default"] .navigation-pane .brand-button.active{
+  background:linear-gradient(180deg,#2b82ef,#1677ff)!important;
+  color:#fff!important;
+  box-shadow:0 4px 10px rgba(22,119,255,.18)!important;
+}
+body[data-theme="studio-default"] .navigation-pane .brand-button .studio-nav-icon{
+  width:21px!important;height:21px!important;
+  display:grid!important;place-items:center!important;
+  color:#425064!important;
+}
+body[data-theme="studio-default"] .navigation-pane .brand-button .studio-nav-icon svg{
+  width:20px!important;height:20px!important;
+}
+body[data-theme="studio-default"] .navigation-pane .brand-button.active .studio-nav-icon{
+  color:#fff!important;
+}
+
+body[data-theme="studio-default"] .studio-sidebar-footer{
+  position:absolute!important;
+  left:14px!important;right:14px!important;bottom:18px!important;
+  min-height:66px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:10px!important;
+  padding-top:14px!important;
+  border-top:1px solid #d8dee7!important;
+}
+body[data-theme="studio-default"] .studio-sidebar-footer .studio-brand-icon{
+  width:44px!important;height:44px!important;flex:0 0 44px!important;
+}
+body[data-theme="studio-default"] .studio-sidebar-footer strong{
+  display:block!important;
+  color:#1d2530!important;
+  font-size:14px!important;
+  line-height:1.2!important;
+}
+body[data-theme="studio-default"] .studio-sidebar-footer small{
+  display:block!important;
+  margin-top:4px!important;
+  color:#7a8492!important;
+  font-size:11px!important;
+}
+
+/* Main work surface */
+body[data-theme="studio-default"] main{
+  min-width:0!important;
+  min-height:0!important;
+  overflow:hidden!important;
+  background:var(--ref-page)!important;
+}
+body[data-theme="studio-default"] .three-pane{
+  height:100%!important;
+  min-height:0!important;
+  grid-template-columns:320px minmax(0,1fr)!important;
+  background:var(--ref-page)!important;
+}
+body[data-theme="studio-default"] .list-pane{
+  background:#fff!important;
+  border-right:1px solid var(--ref-line)!important;
+}
+body[data-theme="studio-default"] .pane-heading{
+  min-height:54px!important;
+  height:54px!important;
+  padding:12px 16px!important;
+  background:#fff!important;
+  border-bottom:1px solid var(--ref-line)!important;
+}
+body[data-theme="studio-default"] .pane-heading h2{
+  color:#111722!important;
+  font-size:16px!important;
+  font-weight:700!important;
+}
+body[data-theme="studio-default"] .workspace-list-controls{
+  min-height:48px!important;
+  height:auto!important;
+  padding:8px 12px!important;
+  gap:8px!important;
+  border-bottom:1px solid var(--ref-line)!important;
+  background:#fff!important;
+}
+body[data-theme="studio-default"] .workspace-list-controls>[data-tab]{
+  min-height:32px!important;
+  height:32px!important;
+  padding:0 11px!important;
+  border:1px solid #bcd5ff!important;
+  border-radius:7px!important;
+  background:var(--ref-blue-soft)!important;
+  color:#1e5fae!important;
+  font-size:12px!important;
+  font-weight:650!important;
+}
+body[data-theme="studio-default"] .workspace-inline-search input{
+  height:32px!important;
+  padding:0 10px!important;
+  border-radius:7px!important;
+  font-size:12px!important;
+}
+body[data-theme="studio-default"] #workspaceRefresh,
+body[data-theme="studio-default"] .workspace-settings-action{
+  width:32px!important;height:32px!important;min-width:32px!important;
+  border-radius:7px!important;
+}
+body[data-theme="studio-default"] #conversationList{
+  background:#fff!important;
+}
+body[data-theme="studio-default"] .conversation-card.compact-job-row{
+  min-height:68px!important;
+  padding:10px 12px!important;
+  border-bottom:1px solid var(--ref-line)!important;
+  background:#fff!important;
+}
+body[data-theme="studio-default"] .conversation-card.compact-job-row:hover{
+  background:#f8fbff!important;
+}
+body[data-theme="studio-default"] .conversation-card.compact-job-row.active{
+  background:#eef6ff!important;
+  box-shadow:inset 3px 0 var(--ref-blue)!important;
+}
+body[data-theme="studio-default"] .compact-job-row .job-row-heading strong{
+  color:#17212b!important;
+  font-size:13px!important;
+  font-weight:700!important;
+}
+body[data-theme="studio-default"] .compact-job-row .job-row-client{
+  margin-top:4px!important;
+  color:#687487!important;
+  font-size:12px!important;
+}
+body[data-theme="studio-default"] .compact-job-row .job-row-meta{
+  margin-top:5px!important;
+  gap:8px!important;
+  color:#8590a0!important;
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .compact-job-row .job-row-meta .job-status{
+  color:#1b9b62!important;
+  font-size:11px!important;
+}
+
+/* Job detail frame */
+body[data-theme="studio-default"] .detail-pane.job-reading-view{
+  height:100%!important;
+  padding:14px 16px 16px!important;
+  grid-template-rows:24px 100px 44px minmax(0,1fr)!important;
+  background:var(--ref-page)!important;
+}
+body[data-theme="studio-default"] .job-breadcrumb{
+  height:24px!important;
+  color:#768191!important;
+  font-size:12px!important;
+}
+body[data-theme="studio-default"] .studio-job-header,
+body[data-theme="studio-default"] .job-reading-view>.detail-header{
+  height:100px!important;
+  min-height:100px!important;
+  padding:14px 16px!important;
+  gap:14px!important;
+  border:1px solid var(--ref-line)!important;
+  border-radius:10px 10px 0 0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+}
+body[data-theme="studio-default"] .studio-job-thumb{
+  width:72px!important;height:72px!important;flex:0 0 72px!important;
+  border-radius:8px!important;
+  background:#eaf0f7!important;
+}
+body[data-theme="studio-default"] .studio-job-copy h1{
+  color:#10151e!important;
+  font-size:26px!important;
+  font-weight:750!important;
+  line-height:1.05!important;
+  letter-spacing:-.02em!important;
+}
+body[data-theme="studio-default"] .studio-job-copy p{
+  margin-top:8px!important;
+  color:#6f7989!important;
+  font-size:12px!important;
+  gap:10px!important;
+}
+body[data-theme="studio-default"] .studio-status-pill{
+  padding:4px 9px!important;
+  border-radius:999px!important;
+  background:#ddf7ea!important;
+  color:#178154!important;
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .job-header-actions{
+  gap:8px!important;
+}
+body[data-theme="studio-default"] .job-header-actions .action,
+body[data-theme="studio-default"] .job-header-actions .primary{
+  min-height:36px!important;
+  height:36px!important;
+  padding:0 12px!important;
+  border-radius:7px!important;
+  font-size:12px!important;
+  font-weight:600!important;
+}
+body[data-theme="studio-default"] .job-header-actions .primary{
+  background:var(--ref-blue)!important;
+  border-color:var(--ref-blue)!important;
+}
+
+/* Tabs */
+body[data-theme="studio-default"] .job-section-tabs{
+  min-height:44px!important;
+  height:44px!important;
+  padding:0 10px!important;
+  border:1px solid var(--ref-line)!important;
+  border-top:0!important;
+  background:#fff!important;
+}
+body[data-theme="studio-default"] .job-section-tabs button{
+  min-width:78px!important;
+  height:43px!important;
+  padding:0 10px!important;
+  color:#657183!important;
+  font-size:12px!important;
+  border:0!important;
+  border-bottom:2px solid transparent!important;
+  background:#fff!important;
+}
+body[data-theme="studio-default"] .job-section-tabs button.active{
+  color:#1765c2!important;
+  border-bottom-color:var(--ref-blue)!important;
+  background:#fff!important;
+  font-weight:700!important;
+}
+
+/* Three-column job workspace */
+body[data-theme="studio-default"] .job-work-board{
+  min-height:0!important;
+  grid-template-columns:minmax(280px,30%) minmax(520px,47%) minmax(270px,23%)!important;
+  gap:12px!important;
+  padding-top:12px!important;
+}
+body[data-theme="studio-default"] .job-message-column,
+body[data-theme="studio-default"] .job-lower-pane,
+body[data-theme="studio-default"] .job-context-sidebar>section{
+  width:100%!important;
+  max-width:none!important;
+  box-sizing:border-box!important;
+  border:1px solid var(--ref-line)!important;
+  border-radius:10px!important;
+  background:#fff!important;
+  box-shadow:0 2px 8px rgba(16,24,40,.035)!important;
+}
+body[data-theme="studio-default"] .job-message-column{
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"] .job-panel-heading,
+body[data-theme="studio-default"] .context-card-header{
+  min-height:46px!important;
+  height:46px!important;
+  padding:0 14px!important;
+  background:#fff!important;
+  border-bottom:1px solid var(--ref-line)!important;
+}
+body[data-theme="studio-default"] .job-panel-heading strong,
+body[data-theme="studio-default"] .context-card-header strong{
+  color:#18202a!important;
+  font-size:14px!important;
+  font-weight:700!important;
+}
+body[data-theme="studio-default"] .panel-count{
+  margin-left:6px!important;
+  padding:2px 6px!important;
+  background:#eef2f6!important;
+  color:#6c7787!important;
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .panel-heading-actions .icon-button{
+  width:30px!important;height:30px!important;
+  color:#697586!important;
+  font-size:15px!important;
+}
+body[data-theme="studio-default"] #combinedJobMessages{
+  padding:2px 12px 6px!important;
+  background:#fff!important;
+}
+body[data-theme="studio-default"] .job-message-column .message{
+  padding:11px 0!important;
+  gap:10px!important;
+  border-bottom:1px solid var(--ref-line)!important;
+}
+body[data-theme="studio-default"] .message-avatar{
+  width:34px!important;height:34px!important;flex:0 0 34px!important;
+  font-size:12px!important;
+}
+body[data-theme="studio-default"] .message-head{
+  color:#667284!important;
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .message-kind{
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .message-content p{
+  margin-top:4px!important;
+  color:#313b49!important;
+  font-size:12px!important;
+  line-height:1.45!important;
+}
+body[data-theme="studio-default"] #hierarchyCompose{
+  padding:10px!important;
+  gap:7px!important;
+}
+body[data-theme="studio-default"] #hierarchyBody{
+  height:42px!important;
+  min-height:42px!important;
+  max-height:42px!important;
+  padding:10px 36px 10px 10px!important;
+  border-radius:7px!important;
+  font-size:12px!important;
+}
+body[data-theme="studio-default"] #hierarchyCompose .primary,
+body[data-theme="studio-default"] #hierarchyCompose select{
+  min-height:32px!important;height:32px!important;
+  font-size:11px!important;
+}
+
+/* Media */
+body[data-theme="studio-default"] .job-lower-pane{
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"] .job-lower-pane>.job-section-tabs{
+  display:none!important;
+}
+body[data-theme="studio-default"] .media-toolbar-host{
+  min-height:46px!important;
+  padding:7px 10px!important;
+  border-bottom:1px solid var(--ref-line)!important;
+}
+body[data-theme="studio-default"] .media-toolbar{
+  gap:6px!important;
+}
+body[data-theme="studio-default"] .media-toolbar .action,
+body[data-theme="studio-default"] .media-toolbar button,
+body[data-theme="studio-default"] .media-toolbar select{
+  min-height:32px!important;
+  height:32px!important;
+  padding:0 10px!important;
+  border-radius:6px!important;
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .job-tab-content{
+  padding:10px!important;
+}
+body[data-theme="studio-default"] .media-items.image-lens{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:10px!important;
+}
+body[data-theme="studio-default"] .media-items.image-lens .job-file-tile>img{
+  aspect-ratio:1.36/1!important;
+  border-radius:7px!important;
+}
+body[data-theme="studio-default"] .media-items.image-lens .job-file-tile>strong{
+  margin-top:5px!important;
+  color:#313b49!important;
+  font-size:11px!important;
+}
+
+/* Right rail: equal width, no artificial blank gaps */
+body[data-theme="studio-default"] .job-context-sidebar{
+  width:100%!important;
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  justify-content:flex-start!important;
+  gap:12px!important;
+  overflow:auto!important;
+}
+body[data-theme="studio-default"] .job-context-sidebar>*{
+  width:100%!important;
+  max-width:none!important;
+  box-sizing:border-box!important;
+  margin:0!important;
+}
+body[data-theme="studio-default"] .thread-next-tasks{
+  flex:0 0 auto!important;
+  height:auto!important;
+  min-height:0!important;
+}
+body[data-theme="studio-default"] .thread-next-tasks>h3{
+  min-height:46px!important;
+  margin:0!important;
+  padding:0 14px!important;
+  display:flex!important;
+  align-items:center!important;
+  border-bottom:1px solid var(--ref-line)!important;
+  background:#fff!important;
+  color:#18202a!important;
+  font-size:14px!important;
+}
+body[data-theme="studio-default"] .job-workflow-summary,
+body[data-theme="studio-default"] .workflow-actions,
+body[data-theme="studio-default"] .thread-task-list{
+  padding-left:12px!important;
+  padding-right:12px!important;
+}
+body[data-theme="studio-default"] .thread-task-list{
+  max-height:190px!important;
+  overflow:auto!important;
+}
+body[data-theme="studio-default"] .compact-task{
+  padding:8px 0!important;
+  border-bottom:1px solid var(--ref-line)!important;
+}
+body[data-theme="studio-default"] .compact-task strong,
+body[data-theme="studio-default"] .compact-task small{
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .thread-task-footer{
+  margin:0!important;
+  padding:10px 12px!important;
+  background:#fff!important;
+}
+body[data-theme="studio-default"] .thread-task-footer .action{
+  min-height:32px!important;
+  height:32px!important;
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .job-details-card{
+  flex:0 0 auto!important;
+  width:100%!important;
+  min-width:0!important;
+}
+body[data-theme="studio-default"] .job-details-card dl{
+  margin:0!important;
+  padding:10px 14px 12px!important;
+  display:grid!important;
+  grid-template-columns:92px minmax(0,1fr)!important;
+  gap:8px 10px!important;
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .job-details-card dt{
+  color:#7a8492!important;
+}
+body[data-theme="studio-default"] .job-details-card dd{
+  margin:0!important;
+  color:#303947!important;
+}
+body[data-theme="studio-default"] .conversation-files-title{
+  min-height:46px!important;
+  padding:0 14px!important;
+  display:flex!important;
+  align-items:center!important;
+  border-bottom:1px solid var(--ref-line)!important;
+  color:#18202a!important;
+  font-size:14px!important;
+  font-weight:700!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-gallery{
+  padding:7px 12px 10px!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-tile{
+  min-height:36px!important;
+  padding:6px 0!important;
+  grid-template-columns:28px minmax(0,1fr)!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-tile img{
+  width:24px!important;height:24px!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-tile strong{
+  font-size:11px!important;
+}
+
+/* Generic pages: readable dashboard-like cards */
+body[data-theme="studio-default"] .generic{
+  height:100%!important;
+  overflow:auto!important;
+  padding:24px 28px!important;
+  background:var(--ref-page)!important;
+}
+body[data-theme="studio-default"] .studio-page-heading{
+  margin-bottom:18px!important;
+}
+body[data-theme="studio-default"] .studio-page-heading h1{
+  margin:0!important;
+  color:#10151e!important;
+  font-size:32px!important;
+  line-height:1.1!important;
+  font-weight:750!important;
+  letter-spacing:-.025em!important;
+}
+body[data-theme="studio-default"] .studio-card{
+  border:1px solid var(--ref-line)!important;
+  border-radius:10px!important;
+  background:#fff!important;
+  box-shadow:0 2px 8px rgba(16,24,40,.035)!important;
+  padding:16px!important;
+}
+body[data-theme="studio-default"] .my-work-grid{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  gap:16px!important;
+}
+body[data-theme="studio-default"] .studio-card-heading{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  margin-bottom:10px!important;
+}
+body[data-theme="studio-default"] .studio-card-heading h2{
+  margin:0!important;
+  color:#18202a!important;
+  font-size:18px!important;
+}
+body[data-theme="studio-default"] .studio-list-row{
+  width:100%!important;
+  min-height:52px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  gap:4px!important;
+  padding:8px 10px!important;
+  border:0!important;
+  border-bottom:1px solid var(--ref-line)!important;
+  background:#fff!important;
+  color:#26303d!important;
+  text-align:left!important;
+  cursor:pointer!important;
+}
+body[data-theme="studio-default"] .studio-list-row:hover{
+  background:#f8fbff!important;
+}
+body[data-theme="studio-default"] .studio-list-row strong{
+  font-size:13px!important;
+}
+body[data-theme="studio-default"] .studio-list-row span{
+  color:#748091!important;
+  font-size:11px!important;
+}
+
+/* Keep the desktop composition readable rather than shrinking typography. */
+@media(max-width:1380px){
+  body[data-theme="studio-default"] main{overflow:auto!important}
+  body[data-theme="studio-default"] .three-pane{
+    min-width:1180px!important;
+    grid-template-columns:300px minmax(0,1fr)!important;
+  }
+  body[data-theme="studio-default"] .job-work-board{
+    grid-template-columns:290px 520px 270px!important;
+  }
+}
