@@ -3,6 +3,7 @@
     const genericView=document.getElementById('genericView');
 
     function setActive(view){
+        document.body.dataset.studioView=view;
         document.querySelectorAll('.rail [data-view]').forEach(button=>{
             button.classList.toggle('active',button.dataset.view===view);
         });
