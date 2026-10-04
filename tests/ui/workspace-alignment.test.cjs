@@ -164,7 +164,7 @@ test('Media collection controls persist names and dropped files target the selec
  assert.ok(uploadForm);await uploadForm.onsubmit({preventDefault(){},currentTarget:uploadForm});
  await new Promise(resolve=>setTimeout(resolve,10));
  assert.equal(calls.find(x=>x.url.endsWith('/uploads')).options.body.get('collection'),'Portraits');
- panel.querySelector('[data-rename-collection]').click();form=w.document.querySelectorAll('dialog form')[1];form.elements.name.value='Portraits edited';await form.onsubmit({preventDefault(){},currentTarget:form});
+ panel.querySelector('[data-rename-collection]').click();form=[...w.document.querySelectorAll('dialog form')].find(x=>x.closest('dialog')?.textContent.includes('Rename collection'));assert.ok(form);form.elements.name.value='Portraits edited';await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.ok(calls.some(x=>x.url.includes('/collections/Portraits')));
 });
 test('upcoming tasks keep the Add task action outside the scrolling task list',async()=>{
