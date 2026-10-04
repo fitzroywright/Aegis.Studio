@@ -6,15 +6,6 @@ let posClientRequestId = null;
 let posCatalog = [];
 let posDeviceAgentBaseUrl = null;
 
-const baseActivateView = activateView;
-activateView = function(view) {
-    if (view === 'pos') {
-        showPos();
-        return;
-    }
-    baseActivateView(view);
-};
-
 async function showPos() {
     activateNavigation('frontdesk');
     conversationView.classList.add('hidden');
@@ -453,3 +444,4 @@ async function sendSaleToDeviceAgent(sale) {
         // Hardware is optional and must never roll back a committed sale.
     }
 }
+

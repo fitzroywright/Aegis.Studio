@@ -89,6 +89,8 @@ public sealed class StudioFeatureDatabase
                 end if;
             end $$;
 
+            alter table studio_job_activities add column if not exists collection_name text null;
+
             create table if not exists studio_photographers
             (
                 user_name text primary key,display_name text not null,employment_type text not null,is_active boolean not null default true,skills text[] not null default '{}',
@@ -169,3 +171,4 @@ public sealed class StudioFeatureDatabase
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }
+

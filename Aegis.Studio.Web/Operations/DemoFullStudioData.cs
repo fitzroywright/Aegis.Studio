@@ -14,12 +14,12 @@ internal static class DemoFullStudioData
 
     private static readonly DemoWorkspace[] Workspaces =
     [
-        new(1,"DEMO - Portraits and IDs"),
-        new(2,"DEMO - Weddings and Events"),
-        new(3,"DEMO - Schools and Corporate"),
-        new(4,"DEMO - Graduations"),
-        new(5,"DEMO - Commercial and Products"),
-        new(6,"DEMO - Sports and Groups")
+        new(1,"Portraits and IDs"),
+        new(2,"Weddings and Events"),
+        new(3,"Schools and Corporate"),
+        new(4,"Graduations"),
+        new(5,"Commercial and Products"),
+        new(6,"Sports and Groups")
     ];
 
     private static readonly DemoClient[] Clients =
@@ -41,9 +41,9 @@ internal static class DemoFullStudioData
     private static readonly DemoJob[] Jobs =
     [
         new(101,1,1,"Miller Family - Fall Portraits","Production",0,"Studio A",45000,22500,"demo.sam","Family Portrait"),
-        new(102,1,5,"Harrison Senior Session","Photography",1,"Studio B",38000,38000,"demo.jason","Senior Portrait"),
-        new(103,1,6,"Peterson Newborn","Editing",-1,"Client Home",52000,26000,"demo.anna","Newborn"),
-        new(104,1,7,"Wilson Family + Dog","Ready for Client",-2,"Hope Gardens",42000,42000,"demo.sam","Family + Pets"),
+        new(102,1,5,"Harrison Senior Session","Scheduled",0,"Studio B",38000,38000,"demo.jason","Senior Portrait"),
+        new(103,1,6,"Peterson Newborn","Scheduled",0,"Client Home",52000,26000,"demo.anna","Newborn"),
+        new(104,1,7,"Wilson Family + Dog","Scheduled",0,"Hope Gardens",42000,42000,"demo.sam","Family + Pets"),
         new(105,1,8,"Thompson Passport & Visa Photos","Completed",-7,"Front Desk Studio",12000,12000,"demo.michael","Passport / Visa"),
         new(106,1,3,"Carter Corp Employee IDs","Scheduled",2,"Carter Corporation HQ",96000,48000,"demo.jason","Employee ID"),
 
@@ -68,11 +68,16 @@ internal static class DemoFullStudioData
 
         new(601,6,8,"Thompson Youth Football Team","Printing",-2,"National Stadium",135000,90000,"demo.jason","Sports Team"),
         new(602,6,5,"Harrison Track Athlete Portraits","Ready for Delivery",-1,"National Stadium",48000,48000,"demo.sam","Sports Portrait"),
-        new(603,6,9,"NCA Swim Team","Completed",-14,"National Aquatic Centre",110000,110000,"demo.michael","Sports Team")
+        new(603,6,9,"NCA Swim Team","Completed",-14,"National Aquatic Centre",110000,110000,"demo.michael","Sports Team"),
+        new(107,1,6,"Peterson Maternity Portraits","Completed",-60,"Hope Gardens",42000,42000,"demo.anna","Maternity"),
+        new(205,2,8,"Thompson Birthday Celebration","Needs Scheduling",5,"Client Home",58000,14500,"demo.jason","Birthday"),
+        new(206,2,11,"Harbour Awards Ceremony","Cancelled",7,"Jamaica Pegasus",0,0,"demo.michael","Awards")
     ];
 
     internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IFileStorage storage)
     {
+        using(var check=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v6-full-studio')",connection,transaction))
+            if((bool)check.ExecuteScalar()!)return false;
         var versionStorage=new PrefixedFileStorage(storage,"VersionStore");
         foreach(var workspace in Workspaces)
         {
@@ -106,7 +111,7 @@ internal static class DemoFullStudioData
 
             Execute(connection,transaction,
                 "insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values($1,$2,$3,$4,$5,$6,false,now()-($7 || ' days')::interval) on conflict(id) do update set subject=excluded.subject,contact_name=excluded.contact_name,contact_address=excluded.contact_address,channel=excluded.channel",
-                conversationId,workspaceId,job.Title,client.Name,client.Email,ordinal%4==0?"Phone":ordinal%3==0?"Website":"Email",Math.Abs(job.DayOffset)+2);
+                conversationId,workspaceId,job.Title,client.Name,client.Email,ordinal%4==0?"Phone":ordinal%3==0?"Portal":"Email",Math.Abs(job.DayOffset)+2);
 
             Execute(connection,transaction,
                 "insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,client_id) values($1,$2,$3,$4,$5,$6,$7,now()-($8 || ' days')::interval,$9,$10) on conflict(id) do update set workspace_id=excluded.workspace_id,conversation_id=excluded.conversation_id,title=excluded.title,client_name=excluded.client_name,status=excluded.status,event_date=excluded.event_date,assigned_to=excluded.assigned_to,client_id=excluded.client_id",
@@ -119,15 +124,18 @@ internal static class DemoFullStudioData
             SeedMedia(connection,transaction,versionStorage,job,jobId,login,ordinal);
             SeedSchedule(connection,transaction,job,jobId,start,end,ordinal);
             SeedFinance(connection,transaction,job,jobId,ordinal);
-            SeedActivities(connection,transaction,job,jobId,ordinal);
+            SeedActivities(connection,transaction,job,jobId,ordinal,login);
+            SeedNotifications(connection,transaction,job,login,ordinal);
             SeedAudit(connection,transaction,job,jobId,ordinal);
+            SeedBooking(connection,transaction,job,jobId,start,end,ordinal);
+            SeedDocument(connection,transaction,storage,job,conversationId,login);
         }
 
         SeedFrontDeskRequests(connection,transaction);
         SeedInvoices(connection,transaction);
 
         Execute(connection,transaction,
-            "insert into studio_state(key,value,updated_at_utc) values('demo-data-v5-full-studio',$1,now()) on conflict(key) do update set value=excluded.value,updated_at_utc=excluded.updated_at_utc",login);
+            "insert into studio_state(key,value,updated_at_utc) values('demo-data-v6-full-studio',$1,now()) on conflict(key) do update set value=excluded.value,updated_at_utc=excluded.updated_at_utc",login);
         return true;
     }
 
@@ -179,15 +187,17 @@ internal static class DemoFullStudioData
         int subjectCount=DemoSubjectCount(job);
         for(int i=0;i<subjectCount;i++)
         {
-            Guid subject=Id(59,job.Number*100+i);
-            string name=subjectCount>=10?$"Subject {i+1:00} - {job.Title}":i switch{0=>"Primary Client",1=>"Partner / Parent",2=>"Child / Group Member",_=>"Additional Subject"};
+            Guid subject=MediaId(59,job.Number,i);
+            string[] given=["Alicia","Jordan","Samantha","Jason","Amelia","Daniel","Emily","Michael","Anna","Ethan","Sarah","James","Chloe","Liam","Naomi","Noah","Grace","Joshua","Leah","Matthew"];
+            string[] family=["Brown","Williams","Clarke","Campbell","Thompson","Henry","Grant","Wright","Johnson","Robinson","Miller","Wilson","Reid","Walker","Smith","Lewis","Morgan","Carter","Peterson","Harrison"];
+            string name=$"{given[i%given.Length]} {family[(i/given.Length+job.Number)%family.Length]}";
             string reference=$"{job.Number}-{i+1:000}";
             string attributes=JsonSerializer.Serialize(new { rosterId=reference, category=job.Type, demo=true });
             string subjectStatus=job.Number==106
                 ? i<4?"Not Photographed":i<7?"Needs Retake":i<11?"Needs Editing":i<15?"Ready for Production":"Ready"
                 : job.DayOffset<0?"Photographed":"Not Photographed";
             Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,production_status,attributes,collection_name,scheduled_at_utc,schedule_location,contact_name,contact_email,contact_phone,photo_notes,is_system) values($1,$2,$2,$3,$4,$5,'demo-seed',$6,$7::jsonb,$8,$9,$10,'','','',$11,false) on conflict(id) do update set name=excluded.name,reference=excluded.reference,production_status=excluded.production_status,attributes=excluded.attributes,collection_name=excluded.collection_name,scheduled_at_utc=excluded.scheduled_at_utc,schedule_location=excluded.schedule_location,photo_notes=excluded.photo_notes,updated_at_utc=now()",
-                subject,jobId,name,reference,$"DEMO roster / subject for {job.Type}",subjectStatus,attributes,collections[Math.Min(i%collections.Length,collections.Length-1)],scheduled,job.Location,$"Capture requirements for {job.Type}");
+                subject,jobId,name,reference,$"Roster / subject for {job.Type}",subjectStatus,attributes,collections[Math.Min(i%collections.Length,collections.Length-1)],scheduled,job.Location,$"Capture requirements for {job.Type}");
         }
     }
 
@@ -215,20 +225,21 @@ internal static class DemoFullStudioData
         for(int i=0;i<count;i++)
         {
             string key=$"demo-full/{job.Number}/asset-{i+1:000}";
-            Guid versionId=Id(64,job.Number*100+i);
+            Guid versionId=MediaId(64,job.Number,i);
             // Each asset-version owns a unique stored object/path. DemoDataExpansion caches
             // the downloaded public-domain source bytes, so this does not redownload the
             // same photograph for every asset, while still preserving Studio's storage model.
-            DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount),null,login);
-            Guid assetId=Id(65,job.Number*100+i);
+            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount),null,login);
+            if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,SelectPhotoVariant(job,i%sourceCount),original,login);
+            Guid assetId=MediaId(65,job.Number,i);
             string status=statuses[(ordinal+i)%statuses.Length];
-            Execute(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status,assigned_to,capture_at_utc) values($1,$2,$2,$3,$4,$5,now()-($6 || ' hours')::interval) on conflict(job_id,asset_key) do update set production_status=excluded.production_status,assigned_to=excluded.assigned_to,capture_at_utc=excluded.capture_at_utc",
+            assetId=ExecuteGuid(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status,assigned_to,capture_at_utc) values($1,$2,$2,$3,$4,$5,now()-($6 || ' hours')::interval) on conflict(job_id,asset_key) do update set production_status=excluded.production_status,assigned_to=excluded.assigned_to,capture_at_utc=excluded.capture_at_utc returning id",
                 assetId,jobId,key,status,job.Photographer,(i+1).ToString());
             Execute(c,tx,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",
                 jobId,key,collections[i%collections.Length]);
             int subjectCount=DemoSubjectCount(job);
             int subjectIndex=job.Number==106 ? 4+(i%Math.Max(1,subjectCount-4)) : i%Math.Max(1,subjectCount);
-            Guid subjectId=Id(59,job.Number*100+subjectIndex);
+            Guid subjectId=MediaId(59,job.Number,subjectIndex);
             Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) values($1,$2) on conflict do nothing",assetId,subjectId);
         }
     }
@@ -275,7 +286,7 @@ internal static class DemoFullStudioData
     private static void SeedConversation(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,DemoClient client,Guid conversation,int ordinal)
     {
         Execute(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'External',$4,now()-interval '2 days') on conflict(id) do update set body=excluded.body",
-            Id(45,job.Number),conversation,client.Name,$"Demo request for {job.Type}. Please confirm schedule, package details and delivery timing.");
+            Id(45,job.Number),conversation,client.Name,$"Request for {job.Type}. Please confirm schedule, package details and delivery timing.");
         Execute(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Bryans Studio','Internal',$3,now()-interval '1 day') on conflict(id) do update set body=excluded.body",
             Id(46,job.Number),conversation,$"Team note: {job.Title} is currently {job.Status}. Confirm next action and customer communication.");
         if(ordinal%3==0)
@@ -286,11 +297,11 @@ internal static class DemoFullStudioData
     private static void SeedSchedule(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,DateTimeOffset start,DateTimeOffset end,int ordinal)
     {
         Guid schedule=Id(48,job.Number);
-        string status=job.Status=="Completed"?"Completed":job.Status=="Photography"?"CheckedIn":job.Status=="Booking"?"Requested":"Scheduled";
+        string status=job.Status=="Cancelled"?"Cancelled":job.DayOffset<0?"Completed":job.Status=="Photography"?"CheckedIn":job.Status=="Booking"?"Requested":"Scheduled";
         Execute(c,tx,"insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,now()) on conflict(id) do update set title=excluded.title,starts_at_utc=excluded.starts_at_utc,ends_at_utc=excluded.ends_at_utc,location=excluded.location,status=excluded.status,notes=excluded.notes",
             schedule,jobId,job.Title,start,end,job.Location,status,$"DEMO {job.Type} shoot");
         Execute(c,tx,"insert into studio_shoot_sessions(id,job_id,schedule_entry_id,photographer_user_name,assistant_user_name,call_time_utc,planned_end_utc,location,status,image_count,backup_confirmed,reshoot_required,coverage_notes,equipment_notes,handoff_status,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'DEMO camera kit',$14,now(),now()) on conflict(id) do update set photographer_user_name=excluded.photographer_user_name,call_time_utc=excluded.call_time_utc,planned_end_utc=excluded.planned_end_utc,location=excluded.location,status=excluded.status,image_count=excluded.image_count,backup_confirmed=excluded.backup_confirmed,reshoot_required=excluded.reshoot_required,handoff_status=excluded.handoff_status,updated_at_utc=now()",
-            Id(49,job.Number),jobId,schedule,job.Photographer,ordinal%4==0?"demo.anna":DBNull.Value,start,end,job.Location,job.Status=="Completed"?"Completed":job.Status=="Photography"?"InProgress":"Scheduled",
+            Id(49,job.Number),jobId,schedule,job.Photographer,ordinal%4==0?"demo.anna":DBNull.Value,start,end,job.Location,job.Status=="Cancelled"?"Cancelled":job.DayOffset<0?"ShootComplete":job.Status=="Photography"?"InProgress":"Scheduled",
             Math.Max(0,ordinal*17),job.DayOffset<0,ordinal%11==0,$"Coverage plan for {job.Type}",job.DayOffset<0?"Ready":"NotReady");
 
         // Demonstrate a true multi-session job and schedule exception states.
@@ -319,23 +330,28 @@ internal static class DemoFullStudioData
             Id(50,job.Number),jobId,job.Price);
         if(job.Paid>0)
             Execute(c,tx,"insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) values($1,$2,$3,$4,$5,now()-interval '4 days') on conflict(id) do update set amount=excluded.amount,note=excluded.note",
-                Id(51,job.Number),jobId,job.Paid==job.Price?"Payment":"Deposit",job.Paid,ordinal%2==0?"DEMO card payment":"DEMO bank transfer");
+                Id(51,job.Number),jobId,job.Paid==job.Price?"Payment":"Deposit",job.Number==201?job.Paid/2:job.Paid,ordinal%2==0?"DEMO card payment":"DEMO bank transfer");
+        if(job.Number==201)
+            Execute(c,tx,"insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) values($1,$2,'Payment',$3,'Second wedding payment - bank transfer',now()-interval '2 days') on conflict(id) do nothing",Id(73,job.Number),jobId,job.Paid/2);
         if(ordinal%10==0)
             Execute(c,tx,"insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) values($1,$2,'Refund',$3,'DEMO partial refund',now()-interval '1 day') on conflict(id) do update set amount=excluded.amount",
                 Id(52,job.Number),jobId,-5000m);
     }
 
-    private static void SeedActivities(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,int ordinal)
+    private static void SeedActivities(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,int ordinal,string login)
     {
         string[] stages=["FileIngest","Cull","Edit","Retouch","Proof","QC","Print","Delivery"];
         for(int i=0;i<3;i++)
         {
             string stage=stages[(ordinal+i)%stages.Length];
-            string status=i==0?(job.DayOffset<0?"Completed":"InProgress"):i==1?(ordinal%5==0?"Blocked":"NotStarted"):"NotStarted";
-            string? blocker=status=="Blocked"?"Waiting on customer selection":null;
+            string collection=job.Type=="Wedding"?new[]{"Ceremony","Portraits","Reception"}[i]:job.Type.Contains("Graduation")||job.Type.Contains("School")?new[]{"Roster","Stage","Groups"}[i]:job.Type.Contains("Corporate")||job.Type.Contains("Headshot")?new[]{"Executives","Team","Selects"}[i]:new[]{"Selects","Proofs","Finals"}[i];
+            string[] workStates=["NotStarted","InProgress","Blocked","WaitingOnCustomer","ReworkRequired","Partial","Failed","ReprintRequired","ReadyForDelivery","Completed","Archived"];
+            string status=job.Status=="Completed"?"Completed":workStates[(ordinal+i)%workStates.Length];
+            string? blocker=status is "Blocked" or "WaitingOnCustomer"?"Waiting on customer selection":status is "Failed" or "ReprintRequired"?"Output failed; check the printer and approve a reprint":status=="ReworkRequired"?"QC requested another retouch pass":null;
             Execute(c,tx,"insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,now()+($9 || ' hours')::interval,now()+($10 || ' days')::interval,$11,$12,$13,$14,null,'demo-seed',now(),now()) on conflict(id) do update set activity_type=excluded.activity_type,title=excluded.title,status=excluded.status,priority=excluded.priority,assigned_to=excluded.assigned_to,due_at_utc=excluded.due_at_utc,blocked_reason=excluded.blocked_reason,updated_at_utc=now()",
-                Id(53,job.Number*10+i),jobId,stage,$"{stage}: {job.Title}",$"DEMO production work for {job.Type}",status,ordinal%7==0?"High":ordinal%4==0?"Low":"Normal",job.Photographer,(i*4).ToString(),(job.DayOffset+i+1).ToString(),
+                Id(53,job.Number*10+i),jobId,stage,$"{stage}: {job.Title}",$"Production work for {job.Type}",status,ordinal%7==0?"High":ordinal%4==0?"Low":"Normal",i==1?login:job.Photographer,(i*4).ToString(),(job.DayOffset+i+1).ToString(),
                 status=="InProgress"?DateTimeOffset.UtcNow:DBNull.Value,status=="Completed"?DateTimeOffset.UtcNow.AddHours(-2):DBNull.Value,job.Location,(object?)blocker??DBNull.Value);
+            Execute(c,tx,"update studio_job_activities set collection_name=$2 where id=$1",Id(53,job.Number*10+i),collection);
         }
     }
 
@@ -349,8 +365,8 @@ internal static class DemoFullStudioData
 
     private static void SeedInvoices(NpgsqlConnection c,NpgsqlTransaction tx)
     {
-        var invoiceJobs=new[] {101,201,301,304,401,501,601,603};
-        string[] statuses=["Issued","Paid","Overdue","Paid","Draft","Issued","Overdue","Paid"];
+        var invoiceJobs=new[] {101,201,301,304,401,501,601,603,503};
+
         for(int i=0;i<invoiceJobs.Length;i++)
         {
             var job=Jobs.Single(x=>x.Number==invoiceJobs[i]);
@@ -360,7 +376,7 @@ internal static class DemoFullStudioData
             decimal tax=0m;
             decimal total=subtotal+tax;
             DateTimeOffset due=new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero).AddDays(i%3==0?-3:7+i);
-            string status=statuses[i];
+            string status=job.Status=="Booking"?"Draft":job.Paid>=job.Price?"Paid":due<DateTimeOffset.UtcNow?"Overdue":"Issued";
             Execute(c,tx,"insert into studio_account_invoices(id,invoice_number,job_id,client_name,client_email,currency,subtotal,tax_amount,total_amount,status,due_at_utc,issued_at_utc,paid_at_utc,created_by,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,'JMD',$6,$7,$8,$9,$10,$11,$12,'demo-seed',now()-interval '10 days',now()) on conflict(id) do update set client_name=excluded.client_name,client_email=excluded.client_email,subtotal=excluded.subtotal,tax_amount=excluded.tax_amount,total_amount=excluded.total_amount,status=excluded.status,due_at_utc=excluded.due_at_utc,issued_at_utc=excluded.issued_at_utc,paid_at_utc=excluded.paid_at_utc,updated_at_utc=now()",
                 invoice,$"DEMO-{DateTime.UtcNow:yyyy}-{job.Number}",Id(41,job.Number),client.Name,client.Email,subtotal,tax,total,status,due,
                 status=="Draft"?DBNull.Value:DateTimeOffset.UtcNow.AddDays(-9),
@@ -377,7 +393,7 @@ internal static class DemoFullStudioData
         {
             (701,1,1,"Family Portrait Enquiry","Pending",25000m,0m,2),
             (702,3,10,"KMG Executive Portrait Follow-up","AwaitingDeposit",50000m,25000m,3),
-            (703,4,2,"Campion Graduation Retake Booking","Confirmed",15000m,15000m,8),
+            (703,4,2,"Campion Graduation Retake Booking","AwaitingDeposit",15000m,5000m,8),
             (704,2,11,"Harbour Awards Night","Pending",40000m,0m,5)
         };
         foreach(var item in samples)
@@ -392,6 +408,7 @@ internal static class DemoFullStudioData
                 title=item.Item4,
                 eventDate=DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(item.Item8)),
                 requiredDeposit=item.Item6,
+                source=item.Item1%2==0?"Website":"FrontDesk",
                 currency="JMD",
                 notes="DEMO front desk booking request",
                 clientId=Id(40,item.Item3),
@@ -409,6 +426,41 @@ internal static class DemoFullStudioData
         }
     }
 
+    private static void SeedBooking(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,DateTimeOffset start,DateTimeOffset end,int ordinal)
+    {
+        var client=Clients.Single(x=>x.Number==job.Client);
+        Execute(c,tx,"insert into studio_bookings(id,job_id,workspace_id,client_name,client_email,client_phone,session_type,starts_at_utc,ends_at_utc,location,notes,source,status,external_booking_id,created_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'Manual booking linked to Studio job',$11,$12,$13,now()-interval '10 days') on conflict(id) do nothing",
+            Id(71,job.Number),jobId,Id(1,job.Workspace),client.Name,client.Email,client.Phone,job.Type,start,end,job.Location,ordinal%5,job.Status=="Cancelled"?4:job.DayOffset<0?3:2,$"DEMO-FULL-{job.Number}");
+        Guid resource=Id(43,job.Photographer=="demo.sam"?1:job.Photographer=="demo.jason"?2:job.Photographer=="demo.anna"?3:4);
+        Execute(c,tx,"insert into studio_schedule_entry_resources(entry_id,resource_id) values($1,$2) on conflict do nothing",Id(48,job.Number),resource);
+        Execute(c,tx,"update studio_schedule_entries set booking_id=$2 where id=$1",Id(48,job.Number),Id(71,job.Number));
+    }
+
+    private static void SeedDocument(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,DemoJob job,Guid conversation,string login)
+    {
+        Guid id=Id(72,job.Number);
+        string key=$"demo/{id:N}.txt";
+        byte[] bytes=System.Text.Encoding.UTF8.GetBytes($"{job.Title}\nCoverage: {job.Type}\nLocation: {job.Location}\nPackage charge: JMD {job.Price:N2}\nContact and delivery arrangements confirmed in the job conversation.\n");
+        using var stream=new MemoryStream(bytes,false);
+        var stored=new PrefixedFileStorage(storage,"Storage/attachments").StoreAsync(new StorageWriteRequest(key,stream,"text/plain","Session instructions.txt",login)).GetAwaiter().GetResult();
+        Execute(c,tx,"insert into studio_attachments(id,conversation_id,file_name,stored_name,content_type,size_bytes,visibility,created_at_utc,sha256,uploaded_by,storage_status,source_key) values($1,$2,'Session instructions.txt',$3,'text/plain',$4,'Internal',now()-interval '2 days',$5,$6,'Stored',$7) on conflict(id) do nothing",id,conversation,key,stored.Length,stored.Sha256,login,$"demo-full-{job.Number}");
+    }
+
+    private static void SeedNotifications(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,string login,int ordinal)
+    {
+        Execute(c,tx,"insert into studio_notifications(id,user_name,channel,event_type,subject,body,reference_type,reference_id,status,is_read,created_at_utc) values($1,$2,'InApp','WorkspaceMessage',$3,$4,'Job',$5,'Delivered',$6,now()-($7||' hours')::interval) on conflict(id) do nothing",
+            Id(70,job.Number),login,job.Title,$"{job.Type}: please confirm the session, balance and delivery date.",Id(41,job.Number).ToString(),ordinal%3!=0,ordinal.ToString());
+    }
+
+    private static Guid ExecuteGuid(NpgsqlConnection c,NpgsqlTransaction tx,string sql,params object[] values)
+    {
+        using var command=new NpgsqlCommand(sql,c,tx);
+        foreach(object value in values)command.Parameters.AddWithValue(value is DateTimeOffset timestamp?timestamp.ToUniversalTime():value);
+        return (Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo insert did not return an ID."));
+    }
+
+    private static Guid MediaId(int group,int jobNumber,int index)=>Id(group,checked(jobNumber*10000+index));
+
     private static Guid Id(int group,int number)=>Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
 
     private static void Execute(NpgsqlConnection c,NpgsqlTransaction tx,string sql,params object[] values)
@@ -418,3 +470,4 @@ internal static class DemoFullStudioData
         command.ExecuteNonQuery();
     }
 }
+

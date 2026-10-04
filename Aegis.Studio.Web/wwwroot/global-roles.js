@@ -1,6 +1,4 @@
-const baseShowWorkspacesForGlobalRoles = showWorkspaces;
-showWorkspaces = async function() {
-    await baseShowWorkspacesForGlobalRoles();
+async function renderGlobalRoleAdministration() {
     try {
         const me = await json('/api/auth/me');
         if (me?.user?.isAdministrator !== true) return;
@@ -66,3 +64,4 @@ async function removeOperationsManagerRoleMember(roleId, userName) {
     if (!response.ok) throw new Error(await response.text());
     await refreshOperationsManagerRoleMembers(roleId);
 }
+

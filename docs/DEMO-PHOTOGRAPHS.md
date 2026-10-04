@@ -26,8 +26,9 @@ The existing Carter Wedding catalogue also uses Wikimedia Commons photographs an
 
 ## Seed behavior
 
-The flagship demo jobs expose roughly 1,000 media records so Media, Subjects, production queues, dashboards and counts behave like a working studio. The loader downloads a limited curated set of real source photographs and reuses those stored source files for additional demo asset records instead of repeatedly downloading or storing hundreds of duplicate binaries.
+The full demo adds 27 interconnected jobs and over 1,000 media records so Media, Subjects, production queues, dashboards and counts behave like a working studio. The loader downloads a limited curated set of real source photographs and caches the downloaded source bytes. Each asset version receives its own Common.Storage object and path; JPEG derivatives are constrained to 1200 pixels to keep the demo manageable.
 
 This is intentional demo-data behavior. The records are distinct Studio assets, while the source photographs are a reusable licensed demonstration corpus.
 
 Do not replace these photographs with AI-generated, procedurally generated or placeholder imagery.
+

@@ -102,8 +102,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
             <span class="job-row-heading"><strong>${esc(job.title)}</strong></span>
             <span class="job-row-client">${esc(job.clientName || job.linkedClientName || 'Client not linked')}</span>
             <span class="job-row-meta">
-                <span>${esc(job.eventDate || 'Not scheduled')}</span>
-                <span>${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, 'Team member', true) : 'Unassigned')}</span>
+                <span>Event: ${esc(job.eventDate || 'Not scheduled')}</span>
+                <span>Assigned to: ${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, 'Team member', true) : 'Unassigned')}</span>
                 <span class="job-status">${esc(job.status)}</span>
             </span>
         </button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
@@ -169,60 +169,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 '<span class="studio-job-location">Location not set</span>',
                 '<span class="studio-status-pill">'+esc(job.status)+'</span>'
             ].join('');
-            const thumb=document.createElement('div');
-            thumb.className='studio-job-thumb';
-            thumb.innerHTML='<span>'+esc((job.title||'J').slice(0,1))+'</span>';
-            header.prepend(thumb);
-            Promise.allSettled([
-                json(`/api/jobs/${job.id}/media`),
-                json(`/api/schedule/entries?jobId=${job.id}&from=${encodeURIComponent(new Date(Date.now()-31536000000).toISOString())}&to=${encodeURIComponent(new Date(Date.now()+94608000000).toISOString())}`)
-            ]).then(results=>{
-                if(version!==revision)return;
-                const media=results[0].status==='fulfilled'?(results[0].value.assets||[]):[];
-                const image=media.find(a=>String(a.contentType||'').startsWith('image/'));
-                if(image?.versionId)thumb.innerHTML=`<img src="/api/jobs/${job.id}/versions/by-id/${image.versionId}/content" alt="">`;
-                const schedules=results[1].status==='fulfilled'?results[1].value:[];
-                const location=schedules.find(x=>x.location)?.location;
-                if(location){
-                    const locationNode=copy.querySelector('.studio-job-location');
-                    if(locationNode)locationNode.textContent=location;
-                }
-            });
-        }
-        if(job){
-            const filesPanel=document.createElement('section');
-            filesPanel.className='thread-shared-files';
-            const messagesPanel=document.getElementById('combinedJobMessages');
-            const composer=document.getElementById('hierarchyCompose');
-            const conversationRow=document.createElement('div');
-            conversationRow.className='job-conversation-row';
-            messagesPanel.before(conversationRow);
-            const messageColumn=document.createElement('div');
-            messageColumn.className='job-message-column';
-            const messageHeader=document.createElement('header');
-            messageHeader.className='job-panel-heading';
-            messageHeader.innerHTML='<div><strong>Messages</strong><span class="panel-count">'+combined.length+'</span></div><div class="panel-heading-actions"><button type="button" class="icon-button" data-message-search aria-label="Search messages">⌕</button><button type="button" class="icon-button" data-message-more aria-label="Message options">⋮</button></div>';
-            const nextPanel=document.createElement('section');nextPanel.className='thread-next-tasks';
-            messageColumn.append(messageHeader,messagesPanel,composer);
-            conversationRow.append(messageColumn,filesPanel,nextPanel);
-            const current=()=>version===revision;
-            renderCompactTasks(job,nextPanel,current).catch(error=>{if(current())nextPanel.textContent='Upcoming work could not be loaded: '+error.message;});
-            const refreshFiles=()=>renderConversationFiles(job,filesPanel,current,refreshFiles);
-            refreshFiles().catch(error=>{if(current())filesPanel.textContent='Conversation files could not be loaded: '+error.message;});
-        }
-        if(job){
-            const searchButton=detailPane.querySelector('[data-message-search]');
-            if(searchButton)searchButton.onclick=()=>{
-                const term=prompt('Search this conversation');
-                if(term===null)return;
-                const value=term.trim().toLowerCase();
-                detailPane.querySelectorAll('#combinedJobMessages .message').forEach(row=>row.hidden=!!value&&!row.textContent.toLowerCase().includes(value));
-            };
-            const moreButton=detailPane.querySelector('[data-message-more]');
-            if(moreButton)moreButton.onclick=()=>{
-                detailPane.querySelectorAll('#combinedJobMessages .message').forEach(row=>row.hidden=false);
-                document.getElementById('hierarchyBody')?.focus();
-            };
+
         }
         const sender = document.getElementById('jobSendingIdentity');
         const canSend = () => !job || sender?.value === 'Internal' || (!!conversation && (String(conversation.channel).toLowerCase() !== 'email' ? sender?.value === 'Workspace' : identities.some(i => i.type === sender?.value)));
@@ -264,9 +211,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
 
             const messagesPanel=document.getElementById('combinedJobMessages');
             const composer=document.getElementById('hierarchyCompose');
-            const existingConversationRow=detailPane.querySelector('.job-conversation-row');
-            const filesPanel=existingConversationRow.querySelector('.thread-shared-files');
-            const nextPanel=existingConversationRow.querySelector('.thread-next-tasks');
+            const filesPanel=document.createElement('section');filesPanel.className='thread-shared-files';
+            const nextPanel=document.createElement('section');nextPanel.className='thread-next-tasks';
+            const refreshFiles=()=>renderConversationFiles(job,filesPanel,current,refreshFiles);
+            refreshFiles().catch(error=>{if(current())filesPanel.textContent=error.message;});
 
             const messageColumn=document.createElement('section');
             messageColumn.className='job-message-column';
@@ -291,9 +239,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 ['Client',esc(job.linkedClientName||job.clientName||'Not linked')],
                 ['Type',esc(job.jobType||job.type||'Photography')],
                 ['Tags',esc(Array.isArray(job.tags)?job.tags.join(', '):(job.tags||'—'))],
-                ['Budget',job.budget==null?'—':esc(String(job.budget))],
-                ['Amount Paid',job.amountPaid==null?'—':esc(String(job.amountPaid))],
-                ['Remaining',job.remaining==null?'—':esc(String(job.remaining))],
+                ['Package charge',esc(money(studioFinancials(job).charges))],
+                ['Amount Paid',esc(money(studioFinancials(job).received))],
+                ['Remaining',esc(money(studioFinancials(job).balance))],
                 ['Job Code',esc(job.jobCode||job.code||String(job.id).slice(0,12))]
             ];
             details.innerHTML='<summary class="context-card-header"><strong>Job Details</strong><button class="text-button" type="button" data-edit-details>✎ Edit</button></summary><dl>'+detailRows.map(([label,value])=>'<dt>'+label+'</dt><dd>'+value+'</dd>').join('')+'</dl>';
@@ -356,11 +304,17 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const nav=document.createElement('nav');
             nav.className='job-section-tabs';
             nav.setAttribute('aria-label','Job information');
-            nav.innerHTML='<button data-job-scroll="messages" class="active">Messages</button><button data-job-scroll="media">Media</button><button data-job-scroll="subjects">Subjects</button><button data-job-scroll="tasks">Tasks</button><button data-job-scroll="calendar">Calendar</button><button data-job-scroll="activity">Activity</button>';
+            nav.innerHTML='<button data-job-scroll="overview" class="active">Overview</button><button data-job-scroll="messages">Messages</button><button data-job-scroll="media">Media</button><button data-job-scroll="subjects">Subjects</button><button data-job-scroll="tasks">Tasks</button><button data-job-scroll="sessions">Sessions</button><button data-job-scroll="activity">Activity</button>';
             meta.after(nav,board);
 
             board.append(messageColumn,lower,side);
-            existingConversationRow.remove();
+            messageHeader.querySelector('[data-message-search]').onclick=()=>{
+                const term=prompt('Search this conversation');if(term===null)return;
+                messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));
+            };
+            messageHeader.querySelector('[data-message-more]').onclick=()=>{
+                messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();
+            };
 
             const mediaPanel=lower.querySelector('.job-media-content');
             const subjectsPanel=lower.querySelector('.job-subjects-content');
@@ -391,6 +345,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 button.onclick=async()=>{
                     nav.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===button));
                     const name=button.dataset.jobScroll;
+                    if(name==='overview'){messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);await refreshTasks();return;}
+                    if(name==='sessions'){const dialog=studioDialog('Job Sessions','<div data-job-sessions></div>');const sessions=await json('/api/operations/shoots?jobId='+job.id);dialog.querySelector('[data-job-sessions]').innerHTML=sessions.map(s=>'<article class="task-card"><strong>'+esc(s.location||'Session')+'</strong><small>'+esc(new Date(s.callTimeUtc).toLocaleString())+' · '+esc(s.status)+' · '+esc(studioFirstName(s.photographerUserName))+'</small></article>').join('')||'<p>No sessions scheduled.</p>';return;}
                     if(name==='messages')messageColumn.scrollIntoView({block:'nearest'});
                     else if(name==='media')lower.querySelector('.job-media-section').scrollIntoView({block:'nearest'});
                     else if(name==='subjects')lower.querySelector('.job-subjects-section').scrollIntoView({block:'nearest'});
@@ -491,4 +447,5 @@ function mergeJobMessages(teamMessages, customerMessages) {
     document.getElementById('workspaceRefresh').onclick = () => loadConversations().catch(fail);
     document.querySelector('.pane-heading p').textContent = 'Jobs, announcements and members';
 })();
+
 

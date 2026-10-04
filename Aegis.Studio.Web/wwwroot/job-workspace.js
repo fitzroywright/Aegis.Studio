@@ -188,10 +188,7 @@ async function renderAnnouncementBanners(host,workspaceId,current) {
 }
 
 // Posting remains available in workspace administration, without a navigation tab.
-(() => {
-    const previous=showWorkspaces;
-    showWorkspaces=async function(){
-        await previous();
+async function renderAnnouncementAdministration(){
         const eligible=workspaceCache.filter(w=>w.permissions?.notifyMembers);
         if(!eligible.length)return;
         const section=document.createElement('section');section.className='job-section';
@@ -203,6 +200,6 @@ async function renderAnnouncementBanners(host,workspaceId,current) {
             catch(error){form.querySelector('[role=status]').textContent=error.message;}
             finally{button.disabled=false;}
         };
-    };
-})();
+}
+
 

@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
 using System.Net.Http;
 using Npgsql;
 using Common.Storage;
@@ -187,7 +189,12 @@ internal static class DemoDataExpansion
                 {
                     using HttpResponseMessage response=demoPhotoClient.GetAsync(url).GetAwaiter().GetResult();
                     response.EnsureSuccessStatusCode();
-                    bytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                    byte[] sourceBytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                    using var photograph=Image.Load(sourceBytes);
+                    photograph.Mutate(x=>x.Resize(new ResizeOptions { Size=new Size(1200,1200),Mode=ResizeMode.Max }));
+                    using var derivative=new MemoryStream();
+                    photograph.SaveAsJpeg(derivative,new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality=85 });
+                    bytes=derivative.ToArray();
                     weddingPhotoCache[url]=bytes;
                 }
                 selectedUrl=url;
@@ -262,7 +269,12 @@ internal static class DemoDataExpansion
                 {
                     using HttpResponseMessage response=demoPhotoClient.GetAsync(url).GetAwaiter().GetResult();
                     response.EnsureSuccessStatusCode();
-                    bytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                    byte[] sourceBytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                    using var photograph=Image.Load(sourceBytes);
+                    photograph.Mutate(x=>x.Resize(new ResizeOptions { Size=new Size(1200,1200),Mode=ResizeMode.Max }));
+                    using var derivative=new MemoryStream();
+                    photograph.SaveAsJpeg(derivative,new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality=85 });
+                    bytes=derivative.ToArray();
                     weddingPhotoCache[url]=bytes;
                 }
                 selectedUrl=url;
@@ -344,3 +356,4 @@ internal static class DemoDataExpansion
         command.ExecuteNonQuery();
     }
 }
+

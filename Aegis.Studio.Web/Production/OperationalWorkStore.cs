@@ -17,7 +17,7 @@ public sealed class OperationalWorkStore
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
-            select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc
+            select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc,collection_name
             from studio_job_activities
             where ($1::uuid is null or job_id=$1)
               and ($2::text is null or status=$2)
@@ -155,7 +155,7 @@ public sealed class OperationalWorkStore
     private JobActivity? GetActivity(Guid id)
     {
         using NpgsqlConnection connection=database.OpenConnection(); using NpgsqlCommand command=connection.CreateCommand();
-        command.CommandText="select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc from studio_job_activities where id=$1";
+        command.CommandText="select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc,collection_name from studio_job_activities where id=$1";
         command.Parameters.AddWithValue(id); using NpgsqlDataReader reader=command.ExecuteReader(); return reader.Read()?ReadActivity(reader):null;
     }
 
@@ -202,19 +202,20 @@ public sealed class OperationalWorkStore
         command.Parameters.AddWithValue(Guid.NewGuid()); command.Parameters.AddWithValue(jobId); command.Parameters.AddWithValue((object?)activityId??DBNull.Value); command.Parameters.AddWithValue(action); command.Parameters.AddWithValue(userName); command.Parameters.AddWithValue((object?)Clean(detail)??DBNull.Value); command.ExecuteNonQuery();
     }
 
-    private static JobActivity ReadActivity(NpgsqlDataReader r) => new(r.GetGuid(0),r.GetGuid(1),r.GetString(2),r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),r.GetString(5),r.GetString(6),r.IsDBNull(7)?null:r.GetString(7),r.IsDBNull(8)?null:r.GetFieldValue<DateTimeOffset>(8),r.IsDBNull(9)?null:r.GetFieldValue<DateTimeOffset>(9),r.IsDBNull(10)?null:r.GetFieldValue<DateTimeOffset>(10),r.IsDBNull(11)?null:r.GetFieldValue<DateTimeOffset>(11),r.IsDBNull(12)?null:r.GetString(12),r.IsDBNull(13)?null:r.GetString(13),r.IsDBNull(14)?null:r.GetString(14),r.GetString(15),r.GetFieldValue<DateTimeOffset>(16),r.GetFieldValue<DateTimeOffset>(17));
+    private static JobActivity ReadActivity(NpgsqlDataReader r) => new(r.GetGuid(0),r.GetGuid(1),r.GetString(2),r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),r.GetString(5),r.GetString(6),r.IsDBNull(7)?null:r.GetString(7),r.IsDBNull(8)?null:r.GetFieldValue<DateTimeOffset>(8),r.IsDBNull(9)?null:r.GetFieldValue<DateTimeOffset>(9),r.IsDBNull(10)?null:r.GetFieldValue<DateTimeOffset>(10),r.IsDBNull(11)?null:r.GetFieldValue<DateTimeOffset>(11),r.IsDBNull(12)?null:r.GetString(12),r.IsDBNull(13)?null:r.GetString(13),r.IsDBNull(14)?null:r.GetString(14),r.GetString(15),r.GetFieldValue<DateTimeOffset>(16),r.GetFieldValue<DateTimeOffset>(17),r.IsDBNull(18)?null:r.GetString(18));
     private static ShootSession ReadShoot(NpgsqlDataReader r) => new(r.GetGuid(0),r.GetGuid(1),r.IsDBNull(2)?null:r.GetGuid(2),r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),r.GetFieldValue<DateTimeOffset>(5),r.GetFieldValue<DateTimeOffset>(6),r.IsDBNull(7)?null:r.GetString(7),r.GetString(8),r.IsDBNull(9)?null:r.GetFieldValue<DateTimeOffset>(9),r.IsDBNull(10)?null:r.GetFieldValue<DateTimeOffset>(10),r.GetInt32(11),r.GetBoolean(12),r.GetBoolean(13),r.IsDBNull(14)?null:r.GetString(14),r.IsDBNull(15)?null:r.GetString(15),r.GetString(16),r.IsDBNull(17)?null:r.GetString(17),r.GetFieldValue<DateTimeOffset>(18),r.GetFieldValue<DateTimeOffset>(19));
     private static string NormalizeActivityType(string? value) => value?.Trim() switch { "Shoot"=>"Shoot","Travel"=>"Travel","EquipmentPrep"=>"EquipmentPrep","FileIngest"=>"FileIngest","Backup"=>"Backup","Cull"=>"Cull","Edit"=>"Edit","Retouch"=>"Retouch","Proof"=>"Proof","Print"=>"Print","QC"=>"QC","Delivery"=>"Delivery","Archive"=>"Archive","Reshoot"=>"Reshoot",_=>"Other" };
-    private static string NormalizeStatus(string? value) => value?.Trim() switch { "Scheduled"=>"Scheduled","InProgress"=>"InProgress","Blocked"=>"Blocked","Completed"=>"Completed","Cancelled"=>"Cancelled",_=>"NotStarted" };
+    private static string NormalizeStatus(string? value) => value?.Trim() switch { "Scheduled"=>"Scheduled","InProgress"=>"InProgress","Blocked"=>"Blocked","Completed"=>"Completed","Cancelled"=>"Cancelled","WaitingOnCustomer"=>"WaitingOnCustomer","ReworkRequired"=>"ReworkRequired","Partial"=>"Partial","Failed"=>"Failed","ReprintRequired"=>"ReprintRequired","ReadyForDelivery"=>"ReadyForDelivery","Archived"=>"Archived",_=>"NotStarted" };
     private static string NormalizePriority(string? value) => value?.Trim() switch { "Low"=>"Low","High"=>"High","Urgent"=>"Urgent",_=>"Normal" };
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value)?null:value.Trim();
 }
 
-public sealed record JobActivity(Guid Id,Guid JobId,string ActivityType,string Title,string? Description,string Status,string Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,DateTimeOffset? StartedAtUtc,DateTimeOffset? CompletedAtUtc,string? Location,string? BlockedReason,string? HandoffTo,string CreatedBy,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc);
+public sealed record JobActivity(Guid Id,Guid JobId,string ActivityType,string Title,string? Description,string Status,string Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,DateTimeOffset? StartedAtUtc,DateTimeOffset? CompletedAtUtc,string? Location,string? BlockedReason,string? HandoffTo,string CreatedBy,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc,string? CollectionName=null);
 public sealed record JobActivityRequest(string? ActivityType,string Title,string? Description,string? Status,string? Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,string? Location,string? BlockedReason,string? HandoffTo);
 public sealed record ShootSession(Guid Id,Guid JobId,Guid? ScheduleEntryId,string PhotographerUserName,string? AssistantUserName,DateTimeOffset CallTimeUtc,DateTimeOffset PlannedEndUtc,string? Location,string Status,DateTimeOffset? CheckedInAtUtc,DateTimeOffset? CheckedOutAtUtc,int ImageCount,bool BackupConfirmed,bool ReshootRequired,string? CoverageNotes,string? EquipmentNotes,string HandoffStatus,string? HandoffTo,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc);
 public sealed record ShootSessionRequest(Guid? ScheduleEntryId,string PhotographerUserName,string? AssistantUserName,DateTimeOffset CallTimeUtc,DateTimeOffset PlannedEndUtc,string? Location,string? CoverageNotes,string? EquipmentNotes);
 public sealed record ShootSessionUpdateRequest(string? Action,int? ImageCount,bool? BackupConfirmed,bool? ReshootRequired,string? CoverageNotes,string? EquipmentNotes,string? HandoffTo);
 public sealed record OperationalAudit(Guid Id,Guid JobId,Guid? ActivityId,string Action,string UserName,string? Detail,DateTimeOffset CreatedAtUtc);
 public sealed record OperationalSummary(int ShootsToday,int ShootsInProgress,int ShootsAwaitingBackup,int ReshootsRequired,int OpenActivities,int BlockedActivities,int OverdueActivities);
+
 

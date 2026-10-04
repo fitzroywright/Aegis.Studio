@@ -1,0 +1,32 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const {JSDOM}=require('jsdom');
+const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
+function setup(scripts=['management.js']){
+ const dom=new JSDOM('<main id="genericView"></main><div id="conversationView"></div>',{url:'https://studio.test',runScripts:'outside-only'}),w=dom.window;
+ Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),activateNavigation(){},esc:s=>String(s??''),money:n=>'JMD '+Number(n).toLocaleString(),studioFirstName:s=>String(s),studioRememberPeople(){},alert(){}});
+ scripts.forEach(s=>w.eval(fs.readFileSync(path.join(root,s),'utf8')));return w;
+}
+const date=new Date().toISOString();
+const jobs=[{id:'job',workspaceId:'workspace',clientId:'client',title:'Wedding',clientName:'Carter',status:'Production',financialEvents:[{kind:'Charge',amount:100,createdAt:date},{kind:'Deposit',amount:30,createdAt:date},{kind:'Payment',amount:50,createdAt:date},{kind:'Refund',amount:-10,createdAt:date},{kind:'Discount',amount:-5,createdAt:date}]}];
+function endpoints(w){w.json=async u=>u==='/api/jobs'?jobs:u==='/api/accounts/invoices'?[{id:'invoice',jobId:'job',invoiceNumber:'001',clientName:'Carter',totalAmount:95,status:'Issued'}]:u==='/api/photographers'?[{userName:'staff',displayName:'Staff',scheduleResourceId:'resource',isActive:true}]:u.startsWith('/api/schedule/entries')?[{id:'session',jobId:'job',title:'Wedding',startsAtUtc:date,endsAtUtc:date,resourceIds:['resource'],status:'Scheduled'}]:u.endsWith('/media')?{assets:[]}:u==='/api/auth/me'?{user:{userName:'staff',isAdministrator:true}}:u==='/api/workspaces'?[{id:'workspace',name:'Weddings'}]:u==='/api/schedule/resources'?[]:u.endsWith('/access')?{permissions:{manageProduction:true}}:[];}
+test('Finance reconciles signed refunds and discounts with the job balance',async()=>{
+ const w=setup();endpoints(w);assert.deepEqual(JSON.parse(JSON.stringify(w.studioFinancials(jobs[0]))),{charges:95,received:70,balance:25});await w.showAccounts();
+ assert.match(w.genericView.textContent,/JMD 70/);assert.match(w.genericView.textContent,/JMD 25/);assert.equal(w.document.querySelectorAll('.finance-grid>.op-card').length,4);
+ let opened;w.openWorkspaceJob=async id=>opened=id;w.document.querySelector('[data-open-job]').click();assert.equal(opened,'job');
+ const chart=w.studioRevenueChart([{kind:'Refund',amount:-100,createdAt:date}]);const fragment=new JSDOM(chart);assert.ok([...fragment.window.document.querySelectorAll('rect')].every(r=>Number(r.getAttribute('height'))>=0));
+});
+test('Management workload follows the same schedule resource IDs as Pipeline',async()=>{
+ const w=setup();endpoints(w);w.pipelineStages=[['Production',['Production']]];await w.showManagement();assert.equal(w.document.querySelectorAll('.management-grid>.op-card').length,8);assert.match(w.genericView.textContent,/0 open tasks · 1 sessions/);
+ let route;w.studioNavigate=v=>route=v;w.document.querySelector('[data-stage]').click();assert.equal(route,'pipeline');assert.equal(w.pipelineSelectedStage,'Production');
+});
+test('Production filters collections and persists completion through the existing API',async()=>{
+ const w=setup(['management.js','production.js']);endpoints(w);const read=w.json,calls=[];let status='NotStarted';
+ w.json=async(u,o)=>{if(o){calls.push({u,body:JSON.parse(o.body)});status=JSON.parse(o.body).status;return {};}
+ if(u==='/api/operations/activities')return [{id:'task',jobId:'job',activityType:'Retouch',title:'Retouch Selects',collectionName:'Selects',assignedTo:'staff',status,priority:'Normal',createdAtUtc:date}];
+ if(u.endsWith('/media'))return {assets:[{collection:'Selects'},{collection:'Proofs'}]};return read(u,o);};
+ await w.showProduction();let row=w.document.querySelector('tbody tr');assert.equal(row.children[3].textContent,'1');assert.ok(row.querySelector('[data-work-complete]'));
+ await w.setOperationalActivityStatus('task','Completed');assert.equal(calls[0].u,'/api/operations/activities/task');assert.equal(calls[0].body.status,'Completed');assert.equal(w.document.querySelector('[data-work-complete]'),null);
+});
+test('folder ingest drains repeated directory batches and ignores non-photo files',async()=>{
+ const w=setup(['media-production.js']);const file=name=>({isFile:true,file:done=>done({name,type:'image/jpeg'})});const batches=[[file('one.jpg')],[file('two.png'),file('notes.txt')],[]];
+ const directory={isDirectory:true,createReader:()=>({readEntries:done=>done(batches.shift())})};const files=await w.studioDroppedPhotos({items:[{webkitGetAsEntry:()=>directory}],files:[]});assert.deepEqual(Array.from(files,f=>f.name),['one.jpg','two.png']);assert.equal(batches.length,0);
+});

@@ -60,6 +60,7 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  w.fetch=async url=>({ok:true,json:async()=>url.endsWith('/sending-identities')?{identities:[{type:'Workspace'},{type:'Self',isDefault:true}]}:{channel:'Email',messages:[]}});
  w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.endsWith('/media')?{assets:[],subjects:[],unmatched:[],gallery:{default_lens:'Auto'}}:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
  w.eval(fs.readFileSync(path.join(root,'auth.js'),'utf8'));
+ w.money=n=>'JMD '+n;w.eval(fs.readFileSync(path.join(root,'management.js'),'utf8'));
  w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,10));
  assert.equal(w.document.querySelector('#jobInternalNote'),null);
@@ -76,7 +77,7 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
  assert.equal(w.messageFirstName('fwright',[],'Team member',true),'fwright');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'fwright');
- assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.textContent),['Messages','Media','Subjects','Tasks','Calendar','Activity']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.textContent),['Overview','Messages','Media','Subjects','Tasks','Sessions','Activity']);
  assert.equal(w.document.querySelector('.detail-header .activity-button'),null);
  assert.equal(w.document.querySelector('[data-job-scroll=activity]')?.textContent,'Activity');
  assert.ok(w.document.querySelector('.job-work-board'));
@@ -113,7 +114,7 @@ test('job handoff uses shoot completion, never first upload, and shows blocked w
 test('FrontDesk search preserves focus and separates enquiry and booking queues',()=>{
  const {w,panel}=environment();panel.id='genericView';
  Object.assign(w,{activateView(){},activateNavigation(){},conversationView:{classList:{add(){}}},genericView:panel,money:n=>'JMD '+n,openWorkspaceJob(){},openPos(){},json:async()=>({frontDesk:true,user:{isAdministrator:true}})});
- w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nfrontDeskJobs=[{id:'job',clientName:'Campbell',title:'Wedding',status:'Needs Scheduling'}];frontDeskRequests=[{id:'request',request:{clientName:'Campbell',title:'Wedding',eventDate:'2026-10-10',requiredDeposit:100,workspaceId:'workspace'},recordedDeposit:40,status:'AwaitingDeposit'}];frontDeskWorkspaces=[{id:'workspace',name:'Weddings'}];renderFrontDesk();");
+ w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nfrontDeskJobs=[{id:'job',clientName:'Campbell',title:'Wedding',status:'Needs Scheduling'}];frontDeskRequests=[{id:'request',request:{clientName:'Campbell',title:'Wedding',eventDate:'2026-10-10',requiredDeposit:100,workspaceId:'workspace'},recordedDeposit:40,status:'AwaitingDeposit'}];frontDeskTab='requests';frontDeskWorkspaces=[{id:'workspace',name:'Weddings'}];renderFrontDesk();document.querySelector('[data-frontdesk-tab=\"requests\"]').click();");
  const input=panel.querySelector('#frontDeskSearch');input.focus();input.value='Campbell';input.oninput({target:input});assert.equal(panel.querySelector('#frontDeskSearch'),input);assert.equal(w.document.activeElement,input);
  assert.match(panel.textContent,/Partial deposit/);assert.match(panel.textContent,/Record verified deposit/);assert.equal(panel.querySelector('[data-frontdesk-job]'),null);
 });
@@ -159,7 +160,7 @@ test('Media collection controls persist names and dropped files target the selec
  await w.renderProductionMedia({id:'job'},panel,()=>true);
  panel.querySelector('[data-new-collection]').click();let form=w.document.querySelector('dialog form');form.elements.name.value='Portraits';await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.equal(panel.querySelector('[data-collection]').value,'Portraits');
- panel.querySelector('.media-drop-surface').ondrop({preventDefault(){},dataTransfer:{files:[{name:'portrait.jpg'}]}});
+ await panel.querySelector('.media-drop-surface').ondrop({preventDefault(){},dataTransfer:{files:[{name:'portrait.jpg'}]}});
  let uploadForm=[...w.document.querySelectorAll('dialog form')].find(x=>x.closest('dialog')?.textContent.includes('Add / Upload'));
  assert.ok(uploadForm);await uploadForm.onsubmit({preventDefault(){},currentTarget:uploadForm});
  await new Promise(resolve=>setTimeout(resolve,10));
@@ -210,4 +211,5 @@ test('Pipeline shows stage groups with schedule and task on timeline and calenda
  await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.ok(requests.some(url=>url==='/api/schedule/entries'));
 });
+
 

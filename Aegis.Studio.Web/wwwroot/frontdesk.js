@@ -1,16 +1,6 @@
 let frontDeskJobs = [];
 let frontDeskRole = null;
 
-const frontDeskBaseActivateView = activateView;
-activateView = function(view) {
-    if (view === 'frontdesk') {
-        showFrontDesk();
-        return;
-    }
-
-    frontDeskBaseActivateView(view);
-};
-
 async function loadFrontDeskRole() {
     try {
         frontDeskRole = await json('/api/security/global-role-me');
@@ -57,47 +47,42 @@ async function showFrontDesk() {
 }
 
 let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskClients=[],frontDeskSchedule=[],frontDeskInvoices=[];
-let frontDeskTab='requests',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelectedClientId=null;
+let frontDeskTab='today',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelectedClientId=null;
 function frontDeskRequestStage(item){return item.jobId?'Confirmed':item.recordedDeposit>0?'Partial deposit':item.status==='AwaitingDeposit'?'Awaiting deposit':'Pending request';}
-function renderFrontDesk() {
-    const pending=frontDeskRequests.filter(r=>!r.jobId),ready=frontDeskJobs.filter(j=>j.status==='Ready for Client');
-    const arrivals=frontDeskJobs.filter(j=>j.status==='Arrived');
-    const walkIns=frontDeskEnquiries.filter(e=>String(e.channel).toLowerCase()==='walk-in');const todaySchedule=frontDeskSchedule.filter(entry=>{const d=new Date(entry.startsAtUtc);return d>=new Date(new Date().setHours(0,0,0,0))&&d<new Date(new Date().setHours(24,0,0,0));});
-    genericView.innerHTML=`<div class="job-detail-header frontdesk-header"><div><h1>Front Desk</h1><p>Client lookup, arrivals, bookings, payments, pickups and job status.</p></div><div class="job-actions"><button class="action" onclick="showAccounts()">Accounts / Invoices</button><button class="action" onclick="showPos()">Sales / Payments</button><button class="primary" id="newBookingRequest">New Booking</button></div></div>
-    <section class="frontdesk-operational-desk">
-      <div class="frontdesk-client-desk">
-        <div class="workspace-inline-search"><input id="frontDeskClientSearch" type="search" placeholder="Search clients…" aria-label="Search clients" value="${esc(frontDeskClientTerm)}"></div>
-        <div id="frontDeskClientResults" class="frontdesk-client-results"></div>
-        <div id="frontDeskClientContext" class="frontdesk-client-context"><p class="muted">Select a client to see Jobs → Workspaces and contextual actions.</p></div>
-      </div>
-      <div class="frontdesk-today">
-        <h2>Today</h2>
-        <div class="frontdesk-status-strip"><span><b>${todaySchedule.length}</b> appointments</span><span><b>${arrivals.length}</b> waiting</span><span><b>${walkIns.length}</b> walk-ins</span><span><b>${ready.length}</b> pickups</span><span><b>${pending.length}</b> pending bookings</span></div>
-        <div class="frontdesk-today-list">${todaySchedule.map(entry=>`<button class="job-row" type="button" ${entry.jobId?`data-frontdesk-job="${entry.jobId}"`:''}><div><strong>${esc(entry.title)}</strong><small>${esc(new Date(entry.startsAtUtc).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))} · ${esc(entry.location||'Location not set')}</small></div><span class="status-pill">${esc(entry.status||'Scheduled')}</span></button>`).join('')||'<p class="muted">No appointments scheduled today.</p>'}</div>
-      </div>
-    </section>
-    <nav class="workspace-tabs" aria-label="Front Desk queues">${[['requests','Booking requests'],['enquiries','Enquiries'],['jobs','Active jobs'],['delivery','Pickup / delivery'],['completed','Completed']].map(([key,label])=>`<button data-frontdesk-tab="${key}" class="${key===frontDeskTab?'active':''}">${label}</button>`).join('')}</nav>
-    <div class="workspace-inline-search frontdesk-queue-search"><input id="frontDeskSearch" type="search" placeholder="Search this queue…" aria-label="Search Front Desk queue" value="${esc(frontDeskTerm)}"><button class="action" onclick="showFrontDesk()">Refresh</button></div><div id="frontDeskJobList"></div>`;
-    const newRequestAction=document.getElementById('newRequestButton');
-    const frontDeskActions=genericView.querySelector('.job-actions');
-    if(newRequestAction&&frontDeskActions){newRequestAction.hidden=false;frontDeskActions.insertBefore(newRequestAction,genericView.querySelector('#newBookingRequest'));}
-    genericView.querySelector('#newBookingRequest').onclick=()=>openPendingBookingForm();
+function renderFrontDesk(){
+    const today=new Date().toLocaleDateString(),sessions=frontDeskSchedule.filter(s=>new Date(s.startsAtUtc).toLocaleDateString()===today&&s.status!=='Cancelled').sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
+    const tabs=[['today','Walk-in / Today'],['requests','Bookings'],['jobs','Jobs'],['delivery','Pickup / Delivery'],['completed','Completed'],['enquiries','Inquiries']];
+    genericView.innerHTML=`<header class="studio-page-heading"><div><h1>Front Desk</h1><p>Welcome clients, manage bookings, sales and customer service.</p></div><div class="job-actions"><button class="primary" id="newBookingRequest">＋ New Booking</button><button onclick="showPos()">＋ New Sale</button></div></header>
+    <nav class="workspace-tabs" aria-label="Front Desk queues">${tabs.map(([key,label])=>`<button data-frontdesk-tab="${key}" class="${key===frontDeskTab?'active':''}">${label}</button>`).join('')}</nav>
+    <div class="op-grid frontdesk-board"><section class="op-card"><header><h2>Client Lookup</h2></header><div class="op-body"><input id="frontDeskClientSearch" type="search" placeholder="Search name, phone or email…" value="${esc(frontDeskClientTerm)}" aria-label="Find client"><div id="frontDeskClientResults" class="frontdesk-client-results"></div><button class="text-button" data-new-client>＋ New Client</button></div></section>
+    <section class="op-card"><header><h2>${frontDeskTab==='today'?"Today's Schedule":tabs.find(t=>t[0]===frontDeskTab)?.[1]||'Jobs'}</h2><button onclick="studioNavigate('pipeline')">View Calendar →</button></header><div class="op-body">${frontDeskTab==='today'?`<div class="frontdesk-today-list">${sessions.map(s=>`<article class="job-row"><button class="link-button" data-frontdesk-job="${s.jobId}"><strong>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))} · ${esc(s.title)}</strong><small>${esc(s.location||'')} · ${esc(s.status)}</small></button><button data-check-in="${s.jobId}">Check In</button></article>`).join('')||'<p>No sessions today.</p>'}</div>`:''}<input id="frontDeskSearch" type="search" placeholder="Search this queue…" aria-label="Find job, booking or customer" value="${esc(frontDeskTerm)}" ${frontDeskTab==='today'?'hidden':''}><div id="frontDeskJobList" ${frontDeskTab==='today'?'hidden':''}></div></div></section>
+    <section class="op-card"><header><h2>Quick Actions</h2></header><div class="op-body frontdesk-actions"><button data-new-client>＋ New Customer</button><button data-new-booking>New Booking</button><button data-take-payment>Take Payment</button><button onclick="showPos()">New Sale</button><button onclick="studioNavigate('pipeline')">Check Availability / Reschedule</button><button data-pickups>Pickup / Delivery</button><button onclick="studioNavigate('finance')">Invoices / Finance</button><h3>Walk-in Sales</h3><p class="muted">Use New Sale to select a client's job, add products and take payment.</p></div></section></div>`;
+    genericView.querySelector('#newBookingRequest').onclick=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
+    genericView.querySelector('[data-new-booking]').onclick=()=>genericView.querySelector('#newBookingRequest').click();
+    genericView.querySelectorAll('[data-new-client]').forEach(b=>b.onclick=async()=>{await showFrontDeskClients();document.querySelector('dialog[open] [data-new]')?.click();});
+    genericView.querySelector('[data-take-payment]').onclick=()=>frontDeskSelectedClientId?takeFrontDeskClientPayment(frontDeskSelectedClientId):showPos();
+    genericView.querySelector('[data-pickups]').onclick=()=>{frontDeskTab='delivery';renderFrontDesk();};
     genericView.querySelectorAll('[data-frontdesk-tab]').forEach(b=>b.onclick=()=>{frontDeskTab=b.dataset.frontdeskTab;renderFrontDesk();});
     genericView.querySelector('#frontDeskSearch').oninput=e=>{frontDeskTerm=e.target.value;renderFrontDeskRows();};
     genericView.querySelector('#frontDeskClientSearch').oninput=e=>{frontDeskClientTerm=e.target.value;renderFrontDeskClientResults();};
-    genericView.querySelectorAll('.frontdesk-today [data-frontdesk-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.frontdeskJob));
-    renderFrontDeskClientResults();
-    renderFrontDeskRows();
+    genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.frontdeskJob));
+    genericView.querySelectorAll('[data-check-in]').forEach(b=>b.onclick=()=>checkInFrontDeskJob(b.dataset.checkIn));
+    renderFrontDeskClientResults();if(frontDeskTab!=='today')renderFrontDeskRows();
 }
+function selectFrontDeskClient(clientId){
+    frontDeskSelectedClientId=clientId;
+    const dialog=studioDialog('Client history','<div id="frontDeskClientContext" class="frontdesk-client-context"></div>');
+    renderFrontDeskClientContext().catch(e=>dialog.querySelector('#frontDeskClientContext').textContent=e.message);
+}
+
 function renderFrontDeskClientResults(){
     const host=document.getElementById('frontDeskClientResults');if(!host)return;
     const term=frontDeskClientTerm.trim().toLowerCase();
     const clients=frontDeskClients.filter(c=>!term||[c.displayName,c.email,c.phone].join(' ').toLowerCase().includes(term)).slice(0,30);
     host.innerHTML=clients.map(c=>`<button type="button" class="frontdesk-client-row ${frontDeskSelectedClientId===c.id?'active':''}" data-frontdesk-client="${c.id}"><strong>${esc(c.displayName)}</strong><small>${esc(c.email||c.phone||'No contact detail')}</small><span>${frontDeskJobs.filter(j=>j.clientId===c.id&&j.status!=='Completed').length} active</span></button>`).join('')||'<p class="muted">No clients found.</p>';
     host.querySelectorAll('[data-frontdesk-client]').forEach(b=>b.onclick=()=>selectFrontDeskClient(b.dataset.frontdeskClient));
-    if(frontDeskSelectedClientId)renderFrontDeskClientContext();
+
 }
-function selectFrontDeskClient(clientId){frontDeskSelectedClientId=clientId;renderFrontDeskClientResults();renderFrontDeskClientContext().catch(error=>{const host=document.getElementById('frontDeskClientContext');if(host)host.innerHTML='<p role="alert">'+esc(error.message)+'</p>';});}
 async function renderFrontDeskClientContext(){
     const host=document.getElementById('frontDeskClientContext');if(!host)return;
     const client=frontDeskClients.find(c=>c.id===frontDeskSelectedClientId);if(!client){host.innerHTML='<p class="muted">Select a client.</p>';return;}
@@ -291,3 +276,4 @@ async function messageFrontDeskJob(jobId, mode) {
         }catch(error){form.querySelector('[role=alert]').textContent=error.message;}
     };
 }
+

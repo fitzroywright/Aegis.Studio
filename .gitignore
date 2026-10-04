@@ -19,3 +19,7 @@ Thumbs.db
 
 # Studio runtime media/version store
 /Aegis.Studio.Web/VersionStore/
+
+
+# UI test dependencies
+node_modules/

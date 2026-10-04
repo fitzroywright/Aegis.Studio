@@ -1,30 +1,7 @@
 let workspaceAccessCache = [];
 let studioRolesCache = [];
 
-async function showWorkspaces() {
-    activateNavigation('workspaces');
-    conversationView.classList.add('hidden');
-    genericView.classList.remove('hidden');
-
-    try {
-        const me = await json('/api/auth/me');
-        const isAdministrator = me?.user?.isAdministrator === true;
-        workspaceAccessCache = await json('/api/workspace-access');
-        const manageable = workspaceAccessCache.filter(item => isAdministrator || item.permissions.editWorkspace || item.permissions.manageMembers || item.permissions.adminWorkspace);
-        if (isAdministrator) studioRolesCache = await json('/api/security/roles');
-
-        genericView.innerHTML = `
-            <div class="job-detail-header"><div><h1>Workspaces</h1><p>Workspace access is membership based. Permissions control what each member can see and do.</p></div></div>
-            <section class="job-section"><h2>Your workspaces</h2>${manageable.length ? manageable.map(item => renderWorkspaceAdminRow(item.workspace, item.permissions, isAdministrator)).join('') : '<p class="muted">You do not administer any workspaces.</p>'}</section>
-            ${isAdministrator ? `<section class="job-section"><h2>Create workspace</h2><p><button class="action" onclick="seedStudioDemoData(this)">Load demo data</button></p><p class="muted">Routing uses the exact email address or route key. Every operational workspace requires a Workspace Manager.</p><div class="pos-entry"><label>Name<input id="workspaceName"></label><label>Email address<input id="workspaceEmail" type="email"></label><label>Route key<input id="workspaceRouteKey"></label><label>Manager user name<input id="workspaceManagerUser" placeholder="domain user name"></label><label>Manager display name<input id="workspaceManagerDisplay"></label><button class="primary" onclick="createWorkspace()">Create workspace</button></div></section>` : ''}
-            <section id="workspaceMemberPanel" class="job-section hidden"></section>
-            <section id="workspaceImportPanel" class="job-section hidden"></section>
-            ${isAdministrator ? renderSecurityRolesSection() + renderWorkflowSection() : ''}`;
-        await hydrateWorkspaceManagers(manageable);if (isAdministrator) await refreshWorkflowList();
-    } catch (error) {
-        genericView.innerHTML = `<h1>Workspaces</h1><div class="empty-state" style="text-align:left"><h2>Unable to load workspace administration</h2><p>${esc(error.message || error)}</p></div>`;
-    }
-}
+async function showWorkspaces(){return window.studioNavigate('admin');}
 
 function renderWorkspaceAdminRow(workspace, permissions, isAdministrator) {
     const canEdit = isAdministrator || permissions.editWorkspace || permissions.adminWorkspace;
@@ -198,3 +175,4 @@ async function seedStudioDemoData(button) {
         button.disabled = false;
     }
 }
+

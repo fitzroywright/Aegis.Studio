@@ -22,7 +22,7 @@
 
         const [auth,jobs,tasks,schedule,notifications]=await Promise.all([
             json('/api/auth/me').catch(()=>({})),
-            json('/api/jobs').catch(()=>[]),
+            json('/api/jobs'),
             json('/api/operations/activities').catch(()=>[]),
             json('/api/schedule/entries?from='+encodeURIComponent(scheduleFrom)+'&to='+encodeURIComponent(scheduleTo)).catch(()=>[]),
             json('/api/notifications?count=80').catch(()=>[])
@@ -34,7 +34,7 @@
         const isManager=me.isAdministrator===true||auth.isAdministrator===true||roles.some(r=>/administrator|manager|owner|finance/.test(r));
         const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status) && (!user || String(t.assignedTo||'').toLowerCase()===user));
         const todaySchedule=schedule
-            .filter(s=>{const d=new Date(s.startsAtUtc||s.start||s.startsAt);return d>=startOfDay&&d<endOfDay;})
+            .filter(s=>{const d=new Date(s.startsAtUtc||s.start||s.startsAt);return s.status!=='Cancelled'&&d>=startOfDay&&d<endOfDay;})
             .sort((a,b)=>new Date(a.startsAtUtc||a.start||a.startsAt)-new Date(b.startsAtUtc||b.start||b.startsAt));
 
         const recentJobs=[...jobs]
@@ -42,7 +42,7 @@
             .slice(0,6);
 
         const visualJobIds=[...new Set([
-            ...recentJobs.map(j=>j.id),
+            ...jobs.map(j=>j.id),
             ...todaySchedule.map(s=>s.jobId).filter(Boolean)
         ])];
 
@@ -53,7 +53,7 @@
         }));
 
         const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assets:[]}}));
-        const totalPhotos=mediaSnapshots.reduce((sum,x)=>sum+(x.media.assets?.length||0),0);
+        const totalPhotos=[...mediaByJob.values()].reduce((sum,x)=>sum+(x.assets?.length||0),0);
         const messageNotifications=notifications.filter(n=>/message|conversation|reply/i.test(String(n.eventType||n.title||n.type||'')));
         const activityNotifications=notifications.slice(0,8);
 
@@ -79,7 +79,7 @@
             </button>`;
         }).join('');
 
-        const sessionRows=todaySchedule.slice(0,5).map(entry=>{
+        const sessionRows=todaySchedule.map(entry=>{
             const job=scheduleJob(entry);
             const image=entry.jobId?imageForJob(entry.jobId):'';
             return `<button class="mw-session-row" data-open-job="${entry.jobId||job.id||''}">
@@ -91,7 +91,7 @@
             </button>`;
         }).join('')||'<div class="mw-empty">No sessions scheduled today.</div>';
 
-        const taskRows=myTasks.slice(0,5).map(task=>`<button class="mw-task-row" data-open-job="${task.jobId}">
+        const taskRows=myTasks.slice(0,5).map(task=>`<button class="mw-task-row" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
             <span class="mw-check"></span>
             <strong>${esc(task.title)}</strong>
             <span>${esc(task.activityType||'Photography')}</span>
@@ -100,25 +100,25 @@
             <span class="mw-kebab">⋮</span>
         </button>`).join('')||'<div class="mw-empty">No open tasks assigned to you.</div>';
 
-        const scheduleRows=todaySchedule.slice(0,6).map((entry,index)=>{
+        const scheduleRows=todaySchedule.map((entry,index)=>{
             const job=scheduleJob(entry);
             return `<button class="mw-schedule-row" data-open-job="${entry.jobId||job.id||''}">
                 <span class="mw-timeline-dot ${index===0?'now':''}"></span>
                 <span class="mw-schedule-time">${formatTime(entry.startsAtUtc||entry.start||entry.startsAt)}</span>
                 <span class="mw-schedule-copy"><strong>${esc(job.title||entry.title||'Session')}</strong><small>${esc(entry.location||'Location not set')}</small></span>
-                <span class="mw-when">${index===0?'Now':'Upcoming'}</span>
+                <span class="mw-when">${new Date(entry.endsAtUtc)<now?'Finished':new Date(entry.startsAtUtc)<=now?'Now':'Upcoming'}</span>
             </button>`;
         }).join('')||'<div class="mw-empty">No schedule items today.</div>';
 
-        const messageRows=messageNotifications.slice(0,3).map(n=>`<button class="mw-message-row">
-            <span class="mw-message-avatar">${esc(String(n.title||n.eventType||'M').slice(0,1))}</span>
-            <span class="mw-message-copy"><strong>${esc(n.title||'Studio message')}</strong><small>${esc(n.body||n.message||'New activity in Studio')}</small></span>
+        const messageRows=messageNotifications.slice(0,3).map(n=>`<button class="mw-message-row" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
+            <span class="mw-message-avatar">${esc(String(n.subject||n.title||n.eventType||'M').slice(0,1))}</span>
+            <span class="mw-message-copy"><strong>${esc(n.subject||n.title||'Studio message')}</strong><small>${esc(n.body||n.message||'New activity in Studio')}</small></span>
             <span class="mw-message-time">${n.createdAtUtc?formatTime(n.createdAtUtc):''}</span>
         </button>`).join('')||'<div class="mw-empty">No new messages.</div>';
 
         const activityRows=activityNotifications.slice(0,4).map(n=>`<div class="mw-activity-row">
             <span class="mw-activity-icon">✓</span>
-            <span><strong>${esc(n.title||n.eventType||'Studio activity')}</strong><small>${esc(n.body||n.message||'')}</small></span>
+            <span><strong>${esc(n.subject||n.title||n.eventType||'Studio activity')}</strong><small>${esc(n.body||n.message||'')}</small></span>
             <time>${n.createdAtUtc?formatTime(n.createdAtUtc):''}</time>
         </div>`).join('')||'<div class="mw-empty">No recent activity.</div>';
 
@@ -151,8 +151,8 @@
                         <div class="mw-metrics">
                             <article class="mw-metric"><span class="mw-metric-icon blue">📷</span><div><strong>${todaySchedule.length}</strong><b>Today's Sessions</b><small>${todaySchedule.length} scheduled</small></div></article>
                             <article class="mw-metric"><span class="mw-metric-icon green">✓</span><div><strong>${myTasks.length}</strong><b>Pending Tasks</b><small>${myTasks.filter(t=>String(t.priority).toLowerCase()==='high').length} high priority</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon purple">▧</span><div><strong>${totalPhotos}</strong><b>New Photos</b><small>Ready for review</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon orange">●</span><div><strong>${messageNotifications.length}</strong><b>Client Messages</b><small>${messageNotifications.length?'Needs attention':'All caught up'}</small></div></article>
+                            <article class="mw-metric"><span class="mw-metric-icon purple">▧</span><div><strong>${totalPhotos}</strong><b>Photos Catalogued</b><small>Across accessible jobs</small></div></article>
+                            <article class="mw-metric"><span class="mw-metric-icon orange">●</span><div><strong>${messageNotifications.filter(n=>!n.isRead).length}</strong><b>Unread Messages</b><small>${messageNotifications.length} recent</small></div></article>
                         </div>
 
                         <div class="mw-two-col">
@@ -169,8 +169,8 @@
                         <div class="mw-two-col lower">
                             <section class="mw-card">
                                 <header><h2>My Tasks</h2><button data-nav="workspaces">Open Jobs →</button></header>
-                                <div class="mw-task-tabs"><button class="active">All (${myTasks.length})</button><button>Editing</button><button>Client</button><button>Production</button></div>
-                                <div>${taskRows}</div>
+                                <div class="mw-task-tabs"><button class="active" data-mw-filter="all">All (${myTasks.length})</button><button data-mw-filter="edit">Editing</button><button data-mw-filter="proof">Client</button><button data-mw-filter="print">Output</button></div>
+                                <div>${taskRows}</div><footer class="mw-quick-links">${quickLinks.map(link=>`<button class="text-button" data-nav="${link[0]}">${link[1]}</button>`).join('')}</footer>
                             </section>
                             <section class="mw-card">
                                 <header><h2>Pipeline Overview</h2><button data-nav="pipeline">View Pipeline →</button></header>
@@ -181,7 +181,7 @@
                                     <div class="green"><strong>${pipelineCounts.deliver}</strong><span>Deliver</span></div>
                                 </div>
                                 <h3>Active Jobs (${jobs.length})</h3>
-                                <div class="mw-active-jobs">${jobs.slice(0,5).map(job=>`<button data-open-job="${job.id}"><span>${esc(job.title)}</span><i><em style="width:${20+Math.min(75,Math.abs(String(job.title||'').length*4))}%"></em></i><b>${esc(job.status||'Active')}</b></button>`).join('')}</div>
+                                <div class="mw-active-jobs">${jobs.slice(0,5).map(job=>`<button data-open-job="${job.id}"><span>${esc(job.title)}</span><i><em style="width:${tasks.filter(t=>t.jobId===job.id).length?Math.round(tasks.filter(t=>t.jobId===job.id&&t.status==='Completed').length/tasks.filter(t=>t.jobId===job.id).length*100):0}%"></em></i><b>${esc(job.status||'Active')}</b></button>`).join('')}</div>
                             </section>
                         </div>
                     </div>
@@ -196,19 +196,6 @@
                             <div>${messageRows}</div>
                             <button class="mw-link-button" data-nav="workspaces">Open workspace jobs →</button>
                         </section>
-                        ${isManager?`<section class="mw-card">
-                            <header><h2>Operations Attention</h2><button data-nav="management">Management →</button></header>
-                            <div class="mw-pipeline-stats">
-                                <div class="orange"><strong>${overdueTasks}</strong><span>Overdue</span></div>
-                                <div class="purple"><strong>${blockedTasks}</strong><span>Blocked</span></div>
-                                <div class="blue"><strong>${attentionJobs}</strong><span>Jobs</span></div>
-                                <div class="green"><strong>${messageNotifications.length}</strong><span>Messages</span></div>
-                            </div>
-                        </section>`:''}
-                        <section class="mw-card">
-                            <header><h2>Quick Links</h2></header>
-                            <div class="mw-active-jobs">${quickLinks.map(link=>`<button data-nav="${link[0]}"><span>${link[1]}</span><b>${link[2]}</b></button>`).join('')}</div>
-                        </section>
                         <section class="mw-card">
                             <header><h2>Studio Activity</h2><button data-nav="${isManager?'management':'workspaces'}">View All →</button></header>
                             <div>${activityRows}</div>
@@ -217,8 +204,18 @@
                 </div>
             </section>`;
 
+        genericView.querySelectorAll('[data-mw-filter]').forEach(button=>button.onclick=()=>{
+            const filter=button.dataset.mwFilter;
+            genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b===button));
+            genericView.querySelectorAll('[data-task-type]').forEach(row=>row.hidden=filter!=='all'&&!row.dataset.taskType.toLowerCase().includes(filter));
+        });
+        genericView.querySelectorAll('[data-notification]').forEach(button=>button.onclick=async()=>{
+            await json('/api/notifications/'+button.dataset.notification+'/read',{method:'POST'});
+            if(button.dataset.messageJob)await openWorkspaceJob(button.dataset.messageJob);
+            else document.getElementById('notificationButton').click();
+        });
         genericView.querySelectorAll('[data-open-job]').forEach(button=>button.addEventListener('click',()=>{
-            if(button.dataset.openJob)openWorkspaceJob(button.dataset.openJob).catch(()=>{});
+            if(button.dataset.openJob)openWorkspaceJob(button.dataset.openJob).catch(error=>alert(error.message));
         }));
         genericView.querySelectorAll('[data-nav]').forEach(button=>button.addEventListener('click',()=>window.studioNavigate(button.dataset.nav)));
     }
@@ -229,8 +226,8 @@
         genericView.innerHTML='<div class="mywork-loading">Loading workspaces…</div>';
 
         const [workspaces,jobs]=await Promise.all([
-            json('/api/workspaces').catch(()=>[]),
-            json('/api/jobs').catch(()=>[])
+            json('/api/workspaces'),
+            json('/api/jobs')
         ]);
 
         const workspaceData=await Promise.all(workspaces.map(async workspace=>{
@@ -328,8 +325,8 @@
                             </div>
                             <div class="workspace-reference-tools">
                                 <div class="workspace-view-toggle" aria-label="Workspace view">
-                                    <button type="button" title="Grid view">▦ Grid</button>
-                                    <button type="button" class="active" title="List view">☷ List</button>
+                                    <button type="button" data-workspace-display="grid" title="Grid view">▦ Grid</button>
+                                    <button type="button" data-workspace-display="list" class="active" title="List view">☷ List</button>
                                 </div>
                                 <select data-workspace-sort aria-label="Sort workspaces">
                                     <option value="name">Name (A–Z)</option>
@@ -343,7 +340,7 @@
 
                     <aside class="workspace-reference-side">
                         <section class="workspace-side-card">
-                            <header><h2>📣 Announcements</h2><span>View All →</span></header>
+                            <header><h2>📣 Announcements</h2></header>
                             <div class="workspace-announcement-list">
                                 ${announcements.length?announcements.map(a=>`<article><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p><small>${esc(a.workspaceName)} · ${a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString():''}</small></article>`).join(''):'<p class="mw-empty">No workspace announcements.</p>'}
                             </div>
@@ -366,6 +363,7 @@
                 </div>
             </section>`;
 
+        genericView.querySelectorAll('[data-workspace-display]').forEach(b=>b.onclick=()=>{genericView.querySelector('[data-workspace-list]').classList.toggle('grid-view',b.dataset.workspaceDisplay==='grid');genericView.querySelectorAll('[data-workspace-display]').forEach(x=>x.classList.toggle('active',x===b));});
         const allRows=()=>[...genericView.querySelectorAll('[data-workspace-row]')];
         let filter='all';
         let term='';
@@ -522,6 +520,8 @@
 
         await hydrateWorkspaceManagers(manageable);
         await refreshWorkflowList();
+        await renderGlobalRoleAdministration();
+        await renderAnnouncementAdministration();
 
         const panel=document.getElementById('studioDemoLoader');
         panel.querySelector('[data-load-demo]').onclick=async()=>{

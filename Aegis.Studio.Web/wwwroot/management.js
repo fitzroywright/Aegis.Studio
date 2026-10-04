@@ -1,74 +1,82 @@
-if (!document.querySelector('link[href="/management.css"]')) {
-    const managementStyles = document.createElement('link');
-    managementStyles.rel = 'stylesheet';
-    managementStyles.href = '/management.css?v=20260929-fullops2';
-    document.head.appendChild(managementStyles);
+/* Finance and Management use the same jobs, transactions, sessions and tasks. */
+let studioPeriodDays=90;
+const studioColors=['#1677ff','#26c58b','#9454ff','#ff9400','#f34865','#05a7b9'];
+function studioFinancials(job){
+    const events=job.financialEvents||[];
+    const charges=events.filter(e=>/^(charge|adjustment|discount)$/i.test(e.kind)).reduce((n,e)=>n+Number(e.amount),0);
+    const received=events.filter(e=>/^(payment|deposit|refund|reversal)$/i.test(e.kind)).reduce((n,e)=>n+Number(e.amount),0);
+    return {charges,received,balance:Math.max(0,charges-received)};
 }
-
-showManagement = async function() {
-    activateNavigation('management');
-    conversationView.classList.add('hidden');
-    genericView.classList.remove('hidden');
-    genericView.innerHTML = '<p>Loading Dashboard…</p>';
-    try {
-        const now=new Date(), scheduleFrom=new Date(now.getTime()-14*86400000), scheduleTo=new Date(now.getTime()+90*86400000), capacityTo=new Date(now.getTime()+7*86400000);
-        const [jobs, scheduleEntries, activities, workflowStages, capacity, escalations, workflows] = await Promise.all([
-            json('/api/jobs'),
-            json('/api/schedule/entries?from=' + encodeURIComponent(scheduleFrom.toISOString()) + '&to=' + encodeURIComponent(scheduleTo.toISOString())),
-            json('/api/operations/activities'),
-            json('/api/workflow/stages'),
-            json('/api/schedule/capacity?from=' + encodeURIComponent(now.toISOString()) + '&to=' + encodeURIComponent(capacityTo.toISOString())).catch(()=>[]),
-            json('/api/escalations/open').catch(()=>[]),
-            json('/api/workflow-operations/summary').catch(()=>null)
-        ]);
-        const active=jobs.filter(job=>String(job.status).toLowerCase()!=='completed');
-        const overdue=activities.filter(item=>!['Completed','Cancelled'].includes(item.status)&&item.dueAtUtc&&new Date(item.dueAtUtc)<now);
-        const upcoming=scheduleEntries.filter(item=>new Date(item.startsAtUtc)>=now&&new Date(item.startsAtUtc)<=capacityTo);
-        const unassigned=active.filter(job=>!job.assignedTo);
-        const scheduledJobs=new Set(scheduleEntries.filter(x=>x.jobId).map(x=>x.jobId));
-        const missingDates=active.filter(job=>!job.eventDate&&!scheduledJobs.has(job.id));
-        const conflictCount=managementScheduleConflictCount(scheduleEntries);
-        const stuckJobs=new Set(overdue.map(x=>x.jobId).filter(Boolean));
-        genericView.innerHTML = `
-            <div class="job-detail-header"><div><h1>Management Dashboard</h1><p>Work, status, responsibility and exceptions from Studio's live operational data.</p></div></div>
-            <div class="management-summary-strip">
-                <span><b>${active.length}</b> active jobs</span>
-                <span><b>${overdue.length}</b> overdue tasks</span>
-                <span><b>${upcoming.length}</b> shoots / schedule items next 7 days</span>
-                <span><b>${unassigned.length}</b> unassigned jobs</span>
-                <span><b>${missingDates.length}</b> missing dates</span>
-                <span class="${conflictCount?'risk':''}"><b>${conflictCount}</b> schedule conflicts</span>
-                <span class="${stuckJobs.size?'risk':''}"><b>${stuckJobs.size}</b> jobs with overdue work</span>
-            </div>
-            <section class="job-section"><h2>Pipeline overview</h2>${renderManagementPipelineFlow(jobs, activities, workflowStages, scheduleEntries)}</section>
-            <section class="job-section"><h2>Photographer workload</h2>${renderPhotographerWorkload(jobs, scheduleEntries, activities, capacity)}</section>
-            <section class="job-section management-gantt-section"><div class="management-section-heading"><div><h2>Job Gantt</h2><p class="muted">Read-only view of real job, schedule and production dates. Open a job from its row.</p></div></div>${renderManagementGantt(jobs, scheduleEntries, activities)}</section>
-            ${escalations.length?'<section class="job-section"><h2>Escalations</h2>'+renderEscalations(escalations)+'</section>':''}
-            ${workflows?'<section class="job-section"><h2>Workflow engine</h2><div class="management-summary-strip"><span><b>'+workflows.running+'</b> running</span><span><b>'+workflows.waiting+'</b> waiting</span><span><b>'+workflows.failed+'</b> failed</span><span><b>'+workflows.completed+'</b> completed</span></div></section>':''}`;
-    } catch (error) {
-        genericView.innerHTML = `<h1>Dashboard</h1><p role="alert">${esc(error.message || error)}</p><button class="action" onclick="showManagement()">Retry</button>`;
-    }
-};
-
-showAccounts = async function() {
-    activateNavigation('finance');
-    conversationView.classList.add('hidden');
-    genericView.classList.remove('hidden');
-    try {
-        const [invoices, jobs] = await Promise.all([json('/api/accounts/invoices'), json('/api/jobs')]);
-        const outstanding = invoices.filter(x => ['Issued','Overdue'].includes(x.status)).reduce((sum,x)=>sum+x.totalAmount,0);
-        const paid = invoices.filter(x => x.status === 'Paid').reduce((sum,x)=>sum+x.totalAmount,0);
-        genericView.innerHTML = `
-            <div class="job-detail-header"><div><h1>Finance</h1><p>Operational financial control for Studio. Front Desk can take payments; Finance oversees invoices, balances and accounting handoff.</p></div><div class="job-actions"><button class="action" onclick="showManagement()">Management Dashboard</button><button class="primary" onclick="createInvoiceFromAccounts()">New invoice</button></div></div>
-            <div class="cards"><div class="metric">Outstanding<strong>${money(outstanding)}</strong></div><div class="metric">Paid invoices<strong>${money(paid)}</strong></div><div class="metric">Invoices<strong>${invoices.length}</strong></div></div>
-            <section class="job-section"><h2>Invoices</h2>${invoices.length ? invoices.map(invoice => `
-                <div class="financial-row"><div><b>${esc(invoice.invoiceNumber)}</b><small>${esc(invoice.clientName)} · ${esc(invoice.status)} · due ${new Date(invoice.dueAtUtc).toLocaleDateString()}</small></div><div class="job-actions"><strong>${money(invoice.totalAmount)}</strong>${invoice.status==='Draft'?`<button class="action" onclick="setInvoiceStatus('${invoice.id}','Issued')">Issue</button>`:''}${invoice.status==='Issued'||invoice.status==='Overdue'?`<button class="action" onclick="setInvoiceStatus('${invoice.id}','Paid')">Mark paid</button>`:''}<button class="action" onclick="issueClientPortal('${invoice.jobId}')">Client portal</button></div></div>`).join('') : '<p class="muted">No invoices yet.</p>'}</section>
-            <section class="job-section"><h2>Jobs available for billing</h2>${renderJobRows(jobs)}</section>`;
-        bindJobRows();
-    } catch (error) {
-        genericView.innerHTML = `<h1>Finance</h1><p class="muted">You do not have billing access.</p>`;
-    }
-};
+function studioMetric(value,label,color='blue',detail=''){
+    return `<article class="op-metric"><span class="op-icon ${color}">${color==='green'?'$':color==='purple'?'▧':color==='orange'?'▣':'✓'}</span><span><b>${esc(value)}</b><span>${esc(label)}</span>${detail?`<small>${esc(detail)}</small>`:''}</span></article>`;
+}
+function studioCard(title,body,action=''){
+    return `<section class="op-card"><header><h2>${esc(title)}</h2>${action}</header><div class="op-body">${body}</div></section>`;
+}
+function studioPeriod(){return `<select data-period aria-label="Reporting period"><option value="30" ${studioPeriodDays===30?'selected':''}>Last 30 days</option><option value="90" ${studioPeriodDays===90?'selected':''}>Last 90 days</option><option value="365" ${studioPeriodDays===365?'selected':''}>Last year</option></select>`;}
+async function studioReadOperations(){
+    const now=new Date(),start=new Date(now.getTime()-studioPeriodDays*86400000),end=new Date(now.getTime()+30*86400000);
+    const [jobs,tasks,sessions,photographers,invoices]=await Promise.all([
+        json('/api/jobs'),json('/api/operations/activities'),json('/api/schedule/entries?from='+encodeURIComponent(start.toISOString())+'&to='+encodeURIComponent(end.toISOString())),json('/api/photographers'),json('/api/accounts/invoices')
+    ]);
+    const transactions=jobs.flatMap(job=>(job.financialEvents||[]).map(e=>({...e,jobId:job.id,client:job.clientName,title:job.title}))).filter(e=>new Date(e.createdAt||e.createdAtUtc)>=start&&new Date(e.createdAt||e.createdAtUtc)<=now);
+    const receipts=transactions.filter(e=>/^(payment|deposit|refund|reversal)$/i.test(e.kind));
+    const balances=jobs.map(job=>({job,...studioFinancials(job)}));
+    return {jobs,tasks,sessions,photographers,invoices,transactions,receipts,balances,now,start};
+}
+function studioRevenueChart(receipts){
+    const days=Array.from({length:12},(_,i)=>new Date(Date.now()-(12-i)*studioPeriodDays/12*86400000));
+    const totals=days.map((day,i)=>receipts.filter(e=>new Date(e.createdAt||e.createdAtUtc)>=day&&(i===11||new Date(e.createdAt||e.createdAtUtc)<days[i+1])).reduce((n,e)=>n+Number(e.amount),0));
+    const max=Math.max(1,...totals),min=Math.min(0,...totals),scale=125/(max-min),zero=150+min*scale;
+    const y=n=>zero-n*scale,points=totals.map((n,i)=>`${42+i*32},${y(n)}`).join(' ');
+    return `<svg class="op-chart" viewBox="0 0 420 185" role="img" aria-label="Net receipts over the selected period"><path d="M40 15V150M40 ${zero}H407" fill="none" stroke="#dce2ea"/><text x="2" y="20">${esc(money(max))}</text><text x="16" y="${zero}">0</text>${totals.map((n,i)=>`<rect x="${42+i*32}" y="${Math.min(zero,y(n))}" width="20" height="${Math.abs(n*scale)}" fill="${n<0?'#f34865':'#1677ff'}"><title>${money(n)}</title></rect>`).join('')}<polyline points="${points}" fill="none" stroke="#9454ff" stroke-width="2"/><text x="42" y="173">${days[0].toLocaleDateString()}</text><text x="340" y="173">Today</text></svg>`;
+}
+function studioComposition(values,label){
+    const total=values.reduce((n,x)=>n+x.value,0);let offset=0;
+    const gradient=values.map((x,i)=>{const first=offset;offset+=total?x.value/total*100:0;return `${studioColors[i%studioColors.length]} ${first}% ${offset}%`;}).join(',');
+    return `<div class="op-composition"><div class="op-donut" style="background:${total?'conic-gradient('+gradient+')':'#edf0f4'}"><span><b>${esc(total.toLocaleString())}</b><small>${esc(label)}</small></span></div><div class="op-legend">${values.map((x,i)=>`<span><i style="background:${studioColors[i%studioColors.length]}"></i>${esc(x.label)} <b>${total?Math.round(x.value/total*100):0}%</b></span>`).join('')}</div></div>`;
+}
+function studioTransactionsTable(transactions){
+    return `<table class="studio-table"><thead><tr><th>Date</th><th>Client</th><th>Description</th><th>Amount</th></tr></thead><tbody>${transactions.slice().sort((a,b)=>new Date(b.createdAt||b.createdAtUtc)-new Date(a.createdAt||a.createdAtUtc)).map(e=>`<tr><td>${esc(new Date(e.createdAt||e.createdAtUtc).toLocaleDateString())}</td><td><button data-open-job="${e.jobId}">${esc(e.client)}</button></td><td>${esc(e.kind)}<small>${esc(e.note||'')}</small></td><td>${esc(money(e.amount))}</td></tr>`).join('')}</tbody></table>`;
+}
+function studioExportTransactions(transactions){
+    const quote=value=>'"'+String(value??'').replace(/"/g,'""')+'"';
+    const rows=[['Date','Client','Job','Type','Amount','Note'],...transactions.map(e=>[e.createdAt||e.createdAtUtc,e.client,e.title,e.kind,e.amount,e.note])];
+    const url=URL.createObjectURL(new Blob([rows.map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
+    const a=document.createElement('a');a.href=url;a.download='studio-transactions.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function studioBindOperations(data,refresh){
+    genericView.querySelectorAll('[data-open-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.openJob).catch(e=>alert(e.message)));
+    genericView.querySelector('[data-period]').onchange=e=>{studioPeriodDays=Number(e.target.value);refresh().catch(e=>alert(e.message));};
+    genericView.querySelector('[data-export]').onclick=()=>studioExportTransactions(data.transactions);
+}
+async function showAccounts(){
+    activateNavigation('finance');conversationView.classList.add('hidden');genericView.classList.remove('hidden');
+    const data=await studioReadOperations();
+    const net=data.receipts.reduce((n,e)=>n+Number(e.amount),0),charge=data.transactions.filter(e=>e.kind==='Charge').reduce((n,e)=>n+Number(e.amount),0),outstanding=data.balances.reduce((n,x)=>n+x.balance,0);
+    const methods=[...new Set(data.receipts.map(e=>e.kind))].map(kind=>({label:kind,value:data.receipts.filter(e=>e.kind===kind).length}));
+    genericView.innerHTML=`<header class="studio-page-heading"><div><h1>Finance</h1><p>Receipts, balances and the operational accounting handoff.</p></div><div class="job-actions">${studioPeriod()}<button data-export>Export</button><button class="primary" onclick="createInvoiceFromAccounts()">New Invoice</button><button onclick="studioNavigate('management')">Management</button></div></header>
+    <div class="op-metrics">${studioMetric(money(net),'Net receipts','green')}${studioMetric(money(charge),'Charges','blue')}${studioMetric(money(outstanding),'Outstanding balance','purple','All jobs')}${studioMetric(data.invoices.filter(i=>i.status==='Overdue').length,'Overdue invoices','orange')}</div>
+    <div class="op-grid finance-grid">${studioCard('Revenue Trend',studioRevenueChart(data.receipts))}${studioCard('Transaction Types',studioComposition(methods,'transactions'))}${studioCard('Recent Transactions',studioTransactionsTable(data.transactions))}${studioCard('Invoices',data.invoices.map(i=>`<article class="job-row"><span><button class="link-button" data-open-job="${i.jobId}">${esc(i.invoiceNumber)}</button><small>${esc(i.clientName)} · ${esc(i.status)} · ${money(i.totalAmount)}</small></span><span>${i.status==='Draft'?`<button onclick="setInvoiceStatus('${i.id}','Issued')">Issue</button>`:''}<button onclick="issueClientPortal('${i.jobId}')">Client Portal</button></span></article>`).join('')||'<p>No invoices.</p>')}</div>`;
+    studioBindOperations(data,showAccounts);
+}
+async function showManagement(){
+    activateNavigation('management');conversationView.classList.add('hidden');genericView.classList.remove('hidden');
+    const data=await studioReadOperations();const {jobs,tasks,sessions,photographers,now}=data;
+    const snapshots=await Promise.all(jobs.map(j=>json('/api/jobs/'+j.id+'/media')));
+    const photos=snapshots.reduce((n,s)=>n+(s.assets||[]).length,0),overdue=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status)&&t.dueAtUtc&&new Date(t.dueAtUtc)<now),blocked=tasks.filter(t=>t.status==='Blocked');
+    const today=sessions.filter(s=>new Date(s.startsAtUtc).toLocaleDateString()===now.toLocaleDateString()&&s.status!=='Cancelled');
+    const net=data.receipts.reduce((n,e)=>n+Number(e.amount),0);
+    const pipeline=pipelineStages.map(([label,statuses])=>({label,value:jobs.filter(j=>statuses.includes(j.status)).length})).filter(x=>x.value);
+    const clientTotals=[...new Set(jobs.map(j=>j.clientId||j.clientName))].map(id=>{const related=jobs.filter(j=>(j.clientId||j.clientName)===id);return {job:related[0],amount:data.receipts.filter(e=>related.some(j=>j.id===e.jobId)).reduce((n,e)=>n+Number(e.amount),0)};}).sort((a,b)=>b.amount-a.amount);
+    const upcoming=sessions.filter(s=>new Date(s.startsAtUtc)>=now&&s.status!=='Cancelled').sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
+    genericView.innerHTML=`<header class="studio-page-heading"><div><h1>Management Dashboard</h1><p>Studio performance, operations and work requiring attention.</p></div><div class="job-actions">${studioPeriod()}<button data-export>Export</button></div></header>
+    <div class="op-metrics management-metrics">${studioMetric(money(net),'Net receipts','green')}${studioMetric(sessions.filter(s=>new Date(s.startsAtUtc)<=now&&s.status!=='Cancelled').length,'Sessions','blue')}${studioMetric(clientTotals.length,'Unique clients','purple')}${studioMetric(photos,'Photos catalogued','orange')}${studioMetric(overdue.length,'Overdue tasks','red')}${studioMetric(blocked.length,'Blocked work','teal')}</div>
+    <div class="op-grid management-grid">${studioCard('Revenue Overview',studioRevenueChart(data.receipts))}${studioCard('Jobs by Stage',studioComposition(pipeline,'jobs'))}${studioCard('Top Clients by Receipts',clientTotals.slice(0,6).map((x,i)=>`<button class="op-link-row" data-open-job="${x.job.id}"><b>${i+1}</b><span>${esc(x.job.clientName)}</span><b>${money(x.amount)}</b></button>`).join(''))}${studioCard('Upcoming Sessions',upcoming.slice(0,8).map(s=>`<button class="op-link-row" data-open-job="${s.jobId}"><span><strong>${esc(s.title)}</strong><small>${esc(new Date(s.startsAtUtc).toLocaleString())} · ${esc(s.location||'')}</small></span><small>${esc(s.status)}</small></button>`).join(''))}
+    ${studioCard('Studio Activity',`${studioMetric(today.length,'Sessions today','blue')}${studioMetric(tasks.filter(t=>t.status==='Completed').length,'Completed tasks','green')}${studioMetric(jobs.filter(j=>j.status==='Completed').length,'Completed jobs','purple')}`)}${studioCard('Team Workload',photographers.map(p=>{const assigned=tasks.filter(t=>t.assignedTo===p.userName&&!['Completed','Cancelled'].includes(t.status));const shoots=sessions.filter(s=>(s.resourceIds||[]).includes(p.scheduleResourceId));return `<div class="op-link-row"><span><strong>${esc(p.displayName)}</strong><small>${assigned.length} open tasks · ${shoots.length} sessions</small></span><b>${assigned.length}</b></div>`;}).join(''))}${studioCard('Pipeline Health',pipeline.map(x=>`<button class="op-link-row" data-stage="${esc(x.label)}"><span>${esc(x.label)}</span><b>${x.value}</b></button>`).join(''))}${studioCard('Alerts & Actions',[...overdue,...blocked].filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i).slice(0,12).map(t=>`<button class="op-alert" data-open-job="${t.jobId}">${esc(t.title)}<small>${esc(t.blockedReason||'Overdue '+new Date(t.dueAtUtc).toLocaleDateString())}</small></button>`).join('')||'<p>No overdue or blocked work.</p>')}</div>`;
+    studioBindOperations(data,showManagement);
+    genericView.querySelectorAll('[data-stage]').forEach(b=>b.onclick=()=>{pipelineSelectedStage=b.dataset.stage;studioNavigate('pipeline');});
+}
 
 function renderManagementGantt(jobs, scheduleEntries, activities) {
     const activeJobs=(jobs||[]).filter(job=>job.status!=='Completed');
@@ -229,3 +237,4 @@ function showPhotographerWorkload(resourceId, displayName) {
     const dialog=studioDialog(displayName+' — scheduled work',`<div class="management-person-work">${work.map(entry=>{const job=context.jobs.find(j=>j.id===entry.jobId);return `<article class="front-desk-row"><div><strong>${esc(entry.title)}</strong><small>${esc(new Date(entry.startsAtUtc).toLocaleString())} – ${esc(new Date(entry.endsAtUtc).toLocaleString())} · ${esc(entry.location||'Location not set')}</small></div>${job?`<button type="button" class="action" data-management-job="${job.id}">Open job</button>`:''}</article>`;}).join('')||'<p class="muted">No upcoming scheduled work.</p>'}</div>`);
     dialog.querySelectorAll('[data-management-job]').forEach(button=>button.onclick=()=>{dialog.close();openWorkspaceJob(button.dataset.managementJob);});
 }
+

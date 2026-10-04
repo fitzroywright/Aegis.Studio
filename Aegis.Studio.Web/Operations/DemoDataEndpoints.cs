@@ -21,6 +21,9 @@ public static class DemoDataEndpoints
             command.Transaction = transaction;
             command.CommandText = "select pg_advisory_xact_lock(72709128)";
             command.ExecuteNonQuery();
+            using(var current=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v6-full-studio')",connection,transaction))
+                if((bool)current.ExecuteScalar()!)
+                    return Results.Ok(new { message="Full Studio demo is already loaded. Existing demo work and edits have been preserved." });
             // Re-run the deterministic base seed on every request so a stale marker cannot
             // hide deleted or partially-created DEMO records. Inserts are made idempotent;
             // updates remain updates. Real workspaces are never matched by these fixed DEMO ids.
@@ -42,7 +45,7 @@ public static class DemoDataEndpoints
             bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage);
             transaction.Commit();
             return Results.Ok(new { message = fullStudioExpanded
-                ? "Full Studio demo loaded: 24 interconnected jobs across 6 workspaces, including roughly 1,000 media assets across the flagship ID, graduation, wedding, school, corporate-headshot and commercial jobs, plus clients, bookings, schedules, photographers, availability, payments, production stages and history."
+                ? "Full Studio demo loaded: 27 interconnected jobs across 6 workspaces, including over 1,000 media assets across the flagship ID, graduation, wedding, school, corporate-headshot and commercial jobs, plus clients, bookings, schedules, photographers, availability, payments, production stages and history."
                 : presentationExpanded
                     ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see wedding media and linked workflow data."
                     : expanded
@@ -158,3 +161,4 @@ public static class DemoDataEndpoints
         """insert into studio_state(key,value,updated_at_utc) values('demo-data-v1',$1,now());"""
     ];
 }
+

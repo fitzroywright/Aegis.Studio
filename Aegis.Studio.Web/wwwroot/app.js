@@ -195,34 +195,7 @@ async function showJobs() {
     bindJobRows();
 }
 
-async function openJob(id) {
-    activateNavigation('jobs');
-    conversationView.classList.add('hidden');
-    genericView.classList.remove('hidden');
-    const job = await json('/api/jobs/' + id);
-    genericView.innerHTML = `
-        <div class="job-detail-header">
-            <div>
-                <button class="link-button" onclick="showJobs()">← Jobs</button>
-                <h1>${esc(job.title)}</h1>
-                <p>${esc(job.clientName)} · ${esc(job.status)}${job.assignedTo ? ' · Assigned to ' + esc(studioFirstName(job.assignedTo)) : ''}</p>
-            </div>
-            <button class="action" onclick="openConversation('${job.conversationId}')">Open conversation</button>
-        </div>
-        <div class="cards">
-            <div class="metric">Stage<strong>${esc(job.status)}</strong></div>
-            <div class="metric">Assigned to<strong class="metric-text">${esc(job.assignedTo ? studioFirstName(job.assignedTo) : 'Unassigned')}</strong></div>
-        </div>
-        <div class="job-actions">
-            <button class="primary" onclick="advanceJob('${job.id}','Scheduled')">Schedule</button>
-            <button class="action" onclick="advanceJob('${job.id}','Photography')">Photography</button>
-            <button class="action" onclick="advanceJob('${job.id}','Production')">Production</button>
-            <button class="action" onclick="advanceJob('${job.id}','Ready for Client')">Ready for Client</button>
-            <button class="action" onclick="advanceJob('${job.id}','Completed')">Complete</button>
-            <button class="action" onclick="assignJob('${job.id}')">Assign staff</button>
-        </div>
-        `;
-}
+async function openJob(id){return openWorkspaceJob(id);}
 
 async function advanceJob(id, status) {
     await updateJob(id, { status, assignedTo: null, eventDate: null });
@@ -269,65 +242,6 @@ async function recordMoney(id) {
     await openJob(id);
 }
 
-async function showProduction() {
-    activateNavigation('production');
-    conversationView.classList.add('hidden');
-    genericView.classList.remove('hidden');
-    const jobs = await json('/api/jobs');
-    const active = jobs.filter(job => job.status !== 'Completed');
-    genericView.innerHTML = `
-        <h1>Production</h1>
-        <p>The production team sees work, deadlines and ownership — not inbox folders.</p>
-        <div class="cards">
-            <div class="metric">Active jobs<strong>${active.length}</strong></div>
-            <div class="metric">In production<strong>${active.filter(job => job.status === 'Production').length}</strong></div>
-            <div class="metric">Unassigned<strong>${active.filter(job => !job.assignedTo).length}</strong></div>
-        </div>
-        <h2>Work queue</h2>
-        ${renderJobRows(active)}`;
-    bindJobRows();
-}
-
-async function showAccounts() {
-    activateNavigation('frontdesk');
-    conversationView.classList.add('hidden');
-    genericView.classList.remove('hidden');
-    const [summary, jobs] = await Promise.all([
-        json('/api/accounts/summary'),
-        json('/api/jobs')
-    ]);
-    genericView.innerHTML = `
-        <h1>Accounts</h1>
-        <p>Accounting sees financial events attached to the same jobs the rest of Bryan's is already working.</p>
-        <div class="cards">
-            <div class="metric">Recorded activity<strong>${money(summary.recordedAmount)}</strong></div>
-            <div class="metric">Jobs with activity<strong>${summary.jobsWithFinancialActivity}</strong></div>
-            <div class="metric">Total jobs<strong>${summary.totalJobs}</strong></div>
-        </div>
-        <h2>Jobs</h2>
-        ${renderJobRows(jobs)}`;
-    bindJobRows();
-}
-
-async function showManagement() {
-    activateNavigation('management');
-    conversationView.classList.add('hidden');
-    genericView.classList.remove('hidden');
-    const [jobs, conversations] = await Promise.all([
-        json('/api/jobs'),
-        json('/api/conversations')
-    ]);
-    const completed = jobs.filter(job => job.status === 'Completed').length;
-    genericView.innerHTML = `
-        <h1>Management</h1>
-        <p>One view across customer demand, committed work, production.</p>
-        <div class="cards">
-            <div class="metric">Open conversations<strong>${conversations.length}</strong></div>
-            <div class="metric">Jobs<strong>${jobs.length}</strong></div>
-            <div class="metric">Completed<strong>${completed}</strong></div>
-        </div>`;
-}
-
 function renderJobRows(jobs) {
     if (!jobs.length) {
         return '<div class="empty-state" style="text-align:left"><h2>No jobs yet</h2><p>Open a conversation and choose Create Job when the customer commits.</p></div>';
@@ -367,6 +281,8 @@ function activateView(view) {
         return;
     }
 
+    if(view==='frontdesk')return showFrontDesk();
+    if(view==='pos')return showPos();
     if (view === 'jobs') {
         showJobs();
     } else if (view === 'production') {
@@ -426,13 +342,4 @@ newRequestForm.onsubmit = async event => {
 document.querySelectorAll('.brand-button').forEach(button => {
     button.onclick = () => activateView(button.dataset.view);
 });
-
-// Wait until permission-aware script overrides have been installed.
-document.addEventListener('DOMContentLoaded', () => {
-    // The rebuilt Studio shell owns initial navigation. Populate shared workspace
-    // caches here, but do not run the legacy conversation startup over My Work.
-    loadWorkspaces().catch(error => {
-        conversationList.textContent = 'Unable to load workspaces: ' + (error.message || error);
-    });
-}, { once: true });
 
