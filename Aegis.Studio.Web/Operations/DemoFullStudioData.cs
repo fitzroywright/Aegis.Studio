@@ -124,6 +124,7 @@ internal static class DemoFullStudioData
         }
 
         SeedFrontDeskRequests(connection,transaction);
+        SeedInvoices(connection,transaction);
 
         Execute(connection,transaction,
             "insert into studio_state(key,value,updated_at_utc) values('demo-data-v5-full-studio',$1,now()) on conflict(key) do update set value=excluded.value,updated_at_utc=excluded.updated_at_utc",login);
@@ -244,6 +245,30 @@ internal static class DemoFullStudioData
         Execute(c,tx,"insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,'PhotographerAssigned','demo-seed',$3,now()-interval '5 days') on conflict(id) do nothing",Id(55,job.Number),jobId,$"Assigned to {job.Photographer}");
         if(job.DayOffset<=0)
             Execute(c,tx,"insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,'ShootUpdated','demo-seed',$3,now()-interval '1 day') on conflict(id) do nothing",Id(56,job.Number),jobId,$"Shoot status: {job.Status}");
+    }
+
+    private static void SeedInvoices(NpgsqlConnection c,NpgsqlTransaction tx)
+    {
+        var invoiceJobs=new[] {101,201,301,304,401,501,601,603};
+        string[] statuses=["Issued","Paid","Overdue","Paid","Draft","Issued","Overdue","Paid"];
+        for(int i=0;i<invoiceJobs.Length;i++)
+        {
+            var job=Jobs.Single(x=>x.Number==invoiceJobs[i]);
+            var client=Clients.Single(x=>x.Number==job.Client);
+            Guid invoice=Id(60,job.Number);
+            decimal subtotal=job.Price;
+            decimal tax=0m;
+            decimal total=subtotal+tax;
+            DateTimeOffset due=DateTimeOffset.UtcNow.Date.AddDays(i%3==0?-3:7+i);
+            string status=statuses[i];
+            Execute(c,tx,"insert into studio_account_invoices(id,invoice_number,job_id,client_name,client_email,currency,subtotal,tax_amount,total_amount,status,due_at_utc,issued_at_utc,paid_at_utc,created_by,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,'JMD',$6,$7,$8,$9,$10,$11,$12,'demo-seed',now()-interval '10 days',now()) on conflict(id) do update set client_name=excluded.client_name,client_email=excluded.client_email,subtotal=excluded.subtotal,tax_amount=excluded.tax_amount,total_amount=excluded.total_amount,status=excluded.status,due_at_utc=excluded.due_at_utc,issued_at_utc=excluded.issued_at_utc,paid_at_utc=excluded.paid_at_utc,updated_at_utc=now()",
+                invoice,$"DEMO-{DateTime.UtcNow:yyyy}-{job.Number}",Id(41,job.Number),client.Name,client.Email,subtotal,tax,total,status,due,
+                status=="Draft"?DBNull.Value:DateTimeOffset.UtcNow.AddDays(-9),
+                status=="Paid"?DateTimeOffset.UtcNow.AddDays(-2):DBNull.Value);
+            Execute(c,tx,"insert into studio_account_invoice_jobs(invoice_id,job_id) values($1,$2) on conflict do nothing",invoice,Id(41,job.Number));
+            Execute(c,tx,"insert into studio_account_invoice_lines(id,invoice_id,description,quantity,unit_price,line_total,sort_order) values($1,$2,$3,1,$4,$4,0) on conflict(id) do update set description=excluded.description,unit_price=excluded.unit_price,line_total=excluded.line_total",
+                Id(61,job.Number),invoice,$"{job.Type} package",subtotal);
+        }
     }
 
     private static void SeedFrontDeskRequests(NpgsqlConnection c,NpgsqlTransaction tx)
