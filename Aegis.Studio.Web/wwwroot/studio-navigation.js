@@ -381,19 +381,22 @@
             if(searchSide&&searchSide.value!==value)searchSide.value=value;
             refresh();
         };
-        search.oninput=e=>updateTerm(e.target.value);
-        searchSide.oninput=e=>updateTerm(e.target.value);
-        genericView.querySelector('[data-workspace-sort]').onchange=e=>{sort=e.target.value;refresh();};
-        genericView.querySelector('[data-workspace-status-side]').onchange=e=>{
+        if(search)search.oninput=e=>updateTerm(e.target.value);
+        if(searchSide)searchSide.oninput=e=>updateTerm(e.target.value);
+        const sortControl=genericView.querySelector('[data-workspace-sort]');
+        if(sortControl)sortControl.onchange=e=>{sort=e.target.value;refresh();};
+        const statusControl=genericView.querySelector('[data-workspace-status-side]');
+        if(statusControl)statusControl.onchange=e=>{
             filter=e.target.value;
             genericView.querySelectorAll('[data-workspace-filter]').forEach(x=>x.classList.toggle('active',x.dataset.workspaceFilter===filter));
             refresh();
         };
         genericView.querySelector('.workspace-clear-filters').onclick=()=>{
             filter='all';term='';sort='name';
-            search.value='';searchSide.value='';
-            genericView.querySelector('[data-workspace-sort]').value='name';
-            genericView.querySelector('[data-workspace-status-side]').value='all';
+            if(search)search.value='';
+            if(searchSide)searchSide.value='';
+            if(sortControl)sortControl.value='name';
+            if(statusControl)statusControl.value='all';
             genericView.querySelectorAll('[data-workspace-filter]').forEach(x=>x.classList.toggle('active',x.dataset.workspaceFilter==='all'));
             refresh();
         };
