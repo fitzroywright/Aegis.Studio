@@ -30,8 +30,13 @@ public static class DemoDataEndpoints
                 seedCommand.ExecuteNonQuery();
             }
             bool expanded = DemoDataExpansion.Seed(connection, transaction, login, configuration, environment);
+            bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
             transaction.Commit();
-            return Results.Ok(new { message = expanded ? "Demo data expanded: 24 gallery illustrations (30 versions), 12 upcoming appointments, 24 scheduled tasks, 16 subjects, 3 announcements and 3 room resources added to the DEMO workspaces. Open Jobs → Gallery or Tasks / Calendar; appointments are under Pipeline → Open scheduling. No images were published." : "Demo data is already up to date. Open a DEMO workspace to explore Gallery, Subjects and Tasks / Calendar." });
+            return Results.Ok(new { message = presentationExpanded
+                ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see the reference-style messages, production status, subjects, tasks, schedule and gallery."
+                : expanded
+                    ? "Demo data expanded. Open a DEMO workspace to explore Gallery, Subjects and Tasks / Calendar."
+                    : "Demo data is already up to date. Open DEMO - Weddings and Events, then Carter Wedding." });
         }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
     }
 
