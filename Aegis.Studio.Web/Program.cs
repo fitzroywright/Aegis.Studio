@@ -90,6 +90,18 @@ StorageTargetOptions storageTarget = StorageTargetOptions.FromConfiguration(
     storageProviderSecret,
     s3AccessKeyId: s3AccessKeyId,
     s3SecretAccessKey: s3SecretAccessKey);
+
+if (builder.Environment.IsDevelopment())
+{
+    string developmentStorageRoot = builder.Configuration["Storage:DevelopmentRootPath"]?.Trim()
+        ?? "D:/Studio";
+    storageTarget = storageTarget with
+    {
+        Kind = StorageTargetKind.LocalFolder,
+        RootPath = Path.GetFullPath(developmentStorageRoot)
+    };
+}
+
 if (storageTarget.Kind is StorageTargetKind.LocalFolder or StorageTargetKind.NetworkFolder &&
     !Path.IsPathRooted(storageTarget.RootPath))
 {
