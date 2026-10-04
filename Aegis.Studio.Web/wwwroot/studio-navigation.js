@@ -262,7 +262,9 @@
         },
         messages:async()=>{
             setActive('messages');
-            await showMessages();
+            if(typeof window.showStudioMessages!=='function')
+                throw new Error('Studio Messages view is unavailable.');
+            await window.showStudioMessages();
             setActive('messages');
         },
         media:async()=>{
@@ -319,14 +321,27 @@
         try{await route();}catch(error){showError(error);}
     };
 
-    // Document-level delegation survives all DOM rewrites and prevents dead nav buttons.
+    // Bind the actual rendered buttons directly. This is deliberately simple:
+    // one visible button = one real navigation handler.
+    const bindNavigationButtons=()=>{
+        rail.querySelectorAll('[data-view]').forEach(button=>{
+            button.onclick=event=>{
+                event.preventDefault();
+                event.stopPropagation();
+                navigate(button.dataset.view);
+            };
+        });
+    };
+    bindNavigationButtons();
+
+    // Fallback delegation covers any later nav DOM replacement.
     document.addEventListener('click',event=>{
         const button=event.target.closest('.rail [data-view]');
         if(!button)return;
         event.preventDefault();
         event.stopPropagation();
         navigate(button.dataset.view);
-    },true);
+    });
 
     window.studioNavigate=navigate;
 
