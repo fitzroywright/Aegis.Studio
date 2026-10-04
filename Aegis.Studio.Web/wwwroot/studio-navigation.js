@@ -293,7 +293,7 @@
                 </header>
 
                 <div class="workspace-reference-layout">
-                    <main class="workspace-reference-center">
+                    <div class="workspace-reference-center">
                         <div class="workspace-reference-toolbar">
                             <div class="workspace-reference-tabs" role="tablist">
                                 <button class="active" data-workspace-filter="all">All Workspaces <b>${workspaceData.length}</b></button>
@@ -301,7 +301,10 @@
                                 <button data-workspace-filter="completed">Completed <b>${completedWorkspaceCount}</b></button>
                             </div>
                             <div class="workspace-reference-tools">
-                                <label class="workspace-reference-search">⌕ <input type="search" placeholder="Search workspaces…" data-workspace-search></label>
+                                <div class="workspace-view-toggle" aria-label="Workspace view">
+                                    <button type="button" title="Grid view">▦ Grid</button>
+                                    <button type="button" class="active" title="List view">☷ List</button>
+                                </div>
                                 <select data-workspace-sort aria-label="Sort workspaces">
                                     <option value="name">Name (A–Z)</option>
                                     <option value="jobs">Most jobs</option>
@@ -314,21 +317,21 @@
 
                     <aside class="workspace-reference-side">
                         <section class="workspace-side-card">
-                            <header><h2>Announcements</h2><span>Recent</span></header>
+                            <header><h2>📣 Announcements</h2><span>View All →</span></header>
                             <div class="workspace-announcement-list">
                                 ${announcements.length?announcements.map(a=>`<article><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p><small>${esc(a.workspaceName)} · ${a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString():''}</small></article>`).join(''):'<p class="mw-empty">No workspace announcements.</p>'}
                             </div>
                         </section>
 
                         <section class="workspace-side-card">
-                            <header><h2>Workspace Filters</h2></header>
+                            <header><h2>⌁ Workspace Filters</h2></header>
                             <label>Search<input type="search" placeholder="Search workspaces…" data-workspace-search-side></label>
                             <label>Status<select data-workspace-status-side><option value="all">All Statuses</option><option value="active">Active</option><option value="completed">Completed</option><option value="ready">Ready</option></select></label>
                             <button type="button" class="action workspace-clear-filters">Clear Filters</button>
                         </section>
 
                         <section class="workspace-side-card">
-                            <header><h2>Quick Actions</h2></header>
+                            <header><h2>ϟ Quick Actions</h2></header>
                             <button type="button" class="workspace-quick-action" data-workspace-admin>＋ New Workspace</button>
                             <button type="button" class="workspace-quick-action" data-nav-quick="pipeline">▣ View Calendar</button>
                             <button type="button" class="workspace-quick-action" data-nav-quick="frontdesk">＋ Create Booking</button>
