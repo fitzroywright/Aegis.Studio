@@ -47,7 +47,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
     tabs.querySelector('.workspace-member-avatars').before(searchBox);
     tabs.querySelector('.workspace-settings-action').onclick=()=>{if(selectedWorkspace)openWorkspaceSettings(selectedWorkspace).catch(fail);};
     document.querySelector('.workspace-toolbar').remove();
-    allButton.remove();
+    const legacyAllButton=document.getElementById('allButton');
+    legacyAllButton?.remove();
     function syncSearchField(){
         const active=tabs.querySelector('[data-tab="'+tab+'"]');
         active.after(searchBox);
@@ -369,8 +370,6 @@ function mergeJobMessages(teamMessages, customerMessages) {
             return;
         }
     }
-    allButton.textContent = 'Jobs';
-    allButton.onclick = () => { tab = 'jobs'; loadConversations().catch(fail); };
     document.getElementById('workspaceRefresh').onclick = () => loadConversations().catch(fail);
     document.querySelector('.pane-heading p').textContent = 'Jobs, announcements and members';
 })();
