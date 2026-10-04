@@ -29,6 +29,19 @@ public static class MediaProductionEndpoints
         app.MapPut("/api/jobs/{jobId:guid}/media/collections/{name}",(Guid jobId,string name,MediaCollectionRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).RenameCollection(jobId,name,request.Name,Name(user));return Results.NoContent();})).RequireAuthorization();
         app.MapPut("/api/jobs/{jobId:guid}/media/collections/default",(Guid jobId,MediaCollectionRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).SetDefaultCollection(jobId,request.Name,Name(user));return Results.NoContent();})).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/roster",(Guid jobId,RosterImport request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>Results.Ok(new{count=Store(db,storage).ImportSubjects(jobId,request,Name(user))}))).RequireAuthorization();
+        app.MapPost("/api/jobs/{jobId:guid}/media/roster-file",async(Guid jobId,HttpRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>
+        {
+            if(!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
+            if(!request.HasFormContentType)return Results.BadRequest(new{error="Select a CSV or XLSX roster."});
+            var form=await request.ReadFormAsync(request.HttpContext.RequestAborted);
+            if(form.Files.Count!=1 || form.Files[0].Length>5_000_000)return Results.BadRequest(new{error="Select one roster file of at most 5 MB."});
+            return Write(jobId,user,access,()=>
+            {
+                using var input=form.Files[0].OpenReadStream();
+                string csv=RosterFileReader.Read(input,form.Files[0].FileName);
+                return Results.Ok(new{count=Store(db,storage).ImportSubjects(jobId,new RosterImport(csv,form["nameColumn"].ToString(),form["idColumn"].ToString()),Name(user))});
+            });
+        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6_000_000)).DisableAntiforgery().RequireAuthorization();
         app.MapPut("/api/jobs/{jobId:guid}/media/subjects/{subjectId:guid}/status",(Guid jobId,Guid subjectId,SubjectStateRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).SubjectStatus(jobId,subjectId,request.Status,Name(user));return Results.NoContent();})).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/export",(Guid jobId,MediaExportRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>Results.File(Store(db,storage).Export(jobId,request.Assets??[],Name(user)),"application/zip","studio-editing-batch.zip"))).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/uploads",async(Guid jobId,HttpRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>
