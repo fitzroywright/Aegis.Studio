@@ -216,7 +216,7 @@ internal static class DemoFullStudioData
                  job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?10:
                  job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?8:6
         };
-        string[] statuses=["Needs Sorting","Selected","Editing","Needs Review","Approved","Ready for Delivery"];
+        string[] statuses=["Needs Sorting","Needs Editing","Needs Review","Needs Approval","Ready","Ready for Production","Needs Print","Needs QC","Needs Delivery","Completed","Blocked","Needs Retake"];
         string[] collections=job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
             job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Roster","Stage","Groups","Unclassified"]:
             job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)?["Executives","Team","Selects","Unclassified"]:
