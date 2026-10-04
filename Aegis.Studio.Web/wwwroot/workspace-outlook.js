@@ -16,7 +16,8 @@ function studioWorkspaceIcon(name) {
         camera:'<path d="M4 7h3l1.5-2h7L17 7h3a2 2 0 0 1 2 2v9H2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="4"/>',
         user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c.7-5 3.3-7 8-7s7.3 2 8 7"/>',
         trend:'<path d="M4 18 9 13l4 3 7-9"/><path d="M15 7h5v5"/>',
-        files:'<path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h5"/>'
+        files:'<path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h5"/>',
+        search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>'
     };
     return '<svg class="studio-ui-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+(paths[name]||paths.activity)+'</svg>';
 }
@@ -240,7 +241,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                         <header class="job-panel-heading">
                             <div><strong>Messages</strong><span class="panel-count">${combined.length}</span></div>
                             <div class="panel-heading-actions">
-                                <button type="button" class="icon-button" data-message-search aria-label="Search messages" title="Search messages">${studioWorkspaceIcon('messages')}</button>
+                                <button type="button" class="icon-button" data-message-search aria-label="Search messages" title="Search messages">${studioWorkspaceIcon('search')}</button>
                                 <button type="button" class="icon-button" aria-label="More message options" title="More message options">⋮</button>
                             </div>
                         </header>
@@ -531,32 +532,41 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 <header class="workspace-media-heading">
                     <div><h2>Media <span class="workspace-media-count">${assets.length}</span></h2></div>
                     <div class="workspace-media-actions">
-                        <button type="button" class="primary" data-open-media>Upload</button>
-                        <button type="button" class="action" data-open-media>Select</button>
-                        <button type="button" class="action" data-open-media>Download</button>
-                        <button type="button" class="action" data-open-media>Import Roster</button>
+                        <button type="button" class="primary" data-manage-media>Upload</button>
+                        <button type="button" class="action" data-manage-media>Select</button>
+                        <button type="button" class="action" data-manage-media>Download</button>
+                        <button type="button" class="action" data-manage-media>Import Roster</button>
+                        <button type="button" class="action media-more-button" data-manage-media aria-label="More media actions">•••</button>
                     </div>
                 </header>
                 <div class="workspace-media-collections">
-                    <button type="button" class="active">All (${assets.length})</button>
-                    ${collections.map(name=>`<button type="button">${esc(name)} (${assets.filter(a=>(a.collection||'Unclassified')===name).length})</button>`).join('')}
+                    <button type="button" class="active" data-collection-filter="">All (${assets.length})</button>
+                    ${collections.map(name=>`<button type="button" data-collection-filter="${esc(name)}">${esc(name)} (${assets.filter(a=>(a.collection||'Unclassified')===name).length})</button>`).join('')}
                 </div>
-                <div class="workspace-media-grid">
-                    ${assets.slice(0,12).map(a=>`
-                        <button type="button" class="workspace-media-tile" data-preview-media="${a.id}">
-                            <img loading="lazy" src="/api/jobs/${job.id}/versions/by-id/${a.versionId}/content" alt="${esc(a.fileName)}">
-                            <span>${esc(a.fileName)}</span>
-                        </button>`).join('') || '<div class="workspace-media-empty">No images are available for this job yet.</div>'}
-                </div>
+                <div class="workspace-media-grid"></div>
             </section>`;
-        panel.querySelectorAll('[data-open-media]').forEach(button=>button.onclick=()=>{
-            const mediaTab=document.querySelector('[data-job-tab="gallery"]');
-            mediaTab?.click();
+        const grid=panel.querySelector('.workspace-media-grid');
+        const draw=filter=>{
+            const visible=filter?assets.filter(a=>(a.collection||'Unclassified')===filter):assets;
+            grid.innerHTML=visible.slice(0,24).map(a=>`
+                <button type="button" class="workspace-media-tile" data-preview-media="${a.id}">
+                    <img loading="lazy" src="/api/jobs/${job.id}/versions/by-id/${a.versionId}/content" alt="${esc(a.fileName)}">
+                    <span>${esc(a.fileName)}</span>
+                </button>`).join('') || '<div class="workspace-media-empty">No images are available in this collection.</div>';
+            grid.querySelectorAll('[data-preview-media]').forEach(button=>button.onclick=()=>{
+                const asset=assets.find(a=>a.id===button.dataset.previewMedia);
+                if(!asset)return;
+                studioDialog(asset.fileName,`<img style="max-width:100%;max-height:72vh;object-fit:contain" src="/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content" alt="${esc(asset.fileName)}">`);
+            });
+        };
+        draw('');
+        panel.querySelectorAll('[data-collection-filter]').forEach(button=>button.onclick=()=>{
+            panel.querySelectorAll('[data-collection-filter]').forEach(x=>x.classList.toggle('active',x===button));
+            draw(button.dataset.collectionFilter||'');
         });
-        panel.querySelectorAll('[data-preview-media]').forEach(button=>button.onclick=()=>{
-            const asset=assets.find(a=>a.id===button.dataset.previewMedia);
-            if(!asset)return;
-            studioDialog(asset.fileName,`<img style="max-width:100%;max-height:72vh;object-fit:contain" src="/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content" alt="${esc(asset.fileName)}">`);
+        panel.querySelectorAll('[data-manage-media]').forEach(button=>button.onclick=async()=>{
+            panel.innerHTML='<div class="versioned-gallery"></div>';
+            await renderProductionMedia(job,panel.querySelector('.versioned-gallery'),current);
         });
     }
 
