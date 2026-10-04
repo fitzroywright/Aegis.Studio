@@ -794,3 +794,56 @@ body[data-theme="studio-default"] .generic{background:var(--bs-bg)!important}
   body[data-theme="studio-default"] .job-work-board{grid-template-columns:minmax(230px,.8fr) minmax(380px,1.35fr)!important}
   body[data-theme="studio-default"] .job-context-sidebar{grid-column:1/-1!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;height:auto!important}
 }
+
+
+/* Status colors derived from real job status. */
+body[data-theme="studio-default"] .conversation-card[data-status-group="completed"] .job-status{
+  background:var(--bs-complete-soft)!important;
+  color:var(--bs-complete)!important;
+}
+body[data-theme="studio-default"] .conversation-card[data-status-group="planning"] .job-status,
+body[data-theme="studio-default"] .conversation-card[data-job-status*="edit"] .job-status{
+  background:var(--bs-warning-soft)!important;
+  color:var(--bs-warning)!important;
+}
+body[data-theme="studio-default"] .conversation-card[data-job-status*="photo"] .job-status{
+  background:#e8f0ff!important;
+  color:#3164c7!important;
+}
+
+/* Media collection chips mirror the approved screen while driving the real collection filter. */
+body[data-theme="studio-default"] .media-collection-chips{
+  min-height:36px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:5px!important;
+  overflow-x:auto!important;
+  padding:4px 0!important;
+}
+body[data-theme="studio-default"] .media-collection-chips button{
+  min-height:27px!important;
+  padding:4px 8px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:4px!important;
+  white-space:nowrap!important;
+  border:1px solid #e2e7ec!important;
+  border-radius:8px!important;
+  background:#f8fafc!important;
+  color:#667281!important;
+  font-size:8.5px!important;
+  cursor:pointer!important;
+}
+body[data-theme="studio-default"] .media-collection-chips button span{
+  color:#87919e!important;
+  font-size:8px!important;
+}
+body[data-theme="studio-default"] .media-collection-chips button.active{
+  border-color:#ead49d!important;
+  background:var(--bs-gold-soft)!important;
+  color:#6d511b!important;
+  font-weight:700!important;
+}
+body[data-theme="studio-default"] .media-title-toolbar [data-collection]{
+  display:none!important;
+}
