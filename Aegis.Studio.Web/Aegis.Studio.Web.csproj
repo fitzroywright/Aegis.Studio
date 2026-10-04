@@ -11,7 +11,8 @@
     <ProjectReference Include="../Aegis.Pos.DeviceClient/Aegis.Pos.DeviceClient.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\Common.Security.Plugin.ActiveDirectory.csproj"
-                      ReferenceOutputAssembly="false" />
+                      ReferenceOutputAssembly="false"
+                      AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Secrets\Common.Secrets.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.csproj" AdditionalProperties="Configuration=$(Configuration)" />
     <ProjectReference Include="$(CommonRoot)\Common.Messaging\Common.Messaging.Hosting\Common.Messaging.Hosting.csproj" AdditionalProperties="Configuration=$(Configuration)" />
