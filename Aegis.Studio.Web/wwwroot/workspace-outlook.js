@@ -16,6 +16,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
     let revision = 0;
     let selectedJob = null;
     let tab = 'jobs';
+    let jobFilter = 'all';
     const baseConversation = openConversation;
     function empty(title, message) {
         detailPane.classList.remove('job-reading-view'); document.getElementById('conversationView').classList.remove('has-open-job');
@@ -23,6 +24,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         detailPane.innerHTML = `<div class="empty-state"><h2>${esc(title)}</h2><p>${esc(message)}</p></div>`;
     }
     function filter() {
+        if(tab==='jobs' && typeof applyJobFilter==='function'){ applyJobFilter(); return; }
         const term = search.value.trim().toLocaleLowerCase();
         const container=tab==='members'?detailPane:conversationList;
         container.querySelectorAll('[data-search]').forEach(row => row.hidden = !row.textContent.toLocaleLowerCase().includes(term));
@@ -58,6 +60,49 @@ function mergeJobMessages(teamMessages, customerMessages) {
         refreshButton.setAttribute('aria-label',refreshButton.title);
     }
     syncSearchField();
+
+    const jobFilterBar=document.createElement('div');
+    jobFilterBar.className='job-filter-bar';
+    jobFilterBar.innerHTML='<button type="button" data-job-filter="all" class="active">All <span>0</span></button><button type="button" data-job-filter="active">Active <span>0</span></button><button type="button" data-job-filter="planning">Planning <span>0</span></button><button type="button" data-job-filter="completed">Completed <span>0</span></button>';
+    tabs.after(jobFilterBar);
+
+    const statusGroup=status=>{
+        const value=String(status||'').toLowerCase();
+        if(value.includes('complete')||value.includes('deliver')||value.includes('publish'))return 'completed';
+        if(value.includes('plan')||value.includes('pending')||value.includes('schedule')||value.includes('confirm')||value.includes('deposit'))return 'planning';
+        return 'active';
+    };
+
+    function applyJobFilter(){
+        const term=search.value.trim().toLocaleLowerCase();
+        conversationList.querySelectorAll('[data-search][data-job]').forEach(row=>{
+            const textMatch=!term||row.textContent.toLocaleLowerCase().includes(term);
+            const groupMatch=jobFilter==='all'||row.dataset.statusGroup===jobFilter;
+            row.hidden=!(textMatch&&groupMatch);
+        });
+        jobFilterBar.querySelectorAll('[data-job-filter]').forEach(button=>button.classList.toggle('active',button.dataset.jobFilter===jobFilter));
+    }
+
+    jobFilterBar.querySelectorAll('[data-job-filter]').forEach(button=>button.onclick=()=>{
+        jobFilter=button.dataset.jobFilter;
+        applyJobFilter();
+    });
+
+    workspaceTitle.setAttribute('role','button');
+    workspaceTitle.tabIndex=0;
+    workspaceTitle.classList.add('workspace-title-picker');
+    const openWorkspacePicker=()=>{
+        const visible=workspaceCache.filter(x=>x.permissions?.accessWorkspace&&x.permissions?.view);
+        const dialog=studioDialog('Choose Workspace','<div class="workspace-picker-list">'+visible.map(w=>'<button type="button" class="workspace-picker-row" data-workspace-id="'+esc(w.id)+'"><strong>'+esc(w.name)+'</strong><span>'+esc(w.address||'')+'</span></button>').join('')+'</div>');
+        dialog.querySelectorAll('[data-workspace-id]').forEach(button=>button.onclick=()=>{
+            const workspace=visible.find(w=>w.id===button.dataset.workspaceId);
+            dialog.close();
+            selectWorkspace(workspace.id,workspace.name).catch(fail);
+        });
+    };
+    workspaceTitle.onclick=openWorkspacePicker;
+    workspaceTitle.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openWorkspacePicker();}};
+
     const banners = document.createElement('section');
     banners.className = 'workspace-announcement-banners';
     banners.hidden = true;
@@ -97,8 +142,34 @@ function mergeJobMessages(teamMessages, customerMessages) {
         studioRememberPeople(people);
         tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(studioFirstName(m))}">${esc(studioFirstName(m).slice(0,1))}</span>`).join('');
         if (version !== revision) return;
-        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}"><span class="job-row-heading"><strong>${esc(job.title)}</strong></span><small>${esc(job.clientName)}</small><small>Event: ${esc(job.eventDate || "Not scheduled")}</small><small class="job-card-assignment"><span>Assigned to: ${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, "Team member", true) : "Unassigned")}</span><span class="job-status">${esc(job.status)}</span></small></button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
-        conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(jobs.find(x => x.id === button.dataset.job)).catch(fail));
+        const workspaceJobs=jobs.filter(x => x.workspaceId === workspaceId);
+        const counts={
+            all:workspaceJobs.length,
+            active:workspaceJobs.filter(x=>statusGroup(x.status)==='active').length,
+            planning:workspaceJobs.filter(x=>statusGroup(x.status)==='planning').length,
+            completed:workspaceJobs.filter(x=>statusGroup(x.status)==='completed').length
+        };
+        jobFilterBar.querySelectorAll('[data-job-filter]').forEach(button=>{
+            const count=button.querySelector('span');
+            if(count)count.textContent=counts[button.dataset.jobFilter]??0;
+        });
+        conversationList.innerHTML = workspaceJobs.map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}" data-status-group="${statusGroup(job.status)}">
+            <span class="job-list-thumb" data-job-thumb="${job.id}"><span>${esc((job.title||'J').slice(0,1))}</span></span>
+            <span class="job-list-copy">
+                <span class="job-row-heading"><strong>${esc(job.title)}</strong></span>
+                <small>${esc(job.clientName||job.linkedClientName||'Client not linked')}</small>
+                <small class="job-date-line">▣ ${esc(job.eventDate || "Not scheduled")}</small>
+            </span>
+            <span class="job-status">${esc(job.status)}</span>
+        </button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
+        conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(workspaceJobs.find(x => x.id === button.dataset.job)).catch(fail));
+        Promise.allSettled(workspaceJobs.map(async job=>{
+            const media=await json(`/api/jobs/${job.id}/media`);
+            if(version!==revision)return;
+            const image=(media.assets||[]).find(a=>String(a.contentType||'').startsWith('image/'));
+            const host=conversationList.querySelector(`[data-job-thumb="${job.id}"]`);
+            if(host&&image?.versionId)host.innerHTML=`<img src="/api/jobs/${job.id}/versions/by-id/${image.versionId}/content" alt="">`;
+        }));
         filter();
     };
     window.openWorkspaceJob = async function(id) {
@@ -238,7 +309,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 if(image?.versionId)thumb.innerHTML=`<img src="/api/jobs/${job.id}/versions/by-id/${image.versionId}/content" alt="">`;
                 const schedules=results[1].status==='fulfilled'?results[1].value:[];
                 const location=schedules.find(x=>x.location)?.location;
-                if(location)copy.querySelector('.studio-job-location').textContent=location;
+                if(location){
+                    copy.querySelector('.studio-job-location').textContent=location;
+                    const detailsLocation=detailPane.querySelector('[data-details-location]');
+                    if(detailsLocation)detailsLocation.textContent=location;
+                }
             });
         }
         if(job){
@@ -275,7 +350,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             detailPane.classList.add('job-reading-view'); document.getElementById('conversationView').classList.add('has-open-job');
             const lower = document.createElement('section');
             lower.className = 'job-lower-pane';
-            lower.innerHTML = '<nav class="workspace-tabs job-section-tabs" aria-label="Job information"><button data-job-tab="messages">Messages</button><button data-job-tab="gallery">Media</button><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks</button><button data-job-tab="calendar">Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="media-toolbar-host" aria-label="Media toolbar"></div><div class="gallery-tab-filter"></div><div class="job-tab-content"></div>';
+            lower.innerHTML = '<nav class="workspace-tabs job-section-tabs" aria-label="Job information"><button data-job-tab="messages">▣ <span>Messages</span></button><button data-job-tab="gallery">▧ <span>Media</span></button><button data-job-tab="subjects">♙ <span>Subjects</span></button><button data-job-tab="tasks">☑ <span>Tasks</span></button><button data-job-tab="calendar">▦ <span>Calendar</span></button><button data-job-tab="activity">⌁ <span>Activity</span></button></nav><div class="media-toolbar-host" aria-label="Media toolbar"></div><div class="gallery-tab-filter"></div><div class="job-tab-content"></div>';
             detailPane.appendChild(lower);
             const job = selectedJob;
             let tabRevision = 0;
@@ -294,17 +369,17 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const conversationRow=detailPane.querySelector('.job-conversation-row');
             const side=document.createElement('aside'); side.className='job-context-sidebar';
             side.append(conversationRow.querySelector('.thread-next-tasks'));
-            const details=document.createElement('details');details.className='job-details-card';details.open=true;
-            details.innerHTML=`<summary>Details</summary><dl><dt>Customer</dt><dd>${esc(job.linkedClientName||job.clientName||'Not linked')}</dd><dt>Date</dt><dd>${esc(job.eventDate||'Needs scheduling')}</dd><dt>Status</dt><dd>${esc(job.status)}</dd><dt>Workspace</dt><dd>${esc(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace')}</dd><dt>Assigned to</dt><dd>${esc(job.assignedTo?studioFirstName(job.assignedTo):'Unassigned')}</dd></dl><button class="action" data-edit-details>Edit Details</button>`;
+            const details=document.createElement('section');details.className='job-details-card';
+            details.innerHTML=`<header class="context-card-header"><strong>Job Details</strong><button class="action text-button" type="button" data-edit-details>Edit</button></header><dl><dt>Workspace</dt><dd>${esc(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace')}</dd><dt>Status</dt><dd><span class="studio-status-pill">${esc(job.status)}</span></dd><dt>Event Date</dt><dd>${esc(job.eventDate||'Needs scheduling')}</dd><dt>Location</dt><dd data-details-location>Location not set</dd><dt>Customer</dt><dd>${esc(job.linkedClientName||job.clientName||'Not linked')}</dd><dt>Assigned To</dt><dd>${esc(job.assignedTo?studioFirstName(job.assignedTo):'Unassigned')}</dd></dl>`;
             details.querySelector('[data-edit-details]').onclick=()=>openJobDetailsEditor(job);
             side.append(details,conversationRow.querySelector('.thread-shared-files'));
             const board=document.createElement('div');board.className='job-work-board';
             const header=detailPane.querySelector('.detail-header');
-            const breadcrumb=document.createElement('p');breadcrumb.className='job-breadcrumb';breadcrumb.textContent='Workspaces / '+(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace');
+            const breadcrumb=document.createElement('p');breadcrumb.className='job-breadcrumb';breadcrumb.innerHTML='Workspaces <span aria-hidden="true">/</span> '+esc(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace')+' <span aria-hidden="true">/</span> <strong>'+esc(job.title)+'</strong>';
             header.before(breadcrumb);
             const actions=document.createElement('div');
             actions.className='job-header-actions';
-            actions.innerHTML='<button class="action" data-message-action>Message</button><button class="action" data-add-task>Add Task</button><button class="action" data-more-action>More ▾</button>';
+            actions.innerHTML='<button class="action" data-message-action>▰ Message</button><button class="primary" data-add-task>＋ Add Task</button><button class="action" data-more-action>More⌄</button>';
             actions.querySelector('[data-message-action]').onclick=()=>document.getElementById('hierarchyBody')?.focus();
             actions.querySelector('[data-add-task]').onclick=()=>{
                 const dialog=studioDialog('Job tasks','<div class="all-tasks"></div>');
