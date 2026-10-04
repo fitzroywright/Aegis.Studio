@@ -148,14 +148,14 @@
                                 <div>${sessionRows}</div>
                             </section>
                             <section class="mw-card">
-                                <header><h2>Recent Work</h2><button data-nav="jobs">View All →</button></header>
+                                <header><h2>Recent Work</h2><button data-nav="workspaces">View Workspaces →</button></header>
                                 <div class="mw-recent-grid">${recentCards||'<div class="mw-empty">No recent work.</div>'}</div>
                             </section>
                         </div>
 
                         <div class="mw-two-col lower">
                             <section class="mw-card">
-                                <header><h2>My Tasks</h2><button data-nav="tasks">View All →</button></header>
+                                <header><h2>My Tasks</h2><button data-nav="workspaces">Open Jobs →</button></header>
                                 <div class="mw-task-tabs"><button class="active">All (${myTasks.length})</button><button>Editing</button><button>Client</button><button>Production</button></div>
                                 <div>${taskRows}</div>
                             </section>
@@ -179,9 +179,9 @@
                             <div class="mw-schedule-list">${scheduleRows}</div>
                         </section>
                         <section class="mw-card">
-                            <header><h2>Messages</h2><button data-nav="messages">View All →</button></header>
+                            <header><h2>Messages</h2><button data-nav="workspaces">Open Jobs →</button></header>
                             <div>${messageRows}</div>
-                            <button class="mw-link-button" data-nav="messages">Show all messages →</button>
+                            <button class="mw-link-button" data-nav="workspaces">Open workspace jobs →</button>
                         </section>
                         <section class="mw-card">
                             <header><h2>Studio Activity</h2><button data-nav="reports">View All →</button></header>
@@ -197,38 +197,74 @@
         genericView.querySelectorAll('[data-nav]').forEach(button=>button.addEventListener('click',()=>window.studioNavigate(button.dataset.nav)));
     }
 
-    async function renderPeople(){
+    async function renderWorkspaces(){
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML='<div class="studio-page-heading"><h1>People</h1></div><div class="studio-card"><p>Loading…</p></div>';
+        genericView.innerHTML='<div class="mywork-loading">Loading workspaces…</div>';
 
-        const jobs=await json('/api/jobs');
-        const rows=[];
-        for(const job of jobs.slice(0,30)){
-            const media=await json('/api/jobs/'+job.id+'/media').catch(()=>({subjects:[]}));
-            for(const subject of (media.subjects||[]).filter(x=>!x.isSystem))
-                rows.push({job,subject});
-        }
+        const [workspaces,jobs]=await Promise.all([
+            json('/api/workspaces').catch(()=>[]),
+            json('/api/jobs').catch(()=>[])
+        ]);
 
-        genericView.innerHTML='<div class="studio-page-heading"><h1>People</h1></div><div class="studio-card studio-table-list">'+rows.map(x=>'<button class="studio-list-row" data-open-job="'+x.job.id+'"><strong>'+esc(x.subject.name)+'</strong><span>'+esc(x.job.title)+' · '+esc(x.subject.imageCount??0)+' photos</span></button>').join('')+'</div>';
-        genericView.querySelectorAll('[data-open-job]').forEach(button=>button.onclick=()=>openWorkspaceJob(button.dataset.openJob));
-    }
+        const activeJobs=jobs.filter(job=>String(job.status||'').toLowerCase()!=='completed');
+        const completedJobs=jobs.length-activeJobs.length;
+        const unassignedJobs=activeJobs.filter(job=>!job.assignedTo).length;
 
-    async function renderTasks(){
-        conversationView.classList.add('hidden');
-        genericView.classList.remove('hidden');
-        const tasks=await json('/api/operations/activities');
-        genericView.innerHTML='<div class="studio-page-heading"><h1>Tasks</h1></div><div class="studio-card studio-table-list">'+tasks.map(task=>'<button class="studio-list-row" data-open-job="'+task.jobId+'"><strong>'+esc(task.title)+'</strong><span>'+esc(task.status||'')+(task.assignedTo?' · '+esc(studioFirstName(task.assignedTo)):'')+'</span></button>').join('')+'</div>';
-        genericView.querySelectorAll('[data-open-job]').forEach(button=>button.onclick=()=>openWorkspaceJob(button.dataset.openJob));
-    }
+        const workspaceCards=workspaces.map(workspace=>{
+            const workspaceJobs=jobs.filter(job=>String(job.workspaceId)===String(workspace.id));
+            const current=workspaceJobs.filter(job=>String(job.status||'').toLowerCase()!=='completed');
+            const recent=[...workspaceJobs]
+                .sort((a,b)=>new Date(b.eventDate||b.createdAtUtc||b.createdAt||0)-new Date(a.eventDate||a.createdAtUtc||a.createdAt||0))
+                .slice(0,5);
 
-    async function renderMedia(){
-        conversationView.classList.add('hidden');
-        genericView.classList.remove('hidden');
-        genericView.innerHTML='<div class="studio-page-heading"><h1>Media</h1></div><section class="studio-card" id="globalMediaQueue"><p>Loading…</p></section>';
-        const host=document.getElementById('globalMediaQueue');
-        if(typeof renderMediaAttentionQueue==='function') await renderMediaAttentionQueue(host);
-        else host.innerHTML='<p>Media queue is unavailable.</p>';
+            return `<article class="workspace-hub-card">
+                <header>
+                    <div>
+                        <span class="workspace-hub-icon">▦</span>
+                        <div><h2>${esc(workspace.name)}</h2><p>${esc(workspace.emailAddress||workspace.routeKey||'Studio workspace')}</p></div>
+                    </div>
+                    <button type="button" class="action" data-open-workspace="${workspace.id}" data-workspace-name="${esc(workspace.name)}">Open Workspace</button>
+                </header>
+                <div class="workspace-hub-stats">
+                    <span><strong>${current.length}</strong> Active Jobs</span>
+                    <span><strong>${workspaceJobs.length-current.length}</strong> Completed</span>
+                    <span><strong>${current.filter(job=>!job.assignedTo).length}</strong> Unassigned</span>
+                </div>
+                <div class="workspace-job-list">
+                    ${recent.length?recent.map(job=>`<button type="button" class="workspace-job-row" data-open-job="${job.id}">
+                        <span><strong>${esc(job.title)}</strong><small>${esc(job.clientName||'Client')} · ${esc(job.status||'Active')}</small></span>
+                        <span class="workspace-job-status">${esc(job.status||'Active')}</span>
+                        <span class="workspace-job-arrow">›</span>
+                    </button>`).join(''):'<div class="mw-empty">No jobs in this workspace yet.</div>'}
+                </div>
+            </article>`;
+        }).join('');
+
+        genericView.innerHTML=`
+            <section class="studio-reference-page workspace-hub-page">
+                <header class="studio-reference-header">
+                    <div><h1>Workspaces</h1><p>Jobs live inside workspaces. Open a job for its messages, media, subjects, tasks, calendar and activity.</p></div>
+                </header>
+                <div class="studio-reference-metrics">
+                    <article><span class="metric-glyph blue">▦</span><div><strong>${workspaces.length}</strong><b>Workspaces</b><small>Operational teams</small></div></article>
+                    <article><span class="metric-glyph green">✓</span><div><strong>${activeJobs.length}</strong><b>Active Jobs</b><small>Across all workspaces</small></div></article>
+                    <article><span class="metric-glyph purple">●</span><div><strong>${completedJobs}</strong><b>Completed</b><small>Finished jobs</small></div></article>
+                    <article><span class="metric-glyph orange">!</span><div><strong>${unassignedJobs}</strong><b>Unassigned</b><small>Needs ownership</small></div></article>
+                </div>
+                <div class="workspace-hub-grid">${workspaceCards||'<div class="studio-reference-card"><p>No workspaces are available.</p></div>'}</div>
+            </section>`;
+
+        genericView.querySelectorAll('[data-open-job]').forEach(button=>{
+            button.onclick=()=>openWorkspaceJob(button.dataset.openJob);
+        });
+        genericView.querySelectorAll('[data-open-workspace]').forEach(button=>{
+            button.onclick=async()=>{
+                conversationView.classList.remove('hidden');
+                genericView.classList.add('hidden');
+                await selectWorkspace(button.dataset.openWorkspace,button.dataset.workspaceName);
+            };
+        });
     }
 
     async function renderAdmin(){
@@ -269,19 +305,7 @@
 
     const routes={
         mywork:renderMyWork,
-        workspaces:async()=>{
-            if(typeof showWorkspaces==='function') return showWorkspaces();
-            conversationView.classList.remove('hidden');
-            genericView.classList.add('hidden');
-        },
-        jobs:()=>showJobs(),
-        messages:()=>{
-            if(typeof window.showStudioMessages==='function') return window.showStudioMessages();
-            throw new Error('Messages view is unavailable.');
-        },
-        media:renderMedia,
-        subjects:renderPeople,
-        tasks:renderTasks,
+        workspaces:renderWorkspaces,
         pipeline:()=>showPipeline(),
         production:()=>showProduction(),
         frontdesk:()=>showFrontDesk(),
