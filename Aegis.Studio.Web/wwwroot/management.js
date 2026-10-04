@@ -51,7 +51,7 @@ showManagement = async function() {
 };
 
 showAccounts = async function() {
-    activateNavigation('frontdesk');
+    activateNavigation('finance');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
     try {
@@ -59,14 +59,14 @@ showAccounts = async function() {
         const outstanding = invoices.filter(x => ['Issued','Overdue'].includes(x.status)).reduce((sum,x)=>sum+x.totalAmount,0);
         const paid = invoices.filter(x => x.status === 'Paid').reduce((sum,x)=>sum+x.totalAmount,0);
         genericView.innerHTML = `
-            <div class="job-detail-header"><div><h1>Front Desk — Accounts</h1><p>Invoices and client portal access remain tied directly to the operational Job.</p></div><button class="primary" onclick="createInvoiceFromAccounts()">New invoice</button></div>
+            <div class="job-detail-header"><div><h1>Finance</h1><p>Operational financial control for Studio. Front Desk can take payments; Finance oversees invoices, balances and accounting handoff.</p></div><div class="job-actions"><button class="action" onclick="showManagement()">Management Dashboard</button><button class="primary" onclick="createInvoiceFromAccounts()">New invoice</button></div></div>
             <div class="cards"><div class="metric">Outstanding<strong>${money(outstanding)}</strong></div><div class="metric">Paid invoices<strong>${money(paid)}</strong></div><div class="metric">Invoices<strong>${invoices.length}</strong></div></div>
             <section class="job-section"><h2>Invoices</h2>${invoices.length ? invoices.map(invoice => `
                 <div class="financial-row"><div><b>${esc(invoice.invoiceNumber)}</b><small>${esc(invoice.clientName)} · ${esc(invoice.status)} · due ${new Date(invoice.dueAtUtc).toLocaleDateString()}</small></div><div class="job-actions"><strong>${money(invoice.totalAmount)}</strong>${invoice.status==='Draft'?`<button class="action" onclick="setInvoiceStatus('${invoice.id}','Issued')">Issue</button>`:''}${invoice.status==='Issued'||invoice.status==='Overdue'?`<button class="action" onclick="setInvoiceStatus('${invoice.id}','Paid')">Mark paid</button>`:''}<button class="action" onclick="issueClientPortal('${invoice.jobId}')">Client portal</button></div></div>`).join('') : '<p class="muted">No invoices yet.</p>'}</section>
             <section class="job-section"><h2>Jobs available for billing</h2>${renderJobRows(jobs)}</section>`;
         bindJobRows();
     } catch (error) {
-        genericView.innerHTML = `<h1>Accounts</h1><p class="muted">You do not have billing access.</p>`;
+        genericView.innerHTML = `<h1>Finance</h1><p class="muted">You do not have billing access.</p>`;
     }
 };
 
