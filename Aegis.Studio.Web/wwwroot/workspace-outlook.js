@@ -18,7 +18,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
     let tab = 'jobs';
     const baseConversation = openConversation;
     function empty(title, message) {
-        detailPane.classList.remove('job-reading-view');
+        detailPane.classList.remove('job-reading-view'); document.getElementById('conversationView').classList.remove('has-open-job');
         detailPane.classList.add('empty');
         detailPane.innerHTML = `<div class="empty-state"><h2>${esc(title)}</h2><p>${esc(message)}</p></div>`;
     }
@@ -178,10 +178,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if(sender) { sender.value = 'Workspace'; sender.onchange = syncSend; }
         syncSend();
         if (scope === 'Job') {
-            detailPane.classList.add('job-reading-view');
+            detailPane.classList.add('job-reading-view'); document.getElementById('conversationView').classList.add('has-open-job');
             const lower = document.createElement('section');
             lower.className = 'job-lower-pane';
-            lower.innerHTML = '<div class="media-toolbar-host" aria-label="Media toolbar"></div><nav class="workspace-tabs" aria-label="Job information"><span class="gallery-tab-group"><button data-job-tab="gallery">Media</button><span class="gallery-tab-filter"></span></span></nav><div class="job-tab-content"></div>';
+            lower.innerHTML = '<nav class="workspace-tabs job-section-tabs" aria-label="Job information"><button data-job-tab="messages">Messages</button><button data-job-tab="gallery">Media</button><button data-job-tab="subjects">Subjects</button><button data-job-tab="tasks">Tasks</button><button data-job-tab="calendar">Calendar</button><button data-job-tab="activity">Activity</button></nav><div class="media-toolbar-host" aria-label="Media toolbar"></div><div class="gallery-tab-filter"></div><div class="job-tab-content"></div>';
             detailPane.appendChild(lower);
             const job = selectedJob;
             let tabRevision = 0;
@@ -191,37 +191,48 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 const current = () => version === revision && token === tabRevision;
                 lower.querySelectorAll('[data-job-tab]').forEach(button => button.classList.toggle('active', button.dataset.jobTab === name));
                 lower.querySelector('.gallery-tab-filter').replaceChildren();
-                lower.querySelector('.gallery-tab-group').classList.toggle('active',name==='gallery');
+                detailPane.dataset.jobSection=name; const row=detailPane.querySelector('.job-conversation-row'); if(row)row.querySelector('.job-message-column').hidden=name!=='messages'; lower.querySelector('.media-toolbar-host').hidden=!['messages','gallery'].includes(name);
                 panel.textContent = 'Loading…';
-                try { await renderJobTab(name, job, panel, current, () => activate(name)); }
+                try { await renderJobTab(name==='messages'?'gallery':name, job, panel, current, () => activate(name)); }
                 catch (error) { if (current()) panel.textContent = 'Unable to load: ' + (error.message || error); }
             };
             lower.querySelectorAll('[data-job-tab]').forEach(button => button.onclick = () => activate(button.dataset.jobTab));
-            const handoff=document.createElement('div');handoff.className='job-handoff';
-            const mediaToolbarHost=lower.querySelector('.media-toolbar-host');mediaToolbarHost.after(handoff);
-            const summary=document.createElement('div');summary.className='job-handoff-summary';handoff.appendChild(summary);
-            const activity=document.createElement('button');activity.className='action activity-button';activity.type='button';activity.textContent='Activity';activity.onclick=()=>showJobActivityFlyout(job,lower);handoff.appendChild(activity);
-            renderJobHandoff(job,summary,()=>version===revision).catch(error=>{if(version===revision)summary.textContent='Job progress could not be loaded. Refresh to retry.';});
-            activate('gallery');
-        } else detailPane.classList.remove('job-reading-view');
+            const conversationRow=detailPane.querySelector('.job-conversation-row');
+            const side=document.createElement('aside'); side.className='job-context-sidebar';
+            side.append(conversationRow.querySelector('.thread-next-tasks'));
+            const details=document.createElement('details');details.className='job-details-card';details.open=true;
+            details.innerHTML=`<summary>Details</summary><dl><dt>Customer</dt><dd>${esc(job.linkedClientName||job.clientName||'Not linked')}</dd><dt>Date</dt><dd>${esc(job.eventDate||'Needs scheduling')}</dd><dt>Status</dt><dd>${esc(job.status)}</dd><dt>Workspace</dt><dd>${esc(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace')}</dd><dt>Assigned to</dt><dd>${esc(job.assignedTo?studioFirstName(job.assignedTo):'Unassigned')}</dd></dl><button class="action" data-edit-details>Edit Details</button>`;
+            details.querySelector('[data-edit-details]').onclick=()=>openJobDetailsEditor(job);
+            side.append(details,conversationRow.querySelector('.thread-shared-files'));
+            const board=document.createElement('div');board.className='job-work-board';
+            const header=detailPane.querySelector('.detail-header');
+            const breadcrumb=document.createElement('p');breadcrumb.className='job-breadcrumb';breadcrumb.textContent='Workspaces / '+(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace');
+            header.before(breadcrumb);
+            const actions=document.createElement('div');actions.className='job-header-actions';actions.innerHTML='<button class="action" data-job-list>Jobs</button><button class="action" data-edit-details>Edit Details</button>';
+            actions.querySelector('[data-job-list]').onclick=()=>{document.getElementById('conversationView').classList.remove('has-open-job');loadConversations().catch(fail);};
+            actions.querySelector('[data-edit-details]').onclick=()=>openJobDetailsEditor(job);header.append(actions);
+            const nav=lower.querySelector('.job-section-tabs');header.after(nav,board);
+            board.append(conversationRow.querySelector('.job-message-column'),lower,side);conversationRow.remove();
+            activate('messages');
+        } else detailPane.classList.remove('job-reading-view'); document.getElementById('conversationView').classList.remove('has-open-job');
+        let pendingSend=null,pendingAttachment=null;
         document.getElementById('hierarchyCompose').onsubmit = async event => {
             event.preventDefault();
             const form = event.currentTarget, body = form.querySelector('textarea').value.trim();
-            if (!body || !canSend()) return;
+            if ((!body&&!pendingSend) || !canSend()) return;
             const button = form.querySelector('button'); button.disabled = true;
             try {
                 const external = job && sender?.value !== 'Internal';
                 const url = external ? `/api/conversations/${job.conversationId}/messages` : `/api/messages/threads/${value.id}`;
                 const payload = external ? {body, isInternal:false, sendingIdentity:sender?.value || 'Workspace'} : {body};
-                const sent = await json(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+                const sent = pendingSend || await json(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); pendingSend=sent; form.querySelector('textarea').readOnly=true; if(sender)sender.disabled=true;
                 const file = job ? form.querySelector('[data-message-file]')?.files?.[0] : null;
                 if (file) {
                     const messageId = external ? sent.messageId : sent.id;
                     if (!messageId) throw new Error('Message was sent but Studio did not return its message id, so the attachment was not uploaded.');
                     const data = new FormData(); data.append('file', file);
-                    const upload = await fetch('/api/conversations/' + job.conversationId + '/attachments?visibility=' + encodeURIComponent(external ? 'External' : 'Internal'), { method:'POST', body:data });
-                    if (!upload.ok) throw new Error(await upload.text());
-                    const attachment = await upload.json();
+                    if(!pendingAttachment)pendingAttachment=await json('/api/conversations/' + job.conversationId + '/attachments?visibility=' + encodeURIComponent(external ? 'External' : 'Internal'),{method:'POST',body:data});
+                    const attachment=pendingAttachment;
                     const link = await fetch('/api/attachments/' + attachment.id + '/message-link', {
                         method:'POST',
                         headers:{'Content-Type':'application/json'},
@@ -230,17 +241,17 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     if (!link.ok) throw new Error(await link.text());
                 }
                 if (version === revision) await thread(scope, scopeId, version);
-            } catch(error) { form.querySelector('[role="alert"]').textContent = error.message || error; }
-            finally { if (form.isConnected) syncSend(); }
+            } catch(error) { form.querySelector('[role="alert"]').textContent = pendingSend ? 'Message saved. Attachment could not be linked; retry to finish attaching it.' : (error.message || error); }
+            finally { if (form.isConnected) { syncSend(); if(pendingSend) {button.textContent='Retry attachment';form.querySelector('textarea').required=false;} } }
         };
     }
     async function renderConversationFiles(job,panel,current,refresh) {
-            const files = await json(`/api/conversations/${job.conversationId}/files`);
+            const files = (await json(`/api/conversations/${job.conversationId}/files`)).filter(f=>f.messageId);
             if (!current()) return;
             panel.innerHTML = `<section class="legacy-attachments"><header class="conversation-files-title">Conversation Files</header><div class="conversation-file-actions"><button class="action" data-preview-file disabled>Preview</button><a class="action" data-download-file hidden>Download</a></div><div class="job-file-gallery">${files.map(file => {
                 const url = '/api/attachments/' + encodeURIComponent(file.id);
                 const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
-                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}${file.messageId?' · linked to '+esc(file.messageKind||'message'):''}</small><span>${file.messageId?'<span class="conversation-file-source" data-source-message="'+esc(file.messageId)+'">Source message '+esc(String(file.messageId).slice(0,8))+'</span>':'Open file'}</span></a>`;
+                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}${file.messageId?' · linked to '+esc(file.messageKind||'message'):''}</small><span>${file.messageId?'<span class="conversation-file-source" data-source-message="'+esc(file.messageId)+'">View source message</span>':'Open file'}</span></a>`;
             }).join('') || '<p>No files attached yet.</p>'}</div></section>`;
             panel.querySelectorAll('[data-source-message]').forEach(source=>source.onclick=event=>{
                 event.preventDefault();event.stopPropagation();
@@ -270,6 +281,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
     async function renderJobTab(name, job, panel, current, refresh) {
         if (name === 'subjects') return renderJobSubjects(job,panel,current,refresh);
         if (name === 'tasks') return renderJobTasks(job,panel,current,refresh);
+        if (name === 'calendar') { await renderJobCalendar(job,panel,current); return; }
         if (name === 'activity') return renderJobActivity(job,panel,current);
         if (name === 'gallery') {
             panel.innerHTML='<div class="versioned-gallery"></div>';
@@ -282,3 +294,4 @@ function mergeJobMessages(teamMessages, customerMessages) {
     document.getElementById('workspaceRefresh').onclick = () => loadConversations().catch(fail);
     document.querySelector('.pane-heading p').textContent = 'Jobs, announcements and members';
 })();
+
