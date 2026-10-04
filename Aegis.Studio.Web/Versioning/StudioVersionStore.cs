@@ -55,6 +55,7 @@ public sealed class StudioVersionStore
     // Callers can enlist version metadata and their workflow state in the same transaction.
     internal StudioAssetVersion Add(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid jobId, string assetKey, string fileName, string contentType, Stream source, string createdBy, string? note = null, Guid? sourceVersionId = null)
     {
+        LockJobForMediaChange(connection,transaction,jobId);
         string key = NormalizeKey(assetKey);
         Guid id = Guid.NewGuid();
         string stored = $"{jobId:N}/{SafeKey(key)}/{id:N}{Path.GetExtension(fileName)}";
@@ -128,6 +129,14 @@ public sealed class StudioVersionStore
         object?[] values = [version.Id, version.JobId, version.AssetKey, version.VersionNumber, version.FileName, version.ContentType, version.SizeBytes, version.Sha256, version.StoredPath, version.CreatedBy, version.CreatedAtUtc, (object?)version.SourceVersionId ?? DBNull.Value, (object?)version.Note ?? DBNull.Value];
         foreach (object? value in values) command.Parameters.AddWithValue(value ?? DBNull.Value);
         command.ExecuteNonQuery();
+    }
+
+    internal static void LockJobForMediaChange(NpgsqlConnection connection,NpgsqlTransaction transaction,Guid jobId)
+    {
+        using var command=new NpgsqlCommand("select status from studio_jobs where id=$1 for update",connection,transaction);command.Parameters.AddWithValue(jobId);
+        string status=command.ExecuteScalar() as string??throw new KeyNotFoundException("Job was not found.");
+        if(status is "Ready for Client" or "Published" or "Completed" or "Closed" or "Cancelled")
+            throw new ArgumentException("This job's approved media is closed for changes. Request changes before uploading a revision.");
     }
 
     private static string NormalizeKey(string value)
