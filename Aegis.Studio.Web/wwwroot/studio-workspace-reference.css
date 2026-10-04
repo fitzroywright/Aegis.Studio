@@ -4441,3 +4441,14 @@ body[data-theme="studio-default"] .mw-session-thumb{
 body[data-theme="studio-default"] .mw-session-row{
   grid-template-columns:68px 52px minmax(0,1fr) auto 14px!important;
 }
+
+
+/* My Work balance correction: narrower Today's Sessions, wider Recent Work. */
+body[data-theme="studio-default"] .mw-two-col:not(.lower){
+  grid-template-columns:minmax(420px,.82fr) minmax(520px,1.18fr)!important;
+}
+@media(max-width:1450px){
+  body[data-theme="studio-default"] .mw-two-col:not(.lower){
+    grid-template-columns:minmax(390px,.80fr) minmax(500px,1.20fr)!important;
+  }
+}
