@@ -227,7 +227,7 @@ internal static class DemoFullStudioData
             Guid versionId=Id(64,job.Number*100+i);
             if(i<12)
             {
-                DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,(ordinal+i)%12,null,login);
+                DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i),null,login);
             }
             else
             {
@@ -244,6 +244,18 @@ internal static class DemoFullStudioData
             Guid subjectId=Id(59,job.Number*100+(i%Math.Max(1,job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?8:job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?24:job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4)));
             Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) values($1,$2) on conflict do nothing",assetId,subjectId);
         }
+    }
+
+    private static int SelectPhotoVariant(DemoJob job,int index)
+    {
+        // Indices map to the curated real-photo catalogue in DemoDataExpansion.
+        if(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return 13+(index%2);
+        if(job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)) return index%4;
+        if(job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)) return 4+(index%3);
+        if(job.Type.Contains("Product",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Campaign",StringComparison.OrdinalIgnoreCase)) return 12;
+        if(job.Type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)) return 11;
+        if(job.Type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)) return 9+(index%2);
+        return 7+(index%4);
     }
 
     private static void SeedConversation(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,DemoClient client,Guid conversation,int ordinal)
