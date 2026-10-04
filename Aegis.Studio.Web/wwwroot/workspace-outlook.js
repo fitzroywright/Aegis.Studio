@@ -193,7 +193,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 lower.querySelector('.gallery-tab-filter').replaceChildren();
                 detailPane.dataset.jobSection=name; const row=detailPane.querySelector('.job-conversation-row'); if(row)row.querySelector('.job-message-column').hidden=name!=='messages'; lower.querySelector('.media-toolbar-host').hidden=!['messages','gallery'].includes(name);
                 panel.textContent = 'Loading…';
-                try { await renderJobTab(name==='messages'?'gallery':name, job, panel, current, () => activate(name)); }
+                try {
+                    if(name==='messages') await renderJobMediaOverview(job,panel,current);
+                    else await renderJobTab(name, job, panel, current, () => activate(name));
+                }
                 catch (error) { if (current()) panel.textContent = 'Unable to load: ' + (error.message || error); }
             };
             lower.querySelectorAll('[data-job-tab]').forEach(button => button.onclick = () => activate(button.dataset.jobTab));
@@ -278,6 +281,45 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 tile.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();tile.click();panel.querySelector('[data-preview-file]').click();}};
             });
     }
+    async function renderJobMediaOverview(job,panel,current){
+        const data=await json(`/api/jobs/${job.id}/media`);
+        if(!current())return;
+        const assets=(data.assets||[]).filter(a=>String(a.contentType||'').startsWith('image/'));
+        const collections=[...new Set(assets.map(a=>a.collection||'Unclassified'))];
+        panel.innerHTML=`
+            <section class="workspace-media-overview">
+                <header class="workspace-media-heading">
+                    <div><h2>Media <span class="workspace-media-count">${assets.length}</span></h2></div>
+                    <div class="workspace-media-actions">
+                        <button type="button" class="primary" data-open-media>Upload</button>
+                        <button type="button" class="action" data-open-media>Select</button>
+                        <button type="button" class="action" data-open-media>Download</button>
+                        <button type="button" class="action" data-open-media>Import Roster</button>
+                    </div>
+                </header>
+                <div class="workspace-media-collections">
+                    <button type="button" class="active">All (${assets.length})</button>
+                    ${collections.map(name=>`<button type="button">${esc(name)} (${assets.filter(a=>(a.collection||'Unclassified')===name).length})</button>`).join('')}
+                </div>
+                <div class="workspace-media-grid">
+                    ${assets.slice(0,12).map(a=>`
+                        <button type="button" class="workspace-media-tile" data-preview-media="${a.id}">
+                            <img loading="lazy" src="/api/jobs/${job.id}/versions/by-id/${a.versionId}/content" alt="${esc(a.fileName)}">
+                            <span>${esc(a.fileName)}</span>
+                        </button>`).join('') || '<div class="workspace-media-empty">No images are available for this job yet.</div>'}
+                </div>
+            </section>`;
+        panel.querySelectorAll('[data-open-media]').forEach(button=>button.onclick=()=>{
+            const mediaTab=document.querySelector('[data-job-tab="gallery"]');
+            mediaTab?.click();
+        });
+        panel.querySelectorAll('[data-preview-media]').forEach(button=>button.onclick=()=>{
+            const asset=assets.find(a=>a.id===button.dataset.previewMedia);
+            if(!asset)return;
+            studioDialog(asset.fileName,`<img style="max-width:100%;max-height:72vh;object-fit:contain" src="/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content" alt="${esc(asset.fileName)}">`);
+        });
+    }
+
     async function renderJobTab(name, job, panel, current, refresh) {
         if (name === 'subjects') return renderJobSubjects(job,panel,current,refresh);
         if (name === 'tasks') return renderJobTasks(job,panel,current,refresh);
