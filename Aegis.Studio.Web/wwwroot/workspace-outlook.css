@@ -960,3 +960,25 @@ dialog{border-radius:14px!important}
   .job-conversation-row{display:flex!important;flex-direction:column;overflow:auto}
   .top-action-label,.studio-global-search kbd{display:none}
 }
+
+
+/* Runtime navigation correction: workspace selection now lives in the main surface. */
+.navigation-pane .workspaces{display:none!important}
+.navigation-pane .rail{order:1!important;flex:1!important;border:0!important;padding:14px 10px!important;background:transparent!important}
+.navigation-pane .studio-back-button{margin-top:auto!important;opacity:.72}
+.navigation-pane .studio-back-button:disabled{visibility:hidden}
+.reference-page-heading{display:flex;justify-content:space-between;align-items:flex-end;margin:4px 0 18px}
+.reference-page-heading h1{margin:4px 0 4px;font-size:30px;line-height:1.1}
+.reference-page-heading p{margin:0;color:var(--studio-ref-muted)}
+.reference-eyebrow{font-size:10px;letter-spacing:.16em;color:var(--studio-ref-gold-strong);font-weight:800}
+.reference-workspace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.reference-workspace-card{
+  appearance:none;width:100%;min-height:92px;display:grid;grid-template-columns:46px 1fr auto;gap:12px;align-items:center;
+  text-align:left;padding:16px;border:1px solid var(--studio-ref-border);border-radius:12px;background:#fff;color:var(--studio-ref-text);
+  box-shadow:0 2px 8px rgba(46,39,29,.035);cursor:pointer
+}
+.reference-workspace-card:hover{border-color:#d2c3a8;background:#fffaf0}
+.reference-workspace-card strong{display:block;font-size:15px}
+.reference-workspace-card small{display:block;margin-top:4px;color:var(--studio-ref-muted)}
+.reference-workspace-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:10px;background:#f4ead1;color:var(--studio-ref-gold-strong)}
+.reference-workspace-icon svg{width:22px;height:22px}
