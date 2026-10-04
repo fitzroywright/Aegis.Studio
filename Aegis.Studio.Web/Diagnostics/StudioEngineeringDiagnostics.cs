@@ -195,6 +195,14 @@ public sealed class StudioEngineeringDiagnosticCatalog
                 CheckStorageAsync),
 
             new EngineeringDiagnosticCheckDefinition(
+                "studio-l4-client-gallery",
+                "Client gallery provider",
+                EngineeringDiagnosticLevel.Level4Analysis,
+                _ => Task.FromResult(services.GetRequiredService<IConfiguration>()["ClientGallery:Provider"]=="Manifest"
+                    ? Passed("studio-l4-client-gallery","Client gallery provider","Gallery handoff is configured. Delivery uses Common.Storage; the consuming client site requires separate verification.")
+                    : Warning("studio-l4-client-gallery","Client gallery provider","No supported client gallery handoff provider is configured."))),
+
+            new EngineeringDiagnosticCheckDefinition(
                 "studio-l3-email",
                 "Studio Microsoft Graph email",
                 EngineeringDiagnosticLevel.Level3Verification,
