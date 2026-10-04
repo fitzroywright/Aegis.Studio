@@ -126,13 +126,13 @@ internal static class DemoDataExpansion
 
                 if(number==4)
                 {
-                    Guid mediaId=Id(29,number*100+asset);
+                    Guid requestedMediaId=Id(29,number*100+asset);
                     Execute(connection,transaction,
                         "insert into studio_media_galleries(id) values($1) on conflict(id) do nothing",
                         job);
-                    Execute(connection,transaction,
-                        "insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status) values($1,$2,$2,$3,$4) on conflict(job_id,asset_key) do update set production_status=excluded.production_status",
-                        mediaId,job,key,asset<34?"Photographed":"Needs Review");
+                    Guid mediaId=ExecuteGuid(connection,transaction,
+                        "insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status) values($1,$2,$2,$3,$4) on conflict(job_id,asset_key) do update set production_status=excluded.production_status returning id",
+                        requestedMediaId,job,key,asset<34?"Photographed":"Needs Review");
 
                     int[][] assignments=[
                         [0,2], [1,2], [0], [1], [0,3], [1,4], [2], [0,2],
@@ -299,6 +299,15 @@ internal static class DemoDataExpansion
         }
         return image;
     }
+    private static Guid ExecuteGuid(NpgsqlConnection connection,NpgsqlTransaction transaction,string sql,params object[] values)
+    {
+        using var command=new NpgsqlCommand(sql,connection,transaction);
+        foreach(object value in values)command.Parameters.AddWithValue(value);
+        object? result=command.ExecuteScalar();
+        if(result is Guid id)return id;
+        throw new InvalidOperationException("Expected a Guid result from demo data command.");
+    }
+
     private static void Execute(NpgsqlConnection connection,NpgsqlTransaction transaction,string sql,params object[] values)
     {
         string commandText=sql.Trim();
