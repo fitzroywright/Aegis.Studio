@@ -49,6 +49,17 @@ public sealed class FrontDeskBookingRequestTests
         Assert.Equal(2,fixture.Count("studio_jobs"));Assert.Equal(4,fixture.Count("studio_financial_events"));
     }
 
+    [StudioPostgresFact]
+    public async Task ConcurrentWebsiteRetryCreatesOnePendingRequestWithoutAJob()
+    {
+        await using var fixture=await DatabaseFixture.Create();
+        var store=new FrontDeskBookingRequestStore(fixture.Database);
+        var request=new PendingBookingRequest(fixture.Workspace,"Morgan","morgan@example.invalid","Portrait",DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2)),100,"JMD",null,ExternalBookingId:"website-001");
+        var results=await Task.WhenAll(Task.Run(()=>store.Create(request,"website")),Task.Run(()=>store.Create(request,"website")));
+        Assert.Equal(results[0].Id,results[1].Id);Assert.Equal(1,fixture.Count("studio_frontdesk_requests"));Assert.Equal(0,fixture.Count("studio_jobs"));
+        Assert.Throws<ArgumentException>(()=>store.Create(request with{ClientName="Someone else"},"website"));
+    }
+
     private sealed class DatabaseFixture : IAsyncDisposable
     {
         private readonly string connectionString;
@@ -69,9 +80,11 @@ public sealed class FrontDeskBookingRequestTests
             string[] sql=[
                 "create table studio_workspaces(id uuid primary key,is_enabled boolean not null)",
                 "create table studio_conversations(id uuid primary key,workspace_id uuid not null,subject text,contact_name text,contact_address text,channel text,is_closed boolean,created_at_utc timestamptz,job_id uuid)",
-                "create table studio_jobs(id uuid primary key,workspace_id uuid,conversation_id uuid references studio_conversations(id),title text,client_name text,status text,event_date date,created_at_utc timestamptz)",
+                "create table studio_jobs(id uuid primary key,workspace_id uuid,conversation_id uuid references studio_conversations(id),title text,client_name text,status text,event_date date,created_at_utc timestamptz,client_id uuid)",
+                "create table studio_clients(id uuid primary key,display_name text,email text,phone text,updated_at_utc timestamptz default now())",
                 "create table studio_messages(id uuid primary key,conversation_id uuid,author_display_name text,visibility text,body text,created_at_utc timestamptz)",
-                "create table studio_financial_events(id uuid primary key,job_id uuid,kind text,amount numeric(18,2),note text,created_at_utc timestamptz)"
+                "create table studio_financial_events(id uuid primary key,job_id uuid,kind text,amount numeric(18,2),note text,created_at_utc timestamptz)",
+                "create table studio_operational_audit(id uuid primary key,job_id uuid,activity_id uuid,action text,user_name text,detail text,created_at_utc timestamptz)"
             ];
             foreach(string statement in sql){using var command=new NpgsqlCommand(statement,c);command.ExecuteNonQuery();}
             using(var command=new NpgsqlCommand("insert into studio_workspaces values($1,true)",c)){command.Parameters.AddWithValue(fixture.Workspace);command.ExecuteNonQuery();}
