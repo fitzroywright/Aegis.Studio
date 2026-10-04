@@ -99,6 +99,22 @@ async function renderProductionMedia(job,host,current){
  controls.innerHTML=`<span class="media-title-toolbar"><strong class="media-panel-heading">Media <span>${data.assets.length}</span></strong>${canEdit?'<button class="primary" data-add>☁ Upload</button><span class="media-split" data-select-menu><button type="button" class="action media-split-main">Select</button><button type="button" class="action media-split-arrow" aria-label="Select options">▾</button><span class="media-split-menu"><button type="button" data-select-visible>Select Visible</button><button type="button" data-select-all>Select All</button></span></span><span class="media-split" data-download-menu><button type="button" class="action media-split-main" data-download>Download</button><button type="button" class="action media-split-arrow" aria-label="Download options">▾</button><span class="media-split-menu"><button type="button" data-download-selected>Download Selected</button></span></span><button class="action" data-roster title="Import a CSV or XLSX roster of subjects. Subject ID matches existing subjects; extra columns are retained as subject fields.">Import Roster</button><button class="action" data-media-settings aria-label="Media settings" title="Media settings">•••</button>':''}<span class="media-progress"></span>${canEdit?'<button type="button" class="action" data-change-subject disabled>Change Subject</button>':''}<select data-collection aria-label="Filter media by collection"><option value="">All</option><option value="Unclassified" ${collection==='Unclassified'?'selected':''}>Unclassified</option>${collections.map(x=>`<option value="${esc(x)}" ${collection===x?'selected':''}>${esc(x)}${data.gallery?.default_collection===x?' ★':''}</option>`).join('')}</select>${canEdit?'<button type="button" class="action collection-admin-action" data-new-collection title="New collection" aria-label="New collection">＋</button><button type="button" class="action collection-admin-action" data-rename-collection title="Rename selected collection" aria-label="Rename selected collection">✎</button><button type="button" class="action collection-admin-action" data-default-collection title="Make selected collection the default" aria-label="Make selected collection the default">★</button>':''}</span>`;
  (tabSlot||filter).replaceChildren(controls);
  const collectionSelector=controls.querySelector('[data-collection]');
+ const collectionChips=document.createElement('div');
+ collectionChips.className='media-collection-chips';
+ const countFor=name=>data.assets.filter(a=>name===null||name===''||(a.collection||'Unclassified')===name).length;
+ const chipNames=['', 'Unclassified', ...collections.filter(x=>x!=='Unclassified')];
+ collectionChips.innerHTML=chipNames.map(name=>`<button type="button" data-media-collection="${esc(name)}" class="${(collection||'')===name?'active':''}">${name||'All'} <span>${countFor(name)}</span></button>`).join('');
+ filter.replaceChildren(collectionChips);
+ collectionChips.querySelectorAll('[data-media-collection]').forEach(button=>button.onclick=()=>{
+  collection=button.dataset.mediaCollection||null;
+  collectionSelector.value=collection||'';
+  (window.studioMediaCollections??={})[job.id]=collection;
+  collectionChips.querySelectorAll('[data-media-collection]').forEach(x=>x.classList.toggle('active',x===button));
+  subject=null;
+  syncCollectionActions();
+  render();
+  syncSubjectRail();
+ });
  const subjectRail=host.querySelector('.media-subject-rail'),subjectSearch=subjectRail.querySelector('input'),subjectList=subjectRail.querySelector('.media-subject-list');
  function renderSubjectList(){
   const term=subjectSearch.value.trim().toLocaleLowerCase();
@@ -123,7 +139,7 @@ async function renderProductionMedia(job,host,current){
   host.querySelector('.media-production-layout').classList.add('has-subject-list'); host.querySelector('.media-production-layout').classList.toggle('compact-subjects',data.subjects.length<=12);
   renderSubjectList();
  }
- collectionSelector.onchange=()=>{collection=collectionSelector.value||null;subject=null;(window.studioMediaCollections??={})[job.id]=collection;syncCollectionActions();render();syncSubjectRail();};
+ collectionSelector.onchange=()=>{collection=collectionSelector.value||null;subject=null;(window.studioMediaCollections??={})[job.id]=collection;collectionChips.querySelectorAll('[data-media-collection]').forEach(button=>button.classList.toggle('active',(button.dataset.mediaCollection||'')===(collection||'')));syncCollectionActions();render();syncSubjectRail();};
  if(typeof ResizeObserver!=='undefined'){const observer=new ResizeObserver(()=>{if(current()&&host.isConnected)syncSubjectRail();else observer.disconnect();});observer.observe(surface);}
  const rename=controls.querySelector('[data-rename-collection]'),makeDefault=controls.querySelector('[data-default-collection]');
  function syncCollectionActions(){if(rename)rename.disabled=!collection;if(makeDefault)makeDefault.disabled=!collection||data.gallery?.default_collection===collection;}
