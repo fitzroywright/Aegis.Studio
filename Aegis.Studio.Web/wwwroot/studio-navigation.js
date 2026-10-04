@@ -433,7 +433,7 @@
         panel=document.createElement('section');
         panel.id='studioDemoLoader';
         panel.className='studio-card studio-demo-loader';
-        panel.innerHTML='<div class="studio-card-heading"><div><h2>Demo Data</h2><p>Load Carter Wedding with 50 wedding photos, linked People, messages, tasks, appointments and production data.</p></div><button class="primary" type="button" data-load-demo>Load Demo Data</button></div><p data-demo-status></p>';
+        panel.innerHTML='<div class="studio-card-heading"><div><h2>Demo Data</h2><p>Load a full working studio: multiple workspaces, clients, jobs, bookings, shoots, photographers, payments, production stages, messages and history.</p></div><button class="primary" type="button" data-load-demo>Load Demo Data</button></div><p data-demo-status></p>';
         genericView.prepend(panel);
 
         panel.querySelector('[data-load-demo]').onclick=async()=>{
@@ -459,7 +459,9 @@
         pipeline:()=>showPipeline(),
         production:()=>showProduction(),
         frontdesk:()=>showFrontDesk(),
+        finance:()=>showAccounts(),
         reports:()=>showManagement(),
+        management:()=>showManagement(),
         admin:renderAdmin
     };
 
