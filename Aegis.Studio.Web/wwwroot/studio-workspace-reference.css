@@ -1355,3 +1355,21 @@ body[data-theme="studio-default"] .job-section-tabs button{
   padding:0 12px!important;
   font-size:10px!important;
 }
+
+
+/* Keep the real main navigation above workspace chrome and always clickable. */
+body[data-theme="studio-default"] .navigation-pane .rail{
+  position:relative!important;
+  z-index:5!important;
+  pointer-events:auto!important;
+}
+body[data-theme="studio-default"] .navigation-pane .rail .brand-button{
+  position:relative!important;
+  z-index:6!important;
+  pointer-events:auto!important;
+  cursor:pointer!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspaces{
+  position:relative!important;
+  z-index:1!important;
+}
