@@ -10,7 +10,7 @@ public static class DemoDataEndpoints
 {
     public static void MapStudioDemoData(this WebApplication app)
     {
-        app.MapPost("/api/admin/demo/seed", (ClaimsPrincipal user, StudioDatabase database, IConfiguration configuration, IWebHostEnvironment environment, IFileStorage storage) =>
+        app.MapPost("/api/admin/demo/seed", (ClaimsPrincipal user, StudioDatabase database, IWebHostEnvironment environment, IFileStorage storage) =>
         {
             if(!environment.IsDevelopment())return Results.NotFound();
             string? login = user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
