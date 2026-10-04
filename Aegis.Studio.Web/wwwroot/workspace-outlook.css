@@ -1394,419 +1394,464 @@ body .has-open-job .media-items.image-lens{
   }
 }
 
+/* Aegis.Studio job workspace v2.
+   One authoritative layout. Do not layer legacy workspace overrides below this block. */
 
-/* 2026-10-04 compact job workspace correction.
-   Keep the approved three-column work board visible immediately below the job heading. */
-body .has-open-job .detail-pane{
-  padding:10px 14px 16px!important;
-}
-body .has-open-job .job-breadcrumb{
-  margin:0 0 4px!important;
-  font-size:10px!important;
-  line-height:1.2!important;
-}
-body .has-open-job .job-reading-view>.detail-header{
-  min-height:0!important;
-  height:auto!important;
-  margin:0!important;
-  padding:0 0 6px!important;
-  align-items:center!important;
-}
-body .has-open-job .job-reading-view>.detail-header>div{
-  margin:0!important;
-  padding:0!important;
-  min-height:0!important;
-}
-body .has-open-job .job-reading-view>.detail-header h1{
-  margin:0!important;
-  font-size:24px!important;
-  line-height:1.08!important;
-}
-body .has-open-job .job-reading-view>.detail-header p{
-  margin:3px 0 0!important;
-  font-size:11px!important;
-  line-height:1.2!important;
-}
-body .has-open-job .job-header-actions .action{
-  min-height:30px!important;
-  padding:5px 9px!important;
-  font-size:11px!important;
-}
-body .has-open-job .job-section-tabs{
-  min-height:34px!important;
-  margin:0 0 8px!important;
-  gap:16px!important;
-}
-body .has-open-job .job-section-tabs button{
-  min-height:34px!important;
-  padding:0 1px 7px!important;
-  font-size:12px!important;
-}
-body .has-open-job .job-work-board{
-  margin:0!important;
-  align-items:stretch!important;
-}
-body .has-open-job .job-message-column,
-body .has-open-job .job-lower-pane{
-  height:calc(100dvh - 175px)!important;
-  min-height:430px!important;
-  max-height:760px!important;
-}
-body .has-open-job .job-tab-content{
-  padding:8px!important;
-}
-body .has-open-job .media-items.image-lens{
-  grid-template-columns:repeat(auto-fill,minmax(135px,1fr))!important;
-  gap:10px!important;
-  align-content:start!important;
-}
-body .has-open-job .media-items.image-lens .job-file-tile img{
-  width:100%!important;
-  height:118px!important;
-  object-fit:cover!important;
-  display:block!important;
-}
-body .has-open-job .media-production-layout{
-  min-height:0!important;
-}
-body .has-open-job .media-drop-surface{
-  min-height:0!important;
-}
-@media(max-width:980px){
-  body .has-open-job .job-message-column,
-  body .has-open-job .job-lower-pane{
-    height:auto!important;
-    min-height:360px!important;
-    max-height:none!important;
-  }
-}
-
-
-/* 2026-10-04 approved Studio workspace composition - authoritative final override. */
 .navigation-pane .rail{
-  flex:1 1 auto!important;
-  justify-content:flex-start!important;
-  align-content:flex-start!important;
+  flex:1 1 auto;
+  justify-content:flex-start;
+  align-content:flex-start;
 }
-.navigation-pane .rail>.brand-button{
-  flex:0 0 auto!important;
-}
+.navigation-pane .rail>.brand-button{flex:0 0 auto}
 .navigation-pane .studio-back-button{
-  order:99!important;
-  margin-top:auto!important;
+  order:99;
+  margin-top:auto;
 }
-.navigation-pane .brand-button:not(.studio-back-button){
-  order:0!important;
+.navigation-pane .brand-button:not(.studio-back-button){order:0}
+
+.three-pane.has-open-job{
+  height:100%;
+  min-height:0;
+  overflow:hidden;
 }
 
-/* Eliminate the legacy vertical spacer in an open job. */
-body .three-pane.has-open-job{
-  height:100%!important;
-  min-height:0!important;
-  overflow:hidden!important;
-}
-body .has-open-job .detail-pane{
-  height:100%!important;
-  min-height:0!important;
-  overflow:hidden!important;
-  padding:8px 12px 12px!important;
-}
-body .has-open-job .job-reading-view{
-  display:flex!important;
-  flex-direction:column!important;
-  height:100%!important;
-  min-height:0!important;
-  overflow:hidden!important;
-}
-body .has-open-job .job-breadcrumb{
-  flex:0 0 auto!important;
-  margin:0 0 4px!important;
-}
-body .has-open-job .job-reading-view>.detail-header{
-  flex:0 0 64px!important;
-  height:64px!important;
-  min-height:64px!important;
-  max-height:64px!important;
-  box-sizing:border-box!important;
-  margin:0!important;
-  padding:6px 8px 8px!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:space-between!important;
-  border:0!important;
-}
-body .has-open-job .job-reading-view>.detail-header h1{
-  font-size:25px!important;
-  line-height:1.05!important;
-  margin:0!important;
-}
-body .has-open-job .job-reading-view>.detail-header p{
-  margin:4px 0 0!important;
-  font-size:11px!important;
-}
-body .has-open-job .job-section-tabs{
-  flex:0 0 38px!important;
-  height:38px!important;
-  min-height:38px!important;
-  margin:0 0 8px!important;
-  padding:0 8px!important;
-  box-sizing:border-box!important;
-}
-body .has-open-job .job-section-tabs button{
-  height:38px!important;
-  min-height:38px!important;
-  padding:0 2px 7px!important;
-}
-body .has-open-job .job-work-board{
-  flex:1 1 auto!important;
-  min-height:0!important;
-  height:auto!important;
-  display:grid!important;
-  grid-template-columns:minmax(260px,.85fr) minmax(430px,1.5fr) minmax(255px,.78fr)!important;
-  gap:10px!important;
-  overflow:hidden!important;
-  align-items:stretch!important;
-}
-body .has-open-job .job-message-column,
-body .has-open-job .job-lower-pane{
-  height:100%!important;
-  min-height:0!important;
-  max-height:none!important;
-}
-body .has-open-job .job-context-sidebar{
-  height:100%!important;
-  min-height:0!important;
-  overflow:auto!important;
-  align-content:start!important;
-}
-body .has-open-job .job-lower-pane{
-  display:flex!important;
-  flex-direction:column!important;
-}
-body .has-open-job .media-toolbar-host{
-  min-height:42px!important;
-  padding:5px 7px!important;
-}
-body .has-open-job .job-tab-content{
-  flex:1 1 auto!important;
-  min-height:0!important;
-  overflow:auto!important;
-  padding:8px!important;
-}
-body .has-open-job .media-production-layout{
-  min-height:0!important;
-  height:auto!important;
-}
-body .has-open-job .media-drop-surface{
-  min-height:0!important;
-}
-body .has-open-job .media-items.image-lens{
-  display:grid!important;
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  gap:8px!important;
-  align-content:start!important;
-}
-body .has-open-job .media-items.image-lens .job-file-tile{
-  min-width:0!important;
-}
-body .has-open-job .media-items.image-lens .job-file-tile img{
-  width:100%!important;
-  height:112px!important;
-  object-fit:cover!important;
-  display:block!important;
-}
-body .has-open-job .media-items.image-lens .job-file-tile strong,
-body .has-open-job .media-items.image-lens .job-file-tile small{
-  display:block!important;
-  white-space:nowrap!important;
-  overflow:hidden!important;
-  text-overflow:ellipsis!important;
-}
-@media(max-width:1280px){
-  body .has-open-job .job-work-board{
-    grid-template-columns:minmax(245px,.9fr) minmax(390px,1.35fr)!important;
-  }
-  body .has-open-job .job-context-sidebar{
-    grid-column:1/-1!important;
-    display:grid!important;
-    grid-template-columns:repeat(3,minmax(0,1fr))!important;
-    height:auto!important;
-    overflow:visible!important;
-  }
-}
-@media(max-width:900px){
-  body .has-open-job .detail-pane{overflow:auto!important}
-  body .has-open-job .job-reading-view{height:auto!important;overflow:visible!important}
-  body .has-open-job .job-work-board{grid-template-columns:1fr!important;overflow:visible!important}
-  body .has-open-job .job-message-column,
-  body .has-open-job .job-lower-pane{height:auto!important;min-height:420px!important}
-  body .has-open-job .job-context-sidebar{grid-template-columns:1fr!important}
+.has-open-job .detail-pane.job-reading-view{
+  box-sizing:border-box;
+  height:100%;
+  min-height:0;
+  overflow:hidden;
+  padding:8px 10px 10px;
+  background:#f7f4ef;
+  display:grid;
+  grid-template-rows:16px 46px 34px minmax(0,1fr);
+  gap:0;
 }
 
+.has-open-job .job-breadcrumb{
+  height:16px;
+  margin:0;
+  padding:0 2px;
+  line-height:16px;
+  font-size:10px;
+  color:#8c7a5d;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
 
-/* Photo-first workspace media overview used on the default job screen. */
-body .has-open-job .workspace-media-overview{
+.has-open-job .job-reading-view>.detail-header{
+  box-sizing:border-box;
+  height:46px;
+  min-height:46px;
+  margin:0;
+  padding:2px 4px 4px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:0;
+  background:transparent;
+}
+.has-open-job .job-reading-view>.detail-header>div{
+  min-width:0;
+  margin:0;
+  padding:0;
+}
+.has-open-job .job-reading-view>.detail-header h1{
+  margin:0;
+  font:750 22px/1 "Segoe UI",system-ui,sans-serif;
+  letter-spacing:-.02em;
+  color:#201f1c;
+}
+.has-open-job .job-reading-view>.detail-header p{
+  margin:3px 0 0;
+  font-size:10px;
+  line-height:1.1;
+  color:#746f67;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.has-open-job .job-header-actions{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex:0 0 auto;
+}
+.has-open-job .job-header-actions .action{
+  height:26px;
+  min-height:26px;
+  padding:3px 8px;
+  border:1px solid #e6e0d7;
+  border-radius:7px;
+  background:#fff;
+  color:#302b24;
+  font-size:10px;
+}
+
+.has-open-job .job-section-tabs{
+  box-sizing:border-box;
+  height:34px;
+  min-height:34px;
+  margin:0;
+  padding:0 4px;
+  display:flex;
+  align-items:end;
+  gap:16px;
+  overflow-x:auto;
+  border:0;
+  border-bottom:1px solid #e4ddd4;
+  background:transparent;
+}
+.has-open-job .job-section-tabs button{
+  box-sizing:border-box;
+  height:34px;
+  min-height:34px;
+  padding:0 1px 6px;
+  border:0;
+  border-bottom:3px solid transparent;
+  border-radius:0;
+  background:transparent;
+  color:#514b43;
+  font-size:11px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.has-open-job .job-section-tabs button.active{
+  border-bottom-color:#a87412;
+  background:transparent;
+  color:#211f1b;
+}
+
+.has-open-job .job-work-board{
+  min-width:0;
+  min-height:0;
+  height:100%;
+  overflow:hidden;
+  padding-top:8px;
+  display:grid;
+  grid-template-columns:minmax(255px,.82fr) minmax(390px,1.42fr) minmax(245px,.76fr);
+  gap:10px;
+  align-items:stretch;
+}
+.has-open-job .job-work-board>*{min-width:0;min-height:0}
+
+.has-open-job .job-message-column,
+.has-open-job .job-lower-pane,
+.has-open-job .job-context-sidebar>section,
+.has-open-job .job-details-card{
+  min-width:0;
+  min-height:0;
+  border:1px solid #e8e2da;
+  border-radius:9px;
+  background:#fff;
+  box-shadow:0 2px 7px rgba(53,44,31,.035);
+  overflow:hidden;
+}
+
+.has-open-job .job-message-column{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+}
+.has-open-job .job-message-column>.messages{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
+  padding:9px 12px;
+}
+.has-open-job .job-message-column .message{
+  display:flex;
+  gap:9px;
+  max-width:100%;
+  margin:0;
+  padding:9px 0;
+  border:0;
+  border-bottom:1px solid #f0ece6;
+  border-radius:0;
+  background:transparent;
+}
+.has-open-job .message-avatar{
+  flex:0 0 32px;
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#b78d47;
+  color:#fff;
+  font-size:12px;
+  font-weight:700;
+}
+.has-open-job .internal-discussion .message-avatar{background:#2b2721}
+.has-open-job .message-content p{
+  margin:4px 0;
+  font-size:12px;
+  line-height:1.4;
+}
+.has-open-job .message-head{
+  font-size:10px;
+  color:#827b71;
+}
+.has-open-job .message-kind{display:none}
+
+.has-open-job #hierarchyCompose{
+  flex:0 0 auto;
+  margin:0;
+  padding:8px 10px;
+  border:0;
+  border-top:1px solid #e8e2da;
+  background:#fff;
+}
+.has-open-job #hierarchyCompose>label{display:none}
+.has-open-job .reply-textbox-shell textarea{
+  box-sizing:border-box;
+  width:100%;
+  min-height:58px;
+  height:58px;
+  resize:none;
+  border:1px solid #ddd6cc;
+  border-radius:7px;
+  background:#fff;
+}
+.has-open-job #hierarchyCompose .send-split{
+  margin-top:6px;
+  display:flex;
+  gap:6px;
+  justify-content:flex-end;
+}
+.has-open-job #hierarchyCompose .primary,
+.has-open-job #hierarchyCompose select{
+  min-height:28px;
+  font-size:10px;
+}
+
+.has-open-job .job-lower-pane{
+  height:100%;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+}
+.has-open-job .job-lower-pane>.job-section-tabs{display:none}
+.has-open-job .media-toolbar-host{
+  flex:0 0 auto;
+  min-height:38px;
+  padding:5px 7px;
+  border-bottom:1px solid #ece6de;
+  background:#fff;
+}
+.has-open-job .gallery-tab-filter{
+  flex:0 0 auto;
+  padding:0 8px;
+  background:#fff;
+}
+.has-open-job .job-tab-content{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
+  padding:8px;
+  background:#fff;
+}
+
+.has-open-job .workspace-media-overview{
   height:100%;
   min-height:0;
   display:flex;
   flex-direction:column;
   background:#fff;
 }
-body .has-open-job .workspace-media-heading{
+.has-open-job .workspace-media-heading{
   flex:0 0 auto;
-  min-height:44px;
+  min-height:38px;
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:10px;
-  padding:8px 10px;
+  gap:8px;
+  padding:6px 8px;
   border-bottom:1px solid #ece6de;
 }
-body .has-open-job .workspace-media-heading h2{
+.has-open-job .workspace-media-heading h2{
   margin:0;
-  font-size:17px;
+  font-size:15px;
   line-height:1;
 }
-body .has-open-job .workspace-media-count{
+.has-open-job .workspace-media-count{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  min-width:24px;
-  height:20px;
+  min-width:22px;
+  height:18px;
   margin-left:4px;
-  padding:0 6px;
+  padding:0 5px;
   border-radius:999px;
   background:#eee3cb;
-  font-size:11px;
+  font-size:10px;
 }
-body .has-open-job .workspace-media-actions{
+.has-open-job .workspace-media-actions{
   display:flex;
-  gap:6px;
+  gap:5px;
   flex-wrap:wrap;
   justify-content:flex-end;
 }
-body .has-open-job .workspace-media-actions .action,
-body .has-open-job .workspace-media-actions .primary{
-  min-height:30px;
-  padding:5px 9px;
-  font-size:11px;
+.has-open-job .workspace-media-actions .action,
+.has-open-job .workspace-media-actions .primary{
+  min-height:26px;
+  padding:3px 7px;
+  font-size:10px;
 }
-body .has-open-job .workspace-media-collections{
+.has-open-job .workspace-media-collections{
   flex:0 0 auto;
   display:flex;
-  gap:6px;
+  gap:5px;
   overflow-x:auto;
-  padding:7px 10px;
+  padding:6px 8px;
   border-bottom:1px solid #efe9e2;
 }
-body .has-open-job .workspace-media-collections button{
+.has-open-job .workspace-media-collections button{
   border:0;
   border-radius:999px;
   background:#f4f2ee;
-  padding:5px 10px;
-  font:600 11px/1.2 "Segoe UI",system-ui,sans-serif;
+  padding:4px 8px;
+  font:600 10px/1.2 "Segoe UI",system-ui,sans-serif;
   color:#5d574e;
   white-space:nowrap;
 }
-body .has-open-job .workspace-media-collections button.active{
+.has-open-job .workspace-media-collections button.active{
   background:#f1dfb2;
   color:#2d2417;
 }
-body .has-open-job .workspace-media-grid{
+.has-open-job .workspace-media-grid{
   flex:1 1 auto;
   min-height:0;
   overflow:auto;
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:10px;
+  gap:8px;
   align-content:start;
-  padding:10px;
+  padding:8px;
 }
-body .has-open-job .workspace-media-tile{
+.has-open-job .workspace-media-tile{
   appearance:none;
+  min-width:0;
+  padding:0;
   border:0;
   background:transparent;
-  padding:0;
   text-align:left;
-  min-width:0;
   cursor:pointer;
 }
-body .has-open-job .workspace-media-tile img{
+.has-open-job .workspace-media-tile img{
   display:block;
   width:100%;
   aspect-ratio:1.45/1;
   object-fit:cover;
-  border-radius:7px;
+  border-radius:6px;
   background:#f4f0e8;
 }
-body .has-open-job .workspace-media-tile span{
+.has-open-job .workspace-media-tile span{
   display:block;
-  margin-top:4px;
-  font-size:10px;
+  margin-top:3px;
+  font-size:9px;
   color:#5f594f;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
-body .has-open-job .workspace-media-empty{
-  grid-column:1/-1;
-  padding:24px;
-  text-align:center;
-  color:#7a7369;
+
+.has-open-job .media-production-layout,
+.has-open-job .media-drop-surface{
+  min-height:0;
 }
-@media(max-width:1100px){
-  body .has-open-job .workspace-media-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.has-open-job .media-items.image-lens{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  align-content:start;
+}
+.has-open-job .media-items.image-lens .job-file-tile{
+  min-width:0;
+  padding:0;
+  border:0;
+  background:#fff;
+  box-shadow:none;
+}
+.has-open-job .media-items.image-lens .job-file-tile img,
+.has-open-job .job-file-gallery .job-file-tile img{
+  display:block;
+  width:100%;
+  height:108px;
+  object-fit:cover;
+  border-radius:6px;
+  background:#f5f1eb;
 }
 
+.has-open-job .job-context-sidebar{
+  height:100%;
+  min-height:0;
+  overflow:auto;
+  display:grid;
+  align-content:start;
+  gap:8px;
+}
+.has-open-job .thread-next-tasks,
+.has-open-job .thread-shared-files{
+  height:auto;
+  max-height:none;
+  padding:10px;
+}
+.has-open-job .thread-next-tasks{order:1}
+.has-open-job .job-details-card{order:2}
+.has-open-job .thread-shared-files{order:3}
+.has-open-job .job-details-card summary{
+  padding:10px;
+  border-bottom:1px solid #eee9e2;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+.has-open-job .job-details-card dl{
+  display:grid;
+  grid-template-columns:72px 1fr;
+  gap:6px 8px;
+  margin:0;
+  padding:9px 10px;
+  font-size:10px;
+}
+.has-open-job .job-details-card dt{color:#8a8176}
+.has-open-job .job-details-card dd{margin:0;color:#302c26}
+.has-open-job .job-details-card .action{
+  margin:0 10px 10px;
+  min-height:26px;
+  padding:3px 7px;
+  font-size:10px;
+}
 
-/* 2026-10-04 remove residual open-job top whitespace. */
-body .has-open-job .detail-pane{
-  padding:4px 10px 10px!important;
+@media(max-width:1280px){
+  .has-open-job .job-work-board{
+    grid-template-columns:minmax(240px,.9fr) minmax(360px,1.35fr);
+  }
+  .has-open-job .job-context-sidebar{
+    grid-column:1/-1;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    height:auto;
+    overflow:visible;
+  }
 }
-body .has-open-job .job-breadcrumb{
-  flex:0 0 16px!important;
-  height:16px!important;
-  line-height:16px!important;
-  margin:0!important;
-  padding:0 2px!important;
-  font-size:10px!important;
-}
-body .has-open-job .job-reading-view>.detail-header{
-  flex:0 0 46px!important;
-  height:46px!important;
-  min-height:46px!important;
-  max-height:46px!important;
-  padding:2px 4px 4px!important;
-  margin:0!important;
-}
-body .has-open-job .job-reading-view>.detail-header h1{
-  font-size:22px!important;
-  line-height:1!important;
-}
-body .has-open-job .job-reading-view>.detail-header p{
-  margin:2px 0 0!important;
-  font-size:10px!important;
-  line-height:1.1!important;
-}
-body .has-open-job .job-header-actions{
-  gap:5px!important;
-}
-body .has-open-job .job-header-actions .action{
-  min-height:26px!important;
-  height:26px!important;
-  padding:3px 8px!important;
-  font-size:10px!important;
-}
-body .has-open-job .job-section-tabs{
-  flex:0 0 32px!important;
-  height:32px!important;
-  min-height:32px!important;
-  margin:0 0 6px!important;
-  padding:0 4px!important;
-}
-body .has-open-job .job-section-tabs button{
-  height:32px!important;
-  min-height:32px!important;
-  padding:0 1px 5px!important;
-  font-size:11px!important;
+@media(max-width:900px){
+  .three-pane.has-open-job{overflow:auto}
+  .has-open-job .detail-pane.job-reading-view{
+    height:auto;
+    overflow:visible;
+    grid-template-rows:auto auto auto auto;
+  }
+  .has-open-job .job-work-board{
+    grid-template-columns:1fr;
+    overflow:visible;
+  }
+  .has-open-job .job-message-column,
+  .has-open-job .job-lower-pane{min-height:420px}
+  .has-open-job .job-context-sidebar{
+    grid-column:auto;
+    grid-template-columns:1fr;
+  }
 }
