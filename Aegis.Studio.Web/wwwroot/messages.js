@@ -15,15 +15,8 @@
     let recentMentionAt = 0;
 
     function installNavigation() {
-        const rail = document.querySelector('.rail');
-        if (!rail || rail.querySelector('[data-view="messages"]')) return;
-        const button = document.createElement('button');
-        button.className = 'brand-button';
-        button.dataset.view = 'messages';
-        button.innerHTML = '<span class="nav-icon message-nav-icon">✉</span><span class="nav-label">Messages</span><span id="messageUnreadBadge" class="message-unread-badge" hidden></span>';
-        button.onclick = showMessages;
-        const jobsButton = rail.querySelector('[data-view="jobs"]');
-        rail.insertBefore(button, jobsButton || rail.firstChild);
+        // Messages are contextual to Workspace/Job. Do not create a duplicate top-level destination.
+        // showMessages remains available to contextual actions and direct links.
     }
 
     async function showMessages() {
