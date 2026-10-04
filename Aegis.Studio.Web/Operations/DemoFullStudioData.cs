@@ -192,9 +192,18 @@ internal static class DemoFullStudioData
 
     private static void SeedMedia(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,DemoJob job,Guid jobId,string login,int ordinal)
     {
-        int count=job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?12:
-            job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?10:
-            job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?8:6;
+        int count=job.Number switch
+        {
+            106 => 180, // employee ID job
+            201 => 320, // wedding
+            303 => 100, // school portraits
+            301 => 120, // executive headshots
+            401 => 220, // graduation
+            501 => 60,  // product catalogue
+            _ => job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?12:
+                 job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?10:
+                 job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?8:6
+        };
         string[] statuses=["Needs Sorting","Selected","Editing","Needs Review","Approved","Ready for Delivery"];
         string[] collections=job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
             job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Roster","Stage","Groups","Unclassified"]:
