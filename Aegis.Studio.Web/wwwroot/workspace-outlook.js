@@ -111,6 +111,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         filter();
     };
     window.openWorkspaceJob = async function(id) {
+        if(!workspaceCache.length)await loadWorkspaces();
         const job=await json('/api/jobs/'+id);
         const workspace=workspaceCache.find(w=>w.id===job.workspaceId);
         selectedWorkspace=job.workspaceId;currentWorkspacePermissions=workspace?.permissions || {};workspaceTitle.textContent=workspace?.name || 'Workspace';

@@ -122,8 +122,12 @@ builder.Services.AddDiagnosticLevelTest<CommonSecretsAvailabilityDiagnosticLevel
 
 string studioConnectionString = await secretProvider.GetRequiredAsync("ConnectionStrings:Studio");
 
-NpgsqlDataSource dataSource = NpgsqlDataSource.Create(studioConnectionString);
-builder.Services.AddSingleton(dataSource);
+builder.Services.AddSingleton<NpgsqlDataSource>(services =>
+{
+    NpgsqlDataSourceBuilder source = new(studioConnectionString);
+    source.UseLoggerFactory(services.GetRequiredService<ILoggerFactory>());
+    return source.Build();
+});
 builder.Services.AddSingleton<StudioDatabase>();
 builder.Services.AddSingleton<StudioFeatureDatabase>();
 builder.Services.AddSingleton<StudioMessagingDatabase>();
@@ -216,6 +220,7 @@ app.Use(async(context,next)=>
         await context.Response.WriteAsJsonAsync(new{error=error is ArgumentException?error.Message:"This action could not be completed. Your saved data is retained; refresh and retry."});
     }
 });
+app.UseMiddleware<MyWorkStartupTimingMiddleware>();
 app.UseAuthentication();
 app.UseMiddleware<WorkDayDeviceTokenMiddleware>();
 app.Use(async (context, next) => { bool document = context.Request.Path == "/" || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase); if (document && context.User.Identity?.IsAuthenticated != true) { context.Response.Redirect("/login"); return; } await next(); });
@@ -234,6 +239,7 @@ app.MapGet("/", (HttpContext context,IWebHostEnvironment e) => { context.Respons
 app.MapStudioAuthentication();
 app.MapStudioUserProfiles();
 app.MapStudioNotifications();
+app.MapStudioMyWork();
 app.MapStudioInAppMessaging();
 app.MapStudioMessageAttachments();
 app.MapStudioOperationsEnhancements();
@@ -686,3 +692,4 @@ app.MapGet("/api/attachments/{id:guid}", (Guid id, ClaimsPrincipal user, Attachm
 app.MapGet("/api/accounts/summary", (StudioStore store) => Results.Ok(store.GetAccountsSummary()));
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
+

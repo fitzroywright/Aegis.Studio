@@ -38,8 +38,8 @@ Folder drops traverse nested directory batches. Subject drops target the selecte
 ## Validation
 
 - Release solution build: zero warnings and errors.
-- Solution tests: 151 Web tests and three Domain tests pass; three PostgreSQL integration tests skip without `STUDIO_TEST_POSTGRES`.
-- UI suite: 22 tests, including a complete shared-shell smoke test, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
+- Solution tests: 153 Web tests and three Domain tests pass; four PostgreSQL integration tests skip without `STUDIO_TEST_POSTGRES`.
+- UI suite: 25 tests, including a complete shared-shell smoke test, progressive My Work startup, cancellation, working retries, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
 - JavaScript syntax and whitespace checks pass.
 
 This environment cannot launch Chromium because socket creation is prohibited. Browser screenshot comparison and a live database seed were not verified here. The DOM smoke test exercises all eight screen renderers with an interconnected API fixture; it does not establish pixel-level equivalence or database seed execution.
@@ -54,3 +54,22 @@ npm --prefix tests/ui test
 ```
 
 Set `STUDIO_TEST_POSTGRES` to a disposable PostgreSQL database to include the transactional persistence tests. In Development, use Admin's demo loader once, then walk from My Work through a job, its subjects/media/tasks, Pipeline, Production, Front Desk and Finance. Check persisted actions and photo downloads against the configured storage provider.
+
+## My Work startup diagnostics
+
+My Work paints its shell immediately. Assigned tasks and today's schedule start first; job summaries, profile information, notifications, media counts and thumbnails fill in afterward. Data requests are limited to two at a time. Each card remains usable when another fails, with real retry controls. Leaving My Work aborts its fetches and prevents late responses from repainting another view. Summary SQL readers receive the request cancellation token; existing synchronous authorization/task/schedule reads finish independently.
+
+This is browser background loading, not a persistent server worker. It removes data retrieval from the initial paint while keeping results fresh for the signed-in user. Full media galleries and financial event histories are fetched when their screens need them. My Work media summaries use read-only SQL and never run the media synchronization writes. Job access uses a bulk permission query instead of resolving every job individually. Global role schema setup runs at application startup rather than in every JobAccessService constructor; schedule history schema setup also runs before requests are served.
+
+In the browser console, run:
+
+```js
+studioMyWorkDiagnostics
+console.table(studioMyWorkDiagnostics.requests)
+```
+
+The current run records shell, essential-card and complete times, plus each component's elapsed time, outcome and server trace. `studioMyWorkReady` resolves when the initial background queue finishes. Timings are observational, not a benchmark of your database.
+
+Server logs contain `MyWork startup begin`, request completion/failure and authorization/job-list/assigned-tasks/media-summary phase timings. Match `Run` with the console run and `Trace` with individual requests. Response headers include `X-Studio-Trace` and `Server-Timing`. Request failures retain their exception and elapsed time, including SQL timeouts. The Npgsql data source now uses the application logger factory; temporarily setting `Logging:LogLevel:Npgsql.Command` to `Information` records command durations and SQL for deeper diagnosis. Parameter logging remains disabled. Restore the normal Npgsql warning level after collecting the slow run.
+
+The PostgreSQL startup regression compares bulk permission results with individual checks for inheritance, explicit overrides, inactive membership, directory groups, global roles and administrators. Enable it with `STUDIO_TEST_POSTGRES` when validating against PostgreSQL locally.

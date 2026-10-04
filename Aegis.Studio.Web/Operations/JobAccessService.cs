@@ -15,7 +15,6 @@ public sealed class JobAccessService
         this.database = database;
         workspaceAccess = new WorkspaceAccessService(database);
         globalRoles = new GlobalOperationalRoleStore(database);
-        globalRoles.EnsureSchema();
     }
 
     public bool HasPermission(ClaimsPrincipal user, Guid jobId, string permission)
@@ -53,29 +52,32 @@ public sealed class JobAccessService
         return member.InheritWorkspacePermissions ? Union(inherited, member.Permissions) : Union(global, member.Permissions);
     }
 
-    public IReadOnlyList<Guid> GetAccessibleJobIds(ClaimsPrincipal user)
+    public IReadOnlyList<Guid> GetAccessibleJobIds(ClaimsPrincipal user, bool requireAttachments = false)
     {
-        if (user.IsInRole("Administrator") || globalRoles.HasPermission(user, "ViewAllJobs"))
-        {
-            using NpgsqlConnection connection = database.OpenConnection();
-            using NpgsqlCommand command = connection.CreateCommand();
-            command.CommandText = "select id from studio_jobs order by created_at_utc desc";
-            using NpgsqlDataReader reader = command.ExecuteReader();
-            List<Guid> all = [];
-            while (reader.Read()) all.Add(reader.GetGuid(0));
-            return all;
-        }
-
-        using NpgsqlConnection jobConnection = database.OpenConnection();
-        using NpgsqlCommand jobCommand = jobConnection.CreateCommand();
-        jobCommand.CommandText = "select id from studio_jobs order by created_at_utc desc";
-        using NpgsqlDataReader jobReader = jobCommand.ExecuteReader();
+        bool administrator = user.IsInRole("Administrator");
+        bool globalView = administrator || globalRoles.HasPermission(user, "ViewAllJobs");
+        bool globalAttachments = administrator || (requireAttachments && globalRoles.HasPermission(user, "ViewClientAttachments"));
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        // Match GetPermissions' inheritance and direct-job overrides in one read.
+        // Global ViewAllJobs still grants the same list access as the previous implementation.
+        command.CommandText = """
+            select j.id from studio_jobs j
+            left join studio_workspace_members w on w.workspace_id=j.workspace_id and lower(w.user_name)=lower($1) and w.is_active
+            left join studio_job_members m on m.job_id=j.id and lower(m.user_name)=lower($1) and m.is_active
+            where ($2 or coalesce(m.admin_job,false) or coalesce(m.access_job,false)
+                or ((m.job_id is null or m.inherit_workspace_permissions) and coalesce(w.access_workspace,false)))
+              and (not $3 or $4 or coalesce(m.admin_job,false) or coalesce(m.view_attachments,false)
+                or ((m.job_id is null or m.inherit_workspace_permissions) and coalesce(w.view_attachments,false)))
+            order by j.created_at_utc desc
+            """;
+        command.Parameters.AddWithValue(GetUserName(user));
+        command.Parameters.AddWithValue(globalView);
+        command.Parameters.AddWithValue(requireAttachments);
+        command.Parameters.AddWithValue(globalAttachments);
+        using NpgsqlDataReader reader = command.ExecuteReader();
         List<Guid> result = [];
-        while (jobReader.Read())
-        {
-            Guid id = jobReader.GetGuid(0);
-            if (GetPermissions(user, id).AccessJob) result.Add(id);
-        }
+        while (reader.Read()) result.Add(reader.GetGuid(0));
         return result;
     }
 
@@ -291,3 +293,4 @@ public sealed record JobPermissionSet(bool AccessJob,bool ViewJob,bool ViewConve
     public static JobPermissionSet JobManager => new(true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,true,true,false);
     public static JobPermissionSet Full => new(true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true);
 }
+

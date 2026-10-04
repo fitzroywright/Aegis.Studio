@@ -11,7 +11,9 @@ const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
 }[character]));
 
 async function json(url, options) {
-    const response = await fetch(url, options);
+    const {onResponse,...requestOptions}=options||{};
+    const response = await fetch(url, requestOptions);
+    onResponse?.(response);
     if (!response.ok) {
         let error=null;try{error=await response.json();}catch{}
         const fallback=response.status===403?'You do not have permission for this action.':response.status===401?'Your session has expired. Sign in again.':response.status===404?'This item is no longer available.':'This action could not be completed. Please retry.';

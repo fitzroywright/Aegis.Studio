@@ -12,10 +12,9 @@ public sealed class ScheduleStore
     {
         this.database = database;
         this.configuration = configuration;
-        EnsureOperationalSchema();
     }
 
-    private void EnsureOperationalSchema()
+    public void EnsureOperationalSchema()
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -290,3 +289,4 @@ public sealed record ScheduleAssignmentChange(
     IReadOnlyList<Guid> PreviousResourceIds,
     IReadOnlyList<Guid> NewResourceIds,
     string? Reason);
+

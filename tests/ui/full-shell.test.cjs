@@ -13,7 +13,9 @@ const media=j=>({gallery:{id:j,defaultLens:'Auto',default_lens:'Auto',defaultCol
 function api(u){const p=u.pathname;
  if(p==='/api/auth/me')return {user:{userName:'demo.sam',displayName:'Samantha Lee',isAdministrator:true}};
  if(p==='/api/workspaces'||p==='/api/frontdesk/workspaces')return workspaces;
- if(p==='/api/jobs')return jobs;
+ if(p==='/api/jobs'||p==='/api/my-work/jobs')return jobs;
+ if(p==='/api/my-work/tasks')return tasks;
+ if(p==='/api/my-work/media-summary')return jobs.map(j=>({jobId:j.id,assetCount:20,thumbnailVersionId:'v'+j.id+'0'}));
  if(/^\/api\/jobs\/j\d$/.test(p))return jobs.find(j=>j.id===p.split('/').pop());
  if(p.endsWith('/access'))return {permissions};
  if(p.endsWith('/appearance'))return {color:'#b99750',icon:'folder'};
@@ -38,7 +40,7 @@ function api(u){const p=u.pathname;
 test('the full shell loads every operational screen with a shared data graph',async()=>{const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc}),w=dom.window;
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));w.fetch=async url=>({ok:true,status:200,json:async()=>api(new URL(url,'http://studio.test')),text:async()=>JSON.stringify(api(new URL(url,'http://studio.test')))});
  for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
- await new Promise(r=>setTimeout(r,25));
+ await new Promise(r=>setTimeout(r,25));await w.studioMyWorkReady;
  for(const view of ['mywork','workspaces','pipeline','production','frontdesk','finance','management','admin']){try{await w.studioNavigate(view);assert.ok(w.document.querySelector('#genericView h1'),view);}catch(e){errors.push(view+': '+e.message)}}
  const routeField=w.document.getElementById('workspaceRouteKey');assert.ok(routeField.closest('details'));assert.equal(routeField.closest('details').open,false);
  try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-work-board'));assert.equal(w.document.querySelectorAll('.job-file-tile').length,20)}catch(e){errors.push('job: '+e.message)}

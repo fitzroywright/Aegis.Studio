@@ -9,51 +9,73 @@
         });
     }
 
-    async function renderMyWork(){
-        conversationView.classList.add('hidden');
-        genericView.classList.remove('hidden');
-        genericView.innerHTML='<div class="mywork-loading">Loading your studio…</div>';
+    let myWorkLoad=null;
+    let navigationRevision=0;
 
-        const now=new Date();
-        const startOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-        const endOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
-        const scheduleFrom=new Date(now.getFullYear(),now.getMonth(),now.getDate()-1).toISOString();
-        const scheduleTo=new Date(now.getFullYear(),now.getMonth(),now.getDate()+14).toISOString();
+    function renderMyWork(){
+        const controller=new AbortController(),revision=navigationRevision;
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],status:{},errors:{},taskFilter:'all'};
+        state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&document.body.dataset.studioView==='mywork'&&!genericView.classList.contains('hidden');};
+        myWorkLoad=controller;
+        conversationView.classList.add('hidden');genericView.classList.remove('hidden');
+        const started=performance.now(),run=globalThis.crypto?.randomUUID?.()||String(Date.now());
+        const diagnostics={run,startedAt:new Date().toISOString(),requests:[],shellMs:null,coreMs:null,completeMs:null};
+        window.studioMyWorkDiagnostics=diagnostics;
+        const now=new Date(),from=new Date(now.getFullYear(),now.getMonth(),now.getDate()),to=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+        const urls={tasks:'/api/my-work/tasks',schedule:'/api/schedule/entries?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString()),jobs:'/api/my-work/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/my-work/media-summary'};
+        let inFlight=0;const waiting=[];
+        async function load(key){
+            while(inFlight>=2)await new Promise(resolve=>waiting.push(resolve));
+            if(!state.active())return;
+            inFlight++;state.status[key]='loading';delete state.errors[key];paintMyWork(state);
+            const begin=performance.now();let outcome='ok',trace=null;
+            try{
+                const value=await json(urls[key],{signal:controller.signal,headers:{'X-Studio-Startup':run},onResponse:response=>{trace=response.headers?.get('X-Studio-Trace');}});
+                if(!state.active())return;
+                state[key]=value;state.status[key]='ready';
+            }catch(error){
+                if(controller.signal.aborted){outcome='cancelled';return;}
+                outcome='error';state.status[key]='error';state.errors[key]=error.message;
+            }finally{
+                inFlight--;waiting.shift()?.();
+                diagnostics.requests.push({component:key,url:urls[key],outcome,elapsedMs:Math.round(performance.now()-begin),trace});
+                console.debug('[Studio My Work]',diagnostics.requests.at(-1));
+                if(state.active())paintMyWork(state);
+            }
+        }
+        state.retry=key=>load(key);
+        paintMyWork(state);diagnostics.shellMs=Math.round(performance.now()-started);
+        // Two reads at a time: operational essentials first, enrichment afterwards.
+        const pending=['tasks','schedule','jobs','auth','notifications','media'];
+        async function worker(){
+            while(pending.length&&state.active()){
+                await load(pending.shift());
+                if(diagnostics.coreMs===null&&['tasks','schedule'].every(k=>['ready','error'].includes(state.status[k])))diagnostics.coreMs=Math.round(performance.now()-started);
+            }
+        }
+        window.studioMyWorkReady=Promise.all([worker(),worker()]).then(()=>{
+            diagnostics.completeMs=Math.round(performance.now()-started);
+            diagnostics.cancelled=controller.signal.aborted;
+            console.info('[Studio My Work startup]',diagnostics);
+        });
+        return Promise.resolve();
+    }
 
-        const [auth,jobs,tasks,schedule,notifications]=await Promise.all([
-            json('/api/auth/me').catch(()=>({})),
-            json('/api/jobs'),
-            json('/api/operations/activities').catch(()=>[]),
-            json('/api/schedule/entries?from='+encodeURIComponent(scheduleFrom)+'&to='+encodeURIComponent(scheduleTo)).catch(()=>[]),
-            json('/api/notifications?count=80').catch(()=>[])
-        ]);
-
-        const me=auth.user||auth;
-        const user=String(me.userName||me.loginName||'').toLowerCase();
+    function paintMyWork(state){
+        if(!state.active())return;
+        const {auth,jobs,tasks,schedule,notifications}=state;
+        const now=new Date(),startOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()),endOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+        const phase=(key,content)=>state.status[key]==='ready'?content:state.status[key]==='error'?'<div class="mw-empty" role="alert">'+esc(state.errors[key])+' <button data-mw-retry="'+key+'">Retry</button></div>':'<div class="mw-empty" role="status">Loading…</div>';
+        const metric=(key,value)=>state.status[key]==='ready'?value:'…';
+        const me=auth.user||auth,user=String(me.userName||me.loginName||'').toLowerCase();
         const roles=[...(Array.isArray(me.roles)?me.roles:[]),...(Array.isArray(auth.roles)?auth.roles:[])].map(x=>String(x).toLowerCase());
         const isManager=me.isAdministrator===true||auth.isAdministrator===true||roles.some(r=>/administrator|manager|owner|finance/.test(r));
-        const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status) && (!user || String(t.assignedTo||'').toLowerCase()===user));
-        const todaySchedule=schedule
-            .filter(s=>{const d=new Date(s.startsAtUtc||s.start||s.startsAt);return s.status!=='Cancelled'&&d>=startOfDay&&d<endOfDay;})
-            .sort((a,b)=>new Date(a.startsAtUtc||a.start||a.startsAt)-new Date(b.startsAtUtc||b.start||b.startsAt));
-
-        const recentJobs=[...jobs]
-            .sort((a,b)=>new Date(b.eventDate||b.createdAtUtc||0)-new Date(a.eventDate||a.createdAtUtc||0))
-            .slice(0,6);
-
-        const visualJobIds=[...new Set([
-            ...jobs.map(j=>j.id),
-            ...todaySchedule.map(s=>s.jobId).filter(Boolean)
-        ])];
-
-        const mediaByJob=new Map();
-        await Promise.all(visualJobIds.map(async jobId=>{
-            const media=await json('/api/jobs/'+jobId+'/media').catch(()=>({assets:[]}));
-            mediaByJob.set(String(jobId),media);
-        }));
-
-        const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assets:[]}}));
-        const totalPhotos=[...mediaByJob.values()].reduce((sum,x)=>sum+(x.assets?.length||0),0);
+        const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status)&&(!user||String(t.assignedTo||'').toLowerCase()===user));
+        const todaySchedule=schedule.filter(entry=>entry.status!=='Cancelled'&&new Date(entry.startsAtUtc)>=startOfDay&&new Date(entry.startsAtUtc)<endOfDay).sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
+        const recentJobs=[...jobs].sort((a,b)=>new Date(b.createdAtUtc||b.createdAt||0)-new Date(a.createdAtUtc||a.createdAt||0)).slice(0,4);
+        const mediaByJob=new Map(state.media.map(row=>[String(row.jobId),row]));
+        const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assetCount:0}}));
+        const totalPhotos=state.media.reduce((sum,row)=>sum+row.assetCount,0);
         const messageNotifications=notifications.filter(n=>/message|conversation|reply/i.test(String(n.eventType||n.title||n.type||'')));
         const activityNotifications=notifications.slice(0,8);
 
@@ -62,16 +84,15 @@
         const formatTime=value=>new Date(value).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
         const formatDay=value=>new Date(value).toLocaleDateString([],{month:'short',day:'numeric'});
         const imageForJob=jobId=>{
-            const media=mediaByJob.get(String(jobId))||{assets:[]};
-            const asset=(media.assets||[]).find(a=>String(a.contentType||'').startsWith('image/'))||(media.assets||[])[0];
-            return asset?.versionId?'/api/jobs/'+jobId+'/versions/by-id/'+asset.versionId+'/content':'';
+            const version=mediaByJob.get(String(jobId))?.thumbnailVersionId;
+            return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/content':'';
         };
 
         const recentCards=mediaSnapshots.slice(0,4).map(({job,media})=>{
             const image=imageForJob(job.id);
-            const count=media.assets?.length||0;
+            const count=state.status.media==='ready'?media.assetCount:'…';
             return `<button class="mw-recent-card" data-open-job="${job.id}">
-                <div class="mw-recent-image">${image?`<img src="${image}" alt="">`:'<span>📷</span>'}</div>
+                <div class="mw-recent-image">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>📷</span>'}</div>
                 <div class="mw-recent-copy">
                     <strong>${esc(job.title)}</strong>
                     <span>${count} photos · ${esc(job.status||'')}</span>
@@ -84,7 +105,7 @@
             const image=entry.jobId?imageForJob(entry.jobId):'';
             return `<button class="mw-session-row" data-open-job="${entry.jobId||job.id||''}">
                 <div class="mw-session-time"><strong>${formatTime(entry.startsAtUtc||entry.start||entry.startsAt)}</strong><span>${formatTime(entry.endsAtUtc||entry.end||entry.endsAt)}</span></div>
-                <div class="mw-session-thumb">${image?`<img src="${image}" alt="">`:'<span>📷</span>'}</div>
+                <div class="mw-session-thumb">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>📷</span>'}</div>
                 <div class="mw-session-main"><strong>${esc(job.title||entry.title||'Session')}</strong><span>${esc(job.clientName||'')}</span><span>${esc(entry.location||'Location not set')}</span></div>
                 <span class="mw-state-pill">${esc(entry.status||'Upcoming')}</span>
                 <span class="mw-kebab">⋮</span>
@@ -139,73 +160,86 @@
             ...(isManager?[['finance','Finance',''],['management','Management','']]:[])
         ];
 
-        genericView.innerHTML=`
+        const markup=`
             <section class="mw-page">
-                <header class="mw-page-header">
+                <header class="mw-page-header" data-mw-region="header">
                     <div><h1>My Work</h1><p>Your day, your studio, everything in one place.</p></div>
-                    <div class="mw-date"><strong>${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</strong><span>Studio overview</span></div>
+                    <div class="mw-date"><strong>${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</strong><span>${state.status.auth==='error'?'<button data-mw-retry="auth">Profile unavailable · Retry</button>':'Studio overview'}</span></div>
                 </header>
 
                 <div class="mw-layout">
                     <div class="mw-main">
-                        <div class="mw-metrics">
-                            <article class="mw-metric"><span class="mw-metric-icon blue">📷</span><div><strong>${todaySchedule.length}</strong><b>Today's Sessions</b><small>${todaySchedule.length} scheduled</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon green">✓</span><div><strong>${myTasks.length}</strong><b>Pending Tasks</b><small>${myTasks.filter(t=>String(t.priority).toLowerCase()==='high').length} high priority</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon purple">▧</span><div><strong>${totalPhotos}</strong><b>Photos Catalogued</b><small>Across accessible jobs</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon orange">●</span><div><strong>${messageNotifications.filter(n=>!n.isRead).length}</strong><b>Unread Messages</b><small>${messageNotifications.length} recent</small></div></article>
+                        <div class="mw-metrics" data-mw-region="metrics">
+                            <article class="mw-metric"><span class="mw-metric-icon blue">📷</span><div><strong>${metric('schedule',todaySchedule.length)}</strong><b>Today's Sessions</b><small>${todaySchedule.length} scheduled</small></div></article>
+                            <article class="mw-metric"><span class="mw-metric-icon green">✓</span><div><strong>${metric('tasks',myTasks.length)}</strong><b>Pending Tasks</b><small>${myTasks.filter(t=>String(t.priority).toLowerCase()==='high').length} high priority</small></div></article>
+                            <article class="mw-metric"><span class="mw-metric-icon purple">▧</span><div><strong>${metric('media',totalPhotos)}</strong><b>Photos Catalogued</b><small>${state.status.media==='error'?'<span role="alert">Photos unavailable</span> <button data-mw-retry="media">Retry</button>':'Across accessible jobs'}</small></div></article>
+                            <article class="mw-metric"><span class="mw-metric-icon orange">●</span><div><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong><b>Unread Messages</b><small>${messageNotifications.length} recent</small></div></article>
                         </div>
 
                         <div class="mw-two-col">
-                            <section class="mw-card">
+                            <section class="mw-card" data-mw-region="sessions">
                                 <header><h2>Today's Sessions</h2><button data-nav="pipeline">View Calendar →</button></header>
-                                <div>${sessionRows}</div>
+                                <div>${phase('schedule',sessionRows)}</div>
                             </section>
-                            <section class="mw-card">
+                            <section class="mw-card" data-mw-region="recent">
                                 <header><h2>Recent Work</h2><button data-nav="workspaces">View Workspaces →</button></header>
-                                <div class="mw-recent-grid">${recentCards||'<div class="mw-empty">No recent work.</div>'}</div>
+                                <div class="mw-recent-grid">${phase('jobs',recentCards||'<div class="mw-empty">No recent work.</div>')}</div>
                             </section>
                         </div>
 
                         <div class="mw-two-col lower">
-                            <section class="mw-card">
+                            <section class="mw-card" data-mw-region="tasks">
                                 <header><h2>My Tasks</h2><button data-nav="workspaces">Open Jobs →</button></header>
                                 <div class="mw-task-tabs"><button class="active" data-mw-filter="all">All (${myTasks.length})</button><button data-mw-filter="edit">Editing</button><button data-mw-filter="proof">Client</button><button data-mw-filter="print">Output</button></div>
-                                <div>${taskRows}</div><footer class="mw-quick-links">${quickLinks.map(link=>`<button class="text-button" data-nav="${link[0]}">${link[1]}</button>`).join('')}</footer>
+                                <div>${phase('tasks',taskRows)}</div><footer class="mw-quick-links">${quickLinks.map(link=>`<button class="text-button" data-nav="${link[0]}">${link[1]}</button>`).join('')}</footer>
                             </section>
-                            <section class="mw-card">
+                            <section class="mw-card" data-mw-region="pipeline">
                                 <header><h2>Pipeline Overview</h2><button data-nav="pipeline">View Pipeline →</button></header>
-                                <div class="mw-pipeline-stats">
+                                ${state.status.jobs==='ready'?'':phase('jobs','')}<div class="mw-pipeline-stats" ${state.status.jobs==='ready'?'':'hidden'}>
                                     <div class="blue"><strong>${pipelineCounts.capture}</strong><span>Capture</span></div>
                                     <div class="purple"><strong>${pipelineCounts.edit}</strong><span>Edit</span></div>
                                     <div class="orange"><strong>${pipelineCounts.review}</strong><span>Review</span></div>
                                     <div class="green"><strong>${pipelineCounts.deliver}</strong><span>Deliver</span></div>
                                 </div>
                                 <h3>Active Jobs (${jobs.length})</h3>
-                                <div class="mw-active-jobs">${jobs.slice(0,5).map(job=>`<button data-open-job="${job.id}"><span>${esc(job.title)}</span><i><em style="width:${tasks.filter(t=>t.jobId===job.id).length?Math.round(tasks.filter(t=>t.jobId===job.id&&t.status==='Completed').length/tasks.filter(t=>t.jobId===job.id).length*100):0}%"></em></i><b>${esc(job.status||'Active')}</b></button>`).join('')}</div>
+                                <div class="mw-active-jobs" ${state.status.jobs==='ready'?'':'hidden'}>${jobs.slice(0,5).map(job=>`<button data-open-job="${job.id}"><span>${esc(job.title)}</span><i><em style="width:${job.taskCount?Math.round(job.completedTaskCount/job.taskCount*100):0}%"></em></i><b>${esc(job.status||'Active')}</b></button>`).join('')}</div>
                             </section>
                         </div>
                     </div>
 
                     <aside class="mw-side">
-                        <section class="mw-card">
+                        <section class="mw-card" data-mw-region="schedule">
                             <header><h2>Today's Schedule</h2><button data-nav="pipeline">View All →</button></header>
-                            <div class="mw-schedule-list">${scheduleRows}</div>
+                            <div class="mw-schedule-list">${phase('schedule',scheduleRows)}</div>
                         </section>
-                        <section class="mw-card">
+                        <section class="mw-card" data-mw-region="messages">
                             <header><h2>Messages</h2><button data-nav="workspaces">Open Jobs →</button></header>
-                            <div>${messageRows}</div>
+                            <div>${phase('notifications',messageRows)}</div>
                             <button class="mw-link-button" data-nav="workspaces">Open workspace jobs →</button>
                         </section>
-                        <section class="mw-card">
+                        <section class="mw-card" data-mw-region="activity">
                             <header><h2>Studio Activity</h2><button data-nav="${isManager?'management':'workspaces'}">View All →</button></header>
-                            <div>${activityRows}</div>
+                            <div>${phase('notifications',activityRows)}</div>
                         </section>
                     </aside>
                 </div>
             </section>`;
 
+        const next=document.createElement('div');next.innerHTML=markup;
+        if(!genericView.querySelector('.mw-page')){genericView.replaceChildren(next.firstElementChild);state.root=genericView.querySelector('.mw-page');}
+        else next.querySelectorAll('[data-mw-region]').forEach(region=>{
+            const existing=genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]');
+            if(existing.innerHTML===region.innerHTML)return;
+            const scroll=[...existing.querySelectorAll('div')].map(el=>el.scrollTop);
+            const focused=document.activeElement?.dataset?.mwFilter;
+            existing.innerHTML=region.innerHTML;
+            existing.querySelectorAll('div').forEach((el,i)=>el.scrollTop=scroll[i]||0);
+            if(focused)existing.querySelector('[data-mw-filter="'+focused+'"]')?.focus();
+        });
+        state.root=genericView.querySelector('.mw-page');
+        genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
         genericView.querySelectorAll('[data-mw-filter]').forEach(button=>button.onclick=()=>{
-            const filter=button.dataset.mwFilter;
+            const filter=button.dataset.mwFilter;state.taskFilter=filter;
             genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b===button));
             genericView.querySelectorAll('[data-task-type]').forEach(row=>row.hidden=filter!=='all'&&!row.dataset.taskType.toLowerCase().includes(filter));
         });
@@ -214,10 +248,12 @@
             if(button.dataset.messageJob)await openWorkspaceJob(button.dataset.messageJob);
             else document.getElementById('notificationButton').click();
         });
-        genericView.querySelectorAll('[data-open-job]').forEach(button=>button.addEventListener('click',()=>{
+        genericView.querySelectorAll('[data-open-job]').forEach(button=>button.onclick=()=>{
             if(button.dataset.openJob)openWorkspaceJob(button.dataset.openJob).catch(error=>alert(error.message));
-        }));
-        genericView.querySelectorAll('[data-nav]').forEach(button=>button.addEventListener('click',()=>window.studioNavigate(button.dataset.nav)));
+        });
+        genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b.dataset.mwFilter===state.taskFilter));
+        genericView.querySelectorAll('[data-task-type]').forEach(row=>row.hidden=state.taskFilter!=='all'&&!row.dataset.taskType.toLowerCase().includes(state.taskFilter));
+        genericView.querySelectorAll('[data-nav]').forEach(button=>button.onclick=()=>window.studioNavigate(button.dataset.nav));
     }
 
     async function renderWorkspaces(){
@@ -556,11 +592,14 @@
     window.studioNavigate=async function(view){
         const route=routes[view];
         if(!route) throw new Error('Unknown Studio navigation view: '+view);
+        const revision=++navigationRevision;
+        myWorkLoad?.abort();
         setActive(view);
         try{
             await route();
-            setActive(view);
+            if(revision===navigationRevision)setActive(view);
         }catch(error){
+            if(revision!==navigationRevision)return;
             conversationView.classList.add('hidden');
             genericView.classList.remove('hidden');
             genericView.innerHTML='<div class="studio-page-heading"><h1>Unable to load view</h1></div><div class="studio-card"><p>'+esc(error?.message||error)+'</p></div>';
@@ -574,12 +613,9 @@
     });
 
     const topNew=document.getElementById('topNewButton');
-    if(topNew) topNew.onclick=()=>document.getElementById('newRequestDialog')?.showModal();
+    if(topNew) topNew.onclick=async()=>{topNew.disabled=true;try{await loadWorkspaces();document.getElementById('newRequestDialog')?.showModal();}catch(error){alert(error.message);}finally{topNew.disabled=false;}};
 
     const startStudio=async()=>{
-        // Let the base shell, theme, authentication and shared workspace cache finish
-        // their startup work before the first routed view is painted.
-        try{await loadWorkspaces();}catch{}
         window.studioNavigate('mywork').catch(error=>{
             console.error('Studio startup navigation failed.',error);
         });

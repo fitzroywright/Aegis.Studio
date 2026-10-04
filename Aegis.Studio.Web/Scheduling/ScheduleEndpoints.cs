@@ -12,6 +12,7 @@ public static class ScheduleEndpoints
 {
     public static void MapStudioScheduling(this WebApplication app)
     {
+        app.Services.GetRequiredService<ScheduleStore>().EnsureOperationalSchema();
         app.MapGet("/api/schedule/resources", (ScheduleStore store, bool? includeInactive) => Results.Ok(store.GetResources(includeInactive == true))).RequireAuthorization();
         app.MapPost("/api/schedule/resources", (ScheduleResourceRequest request, ClaimsPrincipal user, ScheduleStore store) =>
         {
@@ -248,3 +249,4 @@ public static class ScheduleEndpoints
 }
 
 public sealed record ScheduleReassignmentRequest(IReadOnlyList<Guid>? ResourceIds,string? Reason);
+
