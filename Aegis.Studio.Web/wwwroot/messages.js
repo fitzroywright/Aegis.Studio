@@ -52,6 +52,8 @@
         startRefresh();
     }
 
+    window.showStudioMessages = showMessages;
+
     async function loadThreads() {
         const threads = await json('/api/messages/threads');
         const list = document.getElementById('messageThreadList');
