@@ -202,83 +202,64 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 </form>`;
         } else {
             detailPane.innerHTML = `
-                <div class="job-breadcrumb">Workspaces / ${esc(workspaceName)}</div>
+                <div class="job-breadcrumb">Workspaces / ${esc(workspaceName)} <span aria-hidden="true">›</span> <strong>${esc(job.title)}</strong></div>
 
                 <header class="studio-job-header">
                     <div class="studio-job-identity">
                         <div class="studio-job-thumb" data-job-cover aria-hidden="true">
                             <span>${esc((job.title || 'J').slice(0,1))}</span>
                         </div>
-                        <div>
-                            <div class="studio-job-title-line">
-                                <h1>${esc(job.title)}</h1>
+                        <div class="studio-job-copy">
+                            <div class="studio-job-title-line"><h1>${esc(job.title)}</h1></div>
+                            <div class="studio-job-client">${esc(job.linkedClientName || job.clientName || 'Client not linked')}</div>
+                            <div class="studio-job-meta">
+                                <span>${studioWorkspaceIcon('calendar')}<b data-job-date>${esc(job.eventDate || 'Needs scheduling')}</b></span>
+                                <span>${studioWorkspaceIcon('activity')}<b data-job-location>Location not set</b></span>
                                 <span class="studio-status-pill" data-status="${esc(job.status)}">${esc(job.status)}</span>
                             </div>
-                            <p>${esc([
-                                job.linkedClientName || job.clientName || 'Client not linked',
-                                job.eventDate || 'Needs scheduling',
-                                workspaceName
-                            ].filter(Boolean).join(' · '))}</p>
                         </div>
                     </div>
                     <div class="job-header-actions">
-                        <button class="action" type="button" data-job-list>${studioWorkspaceIcon('tasks')}<span>Jobs</span></button>
-                        <button class="primary compact-primary" type="button" data-edit-details>${studioWorkspaceIcon('activity')}<span>Edit Details</span></button>
+                        <button class="action" type="button" data-message-action>${studioWorkspaceIcon('messages')}<span>Message</span></button>
+                        <button class="action" type="button" data-add-task>Add Task</button>
+                        <button class="action" type="button" data-more-action>More <span aria-hidden="true">⌄</span></button>
                     </div>
                 </header>
 
-                <section class="studio-job-summary" aria-label="Job status summary">
-                    <article class="studio-summary-card studio-summary-progress">
-                        <div class="studio-progress-ring" data-progress-ring style="--progress:${studioStatusProgress(job.status)}">
-                            <strong>${studioStatusProgress(job.status)}%</strong>
-                        </div>
-                        <div><span>Workflow</span><strong>${esc(job.status)}</strong><small>Current job stage</small></div>
-                    </article>
-                    <article class="studio-summary-card">
-                        <span class="studio-summary-icon">${studioWorkspaceIcon('media')}</span>
-                        <div><span>Media</span><strong data-media-count>—</strong><small data-media-note>Loading photographs</small></div>
-                    </article>
-                    <article class="studio-summary-card">
-                        <span class="studio-summary-icon">${studioWorkspaceIcon('tasks')}</span>
-                        <div class="studio-summary-grow"><span>Tasks</span><strong data-task-count>—</strong><small data-task-note>Loading workflow tasks</small><div class="studio-mini-progress"><i data-task-progress></i></div></div>
-                    </article>
-                    <article class="studio-summary-card">
-                        <span class="studio-summary-icon">${studioWorkspaceIcon('subjects')}</span>
-                        <div><span>Subjects</span><strong data-subject-count>—</strong><small>People / roster</small></div>
-                    </article>
-                </section>
-
                 <nav class="studio-job-tabs job-section-tabs" aria-label="Job information">
-                    <button data-job-tab="messages">${studioWorkspaceIcon('messages')}<span>Messages</span></button>
-                    <button data-job-tab="gallery">${studioWorkspaceIcon('media')}<span>Media</span></button>
-                    <button data-job-tab="subjects">${studioWorkspaceIcon('subjects')}<span>Subjects</span></button>
-                    <button data-job-tab="tasks">${studioWorkspaceIcon('tasks')}<span>Tasks</span></button>
-                    <button data-job-tab="calendar">${studioWorkspaceIcon('calendar')}<span>Calendar</span></button>
-                    <button data-job-tab="activity">${studioWorkspaceIcon('activity')}<span>Activity</span></button>
+                    <button data-job-tab="messages"><span>Messages</span></button>
+                    <button data-job-tab="gallery"><span>Media</span></button>
+                    <button data-job-tab="subjects"><span>Subjects</span></button>
+                    <button data-job-tab="tasks"><span>Tasks</span></button>
+                    <button data-job-tab="calendar"><span>Calendar</span></button>
+                    <button data-job-tab="activity"><span>Activity</span></button>
                 </nav>
 
                 <div class="studio-job-board job-work-board">
                     <section class="studio-job-messages job-message-column" aria-label="Messages">
                         <header class="job-panel-heading">
-                            <div>${studioWorkspaceIcon('messages')}<strong>Messages</strong><span>Conversation</span></div>
-                            <span class="studio-panel-status">Live</span>
+                            <div><strong>Messages</strong><span class="panel-count">${combined.length}</span></div>
+                            <div class="panel-heading-actions">
+                                <button type="button" class="icon-button" data-message-search aria-label="Search messages" title="Search messages">${studioWorkspaceIcon('messages')}</button>
+                                <button type="button" class="icon-button" aria-label="More message options" title="More message options">⋮</button>
+                            </div>
                         </header>
                         <div id="combinedJobMessages" class="messages" aria-live="polite"></div>
-                        <form id="hierarchyCompose" class="composer">
+                        <form id="hierarchyCompose" class="composer compact-composer">
                             <div class="reply-textbox-shell">
-                                <textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>
+                                <textarea id="hierarchyBody" rows="1" placeholder="Type a message…" required maxlength="10000"></textarea>
                                 <label class="reply-paperclip" title="Attach document" aria-label="Attach document">
                                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8l9.2-9.2"/></svg>
                                     <input type="file" data-message-file hidden>
                                 </label>
                             </div>
                             <div class="send-split">
-                                <button class="primary" type="submit">Reply</button>
                                 <select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply">
                                     <option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option>
-                                    <option value="Internal">Reply as internal note</option>
-                                    <option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option>
+                                    <option value="Internal">Internal note</option>
+                                    <option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>As myself</option>
                                 </select>
+                                <button class="primary send-icon-button" type="submit" aria-label="Send message">➤</button>
                             </div>
                             <p class="muted">${esc(customerNotice)}</p>
                             <p id="hierarchyError" role="alert"></p>
@@ -292,23 +273,18 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     </section>
 
                     <aside class="studio-job-context job-context-sidebar">
-                        <section class="thread-next-tasks">
-                            <header class="job-panel-heading"><div>${studioWorkspaceIcon('trend')}<strong>What's Next</strong><span>Workflow</span></div></header>
-                            <div class="studio-next-loading">Loading workflow…</div>
-                        </section>
+                        <section class="thread-next-tasks"></section>
 
                         <section class="job-details-card">
-                            <header class="job-panel-heading">
-                                <div>${studioWorkspaceIcon('camera')}<strong>Job Details</strong><span>Current booking</span></div>
-                            </header>
+                            <header class="context-card-header"><strong>Job Details</strong><button class="action text-button" type="button" data-edit-details>Edit</button></header>
                             <dl>
-                                <dt>Customer</dt><dd>${esc(job.linkedClientName || job.clientName || 'Not linked')}</dd>
-                                <dt>Date</dt><dd>${esc(job.eventDate || 'Needs scheduling')}</dd>
-                                <dt>Status</dt><dd>${esc(job.status)}</dd>
                                 <dt>Workspace</dt><dd>${esc(workspaceName)}</dd>
-                                <dt>Assigned to</dt><dd>${esc(job.assignedTo ? studioFirstName(job.assignedTo) : 'Unassigned')}</dd>
+                                <dt>Status</dt><dd><span class="studio-status-pill" data-status="${esc(job.status)}">${esc(job.status)}</span></dd>
+                                <dt>Event Date</dt><dd>${esc(job.eventDate || 'Needs scheduling')}</dd>
+                                <dt>Location</dt><dd data-details-location>Location not set</dd>
+                                <dt>Customer</dt><dd>${esc(job.linkedClientName || job.clientName || 'Not linked')}</dd>
+                                <dt>Assigned To</dt><dd>${esc(job.assignedTo ? studioFirstName(job.assignedTo) : 'Unassigned')}</dd>
                             </dl>
-                            <button class="action" type="button" data-edit-details>Edit Details</button>
                         </section>
 
                         <section class="thread-shared-files"></section>
@@ -321,8 +297,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
             <article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}" data-message-id="${esc(m.sourceId || '')}">
                 <span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly).slice(0,1))}</span>
                 <div class="message-content">
-                    <div class="message-head">${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div>
-                    <p style="white-space:pre-wrap">${esc(m.body)}</p>
+                    <div class="message-head"><strong>${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))}</strong><time>${esc(new Date(m.at).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))}</time></div>
+                    <p>${esc(m.body)}</p>
                 </div>
             </article>`).join('') || '<p>No messages to display.</p>';
 
@@ -335,13 +311,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
 
         const syncSend = () => {
             const button = document.getElementById('hierarchyCompose').querySelector('button');
-            button.textContent = !job
-                ? 'Send message'
-                : sender?.value === 'Internal'
-                    ? 'Reply as internal note'
-                    : sender?.value === 'Self'
-                        ? 'Reply as myself'
-                        : 'Reply';
+            if(!job) button.textContent='Send message';
+            else if(!button.classList.contains('send-icon-button')) button.textContent = sender?.value === 'Internal' ? 'Reply as internal note' : sender?.value === 'Self' ? 'Reply as myself' : 'Reply';
             button.disabled = !canSend();
         };
 
@@ -352,45 +323,48 @@ function mergeJobMessages(teamMessages, customerMessages) {
         syncSend();
 
         if (job) {
-            detailPane.querySelector('[data-job-list]').onclick = () => {
-                document.getElementById('conversationView').classList.remove('has-open-job');
-                loadConversations().catch(fail);
-            };
+            const nextPanel = detailPane.querySelector('.thread-next-tasks');
+            const filesPanel = detailPane.querySelector('.thread-shared-files');
+            const lower = detailPane.querySelector('.job-lower-pane');
+            const current = () => version === revision;
+
             detailPane.querySelectorAll('[data-edit-details]').forEach(button => {
                 button.onclick = () => openJobDetailsEditor(job);
             });
 
-            const nextPanel = detailPane.querySelector('.thread-next-tasks');
-            const filesPanel = detailPane.querySelector('.thread-shared-files');
-            const current = () => version === revision;
+            detailPane.querySelector('[data-message-action]').onclick = () => {
+                detailPane.querySelector('#hierarchyBody')?.focus();
+            };
+            detailPane.querySelector('[data-add-task]').onclick = () => {
+                const dialog=studioDialog('Job tasks','<div class="all-tasks"></div>');
+                const panel=dialog.querySelector('.all-tasks');
+                const refresh=()=>renderJobTasks(job,panel,()=>dialog.isConnected,refresh);
+                refresh().catch(error=>panel.textContent=error.message);
+            };
+            detailPane.querySelector('[data-more-action]').onclick = () => openJobDetailsEditor(job);
+
+            const dateWindowStart=new Date();
+            dateWindowStart.setFullYear(dateWindowStart.getFullYear()-2);
+            const dateWindowEnd=new Date();
+            dateWindowEnd.setFullYear(dateWindowEnd.getFullYear()+3);
 
             Promise.allSettled([
                 json(`/api/jobs/${job.id}/media`),
-                json(`/api/operations/activities?jobId=${job.id}`),
-                json(`/api/jobs/${job.id}/subjects`)
+                json(`/api/schedule/entries?jobId=${job.id}&from=${encodeURIComponent(dateWindowStart.toISOString())}&to=${encodeURIComponent(dateWindowEnd.toISOString())}`)
             ]).then(results => {
                 if(!current()) return;
                 const media = results[0].status === 'fulfilled' ? (results[0].value.assets || []) : [];
-                const tasks = results[1].status === 'fulfilled' ? results[1].value : [];
-                const subjects = results[2].status === 'fulfilled' ? results[2].value : [];
+                const schedules = results[1].status === 'fulfilled' ? results[1].value : [];
                 const images = media.filter(a => String(a.contentType || '').startsWith('image/'));
-                const completed = tasks.filter(t => String(t.status || '').toLowerCase() === 'completed').length;
-                const taskPct = tasks.length ? Math.round(completed / tasks.length * 100) : 0;
-                const mediaCount = detailPane.querySelector('[data-media-count]');
-                const mediaNote = detailPane.querySelector('[data-media-note]');
-                const taskCount = detailPane.querySelector('[data-task-count]');
-                const taskNote = detailPane.querySelector('[data-task-note]');
-                const taskProgress = detailPane.querySelector('[data-task-progress]');
-                const subjectCount = detailPane.querySelector('[data-subject-count]');
-                if(mediaCount) mediaCount.textContent=String(images.length);
-                if(mediaNote) mediaNote.textContent=images.length === 1 ? '1 photograph' : images.length + ' photographs';
-                if(taskCount) taskCount.textContent=completed + ' / ' + tasks.length;
-                if(taskNote) taskNote.textContent=tasks.length ? taskPct + '% complete' : 'No tasks yet';
-                if(taskProgress) taskProgress.style.width=taskPct + '%';
-                if(subjectCount) subjectCount.textContent=String(subjects.length);
                 const cover=detailPane.querySelector('[data-job-cover]');
                 const first=images[0];
                 if(cover && first?.versionId) cover.innerHTML=`<img src="/api/jobs/${job.id}/versions/by-id/${first.versionId}/content" alt="">`;
+                const schedule=schedules.find(x=>x.location)||schedules[0];
+                const location=schedule?.location || 'Location not set';
+                const locationHeader=detailPane.querySelector('[data-job-location]');
+                const locationDetails=detailPane.querySelector('[data-details-location]');
+                if(locationHeader) locationHeader.textContent=location;
+                if(locationDetails) locationDetails.textContent=location;
             });
 
             renderCompactTasks(job, nextPanel, current)
@@ -401,8 +375,6 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 .catch(error => { if (current()) filesPanel.textContent = 'Conversation files could not be loaded: ' + error.message; });
 
             let tabRevision = 0;
-            const board = detailPane.querySelector('.job-work-board');
-            const lower = detailPane.querySelector('.job-lower-pane');
             const activate = async name => {
                 const token = ++tabRevision;
                 const panel = lower.querySelector('.job-tab-content');
@@ -413,15 +385,17 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 });
 
                 detailPane.dataset.jobSection = name;
-                board.classList.toggle('focus-mode', name !== 'messages');
-                detailPane.querySelector('.job-message-column').hidden = name !== 'messages';
-                lower.querySelector('.media-toolbar-host').hidden = !['messages','gallery'].includes(name);
+                lower.querySelector('.media-toolbar-host').hidden = name !== 'gallery';
                 lower.querySelector('.gallery-tab-filter').replaceChildren();
                 panel.textContent = 'Loading…';
 
                 try {
-                    if (name === 'messages') await renderJobMediaOverview(job, panel, tabCurrent);
-                    else await renderJobTab(name, job, panel, tabCurrent, () => activate(name));
+                    if (name === 'gallery') await renderJobMediaOverview(job, panel, tabCurrent);
+                    else if (name === 'messages') {
+                        panel.innerHTML='<div class="message-tab-placeholder"><strong>Conversation</strong><p>Use the Messages panel to read and reply while keeping the job context visible.</p></div>';
+                    } else {
+                        await renderJobTab(name, job, panel, tabCurrent, () => activate(name));
+                    }
                 } catch (error) {
                     if (tabCurrent()) panel.textContent = 'Unable to load: ' + (error.message || error);
                 }
@@ -431,7 +405,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 button.onclick = () => activate(button.dataset.jobTab);
             });
 
-            activate('messages');
+            activate('gallery');
         }
 
         let pendingSend = null, pendingAttachment = null;
