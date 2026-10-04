@@ -97,7 +97,14 @@ function mergeJobMessages(teamMessages, customerMessages) {
         studioRememberPeople(people);
         tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(studioFirstName(m))}">${esc(studioFirstName(m).slice(0,1))}</span>`).join('');
         if (version !== revision) return;
-        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}"><span class="job-row-heading"><strong>${esc(job.title)}</strong></span><small>${esc(job.clientName)}</small><small>Event: ${esc(job.eventDate || "Not scheduled")}</small><small class="job-card-assignment"><span>Assigned to: ${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, "Team member", true) : "Unassigned")}</span><span class="job-status">${esc(job.status)}</span></small></button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
+        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row compact-job-row" data-search data-job="${job.id}">
+            <span class="job-row-heading"><strong>${esc(job.title)}</strong><span class="job-status">${esc(job.status)}</span></span>
+            <span class="job-row-client">${esc(job.clientName || job.linkedClientName || 'Client not linked')}</span>
+            <span class="job-row-meta">
+                <span>${esc(job.eventDate || 'Not scheduled')}</span>
+                <span>${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, 'Team member', true) : 'Unassigned')}</span>
+            </span>
+        </button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
         conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(jobs.find(x => x.id === button.dataset.job)).catch(fail));
         filter();
     };
@@ -206,10 +213,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
             side.append(details,conversationRow.querySelector('.thread-shared-files'));
             const board=document.createElement('div');board.className='job-work-board';
             const header=detailPane.querySelector('.detail-header');
-            const breadcrumb=document.createElement('p');breadcrumb.className='job-breadcrumb';breadcrumb.textContent='Workspaces / '+(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace');
+            const breadcrumb=document.createElement('p');breadcrumb.className='job-breadcrumb';breadcrumb.textContent='Workspaces / '+(workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace')+' / '+job.title;
             header.before(breadcrumb);
-            const actions=document.createElement('div');actions.className='job-header-actions';actions.innerHTML='<button class="action" data-job-list>Jobs</button><button class="action" data-edit-details>Edit Details</button>';
-            actions.querySelector('[data-job-list]').onclick=()=>{document.getElementById('conversationView').classList.remove('has-open-job');loadConversations().catch(fail);};
+            const actions=document.createElement('div');actions.className='job-header-actions';actions.innerHTML='<button class="action" data-edit-details>Edit Details</button>';
             actions.querySelector('[data-edit-details]').onclick=()=>openJobDetailsEditor(job);header.append(actions);
             const nav=lower.querySelector('.job-section-tabs');header.after(nav,board);
             board.append(conversationRow.querySelector('.job-message-column'),lower,side);conversationRow.remove();
