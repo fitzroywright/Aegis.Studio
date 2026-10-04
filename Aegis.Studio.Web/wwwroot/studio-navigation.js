@@ -2,7 +2,7 @@
 (() => {
     const rail=document.querySelector('.rail');
     rail.className='rail';rail.setAttribute('role','navigation');rail.setAttribute('aria-label','Main navigation');
-    const items=[['mywork','My Work'],['workspaces','Workspaces'],['pipeline','Pipeline'],['production','Production'],['frontdesk','FrontDesk'],['workday','WorkDay'],['admin','Admin']];
+    const items=[['mywork','My Work'],['workspaces','Workspaces'],['pipeline','Pipeline'],['production','Production'],['frontdesk','FrontDesk'],['dashboard','Dashboard'],['admin','Admin']];
     const icons={
         mywork:'<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3h6v2M8 12l2 2 5-5M8 18h8"/>',
         dashboard:'<path d="M4 20V11h4v9M10 20V5h4v15M16 20V8h4v12"/>',
