@@ -3487,3 +3487,12 @@ body[data-theme="studio-default"] #conversationView.hidden,
 body[data-theme="studio-default"] #genericView.hidden{
   display:none!important;
 }
+
+
+/* Approved My Work thumbnail treatment. */
+body[data-theme="studio-default"] .mw-session-thumb img{
+  width:100%!important;
+  height:100%!important;
+  display:block!important;
+  object-fit:cover!important;
+}
