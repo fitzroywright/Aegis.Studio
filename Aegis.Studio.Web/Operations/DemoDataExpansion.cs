@@ -41,7 +41,7 @@ internal static class DemoDataExpansion
         string[] names=["Morgan","Taylor","Alex","Jordan","Casey","Riley"];
         for(int workspace=1;workspace<=3;workspace++)
         {
-            Execute(connection,transaction,"insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,$3,$4,$5)",Id(20,workspace),Id(1,workspace),"DEMO — Explore this workspace","Open a job to try Gallery collections and version history, Subjects, Tasks / Calendar and Activity. All sample images are synthetic illustrations; nothing is published.",login);
+            Execute(connection,transaction,"insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,$3,$4,$5)",Id(20,workspace),Id(1,workspace),"DEMO — Explore this workspace","Open a job to try Media collections and version history, People, Tasks / Calendar and Activity. Carter Wedding includes fifty seeded wedding photographs with people assignments; nothing is published.",login);
             Execute(connection,transaction,"insert into studio_schedule_resources(id,name,resource_type,is_active,notes,created_at_utc) values($1,$2,'Room',true,'Fictional demo resource',now())",Id(21,workspace),$"DEMO — Studio {workspace}");
         }
         for(int index=0;index<JobNumbers.Length;index++)
@@ -63,11 +63,49 @@ internal static class DemoDataExpansion
                 Execute(connection,transaction,"insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,$3,$4,$5,$6,'Scheduled','Fictional demo appointment',now())",Id(24,key),job,slot==0?"DEMO — Photo session":"DEMO — Client review",start,start.AddHours(1),$"DEMO Studio {workspace}");
                 Execute(connection,transaction,"insert into studio_schedule_entry_resources(entry_id,resource_id) values($1,$2)",Id(24,key),Id(21,workspace));
             }
-            int subjects=index>=4?6:1;
-            for(int subject=0;subject<subjects;subject++)
-                Execute(connection,transaction,"insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by) values($1,$2,$3,$4,'Fictional demo subject',$5)",Id(25,number*10+subject),job,names[(index+subject)%names.Length],$"DEMO-{number}-{subject+1:00}",login);
-            int assetCount=number==4?12:4;
-            string[] weddingCollections=["Getting Ready","Getting Ready","Ceremony","Ceremony","Ceremony","Ceremony","Portraits","Portraits","Portraits","Reception","Reception","Reception"];
+            Guid[] weddingSubjects=[];
+            if(number==4)
+            {
+                string[] weddingNames=[
+                    "Emily Carter",
+                    "Daniel Carter",
+                    "Emily & Daniel",
+                    "Bridal Party",
+                    "Groomsmen",
+                    "Carter Family",
+                    "Parents of the Bride",
+                    "Parents of the Groom",
+                    "Guests"
+                ];
+                string[] weddingRoles=[
+                    "Bride",
+                    "Groom",
+                    "Couple",
+                    "Wedding party",
+                    "Wedding party",
+                    "Family group",
+                    "Family group",
+                    "Family group",
+                    "Reception guests"
+                ];
+                weddingSubjects=new Guid[weddingNames.Length];
+                for(int subject=0;subject<weddingNames.Length;subject++)
+                {
+                    Guid subjectId=Id(25,number*10+subject);
+                    weddingSubjects[subject]=subjectId;
+                    Execute(connection,transaction,
+                        "insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by) values($1,$2,$3,$4,$5,$6) on conflict(id) do update set name=excluded.name,reference=excluded.reference,notes=excluded.notes,updated_by=excluded.updated_by",
+                        subjectId,job,weddingNames[subject],$"WED-{subject+1:00}",weddingRoles[subject],login);
+                }
+            }
+            else
+            {
+                int subjects=index>=4?6:1;
+                for(int subject=0;subject<subjects;subject++)
+                    Execute(connection,transaction,"insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by) values($1,$2,$3,$4,'Fictional demo subject',$5)",Id(25,number*10+subject),job,names[(index+subject)%names.Length],$"DEMO-{number}-{subject+1:00}",login);
+            }
+
+            int assetCount=number==4?50:4;
             for(int asset=0;asset<assetCount;asset++)
             {
                 string key=$"demo-{number}-{asset}";
@@ -80,16 +118,42 @@ internal static class DemoDataExpansion
                     if(number==4) AddWeddingPhoto(connection,transaction,versionStorage,job,key,Id(27,number),2,asset+1,original,login);
                     else AddImage(connection,transaction,versionStorage,job,key,Id(27,number),2,index*16+asset+1,original,login);
                 }
-                string collection=number==4?weddingCollections[asset]:(asset<2?"Demo selects":"Demo proofs");
+                string collection=number==4
+                    ? asset<8?"Getting Ready":asset<22?"Ceremony":asset<38?"Portraits":"Reception"
+                    : asset<2?"Demo selects":"Demo proofs";
                 Execute(connection,transaction,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,$3)",job,key,collection);
                 Execute(connection,transaction,"update studio_job_asset_collections set collection_name=$3 where job_id=$1 and asset_key=$2",job,key,collection);
+
+                if(number==4)
+                {
+                    Guid mediaId=Id(29,number*100+asset);
+                    Execute(connection,transaction,
+                        "insert into studio_media_galleries(id) values($1) on conflict(id) do nothing",
+                        job);
+                    Execute(connection,transaction,
+                        "insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status) values($1,$2,$2,$3,$4) on conflict(job_id,asset_key) do update set production_status=excluded.production_status",
+                        mediaId,job,key,asset<34?"Photographed":"Needs Review");
+
+                    int[][] assignments=[
+                        [0,2], [1,2], [0], [1], [0,3], [1,4], [2], [0,2],
+                        [0,1,2], [0,1,2], [3], [4], [0,1], [5], [6], [7],
+                        [0,1,3], [0,1,4], [2,5], [2,6], [2,7], [0,1,2],
+                        [0,2], [1,2], [0], [1], [2], [3], [4], [5],
+                        [6], [7], [0,1], [0,2], [1,2], [0,1,2], [3,4], [5],
+                        [8], [8], [0,1,2], [3], [4], [5], [6], [7], [8], [0,1], [2], [0,1,2]
+                    ];
+                    foreach(int subjectIndex in assignments[asset])
+                        Execute(connection,transaction,
+                            "insert into studio_media_asset_subjects(asset_id,subject_id) values($1,$2) on conflict do nothing",
+                            mediaId,weddingSubjects[subjectIndex]);
+                }
             }
             string mediaMessage=number==4
-                ?"Demo gallery ready: twelve wedding photographs across Getting Ready, Ceremony, Portraits and Reception."
+                ?"Demo gallery ready: fifty wedding photographs across Getting Ready, Ceremony, Portraits and Reception, linked to the people and groups in the People roster."
                 :"Demo gallery ready: four sample illustrations across Selects and Proofs, with two versions of the first image.";
             Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Studio','Internal',$3,now())",Id(28,number),Id(2,number),mediaMessage);
         }
-        Execute(connection,transaction,"insert into studio_state(key,value,updated_at_utc) values('demo-data-v2',$1,now())",login);
+        Execute(connection,transaction,"insert into studio_state(key,value,updated_at_utc) values('demo-data-v3',$1,now()) on conflict(key) do update set value=excluded.value,updated_at_utc=excluded.updated_at_utc",login);
         return true;
     }
 
