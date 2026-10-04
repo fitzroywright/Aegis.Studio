@@ -5023,3 +5023,157 @@ body[data-theme="studio-default"][data-studio-view="mywork"] .mw-active-jobs::-w
     grid-template-columns:minmax(0,1.08fr) minmax(290px,.92fr)!important;
   }
 }
+
+
+/* === WORKSPACES FIXED RIGHT RAIL ========================================== */
+/* Never stack the reference right-hand cards under the workspace list. */
+body[data-theme="studio-default"][data-studio-view="workspaces"] main,
+body[data-theme="studio-default"][data-studio-view="workspaces"] #genericView{
+  min-height:0!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] #genericView{
+  height:100%!important;
+  padding:14px 16px 16px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-page{
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-header{
+  flex:0 0 64px!important;
+  min-height:64px!important;
+  height:64px!important;
+  margin:0!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-layout{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  min-height:0!important;
+  height:auto!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 296px!important;
+  gap:14px!important;
+  align-items:stretch!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-center{
+  min-width:0!important;
+  min-height:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-toolbar{
+  flex:0 0 42px!important;
+  min-height:42px!important;
+  height:42px!important;
+  margin:0 0 7px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-list{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  padding-right:3px!important;
+  scrollbar-width:thin!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-side{
+  width:296px!important;
+  min-width:296px!important;
+  min-height:0!important;
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  grid-template-rows:minmax(0,.80fr) minmax(0,1.05fr) minmax(0,.78fr)!important;
+  gap:12px!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-side-card{
+  min-height:0!important;
+  height:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-announcement-list,
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-side-card:nth-child(2),
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-side-card:nth-child(3){
+  min-height:0!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  scrollbar-width:thin!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-list::-webkit-scrollbar,
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-announcement-list::-webkit-scrollbar,
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-side-card::-webkit-scrollbar{
+  width:6px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-list::-webkit-scrollbar-thumb,
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-announcement-list::-webkit-scrollbar-thumb,
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-side-card::-webkit-scrollbar-thumb{
+  border-radius:999px!important;
+  background:#cfd6df!important;
+}
+
+/* The reference rail remains on the right even in the half-screen development view. */
+@media(max-width:1500px){
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-layout{
+    grid-template-columns:minmax(0,1fr) 250px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-side{
+    width:250px!important;
+    min-width:250px!important;
+    grid-template-columns:1fr!important;
+  }
+}
+@media(max-width:1050px){
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-layout{
+    grid-template-columns:minmax(0,1fr) 220px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-side{
+    width:220px!important;
+    min-width:220px!important;
+    grid-template-columns:1fr!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-toolbar{
+    flex-direction:row!important;
+    align-items:center!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-tools{
+    width:auto!important;
+    margin-left:auto!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-main{
+    grid-template-columns:70px minmax(110px,1fr) 32px 36px 36px minmax(92px,116px) 68px 10px!important;
+    gap:4px!important;
+    min-height:70px!important;
+    padding:5px 6px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-hero{
+    width:70px!important;
+    height:54px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-previews img,
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-previews i{
+    width:28px!important;
+    height:26px!important;
+    flex-basis:28px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-copy strong{
+    font-size:10px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-copy small,
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-stat small,
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-activity small,
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-activity b{
+    font-size:7px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-stat b{
+    font-size:10px!important;
+  }
+}
