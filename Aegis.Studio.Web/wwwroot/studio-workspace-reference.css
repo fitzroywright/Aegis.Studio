@@ -3477,3 +3477,13 @@ body[data-theme="studio-default"] .studio-sidebar-footer{
   z-index:10!important;
   pointer-events:none!important;
 }
+
+
+/* View visibility must outrank layout display rules. */
+body[data-theme="studio-default"] .hidden{
+  display:none!important;
+}
+body[data-theme="studio-default"] #conversationView.hidden,
+body[data-theme="studio-default"] #genericView.hidden{
+  display:none!important;
+}
