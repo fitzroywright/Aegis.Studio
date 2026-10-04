@@ -14,9 +14,6 @@ Only photographs verified as CC0 or public domain are included in the curated ca
 | Graduation / school | Ceremony graduation.jpg | CC0 |
 | Corporate / ID | Headshot.Corporate.2023.jpg | CC0 |
 | Corporate / ID | Woman (headshot).jpg | Public domain release |
-| Corporate / ID | Portrait of woman.jpg | CC0 |
-| Family portrait | Family portrait (1293715).jpg | CC0 |
-| Family portrait | Erin O'Toole - Family Portrait (51178622573).jpg | CC0 |
 | Family / baby | Parents and their baby.jpg | CC0 |
 | Newborn | New born baby with father.jpg | CC0 |
 | Sports / groups | Team picture time.jpg | CC0 |
