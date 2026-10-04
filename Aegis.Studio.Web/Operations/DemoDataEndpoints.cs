@@ -39,7 +39,7 @@ public static class DemoDataEndpoints
             RepairDemoWorkspaces(connection, transaction, login);
             bool expanded = DemoDataExpansion.Seed(connection, transaction, login, storage);
             bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
-            bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login);
+            bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage);
             transaction.Commit();
             return Results.Ok(new { message = fullStudioExpanded
                 ? "Full Studio demo loaded: 24 interconnected jobs across 6 workspaces with clients, bookings, schedules, photographers, availability, payments, production stages and history."
