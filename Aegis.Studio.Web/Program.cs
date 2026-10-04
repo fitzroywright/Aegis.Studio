@@ -139,6 +139,11 @@ builder.Services.AddSingleton<MicrosoftGraphEmailClient>();
 
 global::Common.Messaging.Hosting.ServiceCollectionExtensions
     .AddCommonMessagingSecrets(builder.Services);
+global::Common.Messaging.Hosting.ServiceCollectionExtensions
+    .AddCommonMessagingPostgreSqlDelivery(
+        builder.Services,
+        studioConnectionString,
+        "aegis-studio");
 if (builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false))
 {
     global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
