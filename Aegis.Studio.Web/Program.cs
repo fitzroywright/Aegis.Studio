@@ -52,17 +52,8 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<StudioOperationsFl
 ISecretProvider secretProvider = CommonSecretProviderFactory.Create(builder.Configuration);
 builder.Services.AddSingleton(secretProvider);
 
-string storageProvider = builder.Configuration["Storage:Provider"]?.Trim() ?? "LocalFolder";
-
-if (!builder.Environment.IsProduction() &&
-    storageProvider.Equals("NetworkFolder", StringComparison.OrdinalIgnoreCase))
-{
-    string networkRoot = builder.Configuration["Storage:NetworkFolder:RootPath"]?.Trim() ?? "(not configured)";
-    throw new InvalidOperationException(
-        $"ST-CONFIG-STORAGE-ENV-001: NetworkFolder storage is production-only. " +
-        $"Environment '{builder.Environment.EnvironmentName}' resolved Storage:Provider=NetworkFolder " +
-        $"with root '{networkRoot}'. Remove the higher-precedence configuration override.");
-}
+string storageProvider = builder.Configuration["Storage:Provider"]?.Trim()
+    ?? throw new InvalidOperationException("Storage:Provider must be configured.");
 string? storageProviderSecret = null;
 string? s3AccessKeyId = null;
 string? s3SecretAccessKey = null;
