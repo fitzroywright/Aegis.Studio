@@ -790,18 +790,30 @@ body[data-theme="studio-default"] .workspace-picker-row span{color:#748091!impor
 /* Keep non-workspace screens intact while using the light production palette. */
 body[data-theme="studio-default"] .generic{background:var(--bs-bg)!important}
 
-/* Responsive compression; desktop remains the priority. */
+/* Responsive behavior: preserve the desktop composition instead of crushing it.
+   Below the design width the workspace scrolls horizontally rather than shrinking text/cards. */
 @media(max-width:1360px){
-  body[data-theme="studio-default"] .shell{grid-template-columns:170px minmax(0,1fr)!important}
-  body[data-theme="studio-default"] .three-pane{grid-template-columns:275px minmax(0,1fr)!important}
-  body[data-theme="studio-default"] .job-work-board{
-    grid-template-columns:minmax(235px,.8fr) minmax(400px,1.45fr) minmax(245px,.9fr)!important;
+  body[data-theme="studio-default"] main{
+    overflow:auto!important;
   }
-  body[data-theme="studio-default"] .media-items.image-lens{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  body[data-theme="studio-default"] .three-pane{
+    min-width:1180px!important;
+    grid-template-columns:290px minmax(0,1fr)!important;
+  }
+  body[data-theme="studio-default"] .job-work-board{
+    grid-template-columns:290px minmax(520px,1fr) 300px!important;
+  }
+  body[data-theme="studio-default"] .media-items.image-lens{
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  }
 }
-@media(max-width:1100px){
-  body[data-theme="studio-default"] .job-work-board{grid-template-columns:minmax(230px,.8fr) minmax(380px,1.35fr)!important}
-  body[data-theme="studio-default"] .job-context-sidebar{grid-column:1/-1!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;height:auto!important}
+@media(max-width:900px){
+  body[data-theme="studio-default"] .shell{
+    grid-template-columns:170px minmax(0,1fr)!important;
+  }
+  body[data-theme="studio-default"] .three-pane{
+    min-width:1140px!important;
+  }
 }
 
 
@@ -855,4 +867,175 @@ body[data-theme="studio-default"] .media-collection-chips button.active{
 }
 body[data-theme="studio-default"] .media-title-toolbar [data-collection]{
   display:none!important;
+}
+
+
+/* Readability and fidelity pass based on the live Bryan Studios workspace. */
+body[data-theme="studio-default"]{
+  font-size:14px!important;
+}
+body[data-theme="studio-default"] .navigation-pane .brand-button{
+  font-size:13px!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspace b{
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .navigation-pane .workspace small{
+  font-size:9.5px!important;
+}
+body[data-theme="studio-default"] .pane-heading h2{
+  font-size:15px!important;
+}
+body[data-theme="studio-default"] .workspace-list-controls>[data-tab]{
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .workspace-inline-search input{
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .conversation-card{
+  min-height:96px!important;
+}
+body[data-theme="studio-default"] .job-row-heading strong{
+  font-size:12px!important;
+}
+body[data-theme="studio-default"] .job-list-copy small{
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .job-status{
+  font-size:9px!important;
+}
+body[data-theme="studio-default"] .studio-job-copy h1,
+body[data-theme="studio-default"] .job-reading-view>.detail-header h1{
+  font-size:28px!important;
+}
+body[data-theme="studio-default"] .studio-job-copy p{
+  font-size:12px!important;
+}
+body[data-theme="studio-default"] .job-section-tabs button{
+  font-size:11px!important;
+}
+body[data-theme="studio-default"] .job-panel-heading strong,
+body[data-theme="studio-default"] .context-card-header strong{
+  font-size:14px!important;
+}
+body[data-theme="studio-default"] .message-head{
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .message-content p{
+  font-size:10.5px!important;
+}
+body[data-theme="studio-default"] .compact-task strong,
+body[data-theme="studio-default"] .compact-task small{
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .job-details-card dl{
+  font-size:10.5px!important;
+}
+body[data-theme="studio-default"] .conversation-file-name{
+  font-size:10px!important;
+}
+
+/* Make the existing real task panel look like the approved compact checklist. */
+body[data-theme="studio-default"] .thread-next-tasks{
+  padding:0!important;
+}
+body[data-theme="studio-default"] .thread-next-tasks>h3{
+  margin:0!important;
+  padding:11px 12px!important;
+  border-bottom:1px solid var(--bs-border-soft)!important;
+  background:#fff!important;
+  font-size:14px!important;
+  font-weight:750!important;
+}
+body[data-theme="studio-default"] .job-workflow-summary,
+body[data-theme="studio-default"] .workflow-actions{
+  padding:8px 10px!important;
+}
+body[data-theme="studio-default"] .thread-task-list{
+  padding:2px 10px 6px!important;
+}
+body[data-theme="studio-default"] .compact-task{
+  padding:8px 0!important;
+  border-bottom:1px solid var(--bs-border-soft)!important;
+}
+body[data-theme="studio-default"] .compact-task .action{
+  float:right!important;
+}
+body[data-theme="studio-default"] .thread-task-footer{
+  padding:8px 10px!important;
+  border-top:1px solid var(--bs-border-soft)!important;
+}
+body[data-theme="studio-default"] .thread-task-footer .action{
+  width:100%!important;
+  min-height:30px!important;
+  border:1px solid var(--bs-gold)!important;
+  background:var(--bs-gold)!important;
+  color:#fff!important;
+  border-radius:6px!important;
+  font-size:10px!important;
+}
+
+/* Existing real Conversation Files presentation. */
+body[data-theme="studio-default"] .thread-shared-files{
+  padding:0!important;
+}
+body[data-theme="studio-default"] .conversation-files-title{
+  padding:10px 11px!important;
+  border-bottom:1px solid var(--bs-border-soft)!important;
+  background:#fff!important;
+  color:#151d2a!important;
+  font-size:13px!important;
+  font-weight:750!important;
+}
+body[data-theme="studio-default"] .conversation-file-actions{
+  padding:7px 10px!important;
+  border-bottom:1px solid var(--bs-border-soft)!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-gallery{
+  display:block!important;
+  padding:4px 10px 8px!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-tile{
+  width:100%!important;
+  min-height:34px!important;
+  display:grid!important;
+  grid-template-columns:26px minmax(0,1fr)!important;
+  align-items:center!important;
+  gap:7px!important;
+  padding:5px 0!important;
+  border:0!important;
+  border-bottom:1px solid var(--bs-border-soft)!important;
+  border-radius:0!important;
+  background:#fff!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-tile img{
+  width:24px!important;
+  height:24px!important;
+  object-fit:cover!important;
+  border-radius:4px!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-tile strong{
+  font-size:10px!important;
+}
+body[data-theme="studio-default"] .thread-shared-files .job-file-tile small,
+body[data-theme="studio-default"] .thread-shared-files .job-file-tile>span:last-child{
+  display:none!important;
+}
+
+/* Make the existing real media controller visually match the reference without altering its handlers. */
+body[data-theme="studio-default"] .media-title-toolbar{
+  gap:6px!important;
+}
+body[data-theme="studio-default"] .media-title-toolbar .action,
+body[data-theme="studio-default"] .media-title-toolbar button{
+  font-size:9.5px!important;
+}
+body[data-theme="studio-default"] .media-progress{
+  font-size:9px!important;
+}
+body[data-theme="studio-default"] .media-items.image-lens{
+  grid-auto-rows:auto!important;
+}
+body[data-theme="studio-default"] .media-items.image-lens .job-file-tile>strong{
+  font-size:9.5px!important;
 }
