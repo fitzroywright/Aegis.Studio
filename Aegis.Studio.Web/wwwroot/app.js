@@ -429,7 +429,9 @@ document.querySelectorAll('.brand-button').forEach(button => {
 
 // Wait until permission-aware script overrides have been installed.
 document.addEventListener('DOMContentLoaded', () => {
-    loadWorkspaces().then(loadConversations).catch(error => {
+    // The rebuilt Studio shell owns initial navigation. Populate shared workspace
+    // caches here, but do not run the legacy conversation startup over My Work.
+    loadWorkspaces().catch(error => {
         conversationList.textContent = 'Unable to load workspaces: ' + (error.message || error);
     });
 }, { once: true });
