@@ -1757,3 +1757,56 @@ body .has-open-job .workspace-media-empty{
 @media(max-width:1100px){
   body .has-open-job .workspace-media-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* 2026-10-04 remove residual open-job top whitespace. */
+body .has-open-job .detail-pane{
+  padding:4px 10px 10px!important;
+}
+body .has-open-job .job-breadcrumb{
+  flex:0 0 16px!important;
+  height:16px!important;
+  line-height:16px!important;
+  margin:0!important;
+  padding:0 2px!important;
+  font-size:10px!important;
+}
+body .has-open-job .job-reading-view>.detail-header{
+  flex:0 0 46px!important;
+  height:46px!important;
+  min-height:46px!important;
+  max-height:46px!important;
+  padding:2px 4px 4px!important;
+  margin:0!important;
+}
+body .has-open-job .job-reading-view>.detail-header h1{
+  font-size:22px!important;
+  line-height:1!important;
+}
+body .has-open-job .job-reading-view>.detail-header p{
+  margin:2px 0 0!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+}
+body .has-open-job .job-header-actions{
+  gap:5px!important;
+}
+body .has-open-job .job-header-actions .action{
+  min-height:26px!important;
+  height:26px!important;
+  padding:3px 8px!important;
+  font-size:10px!important;
+}
+body .has-open-job .job-section-tabs{
+  flex:0 0 32px!important;
+  height:32px!important;
+  min-height:32px!important;
+  margin:0 0 6px!important;
+  padding:0 4px!important;
+}
+body .has-open-job .job-section-tabs button{
+  height:32px!important;
+  min-height:32px!important;
+  padding:0 1px 5px!important;
+  font-size:11px!important;
+}
