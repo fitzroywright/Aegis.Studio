@@ -116,7 +116,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         window.studioRememberView?.({view:'workspaces',workspaceId:id,jobId:null});
         selectedWorkspace = id; selectedJob = null; selectedConversation = null;
         currentWorkspacePermissions = workspace.permissions;
-        tab = 'jobs'; search.value = ''; workspaceTitle.textContent = name;
+        tab = 'jobs'; jobFilter='all'; search.value = ''; workspaceTitle.textContent = name;
         document.querySelectorAll('.workspace').forEach(button => button.classList.toggle('active', button.dataset.id === id));
         display();
         try { await loadConversations(); } catch (error) { fail(error); }
@@ -153,7 +153,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const count=button.querySelector('span');
             if(count)count.textContent=counts[button.dataset.jobFilter]??0;
         });
-        conversationList.innerHTML = workspaceJobs.map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}" data-status-group="${statusGroup(job.status)}">
+        conversationList.innerHTML = workspaceJobs.map(job => `<button class="conversation-card hierarchy-row" data-search data-job="${job.id}" data-status-group="${statusGroup(job.status)}" data-job-status="${esc(String(job.status||'').toLowerCase())}">
             <span class="job-list-thumb" data-job-thumb="${job.id}"><span>${esc((job.title||'J').slice(0,1))}</span></span>
             <span class="job-list-copy">
                 <span class="job-row-heading"><strong>${esc(job.title)}</strong></span>
