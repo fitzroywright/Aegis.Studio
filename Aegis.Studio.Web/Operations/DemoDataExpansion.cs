@@ -135,7 +135,7 @@ internal static class DemoDataExpansion
     {
         string commandText=sql.Trim();
         if(commandText.StartsWith("insert into ",StringComparison.OrdinalIgnoreCase)
-            && !commandText.Contains(" on conflict ",StringComparison.OrdinalIgnoreCase))
+            && !commandText.Contains("on conflict",StringComparison.OrdinalIgnoreCase))
             commandText=commandText.TrimEnd(';')+" on conflict do nothing;";
         using var command=new NpgsqlCommand(commandText,connection,transaction);
         foreach(object value in values)command.Parameters.AddWithValue(value);
