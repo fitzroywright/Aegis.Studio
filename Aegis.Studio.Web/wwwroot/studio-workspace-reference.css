@@ -5177,3 +5177,119 @@ body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-side
     font-size:10px!important;
   }
 }
+
+
+/* === WORKSPACES DESKTOP COMPOSITION LOCK ================================= */
+/* The approved Workspace reference is a desktop canvas. On narrow windows,
+   preserve that canvas and allow horizontal viewport scrolling instead of
+   crushing the center list or dropping the right rail below it. */
+body[data-theme="studio-default"][data-studio-view="workspaces"] main{
+  overflow:hidden!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] #genericView{
+  overflow:auto!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-page{
+  min-width:1280px!important;
+  width:1280px!important;
+  max-width:none!important;
+  height:100%!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-layout{
+  display:grid!important;
+  grid-template-columns:970px 296px!important;
+  gap:14px!important;
+  align-items:stretch!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-center{
+  width:970px!important;
+  min-width:970px!important;
+  max-width:970px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-side{
+  width:296px!important;
+  min-width:296px!important;
+  max-width:296px!important;
+  display:grid!important;
+  grid-template-columns:1fr!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-main{
+  grid-template-columns:110px minmax(190px,1.2fr) 50px 54px 54px 240px 108px 14px!important;
+  gap:9px!important;
+  min-height:101px!important;
+  padding:7px 10px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-hero{
+  width:110px!important;
+  height:84px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-previews img,
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-previews i{
+  width:49px!important;
+  height:40px!important;
+  flex-basis:49px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-copy strong{
+  font-size:14px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-copy small{
+  font-size:10px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-stat b{
+  font-size:14px!important;
+}
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-stat small,
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-activity small,
+body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-activity b{
+  font-size:9px!important;
+}
+
+/* Cancel earlier responsive rules that compressed the approved layout. */
+@media(max-width:1500px){
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-page{
+    min-width:1280px!important;
+    width:1280px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-layout{
+    grid-template-columns:970px 296px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-center{
+    width:970px!important;
+    min-width:970px!important;
+    max-width:970px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-side{
+    width:296px!important;
+    min-width:296px!important;
+    max-width:296px!important;
+  }
+}
+@media(max-width:1050px){
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-layout{
+    grid-template-columns:970px 296px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-side{
+    width:296px!important;
+    min-width:296px!important;
+    max-width:296px!important;
+    grid-template-columns:1fr!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-toolbar{
+    flex-direction:row!important;
+    align-items:center!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-tools{
+    width:auto!important;
+    margin-left:auto!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-main{
+    grid-template-columns:110px minmax(190px,1.2fr) 50px 54px 54px 240px 108px 14px!important;
+    gap:9px!important;
+    min-height:101px!important;
+    padding:7px 10px!important;
+  }
+  body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-hero{
+    width:110px!important;
+    height:84px!important;
+  }
+}
