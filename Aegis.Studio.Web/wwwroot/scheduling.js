@@ -1,17 +1,27 @@
 // Pipeline is the planning home: stage groups, schedule entries and job tasks share one page.
 const pipelineStages = [
-    ['Needs scheduling', ['New', 'Confirmed', 'Inquiry', 'Needs Scheduling']],
+    ['Booking / intake', ['New', 'Inquiry', 'Booking']],
+    ['Needs scheduling', ['Confirmed', 'Needs Scheduling']],
     ['Scheduled', ['Scheduled']],
-    ['Photography', ['Photography', 'Shoot Complete']],
-    ['Production', ['Production']],
-    ['Delivery', ['Ready for Client', 'Completed']]
+    ['Photography', ['Photography', 'Shoot Today', 'In Shoot', 'Shoot Complete']],
+    ['Awaiting upload', ['Awaiting Upload']],
+    ['Production', ['Production', 'Culling', 'Editing', 'Retouching', 'QC', 'Printing']],
+    ['Client review', ['Client Review', 'Ready for Client', 'Waiting on Customer']],
+    ['Delivery', ['Ready for Delivery']],
+    ['Complete', ['Delivered', 'Completed', 'Complete', 'Archived']],
+    ['Cancelled', ['Cancelled']]
 ];
 const pipelineStageTargets = {
+    'Booking / intake':'Booking',
     'Needs scheduling':'Needs Scheduling',
     'Scheduled':'Scheduled',
     'Photography':'Photography',
+    'Awaiting upload':'Awaiting Upload',
     'Production':'Production',
-    'Delivery':'Ready for Client'
+    'Client review':'Client Review',
+    'Delivery':'Ready for Delivery',
+    'Complete':'Completed',
+    'Cancelled':'Cancelled'
 };
 let pipelineView = 'timeline';
 let pipelineAnchor = new Date();
