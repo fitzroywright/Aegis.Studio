@@ -321,7 +321,7 @@ internal static class DemoFullStudioData
             string status=i==0?(job.DayOffset<0?"Completed":"InProgress"):i==1?(ordinal%5==0?"Blocked":"NotStarted"):"NotStarted";
             string? blocker=status=="Blocked"?"Waiting on customer selection":null;
             Execute(c,tx,"insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,now()+($9 || ' hours')::interval,now()+($10 || ' days')::interval,$11,$12,$13,$14,null,'demo-seed',now(),now()) on conflict(id) do update set activity_type=excluded.activity_type,title=excluded.title,status=excluded.status,priority=excluded.priority,assigned_to=excluded.assigned_to,due_at_utc=excluded.due_at_utc,blocked_reason=excluded.blocked_reason,updated_at_utc=now()",
-                Id(53,job.Number*10+i),jobId,stage,$"{stage}: {job.Title}",$"DEMO production work for {job.Type}",status,ordinal%7==0?"High":ordinal%4==0?"Medium":"Normal",job.Photographer,(i*4).ToString(),(job.DayOffset+i+1).ToString(),
+                Id(53,job.Number*10+i),jobId,stage,$"{stage}: {job.Title}",$"DEMO production work for {job.Type}",status,ordinal%7==0?"High":ordinal%4==0?"Low":"Normal",job.Photographer,(i*4).ToString(),(job.DayOffset+i+1).ToString(),
                 status=="InProgress"?DateTimeOffset.UtcNow:DBNull.Value,status=="Completed"?DateTimeOffset.UtcNow.AddHours(-2):DBNull.Value,job.Location,(object?)blocker??DBNull.Value);
         }
     }
