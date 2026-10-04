@@ -37,10 +37,7 @@ public static class DemoDataEndpoints
             }
 
             RepairDemoWorkspaces(connection, transaction, login);
-            string demoStorageRoot = configuration["DemoData:StorageRoot"]?.Trim()
-                ?? "D:/Studio";
-            IFileStorage demoStorage = new LocalFileStorage(Path.GetFullPath(demoStorageRoot));
-            bool expanded = DemoDataExpansion.Seed(connection, transaction, login, demoStorage);
+            bool expanded = DemoDataExpansion.Seed(connection, transaction, login, storage);
             bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
             transaction.Commit();
             return Results.Ok(new { message = presentationExpanded
