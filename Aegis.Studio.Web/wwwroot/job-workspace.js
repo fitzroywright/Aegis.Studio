@@ -13,19 +13,130 @@ async function renderWorkspaceAnnouncements(host, workspaceId, current) {
 }
 
 async function renderJobSubjects(job, panel, current, refresh) {
-    const [originalSubjects, permissions, media] = await Promise.all([json(`/api/jobs/${job.id}/subjects`),json(`/api/jobs/${job.id}/access`),json(`/api/jobs/${job.id}/media`).catch(()=>null)]);
+    const [originalSubjects, permissions, media] = await Promise.all([
+        json(`/api/jobs/${job.id}/subjects`),
+        json(`/api/jobs/${job.id}/access`),
+        json(`/api/jobs/${job.id}/media`).catch(()=>null)
+    ]);
     const subjects=media?.subjects||originalSubjects;
+    const assets=media?.assets||[];
     if(!current()) return;
-    const canEdit = (permissions.permissions || permissions).editJob;
-    const editButton = subject => canEdit && !subject.isSystem ? `<button class="action" data-edit-subject="${subject.id}">Edit</button>` : '';
-    panel.innerHTML = `${subjects.length===1 ? `<article class="subject-card"><h3>${esc(subjects[0].name)}</h3><p>${esc(subjects[0].reference)}</p><p>${esc(subjects[0].notes)}</p>${editButton(subjects[0])}</article>` : subjects.length ? `<table class="subject-roster"><thead><tr><th>Name</th><th>Reference</th><th>Images</th><th>Notes</th><th></th></tr></thead><tbody>${subjects.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.reference)}</td><td>${esc(s.imageCount??"—")}</td><td>${esc(s.notes)}</td><td>${editButton(s)}</td></tr>`).join('')}</tbody></table>` : '<p>No subjects added. Add the person being photographed; additional people form a roster.</p>'}${canEdit ? '<button class="action" id="addJobSubject">Add subject</button><form class="subject-form" hidden><input name="subjectId" type="hidden"><label>Name<input name="name" maxlength="200" required></label><label>Reference<input name="reference" maxlength="200"></label><label>Notes<textarea name="notes" maxlength="4000"></textarea></label><button class="primary">Save subject</button><button type="button" data-cancel>Cancel</button><p role="alert"></p></form>' : ''}`;
+
+    const canEdit=(permissions.permissions||permissions).editJob;
+    const realSubjects=subjects.filter(subject=>!subject.isSystem);
+    const representative=subject=>{
+        const asset=assets.find(a=>(a.subjects||[]).includes(subject.id)&&String(a.contentType||'').startsWith('image/'));
+        return asset?.versionId ? `/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content` : null;
+    };
+    const role=subject=>subject.attributes?.role||subject.attributes?.type||subject.notes||'Person / group being photographed';
+    const status=subject=>subject.status||'Not Photographed';
+
+    panel.innerHTML = `
+        <section class="people-workspace">
+            <header class="people-heading">
+                <div>
+                    <h2>People</h2>
+                    <p>People and groups being photographed in this job. Assign photos to them from Media.</p>
+                </div>
+                <div class="people-heading-actions">
+                    <label class="people-search">
+                        <span aria-hidden="true">⌕</span>
+                        <input type="search" placeholder="Search people…" aria-label="Search people">
+                    </label>
+                    ${canEdit?'<button type="button" class="action" data-import-roster>Import Roster</button><button type="button" class="primary" id="addJobSubject">＋ Add Person</button>':''}
+                </div>
+            </header>
+
+            <div class="people-explainer">
+                <strong>People</strong> identify who is in the photographs. <strong>Collections</strong> identify where the photographs belong, such as Ceremony, Reception or Portraits.
+            </div>
+
+            <div class="people-grid">
+                ${realSubjects.map(subject=>{
+                    const image=representative(subject);
+                    return `
+                        <article class="person-card" data-search-person="${esc((subject.name+' '+(subject.reference||'')+' '+role(subject)).toLowerCase())}">
+                            <div class="person-photo">
+                                ${image?`<img src="${image}" alt="">`:`<span>${esc((subject.name||'?').slice(0,1))}</span>`}
+                            </div>
+                            <div class="person-copy">
+                                <div class="person-title-line">
+                                    <strong>${esc(subject.name)}</strong>
+                                    <span class="person-status" data-status="${esc(status(subject))}">${esc(status(subject))}</span>
+                                </div>
+                                <span class="person-role">${esc(role(subject))}</span>
+                                <div class="person-meta">
+                                    ${subject.reference?`<span>Ref: ${esc(subject.reference)}</span>`:''}
+                                    <span>${esc(subject.imageCount??0)} photo${Number(subject.imageCount??0)===1?'':'s'}</span>
+                                    ${subject.scheduledAtUtc?`<span>${esc(new Date(subject.scheduledAtUtc).toLocaleString())}</span>`:''}
+                                </div>
+                            </div>
+                            <div class="person-actions">
+                                <button type="button" class="action" data-show-media="${esc(subject.id)}">View Photos</button>
+                                ${canEdit?`<button type="button" class="action" data-edit-subject="${esc(subject.id)}">Edit</button>`:''}
+                            </div>
+                        </article>`;
+                }).join('')||'<div class="people-empty"><strong>No people added yet.</strong><span>Add the people or groups being photographed, or import a roster.</span></div>'}
+            </div>
+
+            ${canEdit?'<form class="subject-form people-editor" hidden><input name="subjectId" type="hidden"><label>Name<input name="name" maxlength="200" required></label><label>Reference / ID<input name="reference" maxlength="200"></label><label>Notes / role<textarea name="notes" maxlength="4000" placeholder="Bride, Groom, Student, Bridal Party…"></textarea></label><div class="dialog-actions"><button class="primary">Save</button><button type="button" data-cancel>Cancel</button></div><p role="alert"></p></form>':''}
+        </section>`;
+
+    const search=panel.querySelector('.people-search input');
+    if(search)search.oninput=()=>{
+        const term=search.value.trim().toLowerCase();
+        panel.querySelectorAll('[data-search-person]').forEach(card=>card.hidden=!!term&&!card.dataset.searchPerson.includes(term));
+    };
+
+    panel.querySelectorAll('[data-show-media]').forEach(button=>button.onclick=()=>{
+        window.studioMediaFocus={jobId:job.id,subjectId:button.dataset.showMedia};
+        const mediaTab=document.querySelector('[data-job-tab="gallery"]');
+        mediaTab?.click();
+    });
+
     if(!canEdit) return;
+
     const form=panel.querySelector('form');
-    const edit=subject=>{form.hidden=false;form.elements.subjectId.value=subject?.id || ''; for(const key of ['name','reference','notes']) form.elements[key].value=subject?.[key] || '';form.elements.name.focus();};
+    const edit=subject=>{
+        form.hidden=false;
+        form.elements.subjectId.value=subject?.id||'';
+        for(const key of ['name','reference','notes']) form.elements[key].value=subject?.[key]||'';
+        form.elements.name.focus();
+    };
+
     panel.querySelector('#addJobSubject').onclick=()=>edit(null);
-    panel.querySelectorAll('[data-edit-subject]').forEach(b=>b.onclick=()=>edit(subjects.find(s=>s.id===b.dataset.editSubject)));
+    panel.querySelectorAll('[data-edit-subject]').forEach(button=>button.onclick=()=>edit(realSubjects.find(s=>s.id===button.dataset.editSubject)));
     form.querySelector('[data-cancel]').onclick=()=>form.hidden=true;
-    form.onsubmit=async event=>{event.preventDefault();const id=form.elements.subjectId.value;const button=form.querySelector('button');button.disabled=true;try{await json(`/api/jobs/${job.id}/subjects${id?'/'+id:''}`,{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.elements.name.value,reference:form.elements.reference.value,notes:form.elements.notes.value})});if(current())await refresh();}catch(error){form.querySelector('[role=alert]').textContent=error.message;}finally{button.disabled=false;}};
+
+    const rosterButton=panel.querySelector('[data-import-roster]');
+    if(rosterButton)rosterButton.onclick=()=>{
+        const mediaTab=document.querySelector('[data-job-tab="gallery"]');
+        mediaTab?.click();
+        setTimeout(()=>document.querySelector('[data-roster]')?.click(),0);
+    };
+
+    form.onsubmit=async event=>{
+        event.preventDefault();
+        const id=form.elements.subjectId.value;
+        const button=form.querySelector('button');
+        button.disabled=true;
+        try{
+            await json(`/api/jobs/${job.id}/subjects${id?'/'+id:''}`,{
+                method:id?'PUT':'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    name:form.elements.name.value,
+                    reference:form.elements.reference.value,
+                    notes:form.elements.notes.value
+                })
+            });
+            if(current())await refresh();
+        }catch(error){
+            form.querySelector('[role=alert]').textContent=error.message;
+        }finally{
+            button.disabled=false;
+        }
+    };
 }
 
 function jobTaskDate(task) { return task.scheduledAtUtc || task.dueAtUtc; }
