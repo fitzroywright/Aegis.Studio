@@ -19,6 +19,16 @@
   --studio-red:#ef3340;
   --workspace-gold:#a36b17;
   --workspace-gold-soft:#fbf0e2;
+
+  /* Compatibility tokens for feature-scoped styles. The clean presentation
+     remains the only owner of their actual values. */
+  --theme-accent:var(--studio-blue);
+  --theme-accent-soft:var(--studio-blue-soft);
+  --theme-border:var(--studio-border);
+  --theme-muted:var(--studio-muted);
+  --theme-surface:var(--studio-panel);
+  --theme-surface-2:var(--studio-bg);
+  --theme-text:var(--studio-text);
 }
 
 *{box-sizing:border-box}
