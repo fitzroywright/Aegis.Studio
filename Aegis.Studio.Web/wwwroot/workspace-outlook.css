@@ -1470,7 +1470,7 @@ body[data-theme="studio-default"] .navigation-pane .rail{
   flex-direction:column!important;
   justify-content:flex-start!important;
   gap:2px!important;
-  padding:392px 7px 10px!important;
+  padding:clamp(120px,38vh,350px) 7px 10px!important;
   border:0!important;
   background:#171612!important;
 }
@@ -2341,7 +2341,7 @@ body[data-theme="studio-default"] .message-tab-placeholder{
 @media(max-width:1300px){
   body[data-theme="studio-default"] .shell{grid-template-columns:180px minmax(0,1fr)!important}
   body[data-theme="studio-default"] .three-pane{grid-template-columns:245px minmax(0,1fr)!important}
-  body[data-theme="studio-default"] .navigation-pane .rail{padding-top:280px!important}
+  body[data-theme="studio-default"] .navigation-pane .rail{padding-top:clamp(90px,28vh,220px)!important}
   body[data-theme="studio-default"] .studio-job-board{
     grid-template-columns:minmax(225px,.78fr) minmax(390px,1.45fr) minmax(245px,.9fr)!important;
   }
