@@ -34,6 +34,8 @@ public static class DemoDataEndpoints
                 if (statement.Contains("$1", StringComparison.Ordinal)) seedCommand.Parameters.AddWithValue(login);
                 seedCommand.ExecuteNonQuery();
             }
+
+            RepairDemoWorkspaces(connection, transaction, login);
             bool expanded = DemoDataExpansion.Seed(connection, transaction, login, configuration, environment);
             bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
             transaction.Commit();
@@ -43,6 +45,54 @@ public static class DemoDataEndpoints
                     ? "Demo data expanded. Open a DEMO workspace to explore Gallery, Subjects and Tasks / Calendar."
                     : "Demo data is already up to date. Open DEMO - Weddings and Events, then Carter Wedding." });
         }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
+    }
+
+    private static void RepairDemoWorkspaces(NpgsqlConnection connection, NpgsqlTransaction transaction, string login)
+    {
+        const string workspaceSql = """
+            insert into studio_workspaces(id,name,email_address,route_key,is_enabled,sort_order,created_at_utc,updated_at_utc)
+            values
+              ('de000000-0000-4000-0001-000000000001','DEMO - Portraits and IDs',null,'studio-demo-v1-1',true,101,now(),now()),
+              ('de000000-0000-4000-0001-000000000002','DEMO - Weddings and Events',null,'studio-demo-v1-2',true,102,now(),now()),
+              ('de000000-0000-4000-0001-000000000003','DEMO - Schools and Corporate',null,'studio-demo-v1-3',true,103,now(),now())
+            on conflict(id) do update set
+              name=excluded.name,
+              route_key=excluded.route_key,
+              is_enabled=true,
+              sort_order=excluded.sort_order,
+              updated_at_utc=now();
+            """;
+        using (var workspace = new NpgsqlCommand(workspaceSql, connection, transaction))
+            workspace.ExecuteNonQuery();
+
+        const string memberSql = """
+            insert into studio_workspace_members
+            (workspace_id,user_name,display_name,is_active,access_workspace,can_view,reply_requester,view_attachments,add_attachments,create_job,edit_job,manage_schedule,manage_production,notify_members,edit_workspace,manage_members,admin_workspace,send_as_self,created_at_utc,updated_at_utc)
+            values
+              ('de000000-0000-4000-0001-000000000001',$1,$1,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,now(),now()),
+              ('de000000-0000-4000-0001-000000000002',$1,$1,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,now(),now()),
+              ('de000000-0000-4000-0001-000000000003',$1,$1,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,now(),now())
+            on conflict(workspace_id,user_name) do update set
+              display_name=excluded.display_name,
+              is_active=true,
+              access_workspace=true,
+              can_view=true,
+              reply_requester=true,
+              view_attachments=true,
+              add_attachments=true,
+              create_job=true,
+              edit_job=true,
+              manage_schedule=true,
+              manage_production=true,
+              notify_members=true,
+              edit_workspace=true,
+              manage_members=true,
+              admin_workspace=true,
+              updated_at_utc=now();
+            """;
+        using var member = new NpgsqlCommand(memberSql, connection, transaction);
+        member.Parameters.AddWithValue(login);
+        member.ExecuteNonQuery();
     }
 
     private static readonly string[] SeedStatements =
