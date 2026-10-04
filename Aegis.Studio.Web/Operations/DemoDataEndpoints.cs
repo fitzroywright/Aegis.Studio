@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Aegis.Studio.Web.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
+using Common.Storage;
 
 namespace Aegis.Studio.Web.Operations;
 
@@ -9,7 +10,7 @@ public static class DemoDataEndpoints
 {
     public static void MapStudioDemoData(this WebApplication app)
     {
-        app.MapPost("/api/admin/demo/seed", (ClaimsPrincipal user, StudioDatabase database, IConfiguration configuration, IWebHostEnvironment environment) =>
+        app.MapPost("/api/admin/demo/seed", (ClaimsPrincipal user, StudioDatabase database, IConfiguration configuration, IWebHostEnvironment environment, IFileStorage storage) =>
         {
             if(!environment.IsDevelopment())return Results.NotFound();
             string? login = user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -36,7 +37,7 @@ public static class DemoDataEndpoints
             }
 
             RepairDemoWorkspaces(connection, transaction, login);
-            bool expanded = DemoDataExpansion.Seed(connection, transaction, login, configuration, environment);
+            bool expanded = DemoDataExpansion.Seed(connection, transaction, login, storage);
             bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
             transaction.Commit();
             return Results.Ok(new { message = presentationExpanded
