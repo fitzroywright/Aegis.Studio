@@ -39,12 +39,15 @@ public static class DemoDataEndpoints
             RepairDemoWorkspaces(connection, transaction, login);
             bool expanded = DemoDataExpansion.Seed(connection, transaction, login, storage);
             bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
+            bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login);
             transaction.Commit();
-            return Results.Ok(new { message = presentationExpanded
-                ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see 50 wedding photos, linked People, messages, tasks, schedule and production status."
-                : expanded
-                    ? "Demo data expanded. Open Carter Wedding to explore Media, People and Tasks / Calendar."
-                    : "Demo data is already up to date. Open DEMO - Weddings and Events, then Carter Wedding." });
+            return Results.Ok(new { message = fullStudioExpanded
+                ? "Full Studio demo loaded: 24 interconnected jobs across 6 workspaces with clients, bookings, schedules, photographers, availability, payments, production stages and history."
+                : presentationExpanded
+                    ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see wedding media and linked workflow data."
+                    : expanded
+                        ? "Demo data expanded. Open Carter Wedding to explore Media, People and Tasks / Calendar."
+                        : "Demo data is already up to date." });
         }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
     }
 
