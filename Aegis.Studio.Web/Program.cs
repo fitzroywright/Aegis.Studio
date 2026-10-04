@@ -183,6 +183,7 @@ builder.Services.AddHostedService<InboundEmailWorker>();
 builder.Services.AddHostedService<OutboundEmailWorker>();
 builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddHostedService<ConfigurationContractPublisher>();
+builder.Services.AddSingleton<IClientGalleryPublisher,ManifestClientGalleryPublisher>();
 
 WebApplication app = builder.Build();
 app.MapDiagnosticLevelRuntime();
@@ -197,6 +198,17 @@ workDayStore.EnsureSchema();
 int workDayLocationRetentionDays=Math.Clamp(app.Configuration.GetValue<int?>("WorkDay:LocationRetentionDays")??30,1,3650);
 workDayStore.ApplyLocationRetention(TimeSpan.FromDays(workDayLocationRetentionDays));
 
+app.Use(async(context,next)=>
+{
+    try{await next();}
+    catch(Exception error) when (!context.Response.HasStarted && !context.RequestAborted.IsCancellationRequested)
+    {
+        app.Logger.LogError(error,"Studio request failed: {Method} {Path}",context.Request.Method,context.Request.Path);
+        context.Response.Clear();
+        context.Response.StatusCode=error is ArgumentException?400:error is KeyNotFoundException?404:503;
+        await context.Response.WriteAsJsonAsync(new{error=error is ArgumentException?error.Message:"This action could not be completed. Your saved data is retained; refresh and retry."});
+    }
+});
 app.UseAuthentication();
 app.UseMiddleware<WorkDayDeviceTokenMiddleware>();
 app.Use(async (context, next) => { bool document = context.Request.Path == "/" || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase); if (document && context.User.Identity?.IsAuthenticated != true) { context.Response.Redirect("/login"); return; } await next(); });
@@ -226,6 +238,7 @@ new WorkspaceJobStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureS
 StudioVersionSchema.EnsureCreated(app.Services.GetRequiredService<StudioDatabase>());
 app.MapWorkspaceJobs();
 app.MapMediaProduction();
+app.MapJobLifecycle();
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
 app.MapFrontDeskBookingRequests();
 app.MapStudioClients();
@@ -568,12 +581,15 @@ app.MapPost("/api/jobs/{id:guid}/pipeline-transition", (Guid id, PipelineJobTran
 
 app.MapGet("/api/bookings", (BookingStore store) => Results.Ok(store.GetAll()));
 app.MapGet("/api/bookings/{id:guid}", (Guid id, HttpContext context, BookingStore store, BookingApiAuthenticator security) => { if (!security.IsAuthorized(context)) return Results.Unauthorized(); return store.Get(id) is Booking booking ? Results.Ok(new { booking, payments = store.GetPayments(id) }) : Results.NotFound(); }).AllowAnonymous();
-app.MapPost("/api/bookings", (CreateBookingIntakeRequest request, HttpContext context, BookingStore bookings, StudioStore studio, BookingApiAuthenticator security, NotificationService notifications) =>
+// Website intake joins the same pending booking/deposit flow as FrontDesk.
+app.MapPost("/api/bookings", PublicBookingEndpoints.Create).AllowAnonymous();
+app.MapPost("/api/public/booking-requests", PublicBookingEndpoints.Create).AllowAnonymous();
+app.MapPost("/api/public/booking-requests/{id:guid}/payment-confirmations", PublicBookingEndpoints.RecordDeposit).AllowAnonymous();
+app.MapGet("/api/public/booking-requests/{id:guid}", (Guid id,HttpContext context,BookingApiAuthenticator security,StudioDatabase database)=>
 {
-    if (!security.IsAuthorized(context)) return Results.Unauthorized();
-    if (string.IsNullOrWhiteSpace(request.ClientName) || string.IsNullOrWhiteSpace(request.SessionType) || request.EndsAt <= request.StartsAt) return Results.BadRequest(new { error = "Client name, session type and a valid time range are required." });
-    try { Booking booking = bookings.Create(request, studio); notifications.PublishToAll("BookingChanged", $"New booking: {booking.SessionType}", $"{booking.ClientName} requested {booking.StartsAt.LocalDateTime:g}.", "Booking", booking.Id.ToString("D")); return Results.Created($"/api/bookings/{booking.Id}", new { booking, job = studio.GetJob(booking.JobId) }); }
-    catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    if(!security.IsAuthorized(context))return Results.Unauthorized();
+    var pending=new FrontDeskBookingRequestStore(database).GetAll().FirstOrDefault(x=>x.Id==id);
+    return pending is null?Results.NotFound():Results.Ok(new{pending.Id,pending.Status,pending.JobId,pending.RecordedDeposit,pending.Request.RequiredDeposit});
 }).AllowAnonymous();
 app.MapPut("/api/bookings/{id:guid}/status", (Guid id, UpdateBookingStatusRequest request, BookingStore store, NotificationService notifications) =>
 {

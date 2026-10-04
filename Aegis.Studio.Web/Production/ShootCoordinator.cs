@@ -36,6 +36,13 @@ public sealed class ShootCoordinator
 
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
+        using(var jobLock=new NpgsqlCommand("select id from studio_jobs where id=$1 and status not in ('Completed','Cancelled','Published') for update",connection,transaction))
+        {jobLock.Parameters.AddWithValue(jobId);if(jobLock.ExecuteScalar() is null)throw new InvalidOperationException("The job is unavailable for scheduling.");}
+        using(var duplicate=new NpgsqlCommand("select id from studio_shoot_sessions where job_id=$1 and lower(photographer_user_name)=lower($2) and call_time_utc=$3 and planned_end_utc=$4 and status<>'Cancelled'",connection,transaction))
+        {
+            duplicate.Parameters.AddWithValue(jobId);duplicate.Parameters.AddWithValue(photographer.UserName);duplicate.Parameters.AddWithValue(request.CallTimeUtc.ToUniversalTime());duplicate.Parameters.AddWithValue(request.PlannedEndUtc.ToUniversalTime());
+            if(duplicate.ExecuteScalar() is Guid existing)return new OperationalWorkStore(database).GetShoots(jobId).Single(x=>x.Id==existing);
+        }
         foreach(Guid resourceId in resources.OrderBy(x=>x))
         {
             using var resourceLock=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",connection,transaction);
@@ -44,10 +51,12 @@ public sealed class ShootCoordinator
         EnsureNoConflicts(connection, transaction, resources, request.CallTimeUtc, request.PlannedEndUtc);
 
         Guid scheduleId = Guid.NewGuid();
+        using(var requested=new NpgsqlCommand("select id from studio_schedule_entries where job_id=$1 and status='Requested' and not exists(select 1 from studio_shoot_sessions where schedule_entry_id=studio_schedule_entries.id) order by created_at_utc limit 1 for update",connection,transaction))
+        {requested.Parameters.AddWithValue(jobId);if(requested.ExecuteScalar() is Guid planned)scheduleId=planned;}
         using (NpgsqlCommand schedule = connection.CreateCommand())
         {
             schedule.Transaction = transaction;
-            schedule.CommandText = "insert into studio_schedule_entries(id,job_id,booking_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,null,$3,$4,$5,$6,'Scheduled',$7,now())";
+            schedule.CommandText = "insert into studio_schedule_entries(id,job_id,booking_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,null,$3,$4,$5,$6,'Scheduled',$7,now()) on conflict(id) do update set title=excluded.title,starts_at_utc=excluded.starts_at_utc,ends_at_utc=excluded.ends_at_utc,location=excluded.location,status='Scheduled',notes=excluded.notes";
             schedule.Parameters.AddWithValue(scheduleId); schedule.Parameters.AddWithValue(jobId); schedule.Parameters.AddWithValue("Photography shoot");
             schedule.Parameters.AddWithValue(request.CallTimeUtc.ToUniversalTime()); schedule.Parameters.AddWithValue(request.PlannedEndUtc.ToUniversalTime());
             schedule.Parameters.AddWithValue((object?)request.Location?.Trim() ?? DBNull.Value); schedule.Parameters.AddWithValue((object?)request.CoverageNotes?.Trim() ?? DBNull.Value); schedule.ExecuteNonQuery();
@@ -101,4 +110,3 @@ public sealed class ShootCoordinator
 }
 
 public sealed record IntegratedShootRequest(string PhotographerUserName,string? AssistantUserName,DateTimeOffset CallTimeUtc,DateTimeOffset PlannedEndUtc,string? Location,string? CoverageNotes,string? EquipmentNotes,IReadOnlyList<Guid>? ResourceIds);
-

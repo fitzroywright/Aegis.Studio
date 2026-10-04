@@ -208,16 +208,23 @@ public sealed class StudioStore
     {
         StudioJob current = GetJob(id) ?? throw new KeyNotFoundException("Job was not found.");
         string status = string.IsNullOrWhiteSpace(request.Status) ? current.Status : request.Status.Trim();
+        if(status!=current.Status && current.Status is "Completed" or "Closed" or "Cancelled" or "Published")
+            throw new ArgumentException("This job is finished and cannot move to another stage.");
+        if(status!=current.Status && status is "Needs Review" or "Changes Requested" or "In Production" or "Ready for Client" or "Published")
+            throw new ArgumentException("Use the job workflow action to advance review, production or publication.");
+        if(status!=current.Status && current.Status is "Needs Review" or "Changes Requested" or "In Production" or "Ready for Client")
+            throw new ArgumentException("Use the job workflow action to change the review or production stage.");
         string? assignedTo = string.IsNullOrWhiteSpace(request.AssignedTo) ? current.AssignedTo : request.AssignedTo.Trim();
         DateOnly? eventDate = request.EventDate ?? current.EventDate;
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "update studio_jobs set status=$2, assigned_to=$3, event_date=$4 where id=$1";
+        command.CommandText = "update studio_jobs set status=$2, assigned_to=$3, event_date=$4 where id=$1 and status=$5";
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(status);
         command.Parameters.AddWithValue((object?)assignedTo ?? DBNull.Value);
         command.Parameters.AddWithValue((object?)eventDate ?? DBNull.Value);
-        command.ExecuteNonQuery();
+        command.Parameters.AddWithValue(current.Status);
+        if(command.ExecuteNonQuery()!=1)throw new ArgumentException("The job changed while saving. Refresh and try again.");
         return GetJob(id)!;
     }
 

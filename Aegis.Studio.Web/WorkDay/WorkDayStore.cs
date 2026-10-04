@@ -486,6 +486,13 @@ public sealed class WorkDayStore(StudioDatabase database)
                 if(string.IsNullOrWhiteSpace(request.Text)) throw new InvalidOperationException("Text is required.");
                 using NpgsqlCommand note=c.CreateCommand();note.Transaction=tx;note.CommandText="insert into studio_workday_notes(id,operation_id,user_name,assignment_id,note_type,category,body,occurred_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8)";note.Parameters.AddWithValue(Guid.NewGuid());note.Parameters.AddWithValue(request.OperationId);note.Parameters.AddWithValue(userName);note.Parameters.AddWithValue(assignmentId);note.Parameters.AddWithValue(request.Kind==WorkDayOperationKind.AddNote?"InternalNote":"Exception");note.Parameters.AddWithValue((object?)request.Category??DBNull.Value);note.Parameters.AddWithValue(request.Text);note.Parameters.AddWithValue(request.OccurredAtUtc);note.ExecuteNonQuery();
             }
+            if(request.Kind is WorkDayOperationKind.StartSession or WorkDayOperationKind.CompleteSession)
+            {
+                using var shoot=new NpgsqlCommand("update studio_shoot_sessions set status=$2,checked_in_at_utc=coalesce(checked_in_at_utc,$3),checked_out_at_utc=case when $2='ShootComplete' then coalesce(checked_out_at_utc,$3) else checked_out_at_utc end,updated_at_utc=now() where schedule_entry_id=$1 and status<>'Cancelled' returning job_id",c,tx);
+                shoot.Parameters.AddWithValue(assignmentId);shoot.Parameters.AddWithValue(request.Kind==WorkDayOperationKind.CompleteSession?"ShootComplete":"InProgress");shoot.Parameters.AddWithValue(request.OccurredAtUtc);
+                var jobs=new List<Guid>();using(var reader=shoot.ExecuteReader())while(reader.Read())jobs.Add(reader.GetGuid(0));
+                foreach(Guid job in jobs.Distinct())Aegis.Studio.Web.Production.JobShootLifecycle.Advance(c,tx,job,userName);
+            }
             SaveLocation(c,tx,userName,GetActiveSessionId(c,tx,userName),request,assignmentId);
         }
 
@@ -496,3 +503,4 @@ public sealed class WorkDayStore(StudioDatabase database)
     private static Guid? GetActiveSessionId(NpgsqlConnection c,NpgsqlTransaction tx,string user){using NpgsqlCommand q=c.CreateCommand();q.Transaction=tx;q.CommandText="select id from studio_workday_work_sessions where lower(user_name)=lower($1) and ended_at_utc is null limit 1";q.Parameters.AddWithValue(user);return q.ExecuteScalar() is Guid g?g:null;}
     private static void SaveLocation(NpgsqlConnection c,NpgsqlTransaction tx,string user,Guid? session,WorkDayOperationRequest request,Guid? assignment){if(request.Location is not { } l)return;using NpgsqlCommand q=c.CreateCommand();q.Transaction=tx;q.CommandText="insert into studio_workday_location_observations(id,user_name,work_session_id,assignment_id,operation_id,latitude,longitude,accuracy_metres,observed_at_utc,source,mock_location,received_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now()) on conflict(id) do nothing";q.Parameters.AddWithValue(l.ObservationId);q.Parameters.AddWithValue(user);q.Parameters.AddWithValue((object?)session??DBNull.Value);q.Parameters.AddWithValue((object?)assignment??DBNull.Value);q.Parameters.AddWithValue(request.OperationId);q.Parameters.AddWithValue(l.Latitude);q.Parameters.AddWithValue(l.Longitude);q.Parameters.AddWithValue((object?)l.AccuracyMetres??DBNull.Value);q.Parameters.AddWithValue(l.ObservedAtUtc);q.Parameters.AddWithValue((object?)l.Source??DBNull.Value);q.Parameters.AddWithValue((object?)l.MockLocation??DBNull.Value);q.ExecuteNonQuery();}
 }
+

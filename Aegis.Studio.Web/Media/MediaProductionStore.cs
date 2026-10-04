@@ -33,6 +33,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             "alter table studio_job_subjects add column if not exists photo_notes text not null default ''",
             "alter table studio_job_subjects add column if not exists is_system boolean not null default false",
             "create table if not exists studio_media_assets(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,gallery_id uuid not null references studio_media_galleries(id),asset_key text not null,production_status text not null default 'Needs Sorting',assigned_to text null,capture_at_utc timestamptz null,unique(job_id,asset_key))",
+            "alter table studio_media_assets add column if not exists approved_version_id uuid null references studio_asset_versions(id)",
             "create table if not exists studio_media_asset_subjects(asset_id uuid not null references studio_media_assets(id) on delete cascade,subject_id uuid not null references studio_job_subjects(id) on delete cascade,primary key(asset_id,subject_id))",
             "create table if not exists studio_media_edit_batches(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,created_by text not null,created_at_utc timestamptz not null default now())",
             "create table if not exists studio_media_edit_items(token uuid primary key,batch_id uuid not null references studio_media_edit_batches(id) on delete cascade,asset_id uuid not null references studio_media_assets(id),source_version_id uuid not null references studio_asset_versions(id),export_name text not null,unique(batch_id,asset_id))",
@@ -50,6 +51,8 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
         Execute(c,tx,"insert into studio_media_galleries(id) select id from studio_jobs where id=$1 on conflict do nothing",job);
         Execute(c,tx,"insert into studio_media_collections(job_id,name) select $1,'General' where not exists(select 1 from studio_media_collections where job_id=$1) on conflict do nothing",job);
+        EnsureCollection(c,tx,job,"Unclassified");
+        Execute(c,tx,"update studio_job_subjects set collection_name='Unclassified' where job_id=$1 and is_system and lower(name)='unclassified'",job);
         Execute(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key) select md5($1::text||':'||v.asset_key)::uuid,$1,$1,v.asset_key from studio_asset_versions v where v.job_id=$1 and v.asset_key not like 'unmatched/%' and not exists(select 1 from studio_media_unmatched u where u.version_id=v.id) group by v.asset_key on conflict(job_id,asset_key) do nothing",job);
         Execute(c,tx,"update studio_job_subjects set gallery_id=$1 where job_id=$1 and gallery_id is null",job);
         Guid unclassified = EnsureUnclassifiedSubject(c,tx,job);
@@ -105,7 +108,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         object? existing=Scalar(c,tx,"select id from studio_job_subjects where job_id=$1 and is_system and lower(name)='unclassified' limit 1",job);
         if(existing is Guid id)return id;
         Guid created=Guid.NewGuid();
-        Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,collection_name,is_system) values($1,$2,$2,'Unclassified','','','System','General',true)",created,job);
+        Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,collection_name,is_system) values($1,$2,$2,'Unclassified','','','System','Unclassified',true)",created,job);
         return created;
     }
 
@@ -203,13 +206,20 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         }
         if(returned&&asset is null)
         {
-            using var c=database.OpenConnection();using var tx=c.BeginTransaction();Guid id=Guid.NewGuid();
+            using var c=database.OpenConnection();using var tx=c.BeginTransaction();StudioVersionStore.LockJobForMediaChange(c,tx,job);Guid id=Guid.NewGuid();
             string key="unmatched/"+Guid.NewGuid().ToString("N");memory.Position=0;var version=versions.Add(c,tx,job,key,file.FileName,file.ContentType,memory,user,note);
             Execute(c,tx,"insert into studio_media_unmatched(id,job_id,staging_key,version_id,reason) values($1,$2,$3,$4,'No unique retained export identity. Select the original image.')",id,job,key,version.Id);
             Audit(c,tx,job,"UnmatchedUpload",user,"Returned file requires manual matching.");tx.Commit();return new{unmatched=true,id};
         }
         using(var c=database.OpenConnection())using(var tx=c.BeginTransaction())
         {
+            StudioVersionStore.LockJobForMediaChange(c,tx,job);
+            if(!returned&&!asset.HasValue)
+            {
+                using var duplicate=new NpgsqlCommand("select v.id,a.id from studio_asset_versions v join studio_media_assets a on a.job_id=v.job_id and a.asset_key=v.asset_key where v.job_id=$1 and lower(v.sha256)=lower($2) and lower(v.file_name)=lower($3) order by v.created_at_utc limit 1",c,tx);
+                duplicate.Parameters.AddWithValue(job);duplicate.Parameters.AddWithValue(hash);duplicate.Parameters.AddWithValue(Path.GetFileName(file.FileName));
+                using var reader=duplicate.ExecuteReader();if(reader.Read())return new{unmatched=false,id=reader.GetGuid(0),assetId=reader.GetGuid(1),reused=true};
+            }
             string key=asset.HasValue?AssetKey(c,tx,job,asset.Value):Guid.NewGuid().ToString("D");
             Execute(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))",job.ToString("D")+":"+key);
             if(asset.HasValue&&Scalar(c,tx,"select version_id from studio_media_returns where job_id=$1 and sha256=$2 and asset_id=$3",job,hash,asset.Value) is Guid prior)return new{unmatched=false,id=prior};

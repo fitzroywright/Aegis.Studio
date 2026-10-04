@@ -94,8 +94,16 @@ public sealed class OperationalWorkStore
 
     public ShootSession UpdateShoot(Guid id, ShootSessionUpdateRequest request, string userName)
     {
+        using var connection=database.OpenConnection();using var transaction=connection.BeginTransaction();
+        using(var locked=new NpgsqlCommand("select id from studio_shoot_sessions where id=$1 for update",connection,transaction))
+        {locked.Parameters.AddWithValue(id);if(locked.ExecuteScalar() is null)throw new KeyNotFoundException("Shoot session was not found.");}
         ShootSession current = GetShoot(id) ?? throw new KeyNotFoundException("Shoot session was not found.");
         string action = request.Action?.Trim().ToLowerInvariant() ?? "update";
+        if(action=="checkout" && current.CheckedOutAtUtc.HasValue)return current;
+        if(action=="checkin" && current.CheckedInAtUtc.HasValue)return current;
+        if(action=="handoff" && current.HandoffStatus=="HandedOff")return current;
+        if(current.Status=="Cancelled")throw new InvalidOperationException("A cancelled shoot cannot be updated.");
+        if(action=="checkout"&&!current.CheckedInAtUtc.HasValue)throw new InvalidOperationException("Check in before completing the shoot.");
         ShootSession updated = current with { UpdatedAtUtc = DateTimeOffset.UtcNow };
         if (action == "checkin") updated = updated with { Status = "InProgress", CheckedInAtUtc = current.CheckedInAtUtc ?? DateTimeOffset.UtcNow };
         else if (action == "checkout") updated = updated with { Status = "ShootComplete", CheckedOutAtUtc = current.CheckedOutAtUtc ?? DateTimeOffset.UtcNow };
@@ -109,8 +117,11 @@ public sealed class OperationalWorkStore
             EquipmentNotes = request.EquipmentNotes is null ? updated.EquipmentNotes : Clean(request.EquipmentNotes),
             HandoffTo = request.HandoffTo is null ? updated.HandoffTo : Clean(request.HandoffTo)
         };
-        SaveShoot(updated);
-        Log(updated.JobId, null, $"Shoot:{action}", userName, request.CoverageNotes ?? request.EquipmentNotes);
+        SaveShoot(updated,connection,transaction);
+        JobShootLifecycle.Advance(connection,transaction,updated.JobId,userName);
+        using(var audit=new NpgsqlCommand("insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,$3,$4,$5,now())",connection,transaction))
+        {audit.Parameters.AddWithValue(Guid.NewGuid());audit.Parameters.AddWithValue(updated.JobId);audit.Parameters.AddWithValue("Shoot:"+action);audit.Parameters.AddWithValue(userName);audit.Parameters.AddWithValue((object?)request.CoverageNotes??request.EquipmentNotes??(object)DBNull.Value);audit.ExecuteNonQuery();}
+        transaction.Commit();
         return updated;
     }
 
@@ -169,7 +180,12 @@ public sealed class OperationalWorkStore
 
     private void SaveShoot(ShootSession s)
     {
-        using NpgsqlConnection connection=database.OpenConnection(); using NpgsqlCommand command=connection.CreateCommand();
+        using var connection=database.OpenConnection();using var transaction=connection.BeginTransaction();
+        SaveShoot(s,connection,transaction);transaction.Commit();
+    }
+    private static void SaveShoot(ShootSession s,NpgsqlConnection connection,NpgsqlTransaction transaction)
+    {
+        using NpgsqlCommand command=connection.CreateCommand();command.Transaction=transaction;
         command.CommandText="""
             insert into studio_shoot_sessions(id,job_id,schedule_entry_id,photographer_user_name,assistant_user_name,call_time_utc,planned_end_utc,location,status,checked_in_at_utc,checked_out_at_utc,image_count,backup_confirmed,reshoot_required,coverage_notes,equipment_notes,handoff_status,handoff_to,created_at_utc,updated_at_utc)
             values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
@@ -201,3 +217,4 @@ public sealed record ShootSessionRequest(Guid? ScheduleEntryId,string Photograph
 public sealed record ShootSessionUpdateRequest(string? Action,int? ImageCount,bool? BackupConfirmed,bool? ReshootRequired,string? CoverageNotes,string? EquipmentNotes,string? HandoffTo);
 public sealed record OperationalAudit(Guid Id,Guid JobId,Guid? ActivityId,string Action,string UserName,string? Detail,DateTimeOffset CreatedAtUtc);
 public sealed record OperationalSummary(int ShootsToday,int ShootsInProgress,int ShootsAwaitingBackup,int ReshootsRequired,int OpenActivities,int BlockedActivities,int OverdueActivities);
+

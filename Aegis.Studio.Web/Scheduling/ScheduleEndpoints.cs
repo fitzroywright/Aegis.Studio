@@ -26,9 +26,10 @@ public static class ScheduleEndpoints
             catch (Exception exception) { return Results.BadRequest(new { error = exception.Message }); }
         }).RequireAuthorization();
 
-        app.MapGet("/api/schedule/entries", (DateTimeOffset? from, DateTimeOffset? to, ClaimsPrincipal user, ScheduleStore store, JobAccessService access) =>
+        app.MapGet("/api/schedule/entries", (DateTimeOffset? from, DateTimeOffset? to, Guid? jobId, ClaimsPrincipal user, ScheduleStore store, JobAccessService access) =>
         {
-            IReadOnlyList<ScheduleEntry> entries = store.GetEntries(from, to);
+            if(jobId.HasValue&&!access.HasPermission(user,jobId.Value,"ViewJob"))return Results.Forbid();
+            IReadOnlyList<ScheduleEntry> entries = store.GetEntries(from, to, jobId);
             if (user.IsInRole("Administrator")) return Results.Ok(entries);
             HashSet<Guid> allowed = access.GetAccessibleJobIds(user).ToHashSet();
             return Results.Ok(entries.Where(x => x.JobId.HasValue && allowed.Contains(x.JobId.Value)));

@@ -11,6 +11,7 @@ public static class DemoDataEndpoints
     {
         app.MapPost("/api/admin/demo/seed", (ClaimsPrincipal user, StudioDatabase database, IConfiguration configuration, IWebHostEnvironment environment) =>
         {
+            if(!environment.IsDevelopment())return Results.NotFound();
             string? login = user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrWhiteSpace(login)) return Results.BadRequest(new { error = "A login identifier is required." });
             using var connection = database.OpenConnection();
