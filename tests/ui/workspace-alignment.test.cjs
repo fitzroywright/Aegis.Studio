@@ -26,10 +26,10 @@ test('single subject is a card; multiple subjects form a roster; viewers cannot 
  const {w,panel}=environment();let subjects=[{id:'a',name:'Morgan <script>',reference:'001',notes:'Portrait'}];
  w.json=async url=>url.endsWith('/access')?{permissions:{editJob:false}}:subjects;
  await w.renderJobSubjects({id:'job'},panel,()=>true,()=>{});
- assert.ok(panel.querySelector('.subject-card'));assert.equal(panel.querySelector('script'),null);assert.equal(panel.querySelector('form'),null);
+ assert.equal(panel.querySelectorAll('.person-card').length,1);assert.equal(panel.querySelector('script'),null);assert.equal(panel.querySelector('form'),null);
  subjects.push({id:'b',name:'Alex',reference:'002',notes:''});
  await w.renderJobSubjects({id:'job'},panel,()=>true,()=>{});
- assert.equal(panel.querySelectorAll('tbody tr').length,2);assert.equal(panel.querySelector('.subject-card'),null);
+ assert.equal(panel.querySelectorAll('.person-card').length,2);assert.equal(panel.querySelector('form'),null);
 });
 test('task list and calendar retain the same scheduled and unscheduled records',async()=>{
  const {w,panel}=environment();let calls=0;const tasks=[{id:'a',title:'Retouch portraits',scheduledAtUtc:new Date().toISOString(),status:'NotStarted'},{id:'b',title:'Await prints',status:'Blocked'}];
@@ -76,9 +76,9 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
  assert.equal(w.messageFirstName('fwright',[],'Team member',true),'fwright');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'fwright');
- assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Messages','Media','Subjects','Tasks','Calendar','Activity']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.textContent),['Messages','Media','Subjects','Tasks','Calendar','Activity']);
  assert.equal(w.document.querySelector('.detail-header .activity-button'),null);
- assert.equal(w.document.querySelector('[data-job-tab=activity]')?.textContent,'Activity');
+ assert.equal(w.document.querySelector('[data-job-scroll=activity]')?.textContent,'Activity');
  assert.ok(w.document.querySelector('.job-work-board'));
  await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-context-sidebar .thread-next-tasks'));assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
  assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
@@ -130,7 +130,7 @@ test('shared request helper accepts empty successes and dismissal removes the ba
  w.fetch=async()=>new Response('{"ok":true}',{status:200});
  assert.equal((await w.json('/data')).ok,true);
  w.fetch=async()=>new Response('Denied',{status:403});
- await assert.rejects(w.json('/denied'),/Denied/);
+ await assert.rejects(w.json('/denied'),/permission/);
  w.fetch=async(url,options)=>options?.method==='POST'?new Response(null,{status:204}):new Response(JSON.stringify([{id:'a',title:'Notice',body:'Message'}]),{status:200});
  await w.renderAnnouncementBanners(panel,'workspace',()=>true);
  await panel.querySelector('[data-dismiss]').onclick();
@@ -160,6 +160,8 @@ test('Media collection controls persist names and dropped files target the selec
  panel.querySelector('[data-new-collection]').click();let form=w.document.querySelector('dialog form');form.elements.name.value='Portraits';await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.equal(panel.querySelector('[data-collection]').value,'Portraits');
  panel.querySelector('.media-drop-surface').ondrop({preventDefault(){},dataTransfer:{files:[{name:'portrait.jpg'}]}});
+ let uploadForm=[...w.document.querySelectorAll('dialog form')].find(x=>x.closest('dialog')?.textContent.includes('Add / Upload'));
+ assert.ok(uploadForm);await uploadForm.onsubmit({preventDefault(){},currentTarget:uploadForm});
  await new Promise(resolve=>setTimeout(resolve,10));
  assert.equal(calls.find(x=>x.url.endsWith('/uploads')).options.body.get('collection'),'Portraits');
  panel.querySelector('[data-rename-collection]').click();form=w.document.querySelectorAll('dialog form')[1];form.elements.name.value='Portraits edited';await form.onsubmit({preventDefault(){},currentTarget:form});
@@ -194,7 +196,7 @@ test('Pipeline shows stage groups with schedule and task on timeline and calenda
  w.studioRememberPeople=()=>{};w.studioFirstName=value=>value;
  const today=new Date();const time=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,10).toISOString();const end=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,12).toISOString();
  const requests=[];
- w.json=async(url,options)=>{requests.push(url);if(options)return {id:'new'};if(url==='/api/jobs')return [{id:'job',title:'Wedding',status:'Needs Scheduling',clientName:'Brown'}];if(url.startsWith('/api/schedule/entries?'))return [{id:'shoot',jobId:'job',title:'Wedding shoot',startsAtUtc:time,endsAtUtc:end,resourceIds:['photographer'],status:'Scheduled'},{id:'general',jobId:null,title:'Studio booking',startsAtUtc:time,endsAtUtc:end,resourceIds:[],status:'Tentative'}];if(url==='/api/operations/activities')return [{id:'task',jobId:'job',title:'Confirm location',scheduledAtUtc:time,dueAtUtc:time,status:'NotStarted'}];if(url==='/api/schedule/resources')return [{id:'photographer',name:'Taberfa',resourceType:'Staff',isActive:true}];if(url==='/api/auth/me')return {user:{isAdministrator:true}};throw Error(url);};
+ w.json=async(url,options)=>{requests.push(url);if(options)return {id:'new'};if(url==='/api/jobs')return [{id:'job',title:'Wedding',status:'Needs Scheduling',clientName:'Brown'}];if(url.startsWith('/api/schedule/entries?'))return [{id:'shoot',jobId:'job',title:'Wedding shoot',startsAtUtc:time,endsAtUtc:end,resourceIds:['photographer'],status:'Scheduled'},{id:'general',jobId:null,title:'Studio booking',startsAtUtc:time,endsAtUtc:end,resourceIds:[],status:'Tentative'}];if(url==='/api/operations/activities')return [{id:'task',jobId:'job',title:'Confirm location',scheduledAtUtc:time,dueAtUtc:time,status:'NotStarted'}];if(url==='/api/schedule/resources')return [{id:'photographer',name:'Taberfa',resourceType:'Staff',isActive:true}];if(url==='/api/auth/me')return {user:{isAdministrator:true}};if(url==='/api/workspaces')return [{id:'workspace',name:'Weddings'}];throw Error(url);};
  w.eval(fs.readFileSync(path.join(root,'scheduling.js'),'utf8'));
  await w.showPipeline();
  assert.match(w.genericView.textContent,/Needs scheduling/);assert.match(w.genericView.textContent,/Wedding shoot/);assert.match(w.genericView.textContent,/Confirm location/);assert.match(w.genericView.textContent,/Unlinked schedule/);
