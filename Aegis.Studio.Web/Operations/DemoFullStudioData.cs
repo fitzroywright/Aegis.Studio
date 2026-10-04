@@ -225,7 +225,16 @@ internal static class DemoFullStudioData
         {
             string key=$"demo-full/{job.Number}/asset-{i+1:000}";
             Guid versionId=Id(64,job.Number*100+i);
-            DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,(ordinal+i)%12,null,login);
+            if(i<12)
+            {
+                DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,(ordinal+i)%12,null,login);
+            }
+            else
+            {
+                Guid sourceVersionId=Id(64,job.Number*100+(i%12));
+                Execute(c,tx,"insert into studio_asset_versions(id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note) select $1,job_id,$2,1,$3,content_type,size_bytes,sha256,stored_path,$4,now(),null,'Synthetic demo asset reusing a seeded illustration for scalable demo volume.' from studio_asset_versions where id=$5 on conflict(job_id,asset_key,version_number) do update set file_name=excluded.file_name,content_type=excluded.content_type,size_bytes=excluded.size_bytes,sha256=excluded.sha256,stored_path=excluded.stored_path,created_by=excluded.created_by,note=excluded.note",
+                    versionId,key,$"Demo-{job.Number}-{i+1:000}.png",login,sourceVersionId);
+            }
             Guid assetId=Id(65,job.Number*100+i);
             string status=statuses[(ordinal+i)%statuses.Length];
             Execute(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status,assigned_to,capture_at_utc) values($1,$2,$2,$3,$4,$5,now()-($6 || ' hours')::interval) on conflict(job_id,asset_key) do update set production_status=excluded.production_status,assigned_to=excluded.assigned_to,capture_at_utc=excluded.capture_at_utc",
