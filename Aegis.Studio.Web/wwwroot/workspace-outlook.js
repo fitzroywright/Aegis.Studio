@@ -364,7 +364,17 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 const refresh=()=>renderJobTasks(job,panel,()=>dialog.isConnected,refresh);
                 refresh().catch(error=>panel.textContent=error.message);
             };
-            detailPane.querySelector('[data-more-action]').onclick = () => openJobDetailsEditor(job);
+            detailPane.querySelector('[data-more-action]').onclick = () => {
+                const dialog=studioDialog('Job actions',`
+                    <div class="job-actions mockup-more-actions">
+                        <button type="button" class="action" data-more-edit>Edit Details</button>
+                        <button type="button" class="action" data-more-tasks>View Tasks</button>
+                        <button type="button" class="action" data-more-activity>View Activity</button>
+                    </div>`);
+                dialog.querySelector('[data-more-edit]').onclick=()=>{dialog.close();openJobDetailsEditor(job);};
+                dialog.querySelector('[data-more-tasks]').onclick=()=>{dialog.close();detailPane.querySelector('[data-job-tab="tasks"]')?.click();};
+                dialog.querySelector('[data-more-activity]').onclick=()=>{dialog.close();detailPane.querySelector('[data-job-tab="activity"]')?.click();};
+            };
 
             const dateWindowStart=new Date();
             dateWindowStart.setFullYear(dateWindowStart.getFullYear()-2);
