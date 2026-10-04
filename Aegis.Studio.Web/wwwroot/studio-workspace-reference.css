@@ -757,3 +757,455 @@ body[data-theme="studio-default"][data-studio-view="workspaces"] .generic{
   body[data-theme="studio-default"][data-studio-view="mywork"] .mw-page{min-width:1180px}
   body[data-theme="studio-default"][data-studio-view="workspaces"] .workspace-reference-page{min-width:1180px}
 }
+
+
+/* Job workspace presentation: clean rebuild on top of working controllers. */
+body[data-theme="studio-default"] #conversationView.has-open-job{
+  grid-template-columns:280px minmax(0,1fr);
+  background:var(--studio-bg);
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .list-pane{
+  background:#fff;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .detail-pane{
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+  padding:12px 14px 14px;
+  background:var(--studio-bg);
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-breadcrumb{
+  margin:0 0 6px;
+  color:#7a8595;
+  font-size:10px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .detail-header{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-height:76px;
+  padding:0 0 10px;
+  border:0;
+  background:transparent;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .studio-job-thumb{
+  width:58px;
+  height:58px;
+  flex:0 0 58px;
+  overflow:hidden;
+  display:grid;
+  place-items:center;
+  border-radius:9px;
+  background:#e9eef4;
+  color:#637083;
+  font-size:20px;
+  font-weight:700;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .studio-job-thumb img{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .studio-job-copy{
+  min-width:0;
+  flex:1 1 auto;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .studio-job-copy h1{
+  margin:0;
+  color:#111722;
+  font-size:24px;
+  line-height:1.05;
+  font-weight:760;
+  letter-spacing:-.025em;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .studio-job-copy p{
+  margin:5px 0 0;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  color:#6d7889;
+  font-size:10px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .studio-status-pill{
+  padding:4px 7px;
+  border-radius:999px;
+  background:#eaf3ff;
+  color:#1565c0;
+  font-size:9px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-header-actions{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-header-actions .action,
+body[data-theme="studio-default"] #conversationView.has-open-job .job-header-actions .primary{
+  min-height:32px;
+  padding:0 10px;
+  border:1px solid #dfe5ec;
+  border-radius:7px;
+  background:#fff;
+  color:#3f4a59;
+  font-size:10px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-header-actions .primary{
+  border-color:var(--studio-blue);
+  background:var(--studio-blue);
+  color:#fff;
+}
+
+body[data-theme="studio-default"] #conversationView.has-open-job .job-section-tabs{
+  min-height:36px;
+  display:flex;
+  align-items:flex-end;
+  gap:18px;
+  margin:0 0 10px;
+  padding:0 2px;
+  border-bottom:1px solid var(--studio-border);
+  overflow-x:auto;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-section-tabs button{
+  min-height:35px;
+  padding:0 1px 8px;
+  border:0;
+  border-bottom:2px solid transparent;
+  background:transparent;
+  color:#647183;
+  font-size:10px;
+  font-weight:600;
+  white-space:nowrap;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-section-tabs button.active{
+  border-bottom-color:var(--studio-blue);
+  color:#155fb8;
+}
+
+body[data-theme="studio-default"] #conversationView.has-open-job .job-work-board{
+  min-width:0;
+  min-height:0;
+  height:calc(100% - 128px);
+  display:grid;
+  grid-template-columns:minmax(250px,.82fr) minmax(420px,1.38fr) minmax(230px,.72fr);
+  gap:12px;
+  align-items:stretch;
+  overflow:hidden;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-work-board>*{
+  min-width:0;
+  min-height:0;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-message-column,
+body[data-theme="studio-default"] #conversationView.has-open-job .job-lower-pane,
+body[data-theme="studio-default"] #conversationView.has-open-job .job-context-sidebar>section,
+body[data-theme="studio-default"] #conversationView.has-open-job .job-details-card{
+  border:1px solid var(--studio-border);
+  border-radius:9px;
+  background:#fff;
+  box-shadow:0 2px 7px rgba(16,24,40,.025);
+  overflow:hidden;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-message-column{
+  display:flex;
+  flex-direction:column;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-panel-heading,
+body[data-theme="studio-default"] #conversationView.has-open-job .context-card-header{
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:0 11px;
+  border-bottom:1px solid var(--studio-border-soft);
+  background:#fff;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-panel-heading strong,
+body[data-theme="studio-default"] #conversationView.has-open-job .context-card-header strong{
+  font-size:11px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .panel-count{
+  margin-left:5px;
+  color:#8792a1;
+  font-size:8px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .panel-heading-actions{
+  display:flex;
+  gap:4px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .icon-button,
+body[data-theme="studio-default"] #conversationView.has-open-job .text-button{
+  border:0;
+  background:transparent;
+  color:#657183;
+  font-size:10px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-message-column>.messages{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
+  padding:8px 11px;
+  background:#fff;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .message{
+  display:flex;
+  gap:8px;
+  margin:0;
+  padding:9px 0;
+  border:0;
+  border-bottom:1px solid var(--studio-border-soft);
+  background:transparent;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .message-avatar{
+  width:30px;
+  height:30px;
+  flex:0 0 30px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#eaf3ff;
+  color:#1667c7;
+  font-size:10px;
+  font-weight:700;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .message-content{
+  min-width:0;
+  flex:1 1 auto;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .message-head{
+  color:#7f8997;
+  font-size:8px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .message-content p{
+  margin:4px 0 0;
+  color:#303a48;
+  font-size:9px;
+  line-height:1.4;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job #hierarchyCompose{
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:7px;
+  padding:8px 9px;
+  border-top:1px solid var(--studio-border-soft);
+  background:#fff;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job #hierarchyCompose>label:first-child{
+  position:absolute;
+  width:1px;
+  height:1px;
+  overflow:hidden;
+  clip-path:inset(50%);
+}
+body[data-theme="studio-default"] #conversationView.has-open-job #hierarchyBody{
+  width:100%;
+  min-height:58px;
+  height:58px;
+  resize:none;
+  padding:8px;
+  border:1px solid var(--studio-border);
+  border-radius:7px;
+  background:#fff;
+  color:var(--studio-text);
+  font-size:9px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .send-split{
+  align-self:stretch;
+  display:flex;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .send-split .primary,
+body[data-theme="studio-default"] #conversationView.has-open-job .send-split select{
+  border:1px solid #dfe5ec;
+  background:#fff;
+  font-size:9px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .send-split .primary{
+  min-width:70px;
+  border-color:var(--studio-blue);
+  background:var(--studio-blue);
+  color:#fff;
+}
+
+body[data-theme="studio-default"] #conversationView.has-open-job .job-lower-pane{
+  display:flex;
+  flex-direction:column;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-lower-pane>.job-section-tabs{
+  display:none;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-toolbar-host{
+  flex:0 0 auto;
+  padding:7px 8px 0;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-tab-content{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
+  padding:8px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-title-toolbar{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex-wrap:wrap;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-title-toolbar .action{
+  min-height:29px;
+  padding:0 8px;
+  border:1px solid #dfe5ec;
+  border-radius:6px;
+  background:#fff;
+  color:#4d5968;
+  font-size:8px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-progress{
+  margin-left:auto;
+  color:#7d8795;
+  font-size:8px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-production-layout{
+  min-height:0;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-subject-rail{
+  width:100%;
+  max-height:none;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-subject-list{
+  display:flex;
+  gap:5px;
+  overflow-x:auto;
+  padding:6px 0 7px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-subject-list>button{
+  min-width:74px;
+  flex:0 0 auto;
+  padding:6px;
+  border:1px solid var(--studio-border);
+  border-radius:6px;
+  background:#f8fafc;
+  font-size:8px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-subject-search,
+body[data-theme="studio-default"] #conversationView.has-open-job .media-subject-hint{
+  display:none;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .media-items.image-lens{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  align-content:start;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-file-tile{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  padding:5px;
+  border:1px solid var(--studio-border);
+  border-radius:7px;
+  background:#fff;
+  overflow:hidden;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-file-tile img{
+  width:100%;
+  height:108px;
+  display:block;
+  object-fit:cover;
+  border-radius:5px;
+  background:#eef2f6;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-file-tile strong{
+  overflow:hidden;
+  font-size:8px;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-file-tile small{
+  overflow:hidden;
+  color:#7d8795;
+  font-size:7px;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-file-tile .action{
+  min-height:25px;
+  padding:0 6px;
+  border:1px solid #dfe5ec;
+  border-radius:5px;
+  background:#fff;
+  color:#516071;
+  font-size:7px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .gallery-image-actions{
+  display:flex;
+  gap:3px;
+}
+
+body[data-theme="studio-default"] #conversationView.has-open-job .job-context-sidebar{
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  overflow:auto;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-context-sidebar>section,
+body[data-theme="studio-default"] #conversationView.has-open-job .job-details-card{
+  flex:0 0 auto;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .thread-next-tasks{
+  max-height:190px;
+  overflow:auto;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-details-card dl{
+  display:grid;
+  grid-template-columns:72px minmax(0,1fr);
+  gap:6px 8px;
+  margin:0;
+  padding:9px 10px 11px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-details-card dt{
+  color:#7d8795;
+  font-size:8px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .job-details-card dd{
+  margin:0;
+  color:#344052;
+  font-size:8px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .thread-shared-files{
+  max-height:190px;
+  overflow:auto;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .thread-shared-files .job-file-gallery{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:4px;
+  margin:0;
+  padding:6px 8px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .thread-shared-files .job-file-tile{
+  display:grid;
+  grid-template-columns:28px minmax(0,1fr);
+  align-items:center;
+  gap:6px;
+  padding:4px 0;
+  border:0;
+  border-bottom:1px solid var(--studio-border-soft);
+  border-radius:0;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .thread-shared-files .job-file-tile img{
+  width:28px;
+  height:28px;
+}
+body[data-theme="studio-default"] #conversationView.has-open-job .thread-shared-files .job-file-tile strong{
+  font-size:8px;
+}
+
+@media(max-width:1180px){
+  body[data-theme="studio-default"] #conversationView.has-open-job{
+    min-width:1180px;
+  }
+}
