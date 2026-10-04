@@ -143,6 +143,56 @@ function mergeJobMessages(teamMessages, customerMessages) {
         conversationList.querySelectorAll('[data-job]').forEach(row => row.classList.toggle('active', row.dataset.job === job.id));
         await thread('Job', job.id, version);
     }
+    async function openJobDetailsEditor(job) {
+        const access=await json(`/api/jobs/${job.id}/access`);
+        const permissions=access.permissions||access;
+        if(!permissions.editJob){
+            alert('You do not have permission to edit this job.');
+            return;
+        }
+        const dialog=studioDialog('Edit Job Details',`
+            <form class="subject-form">
+                <label>Status<input name="status" value="${esc(job.status||'')}" ${permissions.changeStatus?'':'disabled'}></label>
+                <label>Assigned To<input name="assignedTo" value="${esc(job.assignedTo||'')}" ${permissions.assignStaff?'':'disabled'}></label>
+                <label>Event Date<input name="eventDate" type="date" value="${esc(job.eventDate||'')}"></label>
+                <div class="dialog-actions">
+                    <button type="button" class="action" data-cancel>Cancel</button>
+                    <button type="submit" class="primary">Save</button>
+                </div>
+                <p role="alert"></p>
+            </form>`);
+        const form=dialog.querySelector('form');
+        dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+        form.onsubmit=async event=>{
+            event.preventDefault();
+            const button=form.querySelector('[type=submit]');
+            button.disabled=true;
+            try{
+                const updated=await json(`/api/jobs/${job.id}`,{
+                    method:'PUT',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({
+                        status:permissions.changeStatus?form.elements.status.value:null,
+                        assignedTo:permissions.assignStaff?(form.elements.assignedTo.value||null):null,
+                        eventDate:form.elements.eventDate.value||null
+                    })
+                });
+                dialog.close();
+                selectedJob=updated;
+                await thread('Job',job.id,revision);
+            }catch(error){
+                form.querySelector('[role=alert]').textContent=error.message;
+                button.disabled=false;
+            }
+        };
+    }
+
+    async function renderJobCalendar(job,panel,current) {
+        await renderJobTasks(job,panel,current,()=>renderJobCalendar(job,panel,current));
+        if(!current())return;
+        panel.querySelector('[data-task-view="calendar"]')?.click();
+    }
+
     async function thread(scope, scopeId, version) {
         const value = await json(`/api/messages/threads/${scope}/${scopeId}`, { method:'POST' });
         const messages = await json(`/api/messages/threads/${value.id}?count=500`);
@@ -580,7 +630,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     <button type="button" class="active" data-collection-filter="">All (${assets.length})</button>
                     ${collections.map(name=>`<button type="button" data-collection-filter="${esc(name)}">${esc(name)} (${assets.filter(a=>(a.collection||'Unclassified')===name).length})</button>`).join('')}
                 </div>
-                <div class="workspace-media-selection" hidden><strong data-selected-count>0 selected</strong><button type="button" class="text-button" data-clear-selection>Clear</button></div>
+                <div class="workspace-media-selection" hidden>
+                    <strong data-selected-count>0 selected</strong>
+                    <button type="button" class="text-button" data-clear-selection>Clear</button>
+                </div>
                 <div class="workspace-media-grid"></div>
             </section>`;
 
@@ -617,20 +670,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             syncSelection();
         };
 
-        const openFullMedia=async action=>{
-            panel.innerHTML='<div class="versioned-gallery"></div>';
-            const host=panel.querySelector('.versioned-gallery');
-            await renderProductionMedia(job,host,current);
-            if(!current())return;
-            const selector={
-                upload:'[data-add]',
-                roster:'[data-roster]'
-            }[action];
-            if(selector){
-                const target=(detailPane.querySelector('.media-toolbar-host')||panel).querySelector(selector) || document.querySelector(selector);
-                target?.click();
-            }
-        };
+        const refreshOverview=()=>renderJobMediaOverview(job,panel,current);
 
         panel.querySelectorAll('[data-collection-filter]').forEach(button=>button.onclick=()=>{
             panel.querySelectorAll('[data-collection-filter]').forEach(x=>x.classList.toggle('active',x===button));
@@ -638,16 +678,87 @@ function mergeJobMessages(teamMessages, customerMessages) {
             draw();
         });
 
-        panel.querySelector('[data-media-upload]').onclick=()=>openFullMedia('upload').catch(error=>alert(error.message));
-        panel.querySelector('[data-media-roster]').onclick=()=>openFullMedia('roster').catch(error=>alert(error.message));
-        panel.querySelector('[data-media-more]').onclick=()=>openFullMedia('manage').catch(error=>alert(error.message));
-
         selectButton.onclick=()=>{
             selectMode=!selectMode;
             if(!selectMode)selected.clear();
             syncSelection();
         };
         panel.querySelector('[data-clear-selection]').onclick=()=>{selected.clear();selectMode=false;syncSelection();};
+
+        panel.querySelector('[data-media-upload]').onclick=()=>{
+            const dialog=studioDialog('Upload Media',`
+                <form class="subject-form">
+                    <label>Collection<select name="collection">
+                        <option value="Unclassified">Unclassified</option>
+                        ${collections.filter(x=>x!=='Unclassified').map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}
+                    </select></label>
+                    <label>Files<input type="file" name="files" accept="image/*" multiple required></label>
+                    <label>Notes<input name="note" maxlength="1000"></label>
+                    <div class="dialog-actions">
+                        <button type="button" class="action" data-cancel>Cancel</button>
+                        <button type="submit" class="primary">Upload</button>
+                    </div>
+                    <p role="alert"></p>
+                </form>`);
+            const form=dialog.querySelector('form');
+            dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+            form.onsubmit=async event=>{
+                event.preventDefault();
+                const files=[...form.elements.files.files];
+                if(!files.length)return;
+                const submit=form.querySelector('[type=submit]');
+                submit.disabled=true;
+                try{
+                    for(const file of files){
+                        const body=new FormData();
+                        body.append('file',file);
+                        body.append('returned','false');
+                        body.append('note',form.elements.note.value||'');
+                        body.append('collection',form.elements.collection.value||'Unclassified');
+                        await json(`/api/jobs/${job.id}/media/uploads`,{method:'POST',body});
+                    }
+                    dialog.close();
+                    await refreshOverview();
+                }catch(error){
+                    form.querySelector('[role=alert]').textContent=error.message;
+                    submit.disabled=false;
+                }
+            };
+        };
+
+        panel.querySelector('[data-media-roster]').onclick=()=>{
+            const dialog=studioDialog('Import Roster',`
+                <form class="subject-form">
+                    <p>Import CSV or XLSX subject data.</p>
+                    <label>Roster file<input type="file" name="roster" accept=".csv,.xlsx" required></label>
+                    <label>Name column<input name="nameColumn" value="Name" required></label>
+                    <label>Subject ID column<input name="idColumn" value="Subject ID" required></label>
+                    <div class="dialog-actions">
+                        <button type="button" class="action" data-cancel>Cancel</button>
+                        <button type="submit" class="primary">Import</button>
+                    </div>
+                    <p role="alert"></p>
+                </form>`);
+            const form=dialog.querySelector('form');
+            dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+            form.onsubmit=async event=>{
+                event.preventDefault();
+                const submit=form.querySelector('[type=submit]');
+                submit.disabled=true;
+                try{
+                    const body=new FormData();
+                    body.append('file',form.elements.roster.files[0]);
+                    body.append('nameColumn',form.elements.nameColumn.value);
+                    body.append('idColumn',form.elements.idColumn.value);
+                    await json(`/api/jobs/${job.id}/media/roster-file`,{method:'POST',body});
+                    dialog.close();
+                    await refreshOverview();
+                }catch(error){
+                    form.querySelector('[role=alert]').textContent=error.message;
+                    submit.disabled=false;
+                }
+            };
+        };
 
         panel.querySelector('[data-media-download]').onclick=async event=>{
             if(!selected.size){
@@ -669,10 +780,17 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 const link=document.createElement('a');
                 link.href=url;
                 link.download='studio-media.zip';
+                document.body.appendChild(link);
                 link.click();
+                link.remove();
                 setTimeout(()=>URL.revokeObjectURL(url),60000);
             }catch(error){alert(error.message);}
             finally{button.disabled=false;}
+        };
+
+        panel.querySelector('[data-media-more]').onclick=async()=>{
+            panel.innerHTML='<div class="versioned-gallery"></div>';
+            await renderProductionMedia(job,panel.querySelector('.versioned-gallery'),current);
         };
 
         draw();
