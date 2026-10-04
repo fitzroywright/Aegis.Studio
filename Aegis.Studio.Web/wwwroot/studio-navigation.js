@@ -14,7 +14,11 @@
         admin:'<path d="M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="M8 12l3 3 5-6"/>'
     };
     rail.innerHTML='<button class="brand-button studio-back-button" type="button" aria-label="Back to previous view" title="Back" disabled>← Back</button>'+items.map(([id,label])=>`<button class="brand-button" data-view="${id}"><span class="studio-nav-icon icon-${id}" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[id]}</svg></span><span>${label}</span></button>`).join('');
-    const showError=e=>{genericView.innerHTML=`<h1>Unable to load view</h1><p>${esc(e.message)}</p>`;};
+    const showError=e=>{
+        conversationView.classList.add('hidden');
+        genericView.classList.remove('hidden');
+        genericView.innerHTML=`<h1>Unable to load view</h1><p>${esc(e?.message||e||'Unknown error')}</p>`;
+    };
     const generic=view=>{activateNavigation(view);conversationView.classList.add('hidden');genericView.classList.remove('hidden');genericView.innerHTML='<p>Loading…</p>';};
     const routes={
         mywork:async()=>{generic('mywork');const auth=await json('/api/auth/me');const me=auth.user||auth;const user=String(me.userName||me.loginName||'').toLowerCase();const [tasks,workdayResponse]=await Promise.all([json('/api/operations/activities?assignedTo='+encodeURIComponent(user)),fetch('/api/workday/bootstrap')]);const mine=tasks.filter(t=>user&&String(t.assignedTo||'').toLowerCase()===user&&!['Completed','Cancelled'].includes(t.status));let assignments=[],notice='';if(workdayResponse.ok){const workday=await workdayResponse.json();assignments=[...(workday.today||[]),...(workday.upcoming||[])].filter(a=>a.jobId);}else if(workdayResponse.status!==404)notice='WorkDay assignments could not be loaded.';genericView.innerHTML=`<h1>My Work</h1><h2>My shoots / WorkDay</h2>${assignments.map(a=>`<article class="task-card"><button class="link-button" data-open-job="${a.jobId}">${esc(a.title)}</button><small>${esc(new Date(a.startsAtUtc).toLocaleString())} · ${esc(a.status)}</small><small>${esc(a.location||'Location not set')}</small><p>${esc(a.instructions||'')}</p></article>`).join('')||`<p>${esc(notice||'No upcoming WorkDay assignments.')}</p>`}<h2>My tasks</h2>${mine.map(t=>`<article class="task-card"><button class="link-button" data-open-job="${t.jobId}">${esc(t.title)}</button><small>${esc(t.status)}${t.dueAtUtc?' · Due '+esc(new Date(t.dueAtUtc).toLocaleString()):''}</small></article>`).join('')||'<p>No open tasks assigned to you.</p>'}`;bindJobs();await renderMediaAttentionQueue(genericView);},
@@ -67,10 +71,29 @@
     let current={view:'workspaces',workspaceId:null,jobId:null},restoring=false;
     const same=(a,b)=>a.view===b.view&&a.workspaceId===b.workspaceId&&a.jobId===b.jobId;
     window.studioRememberView=next=>{if(restoring||same(current,next))return;history.push(current);current=next;back.disabled=false;};
-    rail.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
-        const view=b.dataset.view;
+    const navigate=async view=>{
+        const route=routes[view];
+        if(typeof route!=='function'){
+            showError(new Error('Studio navigation route is unavailable: '+view));
+            return;
+        }
         window.studioRememberView({view,workspaceId:null,jobId:null});
-        Promise.resolve(routes[view]()).catch(showError);
+        rail.querySelectorAll('[data-view]').forEach(button=>button.classList.toggle('active',button.dataset.view===view));
+        try{
+            await route();
+        }catch(error){
+            showError(error);
+        }
+    };
+
+    // Use one delegated handler so rebuilding/styling the rail cannot silently
+    // disconnect the real navigation buttons.
+    rail.addEventListener('click',event=>{
+        const button=event.target.closest('[data-view]');
+        if(!button||!rail.contains(button))return;
+        event.preventDefault();
+        event.stopPropagation();
+        navigate(button.dataset.view);
     });
     back.onclick=async()=>{
         if(!history.length)return;
