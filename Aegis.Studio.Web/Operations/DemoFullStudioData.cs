@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Npgsql;
+using Common.Storage;
 
 namespace Aegis.Studio.Web.Operations;
 
@@ -70,7 +71,7 @@ internal static class DemoFullStudioData
         new(603,6,9,"NCA Swim Team","Completed",-14,"National Aquatic Centre",110000,110000,"demo.michael","Sports Team")
     ];
 
-    internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login)
+    internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IFileStorage storage)
     {
         foreach(var workspace in Workspaces)
         {
@@ -114,6 +115,7 @@ internal static class DemoFullStudioData
 
             SeedConversation(connection,transaction,job,client,conversationId,ordinal);
             SeedSubjectsAndCollections(connection,transaction,job,jobId,ordinal,start);
+            SeedMedia(connection,transaction,storage,job,jobId,login,ordinal);
             SeedSchedule(connection,transaction,job,jobId,start,end,ordinal);
             SeedFinance(connection,transaction,job,jobId,ordinal);
             SeedActivities(connection,transaction,job,jobId,ordinal);
@@ -185,6 +187,33 @@ internal static class DemoFullStudioData
             string attributes=JsonSerializer.Serialize(new { rosterId=reference, category=job.Type, demo=true });
             Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,production_status,attributes,collection_name,scheduled_at_utc,schedule_location,contact_name,contact_email,contact_phone,photo_notes,is_system) values($1,$2,$2,$3,$4,$5,'demo-seed',$6,$7::jsonb,$8,$9,$10,'','','',$11,false) on conflict(id) do update set name=excluded.name,reference=excluded.reference,production_status=excluded.production_status,attributes=excluded.attributes,collection_name=excluded.collection_name,scheduled_at_utc=excluded.scheduled_at_utc,schedule_location=excluded.schedule_location,photo_notes=excluded.photo_notes,updated_at_utc=now()",
                 subject,jobId,name,reference,$"DEMO roster / subject for {job.Type}",job.DayOffset<0?"Photographed":"Not Photographed",attributes,collections[Math.Min(i%collections.Length,collections.Length-1)],scheduled,job.Location,$"Capture requirements for {job.Type}");
+        }
+    }
+
+    private static void SeedMedia(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,DemoJob job,Guid jobId,string login,int ordinal)
+    {
+        int count=job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?12:
+            job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?10:
+            job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?8:6;
+        string[] statuses=["Needs Sorting","Selected","Editing","Needs Review","Approved","Ready for Delivery"];
+        string[] collections=job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
+            job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Roster","Stage","Groups","Unclassified"]:
+            job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)?["Executives","Team","Selects","Unclassified"]:
+            ["Selects","Proofs","Finals","Unclassified"];
+
+        for(int i=0;i<count;i++)
+        {
+            string key=$"demo-full/{job.Number}/asset-{i+1:000}";
+            Guid versionId=Id(64,job.Number*100+i);
+            DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,(ordinal+i)%12,null,login);
+            Guid assetId=Id(65,job.Number*100+i);
+            string status=statuses[(ordinal+i)%statuses.Length];
+            Execute(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status,assigned_to,capture_at_utc) values($1,$2,$2,$3,$4,$5,now()-($6 || ' hours')::interval) on conflict(job_id,asset_key) do update set production_status=excluded.production_status,assigned_to=excluded.assigned_to,capture_at_utc=excluded.capture_at_utc",
+                assetId,jobId,key,status,job.Photographer,(i+1).ToString());
+            Execute(c,tx,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",
+                jobId,key,collections[i%collections.Length]);
+            Guid subjectId=Id(59,job.Number*100+(i%Math.Max(1,job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?8:job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?24:job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4)));
+            Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) values($1,$2) on conflict do nothing",assetId,subjectId);
         }
     }
 
