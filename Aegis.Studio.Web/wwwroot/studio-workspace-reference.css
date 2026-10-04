@@ -3454,3 +3454,26 @@ body[data-theme="studio-default"] .mw-empty{
     grid-template-columns:minmax(0,1fr) 300px;
   }
 }
+
+
+/* Navigation interaction hardening. */
+body[data-theme="studio-default"] .navigation-pane{
+  position:relative!important;
+  z-index:50!important;
+  pointer-events:auto!important;
+}
+body[data-theme="studio-default"] .navigation-pane .rail{
+  position:relative!important;
+  z-index:60!important;
+  pointer-events:auto!important;
+}
+body[data-theme="studio-default"] .navigation-pane .rail .brand-button{
+  position:relative!important;
+  z-index:61!important;
+  pointer-events:auto!important;
+  cursor:pointer!important;
+}
+body[data-theme="studio-default"] .studio-sidebar-footer{
+  z-index:10!important;
+  pointer-events:none!important;
+}
