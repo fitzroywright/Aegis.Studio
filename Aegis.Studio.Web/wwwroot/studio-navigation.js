@@ -6,6 +6,9 @@
         document.querySelectorAll('.rail [data-view]').forEach(button=>{
             button.classList.toggle('active',button.dataset.view===view);
         });
+        document.querySelectorAll('[data-top-view]').forEach(button=>{
+            button.classList.toggle('active',button.dataset.topView===view);
+        });
     }
 
     async function renderMyWork(){
@@ -480,6 +483,10 @@
     document.querySelectorAll('.rail [data-view]').forEach(button=>{
         button.type='button';
         button.onclick=()=>window.studioNavigate(button.dataset.view);
+    });
+    document.querySelectorAll('[data-top-view]').forEach(button=>{
+        button.type='button';
+        button.onclick=()=>window.studioNavigate(button.dataset.topView);
     });
 
     const topNew=document.getElementById('topNewButton');
