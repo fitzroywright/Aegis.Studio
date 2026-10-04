@@ -84,11 +84,14 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
  assert.ok(w.document.querySelector('details.job-details-card'));assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
-test('left navigation has the seven operational destinations',async()=>{
+test('left navigation has the seven operational destinations from the Studio workflow brief',async()=>{
  const dom=new JSDOM('<header class="topbar"></header><div class="shell"><div class="navigation-pane"><aside class="workspaces"></aside><aside class="rail"></aside></div></div><button id="newRequestButton">New Request</button>',{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;let frontDesk=0;
  Object.assign(w,{loadFrontDeskRole(){},showFrontDesk:async()=>frontDesk++,showProduction(){},showWorkspaces(){},showManagement(){}});
  w.eval(fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8'));
- assert.deepEqual(Array.from(w.document.querySelectorAll('.studio-side-nav button'),b=>b.textContent),['← Back','My Work','New Request','Workspaces','Pipeline','Production','FrontDesk','Dashboard','Admin']);
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const shell=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});
+ assert.deepEqual(Array.from(shell.window.document.querySelectorAll('.rail [data-view]'),b=>b.textContent.trim()),['My Work','Workspaces','Pipeline','Production','Front Desk','Finance','Admin']);
+ assert.equal(shell.window.document.querySelector('[data-view="messages"]'),null);
+ assert.equal(shell.window.document.querySelector('[data-view="jobs"]'),null);
  w.document.querySelector('[data-view="frontdesk"]').click();await Promise.resolve();assert.equal(frontDesk,1);assert.equal(w.document.getElementById('newRequestButton').hidden,false);
  const back=w.document.querySelector('.studio-back-button');assert.equal(back.disabled,false);
  w.activateView=()=>{};w.activateNavigation=()=>{};w.loadConversations=async()=>{};
