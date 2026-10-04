@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Net.Http;
 using Npgsql;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -9,6 +10,23 @@ namespace Aegis.Studio.Web.Operations;
 // Only deterministic DEMO identifiers are used; no real jobs or files are changed.
 internal static class DemoDataExpansion
 {
+    private static readonly HttpClient demoPhotoClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(30)
+    };
+
+    private static readonly string[] weddingPhotoUrls =
+    [
+        "https://upload.wikimedia.org/wikipedia/commons/a/a2/People_at_Wedding_ceremony.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/a/ab/Wedding_photo.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/b/bd/Wedding_couple_%281294004%29.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/2/20/Catholic_Wedding.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/e/ec/Wedding_Day_%28Unsplash%29.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/e/e5/Christian_wedding_ceremony_%285%29.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/0/06/Christian_white_wedding_ceremony_-_Bride_holding_flower_-_Maiduguri_-_2026_%281%29.jpg"
+    ];
+
+    private static readonly Dictionary<string,byte[]> weddingPhotoCache = new(StringComparer.OrdinalIgnoreCase);
     internal static readonly int[] JobNumbers = [1,2,4,5,7,8];
     internal static Guid Id(int group,int number) => Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
 
@@ -52,19 +70,79 @@ internal static class DemoDataExpansion
             {
                 string key=$"demo-{number}-{asset}";
                 Guid requestedOriginal=Id(26,number*100+asset);
-                Guid original=AddImage(connection,transaction,versionStorage,job,key,requestedOriginal,1,index*16+asset,null,login);
-                if(asset==0)AddImage(connection,transaction,versionStorage,job,key,Id(27,number),2,index*16+asset+1,original,login);
+                Guid original=number==4
+                    ? AddWeddingPhoto(connection,transaction,versionStorage,job,key,requestedOriginal,1,asset,null,login)
+                    : AddImage(connection,transaction,versionStorage,job,key,requestedOriginal,1,index*16+asset,null,login);
+                if(asset==0)
+                {
+                    if(number==4) AddWeddingPhoto(connection,transaction,versionStorage,job,key,Id(27,number),2,asset+1,original,login);
+                    else AddImage(connection,transaction,versionStorage,job,key,Id(27,number),2,index*16+asset+1,original,login);
+                }
                 string collection=number==4?weddingCollections[asset]:(asset<2?"Demo selects":"Demo proofs");
                 Execute(connection,transaction,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,$3)",job,key,collection);
                 Execute(connection,transaction,"update studio_job_asset_collections set collection_name=$3 where job_id=$1 and asset_key=$2",job,key,collection);
             }
             string mediaMessage=number==4
-                ?"Demo gallery ready: twelve sample wedding illustrations across Getting Ready, Ceremony, Portraits and Reception."
+                ?"Demo gallery ready: twelve wedding photographs across Getting Ready, Ceremony, Portraits and Reception."
                 :"Demo gallery ready: four sample illustrations across Selects and Proofs, with two versions of the first image.";
             Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Studio','Internal',$3,now())",Id(28,number),Id(2,number),mediaMessage);
         }
         Execute(connection,transaction,"insert into studio_state(key,value,updated_at_utc) values('demo-data-v2',$1,now())",login);
         return true;
+    }
+
+    private static Guid AddWeddingPhoto(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int photoIndex,Guid? source,string login)
+    {
+        string url=weddingPhotoUrls[photoIndex%weddingPhotoUrls.Length];
+        if(!weddingPhotoCache.TryGetValue(url,out byte[]? bytes))
+        {
+            bytes=demoPhotoClient.GetByteArrayAsync(url).GetAwaiter().GetResult();
+            weddingPhotoCache[url]=bytes;
+        }
+
+        using var content=new MemoryStream(bytes,false);
+        string stored=$"{job:N}/demo/{id:N}.jpg";
+        string fileName=$"Carter-Wedding-{photoIndex+1:00}-v{version}.jpg";
+        StoredFile storedFile=storage.StoreAsync(new StorageWriteRequest(
+            stored,
+            content,
+            "image/jpeg",
+            fileName,
+            login,
+            new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Application"]="Aegis.Studio",
+                ["JobId"]=job.ToString("D"),
+                ["AssetKey"]=key,
+                ["VersionId"]=id.ToString("D"),
+                ["Demo"]="true",
+                ["DemoSource"]="Wikimedia Commons CC0"
+            })).GetAwaiter().GetResult();
+
+        const string sql="""
+            insert into studio_asset_versions
+            (id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note)
+            values($1,$2,$3,$4,$5,'image/jpeg',$6,$7,$8,$9,now(),$10,$11)
+            on conflict(job_id,asset_key,version_number) do update set
+              file_name=excluded.file_name,
+              content_type=excluded.content_type,
+              size_bytes=excluded.size_bytes,
+              sha256=excluded.sha256,
+              stored_path=excluded.stored_path,
+              created_by=excluded.created_by,
+              source_version_id=excluded.source_version_id,
+              note=excluded.note
+            returning id
+            """;
+
+        using var command=new NpgsqlCommand(sql,connection,transaction);
+        object[] values=[
+            id,job,key,version,fileName,storedFile.Length,storedFile.Sha256,stored,login,
+            (object?)source??DBNull.Value,
+            "CC0 wedding photograph from Wikimedia Commons, seeded for Studio demonstration data."
+        ];
+        foreach(object value in values)command.Parameters.AddWithValue(value);
+        return (Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo wedding media upsert did not return an id."));
     }
 
     private static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login)
