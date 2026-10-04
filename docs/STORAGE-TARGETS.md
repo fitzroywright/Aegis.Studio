@@ -36,18 +36,8 @@ For development the repository default uses `.`, resolved from the Studio conten
 
 ### NetworkFolder
 
-Windows UNC example:
+`NetworkFolder` is a production deployment option only. Configure it in `appsettings.Production.json` or production deployment configuration; do not place NetworkFolder settings in base or Development configuration.
 
-```json
-"Storage": {
-  "Provider": "NetworkFolder",
-  "NetworkFolder": {
-    "RootPath": "\\\\nas01\\Studio"
-  }
-}
-```
-
-Linux deployments may use a mounted SMB/NFS path such as `/mnt/studio`. The share must honor exclusive file-lock semantics used by Common.Storage.
 
 ### SharePoint
 
