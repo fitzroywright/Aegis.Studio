@@ -71,18 +71,177 @@
     const routes={
         mywork:async()=>{
             setActive('mywork');
-            showGeneric('mywork','My Work','<div class="my-work-grid"><section class="studio-card" data-my-work-tasks><h2>My Tasks</h2><p>Loading…</p></section><section class="studio-card" data-my-work-media><h2>Recent Media</h2><p>Loading…</p></section></div>');
-            const auth=await json('/api/auth/me');
+            conversationView.classList.add('hidden');
+            genericView.classList.remove('hidden');
+            genericView.innerHTML='<div class="mywork-loading">Loading your studio…</div>';
+
+            const now=new Date();
+            const startOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+            const endOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+            const scheduleFrom=new Date(now.getFullYear(),now.getMonth(),now.getDate()-1).toISOString();
+            const scheduleTo=new Date(now.getFullYear(),now.getMonth(),now.getDate()+14).toISOString();
+
+            const [auth,jobs,tasks,schedule,notifications]=await Promise.all([
+                json('/api/auth/me').catch(()=>({})),
+                json('/api/jobs').catch(()=>[]),
+                json('/api/operations/activities').catch(()=>[]),
+                json('/api/schedule/entries?from='+encodeURIComponent(scheduleFrom)+'&to='+encodeURIComponent(scheduleTo)).catch(()=>[]),
+                json('/api/notifications?count=80').catch(()=>[])
+            ]);
+
             const me=auth.user||auth;
             const user=String(me.userName||me.loginName||'').toLowerCase();
-            const tasks=await json('/api/operations/activities?assignedTo='+encodeURIComponent(user)).catch(()=>[]);
-            const open=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status));
-            const host=genericView.querySelector('[data-my-work-tasks]');
-            host.innerHTML='<div class="studio-card-heading"><h2>My Tasks</h2><span>'+open.length+'</span></div>'+open.slice(0,12).map(t=>`<button class="studio-list-row" data-open-job="${t.jobId}"><strong>${esc(t.title)}</strong><span>${esc(t.status)}${t.dueAtUtc?' · '+esc(new Date(t.dueAtUtc).toLocaleDateString()):''}</span></button>`).join('')||'<p>No open tasks assigned to you.</p>';
-            openJobButtons();
-            const mediaHost=genericView.querySelector('[data-my-work-media]');
-            mediaHost.innerHTML='<div class="studio-card-heading"><h2>Recent Media</h2></div>';
-            await renderMediaAttentionQueue(mediaHost);
+            const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status) && (!user || String(t.assignedTo||'').toLowerCase()===user));
+            const todaySchedule=schedule
+                .filter(s=>{const d=new Date(s.startsAtUtc||s.start||s.startsAt);return d>=startOfDay&&d<endOfDay;})
+                .sort((a,b)=>new Date(a.startsAtUtc||a.start||a.startsAt)-new Date(b.startsAtUtc||b.start||b.startsAt));
+
+            const recentJobs=[...jobs].sort((a,b)=>new Date(b.eventDate||b.createdAtUtc||0)-new Date(a.eventDate||a.createdAtUtc||0)).slice(0,6);
+            const mediaSnapshots=await Promise.all(recentJobs.map(async job=>({
+                job,
+                media:await json('/api/jobs/'+job.id+'/media').catch(()=>({assets:[]}))
+            })));
+
+            const totalPhotos=mediaSnapshots.reduce((sum,x)=>sum+(x.media.assets?.length||0),0);
+            const messageNotifications=notifications.filter(n=>/message|conversation|reply/i.test(String(n.eventType||n.title||n.type||'')));
+            const activityNotifications=notifications.slice(0,8);
+
+            const jobById=id=>jobs.find(j=>String(j.id)===String(id));
+            const scheduleJob=entry=>jobById(entry.jobId)||{title:entry.title||'Scheduled session',clientName:entry.title||''};
+            const formatTime=value=>new Date(value).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+            const formatDay=value=>new Date(value).toLocaleDateString([],{month:'short',day:'numeric'});
+
+            const recentCards=mediaSnapshots.slice(0,4).map(({job,media})=>{
+                const asset=(media.assets||[]).find(a=>String(a.contentType||'').startsWith('image/'))||(media.assets||[])[0];
+                const image=asset?.versionId?'/api/jobs/'+job.id+'/versions/by-id/'+asset.versionId+'/content':'';
+                const count=media.assets?.length||0;
+                return `<button class="mw-recent-card" data-open-job="${job.id}">
+                    <div class="mw-recent-image">${image?`<img src="${image}" alt="">`:'<span>📷</span>'}</div>
+                    <div class="mw-recent-copy">
+                        <strong>${esc(job.title)}</strong>
+                        <span>${count} photos · ${esc(job.status||'')}</span>
+                    </div>
+                </button>`;
+            }).join('');
+
+            const sessionRows=todaySchedule.slice(0,5).map(entry=>{
+                const job=scheduleJob(entry);
+                return `<button class="mw-session-row" data-open-job="${entry.jobId||job.id||''}">
+                    <div class="mw-session-time"><strong>${formatTime(entry.startsAtUtc||entry.start||entry.startsAt)}</strong><span>${formatTime(entry.endsAtUtc||entry.end||entry.endsAt)}</span></div>
+                    <div class="mw-session-thumb"><span>📷</span></div>
+                    <div class="mw-session-main"><strong>${esc(job.title||entry.title||'Session')}</strong><span>${esc(job.clientName||'')}</span><span>${esc(entry.location||'Location not set')}</span></div>
+                    <span class="mw-state-pill">${esc(entry.status||'Upcoming')}</span>
+                    <span class="mw-kebab">⋮</span>
+                </button>`;
+            }).join('')||'<div class="mw-empty">No sessions scheduled today.</div>';
+
+            const taskRows=myTasks.slice(0,5).map(task=>`<button class="mw-task-row" data-open-job="${task.jobId}">
+                <span class="mw-check"></span>
+                <strong>${esc(task.title)}</strong>
+                <span>${esc(task.activityType||'Photography')}</span>
+                <span class="mw-due">${task.dueAtUtc?formatDay(task.dueAtUtc):'Open'}</span>
+                <span class="mw-priority ${String(task.priority||'').toLowerCase()}">${esc(task.priority||'Normal')}</span>
+                <span class="mw-kebab">⋮</span>
+            </button>`).join('')||'<div class="mw-empty">No open tasks assigned to you.</div>';
+
+            const scheduleRows=todaySchedule.slice(0,6).map((entry,index)=>{
+                const job=scheduleJob(entry);
+                return `<button class="mw-schedule-row" data-open-job="${entry.jobId||job.id||''}">
+                    <span class="mw-timeline-dot ${index===0?'now':''}"></span>
+                    <span class="mw-schedule-time">${formatTime(entry.startsAtUtc||entry.start||entry.startsAt)}</span>
+                    <span class="mw-schedule-copy"><strong>${esc(job.title||entry.title||'Session')}</strong><small>${esc(entry.location||'Location not set')}</small></span>
+                    <span class="mw-when">${index===0?'Now':'Upcoming'}</span>
+                </button>`;
+            }).join('')||'<div class="mw-empty">No schedule items today.</div>';
+
+            const messageRows=messageNotifications.slice(0,3).map(n=>`<button class="mw-message-row">
+                <span class="mw-message-avatar">${esc(String(n.title||n.eventType||'M').slice(0,1))}</span>
+                <span class="mw-message-copy"><strong>${esc(n.title||'Studio message')}</strong><small>${esc(n.body||n.message||'New activity in Studio')}</small></span>
+                <span class="mw-message-time">${n.createdAtUtc?formatTime(n.createdAtUtc):''}</span>
+            </button>`).join('')||'<div class="mw-empty">No new messages.</div>';
+
+            const activityRows=activityNotifications.slice(0,4).map(n=>`<div class="mw-activity-row">
+                <span class="mw-activity-icon">✓</span>
+                <span><strong>${esc(n.title||n.eventType||'Studio activity')}</strong><small>${esc(n.body||n.message||'')}</small></span>
+                <time>${n.createdAtUtc?formatTime(n.createdAtUtc):''}</time>
+            </div>`).join('')||'<div class="mw-empty">No recent activity.</div>';
+
+            const pipelineCounts={
+                capture:jobs.filter(j=>/photo|capture|scheduled/i.test(j.status||'')).length,
+                edit:jobs.filter(j=>/edit|process/i.test(j.status||'')).length,
+                review:jobs.filter(j=>/review|approval/i.test(j.status||'')).length,
+                deliver:jobs.filter(j=>/deliver|ready|complete/i.test(j.status||'')).length
+            };
+
+            genericView.innerHTML=`
+                <section class="mw-page">
+                    <header class="mw-page-header">
+                        <div><h1>My Work</h1><p>Your day, your studio, everything in one place.</p></div>
+                        <div class="mw-date"><strong>${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</strong><span>Studio overview</span></div>
+                    </header>
+
+                    <div class="mw-layout">
+                        <div class="mw-main">
+                            <div class="mw-metrics">
+                                <article class="mw-metric"><span class="mw-metric-icon blue">📷</span><div><strong>${todaySchedule.length}</strong><b>Today's Sessions</b><small>${todaySchedule.length} scheduled</small></div></article>
+                                <article class="mw-metric"><span class="mw-metric-icon green">✓</span><div><strong>${myTasks.length}</strong><b>Pending Tasks</b><small>${myTasks.filter(t=>String(t.priority).toLowerCase()==='high').length} high priority</small></div></article>
+                                <article class="mw-metric"><span class="mw-metric-icon purple">▧</span><div><strong>${totalPhotos}</strong><b>New Photos</b><small>Ready for review</small></div></article>
+                                <article class="mw-metric"><span class="mw-metric-icon orange">●</span><div><strong>${messageNotifications.length}</strong><b>Client Messages</b><small>${messageNotifications.length?'Needs attention':'All caught up'}</small></div></article>
+                            </div>
+
+                            <div class="mw-two-col">
+                                <section class="mw-card">
+                                    <header><h2>Today's Sessions</h2><button data-nav="pipeline">View Calendar →</button></header>
+                                    <div>${sessionRows}</div>
+                                </section>
+                                <section class="mw-card">
+                                    <header><h2>Recent Work</h2><button data-nav="jobs">View All →</button></header>
+                                    <div class="mw-recent-grid">${recentCards||'<div class="mw-empty">No recent work.</div>'}</div>
+                                </section>
+                            </div>
+
+                            <div class="mw-two-col lower">
+                                <section class="mw-card">
+                                    <header><h2>My Tasks</h2><button data-nav="tasks">View All →</button></header>
+                                    <div class="mw-task-tabs"><button class="active">All (${myTasks.length})</button><button>Editing</button><button>Client</button><button>Production</button></div>
+                                    <div>${taskRows}</div>
+                                </section>
+                                <section class="mw-card">
+                                    <header><h2>Pipeline Overview</h2><button data-nav="pipeline">View Pipeline →</button></header>
+                                    <div class="mw-pipeline-stats">
+                                        <div class="blue"><strong>${pipelineCounts.capture}</strong><span>Capture</span></div>
+                                        <div class="purple"><strong>${pipelineCounts.edit}</strong><span>Edit</span></div>
+                                        <div class="orange"><strong>${pipelineCounts.review}</strong><span>Review</span></div>
+                                        <div class="green"><strong>${pipelineCounts.deliver}</strong><span>Deliver</span></div>
+                                    </div>
+                                    <h3>Active Jobs (${jobs.length})</h3>
+                                    <div class="mw-active-jobs">${jobs.slice(0,5).map(job=>`<button data-open-job="${job.id}"><span>${esc(job.title)}</span><i><em style="width:${20+Math.min(75,Math.abs(String(job.title||'').length*4))}%"></em></i><b>${esc(job.status||'Active')}</b></button>`).join('')}</div>
+                                </section>
+                            </div>
+                        </div>
+
+                        <aside class="mw-side">
+                            <section class="mw-card">
+                                <header><h2>Today's Schedule</h2><button data-nav="pipeline">View All →</button></header>
+                                <div class="mw-schedule-list">${scheduleRows}</div>
+                            </section>
+                            <section class="mw-card">
+                                <header><h2>Messages</h2><button data-nav="messages">View All →</button></header>
+                                <div>${messageRows}</div>
+                                <button class="mw-link-button" data-nav="messages">Show all messages →</button>
+                            </section>
+                            <section class="mw-card">
+                                <header><h2>Studio Activity</h2><button data-nav="reports">View All →</button></header>
+                                <div>${activityRows}</div>
+                            </section>
+                        </aside>
+                    </div>
+                </section>`;
+
+            genericView.querySelectorAll('[data-open-job]').forEach(button=>button.addEventListener('click',()=>{
+                if(button.dataset.openJob)openWorkspaceJob(button.dataset.openJob).catch(showError);
+            }));
+            genericView.querySelectorAll('[data-nav]').forEach(button=>button.addEventListener('click',()=>navigate(button.dataset.nav)));
         },
         workspaces:async()=>{
             setActive('workspaces');
