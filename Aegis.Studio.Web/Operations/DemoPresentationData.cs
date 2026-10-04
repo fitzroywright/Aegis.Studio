@@ -7,7 +7,7 @@ internal static class DemoPresentationData
 {
     internal static bool Seed(NpgsqlConnection connection, NpgsqlTransaction transaction, string login)
     {
-        using (var check = new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v3-reference-ui')", connection, transaction))
+        using (var check = new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v4-visual-demo')", connection, transaction))
             if ((bool)check.ExecuteScalar()!) return false;
 
         Guid workspace = DemoDataExpansion.Id(1, 2);
@@ -59,21 +59,22 @@ internal static class DemoPresentationData
         AddActivity(connection, transaction, DemoDataExpansion.Id(31, 402), job, "Publish to Gallery",
             "Publish approved photographs to the client gallery.", "NotStarted", login, 4);
 
-        string[] subjects = ["Bride", "Groom", "Family", "Bridal Party", "Guests"];
-        for (int i = 0; i < subjects.Length; i++)
-        {
-            Guid id = DemoDataExpansion.Id(32, 400 + i);
-            Execute(connection, transaction,
-                "insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by) values($1,$2,$3,$4,'DEMO — reference UI subject',$5) on conflict (id) do nothing",
-                id, job, subjects[i], $"CARTER-{i + 1:00}", login);
-        }
+        // Remove the older placeholder-only subject rows. DemoDataExpansion now
+        // supplies the named wedding people/groups and links the 50 photos to them.
+        Execute(connection, transaction,
+            "delete from studio_job_subjects where id in ($1,$2,$3,$4,$5)",
+            DemoDataExpansion.Id(32, 400),
+            DemoDataExpansion.Id(32, 401),
+            DemoDataExpansion.Id(32, 402),
+            DemoDataExpansion.Id(32, 403),
+            DemoDataExpansion.Id(32, 404));
 
         Execute(connection, transaction,
-            "insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,'Carter Wedding demo','Open Carter Wedding to see the complete reference presentation with messages, media, subjects, production work and job details.',$3) on conflict (id) do nothing",
+            "insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,'Carter Wedding demo','Open Carter Wedding to see the reference presentation with 50 wedding photos, linked People, production work and job details.',$3) on conflict (id) do update set body=excluded.body",
             DemoDataExpansion.Id(33, 4), workspace, login);
 
         Execute(connection, transaction,
-            "insert into studio_state(key,value,updated_at_utc) values('demo-data-v3-reference-ui',$1,now())", login);
+            "insert into studio_state(key,value,updated_at_utc) values('demo-data-v4-visual-demo',$1,now()) on conflict(key) do update set value=excluded.value,updated_at_utc=excluded.updated_at_utc", login);
         return true;
     }
 
