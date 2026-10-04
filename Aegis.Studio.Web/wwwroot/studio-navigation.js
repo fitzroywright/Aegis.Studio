@@ -443,24 +443,87 @@
     }
 
     async function renderAdmin(){
-        if(typeof showWorkspaces==='function') await showWorkspaces();
-        else {
-            conversationView.classList.add('hidden');
-            genericView.classList.remove('hidden');
-        }
+        conversationView.classList.add('hidden');
+        genericView.classList.remove('hidden');
+        genericView.innerHTML='<div class="mywork-loading">Loading administration…</div>';
 
         const me=await json('/api/auth/me').catch(()=>null);
-        if(me?.user?.isAdministrator!==true) return;
+        const isAdministrator=me?.user?.isAdministrator===true||me?.isAdministrator===true;
+        if(!isAdministrator){
+            genericView.innerHTML='<section class="admin-page"><header class="admin-page-header"><div><h1>Admin</h1><p>Studio configuration and access management.</p></div></header><section class="admin-card"><h2>Administrator access required</h2><p class="muted">Your account does not have permission to administer Studio.</p></section></section>';
+            return;
+        }
 
-        let panel=document.getElementById('studioDemoLoader');
-        if(panel) return;
+        workspaceAccessCache=await json('/api/workspace-access').catch(()=>[]);
+        studioRolesCache=await json('/api/security/roles').catch(()=>[]);
+        const manageable=workspaceAccessCache.filter(item=>item.permissions?.editWorkspace||item.permissions?.manageMembers||item.permissions?.adminWorkspace);
 
-        panel=document.createElement('section');
-        panel.id='studioDemoLoader';
-        panel.className='studio-card studio-demo-loader';
-        panel.innerHTML='<div class="studio-card-heading"><div><h2>Demo Data</h2><p>Load a full working studio: multiple workspaces, clients, jobs, bookings, shoots, photographers, payments, production stages, messages and history.</p></div><button class="primary" type="button" data-load-demo>Load Demo Data</button></div><p data-demo-status></p>';
-        genericView.prepend(panel);
+        genericView.innerHTML=`
+            <section class="admin-page">
+                <header class="admin-page-header">
+                    <div><h1>Admin</h1><p>Configure Studio, workspaces, access, roles and workflow automation.</p></div>
+                    <span class="admin-status-pill">Administrator</span>
+                </header>
 
+                <div class="admin-summary-grid">
+                    <article class="admin-summary-card"><strong>${manageable.length}</strong><span>Managed Workspaces</span><small>Membership and routing</small></article>
+                    <article class="admin-summary-card"><strong>${studioRolesCache.filter(x=>x.isActive).length}</strong><span>Active Roles</span><small>Reusable permission sets</small></article>
+                    <article class="admin-summary-card"><strong>Ready</strong><span>Demo Environment</span><small>Deterministic seed data</small></article>
+                </div>
+
+                <div class="admin-layout">
+                    <div class="admin-main-column">
+                        <section class="admin-card admin-demo-card" id="studioDemoLoader">
+                            <header class="admin-card-header">
+                                <div><h2>Demo Data</h2><p>Load the complete working-studio demonstration dataset.</p></div>
+                                <button class="primary" type="button" data-load-demo>Load Demo Data</button>
+                            </header>
+                            <p class="admin-card-note">Creates interconnected workspaces, clients, jobs, schedules, photographers, payments, media, production states, messages and history.</p>
+                            <p class="admin-demo-status" data-demo-status></p>
+                        </section>
+
+                        <section class="admin-card">
+                            <header class="admin-card-header"><div><h2>Workspaces</h2><p>Manage workspace routing, membership and permissions.</p></div></header>
+                            <div class="admin-workspace-list">
+                                ${manageable.length?manageable.map(item=>renderWorkspaceAdminRow(item.workspace,item.permissions,true)).join(''):'<p class="muted">No manageable workspaces are available.</p>'}
+                            </div>
+                        </section>
+
+                        <section id="workspaceMemberPanel" class="admin-card job-section hidden"></section>
+                        <section id="workspaceImportPanel" class="admin-card job-section hidden"></section>
+
+                        <div class="admin-generated-sections">
+                            ${renderSecurityRolesSection()}
+                            ${renderWorkflowSection()}
+                        </div>
+                    </div>
+
+                    <aside class="admin-side-column">
+                        <section class="admin-card">
+                            <header class="admin-card-header"><div><h2>Create Workspace</h2><p>Add a new operational workspace and its manager.</p></div></header>
+                            <div class="admin-form-stack">
+                                <label>Name<input id="workspaceName"></label>
+                                <label>Email address<input id="workspaceEmail" type="email"></label>
+                                <label>Route key<input id="workspaceRouteKey"></label>
+                                <label>Manager user name<input id="workspaceManagerUser" placeholder="domain user name"></label>
+                                <label>Manager display name<input id="workspaceManagerDisplay"></label>
+                                <button class="primary" type="button" onclick="createWorkspace()">Create Workspace</button>
+                            </div>
+                        </section>
+
+                        <section class="admin-card admin-help-card">
+                            <header class="admin-card-header"><div><h2>Administration</h2></div></header>
+                            <p>Workspace access remains membership-based. Use reusable roles where possible and one-off permissions only when required.</p>
+                            <p>Routing uses the exact email address or route key. Every operational workspace requires a Workspace Manager.</p>
+                        </section>
+                    </aside>
+                </div>
+            </section>`;
+
+        await hydrateWorkspaceManagers(manageable);
+        await refreshWorkflowList();
+
+        const panel=document.getElementById('studioDemoLoader');
         panel.querySelector('[data-load-demo]').onclick=async()=>{
             const button=panel.querySelector('[data-load-demo]');
             const status=panel.querySelector('[data-demo-status]');
@@ -513,7 +576,14 @@
     const topNew=document.getElementById('topNewButton');
     if(topNew) topNew.onclick=()=>document.getElementById('newRequestDialog')?.showModal();
 
-    window.studioNavigate('mywork').catch(error=>{
-        console.error('Studio startup navigation failed.',error);
-    });
+    const startStudio=async()=>{
+        // Let the base shell, theme, authentication and shared workspace cache finish
+        // their startup work before the first routed view is painted.
+        try{await loadWorkspaces();}catch{}
+        window.studioNavigate('mywork').catch(error=>{
+            console.error('Studio startup navigation failed.',error);
+        });
+    };
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
+    else startStudio();
 })();
