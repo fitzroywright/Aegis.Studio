@@ -76,19 +76,19 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
  assert.equal(w.messageFirstName('fwright',[],'Team member',true),'fwright');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'fwright');
- assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Media']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-tab]'),b=>b.textContent),['Messages','Media','Subjects','Tasks','Calendar','Activity']);
  assert.equal(w.document.querySelector('.detail-header .activity-button'),null);
- assert.equal(w.document.querySelector('.job-handoff .activity-button')?.textContent,'Activity');
- assert.ok(w.document.querySelector('.job-handoff-summary'));
- await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-conversation-row .thread-next-tasks'));assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
+ assert.equal(w.document.querySelector('[data-job-tab=activity]')?.textContent,'Activity');
+ assert.ok(w.document.querySelector('.job-work-board'));
+ await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-context-sidebar .thread-next-tasks'));assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
  assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
- assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
+ assert.ok(w.document.querySelector('details.job-details-card'));assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
-test('top navigation keeps personal actions right and removes redundant destinations',async()=>{
- const dom=new JSDOM('<header class="topbar"></header><aside class="rail"></aside><button id="newRequestButton">New Request</button>',{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;let frontDesk=0;
+test('left navigation has the seven operational destinations',async()=>{
+ const dom=new JSDOM('<header class="topbar"></header><div class="shell"><div class="navigation-pane"><aside class="workspaces"></aside><aside class="rail"></aside></div></div><button id="newRequestButton">New Request</button>',{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;let frontDesk=0;
  Object.assign(w,{loadFrontDeskRole(){},showFrontDesk:async()=>frontDesk++,showProduction(){},showWorkspaces(){},showManagement(){}});
  w.eval(fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8'));
- assert.deepEqual(Array.from(w.document.querySelectorAll('.studio-top-nav button'),b=>b.textContent),['← Back','Dashboard','Pipeline','Production','FrontDesk','My Work','New Request','Admin']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('.studio-side-nav button'),b=>b.textContent),['← Back','My Work','New Request','Workspaces','Pipeline','Production','FrontDesk','Dashboard','Admin']);
  w.document.querySelector('[data-view="frontdesk"]').click();await Promise.resolve();assert.equal(frontDesk,1);assert.equal(w.document.getElementById('newRequestButton').hidden,false);
  const back=w.document.querySelector('.studio-back-button');assert.equal(back.disabled,false);
  w.activateView=()=>{};w.activateNavigation=()=>{};w.loadConversations=async()=>{};
@@ -210,3 +210,4 @@ test('Pipeline shows stage groups with schedule and task on timeline and calenda
  await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.ok(requests.some(url=>url==='/api/schedule/entries'));
 });
+
