@@ -175,18 +175,29 @@ internal static class DemoFullStudioData
         foreach(string collection in collections)
             Execute(c,tx,"insert into studio_media_collections(job_id,name) values($1,$2) on conflict do nothing",jobId,collection);
 
-        int subjectCount=job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?24:
-            job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?8:
-            job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:
-            job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4;
+        int subjectCount=job.Number switch
+        {
+            106 => 50,
+            401 => 80,
+            303 => 60,
+            301 => 24,
+            201 => 8,
+            _ => job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?24:
+                 job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?8:
+                 job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:
+                 job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4
+        };
         for(int i=0;i<subjectCount;i++)
         {
             Guid subject=Id(59,job.Number*100+i);
             string name=subjectCount>=10?$"Subject {i+1:00} - {job.Title}":i switch{0=>"Primary Client",1=>"Partner / Parent",2=>"Child / Group Member",_=>"Additional Subject"};
             string reference=$"{job.Number}-{i+1:000}";
             string attributes=JsonSerializer.Serialize(new { rosterId=reference, category=job.Type, demo=true });
+            string subjectStatus=job.Number==106
+                ? i<4?"Not Photographed":i<7?"Needs Retake":i<11?"Needs Editing":i<15?"Ready for Production":"Ready"
+                : job.DayOffset<0?"Photographed":"Not Photographed";
             Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,production_status,attributes,collection_name,scheduled_at_utc,schedule_location,contact_name,contact_email,contact_phone,photo_notes,is_system) values($1,$2,$2,$3,$4,$5,'demo-seed',$6,$7::jsonb,$8,$9,$10,'','','',$11,false) on conflict(id) do update set name=excluded.name,reference=excluded.reference,production_status=excluded.production_status,attributes=excluded.attributes,collection_name=excluded.collection_name,scheduled_at_utc=excluded.scheduled_at_utc,schedule_location=excluded.schedule_location,photo_notes=excluded.photo_notes,updated_at_utc=now()",
-                subject,jobId,name,reference,$"DEMO roster / subject for {job.Type}",job.DayOffset<0?"Photographed":"Not Photographed",attributes,collections[Math.Min(i%collections.Length,collections.Length-1)],scheduled,job.Location,$"Capture requirements for {job.Type}");
+                subject,jobId,name,reference,$"DEMO roster / subject for {job.Type}",subjectStatus,attributes,collections[Math.Min(i%collections.Length,collections.Length-1)],scheduled,job.Location,$"Capture requirements for {job.Type}");
         }
     }
 
