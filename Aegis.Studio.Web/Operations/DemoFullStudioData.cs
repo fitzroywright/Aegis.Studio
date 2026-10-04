@@ -72,9 +72,6 @@ internal static class DemoFullStudioData
 
     internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login)
     {
-        using (var check=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v5-full-studio')",connection,transaction))
-            if((bool)check.ExecuteScalar()!) return false;
-
         foreach(var workspace in Workspaces)
         {
             Guid id=Id(1,workspace.Number);
