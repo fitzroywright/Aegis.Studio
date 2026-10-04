@@ -1480,3 +1480,165 @@ body .has-open-job .media-drop-surface{
     max-height:none!important;
   }
 }
+
+
+/* 2026-10-04 approved Studio workspace composition - authoritative final override. */
+.navigation-pane .rail{
+  flex:1 1 auto!important;
+  justify-content:flex-start!important;
+  align-content:flex-start!important;
+}
+.navigation-pane .rail>.brand-button{
+  flex:0 0 auto!important;
+}
+.navigation-pane .studio-back-button{
+  order:99!important;
+  margin-top:auto!important;
+}
+.navigation-pane .brand-button:not(.studio-back-button){
+  order:0!important;
+}
+
+/* Eliminate the legacy vertical spacer in an open job. */
+body .three-pane.has-open-job{
+  height:100%!important;
+  min-height:0!important;
+  overflow:hidden!important;
+}
+body .has-open-job .detail-pane{
+  height:100%!important;
+  min-height:0!important;
+  overflow:hidden!important;
+  padding:8px 12px 12px!important;
+}
+body .has-open-job .job-reading-view{
+  display:flex!important;
+  flex-direction:column!important;
+  height:100%!important;
+  min-height:0!important;
+  overflow:hidden!important;
+}
+body .has-open-job .job-breadcrumb{
+  flex:0 0 auto!important;
+  margin:0 0 4px!important;
+}
+body .has-open-job .job-reading-view>.detail-header{
+  flex:0 0 64px!important;
+  height:64px!important;
+  min-height:64px!important;
+  max-height:64px!important;
+  box-sizing:border-box!important;
+  margin:0!important;
+  padding:6px 8px 8px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  border:0!important;
+}
+body .has-open-job .job-reading-view>.detail-header h1{
+  font-size:25px!important;
+  line-height:1.05!important;
+  margin:0!important;
+}
+body .has-open-job .job-reading-view>.detail-header p{
+  margin:4px 0 0!important;
+  font-size:11px!important;
+}
+body .has-open-job .job-section-tabs{
+  flex:0 0 38px!important;
+  height:38px!important;
+  min-height:38px!important;
+  margin:0 0 8px!important;
+  padding:0 8px!important;
+  box-sizing:border-box!important;
+}
+body .has-open-job .job-section-tabs button{
+  height:38px!important;
+  min-height:38px!important;
+  padding:0 2px 7px!important;
+}
+body .has-open-job .job-work-board{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  height:auto!important;
+  display:grid!important;
+  grid-template-columns:minmax(260px,.85fr) minmax(430px,1.5fr) minmax(255px,.78fr)!important;
+  gap:10px!important;
+  overflow:hidden!important;
+  align-items:stretch!important;
+}
+body .has-open-job .job-message-column,
+body .has-open-job .job-lower-pane{
+  height:100%!important;
+  min-height:0!important;
+  max-height:none!important;
+}
+body .has-open-job .job-context-sidebar{
+  height:100%!important;
+  min-height:0!important;
+  overflow:auto!important;
+  align-content:start!important;
+}
+body .has-open-job .job-lower-pane{
+  display:flex!important;
+  flex-direction:column!important;
+}
+body .has-open-job .media-toolbar-host{
+  min-height:42px!important;
+  padding:5px 7px!important;
+}
+body .has-open-job .job-tab-content{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow:auto!important;
+  padding:8px!important;
+}
+body .has-open-job .media-production-layout{
+  min-height:0!important;
+  height:auto!important;
+}
+body .has-open-job .media-drop-surface{
+  min-height:0!important;
+}
+body .has-open-job .media-items.image-lens{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:8px!important;
+  align-content:start!important;
+}
+body .has-open-job .media-items.image-lens .job-file-tile{
+  min-width:0!important;
+}
+body .has-open-job .media-items.image-lens .job-file-tile img{
+  width:100%!important;
+  height:112px!important;
+  object-fit:cover!important;
+  display:block!important;
+}
+body .has-open-job .media-items.image-lens .job-file-tile strong,
+body .has-open-job .media-items.image-lens .job-file-tile small{
+  display:block!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+@media(max-width:1280px){
+  body .has-open-job .job-work-board{
+    grid-template-columns:minmax(245px,.9fr) minmax(390px,1.35fr)!important;
+  }
+  body .has-open-job .job-context-sidebar{
+    grid-column:1/-1!important;
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    height:auto!important;
+    overflow:visible!important;
+  }
+}
+@media(max-width:900px){
+  body .has-open-job .detail-pane{overflow:auto!important}
+  body .has-open-job .job-reading-view{height:auto!important;overflow:visible!important}
+  body .has-open-job .job-work-board{grid-template-columns:1fr!important;overflow:visible!important}
+  body .has-open-job .job-message-column,
+  body .has-open-job .job-lower-pane{height:auto!important;min-height:420px!important}
+  body .has-open-job .job-context-sidebar{grid-template-columns:1fr!important}
+}
