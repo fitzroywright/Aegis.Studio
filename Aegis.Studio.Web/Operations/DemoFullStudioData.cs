@@ -208,6 +208,25 @@ internal static class DemoFullStudioData
         Execute(c,tx,"insert into studio_shoot_sessions(id,job_id,schedule_entry_id,photographer_user_name,assistant_user_name,call_time_utc,planned_end_utc,location,status,image_count,backup_confirmed,reshoot_required,coverage_notes,equipment_notes,handoff_status,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'DEMO camera kit',$14,now(),now()) on conflict(id) do update set photographer_user_name=excluded.photographer_user_name,call_time_utc=excluded.call_time_utc,planned_end_utc=excluded.planned_end_utc,location=excluded.location,status=excluded.status,image_count=excluded.image_count,backup_confirmed=excluded.backup_confirmed,reshoot_required=excluded.reshoot_required,handoff_status=excluded.handoff_status,updated_at_utc=now()",
             Id(49,job.Number),jobId,schedule,job.Photographer,ordinal%4==0?"demo.anna":DBNull.Value,start,end,job.Location,job.Status=="Completed"?"Completed":job.Status=="Photography"?"InProgress":"Scheduled",
             Math.Max(0,ordinal*17),job.DayOffset<0,ordinal%11==0,$"Coverage plan for {job.Type}",job.DayOffset<0?"Ready":"NotReady");
+
+        // Demonstrate a true multi-session job and schedule exception states.
+        if(job.Number==201)
+        {
+            DateTimeOffset prepStart=start.AddDays(-1).AddHours(-3);
+            DateTimeOffset prepEnd=prepStart.AddHours(2);
+            Guid prepSchedule=Id(62,job.Number);
+            Execute(c,tx,"insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,'Carter Wedding - rehearsal / venue walk-through',$3,$4,$5,'Completed','DEMO multi-session wedding preparation',now()) on conflict(id) do update set starts_at_utc=excluded.starts_at_utc,ends_at_utc=excluded.ends_at_utc,location=excluded.location,status=excluded.status",
+                prepSchedule,jobId,prepStart,prepEnd,job.Location);
+            Execute(c,tx,"insert into studio_shoot_sessions(id,job_id,schedule_entry_id,photographer_user_name,assistant_user_name,call_time_utc,planned_end_utc,location,status,image_count,backup_confirmed,reshoot_required,coverage_notes,equipment_notes,handoff_status,created_at_utc,updated_at_utc) values($1,$2,$3,'demo.sam','demo.anna',$4,$5,$6,'Completed',42,true,false,'Venue and lighting walk-through','DEMO camera kit','Ready',now(),now()) on conflict(id) do update set call_time_utc=excluded.call_time_utc,planned_end_utc=excluded.planned_end_utc,status='Completed',updated_at_utc=now()",
+                Id(63,job.Number),jobId,prepSchedule,prepStart,prepEnd,job.Location);
+        }
+        if(job.Number==403)
+        {
+            Guid cancelled=Id(62,job.Number);
+            DateTimeOffset oldStart=start.AddDays(-2);
+            Execute(c,tx,"insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,'Campion Graduation Retakes - original slot',$3,$4,$5,'Cancelled','DEMO cancelled slot after reschedule',now()) on conflict(id) do update set status='Cancelled',notes=excluded.notes",
+                cancelled,jobId,oldStart,oldStart.AddHours(2),job.Location);
+        }
     }
 
     private static void SeedFinance(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,int ordinal)
