@@ -29,6 +29,9 @@
     <Content Include="../configuration/Aegis.Studio.configuration-contract.json" Link="configuration/Aegis.Studio.configuration-contract.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="StageAuthenticationPluginAfterBuild" AfterTargets="Build">
+    <MSBuild Projects="$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\Common.Security.Plugin.ActiveDirectory.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration)" />
     <PropertyGroup>
       <AuthenticationPluginOutput>$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\bin\$(Configuration)\net10.0</AuthenticationPluginOutput>
     </PropertyGroup>
@@ -44,6 +47,9 @@
   </Target>
 
   <Target Name="StageAuthenticationPluginForPublish" AfterTargets="Publish">
+    <MSBuild Projects="$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\Common.Security.Plugin.ActiveDirectory.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration)" />
     <PropertyGroup>
       <AuthenticationPluginOutput>$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\bin\$(Configuration)\net10.0</AuthenticationPluginOutput>
     </PropertyGroup>
