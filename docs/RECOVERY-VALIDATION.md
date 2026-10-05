@@ -12,7 +12,7 @@ The former combined PostgreSQL workflow test is split into independent schemas f
 
 The public-source test-photo fixture has embedded EXIF, XMP and Photoshop metadata removed; its decoded pixels remain identical to the recovered original.
 
-## Validation in this recovery environment
+## Earlier recovery validation
 
 - UI: 32 tests passed using the standard Node test suite.
 - Recovered Web assembly: 163 tests passed, six database tests skipped, using an in-process reflection runner because the standard test host cannot create its communication sockets here. Domain: three tests passed.
@@ -22,9 +22,17 @@ The public-source test-photo fixture has embedded EXIF, XMP and Photoshop metada
 
 The earlier checkpoint's report of a successful Release build and 172 .NET tests (including PostgreSQL) is retained in `INTEGRATED-WORKSTREAM.md` as historical evidence. Its original test logs were not available. The recovered SDK/test outputs and isolated PostgreSQL files were present, but the NuGet package cache was absent. A fresh solution build failed due to missing packages. The standard test host cannot create named-pipe sockets, and this environment cannot switch to the unprivileged identity required to start PostgreSQL. Direct compilation and in-process checks were the available alternatives.
 
-## Remaining gate before main
+## Resumed validation and main gate
 
-Do not merge this recovery branch until a normal restored Release solution build and all PostgreSQL tests pass. Use a disposable test database with permission to create/drop schemas:
+The resumed session restored all NuGet dependencies normally. Disabling the MSBuild background server and using a single build node avoided its silent startup failure. The standard Release solution build then found two xUnit2031 analyzer errors in the new payment/refund assertions; both now use the predicate overload of `Assert.Single`.
+
+Current source passes a normal restored Release solution build with zero warnings and errors. The standard test host passed all 179 .NET cases (176 Web and three Domain), with zero skipped cases. All 11 PostgreSQL scenarios ran against a fresh disposable PostgreSQL 16 instance. The Node UI suite passed all 33 tests. Whitespace checks pass. The final workspace regression verifies cold-start permission loading and that a denied open leaves the landing page visible; its fix reuses the authoritative permission-aware workspace loader and updates the navigation cache version. The earlier missing-package and test-host limitations above are historical; they no longer block this checkout.
+
+The 100,000-asset scenario completed in 8.94 seconds, including fixture insertion, bounded/disjoint pages and 50,000-image classification. This is one isolated metadata test, not an end-user startup or production ingestion benchmark. Approval/source pinning and independent sale-line refund replay, real-photo derivative generation, unsupported-original retention, demo upgrade replay, shared scheduling conflict rollback, partial payments and refund idempotency all passed.
+
+The build/PostgreSQL gate for main is satisfied. Publication uses published main as the parent and retains its unchanged files, excluding the reconstruction snapshots' whitespace differences. The local repository checkpoint records these validation fixes and results.
+
+For the local build/test cycle, use a disposable test database with permission to create/drop schemas:
 
 ```powershell
 $env:STUDIO_TEST_POSTGRES = 'Host=127.0.0.1;Port=5432;Database=studio_test;Username=studio_test;Password=<test-password>'
@@ -35,4 +43,4 @@ npm --prefix tests/ui ci
 npm --prefix tests/ui test
 ```
 
-Expected current count is 179 .NET cases (176 Web including 11 PostgreSQL scenarios, and three Domain), plus 32 UI tests. Follow with the connected Load Demo Data walkthrough and local provider/role validation described in `INTEGRATED-WORKSTREAM.md`. The 100,000-asset fixture measures metadata operations, not 100,000-photo decode throughput. Main remains unchanged until these gates are satisfied.
+Current count is 179 .NET cases (176 Web including 11 PostgreSQL scenarios, and three Domain), plus 33 UI tests. Follow with the connected Load Demo Data walkthrough and local provider/role validation described in `INTEGRATED-WORKSTREAM.md`. Live first-time photo downloads, provider/device integration, directory roles and browser screenshot comparison still require the configured local runtime; these are not claimed by the isolated suite.

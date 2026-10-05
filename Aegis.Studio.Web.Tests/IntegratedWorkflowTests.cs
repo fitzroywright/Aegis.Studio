@@ -53,6 +53,8 @@ public sealed class IntegratedWorkflowTests
             select $1,'asset-'||n,case when n%2=0 then 'Even' else 'Odd' end from generate_series(1,100000) n
             """,job);
         var media=new MediaProductionStore(db,versions);var first=media.Snapshot(job);Assert.Equal(100000,first.GetProperty("totalAssets").GetInt32());Assert.Equal(100,first.GetProperty("assets").GetArrayLength());
+        Assert.Equal(50000,first.GetProperty("collectionCounts").GetProperty("Even").GetInt32());
+        Assert.Equal(50000,first.GetProperty("collectionCounts").GetProperty("Odd").GetInt32());
         Guid cursor=first.GetProperty("assets")[99].GetProperty("id").GetGuid();var second=media.Snapshot(job,new(After:cursor));
         Assert.Empty(first.GetProperty("assets").EnumerateArray().Select(a=>a.GetProperty("id").GetGuid()).Intersect(second.GetProperty("assets").EnumerateArray().Select(a=>a.GetProperty("id").GetGuid())));
         Assert.Equal(50000,media.Snapshot(job,new(Collection:"Even")).GetProperty("totalAssets").GetInt32());
@@ -148,13 +150,13 @@ public sealed class IntegratedWorkflowTests
         var completion=new CompleteStudioSaleRequest([new(TenderKind.Cash,2500m,"Partial")],"Counter");
         pos.Complete(sale.Id,completion,studio,"Cashier");pos.Complete(sale.Id,completion,studio,"Cashier");
         var job=studio.GetJob(context.Job)!;
-        Assert.Single(job.FinancialEvents!.Where(e=>e.Id==sale.Id));
+        Assert.Single(job.FinancialEvents!,e=>e.Id==sale.Id);
         Assert.Equal(7500m,job.FinancialEvents!.Where(e=>e.Kind=="Charge").Sum(e=>e.Amount)-job.FinancialEvents!.Where(e=>e.Kind is "Payment" or "Refund").Sum(e=>e.Amount));
         var operation=Guid.NewGuid();
         var refund=new RefundStudioSaleRequest([new(sale.Lines.Single().Id,2500m,1)],[new(TenderKind.Cash,2500m,"Refund")],"Customer cancelled",operation);
         pos.Refund(sale.Id,refund,studio,"Cashier");pos.Refund(sale.Id,refund,studio,"Cashier");
         job=studio.GetJob(context.Job)!;
-        Assert.Single(job.FinancialEvents!.Where(e=>e.Id==operation));
+        Assert.Single(job.FinancialEvents!,e=>e.Id==operation);
         Assert.Equal(0m,job.FinancialEvents!.Where(e=>e.Kind is "Payment" or "Refund").Sum(e=>e.Amount));
     }
 

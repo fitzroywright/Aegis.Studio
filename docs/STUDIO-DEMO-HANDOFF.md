@@ -40,11 +40,11 @@ Folder drops traverse nested directory batches. Subject drops target the selecte
 ## Validation
 
 - Release solution build: zero warnings and errors.
-- Solution tests: 161 Web tests and three Domain tests pass; five PostgreSQL integration tests skip without `STUDIO_TEST_POSTGRES`.
-- UI suite: 29 tests, including a complete shared-shell smoke test, streamed demo progress and failure handling, progressive My Work startup, cancellation, working retries, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
+- Solution tests: 176 Web tests and three Domain tests pass, including all 11 PostgreSQL scenarios with `STUDIO_TEST_POSTGRES` configured; zero tests skipped in the resumed run.
+- UI suite: 33 tests, including a complete shared-shell smoke test, streamed demo progress and failure handling, progressive My Work startup, cancellation, working retries, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
 - JavaScript syntax and whitespace checks pass.
 
-This environment cannot launch Chromium because socket creation is prohibited. Browser screenshot comparison and a live database seed were not verified here. The DOM smoke test exercises all eight screen renderers with an interconnected API fixture; it does not establish pixel-level equivalence or database seed execution.
+The DOM smoke test exercises all eight screen renderers with an interconnected API fixture. PostgreSQL tests verify transactional workflows and additive demo upgrade/recovery. Browser screenshot comparison and a full live first-time photo seed were not verified here; neither pixel-level equivalence nor configured provider behavior is established by the DOM tests.
 
 Run locally from the repository root:
 
