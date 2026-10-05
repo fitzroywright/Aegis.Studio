@@ -78,8 +78,8 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             select jsonb_build_object(
             'totalAssets',(select count(*) from matching),
             'totalSubjects',(select count(*) from studio_job_subjects where job_id=$1),
-            'collectionCounts',coalesce((select jsonb_object_agg(name,n) from
-              (select coalesce(col.collection_name,'Unclassified') name,count(*) n from studio_media_assets a
+            'collectionCounts',coalesce((select jsonb_object_agg(collection_name,asset_count) from
+              (select coalesce(col.collection_name,'Unclassified') as collection_name,count(*) as asset_count from studio_media_assets a
                left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key
                where a.job_id=$1 group by coalesce(col.collection_name,'Unclassified')) q),'{}'::jsonb),
             'hasMore',exists(select 1 from matching where id>(select max(id::text)::uuid from page)),

@@ -53,6 +53,8 @@ public sealed class IntegratedWorkflowTests
             select $1,'asset-'||n,case when n%2=0 then 'Even' else 'Odd' end from generate_series(1,100000) n
             """,job);
         var media=new MediaProductionStore(db,versions);var first=media.Snapshot(job);Assert.Equal(100000,first.GetProperty("totalAssets").GetInt32());Assert.Equal(100,first.GetProperty("assets").GetArrayLength());
+        Assert.Equal(50000,first.GetProperty("collectionCounts").GetProperty("Even").GetInt32());
+        Assert.Equal(50000,first.GetProperty("collectionCounts").GetProperty("Odd").GetInt32());
         Guid cursor=first.GetProperty("assets")[99].GetProperty("id").GetGuid();var second=media.Snapshot(job,new(After:cursor));
         Assert.Empty(first.GetProperty("assets").EnumerateArray().Select(a=>a.GetProperty("id").GetGuid()).Intersect(second.GetProperty("assets").EnumerateArray().Select(a=>a.GetProperty("id").GetGuid())));
         Assert.Equal(50000,media.Snapshot(job,new(Collection:"Even")).GetProperty("totalAssets").GetInt32());
