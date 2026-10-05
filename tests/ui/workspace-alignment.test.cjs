@@ -1,3 +1,5 @@
+
+function mediaResponse(data,url){const q=new URL(url,'https://studio.test').searchParams;let assets=data.assets||[];if(q.get('collection'))assets=assets.filter(a=>a.collection===q.get('collection'));if(q.get('subjectId'))assets=assets.filter(a=>(a.subjects||[]).includes(q.get('subjectId')));if(q.get('after'))assets=assets.filter(a=>a.id>q.get('after'));const subjects=(data.subjects||[]).filter(a=>!q.get('subjectSearch')||(a.name+' '+a.reference).toLowerCase().includes(q.get('subjectSearch').toLowerCase()));return {...data,subjects,assets:assets.slice(0,100),totalAssets:assets.length,totalSubjects:(data.subjects||[]).length,hasMore:assets.length>100};}
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -142,14 +144,14 @@ test('shared request helper accepts empty successes and dismissal removes the ba
 test('Media shows all images by default and collection and subject filters live in the title bar',async()=>{
  const {w,panel}=environment();w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
  const data={subjects:[],unmatched:[],assets:[{id:'a',assetKey:'a',versionId:'v1',fileName:'Ceremony.jpg',contentType:'image/jpeg',version:1,status:'Needs Editing',subjects:[],collection:'Ceremony'},{id:'b',assetKey:'b',versionId:'v2',fileName:'Other.jpg',contentType:'image/jpeg',version:1,status:'Needs Sorting',subjects:[],collection:''}]};
- w.json=async url=>url.endsWith('/media')?data:url.endsWith('/access')?{permissions:{manageProduction:false}}:[];
+ w.json=async url=>url.split('?')[0].endsWith('/media')?mediaResponse(data,url):url.endsWith('/access')?{permissions:{manageProduction:false}}:[];
  await w.renderProductionMedia({id:'job'},panel,()=>true);
  assert.equal(panel.querySelector('[data-add]'),null);assert.equal(panel.querySelector('.media-tasks'),null);assert.equal(panel.querySelector('input[type=file]'),null);
  assert.equal(panel.querySelectorAll('.job-file-tile').length,2);
  assert.equal(panel.querySelector('[data-lens]'),null);
- const collection=panel.querySelector('[data-collection]');collection.value='Ceremony';collection.onchange();
+ const collection=panel.querySelector('[data-collection]');collection.value='Ceremony';await collection.onchange();
  assert.equal(panel.querySelectorAll('.job-file-tile').length,1);assert.match(panel.querySelector('.job-file-tile').textContent,/Ceremony.jpg/);
- collection.value='';collection.onchange();assert.equal(panel.querySelectorAll('.job-file-tile').length,2);
+ const all=panel.querySelector('[data-collection]');all.value='';await all.onchange();assert.equal(panel.querySelectorAll('.job-file-tile').length,2);
 });
 test('Media collection controls persist names and dropped files target the selected collection',async()=>{
  const {w,panel}=environment();w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
@@ -182,14 +184,14 @@ test('large Media jobs show a searchable subject list beside overflowing images'
  Object.defineProperty(w.HTMLElement.prototype,'clientWidth',{configurable:true,get(){return this.classList.contains('media-drop-surface')?310:0;}});
  const subjects=Array.from({length:100},(_,i)=>({id:'s'+i,name:'Subject '+i,reference:'R'+i,status:'Photographed',imageCount:1}));
  const assets=Array.from({length:6},(_,i)=>({id:'a'+i,assetKey:'a'+i,versionId:'v'+i,fileName:'Photo'+i+'.jpg',contentType:'image/jpeg',version:1,status:'Ready',subjects:['s'+i],collection:'General'}));
- w.json=async url=>url.endsWith('/media')?{subjects,assets,collections:['General'],gallery:{},unmatched:[]}:url.endsWith('/access')?{permissions:{manageProduction:false}}:[];
+ w.json=async url=>url.split('?')[0].endsWith('/media')?mediaResponse({subjects,assets,collections:['General'],gallery:{},unmatched:[]},url):url.endsWith('/access')?{permissions:{manageProduction:false}}:[];
  w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));
  await w.renderProductionMedia({id:'job'},panel,()=>true);
  assert.equal(panel.querySelector('[data-subject]'),null);
  const rail=panel.querySelector('.media-subject-rail');assert.equal(rail.hidden,false);assert.equal(rail.querySelectorAll('[data-subject-id]').length,101);
- rail.querySelector('input').value='Subject 42';rail.querySelector('input').oninput();assert.equal(rail.querySelectorAll('[data-subject-id]').length,2);
- rail.querySelector('[data-subject-id="s42"]').click();assert.equal(panel.querySelectorAll('.job-file-tile').length,0);
- rail.querySelector('[data-subject-id=""]').click();assert.equal(panel.querySelectorAll('.job-file-tile').length,6);
+ rail.querySelector('input').value='Subject 42';rail.querySelector('input').oninput();await new Promise(r=>setTimeout(r,350));const filtered=panel.querySelector('.media-subject-rail');assert.equal(filtered.querySelectorAll('[data-subject-id]').length,2);
+ await filtered.querySelector('[data-subject-id="s42"]').onclick();assert.equal(panel.querySelectorAll('.job-file-tile').length,0);
+ await panel.querySelector('.media-subject-rail [data-subject-id=""]').onclick();assert.equal(panel.querySelectorAll('.job-file-tile').length,6);
 });
 test('Pipeline shows stage groups with schedule and task on timeline and calendar',async()=>{
  const dom=new JSDOM('<div id="generic"></div><div id="conversation"></div>',{runScripts:'outside-only',url:'https://studio.test'});
@@ -213,3 +215,11 @@ test('Pipeline shows stage groups with schedule and task on timeline and calenda
 });
 
 
+
+test('large galleries render one bounded page of previews and advance using a server cursor',async()=>{
+ const {w,panel}=environment();const requests=[];
+ w.json=async url=>{requests.push(url);if(url.endsWith('/access'))return {permissions:{manageProduction:false}};if(url.includes('/media')){const next=new URL(url,'https://studio.test').searchParams.has('after');return {subjects:[],collections:['General'],gallery:{},unmatched:[],totalAssets:100000,totalSubjects:327,hasMore:true,assets:Array.from({length:100},(_,i)=>{const id=String((next?100:0)+i).padStart(6,'0');return {id,assetKey:id,versionId:'v'+id,fileName:id+'.jpg',contentType:'image/jpeg',version:1,status:'Ready',subjects:[],collection:'General'};})};}return [];};
+ w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));await w.renderProductionMedia({id:'job'},panel,()=>true);
+ assert.equal(panel.querySelectorAll('.job-file-tile').length,100);assert.ok([...panel.querySelectorAll('img')].every(i=>i.src.endsWith('/preview?size=thumbnail')));assert.equal(panel.querySelector('[data-drag-asset]').dataset.dragAsset,'000000');
+ await panel.querySelector('[data-next-page]').onclick();assert.equal(panel.querySelectorAll('.job-file-tile').length,100);assert.equal(panel.querySelector('[data-drag-asset]').dataset.dragAsset,'000100');assert.ok(requests.some(u=>u.includes('after=000099')));w.close();
+});

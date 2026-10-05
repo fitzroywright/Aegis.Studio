@@ -27,11 +27,15 @@ internal static class StudioVersionSchema
             on studio_asset_versions(job_id,asset_key,version_number desc);
         """;
 
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<StudioDatabase, Lazy<bool>> initialized = new();
     public static void EnsureCreated(StudioDatabase database)
+    { _ = initialized.GetValue(database,db => new Lazy<bool>(() => { Create(db); return true; })).Value; }
+    private static void Create(StudioDatabase database)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = Sql;
+        command.CommandText = Sql + Aegis.Studio.Web.Media.MediaDerivativeWorker.Schema;
         command.ExecuteNonQuery();
     }
 }
+

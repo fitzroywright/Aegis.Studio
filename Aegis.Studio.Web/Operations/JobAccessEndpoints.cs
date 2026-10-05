@@ -7,6 +7,7 @@ public static class JobAccessEndpoints
 {
     public static void MapJobAccess(this WebApplication app)
     {
+        app.MapGet("/api/jobs/access",(ClaimsPrincipal user,JobAccessService access)=>Results.Ok(access.GetPermissionMap(user))).RequireAuthorization();
         app.MapGet("/api/jobs/{jobId:guid}/access", (Guid jobId, ClaimsPrincipal user, JobAccessService access) =>
         {
             if (access.GetWorkspaceId(jobId) is null) return Results.NotFound();
@@ -93,7 +94,7 @@ public static class JobAccessEndpoints
         {
             if (!access.HasPermission(user, jobId, "RecordFinancialActivity")) return Results.Forbid();
             if (string.IsNullOrWhiteSpace(request.Kind) || request.Amount == 0) return Results.BadRequest(new { error = "Financial event type and a non-zero amount are required." });
-            try { return Results.Ok(studio.AddFinancialEvent(jobId, request)); }
+            try { return Results.Ok(studio.AddFinancialEvent(jobId, request,user.FindFirst("login_name")?.Value??user.Identity?.Name)); }
             catch (KeyNotFoundException) { return Results.NotFound(); }
         }).RequireAuthorization();
     }
@@ -122,3 +123,4 @@ public static class JobAccessEndpoints
 
 public sealed record JobMemberNotificationRequest(string UserName,string Subject,string Body);
 public sealed record NotifiableJobMember(string UserName,string DisplayName,string Source);
+

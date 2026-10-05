@@ -167,7 +167,7 @@ public sealed class StudioFeatureDatabase
             alter table studio_outbound_email add column if not exists provider_accepted_at_utc timestamptz null;
             """;
 
-        await using NpgsqlCommand command = dataSource.CreateCommand(sql);
+        await using NpgsqlCommand command = dataSource.CreateCommand(sql + Aegis.Studio.Web.Operations.JobWorkspaceParticipation.Schema);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }

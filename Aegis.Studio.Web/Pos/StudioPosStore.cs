@@ -2,6 +2,7 @@ using Aegis.Pos.Core;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Npgsql;
+using Aegis.Studio.Web.Production;
 
 namespace Aegis.Studio.Web.Pos;
 
@@ -43,19 +44,22 @@ public sealed class StudioPosStore
             if (existingId is Guid id) return Get(id)!;
         }
 
+        if(request.ApplyToJobBalance && (request.Lines.Any(l=>l.Code!="BALANCE"||l.Quantity!=1)||request.Lines.Count!=1))throw new InvalidOperationException("Balance payments require a single balance payment line.");
         Sale sale = new(Guid.NewGuid(), "StudioJob", jobId.ToString("D"), DateTimeOffset.UtcNow);
         foreach (CreateStudioSaleLineRequest line in request.Lines) sale.AddLine(SaleLine.Create(line.Code ?? string.Empty, line.Description, line.UnitPrice, line.Quantity));
-        Save(sale, false, request.ClientRequestId);
+        Save(sale, false, request.ClientRequestId,request.ApplyToJobBalance,request.Lines);
         audit.Record("SaleCreated", sale.Id, jobId, userId, sale.Total, $"{sale.Lines.Count} line(s)");
         return sale;
     }
 
     public Sale Complete(Guid saleId, CompleteStudioSaleRequest request, StudioStore studio, string cashierUserId)
     {
+        using var operationConnection=database.OpenConnection();using var operationLock=operationConnection.BeginTransaction();
+        using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",operationConnection,operationLock)){guard.Parameters.AddWithValue("POS:"+saleId.ToString("D"));guard.ExecuteNonQuery();}
         PersistedSale snapshot = GetSnapshot(saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
         Guid jobId = Guid.Parse(sale.ReferenceId);
-        if (sale.Status == SaleStatus.Completed) { EnsureFinancialEventPosted(sale, snapshot, studio); return sale; }
+        if (sale.Status == SaleStatus.Completed) { EnsureFinancialEventPosted(sale, snapshot, studio); ProductionOrderLinker.SyncCompletedSale(database,sale.Id,cashierUserId); return sale; }
         if (sale.Status == SaleStatus.Voided) throw new InvalidOperationException("A voided sale cannot be completed.");
         if (request.Tenders is null || request.Tenders.Count == 0) throw new InvalidOperationException("At least one tender is required.");
         Tender[] tenders = request.Tenders.Select(x => Tender.Create(x.Kind, x.Amount, x.Reference)).ToArray();
@@ -63,12 +67,15 @@ public sealed class StudioPosStore
         sale.Complete(tenders, DateTimeOffset.UtcNow, cashierUserId, request.TerminalId ?? "StudioWeb");
         snapshot = Save(sale, snapshot.FinancialEventPosted, snapshot.ClientRequestId);
         EnsureFinancialEventPosted(sale, snapshot, studio);
+        ProductionOrderLinker.SyncCompletedSale(database,sale.Id,cashierUserId);
         audit.Record("SaleCompleted", sale.Id, jobId, cashierUserId, sale.Total, string.Join(", ", sale.Tenders.Select(t => $"{t.Kind}:{t.Amount:N2}")));
         return sale;
     }
 
     public Sale Void(Guid saleId, string userId, string reason)
     {
+        using var operationConnection=database.OpenConnection();using var operationLock=operationConnection.BeginTransaction();
+        using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",operationConnection,operationLock)){guard.Parameters.AddWithValue("POS:"+saleId.ToString("D"));guard.ExecuteNonQuery();}
         PersistedSale snapshot = GetSnapshot(saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
         sale.Void(userId, DateTimeOffset.UtcNow, reason);
@@ -79,18 +86,22 @@ public sealed class StudioPosStore
 
     public Sale Refund(Guid saleId, RefundStudioSaleRequest request, StudioStore studio, string userId)
     {
+        using var operationConnection=database.OpenConnection();using var operationLock=operationConnection.BeginTransaction();
+        using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",operationConnection,operationLock)){guard.Parameters.AddWithValue("POS:"+saleId.ToString("D"));guard.ExecuteNonQuery();}
         PersistedSale snapshot = GetSnapshot(saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
+        if(request.OperationId.HasValue&&sale.Refunds.Any(r=>r.Id==request.OperationId.Value)){EnsureRefundFinancialEvents(sale,snapshot,studio,userId);ProductionOrderLinker.SyncCompletedSale(database,saleId,userId);return sale;}
         if (request.Lines is null || request.Lines.Count == 0) throw new InvalidOperationException("At least one refund line is required.");
         if (request.Tenders is null || request.Tenders.Count == 0) throw new InvalidOperationException("At least one refund tender is required.");
         if (string.IsNullOrWhiteSpace(request.Reason)) throw new InvalidOperationException("Refund reason is required.");
         RefundLine[] lines = request.Lines.Select(x => new RefundLine(x.SaleLineId, x.UnitPrice, x.Quantity)).ToArray();
         Tender[] tenders = request.Tenders.Select(x => Tender.Create(x.Kind, x.Amount, x.Reference)).ToArray();
-        Refund refund = new(Guid.NewGuid(), sale.Id, lines, tenders, request.Reason.Trim(), DateTimeOffset.UtcNow);
+        Refund refund = new(request.OperationId??Guid.NewGuid(), sale.Id, lines, tenders, request.Reason.Trim(), DateTimeOffset.UtcNow);
         sale.RecordRefund(refund);
         Save(sale, snapshot.FinancialEventPosted, snapshot.ClientRequestId);
         Guid jobId = Guid.Parse(sale.ReferenceId);
-        studio.AddFinancialEvent(jobId, new AddFinancialEventRequest("POS Refund", -refund.Total, $"Refund {refund.Id}: {refund.Reason}"));
+        studio.AddFinancialEvent(jobId, new AddFinancialEventRequest(snapshot.AppliesToBalance?"Refund":"POS Refund", -refund.Total, $"Refund {refund.Id}: {refund.Reason}",string.Join(" + ",refund.Tenders.Select(t=>t.Kind.ToString()).Distinct())),userId,refund.Id);
+        ProductionOrderLinker.SyncCompletedSale(database,sale.Id,userId);
         audit.Record("RefundCompleted", sale.Id, jobId, userId, -refund.Total, refund.Reason);
         return sale;
     }
@@ -101,16 +112,21 @@ public sealed class StudioPosStore
         return new PosDiagnosticsSnapshot(sales.Count, sales.Count(x => x.Status == SaleStatus.Draft), sales.Count(x => x.Status == SaleStatus.Completed), sales.Count(x => x.Status == SaleStatus.Voided), sales.Where(x => x.Status == SaleStatus.Completed).Sum(x => x.Total), sales.SelectMany(x => x.Refunds).Sum(x => x.Total), sales.OrderByDescending(x => x.CreatedAtUtc).FirstOrDefault()?.CreatedAtUtc);
     }
 
+    private static void EnsureRefundFinancialEvents(Sale sale,PersistedSale snapshot,StudioStore studio,string actor)
+    {
+        foreach(var refund in sale.Refunds)studio.AddFinancialEvent(Guid.Parse(sale.ReferenceId),new AddFinancialEventRequest(snapshot.AppliesToBalance?"Refund":"POS Refund",-refund.Total,$"Refund {refund.Id}: {refund.Reason}",string.Join(" + ",refund.Tenders.Select(t=>t.Kind.ToString()).Distinct())),actor,refund.Id);
+    }
     private void EnsureFinancialEventPosted(Sale sale, PersistedSale snapshot, StudioStore studio)
     {
+        EnsureRefundFinancialEvents(sale,snapshot,studio,sale.CashierUserId??"Studio");
         if (snapshot.FinancialEventPosted) return;
         Guid jobId = Guid.Parse(sale.ReferenceId);
         string tenderSummary = string.Join(", ", sale.Tenders.Select(x => $"{x.Kind} {x.Amount:N2}"));
-        studio.AddFinancialEvent(jobId, new AddFinancialEventRequest("POS Sale", sale.Total, $"Sale {sale.Id}: {tenderSummary}"));
+        studio.AddFinancialEvent(jobId, new AddFinancialEventRequest(snapshot.AppliesToBalance?"Payment":"POS Sale", sale.Total, $"Sale {sale.Id}: {tenderSummary}",string.Join(" + ",sale.Tenders.Select(t=>t.Kind.ToString()).Distinct())),sale.CashierUserId,sale.Id);
         Save(sale, true, snapshot.ClientRequestId);
     }
 
-    private PersistedSale Save(Sale sale, bool financialEventPosted, Guid? clientRequestId)
+    private PersistedSale Save(Sale sale, bool financialEventPosted, Guid? clientRequestId,bool? applyToBalance=null,IReadOnlyList<CreateStudioSaleLineRequest>? sourceLines=null)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
@@ -118,11 +134,11 @@ public sealed class StudioPosStore
         {
             command.Transaction = transaction;
             command.CommandText = """
-                insert into studio_pos_sales(id,reference_type,reference_id,created_at_utc,submitted_at_utc,completed_at_utc,voided_at_utc,voided_by,void_reason,cashier_user_id,terminal_id,status,financial_event_posted,client_request_id)
-                values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-                on conflict(id) do update set submitted_at_utc=excluded.submitted_at_utc,completed_at_utc=excluded.completed_at_utc,voided_at_utc=excluded.voided_at_utc,voided_by=excluded.voided_by,void_reason=excluded.void_reason,cashier_user_id=excluded.cashier_user_id,terminal_id=excluded.terminal_id,status=excluded.status,financial_event_posted=excluded.financial_event_posted,client_request_id=excluded.client_request_id
+                insert into studio_pos_sales(id,reference_type,reference_id,created_at_utc,submitted_at_utc,completed_at_utc,voided_at_utc,voided_by,void_reason,cashier_user_id,terminal_id,status,financial_event_posted,client_request_id,applies_to_balance)
+                values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,coalesce($15,false))
+                on conflict(id) do update set submitted_at_utc=excluded.submitted_at_utc,completed_at_utc=excluded.completed_at_utc,voided_at_utc=excluded.voided_at_utc,voided_by=excluded.voided_by,void_reason=excluded.void_reason,cashier_user_id=excluded.cashier_user_id,terminal_id=excluded.terminal_id,status=excluded.status,financial_event_posted=excluded.financial_event_posted,client_request_id=excluded.client_request_id,applies_to_balance=coalesce($15,studio_pos_sales.applies_to_balance)
                 """;
-            object?[] values = [sale.Id,sale.ReferenceType,sale.ReferenceId,sale.CreatedAtUtc,(object?)sale.SubmittedAtUtc??DBNull.Value,(object?)sale.CompletedAtUtc??DBNull.Value,(object?)sale.VoidedAtUtc??DBNull.Value,(object?)sale.VoidedBy??DBNull.Value,(object?)sale.VoidReason??DBNull.Value,(object?)sale.CashierUserId??DBNull.Value,(object?)sale.TerminalId??DBNull.Value,(int)sale.Status,financialEventPosted,(object?)clientRequestId??DBNull.Value];
+            object?[] values = [sale.Id,sale.ReferenceType,sale.ReferenceId,sale.CreatedAtUtc,(object?)sale.SubmittedAtUtc??DBNull.Value,(object?)sale.CompletedAtUtc??DBNull.Value,(object?)sale.VoidedAtUtc??DBNull.Value,(object?)sale.VoidedBy??DBNull.Value,(object?)sale.VoidReason??DBNull.Value,(object?)sale.CashierUserId??DBNull.Value,(object?)sale.TerminalId??DBNull.Value,(int)sale.Status,financialEventPosted,(object?)clientRequestId??DBNull.Value,(object?)applyToBalance??DBNull.Value];
             foreach (object? value in values) command.Parameters.AddWithValue(value ?? DBNull.Value);
             command.ExecuteNonQuery();
         }
@@ -130,8 +146,24 @@ public sealed class StudioPosStore
         foreach (SaleLine line in sale.Lines)
         {
             using NpgsqlCommand command = connection.CreateCommand(); command.Transaction = transaction;
-            command.CommandText = "insert into studio_pos_sale_lines(id,sale_id,code,description,unit_price,quantity) values ($1,$2,$3,$4,$5,$6)";
+            command.CommandText = "insert into studio_pos_sale_lines(id,sale_id,code,description,unit_price,quantity) values ($1,$2,$3,$4,$5,$6) on conflict(id) do update set code=excluded.code,description=excluded.description,unit_price=excluded.unit_price,quantity=excluded.quantity";
             command.Parameters.AddWithValue(line.Id); command.Parameters.AddWithValue(sale.Id); command.Parameters.AddWithValue(line.Code); command.Parameters.AddWithValue(line.Description); command.Parameters.AddWithValue(line.UnitPrice); command.Parameters.AddWithValue(line.Quantity); command.ExecuteNonQuery();
+        }
+        if(sourceLines is not null)
+        {
+            for(int i=0;i<sourceLines.Count;i++)
+            {
+                var request=sourceLines[i];var line=sale.Lines.ElementAt(i);
+                if(!ProductionOrderLinker.RequiresOutput(line.Code)&&request.SourceAssetId is null)continue;
+                Guid? approved=null;
+                if(request.SourceAssetId is Guid asset)
+                {
+                    using var source=new NpgsqlCommand("select approved_version_id from studio_media_assets where id=$1 and job_id=$2",connection,transaction);source.Parameters.AddWithValue(asset);source.Parameters.AddWithValue(Guid.Parse(sale.ReferenceId));
+                    object? version=source.ExecuteScalar();if(version is null)throw new ArgumentException("Order image must belong to this job.");approved=version is Guid id?id:null;
+                }
+                using var binding=new NpgsqlCommand("insert into studio_pos_line_media(sale_line_id,asset_id,source_version_id) values($1,$2,$3) on conflict do nothing",connection,transaction);
+                foreach(var v in new object?[]{line.Id,request.SourceAssetId,approved})binding.Parameters.AddWithValue(v??DBNull.Value);binding.ExecuteNonQuery();
+            }
         }
         foreach (Tender tender in sale.Tenders)
         {
@@ -151,9 +183,8 @@ public sealed class StudioPosStore
 
     private static void DeleteChildren(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid saleId)
     {
-        using NpgsqlCommand command = connection.CreateCommand(); command.Transaction=transaction;
-        command.CommandText = "delete from studio_pos_refund_tenders where refund_id in (select id from studio_pos_refunds where sale_id=$1); delete from studio_pos_refund_lines where refund_id in (select id from studio_pos_refunds where sale_id=$1); delete from studio_pos_refunds where sale_id=$1; delete from studio_pos_tenders where sale_id=$1; delete from studio_pos_sale_lines where sale_id=$1;";
-        command.Parameters.AddWithValue(saleId); command.ExecuteNonQuery();
+        string[] deletes=["delete from studio_pos_refund_tenders where refund_id in (select id from studio_pos_refunds where sale_id=$1)","delete from studio_pos_refund_lines where refund_id in (select id from studio_pos_refunds where sale_id=$1)","delete from studio_pos_refunds where sale_id=$1","delete from studio_pos_tenders where sale_id=$1"];
+        foreach(string sql in deletes){using var command=new NpgsqlCommand(sql,connection,transaction);command.Parameters.AddWithValue(saleId);command.ExecuteNonQuery();}
     }
 
     private IReadOnlyList<PersistedSale> GetSnapshots(string whereClause, string? referenceId)
@@ -168,9 +199,9 @@ public sealed class StudioPosStore
     private PersistedSale? GetSnapshot(Guid saleId)
     {
         using NpgsqlConnection connection = database.OpenConnection(); using NpgsqlCommand command=connection.CreateCommand();
-        command.CommandText="select id,reference_type,reference_id,created_at_utc,submitted_at_utc,completed_at_utc,voided_at_utc,voided_by,void_reason,cashier_user_id,terminal_id,status,financial_event_posted,client_request_id from studio_pos_sales where id=$1"; command.Parameters.AddWithValue(saleId);
+        command.CommandText="select id,reference_type,reference_id,created_at_utc,submitted_at_utc,completed_at_utc,voided_at_utc,voided_by,void_reason,cashier_user_id,terminal_id,status,financial_event_posted,client_request_id,applies_to_balance from studio_pos_sales where id=$1"; command.Parameters.AddWithValue(saleId);
         using NpgsqlDataReader reader=command.ExecuteReader(); if(!reader.Read()) return null;
-        PersistedSale header = new(reader.GetGuid(0),reader.GetString(1),reader.GetString(2),reader.GetFieldValue<DateTimeOffset>(3),reader.IsDBNull(4)?null:reader.GetFieldValue<DateTimeOffset>(4),reader.IsDBNull(5)?null:reader.GetFieldValue<DateTimeOffset>(5),reader.IsDBNull(6)?null:reader.GetFieldValue<DateTimeOffset>(6),reader.IsDBNull(7)?null:reader.GetString(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.IsDBNull(9)?null:reader.GetString(9),reader.IsDBNull(10)?null:reader.GetString(10),(SaleStatus)reader.GetInt32(11),[],[],[],reader.GetBoolean(12),reader.IsDBNull(13)?null:reader.GetGuid(13)); reader.Close();
+        PersistedSale header = new(reader.GetGuid(0),reader.GetString(1),reader.GetString(2),reader.GetFieldValue<DateTimeOffset>(3),reader.IsDBNull(4)?null:reader.GetFieldValue<DateTimeOffset>(4),reader.IsDBNull(5)?null:reader.GetFieldValue<DateTimeOffset>(5),reader.IsDBNull(6)?null:reader.GetFieldValue<DateTimeOffset>(6),reader.IsDBNull(7)?null:reader.GetString(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.IsDBNull(9)?null:reader.GetString(9),reader.IsDBNull(10)?null:reader.GetString(10),(SaleStatus)reader.GetInt32(11),[],[],[],reader.GetBoolean(12),reader.IsDBNull(13)?null:reader.GetGuid(13)); header=header with{AppliesToBalance=reader.GetBoolean(14)};reader.Close();
         List<SaleLine> lines=[]; using(NpgsqlCommand q=connection.CreateCommand()){q.CommandText="select id,code,description,unit_price,quantity from studio_pos_sale_lines where sale_id=$1";q.Parameters.AddWithValue(saleId);using NpgsqlDataReader r=q.ExecuteReader();while(r.Read())lines.Add(new SaleLine(r.GetGuid(0),r.GetString(1),r.GetString(2),r.GetDecimal(3),r.GetInt32(4)));}
         List<Tender> tenders=[]; using(NpgsqlCommand q=connection.CreateCommand()){q.CommandText="select id,kind,amount,reference from studio_pos_tenders where sale_id=$1";q.Parameters.AddWithValue(saleId);using NpgsqlDataReader r=q.ExecuteReader();while(r.Read())tenders.Add(new Tender(r.GetGuid(0),(TenderKind)r.GetInt32(1),r.GetDecimal(2),r.IsDBNull(3)?null:r.GetString(3)));}
         List<PersistedRefund> refunds=[]; using(NpgsqlCommand q=connection.CreateCommand()){q.CommandText="select id,reason,created_at_utc from studio_pos_refunds where sale_id=$1 order by created_at_utc";q.Parameters.AddWithValue(saleId);using NpgsqlDataReader r=q.ExecuteReader();List<(Guid,string,DateTimeOffset)> rs=[];while(r.Read())rs.Add((r.GetGuid(0),r.GetString(1),r.GetFieldValue<DateTimeOffset>(2)));r.Close();foreach(var item in rs){List<RefundLine> refundLines=[];using(NpgsqlCommand l=connection.CreateCommand()){l.CommandText="select sale_line_id,unit_price,quantity from studio_pos_refund_lines where refund_id=$1";l.Parameters.AddWithValue(item.Item1);using NpgsqlDataReader lr=l.ExecuteReader();while(lr.Read())refundLines.Add(new RefundLine(lr.GetGuid(0),lr.GetDecimal(1),lr.GetInt32(2)));}List<Tender> refundTenders=[];using(NpgsqlCommand t=connection.CreateCommand()){t.CommandText="select id,kind,amount,reference from studio_pos_refund_tenders where refund_id=$1";t.Parameters.AddWithValue(item.Item1);using NpgsqlDataReader tr=t.ExecuteReader();while(tr.Read())refundTenders.Add(new Tender(tr.GetGuid(0),(TenderKind)tr.GetInt32(1),tr.GetDecimal(2),tr.IsDBNull(3)?null:tr.GetString(3)));}refunds.Add(new PersistedRefund(item.Item1,refundLines,refundTenders,item.Item2,item.Item3));}};
@@ -183,13 +214,14 @@ public sealed class StudioPosStore
     }
 }
 
-public sealed record PersistedSale(Guid Id,string ReferenceType,string ReferenceId,DateTimeOffset CreatedAtUtc,DateTimeOffset? SubmittedAtUtc,DateTimeOffset? CompletedAtUtc,DateTimeOffset? VoidedAtUtc,string? VoidedBy,string? VoidReason,string? CashierUserId,string? TerminalId,SaleStatus Status,List<SaleLine> Lines,List<Tender> Tenders,List<PersistedRefund> Refunds,bool FinancialEventPosted,Guid? ClientRequestId=null);
+public sealed record PersistedSale(Guid Id,string ReferenceType,string ReferenceId,DateTimeOffset CreatedAtUtc,DateTimeOffset? SubmittedAtUtc,DateTimeOffset? CompletedAtUtc,DateTimeOffset? VoidedAtUtc,string? VoidedBy,string? VoidReason,string? CashierUserId,string? TerminalId,SaleStatus Status,List<SaleLine> Lines,List<Tender> Tenders,List<PersistedRefund> Refunds,bool FinancialEventPosted,Guid? ClientRequestId=null,bool AppliesToBalance=false);
 public sealed record PersistedRefund(Guid Id,List<RefundLine> Lines,List<Tender> Tenders,string Reason,DateTimeOffset CreatedAtUtc);
-public sealed record CreateStudioSaleRequest(IReadOnlyList<CreateStudioSaleLineRequest> Lines,Guid? ClientRequestId=null);
-public sealed record CreateStudioSaleLineRequest(string? Code,string Description,decimal UnitPrice,int Quantity);
+public sealed record CreateStudioSaleRequest(IReadOnlyList<CreateStudioSaleLineRequest> Lines,Guid? ClientRequestId=null,bool ApplyToJobBalance=false);
+public sealed record CreateStudioSaleLineRequest(string? Code,string Description,decimal UnitPrice,int Quantity,Guid? SourceAssetId=null);
 public sealed record CompleteStudioSaleRequest(IReadOnlyList<StudioTenderRequest> Tenders,string? TerminalId);
 public sealed record StudioTenderRequest(TenderKind Kind,decimal Amount,string? Reference);
-public sealed record VoidStudioSaleRequest(string Reason);
-public sealed record RefundStudioSaleRequest(IReadOnlyList<RefundStudioSaleLineRequest> Lines,IReadOnlyList<StudioTenderRequest> Tenders,string Reason);
+public sealed record VoidStudioSaleRequest(string Reason,Guid? OperationId=null);
+public sealed record RefundStudioSaleRequest(IReadOnlyList<RefundStudioSaleLineRequest> Lines,IReadOnlyList<StudioTenderRequest> Tenders,string Reason,Guid? OperationId=null);
 public sealed record RefundStudioSaleLineRequest(Guid SaleLineId,decimal UnitPrice,int Quantity);
 public sealed record PosDiagnosticsSnapshot(int TotalSales,int DraftSales,int CompletedSales,int VoidedSales,decimal GrossCompleted,decimal Refunded,DateTimeOffset? LastSaleAtUtc);
+

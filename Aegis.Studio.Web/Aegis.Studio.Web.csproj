@@ -21,6 +21,9 @@
     <ProjectReference Include="$(CommonRoot)\Common.Registration\Common.Registration.csproj" AdditionalProperties="Configuration=$(Configuration)" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Demo/portrait-catalogue.json" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />

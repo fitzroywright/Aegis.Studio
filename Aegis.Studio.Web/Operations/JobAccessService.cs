@@ -23,63 +23,41 @@ public sealed class JobAccessService
         return GetPermission(permissions, permission);
     }
 
-    public JobPermissionSet GetPermissions(ClaimsPrincipal user, Guid jobId)
+    public JobPermissionSet GetPermissions(ClaimsPrincipal user,Guid jobId)
+        =>GetPermissionMap(user,jobId).GetValueOrDefault(jobId,JobPermissionSet.None);
+    public IReadOnlyList<Guid> GetAccessibleJobIds(ClaimsPrincipal user,bool requireAttachments=false)
+        =>GetPermissionMap(user).Where(x=>x.Value.AccessJob&&(!requireAttachments||x.Value.ViewAttachments)).Select(x=>x.Key).ToArray();
+
+    // The same permission union as GetPermissions, fetched once for list screens.
+    public IReadOnlyDictionary<Guid,JobPermissionSet> GetPermissionMap(ClaimsPrincipal user,Guid? jobId=null)
     {
-        if (user.IsInRole("Administrator"))
-        {
-            return JobPermissionSet.Full;
-        }
-
-        JobPermissionSet global = FromGlobalOperationalRole(user);
-        Guid? workspaceId = GetWorkspaceId(jobId);
-        JobPermissionSet inherited = workspaceId.HasValue
-            ? FromWorkspace(workspaceAccess.GetPermissions(user, workspaceId.Value))
-            : JobPermissionSet.None;
-        inherited = Union(inherited, global);
-
-        string userName = GetUserName(user);
-        JobMember? member = GetMembers(jobId).FirstOrDefault(x => x.IsActive && string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
-        if (member is null)
-        {
-            return inherited;
-        }
-
-        if (member.Permissions.AdminJob)
-        {
-            return JobPermissionSet.Full;
-        }
-
-        return member.InheritWorkspacePermissions ? Union(inherited, member.Permissions) : Union(global, member.Permissions);
-    }
-
-    public IReadOnlyList<Guid> GetAccessibleJobIds(ClaimsPrincipal user, bool requireAttachments = false)
-    {
-        bool administrator = user.IsInRole("Administrator");
-        bool globalView = administrator || globalRoles.HasPermission(user, "ViewAllJobs");
-        bool globalAttachments = administrator || (requireAttachments && globalRoles.HasPermission(user, "ViewClientAttachments"));
-        using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlCommand command = connection.CreateCommand();
-        // Match GetPermissions' inheritance and direct-job overrides in one read.
-        // Global ViewAllJobs still grants the same list access as the previous implementation.
-        command.CommandText = """
-            select j.id from studio_jobs j
-            left join studio_workspace_members w on w.workspace_id=j.workspace_id and lower(w.user_name)=lower($1) and w.is_active
+        var result=new Dictionary<Guid,JobPermissionSet>();
+        bool administrator=user.IsInRole("Administrator");
+        JobPermissionSet global=administrator?JobPermissionSet.Full:FromGlobalOperationalRole(user);
+        using var c=database.OpenConnection();
+        using var cmd=new NpgsqlCommand("""
+            select j.id,array[coalesce(w.access_workspace,false),coalesce(w.can_view,false),coalesce(w.can_view,false),coalesce(w.reply_requester,false),coalesce(w.view_attachments,false),coalesce(w.add_attachments,false),coalesce(w.edit_job,false),coalesce(w.edit_job,false),coalesce(w.edit_job,false),coalesce(w.manage_schedule,false),coalesce(w.manage_production,false),coalesce(w.edit_job,false),coalesce(w.edit_job,false),coalesce(w.edit_job,false),coalesce(w.can_view,false),coalesce(w.edit_job,false),coalesce(w.notify_members,false),coalesce(w.manage_members,false),coalesce(w.admin_workspace,false)],array[coalesce(m.access_job,false),coalesce(m.view_job,false),coalesce(m.view_conversation,false),coalesce(m.reply_requester,false),coalesce(m.view_attachments,false),coalesce(m.add_attachments,false),coalesce(m.edit_job,false),coalesce(m.change_status,false),coalesce(m.assign_staff,false),coalesce(m.manage_schedule,false),coalesce(m.manage_production,false),coalesce(m.view_financials,false),coalesce(m.record_financial_activity,false),coalesce(m.use_pos,false),coalesce(m.view_pos_transactions,false),coalesce(m.refund_void_pos,false),coalesce(m.notify_job_members,false),coalesce(m.manage_job_members,false),coalesce(m.admin_job,false)],
+              m.job_id is not null,coalesce(m.inherit_workspace_permissions,true),coalesce(w.admin_workspace,false)
+            from studio_jobs j
+            left join lateral(select bool_or(access_workspace) as access_workspace,bool_or(can_view) as can_view,bool_or(reply_requester) as reply_requester,bool_or(view_attachments) as view_attachments,bool_or(add_attachments) as add_attachments,bool_or(edit_job) as edit_job,bool_or(manage_schedule) as manage_schedule,bool_or(manage_production) as manage_production,bool_or(notify_members) as notify_members,bool_or(manage_members) as manage_members,bool_or(admin_workspace) as admin_workspace from studio_workspace_members wm
+              where lower(wm.user_name)=lower($1) and wm.is_active and (wm.workspace_id=j.workspace_id or exists(
+                select 1 from studio_job_workspace_links l where l.job_id=j.id and l.workspace_id=wm.workspace_id))) w on true
             left join studio_job_members m on m.job_id=j.id and lower(m.user_name)=lower($1) and m.is_active
-            where ($2 or coalesce(m.admin_job,false) or coalesce(m.access_job,false)
-                or ((m.job_id is null or m.inherit_workspace_permissions) and coalesce(w.access_workspace,false)))
-              and (not $3 or $4 or coalesce(m.admin_job,false) or coalesce(m.view_attachments,false)
-                or ((m.job_id is null or m.inherit_workspace_permissions) and coalesce(w.view_attachments,false)))
-            order by j.created_at_utc desc
-            """;
-        command.Parameters.AddWithValue(GetUserName(user));
-        command.Parameters.AddWithValue(globalView);
-        command.Parameters.AddWithValue(requireAttachments);
-        command.Parameters.AddWithValue(globalAttachments);
-        using NpgsqlDataReader reader = command.ExecuteReader();
-        List<Guid> result = [];
-        while (reader.Read()) result.Add(reader.GetGuid(0));
+            where ($2::uuid is null or j.id=$2)
+            """,c);cmd.Parameters.AddWithValue(GetUserName(user));cmd.Parameters.AddWithValue((object?)jobId??DBNull.Value);
+        using var reader=cmd.ExecuteReader();
+        while(reader.Read())
+        {
+            JobPermissionSet inherited=reader.GetBoolean(5)?JobPermissionSet.Full:FromArray(reader.GetFieldValue<bool[]>(1));
+            JobPermissionSet direct=FromArray(reader.GetFieldValue<bool[]>(2));
+            if(direct.AdminJob)direct=JobPermissionSet.Full;
+            var permissions=administrator?JobPermissionSet.Full:reader.GetBoolean(3)
+                ?Union(reader.GetBoolean(4)?Union(global,inherited):global,direct):Union(global,inherited);
+            if(permissions.AccessJob||permissions.ViewJob)result[reader.GetGuid(0)]=permissions;
+        }
         return result;
     }
+    private static JobPermissionSet FromArray(bool[] values)=>new(values[0],values[1],values[2],values[3],values[4],values[5],values[6],values[7],values[8],values[9],values[10],values[11],values[12],values[13],values[14],values[15],values[16],values[17],values[18]);
 
     public IReadOnlyList<JobMember> GetMembers(Guid jobId)
     {

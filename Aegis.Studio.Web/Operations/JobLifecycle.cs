@@ -4,6 +4,7 @@ using Aegis.Studio.Web.Galleries;
 using Common.Storage;
 using Aegis.Studio.Web.Notifications;
 using Npgsql;
+using Aegis.Studio.Web.Production;
 
 namespace Aegis.Studio.Web.Operations;
 
@@ -83,6 +84,14 @@ public static class JobLifecycleEndpoints
                 using var tasks=new NpgsqlCommand("select exists(select 1 from studio_job_activities where job_id=$1 and status not in ('Completed','Cancelled'))",connection,transaction);tasks.Parameters.AddWithValue(jobId);bool openTasks=(bool)tasks.ExecuteScalar()!;
                 string provider=configuration["ClientGallery:Provider"]??"";
                 JobLifecycleRules.Validate(status,request.Action,mediaCount,openTasks,provider=="Manifest");
+                if(request.Action=="finish-production")
+                {
+                    using var quality=new NpgsqlCommand("""
+                        select exists(select 1 from studio_media_assets a where a.job_id=$1 and (a.approved_version_id is null
+                          or exists(select 1 from studio_production_items i where i.asset_id=a.id and i.source_version_id=a.approved_version_id and i.qc_state not in ('Passed','Cancelled'))))
+                        """,connection,transaction);quality.Parameters.AddWithValue(jobId);
+                    if((bool)quality.ExecuteScalar()!)throw new ArgumentException("Pass quality control for the current approved production items before handing this job to Front Desk.");
+                }
                 string? receipt=null;
                 if(request.Action=="publish")
                 {
@@ -97,17 +106,7 @@ public static class JobLifecycleEndpoints
                     receipt=publication.Reference;
                 }
                 Execute(connection,transaction,"update studio_jobs set status=$2 where id=$1",jobId,target);
-                if(request.Action is "approve" or "finish-production")
-                    Execute(connection,transaction,"update studio_media_assets a set approved_version_id=(select id from studio_asset_versions where job_id=a.job_id and asset_key=a.asset_key order by version_number desc limit 1) where a.job_id=$1",jobId);
-                if(request.Action=="approve")
-                {
-                    Execute(connection,transaction,"update studio_media_assets set production_status='Ready for Production' where job_id=$1",jobId);
-                    Execute(connection,transaction,"""
-                        insert into studio_job_activities(id,job_id,activity_type,title,status,priority,created_by,created_at_utc,updated_at_utc)
-                        select $2,$1,'QC','Complete production and quality control','NotStarted','Normal',$3,now(),now()
-                        where not exists(select 1 from studio_job_activities where job_id=$1 and title='Complete production and quality control')
-                        """,jobId,Guid.NewGuid(),actor);
-                }
+                if(request.Action=="approve")ProductionItems.CreateApprovedBatch(connection,transaction,jobId,actor);
                 Execute(connection,transaction,"insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,$3,$4,$5,now())",Guid.NewGuid(),jobId,"Workflow:"+request.Action,actor,request.Note??$"{status} → {target}");
                 using var conversation=new NpgsqlCommand("select conversation_id from studio_jobs where id=$1",connection,transaction);conversation.Parameters.AddWithValue(jobId);Guid conversationId=(Guid)conversation.ExecuteScalar()!;
                 Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'Internal',$4,now())",Guid.NewGuid(),conversationId,actor,$"{status} → {target}. {request.Note}");
@@ -124,3 +123,4 @@ public static class JobLifecycleEndpoints
     private static void Execute(NpgsqlConnection connection,NpgsqlTransaction transaction,string sql,params object[] values)
     {using var command=new NpgsqlCommand(sql,connection,transaction);foreach(var value in values)command.Parameters.AddWithValue(value);command.ExecuteNonQuery();}
 }
+

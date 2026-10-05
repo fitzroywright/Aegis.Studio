@@ -23,13 +23,15 @@ The navigation controller owns routing and startup. Global roles and announcemen
 
 ## Demo graph
 
-The full seed adds 27 jobs, six workspaces, 12 clients, four photographer profiles, linked bookings, schedule resources, sessions, production activities, invoices, payments, notifications, conversations, subject rosters, collections, document attachments and over 1,000 media records. Existing earlier demo jobs and user records remain available.
+The full seed adds 27 jobs, six workspaces, 12 clients, four photographer profiles, linked bookings, schedule resources, sessions, production activities, invoices, payments, notifications, conversations, subject rosters, collections, document attachments and hundreds of genuine media assets. Existing earlier demo jobs and user records remain available.
 
 The wedding has a rehearsal and primary session, two payments and versioned media. Employee IDs, school portraits, graduation and corporate headshots have large subject rosters. Production activities identify their actual media collection. The ID roster retains subjects without photographs and retake states. Booking requests below the deposit threshold remain separate from jobs.
 
 Real Wikimedia photographs pass through Common.Storage, with source URLs in metadata. Each version owns a storage path; downloaded bytes are cached, and demo JPEG derivatives are limited to 1200 pixels. Internet access is needed for the first seed. No image generator is used.
 
 The v6 marker prevents subsequent demo loads from resetting edits. Loading an older dataset upgrades the full seed once. Asset and subject identifiers reserve 10,000 positions per job, preventing the previous large-job collisions.
+
+The integrated-workstream update is documented in `docs/INTEGRATED-WORKSTREAM.md`.
 
 Finance, Management and Job Details use signed financial events for charges, net receipts and remaining balances. Reporting filters and exports operate on the same dated transactions. Photographer workload follows schedule resource IDs. My Work counts all accessible job media and opens linked notifications and tasks.
 
@@ -38,11 +40,11 @@ Folder drops traverse nested directory batches. Subject drops target the selecte
 ## Validation
 
 - Release solution build: zero warnings and errors.
-- Solution tests: 161 Web tests and three Domain tests pass; five PostgreSQL integration tests skip without `STUDIO_TEST_POSTGRES`.
-- UI suite: 29 tests, including a complete shared-shell smoke test, streamed demo progress and failure handling, progressive My Work startup, cancellation, working retries, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
+- Solution tests: 176 Web tests and three Domain tests pass, including all 11 PostgreSQL scenarios with `STUDIO_TEST_POSTGRES` configured; zero tests skipped in the resumed run.
+- UI suite: 33 tests, including a complete shared-shell smoke test, streamed demo progress and failure handling, progressive My Work startup, cancellation, working retries, signed refund reconciliation, workload links, persisted production completion and repeated folder-directory batches.
 - JavaScript syntax and whitespace checks pass.
 
-This environment cannot launch Chromium because socket creation is prohibited. Browser screenshot comparison and a live database seed were not verified here. The DOM smoke test exercises all eight screen renderers with an interconnected API fixture; it does not establish pixel-level equivalence or database seed execution.
+The DOM smoke test exercises all eight screen renderers with an interconnected API fixture. PostgreSQL tests verify transactional workflows and additive demo upgrade/recovery. Browser screenshot comparison and a full live first-time photo seed were not verified here; neither pixel-level equivalence nor configured provider behavior is established by the DOM tests.
 
 Run locally from the repository root:
 
