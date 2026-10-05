@@ -170,10 +170,10 @@
                 <div class="mw-layout">
                     <div class="mw-main">
                         <div class="mw-metrics" data-mw-region="metrics">
-                            <article class="mw-metric"><span class="mw-metric-icon blue">📷</span><div><strong>${metric('schedule',todaySchedule.length)}</strong><b>Today's Sessions</b><small>${todaySchedule.length} scheduled</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon green">✓</span><div><strong>${metric('tasks',myTasks.length)}</strong><b>Pending Tasks</b><small>${myTasks.filter(t=>String(t.priority).toLowerCase()==='high').length} high priority</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon purple">▧</span><div><strong>${metric('media',totalPhotos)}</strong><b>Photos Catalogued</b><small>${state.status.media==='error'?'<span role="alert">Photos unavailable</span> <button data-mw-retry="media">Retry</button>':'Across accessible jobs'}</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon orange">●</span><div><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong><b>Unread Messages</b><small>${messageNotifications.length} recent</small></div></article>
+                            <article class="mw-metric"><span class="mw-metric-icon blue"><svg aria-hidden="true"><use href="#i-camera"></use></svg></span><div><strong>${metric('schedule',todaySchedule.length)}</strong><b>Today's Sessions</b><small>${todaySchedule.length} scheduled</small></div></article>
+                            <article class="mw-metric"><span class="mw-metric-icon green"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><div><strong>${metric('tasks',myTasks.length)}</strong><b>Pending Tasks</b><small>${myTasks.filter(t=>String(t.priority).toLowerCase()==='high').length} high priority</small></div></article>
+                            <article class="mw-metric"><span class="mw-metric-icon purple"><svg aria-hidden="true"><use href="#i-grid"></use></svg></span><div><strong>${metric('media',totalPhotos)}</strong><b>Photos Catalogued</b><small>${state.status.media==='error'?'<span role="alert">Photos unavailable</span> <button data-mw-retry="media">Retry</button>':'Across accessible jobs'}</small></div></article>
+                            <article class="mw-metric"><span class="mw-metric-icon orange"><svg aria-hidden="true"><use href="#i-bell"></use></svg></span><div><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong><b>Unread Messages</b><small>${messageNotifications.length} recent</small></div></article>
                         </div>
 
                         <div class="mw-two-col">
