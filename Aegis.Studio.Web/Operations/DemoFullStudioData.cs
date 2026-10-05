@@ -57,7 +57,7 @@ internal static class DemoFullStudioData
         new(303,3,9,"North Coast Academy School Portraits","Culling",-3,"North Coast Academy",240000,120000,"demo.anna","School Portraits"),
         new(304,3,2,"Campion Class Group Photos","Client Review",-5,"Campion College",195000,195000,"demo.jason","Class / Group"),
 
-        new(401,4,2,"Campion Graduation 2026","Photography",0,"Campion College",275000,137500,"demo.sam","Graduation"),
+        new(401,4,2,"Campion Graduation 2026","Printing",0,"Campion College",275000,137500,"demo.sam","Graduation"),
         new(402,4,9,"North Coast Academy Graduation","Scheduled",4,"North Coast Academy",210000,105000,"demo.anna","Graduation"),
         new(403,4,2,"Campion Graduation Retakes","Needs Scheduling",8,"Studio A",45000,0,"demo.jason","Graduation Retakes"),
         new(404,4,9,"NCA Valedictorian Portraits","Ready for Delivery",-2,"Studio B",56000,56000,"demo.michael","Graduation Portrait"),
@@ -117,7 +117,7 @@ internal static class DemoFullStudioData
 
             Execute(connection,transaction,
                 "insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,client_id) values($1,$2,$3,$4,$5,$6,$7,now()-($8 || ' days')::interval,$9,$10) on conflict(id) do update set workspace_id=excluded.workspace_id,conversation_id=excluded.conversation_id,title=excluded.title,client_name=excluded.client_name,status=excluded.status,event_date=excluded.event_date,assigned_to=excluded.assigned_to,client_id=excluded.client_id",
-                jobId,workspaceId,conversationId,job.Title,client.Name,job.Status,DateOnly.FromDateTime(start.UtcDateTime),Math.Abs(job.DayOffset)+5,job.Photographer,clientId);
+                jobId,workspaceId,conversationId,job.Title,client.Name,NormalizeStatus(job.Status),DateOnly.FromDateTime(start.UtcDateTime),Math.Abs(job.DayOffset)+5,job.Photographer,clientId);
 
             Execute(connection,transaction,"update studio_conversations set job_id=$2 where id=$1",conversationId,jobId);
 
@@ -219,11 +219,10 @@ internal static class DemoFullStudioData
             report?.Invoke(new(32 + (int)(63 * (ordinal-1 + (double)i / count) / Jobs.Length), "Studio photographs", i, count, $"Job {ordinal}/{Jobs.Length}: {job.Title} — downloading and storing photo {i+1}/{count}."));
             string key=$"demo-full/{job.Number}/asset-{i+1:000}";
             Guid versionId=MediaId(64,job.Number,i);
-            // Each asset-version owns a unique stored object/path. DemoDataExpansion caches
-            // the downloaded public-domain source bytes, so this does not redownload the
-            // same photograph for every asset, while still preserving Studio's storage model.
-            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount),null,login);
-            if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,SelectPhotoVariant(job,i%sourceCount),original,login);
+            // Large portrait jobs use different real source photos for every asset.
+            // Revisions preserve the same photograph and stable asset identity.
+            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount),null,login,sourceUrl:PortraitSource(job,i));
+            if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,SelectPhotoVariant(job,i%sourceCount),original,login,sourceUrl:PortraitSource(job,i));
             Guid assetId=MediaId(65,job.Number,i);
             string status=statuses[(ordinal+i)%statuses.Length];
             assetId=ExecuteGuid(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status,assigned_to,capture_at_utc) values($1,$2,$2,$3,$4,$5,now()-($6 || ' hours')::interval) on conflict(job_id,asset_key) do update set production_status=excluded.production_status,assigned_to=excluded.assigned_to,capture_at_utc=excluded.capture_at_utc returning id",
@@ -242,14 +241,12 @@ internal static class DemoFullStudioData
         return job.Number switch
         {
             106 => 180, // employee ID job
-            201 => 320, // wedding
+            201 => 2, // two distinct licensed wedding photographs
             303 => 100, // school portraits
             301 => 120, // executive headshots
-            401 => 220, // graduation
-            501 => 60,  // product catalogue
-            _ => job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?12:
-                 job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?10:
-                 job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?8:6
+            401 => 241, // large roster: 241 distinct photographed subjects
+            501 => 1,   // one genuine product photograph
+            _ => IsPortraitCorpus(job)?8:PhysicalSourceCount(job)
         };
     }
 
@@ -259,12 +256,13 @@ internal static class DemoFullStudioData
         foreach(var job in Jobs)
         {
             ordinal++;int count=MediaCount(job),sourceCount=PhysicalSourceCount(job);Guid jobId=Id(41,job.Number);
+            using(var old=new NpgsqlCommand("select coalesce(max(substring(asset_key from 'asset-([0-9]+)$')::int),0) from studio_asset_versions where job_id=$1 and asset_key like $2",c,tx)){old.Parameters.AddWithValue(jobId);old.Parameters.AddWithValue($"demo-full/{job.Number}/asset-%");count=Math.Max(count,Convert.ToInt32(old.ExecuteScalar()));}
             for(int asset=0;asset<count;asset++)
             {
                 report?.Invoke(new(32+(int)(63*(ordinal-1+(double)asset/count)/Jobs.Length),"Checking demo photographs",asset,count,$"{job.Title}: checking photo {asset+1}/{count}."));
                 string key=$"demo-full/{job.Number}/asset-{asset+1:000}";
-                Guid original=DemoDataExpansion.AddImage(c,tx,versions,jobId,key,MediaId(64,job.Number,asset),1,SelectPhotoVariant(job,asset%sourceCount),null,login,true,()=>restored++);
-                if(asset%50==0 && original!=Guid.Empty)DemoDataExpansion.AddImage(c,tx,versions,jobId,key,MediaId(66,job.Number,asset),2,SelectPhotoVariant(job,asset%sourceCount),original,login,true,()=>restored++);
+                Guid original=DemoDataExpansion.AddImage(c,tx,versions,jobId,key,MediaId(64,job.Number,asset),1,SelectPhotoVariant(job,asset%sourceCount),null,login,true,()=>restored++,PortraitSource(job,asset));
+                if(asset%50==0 && original!=Guid.Empty)DemoDataExpansion.AddImage(c,tx,versions,jobId,key,MediaId(66,job.Number,asset),2,SelectPhotoVariant(job,asset%sourceCount),original,login,true,()=>restored++,PortraitSource(job,asset));
             }
         }
         return restored;
@@ -275,7 +273,7 @@ internal static class DemoFullStudioData
         return job.Number switch
         {
             106 => 50,
-            401 => 80,
+            401 => 327,
             303 => 60,
             301 => 24,
             201 => 8,
@@ -284,6 +282,26 @@ internal static class DemoFullStudioData
                  job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Group",StringComparison.OrdinalIgnoreCase)?12:
                  job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)?10:4
         };
+    }
+
+    private static string NormalizeStatus(string status)=>status switch
+    {
+        "Production" or "QC" or "Printing"=>"In Production",
+        "Editing" or "Culling" or "Retouching"=>"Changes Requested",
+        "Client Review"=>"Needs Review",
+        "Ready for Delivery"=>"Ready for Client",
+        "Booking"=>"Needs Scheduling",
+        _=>status
+    };
+    private static bool IsPortraitCorpus(DemoJob job)=>job.Number is 106 or 301 or 303 or 401||
+        job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||
+        job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)||
+        job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase);
+    private static string? PortraitSource(DemoJob job,int asset)
+    {
+        if(!IsPortraitCorpus(job))return null;
+        int offset=job.Number switch{106=>0,301=>180,303=>300,401=>400,_=>641+Array.FindIndex(Jobs.Where(j=>IsPortraitCorpus(j)&&j.Number is not(106 or 301 or 303 or 401)).ToArray(),j=>j.Number==job.Number)*8};
+        return DemoPortraitCatalogue.Url(offset+asset);
     }
 
     private static int PhysicalSourceCount(DemoJob job)
@@ -323,13 +341,15 @@ internal static class DemoFullStudioData
     private static void SeedSchedule(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,DateTimeOffset start,DateTimeOffset end,int ordinal)
     {
         Guid schedule=Id(48,job.Number);
-        string status=job.Status=="Cancelled"?"Cancelled":job.DayOffset<0?"Completed":job.Status=="Photography"?"CheckedIn":job.Status=="Booking"?"Requested":"Scheduled";
+        bool shotComplete=job.DayOffset<0||NormalizeStatus(job.Status) is "In Production" or "Ready for Client" or "Completed";
+        string status=job.Status=="Cancelled"?"Cancelled":shotComplete?"Completed":job.Status=="Photography"?"CheckedIn":job.Status=="Booking"?"Requested":"Scheduled";
         Execute(c,tx,"insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,now()) on conflict(id) do update set title=excluded.title,starts_at_utc=excluded.starts_at_utc,ends_at_utc=excluded.ends_at_utc,location=excluded.location,status=excluded.status,notes=excluded.notes",
             schedule,jobId,job.Title,start,end,job.Location,status,$"DEMO {job.Type} shoot");
         Execute(c,tx,"insert into studio_shoot_sessions(id,job_id,schedule_entry_id,photographer_user_name,assistant_user_name,call_time_utc,planned_end_utc,location,status,image_count,backup_confirmed,reshoot_required,coverage_notes,equipment_notes,handoff_status,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'DEMO camera kit',$14,now(),now()) on conflict(id) do update set photographer_user_name=excluded.photographer_user_name,call_time_utc=excluded.call_time_utc,planned_end_utc=excluded.planned_end_utc,location=excluded.location,status=excluded.status,image_count=excluded.image_count,backup_confirmed=excluded.backup_confirmed,reshoot_required=excluded.reshoot_required,handoff_status=excluded.handoff_status,updated_at_utc=now()",
-            Id(49,job.Number),jobId,schedule,job.Photographer,ordinal%4==0?"demo.anna":DBNull.Value,start,end,job.Location,job.Status=="Cancelled"?"Cancelled":job.DayOffset<0?"ShootComplete":job.Status=="Photography"?"InProgress":"Scheduled",
-            Math.Max(0,ordinal*17),job.DayOffset<0,ordinal%11==0,$"Coverage plan for {job.Type}",job.DayOffset<0?"Ready":"NotReady");
+            Id(49,job.Number),jobId,schedule,job.Photographer,ordinal%4==0?"demo.anna":DBNull.Value,start,end,job.Location,job.Status=="Cancelled"?"Cancelled":shotComplete?"ShootComplete":job.Status=="Photography"?"InProgress":"Scheduled",
+            shotComplete||job.Status=="Photography"?MediaCount(job):0,shotComplete,ordinal%11==0,$"Coverage plan for {job.Type}",shotComplete?"Ready":"NotReady");
 
+        if(shotComplete)Execute(c,tx,"update studio_shoot_sessions set checked_in_at_utc=call_time_utc,checked_out_at_utc=planned_end_utc where id=$1",Id(49,job.Number));
         // Demonstrate a true multi-session job and schedule exception states.
         if(job.Number==201)
         {

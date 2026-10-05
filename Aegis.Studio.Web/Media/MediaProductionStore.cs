@@ -13,6 +13,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
     {
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
         string[] statements = [
+            Aegis.Studio.Web.Operations.JobWorkspaceParticipation.Schema,
             "create table if not exists studio_media_migrations(version integer primary key,applied_at timestamptz not null default now())",
             "create table if not exists studio_media_galleries(id uuid primary key references studio_jobs(id) on delete cascade,name text not null default 'Media',default_lens text not null default 'Auto')",
             "alter table studio_media_galleries add column if not exists default_collection text null",
@@ -41,6 +42,9 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             "create table if not exists studio_media_returns(job_id uuid not null,sha256 text not null,asset_id uuid not null references studio_media_assets(id),version_id uuid not null references studio_asset_versions(id),primary key(job_id,sha256,asset_id))",
             "alter table studio_workspaces add column if not exists icon_name text not null default 'folder'",
             "alter table studio_workspaces add column if not exists accent_color text not null default '#b99750'",
+            "create index if not exists ix_media_assets_job_page on studio_media_assets(job_id,id)",
+            "create index if not exists ix_media_subject_assets on studio_media_asset_subjects(subject_id,asset_id)",
+            "create index if not exists ix_media_subjects_job on studio_job_subjects(job_id,id)",
             "insert into studio_media_migrations(version) values(1) on conflict do nothing"
         ];
         foreach (string sql in statements) Execute(c, tx, sql);
@@ -59,25 +63,41 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) select a.id,$2 from studio_media_assets a where a.job_id=$1 and not exists(select 1 from studio_media_asset_subjects x where x.asset_id=a.id) on conflict do nothing",job,unclassified);
         tx.Commit();
     }
-    public JsonElement Snapshot(Guid job)
+    public JsonElement Snapshot(Guid job, MediaPageQuery? page = null)
     {
-        Sync(job);
+        page ??= new();
+        page.Validate();
         using var c=database.OpenConnection();
         using var cmd=new NpgsqlCommand("""
+            with matching as (select a.* from studio_media_assets a
+              left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key
+              where a.job_id=$1 and ($2::text is null or coalesce(col.collection_name,'Unclassified')=$2)
+              and ($3::uuid is null or exists(select 1 from studio_media_asset_subjects x where x.asset_id=a.id and x.subject_id=$3))
+              and ($4::text is null or a.production_status=$4) and ($8::uuid is null or a.id=$8)),
+            page as (select * from matching where ($5::uuid is null or id>$5) order by id limit $6)
             select jsonb_build_object(
+            'totalAssets',(select count(*) from matching),
+            'totalSubjects',(select count(*) from studio_job_subjects where job_id=$1),
+            'collectionCounts',coalesce((select jsonb_object_agg(name,n) from
+              (select coalesce(col.collection_name,'Unclassified') name,count(*) n from studio_media_assets a
+               left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key
+               where a.job_id=$1 group by coalesce(col.collection_name,'Unclassified')) q),'{}'::jsonb),
+            'hasMore',exists(select 1 from matching where id>(select max(id::text)::uuid from page)),
             'gallery',(select to_jsonb(g) from studio_media_galleries g where id=$1),
             'collections',coalesce((select jsonb_agg(name order by name) from studio_media_collections where job_id=$1),'[]'::jsonb),
             'assets',coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'assetKey',a.asset_key,'status',a.production_status,'assignedTo',a.assigned_to,'captureAtUtc',a.capture_at_utc,
-              'versionId',v.id,'fileName',v.file_name,'contentType',v.content_type,'sizeBytes',v.size_bytes,'version',v.version_number,'uploadedAtUtc',v.created_at_utc,'uploadedBy',v.created_by,'photographer',(select assigned_to from studio_jobs where id=$1),'shootDate',(select event_date from studio_jobs where id=$1),
+              'approvedVersionId',a.approved_version_id,'approvedVersionNumber',(select version_number from studio_asset_versions where id=a.approved_version_id),'approvedFileName',(select file_name from studio_asset_versions where id=a.approved_version_id),'previewStatus',coalesce(d.status,'Pending'),'versionId',v.id,'fileName',v.file_name,'contentType',v.content_type,'sizeBytes',v.size_bytes,'version',v.version_number,'uploadedAtUtc',v.created_at_utc,'uploadedBy',v.created_by,'photographer',(select assigned_to from studio_jobs where id=$1),'shootDate',(select event_date from studio_jobs where id=$1),
               'originalFileName',(select file_name from studio_asset_versions where job_id=$1 and asset_key=a.asset_key order by version_number limit 1),
-              'collection',coalesce(col.collection_name,''),'subjects',coalesce((select jsonb_agg(subject_id) from studio_media_asset_subjects where asset_id=a.id),'[]'::jsonb)))
-              from studio_media_assets a join lateral(select * from studio_asset_versions where job_id=a.job_id and asset_key=a.asset_key order by version_number desc limit 1)v on true
-              left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key where a.job_id=$1),'[]'::jsonb),
+              'collection',coalesce(col.collection_name,''),'subjects',coalesce((select jsonb_agg(subject_id) from studio_media_asset_subjects where asset_id=a.id),'[]'::jsonb)) order by a.id)
+              from page a join lateral(select * from studio_asset_versions where job_id=a.job_id and asset_key=a.asset_key order by version_number desc limit 1)v on true
+              left join studio_media_derivatives d on d.version_id=v.id
+              left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key),'[]'::jsonb),
             'subjects',coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'reference',s.reference,'notes',s.notes,'collection',s.collection_name,'scheduledAtUtc',s.scheduled_at_utc,'scheduleLocation',s.schedule_location,'contactName',s.contact_name,'contactEmail',s.contact_email,'contactPhone',s.contact_phone,'photoNotes',s.photo_notes,'isSystem',s.is_system,'status',case when s.production_status='Not Photographed' and exists(select 1 from studio_media_asset_subjects where subject_id=s.id) then 'Photographed' else s.production_status end,'attributes',s.attributes,
-              'imageCount',(select count(*) from studio_media_asset_subjects where subject_id=s.id))) from studio_job_subjects s where job_id=$1),'[]'::jsonb),
+              'imageCount',(select count(*) from studio_media_asset_subjects where subject_id=s.id))) from (select * from studio_job_subjects where job_id=$1 and ($7::text is null or name ilike '%'||$7||'%' or reference ilike '%'||$7||'%') order by is_system desc,name,id limit 500) s),'[]'::jsonb),
             'unmatched',coalesce((select jsonb_agg(jsonb_build_object('id',u.id,'fileName',v.file_name,'versionId',v.id,'reason',u.reason)) from studio_media_unmatched u join studio_asset_versions v on v.id=u.version_id where u.job_id=$1 and u.resolved_asset_id is null),'[]'::jsonb))::text
             """,c);
-        cmd.Parameters.AddWithValue(job);return JsonSerializer.Deserialize<JsonElement>((string)cmd.ExecuteScalar()!);
+        foreach(var value in new object?[]{job,page.Collection,page.SubjectId,page.Status,page.After,page.Limit,page.SubjectSearch,page.AssetId})cmd.Parameters.AddWithValue(value??DBNull.Value);
+        return JsonSerializer.Deserialize<JsonElement>((string)cmd.ExecuteScalar()!);
     }
     public void UpdateAsset(Guid job,Guid id,MediaAssetUpdate request,string user)
     {
@@ -171,11 +191,16 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         Audit(c,tx,job,"SubjectStatusChanged",user,"Subject marked "+status);tx.Commit();
     }
     public byte[] Export(Guid job,Guid[] ids,string user)
+    {using var file=ExportFile(job,ids,user);using var bytes=new MemoryStream();file.CopyTo(bytes);return bytes.ToArray();}
+    public Stream ExportFile(Guid job,Guid[] ids,string user)
     {
         if(ids.Length==0||ids.Length>200)throw new ArgumentException("Select 1–200 images per editing batch.");
         Sync(job);using var c=database.OpenConnection();using var tx=c.BeginTransaction();Guid batch=Guid.NewGuid();
         Execute(c,tx,"insert into studio_media_edit_batches(id,job_id,created_by) values($1,$2,$3)",batch,job,user);
-        using var output=new MemoryStream();var manifest=new List<object>();long total=0;
+        var output=new FileStream(Path.Combine(Path.GetTempPath(),"studio-editing-"+Guid.NewGuid().ToString("N")+".zip"),FileMode.CreateNew,FileAccess.ReadWrite,FileShare.None,65536,FileOptions.DeleteOnClose);
+        try
+        {
+        var manifest=new List<object>();long total=0;
         using(var zip=new ZipArchive(output,ZipArchiveMode.Create,true))foreach(Guid id in ids.Distinct())
         {
             string key=AssetKey(c,tx,job,id);var version=versions.GetWithinTransaction(c,tx,job,key);total+=version.SizeBytes;
@@ -189,7 +214,8 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         }
         // Reopen in update mode only after the original archive central directory is written.
         output.Position=0;using(var zip=new ZipArchive(output,ZipArchiveMode.Update,true))using(var writer=new StreamWriter(zip.CreateEntry("studio-editing-manifest.json").Open()))writer.Write(JsonSerializer.Serialize(manifest));
-        Audit(c,tx,job,"EditingBatchExported",user,$"Exported {manifest.Count} images for editing.");tx.Commit();return output.ToArray();
+        Audit(c,tx,job,"EditingBatchExported",user,$"Exported {manifest.Count} images for editing.");tx.Commit();output.Position=0;return output;
+        }catch{output.Dispose();throw;}
     }
     public object Ingest(Guid job,IFormFile file,bool returned,Guid? explicitAsset,string user,string? note,string? collection=null)
     {
@@ -236,6 +262,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             Execute(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key) values($1,$2,$2,$3) on conflict(job_id,asset_key) do nothing",mediaId,job,key);
             if(!asset.HasValue)
             {
+                Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) values($1,$2) on conflict do nothing",mediaId,EnsureUnclassifiedSubject(c,tx,job));
                 string? destination=string.IsNullOrWhiteSpace(collection)?Scalar(c,tx,"select coalesce(default_collection,(select name from studio_media_collections where job_id=$1 order by name limit 1)) from studio_media_galleries where id=$1",job) as string:collection.Trim();
                 if(destination is not null)
                 {
@@ -268,3 +295,14 @@ public sealed record RosterImport(string Csv,string NameColumn,string IdColumn);
 public sealed record SubjectStateRequest(string Status);
 public sealed record MediaExportRequest(Guid[] Assets);
 public sealed record MatchUploadRequest(Guid AssetId);
+
+
+public sealed record MediaPageQuery(string? Collection=null,Guid? SubjectId=null,string? Status=null,Guid? After=null,int Limit=100,string? SubjectSearch=null,Guid? AssetId=null)
+{
+    public void Validate()
+    {
+        if(Limit<1||Limit>200)throw new ArgumentException("Choose a page size between 1 and 200.");
+        if((Collection?.Length??0)>100||(SubjectSearch?.Length??0)>200)throw new ArgumentException("Filter is too long.");
+        if(Status is not null)MediaProductionRules.ValidateState(Status);
+    }
+}

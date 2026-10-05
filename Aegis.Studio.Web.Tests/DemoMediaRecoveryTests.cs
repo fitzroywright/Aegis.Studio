@@ -43,7 +43,7 @@ public sealed class DemoMediaRecoveryTests
             using(var tx=connection.BeginTransaction()) {Assert.Equal(id,Add(tx,requestedId,true));tx.Commit();}
             Assert.Throws<StorageException>(()=>store.Open(job,id,out _));
 
-            Guid Add(NpgsqlTransaction tx,Guid requested,bool repairOnly)=>(Guid)add.Invoke(null,[connection,tx,versions,job,"demo-1-0",requested,1,0,null,"staff",repairOnly,null])!;
+            Guid Add(NpgsqlTransaction tx,Guid requested,bool repairOnly)=>(Guid)add.Invoke(null,[connection,tx,versions,job,"demo-1-0",requested,1,0,null,"staff",repairOnly,null,null])!;
         }
         finally
         {

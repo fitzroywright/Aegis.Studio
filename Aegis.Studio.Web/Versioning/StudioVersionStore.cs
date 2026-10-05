@@ -12,11 +12,12 @@ public sealed class StudioVersionStore
 
     public StudioVersionStore(StudioDatabase database, IFileStorage storage)
     {
+        StudioVersionSchema.EnsureCreated(database);
         this.database = database;
         this.storage = new PrefixedFileStorage(
             storage ?? throw new ArgumentNullException(nameof(storage)),
             "VersionStore");
-        StudioVersionSchema.EnsureCreated(database);
+
     }
 
     public IReadOnlyList<StudioAssetVersion> GetHistory(Guid jobId, string assetKey)
@@ -48,6 +49,12 @@ public sealed class StudioVersionStore
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
         StudioAssetVersion value = Add(connection, transaction, jobId, assetKey, fileName, contentType, source, createdBy, note, sourceVersionId);
+        // Public version uploads also register their gallery asset atomically.
+        if(!value.AssetKey.StartsWith("unmatched/",StringComparison.Ordinal))
+        {
+            using var gallery=new NpgsqlCommand("insert into studio_media_galleries(id) values($1) on conflict do nothing",connection,transaction);gallery.Parameters.AddWithValue(jobId);gallery.ExecuteNonQuery();
+            using var asset=new NpgsqlCommand("insert into studio_media_assets(id,job_id,gallery_id,asset_key) values(md5($1::text||':'||$2)::uuid,$1,$1,$2) on conflict(job_id,asset_key) do nothing",connection,transaction);asset.Parameters.AddWithValue(jobId);asset.Parameters.AddWithValue(value.AssetKey);asset.ExecuteNonQuery();
+        }
         transaction.Commit();
         return value;
     }
@@ -72,6 +79,13 @@ public sealed class StudioVersionStore
                 ["AssetKey"] = key,
                 ["VersionId"] = id.ToString("D")
             })).GetAwaiter().GetResult();
+        // A provider write and SQL commit are separate. Verify readable bytes before publishing metadata.
+        using (Stream verified = storage.OpenReadAsync(stored).GetAwaiter().GetResult())
+        {
+            string actual = Convert.ToHexString(SHA256.HashData(verified));
+            if (!actual.Equals(storedFile.Sha256, StringComparison.OrdinalIgnoreCase))
+                throw new StorageException("STORAGE-INTEGRITY-001", "Stored upload verification failed.");
+        }
         long size = storedFile.Length;
         string hash = storedFile.Sha256;
 
@@ -154,4 +168,5 @@ public sealed class StudioVersionStore
 }
 
 public sealed record StudioAssetVersion(Guid Id, Guid JobId, string AssetKey, int VersionNumber, string FileName, string ContentType, long SizeBytes, string Sha256, string StoredPath, string CreatedBy, DateTimeOffset CreatedAtUtc, Guid? SourceVersionId, string? Note);
+
 

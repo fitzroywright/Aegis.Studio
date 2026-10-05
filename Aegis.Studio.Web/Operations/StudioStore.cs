@@ -71,24 +71,37 @@ public sealed class StudioStore
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id) from studio_jobs where id = $1";
+        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id) from studio_jobs where id = $1";
         command.Parameters.AddWithValue(id);
         using NpgsqlDataReader reader = command.ExecuteReader();
         return reader.Read() ? ReadJob(reader) : null;
     }
 
-    public IReadOnlyList<StudioJob> GetJobs()
+    public IReadOnlyList<StudioJob> GetJobs(Guid[]? allowedIds=null)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id) from studio_jobs order by created_at_utc desc";
+        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id) from studio_jobs where ($1::uuid[] is null or id=any($1)) order by created_at_utc desc";
+        command.Parameters.AddWithValue((object?)allowedIds??DBNull.Value);
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<StudioJob> values = [];
         while (reader.Read())
         {
-            values.Add(ReadJob(reader));
+            values.Add(ReadJob(reader,readFinancials:false));
         }
-        return values;
+        reader.Close();
+        var finances=new Dictionary<Guid,List<StudioFinancialEvent>>();var links=new Dictionary<Guid,List<Guid>>();
+        using(var events=new NpgsqlCommand("select job_id,id,kind,amount,note,created_at_utc,payment_method,recorded_by from studio_financial_events where job_id=any($1) order by created_at_utc",connection))
+        {
+            events.Parameters.AddWithValue(values.Select(j=>j.Id).ToArray());using var rows=events.ExecuteReader();
+            while(rows.Read()){Guid id=rows.GetGuid(0);if(!finances.TryGetValue(id,out var list))finances[id]=list=[];list.Add(new(rows.GetGuid(1),rows.GetString(2),rows.GetDecimal(3),rows.IsDBNull(4)?null:rows.GetString(4),rows.GetFieldValue<DateTimeOffset>(5),rows.IsDBNull(6)?null:rows.GetString(6),rows.IsDBNull(7)?null:rows.GetString(7)));}
+        }
+        using(var participation=new NpgsqlCommand("select job_id,workspace_id from studio_job_workspace_links where job_id=any($1)",connection))
+        {
+            participation.Parameters.AddWithValue(values.Select(j=>j.Id).ToArray());using var rows=participation.ExecuteReader();
+            while(rows.Read()){Guid id=rows.GetGuid(0);if(!links.TryGetValue(id,out var list))links[id]=list=[];list.Add(rows.GetGuid(1));}
+        }
+        return values.Select(j=>j with{FinancialEvents=finances.GetValueOrDefault(j.Id,[]),ParticipatingWorkspaceIds=links.GetValueOrDefault(j.Id,[])}).ToArray();
     }
 
     public StudioConversation ReceiveInteraction(IncomingInteractionRequest request)
@@ -252,7 +265,7 @@ public sealed class StudioStore
         return GetJob(id)!;
     }
 
-    public StudioJob AddFinancialEvent(Guid id, AddFinancialEventRequest request)
+    public StudioJob AddFinancialEvent(Guid id, AddFinancialEventRequest request,string? actor=null,Guid? eventId=null)
     {
         if (GetJob(id) is null)
         {
@@ -260,13 +273,15 @@ public sealed class StudioStore
         }
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "insert into studio_financial_events(id, job_id, kind, amount, note, created_at_utc) values ($1,$2,$3,$4,$5,$6)";
-        command.Parameters.AddWithValue(Guid.NewGuid());
+        command.CommandText = "insert into studio_financial_events(id, job_id, kind, amount, note, created_at_utc,payment_method,recorded_by) values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict(id) do nothing";
+        command.Parameters.AddWithValue(eventId??Guid.NewGuid());
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(request.Kind.Trim());
         command.Parameters.AddWithValue(request.Amount);
         command.Parameters.AddWithValue((object?)request.Note?.Trim() ?? DBNull.Value);
         command.Parameters.AddWithValue(DateTimeOffset.UtcNow);
+        command.Parameters.AddWithValue((object?)request.PaymentMethod??DBNull.Value);
+        command.Parameters.AddWithValue((object?)actor??DBNull.Value);
         command.ExecuteNonQuery();
         return GetJob(id)!;
     }
@@ -375,23 +390,23 @@ public sealed class StudioStore
         return values;
     }
 
-    private StudioJob ReadJob(NpgsqlDataReader reader)
+    private StudioJob ReadJob(NpgsqlDataReader reader,bool readFinancials=true)
     {
         Guid id = reader.GetGuid(0);
-        return new StudioJob(id, reader.GetGuid(1), reader.GetGuid(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.IsDBNull(6) ? null : DateOnly.FromDateTime(reader.GetDateTime(6)), reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? null : reader.GetString(8), GetFinancialEvents(id), reader.IsDBNull(9)?null:reader.GetGuid(9), reader.IsDBNull(10)?null:reader.GetString(10));
+        return new StudioJob(id, reader.GetGuid(1), reader.GetGuid(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.IsDBNull(6) ? null : DateOnly.FromDateTime(reader.GetDateTime(6)), reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? null : reader.GetString(8), readFinancials?GetFinancialEvents(id):[], reader.IsDBNull(9)?null:reader.GetGuid(9), reader.IsDBNull(10)?null:reader.GetString(10),reader.FieldCount>11?reader.GetFieldValue<Guid[]>(11):null);
     }
 
     private List<StudioFinancialEvent> GetFinancialEvents(Guid jobId)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id, kind, amount, note, created_at_utc from studio_financial_events where job_id=$1 order by created_at_utc";
+        command.CommandText = "select id, kind, amount, note, created_at_utc,payment_method,recorded_by from studio_financial_events where job_id=$1 order by created_at_utc";
         command.Parameters.AddWithValue(jobId);
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<StudioFinancialEvent> values = [];
         while (reader.Read())
         {
-            values.Add(new StudioFinancialEvent(reader.GetGuid(0), reader.GetString(1), reader.GetDecimal(2), reader.IsDBNull(3) ? null : reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4)));
+            values.Add(new StudioFinancialEvent(reader.GetGuid(0), reader.GetString(1), reader.GetDecimal(2), reader.IsDBNull(3) ? null : reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4),reader.IsDBNull(5)?null:reader.GetString(5),reader.IsDBNull(6)?null:reader.GetString(6)));
         }
         return values;
     }
@@ -436,13 +451,14 @@ public sealed class StudioStore
 public sealed record StudioWorkspace(Guid Id, string Name, string Address, int OpenCount);
 public sealed record StudioConversation(Guid Id, Guid WorkspaceId, string Subject, string ContactName, string ContactAddress, string Channel, bool IsClosed, Guid? JobId, List<StudioMessage> Messages, string? ExternalThreadId = null);
 public sealed record StudioMessage(Guid Id, string Author, string Visibility, string Body, DateTimeOffset CreatedAt, string? ExternalMessageId = null, string? AuthorUserName = null);
-public sealed record StudioJob(Guid Id, Guid WorkspaceId, Guid ConversationId, string Title, string ClientName, string Status, DateOnly? EventDate, DateTimeOffset CreatedAt, string? AssignedTo = null, List<StudioFinancialEvent>? FinancialEvents = null, Guid? ClientId = null, string? LinkedClientName = null);
-public sealed record StudioFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt);
+public sealed record StudioJob(Guid Id, Guid WorkspaceId, Guid ConversationId, string Title, string ClientName, string Status, DateOnly? EventDate, DateTimeOffset CreatedAt, string? AssignedTo = null, List<StudioFinancialEvent>? FinancialEvents = null, Guid? ClientId = null, string? LinkedClientName = null,IReadOnlyList<Guid>? ParticipatingWorkspaceIds=null);
+public sealed record StudioFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt,string? PaymentMethod=null,string? RecordedBy=null);
 public sealed record EmailIngestResult(StudioConversation Conversation, bool CreatedConversation, bool WasDuplicate);
 public sealed record IncomingInteractionRequest(Guid? WorkspaceId, string? Destination, string ContactName, string ContactAddress, string Subject, string Body, string? Channel);
 public sealed record AddMessageRequest(string Body, bool IsInternal, string? SendingIdentity = null);
 public sealed record CreateJobRequest(string Title, DateOnly? EventDate);
 public sealed record UpdateJobRequest(string? Status, string? AssignedTo, DateOnly? EventDate);
 public sealed record PipelineJobTransitionRequest(string? Status, Guid? WorkspaceId, string? Reason);
-public sealed record AddFinancialEventRequest(string Kind, decimal Amount, string? Note);
+public sealed record AddFinancialEventRequest(string Kind, decimal Amount, string? Note,string? PaymentMethod=null);
 public sealed record AccountsSummary(decimal RecordedAmount, int JobsWithFinancialActivity, int TotalJobs);
+

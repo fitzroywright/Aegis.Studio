@@ -30,6 +30,7 @@ public static class StudioOperationsEnhancements
                 create index if not exists ix_studio_message_attachment_links_message on studio_message_attachment_links(message_id);
                 create index if not exists ix_studio_message_attachment_links_job on studio_message_attachment_links(job_id);
                 """;
+            command.CommandText += JobWorkspaceParticipation.Schema;
             command.ExecuteNonQuery();
         }
 
@@ -86,6 +87,8 @@ public static class StudioOperationsEnhancements
                 return Results.Forbid();
             StudioJob? job = studio.GetJob(jobId);
             if (job is null) return Results.NotFound();
+            if(job.Status is not ("Scheduled" or "Confirmed" or "Arrived"))return Results.BadRequest(new{error="Only a booked session can be checked in. Open the job for its current next action."});
+            if(job.Status=="Arrived")return Results.Ok(job);
             StudioJob updated = studio.UpdateJob(jobId, new UpdateJobRequest("Arrived", null, null));
             using NpgsqlConnection connection = database.OpenConnection();
             using NpgsqlCommand audit = connection.CreateCommand();
@@ -296,3 +299,4 @@ public static class StudioOperationsEnhancements
 public sealed record FrontDeskCreateJobRequest(Guid WorkspaceId,string Title,DateOnly? EventDate);
 public sealed record FrontDeskCommunicationRequest(string? Kind,string Body,string? EscalationTarget=null);
 public sealed record MessageAttachmentLinkRequest(Guid MessageId,string? MessageKind,Guid? JobId);
+

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Common.Storage;
+using Npgsql;
 
 namespace Aegis.Studio.Web.Versioning;
 
@@ -28,6 +29,39 @@ public static class StudioVersionEndpoints
             {
                 return Results.NotFound();
             }
+        }).RequireAuthorization();
+
+        app.MapGet("/api/jobs/{jobId:guid}/versions/by-id/{versionId:guid}/preview", async
+            (Guid jobId,Guid versionId,string? size,HttpContext context,ClaimsPrincipal user,StudioDatabase db,JobAccessService access,IFileStorage storage) =>
+        {
+            if(!access.HasPermission(user,jobId,"ViewAttachments"))return Results.Forbid();
+            if(size is not null && size is not "thumbnail" and not "preview")return Results.BadRequest(new{error="Choose thumbnail or preview."});
+            using var c=db.OpenConnection();
+            using var cmd=new NpgsqlCommand("select d.status,d.thumbnail_key,d.preview_key from studio_asset_versions v left join studio_media_derivatives d on d.version_id=v.id where v.job_id=$1 and v.id=$2",c);
+            cmd.Parameters.AddWithValue(jobId);cmd.Parameters.AddWithValue(versionId);
+            string state;string? key;
+            using(var r=await cmd.ExecuteReaderAsync(context.RequestAborted))
+            {if(!await r.ReadAsync(context.RequestAborted))return Results.NotFound();state=r.IsDBNull(0)?"Pending":r.GetString(0);int index=size=="thumbnail"?1:2;key=r.IsDBNull(index)?null:r.GetString(index);}
+            context.Response.Headers.CacheControl="private, no-cache";
+            if(state!="Ready"||key is null)
+            {context.Response.Headers.RetryAfter="10";return Results.Json(new{error="Preview not available. Download the original or retry the preview.",state},statusCode:state=="Unsupported"?415:503);}
+            try{return Results.File(await storage.OpenReadAsync(key,context.RequestAborted),"image/jpeg",enableRangeProcessing:true);}
+            catch(StorageException e) when(e.Code=="STORAGE-MISSING-001")
+            {
+                using var retry=new NpgsqlCommand("update studio_media_derivatives set status='Pending',next_attempt_at=now() where version_id=$1",c);retry.Parameters.AddWithValue(versionId);await retry.ExecuteNonQueryAsync(context.RequestAborted);
+                return Results.Json(new{error="Preview file unavailable; regeneration queued."},statusCode:503);
+            }
+        }).RequireAuthorization();
+        app.MapPost("/api/jobs/{jobId:guid}/versions/by-id/{versionId:guid}/preview/retry", async
+            (Guid jobId,Guid versionId,ClaimsPrincipal user,StudioDatabase db,JobAccessService access,CancellationToken token) =>
+        {
+            if(!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
+            using var c=db.OpenConnection();using var cmd=new NpgsqlCommand("""
+                insert into studio_media_derivatives(version_id) select id from studio_asset_versions where job_id=$1 and id=$2
+                on conflict(version_id) do update set status='Pending',attempts=0,next_attempt_at=now(),last_error=null
+                where studio_media_derivatives.status<>'Processing' or studio_media_derivatives.next_attempt_at<now()
+                """,c);cmd.Parameters.AddWithValue(jobId);cmd.Parameters.AddWithValue(versionId);
+            await cmd.ExecuteNonQueryAsync(token);return Results.Accepted();
         }).RequireAuthorization();
 
         app.MapPost("/api/jobs/{jobId:guid}/versions/{assetKey}", async (Guid jobId, string assetKey, HttpRequest request, ClaimsPrincipal user, StudioDatabase db, JobAccessService access, IFileStorage storage) =>

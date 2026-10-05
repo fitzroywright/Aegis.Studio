@@ -195,6 +195,8 @@ builder.Services.AddHostedService<OutboundEmailWorker>();
 builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddHostedService<ConfigurationContractPublisher>();
 builder.Services.AddSingleton<IClientGalleryPublisher,ManifestClientGalleryPublisher>();
+builder.Services.AddHostedService<Aegis.Studio.Web.Media.MediaDerivativeWorker>();
+builder.Services.AddSingleton<Aegis.Studio.Web.WorkDay.IWorkDaySchedulingService>(sp=>new Aegis.Studio.Web.WorkDay.WorkDaySchedulingService(sp.GetRequiredService<StudioDatabase>(),new PhotographerStore(sp.GetRequiredService<StudioDatabase>())));
 
 WebApplication app = builder.Build();
 app.MapDiagnosticLevelRuntime();
@@ -252,12 +254,18 @@ new WorkspaceJobStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureS
 StudioVersionSchema.EnsureCreated(app.Services.GetRequiredService<StudioDatabase>());
 app.MapWorkspaceJobs();
 app.MapMediaProduction();
+app.MapMediaBulkSelection();
+app.MapProductionItems();
+app.MapProductionOrders();
 app.MapJobLifecycle();
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
 app.MapFrontDeskBookingRequests();
 app.MapStudioClients();
+app.MapStudioFulfillment();
 app.MapStudioQuotes();
 app.MapJobAccess();
+app.MapStudioServiceStatus();
+app.MapJobWorkspaceParticipation();
 app.MapAegisHealth(
     "Aegis.Studio",
     async (services, ct) =>
@@ -506,13 +514,13 @@ app.MapPost("/api/conversations/{id:guid}/jobs", (Guid id, CreateJobRequest requ
 });
 app.MapGet("/api/jobs", (ClaimsPrincipal user, StudioStore store, JobAccessService access) =>
 {
-    HashSet<Guid> allowed = access.GetAccessibleJobIds(user).ToHashSet();
-    return Results.Ok(store.GetJobs().Where(x => allowed.Contains(x.Id)));
+    var permissions=access.GetPermissionMap(user);
+    return Results.Ok(store.GetJobs(permissions.Where(p=>p.Value.AccessJob).Select(p=>p.Key).ToArray()).Select(j=>permissions[j.Id].ViewFinancials?j:j with{FinancialEvents=[]}));
 });
 app.MapGet("/api/jobs/{id:guid}", (Guid id, ClaimsPrincipal user, StudioStore store, JobAccessService access) =>
 {
     if (!access.HasPermission(user, id, "ViewJob")) return Results.Forbid();
-    return store.GetJob(id) is StudioJob job ? Results.Ok(job) : Results.NotFound();
+    return store.GetJob(id) is StudioJob job ? Results.Ok(access.HasPermission(user,id,"ViewFinancials")?job:job with{FinancialEvents=[]}) : Results.NotFound();
 });
 app.MapGet("/api/jobs/{id:guid}/timeline", (Guid id, int? count, ClaimsPrincipal user, StudioStore store, JobAccessService access, WorkspaceTimelineService timeline) =>
 {

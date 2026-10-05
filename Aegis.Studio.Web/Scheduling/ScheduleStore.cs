@@ -111,6 +111,8 @@ public sealed class ScheduleStore
     public ScheduleEntry Update(Guid id, ScheduleEntryRequest request)
     {
         ValidateEntry(request);
+        if(ChangeLinkedShoot(id,request.ResourceIds??[],request.StartsAtUtc,request.EndsAtUtc,request.Location,request.Notes,request.JobId,status:request.Status??"Scheduled"))
+            return GetEntries(request.StartsAtUtc.AddMinutes(-1),request.EndsAtUtc.AddMinutes(1)).Single(e=>e.Id==id);
         IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, id);
         if (conflicts.Count > 0 && !request.AllowConflicts) throw new ScheduleConflictException(conflicts);
         using NpgsqlConnection connection = database.OpenConnection();
@@ -203,6 +205,8 @@ public sealed class ScheduleStore
         ScheduleEntry current=GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10))
             .FirstOrDefault(x=>x.Id==entryId)??throw new KeyNotFoundException("Schedule entry was not found.");
         Guid[] next=(newResourceIds??[]).Distinct().ToArray();
+        if(ChangeLinkedShoot(entryId,next,current.StartsAtUtc,current.EndsAtUtc,current.Location,current.Notes,current.JobId,changedBy))
+            return GetAssignmentHistory(entryId,1).Single();
         IReadOnlyList<ScheduleConflict> conflicts=FindConflicts(current.StartsAtUtc,current.EndsAtUtc,next,entryId);
         if(conflicts.Count>0) throw new ScheduleConflictException(conflicts);
 
@@ -234,6 +238,23 @@ public sealed class ScheduleStore
         using NpgsqlDataReader r=q.ExecuteReader();List<ScheduleAssignmentChange> values=[];
         while(r.Read())values.Add(new(r.GetGuid(0),r.GetGuid(1),r.IsDBNull(2)?null:r.GetGuid(2),r.GetString(3),r.GetFieldValue<DateTimeOffset>(4),r.GetFieldValue<Guid[]>(5),r.GetFieldValue<Guid[]>(6),r.IsDBNull(7)?null:r.GetString(7)));
         return values;
+    }
+
+    private bool ChangeLinkedShoot(Guid entry,IReadOnlyList<Guid> resources,DateTimeOffset start,DateTimeOffset end,string? location,string? notes,Guid? jobId,string actor="Studio scheduling",string status="Scheduled")
+    {
+        using var c=database.OpenConnection();using var cmd=new NpgsqlCommand("select id,job_id,photographer_user_name,assistant_user_name,equipment_notes from studio_shoot_sessions where schedule_entry_id=$1 and status<>'Cancelled'",c);cmd.Parameters.AddWithValue(entry);
+        Guid id,job;string photographer;string? assistant,equipment;
+        using(var r=cmd.ExecuteReader()){if(!r.Read())return false;id=r.GetGuid(0);job=r.GetGuid(1);photographer=r.GetString(2);assistant=r.IsDBNull(3)?null:r.GetString(3);equipment=r.IsDBNull(4)?null:r.GetString(4);}
+        if(jobId!=job)throw new InvalidOperationException("A linked shoot cannot be moved to another job.");
+        var store=new Aegis.Studio.Web.Production.PhotographerStore(database);
+        if(status=="Cancelled"){new Aegis.Studio.Web.WorkDay.WorkDaySchedulingService(database,store).Cancel(job,id,actor);return true;}
+        if(status!="Scheduled")throw new InvalidOperationException("Use Scheduled or Cancelled for an unstarted photography assignment; field completion comes from WorkDay.");
+        var people=store.GetByScheduleResourceIds(resources).Where(p=>p.IsActive).ToArray();
+        var primary=people.FirstOrDefault(p=>p.UserName.Equals(photographer,StringComparison.OrdinalIgnoreCase))??people.FirstOrDefault()??throw new InvalidOperationException("A photography assignment requires an active photographer.");
+        var secondary=people.FirstOrDefault(p=>!p.UserName.Equals(primary.UserName,StringComparison.OrdinalIgnoreCase)&&p.UserName.Equals(assistant,StringComparison.OrdinalIgnoreCase))??people.FirstOrDefault(p=>!p.UserName.Equals(primary.UserName,StringComparison.OrdinalIgnoreCase));
+        new Aegis.Studio.Web.WorkDay.WorkDaySchedulingService(database,store).Reschedule(job,id,
+            new(primary.UserName,secondary?.UserName,start,end,location,notes,equipment,resources),actor);
+        return true;
     }
 
     private static void ValidateEntry(ScheduleEntryRequest request)

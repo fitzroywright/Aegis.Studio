@@ -98,7 +98,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         studioRememberPeople(people);
         tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(studioFirstName(m))}">${esc(studioFirstName(m).slice(0,1))}</span>`).join('');
         if (version !== revision) return;
-        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId).map(job => `<button class="conversation-card hierarchy-row compact-job-row" data-search data-job="${job.id}">
+        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId||(x.participatingWorkspaceIds||[]).includes(workspaceId)).map(job => `<button class="conversation-card hierarchy-row compact-job-row" data-search data-job="${job.id}">
             <span class="job-row-heading"><strong>${esc(job.title)}</strong></span>
             <span class="job-row-client">${esc(job.clientName || job.linkedClientName || 'Client not linked')}</span>
             <span class="job-row-meta">

@@ -1,3 +1,4 @@
+using Npgsql;
 using System.Security.Claims;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Messaging;
@@ -114,6 +115,38 @@ public static class OperationalWorkEndpoints
             catch(Exception exception){ return Results.BadRequest(new { error=exception.Message }); }
         }).RequireAuthorization();
 
+        app.MapGet("/api/jobs/{jobId:guid}/scheduling/availability",(Guid jobId,Guid? shootId,DateTimeOffset from,DateTimeOffset to,ClaimsPrincipal user,StudioDatabase db,JobAccessService access)=>
+        {
+            if(!access.HasPermission(user,jobId,"ManageSchedule")&&!access.HasPermission(user,jobId,"AssignStaff"))return Results.Forbid();
+            if(to<=from||(to-from).TotalDays>7)return Results.BadRequest(new{error="Choose a scheduling window of up to seven days."});
+            using var c=db.OpenConnection();using var cmd=new NpgsqlCommand("""
+                select p.user_name,p.display_name,p.schedule_resource_id,
+                  not exists(select 1 from studio_photographer_availability a where lower(a.user_name)=lower(p.user_name) and a.availability_type in ('Unavailable','Leave') and a.starts_at_utc<$2 and a.ends_at_utc>$1)
+                  and not exists(select 1 from studio_schedule_entry_resources er join studio_schedule_entries e on e.id=er.entry_id where er.resource_id=p.schedule_resource_id and e.status<>'Cancelled' and e.starts_at_utc<$2 and e.ends_at_utc>$1
+                    and not exists(select 1 from studio_shoot_sessions s where s.schedule_entry_id=e.id and s.id=$3 and s.job_id=$4))
+                from studio_photographers p where p.is_active order by p.display_name
+                """,c);
+            foreach(var value in new object?[]{from.ToUniversalTime(),to.ToUniversalTime(),shootId,jobId})cmd.Parameters.AddWithValue(value??DBNull.Value);
+            using var r=cmd.ExecuteReader();var rows=new List<object>();while(r.Read())rows.Add(new{userName=r.GetString(0),displayName=r.GetString(1),resourceId=r.GetGuid(2),available=r.GetBoolean(3)});return Results.Ok(rows);
+        }).RequireAuthorization();
+
+        app.MapPut("/api/jobs/{jobId:guid}/operations/shoots/{shootId:guid}/schedule",(Guid jobId,Guid shootId,IntegratedShootRequest request,ClaimsPrincipal user,
+            Aegis.Studio.Web.WorkDay.IWorkDaySchedulingService scheduling,JobAccessService access,JobEventNotifier notifier)=>
+        {
+            if(!access.HasPermission(user,jobId,"ManageSchedule")&&!access.HasPermission(user,jobId,"AssignStaff"))return Results.Forbid();
+            try
+            {
+                var shoot=scheduling.Reschedule(jobId,shootId,request,UserName(user));
+                access.EnsureAssignedMember(jobId,shoot.PhotographerUserName);
+                if(!string.IsNullOrWhiteSpace(shoot.AssistantUserName))access.EnsureAssignedMember(jobId,shoot.AssistantUserName);
+                try{notifier.Publish(jobId,"JobAssigned","Shoot rescheduled",$"{shoot.PhotographerUserName}, {shoot.CallTimeUtc:u}");}
+                catch(Exception notificationError){app.Logger.LogWarning(notificationError,"Shoot {ShootId} rescheduled; optional notification failed",shootId);}
+                return Results.Ok(shoot);
+            }
+            catch(KeyNotFoundException){return Results.NotFound();}
+            catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
+        }).RequireAuthorization();
+
         app.MapPut("/api/operations/shoots/{id:guid}", (Guid id,ShootSessionUpdateRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,IConfiguration configuration,IWebHostEnvironment environment,JobEventNotifier notifier) =>
         {
             OperationalWorkStore store=new(database); ShootSession? current=store.GetShoots().FirstOrDefault(x=>x.Id==id); if(current is null) return Results.NotFound(); string currentUser=UserName(user); bool photographer=string.Equals(current.PhotographerUserName,currentUser,StringComparison.OrdinalIgnoreCase); if(!photographer&&!access.HasPermission(user,current.JobId,"ManageProduction")&&!access.HasPermission(user,current.JobId,"ManageSchedule")) return Results.Forbid();
@@ -170,3 +203,4 @@ public static class OperationalWorkEndpoints
 
     private static string UserName(ClaimsPrincipal user)=>user.FindFirst("login_name")?.Value??user.Identity?.Name??"Studio";
 }
+

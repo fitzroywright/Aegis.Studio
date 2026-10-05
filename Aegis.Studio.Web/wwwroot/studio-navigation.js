@@ -85,7 +85,7 @@
         const formatDay=value=>new Date(value).toLocaleDateString([],{month:'short',day:'numeric'});
         const imageForJob=jobId=>{
             const version=mediaByJob.get(String(jobId))?.thumbnailVersionId;
-            return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/content':'';
+            return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/preview?size=thumbnail':'';
         };
 
         const recentCards=mediaSnapshots.slice(0,4).map(({job,media})=>{
@@ -261,26 +261,20 @@
         genericView.classList.remove('hidden');
         genericView.innerHTML='<div class="mywork-loading">Loading workspaces…</div>';
 
-        const [workspaces,jobs]=await Promise.all([
-            json('/api/workspaces'),
-            json('/api/jobs')
-        ]);
-
-        const workspaceData=await Promise.all(workspaces.map(async workspace=>{
-            const workspaceJobs=jobs.filter(job=>String(job.workspaceId)===String(workspace.id));
-            const media=await Promise.all(workspaceJobs.map(async job=>({
-                job,
-                snapshot:await json('/api/jobs/'+job.id+'/media').catch(()=>({assets:[]}))
-            })));
+        const [workspaces,jobs,mediaSummary]=await Promise.all([json('/api/workspaces'),json('/api/jobs'),json('/api/production/media-summary')]);
+        const workspaceData=[];
+        // Announcement reads are bounded; galleries are represented by counts and three IDs.
+        for(const workspace of workspaces){
+            const workspaceJobs=jobs.filter(job=>String(job.workspaceId)===String(workspace.id)||(job.participatingWorkspaceIds||[]).includes(workspace.id));
+            const media=workspaceJobs.map(job=>{const rows=mediaSummary.filter(x=>x.jobId===job.id);return {job,snapshot:{totalAssets:rows.reduce((n,x)=>n+Number(x.assetCount),0),assets:[...new Set(rows.flatMap(x=>x.thumbnailVersionIds||[]))].map(versionId=>({versionId,contentType:'image/jpeg'}))}};});
             const announcements=await json('/api/workspaces/'+workspace.id+'/announcements').catch(()=>[]);
-            return {workspace,jobs:workspaceJobs,media,announcements};
-        }));
-
-        const photoCount=item=>item.media.reduce((sum,x)=>sum+(x.snapshot.assets?.length||0),0);
+            workspaceData.push({workspace,jobs:workspaceJobs,media,announcements});
+        }
+        const photoCount=item=>item.media.reduce((sum,x)=>sum+(x.snapshot.totalAssets||0),0);
         const latestJob=item=>[...item.jobs].sort((a,b)=>new Date(b.eventDate||b.createdAtUtc||b.createdAt||0)-new Date(a.eventDate||a.createdAtUtc||a.createdAt||0))[0];
         const thumbFor=(job,snapshot)=>{
             const asset=(snapshot.assets||[]).find(a=>String(a.contentType||'').startsWith('image/'))||(snapshot.assets||[])[0];
-            return asset?.versionId?'/api/jobs/'+job.id+'/versions/by-id/'+asset.versionId+'/content':'';
+            return asset?.versionId?'/api/jobs/'+job.id+'/versions/by-id/'+asset.versionId+'/preview?size=thumbnail':'';
         };
         const heroFor=item=>{
             for(const pair of item.media){
@@ -294,7 +288,7 @@
             for(const pair of item.media){
                 for(const asset of (pair.snapshot.assets||[])){
                     if(!asset.versionId)continue;
-                    values.push('/api/jobs/'+pair.job.id+'/versions/by-id/'+asset.versionId+'/content');
+                    values.push('/api/jobs/'+pair.job.id+'/versions/by-id/'+asset.versionId+'/preview?size=thumbnail');
                     if(values.length===3)return values;
                 }
             }
@@ -547,6 +541,7 @@
                             </div>
                         </section>
 
+                        <section class="admin-card" data-service-status><header class="admin-card-header"><h2>Service health</h2><button class="action" data-refresh-service-status>Refresh</button></header><div data-service-status-body>Loading…</div><button class="action" onclick="showPosCatalogManager()">Manage products</button><button class="action" data-service-audit>Recent audit</button></section>
                         <section class="admin-card admin-help-card">
                             <header class="admin-card-header"><div><h2>Administration</h2></div></header>
                             <p>Workspace access remains membership-based. Use reusable roles where possible and one-off permissions only when required.</p>
@@ -556,6 +551,13 @@
                 </div>
             </section>`;
 
+        const statusPanel=document.querySelector('[data-service-status]');
+        if(statusPanel){
+            const readStatus=async()=>{const body=statusPanel.querySelector('[data-service-status-body]');try{const s=await json('/api/admin/studio-status');body.innerHTML=`<p>Database: ${esc(s.database)}</p><p>Storage: ${esc(s.storage.provider)} · ${s.storage.available?'Available':'Unavailable'} · ${s.storage.writable?'Writable':'Read only'}</p><p>Previews: ${s.previews.queued} queued · ${s.previews.failed} retrying · ${s.previews.unsupported} unsupported</p><p>Messaging: ${s.messaging.queuedEmails} queued emails · ${s.messaging.failedNotifications} failed notifications</p><p>Gallery: ${s.galleryConfigured?'Configured':'Unconfigured'} · ${esc(s.diagnostics)}</p>`;}catch(e){body.textContent=e.message;}};
+            statusPanel.querySelector('[data-refresh-service-status]').onclick=readStatus;
+            statusPanel.querySelector('[data-service-audit]').onclick=async()=>{const dialog=studioDialog('Recent operational audit','<p>Loading…</p>');try{const rows=await json('/api/admin/operations/audit?count=100');dialog.querySelector('.studio-dialog-body').textContent=JSON.stringify(rows,null,2);}catch(e){dialog.querySelector('.studio-dialog-body').textContent=e.message;}};
+            readStatus();
+        }
         await hydrateWorkspaceManagers(manageable);
         await refreshWorkflowList();
         await renderGlobalRoleAdministration();

@@ -64,6 +64,7 @@ public static class DemoDataEndpoints
             report?.Invoke(new(2,"Checking storage",0,0,"Checking existing demo photographs without resetting job edits."));
             int restored=DemoDataExpansion.RepairMedia(connection,transaction,login,storage,report)
                 +DemoFullStudioData.RepairMedia(connection,transaction,login,storage,report);
+            DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
             report?.Invoke(new(99,"Committing repairs",0,0,"Saving repaired demo photo references."));
             transaction.Commit();
             return $"Full Studio demo verified. Restored {restored} missing seeded photo versions; existing work and edits have been preserved.";
@@ -91,10 +92,11 @@ public static class DemoDataEndpoints
         report?.Invoke(new(30, "Presentation records", 0, 0, "Linking wedding people, tasks and announcements."));
         bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
         bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage, report);
+        DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
         report?.Invoke(new(99, "Committing", 0, 0, "Saving the complete demo dataset."));
         transaction.Commit();
         return fullStudioExpanded
-            ? "Full Studio demo loaded: 27 interconnected jobs across 6 workspaces, including over 1,000 media assets across the flagship ID, graduation, wedding, school, corporate-headshot and commercial jobs, plus clients, bookings, schedules, photographers, availability, payments, production stages and history."
+            ? "Full Studio demo loaded: 27 interconnected jobs across 6 workspaces, including distinct real photographs, a 327-subject graduation roster, and connected ID, wedding, school, headshot and commercial jobs, plus clients, bookings, schedules, photographers, availability, payments, production stages and history."
             : presentationExpanded
                 ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see wedding media and linked workflow data."
                 : expanded

@@ -20,6 +20,17 @@ internal static class DemoDataExpansion
         return client;
     }
 
+    private static HttpResponseMessage DownloadDemoPhoto(string url)
+    {
+        for(int retry=0;;retry++)
+        {
+            var response=demoPhotoClient.GetAsync(url).GetAwaiter().GetResult();
+            if(retry>=4||((int)response.StatusCode!=429&&(int)response.StatusCode<500))return response;
+            TimeSpan wait=response.Headers.RetryAfter?.Delta??TimeSpan.FromSeconds(Math.Min(20,2*Math.Pow(2,retry)));
+            response.Dispose();Task.Delay(TimeSpan.FromSeconds(Math.Clamp(wait.TotalSeconds,1,30))).GetAwaiter().GetResult();
+        }
+    }
+
     private static readonly string[] weddingPhotoUrls =
     [
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bride_and_bridegroom.jpg",
@@ -28,7 +39,7 @@ internal static class DemoDataExpansion
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1293933).jpg",
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1294004).jpg"
     ];
-    private static readonly Dictionary<string,byte[]> weddingPhotoCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,byte[]> weddingPhotoCache = new(StringComparer.OrdinalIgnoreCase);
     // Curated real photographs only. Each file is CC0 or public domain on Wikimedia Commons.
     // Keep the Commons file URL in storage metadata so every seeded image retains provenance.
     private static readonly string[] realPhotoUrls =
@@ -124,7 +135,7 @@ internal static class DemoDataExpansion
                     Execute(connection,transaction,"insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by) values($1,$2,$3,$4,'Fictional demo subject',$5)",Id(25,number*10+subject),job,names[(index+subject)%names.Length],$"DEMO-{number}-{subject+1:00}",login);
             }
 
-            int assetCount=number==4?50:4;
+            int assetCount=number==4?5:4;
             for(int asset=0;asset<assetCount;asset++)
             {
                 report?.Invoke(new(10 + (int)(20 * (index + (double)asset / assetCount) / JobNumbers.Length), "Legacy photographs", asset, assetCount, $"Job {index+1}/{JobNumbers.Length}: downloading and storing photo {asset+1}/{assetCount}."));
@@ -169,7 +180,7 @@ internal static class DemoDataExpansion
                 }
             }
             string mediaMessage=number==4
-                ?"Demo gallery ready: fifty wedding photographs across Getting Ready, Ceremony, Portraits and Reception, linked to the people and groups in the People roster."
+                ?"Demo gallery ready: five distinct wedding photographs across Getting Ready, Ceremony, Portraits and Reception, linked to the people and groups in the People roster."
                 :"Demo gallery ready: four real public-domain photographs across Selects and Proofs, with two versions of the first image.";
             Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Studio','Internal',$3,now())",Id(28,number),Id(2,number),mediaMessage);
         }
@@ -232,7 +243,7 @@ internal static class DemoDataExpansion
             {
                 if(!weddingPhotoCache.TryGetValue(url,out bytes))
                 {
-                    using HttpResponseMessage response=demoPhotoClient.GetAsync(url).GetAwaiter().GetResult();
+                    using HttpResponseMessage response=DownloadDemoPhoto(url);
                     response.EnsureSuccessStatusCode();
                     byte[] sourceBytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
                     using var photograph=Image.Load(sourceBytes);
@@ -240,6 +251,7 @@ internal static class DemoDataExpansion
                     using var derivative=new MemoryStream();
                     photograph.SaveAsJpeg(derivative,new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality=85 });
                     bytes=derivative.ToArray();
+                    if(weddingPhotoCache.Count>=32)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
                     weddingPhotoCache[url]=bytes;
                 }
                 selectedUrl=url;
@@ -271,9 +283,14 @@ internal static class DemoDataExpansion
                 ["VersionId"]=id.ToString("D"),
                 ["Demo"]="true",
                 ["DemoSource"]="Wikimedia Commons CC0",
-                ["DemoSourceUrl"]=selectedUrl??string.Empty
+                ["DemoSourceUrl"]=selectedUrl??string.Empty,
+                ["DemoSourcePage"]=DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==selectedUrl)?.Page??selectedUrl??string.Empty,
+                ["DemoSourceLicense"]=DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==selectedUrl)?.License??"CC0/Public Domain"
             })).GetAwaiter().GetResult();
 
+        using(var verified=storage.OpenReadAsync(stored).GetAwaiter().GetResult())
+            if(!Convert.ToHexString(SHA256.HashData(verified)).Equals(storedFile.Sha256,StringComparison.OrdinalIgnoreCase))
+                throw new StorageException("STORAGE-INTEGRITY-001","Seeded photo verification failed.");
         const string sql="""
             insert into studio_asset_versions
             (id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note)
@@ -302,21 +319,41 @@ internal static class DemoDataExpansion
         return result;
     }
 
-    internal static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login,bool repairOnly=false,Action? restored=null)
+    internal static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login,bool repairOnly=false,Action? restored=null,string? sourceUrl=null)
     {
         Guid? reusable=ReusableVersion(connection,transaction,storage,job,key,version,ref id,repairOnly);
         if(reusable.HasValue)return reusable.Value;
+        if(repairOnly)
+        {
+            using var lookup=new NpgsqlCommand("select stored_path from studio_asset_versions where id=$1",connection,transaction);lookup.Parameters.AddWithValue(id);
+            if(lookup.ExecuteScalar() is string previousPath)
+            {
+                var metadata=storage.GetMetadataAsync(previousPath).GetAwaiter().GetResult();
+                if(metadata?.Metadata.TryGetValue("DemoSourceUrl",out string? previousUrl)==true&&!string.IsNullOrWhiteSpace(previousUrl))sourceUrl=previousUrl;
+            }
+        }
         byte[]? bytes=null;
         string? selectedUrl=null;
-        Exception? lastError=null;
-        for(int attempt=0;attempt<realPhotoUrls.Length;attempt++)
+        string orphan=$"{job:N}/demo/{id:N}.jpg";
+        var orphanInfo=storage.GetMetadataAsync(orphan).GetAwaiter().GetResult();
+        if(orphanInfo?.Metadata.GetValueOrDefault("Demo")=="true"&&orphanInfo.Metadata.GetValueOrDefault("AssetKey")==key&&orphanInfo.Length<=100_000_000)
         {
-            string url=realPhotoUrls[(variant+attempt)%realPhotoUrls.Length];
+            string? oldUrl=orphanInfo.Metadata.GetValueOrDefault("DemoSourceUrl");
+            if(!string.IsNullOrWhiteSpace(oldUrl)&&(sourceUrl is null||oldUrl==sourceUrl))
+            {
+                try{using var previous=storage.OpenReadAsync(orphan).GetAwaiter().GetResult();using var restoredBytes=new MemoryStream();previous.CopyTo(restoredBytes);var candidate=restoredBytes.ToArray();if(Convert.ToHexString(SHA256.HashData(candidate)).Equals(orphanInfo.Sha256,StringComparison.OrdinalIgnoreCase)){bytes=candidate;selectedUrl=oldUrl;}}
+                catch(StorageException){/* Missing bytes with surviving metadata are redownloaded below. */}
+            }
+        }
+        Exception? lastError=null;
+        for(int attempt=0;bytes is null&&attempt<(sourceUrl is null?realPhotoUrls.Length:1);attempt++)
+        {
+            string url=sourceUrl??realPhotoUrls[(variant+attempt)%realPhotoUrls.Length];
             try
             {
                 if(!weddingPhotoCache.TryGetValue(url,out bytes))
                 {
-                    using HttpResponseMessage response=demoPhotoClient.GetAsync(url).GetAwaiter().GetResult();
+                    using HttpResponseMessage response=DownloadDemoPhoto(url);
                     response.EnsureSuccessStatusCode();
                     byte[] sourceBytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
                     using var photograph=Image.Load(sourceBytes);
@@ -324,6 +361,7 @@ internal static class DemoDataExpansion
                     using var derivative=new MemoryStream();
                     photograph.SaveAsJpeg(derivative,new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality=85 });
                     bytes=derivative.ToArray();
+                    if(weddingPhotoCache.Count>=32)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
                     weddingPhotoCache[url]=bytes;
                 }
                 selectedUrl=url;
@@ -357,9 +395,14 @@ internal static class DemoDataExpansion
                 ["VersionId"]=id.ToString("D"),
                 ["Demo"]="true",
                 ["DemoSource"]="Wikimedia Commons - CC0/Public Domain",
-                ["DemoSourceUrl"]=selectedUrl??string.Empty
+                ["DemoSourceUrl"]=selectedUrl??string.Empty,
+                ["DemoSourcePage"]=DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==selectedUrl)?.Page??selectedUrl??string.Empty,
+                ["DemoSourceLicense"]=DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==selectedUrl)?.License??"CC0/Public Domain"
             })).GetAwaiter().GetResult();
 
+        using(var verified=storage.OpenReadAsync(stored).GetAwaiter().GetResult())
+            if(!Convert.ToHexString(SHA256.HashData(verified)).Equals(storedFile.Sha256,StringComparison.OrdinalIgnoreCase))
+                throw new StorageException("STORAGE-INTEGRITY-001","Seeded photo verification failed.");
         const string sql="""
             insert into studio_asset_versions
             (id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note)

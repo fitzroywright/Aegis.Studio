@@ -85,6 +85,8 @@ public sealed class StudioDatabase
                 note text null,
                 created_at_utc timestamptz not null
             );
+            alter table studio_financial_events add column if not exists payment_method text null;
+            alter table studio_financial_events add column if not exists recorded_by text null;
             create index if not exists ix_studio_financial_events_job on studio_financial_events(job_id, created_at_utc);
 
             create table if not exists studio_bookings
@@ -226,6 +228,7 @@ public sealed class StudioDatabase
                 financial_event_posted boolean not null,
                 client_request_id uuid null
             );
+            alter table studio_pos_sales add column if not exists applies_to_balance boolean not null default false;
             create unique index if not exists ux_studio_pos_sales_client_request on studio_pos_sales(reference_type, reference_id, client_request_id) where client_request_id is not null;
             create index if not exists ix_studio_pos_sales_reference on studio_pos_sales(reference_type, reference_id, created_at_utc desc);
 
@@ -327,3 +330,4 @@ public sealed class StudioDatabase
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }
+
