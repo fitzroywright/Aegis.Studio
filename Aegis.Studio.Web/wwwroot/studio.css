@@ -2357,3 +2357,268 @@ dialog::backdrop {
 }
 
 }
+
+
+/* Reference-fidelity pass: sharpen hierarchy and preserve desktop composition. */
+html {
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility
+}
+body {
+  background:#f4f6f8;
+  color:#111827;
+  font-size:14px
+}
+h1 {
+  font-size:30px;
+  font-weight:700;
+  letter-spacing:-.55px
+}
+h2 {
+  font-size:16px;
+  font-weight:700;
+  letter-spacing:-.1px
+}
+h3 {
+  font-weight:600
+}
+.muted,small,.meta {
+  color:#667085
+}
+.topbar {
+  box-shadow:0 1px 0 #dfe3e8
+}
+.shell-brand-copy strong {
+  font-weight:700
+}
+.navigation-pane {
+  background:#f3f5f7
+}
+.brand-button {
+  font-weight:600;
+  border-radius:6px
+}
+.brand-button:not(.active) {
+  color:#465266
+}
+.brand-button.active {
+  box-shadow:inset 0 0 0 1px #0f67d6
+}
+.generic {
+  background:#f6f7f9
+}
+.mw-page-header h1 {
+  color:#101828
+}
+.mw-page-header p {
+  color:#667085;
+  font-size:14px
+}
+.mw-date strong {
+  font-weight:600
+}
+.mw-card,
+.mw-metric,
+.workspace-side-card,
+.workspace-reference-main,
+.admin-card,
+.admin-summary-card {
+  border-color:#dfe3e8;
+  box-shadow:0 1px 2px rgba(16,24,40,.035)
+}
+.mw-card>header {
+  min-height:43px;
+  border-bottom:1px solid #edf0f3;
+  background:#fff;
+  padding:11px 14px
+}
+.mw-card>header h2 {
+  color:#101828
+}
+.mw-card>header button {
+  font-weight:600;
+  color:#1769c2
+}
+.mw-card>div {
+  padding:10px 14px 12px
+}
+.mw-metrics {
+  gap:10px
+}
+.mw-metric {
+  min-height:76px;
+  padding:12px 14px;
+  border-radius:7px
+}
+.mw-metric-icon {
+  width:40px;
+  height:40px;
+  border-radius:7px
+}
+.mw-metric-icon svg {
+  width:21px;
+  height:21px;
+  stroke-width:2;
+  color:white
+}
+.mw-metric strong {
+  font-size:24px;
+  line-height:1
+}
+.mw-metric b {
+  margin-top:4px;
+  color:#1d2939;
+  font-size:12px;
+  font-weight:700
+}
+.mw-metric small {
+  margin-top:2px;
+  color:#7a8699;
+  font-size:11px
+}
+.mw-session-row {
+  padding:9px 0;
+  border-bottom-color:#eceff2
+}
+.mw-session-time strong,
+.mw-session-main strong {
+  color:#1d2939;
+  font-weight:600
+}
+.mw-session-thumb {
+  background:#e9edf2;
+  border:1px solid #e1e6eb
+}
+.mw-recent-image {
+  border:1px solid #e1e6eb;
+  background:#edf1f4
+}
+.mw-task-tabs {
+  padding:0 14px 8px
+}
+.mw-task-tabs button {
+  border-color:#e1e5ea;
+  background:#f8f9fb;
+  color:#526174;
+  font-weight:600
+}
+.mw-task-row {
+  border-bottom-color:#eceff2
+}
+.mw-pipeline-stats>div {
+  border-radius:5px;
+  box-shadow:none
+}
+.mw-pipeline-stats strong {
+  font-size:20px
+}
+.mw-active-jobs h3 {
+  font-size:12px
+}
+.mw-side {
+  overflow:hidden
+}
+.mw-side .mw-card {
+  overflow:hidden
+}
+.mw-side .mw-card>div {
+  overflow:auto
+}
+.workspace-reference-header h1,
+.admin-page-header h1 {
+  color:#101828
+}
+.workspace-reference-toolbar {
+  min-height:38px
+}
+.workspace-reference-tabs button,
+.workspace-view-toggle button,
+.workspace-reference-tools select {
+  min-height:34px;
+  border-color:#dfe3e8;
+  font-weight:600
+}
+.workspace-reference-main {
+  border-radius:7px
+}
+.workspace-reference-copy strong {
+  color:#1d2939;
+  font-weight:700
+}
+.workspace-reference-stat b {
+  color:#1d2939;
+  font-weight:700
+}
+.admin-card-header h2,
+.admin-summary-card span {
+  color:#101828
+}
+.admin-form-stack input,
+.admin-form-stack select,
+.workspace-side-card input,
+.workspace-side-card select {
+  border-color:#d7dde4;
+  box-shadow:inset 0 1px 1px rgba(16,24,40,.02)
+}
+
+/* Do not collapse the approved desktop composition while comparing against
+   the 1536px reference. Tablet/mobile behavior starts below 760px instead. */
+@media (min-width:760px) and (max-width:1000px) {
+  body {
+    overflow:hidden
+  }
+  .shell {
+    height:calc(100dvh - 68px);
+    min-height:0;
+    grid-template-columns:228px minmax(0,1fr)
+  }
+  .topbar {
+    grid-template-columns:228px minmax(0,1fr)
+  }
+  .navigation-pane {
+    padding:20px 14px 22px;
+    position:static;
+    height:auto
+  }
+  .nav-label,
+  .studio-sidebar-footer {
+    display:initial
+  }
+  .brand-button {
+    justify-content:flex-start;
+    padding:10px 14px
+  }
+  .generic {
+    height:100%;
+    overflow:auto
+  }
+  .mw-page,
+  .mw-main {
+    height:100%
+  }
+  .mw-layout {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 306px
+  }
+  .mw-side {
+    display:grid;
+    grid-template-columns:1fr;
+    grid-template-rows:minmax(0,1.12fr) minmax(0,.86fr) minmax(0,1fr)
+  }
+  .mw-metrics {
+    grid-template-columns:repeat(4,minmax(0,1fr))
+  }
+  .mw-two-col {
+    min-height:0
+  }
+  .mw-two-col.lower {
+    min-height:0
+  }
+  .workspace-reference-layout {
+    grid-template-columns:minmax(0,1fr) 300px
+  }
+  .workspace-reference-side {
+    grid-template-columns:1fr
+  }
+}
