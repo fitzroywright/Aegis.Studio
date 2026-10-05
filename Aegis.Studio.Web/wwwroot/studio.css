@@ -416,7 +416,7 @@ dialog::backdrop {
   color:#885211
 }
 .job-section {
-  padding:13px 14px;
+  padding:16px;
   margin-bottom:14px
 }
 .studio-table {
@@ -490,8 +490,8 @@ dialog::backdrop {
   display:block
 }
 .op-icon {
-  width:42px;
-  height:42px;
+  width:44px;
+  height:44px;
   border-radius:9px;
   background:#1677ff;
   color:white;
@@ -664,18 +664,18 @@ dialog::backdrop {
 .mw-metric {
   display:flex;
   align-items:center;
-  gap:13px;
+  gap:11px;
   background:white;
   border:1px solid var(--studio-border);
   border-radius:8px;
-  padding:16px;
+  padding:13px 14px;
   min-width:0
 }
 .mw-metric-icon {
   display:grid;
   place-items:center;
-  width:44px;
-  height:44px;
+  width:42px;
+  height:42px;
   border-radius:9px;
   color:white;
   font-size:23px;
@@ -2155,7 +2155,7 @@ dialog::backdrop {
 }
 .shell {
   height:auto;
-  min-height:calc(100dvh - 64px);
+  min-height:calc(100dvh - 68px);
   grid-template-columns:70px minmax(0,1fr)
 }
 .topbar {
@@ -2165,7 +2165,7 @@ dialog::backdrop {
   padding:15px 8px;
   position:sticky;
   top:0;
-  height:calc(100dvh - 64px)
+  height:calc(100dvh - 68px)
 }
 .nav-label,.studio-sidebar-footer,.studio-storage-card {
   display:none
@@ -2215,7 +2215,7 @@ dialog::backdrop {
   overflow:auto
 }
 .has-open-job {
-  height:calc(100dvh - 64px)
+  height:calc(100dvh - 68px)
 }
 .frontdesk-board {
   height:auto;
