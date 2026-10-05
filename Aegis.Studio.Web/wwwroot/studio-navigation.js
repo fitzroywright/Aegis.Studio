@@ -261,7 +261,7 @@
         genericView.classList.remove('hidden');
         genericView.innerHTML='<div class="mywork-loading">Loading workspaces…</div>';
 
-        const [workspaces,jobs,mediaSummary]=await Promise.all([json('/api/workspaces'),json('/api/jobs'),json('/api/production/media-summary')]);
+        const [workspaces,jobs,mediaSummary]=await Promise.all([loadWorkspaces().then(()=>workspaceCache),json('/api/jobs'),json('/api/production/media-summary')]);
         const workspaceData=[];
         // Announcement reads are bounded; galleries are represented by counts and three IDs.
         for(const workspace of workspaces){
@@ -457,8 +457,6 @@
 
         genericView.querySelectorAll('[data-open-workspace]').forEach(button=>{
             button.onclick=async()=>{
-                conversationView.classList.remove('hidden');
-                genericView.classList.add('hidden');
                 await selectWorkspace(button.dataset.openWorkspace,button.dataset.workspaceName);
             };
         });

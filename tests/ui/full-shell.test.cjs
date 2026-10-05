@@ -11,6 +11,7 @@ const sessions=jobs.map((j,i)=>({id:'s'+i,jobId:j.id,title:j.title,startsAtUtc:i
 const photographers=[{userName:'demo.sam',displayName:'Samantha Lee',isActive:true,scheduleResourceId:'r1',state:'Available',utilizationPercent:40,scheduledMinutes:120,remainingMinutes:180}];
 const media=j=>({gallery:{id:j,defaultLens:'Auto',default_lens:'Auto',defaultCollection:'All'},subjects:[{id:'sub'+j,name:'Sarah Miller',reference:'P001',productionStatus:'Ready',collectionName:'Selects'}],collections:['Selects','Proofs','Finals'],assets:Array.from({length:20},(_,i)=>({id:'a'+j+i,assetKey:'photo'+i,versionId:'v'+j+i,contentType:'image/jpeg',collection:'Selects',fileName:'Portrait '+i+'.jpg',productionStatus:['Needs Editing','Ready','Needs Review'][i%3],assignedTo:'demo.sam',subjects:['sub'+j],status:'Needs Editing',version:1,versions:[{id:'v'+j+i,versionNumber:1,contentType:'image/jpeg'}]})),unmatched:[]});
 function api(u){const p=u.pathname;
+ if(p==='/api/workspace-access')return workspaces.map(workspace=>({workspace,permissions:workspace.permissions}));
  if(p==='/api/auth/me')return {user:{userName:'demo.sam',displayName:'Samantha Lee',isAdministrator:true}};
  if(p==='/api/workspaces'||p==='/api/frontdesk/workspaces')return workspaces;
  if(p==='/api/jobs'||p==='/api/my-work/jobs')return jobs;
@@ -51,3 +52,25 @@ test('the full shell loads every operational screen with a shared data graph',as
  w.studioLoadDemoData=async()=>{throw Error('Rolled back');};await demoButton.onclick();assert.equal(demoButton.disabled,false);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Rolled back/);
  try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-work-board'));assert.equal(w.document.querySelectorAll('.job-file-tile').length,20)}catch(e){errors.push('job: '+e.message)}
  dom.window.close();assert.deepEqual(errors,[]);});
+
+test('cold workspace opening loads server permissions and keeps actual denial on the landing page',async()=>{
+ const errors=[],requests=[],vc=new VirtualConsole();let denied=false;
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc}),w=dom.window;
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));
+ w.fetch=async url=>{const u=new URL(url,'http://studio.test');requests.push(u.pathname);const body=u.pathname==='/api/workspace-access'?workspaces.map(workspace=>({workspace,permissions:{...permissions,view:!denied}})):api(u);return {ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body)};};
+ try{
+  for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
+  await new Promise(r=>setTimeout(r,25));await w.studioMyWorkReady;
+  assert.equal(w.eval('workspaceCache.length'),0);
+  await w.studioNavigate('workspaces');
+  assert.ok(requests.includes('/api/workspace-access'));
+  await w.document.querySelector('[data-open-workspace="w0"]').onclick();
+  assert.equal(w.eval('selectedWorkspace'),'w0');assert.deepEqual(errors,[]);
+  assert.equal(w.document.getElementById('conversationView').classList.contains('hidden'),false);
+  denied=true;await w.studioNavigate('workspaces');
+  await w.document.querySelector('[data-open-workspace="w1"]').onclick();
+  assert.match(errors.at(-1),/do not have permission/);
+  assert.equal(w.eval('selectedWorkspace'),'w0');
+  assert.equal(w.document.getElementById('genericView').classList.contains('hidden'),false);
+ }finally{dom.window.close();}
+});
