@@ -204,9 +204,9 @@ dialog::backdrop {
 
 /* Shell */
 .topbar {
-  height:64px;
+  height:68px;
   display:grid;
-  grid-template-columns:214px minmax(0,1fr);
+  grid-template-columns:228px minmax(0,1fr);
   background:white;
   border-bottom:1px solid var(--studio-border)
 }
@@ -214,7 +214,7 @@ dialog::backdrop {
   display:flex;
   align-items:center;
   gap:12px;
-  padding:0 24px
+  padding:0 20px
 }
 .shell-brand-icon {
   width:38px;
@@ -245,13 +245,13 @@ dialog::backdrop {
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:0 24px;
-  gap:20px
+  padding:0 28px;
+  gap:24px
 }
 .studio-global-search {
   display:flex;
   align-items:center;
-  width:min(515px,50%);
+  width:min(560px,52%);
   gap:9px
 }
 .studio-global-search input {
@@ -288,14 +288,14 @@ dialog::backdrop {
   display:none
 }
 .shell {
-  height:calc(100dvh - 64px);
+  height:calc(100dvh - 68px);
   display:grid;
-  grid-template-columns:214px minmax(0,1fr)
+  grid-template-columns:228px minmax(0,1fr)
 }
 .navigation-pane {
   display:flex;
   flex-direction:column;
-  padding:18px 15px 24px;
+  padding:20px 14px 22px;
   border-right:1px solid var(--studio-border);
   background:#f0f3f7;
   min-height:0
@@ -308,8 +308,8 @@ dialog::backdrop {
   display:flex;
   align-items:center;
   gap:14px;
-  height:42px;
-  padding:10px 15px;
+  height:44px;
+  padding:10px 14px;
   border:0;
   background:transparent;
   text-align:left
@@ -350,14 +350,14 @@ dialog::backdrop {
 }
 .generic {
   height:100%;
-  padding:22px 26px;
+  padding:24px 28px;
   overflow:auto
 }
 .studio-page-heading,.job-detail-header {
   display:flex;
   justify-content:space-between;
   align-items:center;
-  margin-bottom:18px;
+  margin-bottom:14px;
   gap:15px
 }
 .studio-page-heading p,.job-detail-header p {
@@ -375,7 +375,7 @@ dialog::backdrop {
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:13px 15px;
+  padding:12px 14px;
   gap:10px
 }
 .op-card>header button,.mw-card>header button {
@@ -416,7 +416,7 @@ dialog::backdrop {
   color:#885211
 }
 .job-section {
-  padding:16px;
+  padding:13px 14px;
   margin-bottom:14px
 }
 .studio-table {
@@ -490,8 +490,8 @@ dialog::backdrop {
   display:block
 }
 .op-icon {
-  width:44px;
-  height:44px;
+  width:42px;
+  height:42px;
   border-radius:9px;
   background:#1677ff;
   color:white;
@@ -619,7 +619,7 @@ dialog::backdrop {
   display:flex;
   justify-content:space-between;
   align-items:center;
-  margin-bottom:19px
+  margin-bottom:16px
 }
 .mw-page-header p {
   color:var(--studio-muted);
@@ -637,28 +637,29 @@ dialog::backdrop {
 }
 .mw-layout {
   display:grid;
-  grid-template-columns:minmax(0,1fr) 328px;
-  gap:16px;
+  grid-template-columns:minmax(0,1fr) 306px;
+  gap:14px;
   min-height:0;
   flex:1
 }
 .mw-main {
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-  min-height:0
+  display:grid;
+  grid-template-rows:auto minmax(0,1.18fr) minmax(0,.92fr);
+  gap:12px;
+  min-height:0;
+  overflow:hidden
 }
 .mw-side {
   display:grid;
-  grid-template-rows:minmax(200px,1.1fr) minmax(160px,.85fr) minmax(200px,1fr);
-  gap:14px;
+  grid-template-rows:minmax(0,1.12fr) minmax(0,.86fr) minmax(0,1fr);
+  gap:12px;
   min-height:0;
   overflow:auto
 }
 .mw-metrics {
   display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:10px
+  gap:9px
 }
 .mw-metric {
   display:flex;
@@ -693,7 +694,7 @@ dialog::backdrop {
   background:#ff9800
 }
 .mw-metric strong {
-  font-size:27px;
+  font-size:25px;
   display:block
 }
 .mw-metric b {
@@ -707,14 +708,13 @@ dialog::backdrop {
 }
 .mw-two-col {
   display:grid;
-  grid-template-columns:1.1fr .9fr;
-  gap:14px;
+  grid-template-columns:minmax(0,1.22fr) minmax(300px,.78fr);
+  gap:12px;
   min-height:0;
-  flex:1.2
+  overflow:hidden
 }
 .mw-two-col.lower {
-  grid-template-columns:1.4fr 1fr;
-  flex:1
+  grid-template-columns:minmax(0,1.28fr) minmax(285px,.72fr)
 }
 .mw-card {
   display:flex;
@@ -776,7 +776,7 @@ dialog::backdrop {
   min-width:0
 }
 .mw-recent-image {
-  height:120px;
+  height:108px;
   overflow:hidden;
   border-radius:6px;
   background:#eef2f7
@@ -1003,8 +1003,8 @@ dialog::backdrop {
 }
 .workspace-reference-layout {
   display:grid;
-  grid-template-columns:minmax(0,1fr) 285px;
-  gap:16px;
+  grid-template-columns:minmax(0,1fr) 300px;
+  gap:14px;
   flex:1;
   min-height:0
 }
@@ -1017,7 +1017,7 @@ dialog::backdrop {
   display:flex;
   align-items:center;
   justify-content:space-between;
-  margin-bottom:12px;
+  margin-bottom:10px;
   gap:10px
 }
 .workspace-reference-tabs,.workspace-reference-tools,.workspace-view-toggle {
@@ -1037,23 +1037,23 @@ dialog::backdrop {
   min-height:0
 }
 .workspace-reference-row {
-  margin-bottom:10px
+  margin-bottom:8px
 }
 .workspace-reference-main {
   display:grid;
-  grid-template-columns:85px minmax(130px,1fr) repeat(3,45px) 100px 95px;
-  gap:12px;
+  grid-template-columns:82px minmax(180px,1fr) repeat(3,48px) 104px 92px;
+  gap:10px;
   align-items:center;
   width:100%;
   text-align:left;
-  padding:14px;
+  padding:11px 13px;
   border-color:#e4e8ee;
   background:white;
   border-radius:8px
 }
 .workspace-reference-hero {
-  height:75px;
-  width:85px;
+  height:70px;
+  width:82px;
   border-radius:6px;
   overflow:hidden;
   background:#edf2f6
@@ -1997,19 +1997,26 @@ dialog::backdrop {
 }
 .admin-page {
   height:100%;
-  overflow:auto
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  overflow:hidden
 }
 .admin-layout {
   display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:14px
+  grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);
+  gap:12px;
+  min-height:0;
+  overflow:auto;
+  align-content:start;
+  padding-bottom:2px
 }
 .admin-card,.workspace-admin-card {
-  padding:16px;
+  padding:14px 15px;
   background:white;
   border:1px solid #e4e8ee;
   border-radius:8px;
-  margin-bottom:12px
+  margin-bottom:0
 }
 .admin-card p {
   color:#69758b;
@@ -2049,8 +2056,8 @@ dialog::backdrop {
 }
 .workspace-admin-grid {
   display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:14px
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px
 }
 .permission-grid {
   display:grid;
