@@ -4033,3 +4033,75 @@ body[data-studio-view="reports"] .op-card{
   .mw-list-page .mw-pipeline-row{grid-template-columns:40px minmax(0,1fr) 18px}
   .mw-list-page .mw-pipeline-status,.mw-list-page .mw-pipeline-due{display:none}
 }
+
+
+/* My Work right rail: compact status-style attention and messages */
+.mw-list-layout{
+  grid-template-columns:250px minmax(0,1fr) 280px;
+}
+.mw-list-right{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  min-width:0;
+}
+.mw-list-right .mw-list-panel>header button{
+  border:0;
+  background:transparent;
+  color:#116dc7;
+  font-size:11px;
+}
+.mw-list-right .mw-status-row{
+  min-height:38px;
+}
+.mw-compact-messages{
+  padding:0 12px;
+  max-height:290px;
+  overflow:auto;
+}
+.mw-list-right .mw-message-row{
+  min-height:48px;
+  height:48px;
+  grid-template-columns:30px 8px minmax(0,1fr) 44px 14px;
+  gap:6px;
+  padding:4px 0;
+  border-bottom:1px solid #e6ebf0;
+}
+.mw-list-right .mw-message-row:last-child{
+  border-bottom:0;
+}
+.mw-list-right .mw-message-avatar{
+  width:28px;
+  height:28px;
+  font-size:10px;
+}
+.mw-list-right .mw-message-copy strong{
+  font-size:11px;
+  line-height:14px;
+}
+.mw-list-right .mw-message-copy small{
+  font-size:10px;
+  line-height:13px;
+}
+.mw-list-right .mw-message-time{
+  font-size:9px;
+}
+@media(max-width:1080px){
+  .mw-list-layout{
+    grid-template-columns:235px minmax(0,1fr);
+  }
+  .mw-list-right{
+    grid-column:1 / -1;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+}
+@media(max-width:700px){
+  .mw-list-layout{
+    grid-template-columns:1fr;
+  }
+  .mw-list-right{
+    grid-column:auto;
+    display:flex;
+  }
+}
