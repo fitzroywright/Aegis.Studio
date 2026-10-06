@@ -132,7 +132,6 @@ builder.Services.AddSingleton<StudioDatabase>();
 builder.Services.AddSingleton<StudioFeatureDatabase>();
 builder.Services.AddSingleton<StudioMessagingDatabase>();
 
-MicrosoftGraphEmailOptions graphEmailOptions = builder.Configuration.GetSection("MicrosoftGraphEmail").Get<MicrosoftGraphEmailOptions>() ?? new MicrosoftGraphEmailOptions();
 AuthenticationPluginLoader.Register(
     builder.Services,
     builder.Configuration,
@@ -140,8 +139,6 @@ AuthenticationPluginLoader.Register(
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options => { options.Cookie.Name = "Aegis.Studio.Auth"; options.Cookie.HttpOnly = true; options.Cookie.SameSite = SameSiteMode.Strict; options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; options.LoginPath = "/login"; options.AccessDeniedPath = "/login"; options.ExpireTimeSpan = TimeSpan.FromHours(8); options.SlidingExpiration = true; options.Events.OnRedirectToLogin = context => { if (context.Request.Path.StartsWithSegments("/api")) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; } context.Response.Redirect(context.RedirectUri); return Task.CompletedTask; }; });
 builder.Services.AddAuthorization(options => { options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build(); });
 builder.Services.AddHealthChecks();
-builder.Services.AddSingleton(graphEmailOptions);
-builder.Services.AddSingleton<MicrosoftGraphEmailClient>();
 
 global::Common.Messaging.Hosting.ServiceCollectionExtensions
     .AddCommonMessagingSecrets(builder.Services);
@@ -150,7 +147,9 @@ global::Common.Messaging.Hosting.ServiceCollectionExtensions
         builder.Services,
         studioConnectionString,
         "aegis-studio");
-if (builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false))
+bool graphEmailEnabled = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
+bool graphInboundEnabled = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundEnabled", false);
+if (graphEmailEnabled || graphInboundEnabled)
 {
     global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
         .AddMicrosoftGraphEmailMessagingChannel(
@@ -162,7 +161,10 @@ if (builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", fal
                 SenderUpn = builder.Configuration["Messaging:MicrosoftGraph:Email:SenderUpn"] ?? string.Empty,
                 ClientSecretName = builder.Configuration["Messaging:MicrosoftGraph:ClientSecretName"]
                     ?? "messaging/msgraph/client-secret",
-                SkipSenderRecipient = false
+                SkipSenderRecipient = false,
+                InboundEnabled = graphInboundEnabled,
+                InboundPollSeconds = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundPollSeconds", 30),
+                InboundPageSize = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundPageSize", 50)
             });
 }
 global::Common.Messaging.Hosting.ServiceCollectionExtensions
