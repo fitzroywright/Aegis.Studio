@@ -102,9 +102,9 @@ function renderWorkspaceMenu() {
         </button>`;
     }).join('');
 
-    const more=available.length>6
-        ? '<button type="button" class="workspace-menu-item workspace-menu-more" data-workspace-menu-more><span class="workspace-menu-icon generic" aria-hidden="true">•••</span><span class="workspace-menu-name">More Workspaces</span></button>'
-        : '';
+    const moreLabel=available.length>6?'More Workspaces':'All Workspaces';
+    const moreIcon=available.length>6?'•••':'▱';
+    const more='<button type="button" class="workspace-menu-item workspace-menu-more" data-workspace-menu-more><span class="workspace-menu-icon generic" aria-hidden="true">'+moreIcon+'</span><span class="workspace-menu-name">'+moreLabel+'</span></button>';
 
     menu.innerHTML=rows+more;
     menu.querySelectorAll('[data-workspace-menu-id]').forEach(button=>button.onclick=async()=>{
