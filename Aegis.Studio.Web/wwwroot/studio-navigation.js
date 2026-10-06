@@ -1,6 +1,8 @@
 (() => {
     const conversationView=document.getElementById('conversationView');
     const genericView=document.getElementById('genericView');
+    const studioBreadcrumb=document.getElementById('studioBreadcrumb');
+    const studioPageTools=document.getElementById('studioPageTools');
 
     function setActive(view){
         document.body.dataset.studioView=view;
@@ -97,7 +99,7 @@
         if(!state.active())return;
         const {auth,jobs,tasks,schedule,notifications}=state;
         const workspaceCrumb=state.workspaceName
-            ? '<span aria-hidden="true">›</span><button type="button" data-nav="workspaces" class="workspace-current">'+esc(state.workspaceName)+'</button>'
+            ? '<span aria-hidden="true">›</span><button type="button" class="workspace-current" data-current-workspace>'+esc(state.workspaceName)+'</button>'
             : '';
         const now=new Date(),selectedDate=state.selectedDate||now,startOfDay=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()),endOfDay=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+1);
         const phase=(key,content)=>state.status[key]==='ready'?content:state.status[key]==='error'?'<div class="mw-empty" role="alert">'+esc(state.errors[key])+' <button data-mw-retry="'+key+'">Retry</button></div>':'<div class="mw-empty" role="status">Loading…</div>';
@@ -196,26 +198,6 @@
 
         const markup=`
             <section class="mw-page mw-list-page">
-                <header class="mw-list-header" data-mw-region="header">
-                    <div class="mw-header-line">
-                        <nav class="mw-breadcrumb" aria-label="Breadcrumb">
-                            <button type="button" data-nav="workspaces">Workspaces</button>
-                            ${workspaceCrumb}
-                            <span aria-hidden="true">›</span>
-                            <button type="button" data-nav="mywork">My Work</button>
-                            <span aria-hidden="true">›</span>
-                            <strong>${esc(displayName)}</strong>
-                        </nav>
-                        <span class="mw-header-date">${selectedDate.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>
-                    </div>
-                    <div class="mw-day-nav" aria-label="My Work day navigator">
-                        <button type="button" data-mw-day="-1" aria-label="Previous day">‹</button>
-                        <button type="button" class="today" data-mw-day="today">Today</button>
-                        <button type="button" data-mw-day="1" aria-label="Next day">›</button>
-                        <label class="calendar" aria-label="Choose date"><span>▣</span><input type="date" data-mw-date value="${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}"></label>
-                    </div>
-                </header>
-
                 <div class="mw-list-layout">
                     <div class="mw-list-summary">
                         <section class="mw-list-panel" data-mw-region="status">
@@ -302,7 +284,30 @@
             if(focused)existing.querySelector('[data-mw-filter="'+focused+'"]')?.focus();
         });
         state.root=genericView.querySelector('.mw-page');
-        genericView.querySelectorAll('[data-mw-day]').forEach(button=>button.onclick=()=>{
+        if(studioBreadcrumb){
+            studioBreadcrumb.innerHTML=`
+                <details class="workspace-menu breadcrumb-workspace-menu" id="workspaceMenu">
+                    <summary class="workspace-breadcrumb-trigger"><span>Workspaces</span><span class="workspace-menu-caret">⌄</span></summary>
+                    <div class="workspace-menu-popover" id="workspaceMenuList" role="menu" aria-label="Workspaces"></div>
+                </details>
+                ${workspaceCrumb}
+                <span class="breadcrumb-separator" aria-hidden="true">›</span>
+                <button type="button" data-shell-nav="mywork">My Work</button>
+                <span class="breadcrumb-separator" aria-hidden="true">›</span>
+                <strong>${esc(displayName)}</strong>
+                <span class="breadcrumb-date">· ${selectedDate.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>`;
+        }
+        if(studioPageTools){
+            studioPageTools.innerHTML=`
+                <div class="mw-day-nav" aria-label="My Work day navigator">
+                    <button type="button" data-mw-day="-1" aria-label="Previous day">‹</button>
+                    <button type="button" class="today" data-mw-day="today">Today</button>
+                    <button type="button" data-mw-day="1" aria-label="Next day">›</button>
+                    <label class="calendar" aria-label="Choose date"><span>▣</span><input type="date" data-mw-date value="${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}"></label>
+                </div>`;
+        }
+        const shellScope=studioPageTools||genericView;
+        shellScope.querySelectorAll('[data-mw-day]').forEach(button=>button.onclick=()=>{
             if(button.dataset.mwDay==='today')state.selectDay(new Date());
             else{
                 const next=new Date(state.selectedDate||new Date());
@@ -310,11 +315,19 @@
                 state.selectDay(next);
             }
         });
-        const datePicker=genericView.querySelector('[data-mw-date]');
+        const datePicker=shellScope.querySelector('[data-mw-date]');
         if(datePicker)datePicker.onchange=()=>{
             const parts=String(datePicker.value||'').split('-').map(Number);
             if(parts.length===3&&parts.every(Number.isFinite))state.selectDay(new Date(parts[0],parts[1]-1,parts[2]));
         };
+        studioBreadcrumb?.querySelector('[data-shell-nav="mywork"]')?.addEventListener('click',()=>window.studioNavigate?.('mywork'));
+        studioBreadcrumb?.querySelector('[data-current-workspace]')?.addEventListener('click',()=>{
+            if(typeof selectedWorkspace!=='undefined'&&selectedWorkspace){
+                const workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===String(selectedWorkspace));
+                if(workspace)selectWorkspace(selectedWorkspace,workspace.name);
+            }
+        });
+        if(typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
         genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
         genericView.querySelectorAll('.mw-session-thumb img[data-fallback-src]').forEach(img=>{
             img.addEventListener('error',()=>{
