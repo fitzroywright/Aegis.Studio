@@ -176,7 +176,6 @@
                             <div class="mw-action-list">
                                 <button data-nav="schedule"><span>＋</span><span>My schedule</span><b>›</b></button>
                                 <button data-nav="tasks"><span>☑</span><span>My tasks</span><b>›</b></button>
-                                <button data-nav="messages"><span>✉</span><span>Messages</span><b>›</b></button>
                             </div>
                         </section>
 
