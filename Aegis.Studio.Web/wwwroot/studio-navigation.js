@@ -569,7 +569,7 @@
 
     const routes={
         mywork:renderMyWork,
-        messages:()=>showMessages?.()||window.studioNavigate('workspaces'),
+        messages:()=>window.studioNavigate('workspaces'),
         schedule:()=>showPipeline(),
         tasks:renderMyWork,
         workspaces:renderWorkspaces,
