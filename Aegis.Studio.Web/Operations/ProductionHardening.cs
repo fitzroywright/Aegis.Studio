@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Aegis.Studio.Infrastructure.Email;
+using Common.Messaging.Channels.MicrosoftGraph;
 using Aegis.Studio.Web.Bookings;
 using Aegis.Studio.Web.Persistence;
 using Common.Storage;
