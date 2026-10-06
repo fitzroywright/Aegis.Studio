@@ -229,6 +229,8 @@
         genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b.dataset.mwFilter===state.taskFilter));
         genericView.querySelectorAll('[data-task-type]').forEach(row=>row.hidden=state.taskFilter!=='all'&&!row.dataset.taskType.toLowerCase().includes(state.taskFilter));
         genericView.querySelectorAll('[data-nav]').forEach(button=>button.onclick=()=>window.studioNavigate(button.dataset.nav));
+        const openNotifications=genericView.querySelector('#mwOpenNotifications');
+        if(openNotifications)openNotifications.onclick=()=>document.getElementById('notificationButton')?.click();
     }
 
     async function renderWorkspaces(){
