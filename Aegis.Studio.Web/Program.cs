@@ -7,7 +7,6 @@ using System.Text.Json.Serialization;
 using Aegis.Pos.Core;
 using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Domain.Bookings;
-using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web;
 using Aegis.Studio.Web.Authentication;
 using Aegis.Studio.Web.Bookings;
