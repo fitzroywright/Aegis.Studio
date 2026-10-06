@@ -73,29 +73,47 @@ public static class DemoDataEndpoints
     private static string Seed(StudioDatabase database, IFileStorage storage, string login, Action<DemoSeedProgress>? report = null)
     {
         report?.Invoke(new(0, "Preparing", 0, 0, "Connecting to the database."));
+
+        // Phase 1: create the high-volume operational workload in small, durable batches.
+        // Each batch owns only deterministic DEMO ids, so retries are safe and do not
+        // duplicate data. A later media/network failure cannot roll this work back.
+        int denseJobs = 0;
+        for (int batch = 0; batch < DemoDenseScheduleData.BatchCount; batch++)
+        {
+            using var batchConnection = database.OpenConnection();
+            using var batchTransaction = batchConnection.BeginTransaction();
+            using (var batchLock = new NpgsqlCommand("select pg_advisory_xact_lock(72709128)", batchConnection, batchTransaction))
+                batchLock.ExecuteNonQuery();
+
+            denseJobs += DemoDenseScheduleData.SeedBatch(batchConnection, batchTransaction, login, batch, report);
+            batchTransaction.Commit();
+        }
+
+        // Phase 2: keep the richer historical/media demonstration, but isolate it from
+        // the operational batches above. If a public photo host or storage provider is
+        // unavailable, rerunning the loader preserves and resumes the durable workload.
         using var connection = database.OpenConnection();
         using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = "select pg_advisory_xact_lock(72709128)";
-        report?.Invoke(new(1, "Waiting for seed lock", 0, 0, "Waiting for any other demo loader to finish."));
+        report?.Invoke(new(26, "Rich demo data", 0, 0, "Loading historical workflows and media separately from the operational schedule."));
         command.ExecuteNonQuery();
+
         bool loaded;
         using(var current=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v6-full-studio')",connection,transaction))
             loaded=(bool)current.ExecuteScalar()!;
         if(loaded)
         {
-            report?.Invoke(new(2,"Checking storage",0,0,"Checking existing demo photographs without resetting job edits."));
+            report?.Invoke(new(28,"Checking storage",0,0,"Checking existing demo photographs without resetting job edits."));
             int restored=DemoDataExpansion.RepairMedia(connection,transaction,login,storage,report)
                 +DemoFullStudioData.RepairMedia(connection,transaction,login,storage,report);
             DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
             report?.Invoke(new(99,"Committing repairs",0,0,"Saving repaired demo photo references."));
             transaction.Commit();
-            return $"Full Studio demo verified. Restored {restored} missing seeded photo versions; existing work and edits have been preserved.";
+            return $"Operational demo ready with {denseJobs} jobs covering {DemoDenseScheduleData.Days} days across all six workspaces. Full Studio demo verified; restored {restored} missing seeded photo versions and preserved existing edits.";
         }
-        // Re-run the deterministic base seed on every request so a stale marker cannot
-        // hide deleted or partially-created DEMO records. Inserts are made idempotent;
-        // updates remain updates. Real workspaces are never matched by these fixed DEMO ids.
+
         int statementNumber = 0;
         foreach (string statement in SeedStatements)
         {
@@ -108,7 +126,7 @@ public static class DemoDataEndpoints
             if (statement.Contains("$1", StringComparison.Ordinal)) seedCommand.Parameters.AddWithValue(login);
             seedCommand.ExecuteNonQuery();
             statementNumber++;
-            report?.Invoke(new(2 + 8 * statementNumber / SeedStatements.Length, "Base records", statementNumber, SeedStatements.Length, "Creating workspaces, conversations and jobs."));
+            report?.Invoke(new(28 + 2 * statementNumber / SeedStatements.Length, "Base records", statementNumber, SeedStatements.Length, "Creating historical workspaces, conversations and jobs."));
         }
 
         RepairDemoWorkspaces(connection, transaction, login);
@@ -117,15 +135,16 @@ public static class DemoDataEndpoints
         bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
         bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage, report);
         DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
-        report?.Invoke(new(99, "Committing", 0, 0, "Saving the complete demo dataset."));
+        report?.Invoke(new(99, "Committing rich demo", 0, 0, "Saving historical workflow and media data."));
         transaction.Commit();
+
         return fullStudioExpanded
-            ? "Full Studio demo loaded: 27 interconnected jobs across 6 workspaces, including distinct real photographs, a 327-subject graduation roster, and connected ID, wedding, school, headshot and commercial jobs, plus clients, bookings, schedules, photographers, availability, payments, production stages and history."
+            ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days across all six workspaces, plus the full Studio media demonstration."
             : presentationExpanded
-                ? "Demo presentation data loaded. Open DEMO - Weddings and Events, then Carter Wedding, to see wedding media and linked workflow data."
+                ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days. Demo presentation data also loaded."
                 : expanded
-                    ? "Demo data expanded. Open Carter Wedding to explore Media, People and Tasks / Calendar."
-                    : "Demo data is already up to date.";
+                    ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days. Legacy demo media also expanded."
+                    : $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days; existing rich demo data is already up to date.";
     }
 
     private static void RepairDemoWorkspaces(NpgsqlConnection connection, NpgsqlTransaction transaction, string login)
