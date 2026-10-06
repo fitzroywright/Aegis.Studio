@@ -161,7 +161,7 @@
                 <div class="mw-list-layout">
                     <div class="mw-list-summary">
                         <section class="mw-list-panel" data-mw-region="status">
-                            <header><h2>▥ &nbsp; Work Status</h2><small>Assigned to ${esc(displayName)}</small></header>
+                            <header><h2>▥ &nbsp; Status</h2><small>Assigned to ${esc(displayName)}</small></header>
                             <div class="mw-status-list">
                                 <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>All work</span><strong>${metric('jobs',jobs.length)}</strong></button>
                                 <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Today's sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
@@ -193,7 +193,7 @@
 
                     <section class="mw-list-panel mw-assigned-panel">
                         <header class="mw-assigned-header">
-                            <div><h2>Assigned Work</h2><small>Sessions, tasks and jobs currently belonging to ${esc(displayName)}</small></div>
+                            <div><h2>Assigned</h2><small>Sessions, tasks and jobs currently belonging to ${esc(displayName)}</small></div>
                         </header>
 
                         <div class="mw-work-section" data-mw-region="schedule">
