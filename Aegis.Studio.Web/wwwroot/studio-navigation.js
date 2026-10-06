@@ -107,21 +107,25 @@
             const version=mediaByJob.get(String(jobId))?.thumbnailVersionId;
             return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/preview?size=thumbnail':'';
         };
+        const fallbackImageForJob=jobId=>{
+            const version=mediaByJob.get(String(jobId))?.thumbnailVersionId;
+            return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/preview/fallback':'';
+        };
 
         const sessionRows=todaySchedule.slice(0,5).map((entry,index)=>{
             const job=scheduleJob(entry);
             const image=entry.jobId?imageForJob(entry.jobId):'';
+            const fallbackImage=entry.jobId?fallbackImageForJob(entry.jobId):'';
             const start=new Date(entry.startsAtUtc||entry.start||entry.startsAt);
             const end=new Date(entry.endsAtUtc||entry.end||entry.endsAt);
             const stateLabel=end<now?'Finished':start<=now?'In Progress':'Upcoming';
-            return `<button class="mw-session-row" data-open-job="${entry.jobId||job.id||''}">
-                <span class="mw-session-accent ${index===0?'active':''}"></span>
-                <div class="mw-session-time"><strong>${formatTime(start)} – ${formatTime(end)}</strong></div>
-                <div class="mw-session-thumb">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>📷</span>'}</div>
+            return `<button class="mw-session-row ${index===0?'active':''}" data-open-job="${entry.jobId||job.id||''}">
+                <div class="mw-session-thumb">${image?`<img loading="lazy" src="${image}" data-fallback-src="${fallbackImage}" alt="">`:'<span>📷</span>'}</div>
                 <div class="mw-session-main"><strong>${esc(job.title||entry.title||'Session')}</strong><span>${esc(job.clientName||entry.title||'Photography session')}</span></div>
                 <span class="mw-session-location">⌖ &nbsp;${esc(entry.location||'Location not set')}</span>
+                <div class="mw-session-time"><strong>${formatTime(start)} – ${formatTime(end)}</strong></div>
                 <span class="mw-state-pill ${stateLabel==='In Progress'?'in-progress':''}">${stateLabel}</span>
-                <span class="mw-kebab">•••</span>
+                <span class="mw-chevron">›</span>
             </button>`;
         }).join('')||'<div class="mw-empty">No sessions scheduled today.</div>';
 
@@ -288,6 +292,17 @@
             if(parts.length===3&&parts.every(Number.isFinite))state.selectDay(new Date(parts[0],parts[1]-1,parts[2]));
         };
         genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
+        genericView.querySelectorAll('.mw-session-thumb img[data-fallback-src]').forEach(img=>{
+            img.addEventListener('error',()=>{
+                const fallback=img.dataset.fallbackSrc;
+                if(!fallback||img.dataset.fallbackTried==='1')return;
+                img.dataset.fallbackTried='1';
+                const probe=new Image();
+                probe.onload=()=>{img.src=fallback;img.classList.add('fallback-loaded');};
+                probe.onerror=()=>{img.closest('.mw-session-thumb')?.classList.add('preview-missing');};
+                probe.src=fallback;
+            },{once:true});
+        });
         genericView.querySelectorAll('[data-mw-filter]').forEach(button=>button.onclick=()=>{
             const filter=button.dataset.mwFilter;state.taskFilter=filter;
             genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b===button));
