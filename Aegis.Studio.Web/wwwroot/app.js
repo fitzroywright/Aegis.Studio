@@ -25,41 +25,9 @@ async function json(url, options) {
     return body.trim() ? JSON.parse(body) : null;
 }
 
-function workspaceBandHue(id) {
-    let hash=0;
-    for(const character of String(id)) hash=(hash*31+character.charCodeAt(0))>>>0;
-    return hash%360;
-}
 async function loadWorkspaces() {
     const data = await json('/api/workspaces');
     workspaceCache = data;
-
-    // The current presentation no longer has the legacy #workspaceList sidebar.
-    // Keep this loader responsible for shared workspace state and request-dialog
-    // options; dedicated workspace screens render their own lists.
-    const legacyWorkspaceList = document.getElementById('workspaceList');
-    if (legacyWorkspaceList) {
-        legacyWorkspaceList.innerHTML = data.map(workspace => `
-            <button class="workspace" data-id="${workspace.id}" style="--workspace-hue:${workspaceBandHue(workspace.id)}">
-                <span class="badge">${workspace.openCount}</span>
-                <b>${esc(workspace.name)}</b>
-                <small>${esc(workspace.address)}</small>
-            </button>`).join('');
-
-        await Promise.all(data.map(async workspace=>{
-            const button=legacyWorkspaceList.querySelector(`[data-id="${workspace.id}"]`);
-            if(!button)return;
-            try{const appearance=await json(`/api/workspaces/${workspace.id}/appearance`);if(!button.isConnected)return;
-                if(/^#[0-9a-f]{6}$/i.test(appearance.color)&&appearance.color.toLowerCase()!=='#b99750')button.style.background=`linear-gradient(105deg,${appearance.color}66,${appearance.color}15)`;
-                const icon=document.createElement('span');icon.className='workspace-identity-icon';icon.setAttribute('aria-hidden','true');icon.textContent=({folder:'▰',camera:'📷',portrait:'👤',wedding:'💍',id:'▣'})[appearance.icon]||'▰';button.prepend(icon);
-            }catch(error){button.title='Workspace appearance could not be loaded: '+error.message;}
-        }));
-
-        legacyWorkspaceList.querySelectorAll('.workspace').forEach(button => {
-            button.onclick = () => selectWorkspace(button.dataset.id, button.querySelector('b').textContent);
-        });
-    }
-
     requestWorkspace.innerHTML = data.map(workspace =>
         `<option value="${workspace.id}">${esc(workspace.name)}</option>`).join('');
 }
@@ -303,13 +271,6 @@ function activateView(view) {
         showManagement();
     }
 }
-
-allButton.onclick = () => {
-    selectedWorkspace = null;
-    workspaceTitle.textContent = 'All Work';
-    document.querySelectorAll('.workspace').forEach(button => button.classList.remove('active'));
-    loadConversations();
-};
 
 newRequestButton.onclick = () => {
     if (selectedWorkspace) {
