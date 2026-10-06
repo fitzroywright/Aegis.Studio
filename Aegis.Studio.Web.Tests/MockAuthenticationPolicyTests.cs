@@ -7,7 +7,7 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class MockAuthenticationPolicyTests
 {
     [Fact]
-    public void IsEnabled_RequiresDevelopmentEnvironment()
+    public void IsEnabled_RequiresDevelopmentEnvironmentByDefault()
     {
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -19,6 +19,21 @@ public sealed class MockAuthenticationPolicyTests
         Assert.True(MockAuthenticationPolicy.IsEnabled(configuration, "Development"));
         Assert.False(MockAuthenticationPolicy.IsEnabled(configuration, "Production"));
         Assert.False(MockAuthenticationPolicy.IsEnabled(configuration, "Staging"));
+    }
+
+    [Fact]
+    public void IsEnabled_AllowsExplicitOutsideDevelopmentOptIn()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MockAuthentication:Enabled"] = "true",
+                ["MockAuthentication:AllowOutsideDevelopment"] = "true"
+            })
+            .Build();
+
+        Assert.True(MockAuthenticationPolicy.IsEnabled(configuration, "Production"));
+        Assert.True(MockAuthenticationPolicy.IsEnabled(configuration, "Staging"));
     }
 
     [Fact]
