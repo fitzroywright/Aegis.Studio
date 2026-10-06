@@ -4384,3 +4384,34 @@ body[data-studio-view="mywork"] .generic{
   background:#fff0f2;
   color:#d6334c;
 }
+
+
+/* My Work: single-column quick links and bullet task list */
+.mw-quick-link-list{
+  grid-template-columns:1fr;
+}
+.mw-quick-link-list button{
+  border-right:0;
+}
+.mw-quick-link-list button:nth-last-child(-n+2){
+  border-bottom:1px solid #e2e8ef;
+}
+.mw-quick-link-list button:last-child{
+  border-bottom:0;
+}
+.mw-task-bullet{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#6f42c1;
+  box-shadow:0 0 0 4px #efe8ff;
+  align-self:center;
+  justify-self:center;
+}
+.mw-right-tasks .mw-task-row{
+  grid-template-columns:18px minmax(0,1fr) 62px 16px;
+}
+.mw-right-tasks .mw-task-row:hover .mw-task-bullet{
+  background:#0f6fc6;
+  box-shadow:0 0 0 4px #e7f1ff;
+}

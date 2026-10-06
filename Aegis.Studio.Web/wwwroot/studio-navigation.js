@@ -112,7 +112,7 @@
             const job=jobById(task.jobId)||{};
             const context=[job.title,job.clientName].filter(Boolean).join(' · ')||task.activityType||'Studio task';
             return `<button class="mw-task-row" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
-                <span class="mw-check"></span>
+                <span class="mw-task-bullet" aria-hidden="true"></span>
                 <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(context)}</small></span>
                 <span class="mw-due">${task.dueAtUtc?'Due '+formatDay(task.dueAtUtc):'No due date'}</span>
                 <span class="mw-priority ${String(task.priority||'').toLowerCase()}">${esc(task.priority||'Normal')}</span>
