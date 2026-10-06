@@ -4,7 +4,7 @@
 
     function setActive(view){
         document.body.dataset.studioView=view;
-        document.querySelectorAll('.rail [data-view]').forEach(button=>{
+        document.querySelectorAll('[data-view]').forEach(button=>{
             button.classList.toggle('active',button.dataset.view===view);
         });
     }
@@ -68,6 +68,9 @@
         const phase=(key,content)=>state.status[key]==='ready'?content:state.status[key]==='error'?'<div class="mw-empty" role="alert">'+esc(state.errors[key])+' <button data-mw-retry="'+key+'">Retry</button></div>':'<div class="mw-empty" role="status">Loading…</div>';
         const metric=(key,value)=>state.status[key]==='ready'?value:'…';
         const me=auth.user||auth,user=String(me.userName||me.loginName||'').toLowerCase();
+        const displayName=String(me.displayName||me.name||me.userName||'Jordan').trim();
+        const firstName=(displayName.split(/[\\s\\\\@.]+/).filter(Boolean)[0]||'Jordan');
+        const hour=now.getHours(),greeting=hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
         const roles=[...(Array.isArray(me.roles)?me.roles:[]),...(Array.isArray(auth.roles)?auth.roles:[])].map(x=>String(x).toLowerCase());
         const isManager=me.isAdministrator===true||auth.isAdministrator===true||roles.some(r=>/administrator|manager|owner|finance/.test(r));
         const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status)&&(!user||String(t.assignedTo||'').toLowerCase()===user));
@@ -160,71 +163,47 @@
             ...(isManager?[['finance','Finance',''],['management','Management','']]:[])
         ];
 
+        const productionTasks=myTasks.filter(t=>/edit|retouch|qc|print|deliver|production|gallery|select|design|color|review/i.test(String(t.activityType||'')+' '+String(t.title||'')));
+        const attentionItems=productionTasks.slice(0,5);
         const markup=`
             <section class="mw-page">
-                <header class="mw-page-header" data-mw-region="header">
-                    <div><h1>My Work</h1><p>Your day, your studio, everything in one place.</p></div>
-                    <div class="mw-date"><strong>${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</strong><span>${state.status.auth==='error'?'<button data-mw-retry="auth">Profile unavailable · Retry</button>':'Studio overview'}</span></div>
+                <header class="mw-hero" data-mw-region="header">
+                    <div class="mw-hero-copy"><h1>${greeting}, ${esc(firstName)}</h1><p>Here's what's happening in your studio today.</p></div>
+                    <div class="mw-hero-date"><strong>${now.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</strong><div><button type="button">‹</button><button type="button" class="today">Today</button><button type="button">›</button></div></div>
                 </header>
-
-                <div class="mw-layout">
-                    <div class="mw-main">
-                        <div class="mw-metrics" data-mw-region="metrics">
-                            <article class="mw-metric"><span class="mw-metric-icon blue"><svg aria-hidden="true"><use href="#i-camera"></use></svg></span><div><strong>${metric('schedule',todaySchedule.length)}</strong><b>Today's Sessions</b><small>${todaySchedule.length} scheduled</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon green"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><div><strong>${metric('tasks',myTasks.length)}</strong><b>Pending Tasks</b><small>${myTasks.filter(t=>String(t.priority).toLowerCase()==='high').length} high priority</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon purple"><svg aria-hidden="true"><use href="#i-grid"></use></svg></span><div><strong>${metric('media',totalPhotos)}</strong><b>Photos Catalogued</b><small>${state.status.media==='error'?'<span role="alert">Photos unavailable</span> <button data-mw-retry="media">Retry</button>':'Across accessible jobs'}</small></div></article>
-                            <article class="mw-metric"><span class="mw-metric-icon orange"><svg aria-hidden="true"><use href="#i-bell"></use></svg></span><div><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong><b>Unread Messages</b><small>${messageNotifications.length} recent</small></div></article>
-                        </div>
-
-                        <div class="mw-two-col">
-                            <section class="mw-card" data-mw-region="sessions">
-                                <header><h2>Today's Sessions</h2><button data-nav="pipeline">View Calendar →</button></header>
-                                <div>${phase('schedule',sessionRows)}</div>
-                            </section>
-                            <section class="mw-card" data-mw-region="recent">
-                                <header><h2>Recent Work</h2><button data-nav="workspaces">View Workspaces →</button></header>
-                                <div class="mw-recent-grid">${phase('jobs',recentCards||'<div class="mw-empty">No recent work.</div>')}</div>
-                            </section>
-                        </div>
-
-                        <div class="mw-two-col lower">
-                            <section class="mw-card" data-mw-region="tasks">
-                                <header><h2>My Tasks</h2><button data-nav="workspaces">Open Jobs →</button></header>
-                                <div class="mw-task-tabs"><button class="active" data-mw-filter="all">All (${myTasks.length})</button><button data-mw-filter="edit">Editing</button><button data-mw-filter="proof">Client</button><button data-mw-filter="print">Output</button></div>
-                                <div>${phase('tasks',taskRows)}</div><footer class="mw-quick-links">${quickLinks.map(link=>`<button class="text-button" data-nav="${link[0]}">${link[1]}</button>`).join('')}</footer>
-                            </section>
-                            <section class="mw-card" data-mw-region="pipeline">
-                                <header><h2>Pipeline Overview</h2><button data-nav="pipeline">View Pipeline →</button></header>
-                                ${state.status.jobs==='ready'?'':phase('jobs','')}<div class="mw-pipeline-stats" ${state.status.jobs==='ready'?'':'hidden'}>
-                                    <div class="blue"><strong>${pipelineCounts.capture}</strong><span>Capture</span></div>
-                                    <div class="purple"><strong>${pipelineCounts.edit}</strong><span>Edit</span></div>
-                                    <div class="orange"><strong>${pipelineCounts.review}</strong><span>Review</span></div>
-                                    <div class="green"><strong>${pipelineCounts.deliver}</strong><span>Deliver</span></div>
-                                </div>
-                                <h3>Active Jobs (${jobs.length})</h3>
-                                <div class="mw-active-jobs" ${state.status.jobs==='ready'?'':'hidden'}>${jobs.slice(0,5).map(job=>`<button data-open-job="${job.id}"><span>${esc(job.title)}</span><i><em style="width:${job.taskCount?Math.round(job.completedTaskCount/job.taskCount*100):0}%"></em></i><b>${esc(job.status||'Active')}</b></button>`).join('')}</div>
-                            </section>
-                        </div>
+                <div class="mw-metrics" data-mw-region="metrics">
+                    <article class="mw-metric"><span class="mw-metric-icon blue">▣</span><div><strong>${metric('schedule',todaySchedule.length)}</strong><b>Appointments Today</b><small>${todaySchedule.filter(x=>new Date(x.startsAtUtc)>now).length} upcoming</small></div></article>
+                    <article class="mw-metric"><span class="mw-metric-icon green">▧</span><div><strong>${metric('jobs',jobs.length)}</strong><b>Items in Pipeline</b><small>${attentionJobs} need your action</small></div></article>
+                    <article class="mw-metric"><span class="mw-metric-icon orange">☑</span><div><strong>${metric('tasks',productionTasks.length)}</strong><b>Production Tasks</b><small>${productionTasks.filter(t=>/review|approval/i.test(String(t.status||'')+' '+String(t.title||''))).length} ready for review</small></div></article>
+                    <article class="mw-metric"><span class="mw-metric-icon purple">♧</span><div><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong><b>Client Messages</b><small>${messageNotifications.filter(n=>!n.isRead).length} unread</small></div></article>
+                </div>
+                <div class="mw-dashboard">
+                    <div class="mw-dashboard-main">
+                        <section class="mw-card mw-schedule-card" data-mw-region="schedule">
+                            <header><h2>▣ &nbsp; Today's Schedule</h2><button data-nav="schedule">View Schedule →</button></header>
+                            <div class="mw-schedule-list">${phase('schedule',sessionRows)}</div>
+                        </section>
+                        <section class="mw-card mw-production-attention" data-mw-region="production-attention">
+                            <header><h2>▧ &nbsp; Production Items Needing Your Attention</h2><button data-nav="production">View Pipeline →</button></header>
+                            <div class="mw-attention-grid">${phase('tasks',attentionItems.length?attentionItems.map(task=>{const job=jobById(task.jobId)||{};const image=imageForJob(task.jobId);return `<button class="mw-attention-card" data-open-job="${task.jobId||''}"><span class="mw-attention-image">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>📷</span>'}</span><strong>${esc(job.clientName||job.title||task.title)}</strong><small>${esc(task.activityType||task.title)}</small><em>${task.dueAtUtc?'Due '+formatTime(task.dueAtUtc):esc(task.status||'Needs attention')}</em></button>`}).join(''):'<div class="mw-empty">No production items need attention.</div>')}</div>
+                        </section>
                     </div>
-
-                    <aside class="mw-side">
-                        <section class="mw-card" data-mw-region="schedule">
-                            <header><h2>Today's Schedule</h2><button data-nav="pipeline">View All →</button></header>
-                            <div class="mw-schedule-list">${phase('schedule',scheduleRows)}</div>
+                    <aside class="mw-dashboard-side">
+                        <section class="mw-card" data-mw-region="tasks">
+                            <header><h2>☑ &nbsp; My Tasks</h2><button data-nav="tasks">View All →</button></header>
+                            <div>${phase('tasks',taskRows)}</div>
                         </section>
                         <section class="mw-card" data-mw-region="messages">
-                            <header><h2>Messages</h2><button data-nav="workspaces">Open Jobs →</button></header>
+                            <header><h2>◯ &nbsp; Recent Messages</h2><button data-nav="messages">View All →</button></header>
                             <div>${phase('notifications',messageRows)}</div>
-                            <button class="mw-link-button" data-nav="workspaces">Open workspace jobs →</button>
                         </section>
-                        <section class="mw-card" data-mw-region="activity">
-                            <header><h2>Studio Activity</h2><button data-nav="${isManager?'management':'workspaces'}">View All →</button></header>
-                            <div>${phase('notifications',activityRows)}</div>
+                        <section class="mw-card mw-quick-actions">
+                            <header><h2>ϟ &nbsp; Quick Actions</h2></header>
+                            <div><button data-nav="pipeline">▣ &nbsp; Start Capture Session</button><button data-nav="production">⇧ &nbsp; Upload to Pipeline</button><button id="mwCreateJob">＋ &nbsp; Create New Job</button><button data-nav="schedule">▣ &nbsp; Check In Subject</button></div>
                         </section>
                     </aside>
                 </div>
             </section>`;
-
         const next=document.createElement('div');next.innerHTML=markup;
         if(!genericView.querySelector('.mw-page')){genericView.replaceChildren(next.firstElementChild);state.root=genericView.querySelector('.mw-page');}
         else next.querySelectorAll('[data-mw-region]').forEach(region=>{
@@ -590,6 +569,9 @@
 
     const routes={
         mywork:renderMyWork,
+        messages:()=>showMessages?.()||window.studioNavigate('workspaces'),
+        schedule:()=>showPipeline(),
+        tasks:renderMyWork,
         workspaces:renderWorkspaces,
         pipeline:()=>showPipeline(),
         production:()=>showProduction(),
@@ -618,7 +600,7 @@
         }
     };
 
-    document.querySelectorAll('.rail [data-view]').forEach(button=>{
+    document.querySelectorAll('[data-view]').forEach(button=>{
         button.type='button';
         button.onclick=()=>window.studioNavigate(button.dataset.view);
     });
