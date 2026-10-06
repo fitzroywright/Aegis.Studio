@@ -161,7 +161,7 @@
                 <div class="mw-list-layout">
                     <div class="mw-list-summary">
                         <section class="mw-list-panel" data-mw-region="status">
-                            <header><h2>▥ &nbsp; Status</h2><small>Assigned to ${esc(displayName)}</small></header>
+                            <header><h2><span class="mw-title-icon status">▥</span> Status</h2><small>Assigned to ${esc(displayName)}</small></header>
                             <div class="mw-status-list">
                                 <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>All work</span><strong>${metric('jobs',jobs.length)}</strong></button>
                                 <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Today's sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
@@ -172,7 +172,7 @@
                         </section>
 
                         <section class="mw-list-panel mw-action-panel" data-mw-region="actions">
-                            <header><h2>◆ &nbsp; Actions</h2></header>
+                            <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
                             <div class="mw-action-list">
                                 <button data-nav="schedule"><span>＋</span><span>My schedule</span><b>›</b></button>
                                 <button data-nav="tasks"><span>☑</span><span>My tasks</span><b>›</b></button>
@@ -180,7 +180,7 @@
                         </section>
 
                         <section class="mw-list-panel mw-quick-links-panel" data-mw-region="quick-links">
-                            <header><h2>↗ &nbsp; Quick Links</h2></header>
+                            <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
                             <div class="mw-quick-link-list">
                                 <button data-nav="workspaces"><span>▰</span><span>Workspaces</span></button>
                                 <button data-nav="pipeline"><span>▥</span><span>Pipeline</span></button>
@@ -192,7 +192,7 @@
 
                     <section class="mw-list-panel mw-assigned-panel">
                         <header class="mw-assigned-header">
-                            <div><h2>Assigned</h2><small>Sessions, tasks and jobs currently belonging to ${esc(displayName)}</small></div>
+                            <div><h2><span class="mw-title-icon assigned">▣</span> Assigned</h2><small>Sessions, tasks and jobs currently belonging to ${esc(displayName)}</small></div>
                         </header>
 
                         <div class="mw-work-section" data-mw-region="schedule">
@@ -204,7 +204,7 @@
 
                     <aside class="mw-list-right">
                         <section class="mw-list-panel" data-mw-region="attention">
-                            <header><h2>▲ &nbsp; Needs Attention</h2><small>${metric('tasks',attentionTotal)} items</small></header>
+                            <header><h2><span class="mw-title-icon attention">▲</span> Needs Attention</h2><small>${metric('tasks',attentionTotal)} items</small></header>
                             <div class="mw-status-list">
                                 <button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">◷</span><span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
                                 <button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">!</span><span>Blocked / rework</span><strong>${metric('tasks',blockedTasks)}</strong></button>
@@ -215,12 +215,12 @@
                         </section>
 
                         <section class="mw-list-panel mw-right-tasks-panel" data-mw-region="tasks">
-                            <header><h2>☑ &nbsp; My Tasks</h2><small>${metric('tasks',myTasks.length)} open</small></header>
+                            <header><h2><span class="mw-title-icon tasks">☑</span> My Tasks</h2><small>${metric('tasks',myTasks.length)} open</small></header>
                             <div class="mw-right-tasks">${phase('tasks',taskRows)}</div>
                         </section>
 
                         <section class="mw-list-panel mw-messages-panel" data-mw-region="messages">
-                            <header><h2>✉ &nbsp; Messages</h2><button id="mwOpenNotifications">View all →</button></header>
+                            <header><h2><span class="mw-title-icon messages">✉</span> Messages</h2><button id="mwOpenNotifications">View all →</button></header>
                             <div class="mw-compact-messages">${phase('notifications',messageRows)}</div>
                         </section>
                     </aside>
