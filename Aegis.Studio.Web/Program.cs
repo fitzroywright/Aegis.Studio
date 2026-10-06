@@ -127,7 +127,8 @@ builder.Services.AddSingleton<NpgsqlDataSource>(services =>
     source.UseLoggerFactory(services.GetRequiredService<ILoggerFactory>());
     return source.Build();
 });
-builder.Services.AddSingleton<StudioDatabase>();
+builder.Services.AddSingleton(services =>
+    new StudioDatabase(services.GetRequiredService<NpgsqlDataSource>(), studioConnectionString));
 builder.Services.AddSingleton<StudioFeatureDatabase>();
 builder.Services.AddSingleton<StudioMessagingDatabase>();
 
