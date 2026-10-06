@@ -4565,3 +4565,46 @@ body[data-studio-view="mywork"] .generic{
   color:#9ba8b6;
   font-size:14px;
 }
+
+
+/* My Work tactile row hover ("speed bump") */
+.mw-list-page .mw-status-row,
+.mw-list-page .mw-action-list button,
+.mw-list-page .mw-quick-link-list button,
+.mw-list-page .mw-session-row,
+.mw-list-page .mw-task-row,
+.mw-list-page .mw-pipeline-row,
+.mw-list-page .mw-message-row{
+  position:relative;
+  transition:
+    background-color .14s ease,
+    box-shadow .14s ease,
+    transform .14s ease,
+    border-color .14s ease;
+  will-change:transform;
+}
+.mw-list-page .mw-status-row:hover,
+.mw-list-page .mw-action-list button:hover,
+.mw-list-page .mw-quick-link-list button:hover,
+.mw-list-page .mw-session-row:hover,
+.mw-list-page .mw-task-row:hover,
+.mw-list-page .mw-pipeline-row:hover,
+.mw-list-page .mw-message-row:hover{
+  z-index:2;
+  background:#f1f7fd;
+  transform:translateY(-1px) scale(1.003);
+  box-shadow:0 4px 10px rgba(31,64,96,.12);
+}
+.mw-list-page .mw-status-row:active,
+.mw-list-page .mw-action-list button:active,
+.mw-list-page .mw-quick-link-list button:active,
+.mw-list-page .mw-session-row:active,
+.mw-list-page .mw-task-row:active,
+.mw-list-page .mw-pipeline-row:active,
+.mw-list-page .mw-message-row:active{
+  transform:translateY(0) scale(.998);
+  box-shadow:0 1px 3px rgba(31,64,96,.10);
+}
+.mw-list-page .mw-task-row:hover .mw-task-bullet{
+  transform:scale(1.12);
+}
