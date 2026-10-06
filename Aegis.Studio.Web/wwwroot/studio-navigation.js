@@ -138,21 +138,14 @@
         }).join('')||'<div class="mw-empty">No recent work.</div>';
 
         const overdueTasks=myTasks.filter(t=>t.dueAtUtc&&new Date(t.dueAtUtc)<now).length;
-        const attentionJobs=jobs.filter(j=>/blocked|overdue|needs scheduling|awaiting upload|exception/i.test(j.status||'')).length;
+        const blockedTasks=myTasks.filter(t=>/blocked|rework|required|failed/i.test(String(t.status||''))).length;
+        const schedulingJobs=jobs.filter(j=>/needs scheduling/i.test(String(j.status||''))).length;
+        const uploadJobs=jobs.filter(j=>/awaiting upload/i.test(String(j.status||''))).length;
+        const exceptionJobs=jobs.filter(j=>/blocked|overdue|exception/i.test(String(j.status||''))).length;
+        const attentionJobs=schedulingJobs+uploadJobs+exceptionJobs;
         const productionTasks=myTasks.filter(t=>/edit|retouch|qc|print|deliver|production|gallery|select|design|color|review|upload|schedule/i.test(String(t.activityType||'')+' '+String(t.title||'')));
         const attentionItems=[...productionTasks,...myTasks.filter(t=>!productionTasks.includes(t))].slice(0,5);
-        const attentionRows=attentionItems.map((task,index)=>{
-            const job=jobById(task.jobId)||{};
-            const image=imageForJob(task.jobId);
-            const priority=task.priority||((task.dueAtUtc&&new Date(task.dueAtUtc)<now)?'High':'Medium');
-            return `<button class="mw-attention-row" data-open-job="${task.jobId||''}">
-                <span class="mw-attention-thumb">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>!</span>'}</span>
-                <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(job.title||task.activityType||'Studio work')}</small></span>
-                <span class="mw-due">${task.dueAtUtc?formatDay(task.dueAtUtc):'Today'}</span>
-                <span class="mw-priority ${String(priority).toLowerCase()}">${esc(priority)}</span>
-                <span class="mw-chevron">›</span>
-            </button>`;
-        }).join('')||'<div class="mw-empty">Nothing needs attention right now.</div>';
+        const attentionTotal=overdueTasks+blockedTasks+attentionJobs;
 
         const markup=`
             <section class="mw-page mw-list-page">
@@ -173,8 +166,8 @@
                                 <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>All work</span><strong>${metric('jobs',jobs.length)}</strong></button>
                                 <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Today's sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
                                 <button class="mw-status-row" data-nav="tasks"><span class="mw-status-icon">☑</span><span>Open tasks</span><strong>${metric('tasks',myTasks.length)}</strong></button>
-                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionItems.length+attentionJobs)}</strong></button>
-                                <button class="mw-status-row" id="mwOpenNotifications"><span class="mw-status-icon">✉</span><span>Unread messages</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong></button>
+                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionTotal)}</strong></button>
+                                <button class="mw-status-row" data-nav="messages"><span class="mw-status-icon">✉</span><span>Unread messages</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong></button>
                             </div>
                         </section>
 
@@ -200,11 +193,6 @@
                             <div class="mw-section-rows">${phase('schedule',sessionRows)}</div>
                         </div>
 
-                        <div class="mw-work-section" data-mw-region="attention">
-                            <div class="mw-section-title"><h3>Needs Attention</h3><span class="danger">${metric('tasks',attentionItems.length+attentionJobs)}</span></div>
-                            <div class="mw-section-rows">${phase('tasks',attentionRows)}</div>
-                        </div>
-
                         <div class="mw-work-section" data-mw-region="tasks">
                             <div class="mw-section-title"><h3>My Tasks</h3><span>${metric('tasks',myTasks.length)}</span></div>
                             <div class="mw-section-rows">${phase('tasks',taskRows)}</div>
@@ -215,6 +203,24 @@
                             <div class="mw-section-rows">${phase('jobs',recentRows)}</div>
                         </div>
                     </section>
+
+                    <aside class="mw-list-right">
+                        <section class="mw-list-panel" data-mw-region="attention">
+                            <header><h2>▲ &nbsp; Needs Attention</h2><small>${metric('tasks',attentionTotal)} items</small></header>
+                            <div class="mw-status-list">
+                                <button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">◷</span><span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
+                                <button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">!</span><span>Blocked / rework</span><strong>${metric('tasks',blockedTasks)}</strong></button>
+                                <button class="mw-status-row warning" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Needs scheduling</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
+                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">⇧</span><span>Awaiting upload</span><strong>${metric('jobs',uploadJobs)}</strong></button>
+                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">◆</span><span>Production exceptions</span><strong>${metric('jobs',exceptionJobs)}</strong></button>
+                            </div>
+                        </section>
+
+                        <section class="mw-list-panel mw-messages-panel" data-mw-region="messages">
+                            <header><h2>✉ &nbsp; Messages</h2><button id="mwOpenNotifications">View all →</button></header>
+                            <div class="mw-compact-messages">${phase('notifications',messageRows)}</div>
+                        </section>
+                    </aside>
                 </div>
             </section>`;
         const next=document.createElement('div');next.innerHTML=markup;
