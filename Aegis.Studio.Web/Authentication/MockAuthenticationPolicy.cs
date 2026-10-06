@@ -16,8 +16,12 @@ public static class MockAuthenticationPolicy
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        return string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase)
-            && configuration.GetValue("MockAuthentication:Enabled", false);
+        bool explicitlyAllowedOutsideDevelopment =
+            configuration.GetValue("MockAuthentication:AllowOutsideDevelopment", false);
+
+        return configuration.GetValue("MockAuthentication:Enabled", false)
+            && (string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase)
+                || explicitlyAllowedOutsideDevelopment);
     }
 
     public static MockAuthenticationIdentity CreateIdentity(
