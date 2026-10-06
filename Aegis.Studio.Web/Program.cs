@@ -289,15 +289,15 @@ app.MapStudioEngineeringDiagnostics();
 app.MapStudioPosHardening();
 app.MapStudioGalleries();
 
-app.MapGet("/api/email/status", async (MicrosoftGraphEmailClient client, MicrosoftGraphEmailOptions options, UnroutedEmailStore unrouted, CancellationToken cancellationToken) =>
+app.MapGet("/api/email/status", async (global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphMailboxClient client, global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphEmailOptions options, UnroutedEmailStore unrouted, CancellationToken cancellationToken) =>
 {
     string? slackWebhook = await secretProvider.GetAsync("Notifications:SlackWebhookUrl", cancellationToken);
     string? teamsWebhook = await secretProvider.GetAsync("Notifications:TeamsWebhookUrl", cancellationToken);
     return Results.Ok(new
     {
-        enabled = options.Enabled,
+        enabled = options.InboundEnabled,
         configured = client.IsConfigured,
-        collectionMailbox = options.Mailbox,
+        collectionMailbox = options.SenderUpn,
         pollSeconds = (int)client.PollInterval.TotalSeconds,
         mode = client.IsConfigured ? "Microsoft Graph" : "Microsoft Graph - waiting for client secret",
         slackConfigured = !string.IsNullOrWhiteSpace(slackWebhook),
