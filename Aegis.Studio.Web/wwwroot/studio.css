@@ -5207,3 +5207,79 @@ body[data-studio-view="mywork"] .generic{
 .mw-messages-panel .mw-chevron{
   color:#9aa7b5;
 }
+
+
+/* Studio profile menu: integrated avatar pill */
+body[data-studio-view] .user-menu{
+  position:relative;
+  margin-left:2px;
+}
+body[data-studio-view] .user-menu-trigger{
+  height:38px;
+  min-width:54px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:2px 7px 2px 3px;
+  border:1px solid transparent;
+  border-radius:20px;
+  background:transparent;
+  cursor:pointer;
+  transition:background-color .14s ease,border-color .14s ease,box-shadow .14s ease;
+}
+body[data-studio-view] .user-menu-trigger:hover,
+body[data-studio-view] .user-menu[open] .user-menu-trigger{
+  border-color:#d8e1e9;
+  background:#f3f7fa;
+  box-shadow:0 2px 7px rgba(31,64,96,.08);
+}
+body[data-studio-view] .user-menu .avatar{
+  width:32px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  border:2px solid #fff;
+  border-radius:50%;
+  background:linear-gradient(145deg,#405d76,#263f56);
+  color:#fff;
+  box-shadow:0 0 0 1px #cdd9e3,0 2px 5px rgba(26,54,79,.16);
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+body[data-studio-view="mywork"] .user-menu .avatar{
+  box-shadow:0 0 0 1px #cdd9e3,0 2px 5px rgba(26,54,79,.16);
+}
+body[data-studio-view] .user-menu-caret{
+  display:grid;
+  place-items:center;
+  width:10px;
+  color:#64778a;
+  font-size:10px;
+  line-height:1;
+  transition:transform .14s ease,color .14s ease;
+}
+body[data-studio-view] .user-menu[open] .user-menu-caret{
+  transform:rotate(180deg);
+  color:#245d8c;
+}
+body[data-studio-view] .user-menu-popover{
+  top:44px;
+  right:0;
+  width:176px;
+  padding:5px;
+  border-color:#d8e1e9;
+  border-radius:9px;
+  box-shadow:0 12px 28px rgba(24,45,67,.16);
+}
+body[data-studio-view] .user-menu-popover button{
+  min-height:32px;
+  padding:6px 9px;
+  border-radius:5px;
+  color:#263f56;
+  font-size:12px;
+}
+body[data-studio-view] .user-menu-popover button:hover{
+  background:#f1f7fd;
+  color:#155f9f;
+}
