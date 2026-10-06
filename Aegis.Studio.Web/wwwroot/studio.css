@@ -4691,3 +4691,44 @@ body[data-studio-view="mywork"] .generic{
     display:none;
   }
 }
+
+
+/* My Work breadcrumb title bar */
+.mw-header-line{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.mw-breadcrumb{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  white-space:nowrap;
+}
+.mw-breadcrumb button{
+  border:0;
+  padding:0;
+  background:transparent;
+  color:#2d69a3;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+.mw-breadcrumb button:hover{
+  color:#0f5f9e;
+  text-decoration:underline;
+  text-underline-offset:2px;
+}
+.mw-breadcrumb>span{
+  color:#9aa8b7;
+  font-size:13px;
+}
+.mw-breadcrumb strong{
+  max-width:220px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  color:#17324f;
+  font-size:13px;
+}

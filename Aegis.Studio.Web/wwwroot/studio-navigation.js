@@ -180,8 +180,13 @@
             <section class="mw-page mw-list-page">
                 <header class="mw-list-header" data-mw-region="header">
                     <div class="mw-header-line">
-                        <h1>My Work</h1>
-                        <span class="mw-header-person">${esc(displayName)}</span>
+                        <nav class="mw-breadcrumb" aria-label="Breadcrumb">
+                            <button type="button" data-nav="workspaces">Workspaces</button>
+                            <span aria-hidden="true">›</span>
+                            <button type="button" data-nav="mywork">My Work</button>
+                            <span aria-hidden="true">›</span>
+                            <strong>${esc(displayName)}</strong>
+                        </nav>
                         <span class="mw-header-date">${selectedDate.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>
                     </div>
                     <div class="mw-day-nav" aria-label="My Work day navigator">
