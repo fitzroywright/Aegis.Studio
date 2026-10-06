@@ -37,14 +37,41 @@ public static class StudioVersionEndpoints
             if(!access.HasPermission(user,jobId,"ViewAttachments"))return Results.Forbid();
             if(size is not null && size is not "thumbnail" and not "preview")return Results.BadRequest(new{error="Choose thumbnail or preview."});
             using var c=db.OpenConnection();
-            using var cmd=new NpgsqlCommand("select d.status,d.thumbnail_key,d.preview_key from studio_asset_versions v left join studio_media_derivatives d on d.version_id=v.id where v.job_id=$1 and v.id=$2",c);
+            using var cmd=new NpgsqlCommand("select d.status,d.thumbnail_key,d.preview_key,v.content_type,v.stored_path,v.note from studio_asset_versions v left join studio_media_derivatives d on d.version_id=v.id where v.job_id=$1 and v.id=$2",c);
             cmd.Parameters.AddWithValue(jobId);cmd.Parameters.AddWithValue(versionId);
-            string state;string? key;
+            string state;string? key;string contentType;string storedPath;string? note;
             using(var r=await cmd.ExecuteReaderAsync(context.RequestAborted))
-            {if(!await r.ReadAsync(context.RequestAborted))return Results.NotFound();state=r.IsDBNull(0)?"Pending":r.GetString(0);int index=size=="thumbnail"?1:2;key=r.IsDBNull(index)?null:r.GetString(index);}
+            {
+                if(!await r.ReadAsync(context.RequestAborted))return Results.NotFound();
+                state=r.IsDBNull(0)?"Pending":r.GetString(0);
+                int index=size=="thumbnail"?1:2;
+                key=r.IsDBNull(index)?null:r.GetString(index);
+                contentType=r.GetString(3);
+                storedPath=r.GetString(4);
+                note=r.IsDBNull(5)?null:r.GetString(5);
+            }
             context.Response.Headers.CacheControl="private, no-cache";
             if(state!="Ready"||key is null)
-            {context.Response.Headers.RetryAfter="10";return Results.Json(new{error="Preview not available. Download the original or retry the preview.",state},statusCode:state=="Unsupported"?415:503);}
+            {
+                bool seededDemoImage=contentType.StartsWith("image/",StringComparison.OrdinalIgnoreCase)
+                    && (note?.StartsWith("Real CC0/public-domain photograph from Wikimedia Commons.",StringComparison.Ordinal)==true
+                        || note?.StartsWith("CC0 wedding photograph from Wikimedia Commons, seeded for Studio demonstration data.",StringComparison.Ordinal)==true);
+                if(seededDemoImage)
+                {
+                    try
+                    {
+                        var versions=new PrefixedFileStorage(storage,"VersionStore");
+                        return Results.File(await versions.OpenReadAsync(storedPath,context.RequestAborted),contentType,enableRangeProcessing:true);
+                    }
+                    catch(StorageException e) when(e.Code=="STORAGE-MISSING-001")
+                    {
+                        // Keep the normal retry response below. The derivative worker will
+                        // attempt StoredVersionRecovery for a recoverable seeded original.
+                    }
+                }
+                context.Response.Headers.RetryAfter="10";
+                return Results.Json(new{error="Preview not available. Download the original or retry the preview.",state},statusCode:state=="Unsupported"?415:503);
+            }
             try{return Results.File(await storage.OpenReadAsync(key,context.RequestAborted),"image/jpeg",enableRangeProcessing:true);}
             catch(StorageException e) when(e.Code=="STORAGE-MISSING-001")
             {
