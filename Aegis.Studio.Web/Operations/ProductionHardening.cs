@@ -123,12 +123,12 @@ public static class StudioProductionHardening
             return report.IsReady ? Results.Ok(report) : Results.Json(report, statusCode: StatusCodes.Status503ServiceUnavailable);
         });
 
-        admin.MapGet("/msgraph", async (MicrosoftGraphEmailClient graphClient, MicrosoftGraphEmailOptions graphOptions, CancellationToken cancellationToken) =>
+        admin.MapGet("/msgraph", async (MicrosoftGraphMailboxClient graphClient, MicrosoftGraphEmailOptions graphOptions, CancellationToken cancellationToken) =>
         {
             MicrosoftGraphEmailVerification verification = await graphClient.VerifyConfigurationAsync(cancellationToken);
             return Results.Ok(new
             {
-                enabled = graphOptions.Enabled,
+                enabled = graphOptions.InboundEnabled,
                 tenantId = graphOptions.TenantId,
                 clientId = graphOptions.ClientId,
                 mailbox = graphOptions.Mailbox,
@@ -385,10 +385,10 @@ public static class ProductionReadiness
         BookingApiSecurityStatus booking = services.GetRequiredService<BookingApiAuthenticator>().GetStatus();
         checks.Add(new ProductionReadinessCheck("Public booking authentication", booking.IsReady, booking.IsReady ? $"{booking.ConfiguredClients} HMAC client(s) configured." : "No HMAC booking client secret is configured."));
 
-        MicrosoftGraphEmailClient graphClient = services.GetRequiredService<MicrosoftGraphEmailClient>();
+        MicrosoftGraphMailboxClient graphClient = services.GetRequiredService<MicrosoftGraphMailboxClient>();
         MicrosoftGraphEmailOptions graphOptions = services.GetRequiredService<MicrosoftGraphEmailOptions>();
-        bool graphReady = !graphOptions.Enabled || graphClient.IsConfigured;
-        checks.Add(new ProductionReadinessCheck("Microsoft Graph email", graphReady, graphReady ? (graphOptions.Enabled ? "Enabled and configured." : "Disabled by configuration.") : "Enabled but missing required credentials."));
+        bool graphReady = !graphOptions.InboundEnabled || graphClient.IsConfigured;
+        checks.Add(new ProductionReadinessCheck("Microsoft Graph email", graphReady, graphReady ? (graphOptions.InboundEnabled ? "Enabled and configured." : "Disabled by configuration.") : "Enabled but missing required credentials."));
 
         try
         {
