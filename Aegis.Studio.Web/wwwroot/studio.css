@@ -4836,3 +4836,137 @@ body[data-studio-view="mywork"] .generic{
   border-radius:0 0 6px 6px;
   padding-top:7px;
 }
+
+
+/* Unified single-line shell breadcrumb for My Work */
+.studio-shell-breadcrumb{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  margin-left:10px;
+  white-space:nowrap;
+  font-size:12px;
+}
+.studio-shell-breadcrumb>button,
+.studio-shell-breadcrumb .workspace-breadcrumb-trigger{
+  border:0;
+  padding:4px 2px;
+  background:transparent;
+  color:#155f9f;
+  font-size:12px;
+  font-weight:700;
+}
+.studio-shell-breadcrumb>button:hover,
+.studio-shell-breadcrumb .workspace-breadcrumb-trigger:hover{
+  background:transparent;
+  color:#0b4f88;
+  text-decoration:underline;
+  text-underline-offset:2px;
+}
+.studio-shell-breadcrumb .breadcrumb-separator{
+  color:#95a3b2;
+}
+.studio-shell-breadcrumb>strong{
+  max-width:180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  color:#17324f;
+  font-size:12px;
+}
+.studio-shell-breadcrumb .breadcrumb-date{
+  color:#778697;
+  font-size:11px;
+}
+.studio-shell-page-tools{
+  display:flex;
+  align-items:center;
+  margin-left:auto;
+}
+.studio-shell-page-tools + .shell-context + .studio-global-search,
+.studio-shell-page-tools ~ .studio-global-search{
+  margin-left:12px;
+}
+.studio-shell-page-tools .mw-day-nav{
+  height:34px;
+}
+.studio-shell-page-tools .mw-day-nav button{
+  height:34px;
+}
+.studio-shell-page-tools .mw-day-nav .calendar{
+  height:34px;
+}
+
+/* The breadcrumb owns the Workspaces menu; keep it compact and dense. */
+.breadcrumb-workspace-menu{
+  position:relative;
+}
+.workspace-breadcrumb-trigger{
+  list-style:none;
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  cursor:pointer;
+}
+.workspace-breadcrumb-trigger::-webkit-details-marker{
+  display:none;
+}
+.breadcrumb-workspace-menu .workspace-menu-popover{
+  top:calc(100% + 4px);
+  width:214px;
+  padding:2px;
+  border-radius:7px;
+}
+.breadcrumb-workspace-menu .workspace-menu-item{
+  min-height:28px;
+  grid-template-columns:18px minmax(0,1fr) auto;
+  gap:6px;
+  padding:3px 6px;
+  border-radius:5px;
+  font-size:12px;
+}
+.breadcrumb-workspace-menu .workspace-menu-icon{
+  width:15px;
+  height:15px;
+  border-radius:4px;
+  font-size:9px;
+}
+.breadcrumb-workspace-menu .workspace-menu-more{
+  margin-top:1px;
+  padding-top:4px;
+}
+.breadcrumb-workspace-menu .workspace-menu-current{
+  font-size:8px;
+}
+
+/* My Work starts immediately below the single shell bar. */
+.mw-list-page{
+  padding-top:8px;
+}
+
+/* Reduce Recent Jobs roughly 20% from the expanded layout and give the space to sessions. */
+.mw-assigned-panel .mw-work-section[data-mw-region="schedule"]{
+  flex:1 1 auto;
+  min-height:210px;
+}
+.mw-assigned-panel .mw-work-section[data-mw-region="pipeline"]{
+  flex:0 0 50%;
+  max-height:50%;
+}
+
+/* Needs Attention uses a red semantic accent throughout. */
+.mw-title-icon.attention{
+  background:#fde9ec;
+  color:#cf3344;
+}
+.mw-list-right [data-mw-region="attention"] .mw-status-icon{
+  color:#cf3344!important;
+}
+.mw-list-right [data-mw-region="attention"] .mw-status-row.warning:hover .mw-status-icon{
+  color:#b92536!important;
+}
+
+@media(max-width:1000px){
+  .studio-shell-breadcrumb .breadcrumb-date{display:none}
+  .studio-shell-page-tools{margin-left:6px}
+}
