@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Profiles;
 using Common.Messaging;
 using Common.Secrets;
