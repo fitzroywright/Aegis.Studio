@@ -161,85 +161,7 @@ async function createJob() {
     await openJob(job.id);
 }
 
-async function showJobs() {
-    activateNavigation('jobs');
-    conversationView.classList.add('hidden');
-    genericView.classList.remove('hidden');
-    const jobs = await json('/api/jobs');
-    genericView.innerHTML = `
-        <h1>Jobs</h1>
-        <p>Committed work. Conversations remain linked as context; the job drives execution.</p>
-        ${renderJobRows(jobs)}`;
-    bindJobRows();
-}
-
 async function openJob(id){return openWorkspaceJob(id);}
-
-async function advanceJob(id, status) {
-    await updateJob(id, { status, assignedTo: null, eventDate: null });
-    await openJob(id);
-}
-
-async function assignJob(id) {
-    const assignedTo = prompt('Assign this job to');
-    if (!assignedTo) {
-        return;
-    }
-
-    await updateJob(id, { status: null, assignedTo, eventDate: null });
-    await openJob(id);
-}
-
-async function updateJob(id, payload) {
-    return json('/api/jobs/' + id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-}
-
-async function recordMoney(id) {
-    const kind = prompt('Type', 'Deposit');
-    if (!kind) {
-        return;
-    }
-
-    const amountText = prompt('Amount', '0.00');
-    const amount = Number(amountText);
-    if (!Number.isFinite(amount) || amount === 0) {
-        alert('Enter a non-zero amount. Use a negative value for a refund or reversal.');
-        return;
-    }
-
-    const note = prompt('Note', '');
-    await json('/api/jobs/' + id + '/financial-events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, amount, note })
-    });
-    await openJob(id);
-}
-
-function renderJobRows(jobs) {
-    if (!jobs.length) {
-        return '<div class="empty-state" style="text-align:left"><h2>No jobs yet</h2><p>Open a conversation and choose Create Job when the customer commits.</p></div>';
-    }
-
-    return jobs.map(job => `
-        <button class="job-row job-button" data-job-id="${job.id}">
-            <div>
-                <b>${esc(job.title)}</b>
-                <div class="meta">${esc(job.clientName)}${job.assignedTo ? ' · ' + esc(studioFirstName(job.assignedTo)) : ''}</div>
-            </div>
-            <span class="status-pill">${esc(job.status)}</span>
-        </button>`).join('');
-}
-
-function bindJobRows() {
-    document.querySelectorAll('[data-job-id]').forEach(button => {
-        button.onclick = () => openJob(button.dataset.jobId);
-    });
-}
 
 function money(value) {
     return new Intl.NumberFormat('en-JM', { style: 'currency', currency: 'JMD' }).format(value || 0);
@@ -261,9 +183,7 @@ function activateView(view) {
 
     if(view==='frontdesk')return showFrontDesk();
     if(view==='pos')return showPos();
-    if (view === 'jobs') {
-        showJobs();
-    } else if (view === 'production') {
+    if (view === 'production') {
         showProduction();
     } else if (view === 'accounts') {
         showAccounts();
