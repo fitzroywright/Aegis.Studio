@@ -168,6 +168,7 @@ function money(value) {
 }
 
 function activateNavigation(view) {
+    document.body.dataset.studioView = view;
     document.querySelectorAll('.brand-button').forEach(button => {
         button.classList.toggle('active', button.dataset.view === view);
     });
