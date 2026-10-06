@@ -14,15 +14,24 @@
 
     function renderMyWork(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],status:{},errors:{},taskFilter:'all'};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date()};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['mywork','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         myWorkLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
         const started=performance.now(),run=globalThis.crypto?.randomUUID?.()||String(Date.now());
         const diagnostics={run,startedAt:new Date().toISOString(),requests:[],shellMs:null,coreMs:null,completeMs:null};
         window.studioMyWorkDiagnostics=diagnostics;
-        const now=new Date(),from=new Date(now.getFullYear(),now.getMonth(),now.getDate()),to=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
-        const urls={tasks:'/api/my-work/tasks',schedule:'/api/schedule/entries?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString()),jobs:'/api/my-work/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/my-work/media-summary'};
+        const now=new Date();
+        const dayRange=date=>{
+            const from=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+            const to=new Date(date.getFullYear(),date.getMonth(),date.getDate()+1);
+            return {from,to};
+        };
+        const scheduleUrl=date=>{
+            const {from,to}=dayRange(date);
+            return '/api/schedule/entries?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
+        };
+        const urls={tasks:'/api/my-work/tasks',schedule:scheduleUrl(state.selectedDate),jobs:'/api/my-work/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/my-work/media-summary'};
         let inFlight=0;const waiting=[];
         async function load(key){
             while(inFlight>=2)await new Promise(resolve=>waiting.push(resolve));
@@ -44,6 +53,14 @@
             }
         }
         state.retry=key=>load(key);
+        state.selectDay=date=>{
+            state.selectedDate=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+            urls.schedule=scheduleUrl(state.selectedDate);
+            state.schedule=[];
+            state.status.schedule='loading';
+            paintMyWork(state);
+            load('schedule');
+        };
         paintMyWork(state);diagnostics.shellMs=Math.round(performance.now()-started);
         // Two reads at a time: operational essentials first, enrichment afterwards.
         const pending=['tasks','schedule','jobs','auth','notifications','media'];
@@ -64,7 +81,7 @@
     function paintMyWork(state){
         if(!state.active())return;
         const {auth,jobs,tasks,schedule,notifications}=state;
-        const now=new Date(),startOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()),endOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+        const now=new Date(),selectedDate=state.selectedDate||now,startOfDay=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()),endOfDay=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+1);
         const phase=(key,content)=>state.status[key]==='ready'?content:state.status[key]==='error'?'<div class="mw-empty" role="alert">'+esc(state.errors[key])+' <button data-mw-retry="'+key+'">Retry</button></div>':'<div class="mw-empty" role="status">Loading…</div>';
         const metric=(key,value)=>state.status[key]==='ready'?value:'…';
         const me=auth.user||auth,user=String(me.userName||me.loginName||'').toLowerCase();
@@ -154,12 +171,17 @@
         const markup=`
             <section class="mw-page mw-list-page">
                 <header class="mw-list-header" data-mw-region="header">
-                    <div>
-                        <span class="mw-list-kicker">WORK FOR</span>
-                        <h1>${esc(displayName)}</h1>
-                        <p>My Work · ${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</p>
+                    <div class="mw-header-line">
+                        <h1>My Work</h1>
+                        <span class="mw-header-person">${esc(displayName)}</span>
+                        <span class="mw-header-date">${selectedDate.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>
                     </div>
-                    <div class="mw-day-nav"><button type="button" aria-label="Previous day">‹</button><button type="button" class="today">Today</button><button type="button" aria-label="Next day">›</button><button type="button" class="calendar" aria-label="Choose date">▣</button></div>
+                    <div class="mw-day-nav" aria-label="My Work day navigator">
+                        <button type="button" data-mw-day="-1" aria-label="Previous day">‹</button>
+                        <button type="button" class="today" data-mw-day="today">Today</button>
+                        <button type="button" data-mw-day="1" aria-label="Next day">›</button>
+                        <label class="calendar" aria-label="Choose date"><span>▣</span><input type="date" data-mw-date value="${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}"></label>
+                    </div>
                 </header>
 
                 <div class="mw-list-layout">
@@ -248,6 +270,19 @@
             if(focused)existing.querySelector('[data-mw-filter="'+focused+'"]')?.focus();
         });
         state.root=genericView.querySelector('.mw-page');
+        genericView.querySelectorAll('[data-mw-day]').forEach(button=>button.onclick=()=>{
+            if(button.dataset.mwDay==='today')state.selectDay(new Date());
+            else{
+                const next=new Date(state.selectedDate||new Date());
+                next.setDate(next.getDate()+Number(button.dataset.mwDay||0));
+                state.selectDay(next);
+            }
+        });
+        const datePicker=genericView.querySelector('[data-mw-date]');
+        if(datePicker)datePicker.onchange=()=>{
+            const parts=String(datePicker.value||'').split('-').map(Number);
+            if(parts.length===3&&parts.every(Number.isFinite))state.selectDay(new Date(parts[0],parts[1]-1,parts[2]));
+        };
         genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
         genericView.querySelectorAll('[data-mw-filter]').forEach(button=>button.onclick=()=>{
             const filter=button.dataset.mwFilter;state.taskFilter=filter;
