@@ -201,6 +201,11 @@
                             <div class="mw-section-rows">${phase('schedule',sessionRows)}</div>
                         </div>
 
+                        <div class="mw-work-section" data-mw-region="pipeline">
+                            <div class="mw-section-title"><h3>Recent Jobs</h3><button data-nav="pipeline">View all →</button></div>
+                            <div class="mw-section-rows">${phase('jobs',recentRows)}</div>
+                        </div>
+
                     </section>
 
                     <aside class="mw-list-right">
