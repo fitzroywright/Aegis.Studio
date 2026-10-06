@@ -1975,3 +1975,229 @@ body[data-studio-view="mywork"] .avatar{width:40px;height:40px;background:#3b1d0
   .mw-session-location{font-size:12px}
   body[data-studio-view="mywork"] .studio-global-search{width:220px}
 }
+
+
+/* My Work visual-energy pass 2026-10-06 */
+body[data-studio-view="mywork"]{
+  background:#efece6
+}
+body[data-studio-view="mywork"] .generic{
+  background:
+    radial-gradient(circle at 14% 8%,rgba(180,112,58,.10),transparent 28%),
+    radial-gradient(circle at 84% 14%,rgba(43,112,126,.07),transparent 24%),
+    linear-gradient(180deg,#f7f4ef 0%,#f0ede7 100%)
+}
+body[data-studio-view="mywork"] .topbar{
+  background:rgba(255,253,249,.96);
+  backdrop-filter:blur(14px);
+  box-shadow:0 1px 0 #ddd7cf,0 5px 18px rgba(54,37,24,.04)
+}
+body[data-studio-view="mywork"] .shell-brand strong:before{
+  content:'◉  Studio';
+  color:#2d160b;
+  text-shadow:0 1px 0 #fff
+}
+body[data-studio-view="mywork"] .brand-button{
+  transition:background .14s ease,color .14s ease,border-color .14s ease
+}
+body[data-studio-view="mywork"] .brand-button:hover{
+  background:#f3ece5;
+  color:#5d2e17
+}
+body[data-studio-view="mywork"] .brand-button.active{
+  color:#5d2b14;
+  border-bottom-color:#8d4a25;
+  background:linear-gradient(180deg,transparent 0%,rgba(139,72,35,.06) 100%)
+}
+body[data-studio-view="mywork"] .studio-global-search input{
+  box-shadow:0 1px 2px rgba(48,30,17,.04);
+  background:#fffefd
+}
+body[data-studio-view="mywork"] .avatar{
+  box-shadow:0 0 0 3px #efe4d8
+}
+
+.mw-reference-page{
+  max-width:none;
+  padding-top:18px
+}
+.mw-reference-header h1{
+  color:#2b160b;
+  font-weight:760;
+  text-shadow:0 1px 0 rgba(255,255,255,.75)
+}
+.mw-reference-header p{
+  color:#77706a
+}
+.mw-day-nav button{
+  box-shadow:0 2px 7px rgba(63,42,28,.04)
+}
+.mw-day-nav .today{
+  color:#5f2f17;
+  background:linear-gradient(#fff,#faf6f1)
+}
+
+.mw-reference-page .mw-card{
+  border-color:#ddd7cf;
+  box-shadow:
+    0 1px 1px rgba(57,38,24,.03),
+    0 8px 24px rgba(57,38,24,.035);
+  transition:box-shadow .16s ease,transform .16s ease
+}
+.mw-reference-page .mw-card>header{
+  background:
+    linear-gradient(180deg,#fff 0%,#fcfaf7 100%);
+  border-bottom-color:#e8e2dc
+}
+.mw-reference-page .mw-card>header h2{
+  color:#20130d;
+  letter-spacing:-.2px
+}
+.mw-reference-page .mw-card>header h2:first-letter{
+  color:#9a572f
+}
+.mw-reference-page .mw-card>header button{
+  color:#0d6bd8;
+  font-weight:650
+}
+.mw-reference-page .mw-card>header button:hover{
+  color:#084f9f;
+  background:transparent
+}
+
+.mw-reference-sessions{
+  box-shadow:
+    inset 4px 0 0 #1e9e96,
+    0 10px 26px rgba(57,38,24,.035)
+}
+.mw-reference-attention{
+  box-shadow:
+    inset 4px 0 0 #de3b45,
+    0 10px 26px rgba(57,38,24,.035)
+}
+.mw-reference-tasks{
+  box-shadow:
+    inset 4px 0 0 #25a66a,
+    0 10px 26px rgba(57,38,24,.035)
+}
+.mw-reference-pipeline{
+  box-shadow:
+    inset 4px 0 0 #9b6337,
+    0 10px 26px rgba(57,38,24,.035)
+}
+.mw-reference-messages{
+  box-shadow:
+    inset 4px 0 0 #3078c8,
+    0 10px 26px rgba(57,38,24,.035)
+}
+
+.mw-session-row,
+.mw-attention-row,
+.mw-pipeline-row,
+.mw-task-row,
+.mw-message-row{
+  transition:background .12s ease,transform .12s ease
+}
+.mw-session-row:hover,
+.mw-attention-row:hover,
+.mw-pipeline-row:hover,
+.mw-task-row:hover,
+.mw-message-row:hover{
+  background:#fbf7f2;
+  transform:translateX(1px)
+}
+.mw-session-thumb,
+.mw-attention-thumb,
+.mw-pipeline-thumb{
+  box-shadow:0 2px 7px rgba(34,23,16,.11)
+}
+.mw-state-pill,
+.mw-pipeline-status,
+.mw-priority{
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)
+}
+
+.mw-reference-metrics{
+  border-color:#ddd7cf;
+  box-shadow:0 8px 24px rgba(57,38,24,.035)
+}
+.mw-reference-metrics article{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(115,70,34,.06);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7)
+}
+.mw-reference-metrics article:after{
+  content:'';
+  position:absolute;
+  width:58px;
+  height:58px;
+  border-radius:50%;
+  right:-18px;
+  top:-20px;
+  background:rgba(255,255,255,.45)
+}
+.mw-reference-metrics strong{
+  font-size:24px;
+  font-weight:750
+}
+.mw-reference-metrics small{
+  font-weight:600
+}
+
+.mw-two-line strong{
+  color:#201711;
+  font-weight:650
+}
+.mw-two-line small,
+.mw-message-copy small{
+  color:#6d675f
+}
+.mw-message-avatar{
+  background:linear-gradient(145deg,#f5dfce,#d9b99e);
+  color:#5a2c16;
+  box-shadow:0 2px 6px rgba(57,38,24,.10)
+}
+
+/* Undo stale selectors from the pre-reference My Tasks markup. */
+.mw-reference-tasks .mw-task-row>span{
+  display:block
+}
+.mw-reference-tasks .mw-task-row .mw-two-line{
+  display:block
+}
+.mw-reference-tasks .mw-task-row .mw-priority{
+  display:inline-block;
+  justify-self:center
+}
+.mw-reference-tasks .mw-task-row .mw-chevron{
+  display:block
+}
+.mw-reference-tasks .mw-task-row{
+  grid-template-columns:22px minmax(0,1fr) 64px 76px 18px
+}
+.mw-reference-tasks .mw-task-row .mw-two-line strong{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+/* Stronger, reference-like emphasis without increasing row height. */
+.mw-attention-row .mw-two-line strong,
+.mw-pipeline-row .mw-two-line strong,
+.mw-session-main strong{
+  font-weight:700
+}
+.mw-reference-attention .mw-due{
+  font-weight:600
+}
+.mw-reference-page .mw-empty{
+  display:grid;
+  place-items:center;
+  min-height:90px;
+  color:#8a8178;
+  font-size:13px;
+  background:
+    linear-gradient(135deg,rgba(159,109,70,.025) 25%,transparent 25%) 0 0/16px 16px
+}
