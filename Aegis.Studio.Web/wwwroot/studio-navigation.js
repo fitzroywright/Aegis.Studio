@@ -204,11 +204,6 @@
                             <div class="mw-section-rows">${phase('schedule',sessionRows)}</div>
                         </div>
 
-                        <div class="mw-work-section" data-mw-region="tasks">
-                            <div class="mw-section-title"><h3>My Tasks</h3><span>${metric('tasks',myTasks.length)}</span></div>
-                            <div class="mw-section-rows">${phase('tasks',taskRows)}</div>
-                        </div>
-
                         <div class="mw-work-section" data-mw-region="pipeline">
                             <div class="mw-section-title"><h3>Recent Work</h3><button data-nav="pipeline">View all →</button></div>
                             <div class="mw-section-rows">${phase('jobs',recentRows)}</div>
@@ -225,6 +220,11 @@
                                 <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">⇧</span><span>Awaiting upload</span><strong>${metric('jobs',uploadJobs)}</strong></button>
                                 <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">◆</span><span>Production exceptions</span><strong>${metric('jobs',exceptionJobs)}</strong></button>
                             </div>
+                        </section>
+
+                        <section class="mw-list-panel mw-right-tasks-panel" data-mw-region="tasks">
+                            <header><h2>☑ &nbsp; My Tasks</h2><small>${metric('tasks',myTasks.length)} open</small></header>
+                            <div class="mw-right-tasks">${phase('tasks',taskRows)}</div>
                         </section>
 
                         <section class="mw-list-panel mw-messages-panel" data-mw-region="messages">
