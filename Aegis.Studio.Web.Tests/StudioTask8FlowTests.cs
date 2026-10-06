@@ -1,5 +1,4 @@
 using Aegis.Studio.Web;
-using Aegis.Studio.Infrastructure.Email;
 using Aegis.Studio.Web.Email;
 using Aegis.Studio.Web.Storage;
 using Xunit;
