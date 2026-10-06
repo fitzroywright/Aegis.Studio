@@ -75,10 +75,11 @@
             state.schedule=[];
             state.status.schedule='loading';
             paintMyWork(state);
-        state.resolveWorkspace();
             load('schedule');
         };
-        paintMyWork(state);diagnostics.shellMs=Math.round(performance.now()-started);
+        paintMyWork(state);
+        state.resolveWorkspace();
+        diagnostics.shellMs=Math.round(performance.now()-started);
         // Two reads at a time: operational essentials first, enrichment afterwards.
         const pending=['tasks','schedule','jobs','auth','notifications','media'];
         async function worker(){
@@ -699,9 +700,25 @@
         const revision=++navigationRevision;
         myWorkLoad?.abort();
         setActive(view);
+        if(view!=='mywork'){
+            if(studioPageTools)studioPageTools.innerHTML='';
+            if(studioBreadcrumb){
+                const label=view==='workspaces'?'':view.replace(/(^|\s)\S/g,m=>m.toUpperCase());
+                studioBreadcrumb.innerHTML=`
+                    <details class="workspace-menu breadcrumb-workspace-menu" id="workspaceMenu">
+                        <summary class="workspace-breadcrumb-trigger"><span>Workspaces</span><span class="workspace-menu-caret">⌄</span></summary>
+                        <div class="workspace-menu-popover" id="workspaceMenuList" role="menu" aria-label="Workspaces"></div>
+                    </details>
+                    ${label?'<span class="breadcrumb-separator" aria-hidden="true">›</span><strong>'+esc(label)+'</strong>':''}`;
+                if(typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
+            }
+        }
         try{
             await route();
-            if(revision===navigationRevision)setActive(view);
+            if(revision===navigationRevision){
+                setActive(view);
+                if(view!=='mywork'&&typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
+            }
         }catch(error){
             if(revision!==navigationRevision)return;
             conversationView.classList.add('hidden');
