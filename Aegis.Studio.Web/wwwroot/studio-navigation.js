@@ -15,7 +15,7 @@
     function renderMyWork(){
         const controller=new AbortController(),revision=navigationRevision;
         const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],status:{},errors:{},taskFilter:'all'};
-        state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&document.body.dataset.studioView==='mywork'&&!genericView.classList.contains('hidden');};
+        state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['mywork','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         myWorkLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
         const started=performance.now(),run=globalThis.crypto?.randomUUID?.()||String(Date.now());
@@ -569,7 +569,7 @@
 
     const routes={
         mywork:renderMyWork,
-        messages:()=>window.studioNavigate('workspaces'),
+        messages:async()=>{conversationView.classList.remove('hidden');genericView.classList.add('hidden');await loadWorkspaces();await loadConversations();},
         schedule:()=>showPipeline(),
         tasks:renderMyWork,
         workspaces:renderWorkspaces,
