@@ -4304,3 +4304,24 @@ body[data-studio-view="mywork"] .generic{
     margin-top:0;
   }
 }
+
+
+/* My Work: use the available desktop width aggressively */
+.mw-list-page{
+  padding-left:10px;
+  padding-right:10px;
+}
+.mw-list-layout{
+  grid-template-columns:190px minmax(0,1fr) 245px;
+  gap:10px;
+}
+.mw-assigned-panel .mw-work-section[data-mw-region="schedule"]{
+  flex:1 1 auto;
+  border-bottom:0;
+}
+@media(min-width:1500px){
+  .mw-list-layout{
+    grid-template-columns:200px minmax(0,1fr) 255px;
+    gap:12px;
+  }
+}
