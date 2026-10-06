@@ -2201,3 +2201,119 @@ body[data-studio-view="mywork"] .avatar{
   background:
     linear-gradient(135deg,rgba(159,109,70,.025) 25%,transparent 25%) 0 0/16px 16px
 }
+
+
+/* My Work compact hero header 2026-10-06 */
+.mw-reference-header{
+  height:104px;
+  position:relative;
+  overflow:hidden;
+  align-items:center;
+  padding:0 20px 0 24px;
+  border:1px solid #d8cfc5;
+  border-radius:14px;
+  background:
+    radial-gradient(circle at 86% 50%,rgba(255,255,255,.11) 0 2px,transparent 3px),
+    linear-gradient(102deg,#fbf6ef 0%,#f1e5d8 42%,#c6a88f 70%,#4a2c1d 100%);
+  box-shadow:0 10px 30px rgba(60,38,22,.08)
+}
+.mw-reference-header:after{
+  content:'';
+  position:absolute;
+  right:120px;
+  top:-66px;
+  width:240px;
+  height:240px;
+  border-radius:50%;
+  background:
+    conic-gradient(from 15deg,
+      rgba(255,255,255,.10) 0 10deg,
+      transparent 10deg 55deg,
+      rgba(255,255,255,.08) 55deg 65deg,
+      transparent 65deg 110deg,
+      rgba(255,255,255,.08) 110deg 120deg,
+      transparent 120deg 165deg,
+      rgba(255,255,255,.08) 165deg 175deg,
+      transparent 175deg 220deg,
+      rgba(255,255,255,.08) 220deg 230deg,
+      transparent 230deg 275deg,
+      rgba(255,255,255,.08) 275deg 285deg,
+      transparent 285deg 330deg,
+      rgba(255,255,255,.08) 330deg 340deg,
+      transparent 340deg);
+  opacity:.9;
+  pointer-events:none
+}
+.mw-header-copy{
+  position:relative;
+  z-index:1
+}
+.mw-header-kicker{
+  display:block;
+  margin-bottom:4px;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:1.9px;
+  color:#9a5c35
+}
+.mw-reference-header h1{
+  font-size:36px;
+  line-height:1;
+  color:#271308;
+  letter-spacing:-1.15px
+}
+.mw-reference-header p{
+  margin-top:7px;
+  font-size:16px;
+  color:#6e6258
+}
+.mw-header-side{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  gap:18px
+}
+.mw-header-mark{
+  width:52px;
+  height:52px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.4);
+  background:
+    radial-gradient(circle,#6b4029 0 18%,transparent 19%),
+    conic-gradient(from 0deg,
+      #f4dfc8 0 45deg,
+      #d5b18f 45deg 90deg,
+      #f4dfc8 90deg 135deg,
+      #d5b18f 135deg 180deg,
+      #f4dfc8 180deg 225deg,
+      #d5b18f 225deg 270deg,
+      #f4dfc8 270deg 315deg,
+      #d5b18f 315deg 360deg);
+  box-shadow:0 6px 16px rgba(50,29,17,.14)
+}
+.mw-header-side .mw-day-nav{
+  padding:5px;
+  height:48px;
+  border:1px solid rgba(255,255,255,.30);
+  border-radius:12px;
+  background:rgba(255,255,255,.20);
+  backdrop-filter:blur(8px)
+}
+.mw-header-side .mw-day-nav button{
+  height:36px;
+  min-width:40px;
+  border:0;
+  color:#2d1b12;
+  background:rgba(255,255,255,.83);
+  box-shadow:none
+}
+.mw-header-side .mw-day-nav .today{
+  min-width:76px;
+  background:#fff;
+  color:#5e2f18
+}
+.mw-header-side .mw-day-nav .calendar{
+  margin-left:6px;
+  border-radius:8px
+}
