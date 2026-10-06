@@ -30,6 +30,7 @@ async function loadSignedInUser() {
     const signedInUser = document.getElementById('signedInUser');
     const userAvatar = document.getElementById('userAvatar');
     const signOutButton = document.getElementById('signOutButton');
+    const adminMenuButton = document.getElementById('adminMenuButton');
 
     if (signedInUser) {
         signedInUser.textContent = studioFirstName(user);
@@ -43,6 +44,8 @@ async function loadSignedInUser() {
             ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
             : source.slice(0, 2).toUpperCase();
     }
+
+    if (adminMenuButton) adminMenuButton.hidden = user.isAdministrator !== true;
 
     if (signOutButton) {
         signOutButton.onclick = async () => {
