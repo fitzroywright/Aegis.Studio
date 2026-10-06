@@ -16,7 +16,7 @@
 
     function renderMyWork(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date(),workspaceName:''};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date(),workspaceName:''};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['mywork','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         myWorkLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -57,16 +57,25 @@
         state.retry=key=>load(key);
         state.resolveWorkspace=async()=>{
             try{
-                if(typeof selectedWorkspace==='undefined'||!selectedWorkspace){state.workspaceName='';paintMyWork(state);return;}
-                let workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===String(selectedWorkspace));
-                if(!workspace&&typeof loadWorkspaces==='function'){
-                    await loadWorkspaces();
-                    workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===String(selectedWorkspace));
-                }
+                if(typeof loadWorkspaces==='function'&&(!Array.isArray(workspaceCache)||!workspaceCache.length))await loadWorkspaces();
+                const available=(typeof workspaceCache!=='undefined'?workspaceCache:[]).filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view);
+                const workspace=(typeof selectedWorkspace!=='undefined'&&selectedWorkspace)
+                    ? available.find(w=>String(w.id)===String(selectedWorkspace))
+                    : null;
                 state.workspaceName=workspace?.name||'';
+                const announcementWorkspaces=workspace?[workspace]:available.slice(0,6);
+                const results=await Promise.allSettled(announcementWorkspaces.map(async w=>{
+                    const items=await json('/api/workspaces/'+w.id+'/announcements');
+                    return (items||[]).map(a=>({...a,workspaceId:w.id,workspaceName:w.name}));
+                }));
+                state.announcements=results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
+                state.status.announcements='ready';
                 if(state.active())paintMyWork(state);
             }catch{
                 state.workspaceName='';
+                state.announcements=[];
+                state.status.announcements='error';
+                if(state.active())paintMyWork(state);
             }
         };
         state.selectDay=date=>{
@@ -118,6 +127,10 @@
         const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assetCount:0}}));
         const totalPhotos=state.media.reduce((sum,row)=>sum+row.assetCount,0);
         const messageNotifications=notifications.filter(n=>/message|conversation|reply/i.test(String(n.eventType||n.title||n.type||'')));
+        const combinedCommunicationFeed=[
+            ...messageNotifications.map(n=>({kind:'message',at:n.createdAtUtc||n.createdAt||0,item:n})),
+            ...state.announcements.map(a=>({kind:'announcement',at:a.createdAtUtc||a.createdAt||0,item:a}))
+        ].sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6);
         const activityNotifications=notifications.slice(0,8);
 
         const jobById=id=>jobs.find(j=>String(j.id)===String(id));
@@ -166,13 +179,24 @@
             </button>`;
         }).join('')||'<div class="mw-empty">No open tasks assigned to you.</div>';
 
-        const messageRows=messageNotifications.slice(0,5).map(n=>`<button class="mw-message-row" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
-            <span class="mw-message-avatar">${esc(String(n.subject||n.title||n.eventType||'M').slice(0,1))}</span>
-            <span class="mw-activity-dot ${n.isRead?'read':'unread'}"></span>
-            <span class="mw-message-copy"><strong>${esc(n.subject||n.title||'Studio message')}</strong><small>${esc(n.body||n.message||'New activity in Studio')}</small></span>
-            <span class="mw-message-time">${n.createdAtUtc?formatTime(n.createdAtUtc):''}</span>
-            <span class="mw-chevron">›</span>
-        </button>`).join('')||'<div class="mw-empty">No new messages.</div>';
+        const messageRows=combinedCommunicationFeed.map(entry=>{
+            if(entry.kind==='announcement'){
+                const a=entry.item;
+                return `<button class="mw-message-row announcement" data-announcement-workspace="${a.workspaceId||''}">
+                    <span class="mw-comm-type announcement" title="Announcement" aria-label="Announcement">!</span>
+                    <span class="mw-message-copy"><strong>${esc(a.title||'Announcement')}</strong><small>${esc((a.workspaceName?a.workspaceName+' · ':'')+(a.body||''))}</small></span>
+                    <span class="mw-message-time">${a.createdAtUtc?formatDay(a.createdAtUtc):''}</span>
+                    <span class="mw-chevron">›</span>
+                </button>`;
+            }
+            const n=entry.item;
+            return `<button class="mw-message-row message" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
+                <span class="mw-comm-type message" title="Message" aria-label="Message">✉</span>
+                <span class="mw-message-copy"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.eventType||'Studio message')}</small></span>
+                <span class="mw-message-time">${n.createdAtUtc?formatDay(n.createdAtUtc):''}</span>
+                <span class="mw-chevron">›</span>
+            </button>`;
+        }).join('')||'<div class="mw-empty">No messages or announcements.</div>';
 
         const recentRows=mediaSnapshots.slice(0,5).map(({job,media})=>{
             const image=imageForJob(job.id);
@@ -267,7 +291,7 @@
                         </section>
 
                         <section class="mw-list-panel mw-messages-panel" data-mw-region="messages">
-                            <header><h2><span class="mw-title-icon messages">✉</span> Messages</h2><button id="mwOpenNotifications">View all →</button></header>
+                            <header><h2><span class="mw-title-icon messages">✉</span> Messages &amp; Announcements</h2></header>
                             <div class="mw-compact-messages">${phase('notifications',messageRows)}</div>
                         </section>
                     </aside>
@@ -350,6 +374,12 @@
             await json('/api/notifications/'+button.dataset.notification+'/read',{method:'POST'});
             if(button.dataset.messageJob)await openWorkspaceJob(button.dataset.messageJob);
             else document.getElementById('notificationButton').click();
+        });
+        genericView.querySelectorAll('[data-announcement-workspace]').forEach(button=>button.onclick=async()=>{
+            const id=button.dataset.announcementWorkspace;
+            const workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===String(id));
+            if(workspace)await selectWorkspace(workspace.id,workspace.name);
+            else window.studioNavigate?.('workspaces');
         });
         genericView.querySelectorAll('[data-open-job]').forEach(button=>button.onclick=()=>{
             if(button.dataset.openJob)openWorkspaceJob(button.dataset.openJob).catch(error=>alert(error.message));

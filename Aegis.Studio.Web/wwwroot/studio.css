@@ -5140,3 +5140,70 @@ body[data-studio-view="mywork"] .generic{
   background:#f4fafc;
   border-bottom-color:#d7eaf3;
 }
+
+
+/* My Work communications feed: messages + announcements with type icons */
+.mw-messages-panel .mw-compact-messages{
+  padding:0 10px 4px;
+}
+.mw-messages-panel .mw-message-row{
+  min-height:50px;
+  height:50px;
+  grid-template-columns:24px minmax(0,1fr) 42px 12px;
+  gap:7px;
+  padding:5px 1px;
+}
+.mw-comm-type{
+  width:20px;
+  height:20px;
+  display:grid;
+  place-items:center;
+  border-radius:6px;
+  font-size:10px;
+  font-weight:900;
+  line-height:1;
+}
+.mw-comm-type.message{
+  background:#e5f0ff;
+  color:#1d6fbb;
+}
+.mw-comm-type.announcement{
+  background:#fff0df;
+  color:#c96c00;
+}
+.mw-message-row.message:hover .mw-comm-type.message{
+  background:#d8eaff;
+}
+.mw-message-row.announcement:hover .mw-comm-type.announcement{
+  background:#ffe7c8;
+}
+.mw-messages-panel .mw-message-copy{
+  min-width:0;
+}
+.mw-messages-panel .mw-message-copy strong{
+  display:block;
+  color:#17324f;
+  font-size:11px;
+  line-height:14px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.mw-messages-panel .mw-message-copy small{
+  display:block;
+  margin-top:1px;
+  color:#718097;
+  font-size:9.5px;
+  line-height:12px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.mw-messages-panel .mw-message-time{
+  font-size:9px;
+  color:#7e8b99;
+  text-align:right;
+}
+.mw-messages-panel .mw-chevron{
+  color:#9aa7b5;
+}
