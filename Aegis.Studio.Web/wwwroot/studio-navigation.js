@@ -323,12 +323,22 @@
                 <span class="breadcrumb-date">· ${selectedDate.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>`;
         }
         if(studioPageTools){
+            const today=new Date();
+            const isToday=selectedDate.getFullYear()===today.getFullYear()
+                && selectedDate.getMonth()===today.getMonth()
+                && selectedDate.getDate()===today.getDate();
+            const selectedDateLabel=isToday
+                ? 'Today'
+                : selectedDate.toLocaleDateString([],{month:'short',day:'numeric'});
             studioPageTools.innerHTML=`
                 <div class="mw-day-nav" aria-label="My Work day navigator">
-                    <button type="button" data-mw-day="-1" aria-label="Previous day">‹</button>
-                    <button type="button" class="today" data-mw-day="today">Today</button>
-                    <button type="button" data-mw-day="1" aria-label="Next day">›</button>
-                    <label class="calendar" aria-label="Choose date"><span>▣</span><input type="date" data-mw-date value="${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}"></label>
+                    <button type="button" class="mw-day-step" data-mw-day="-1" aria-label="Previous day">‹</button>
+                    <button type="button" class="mw-day-current" data-mw-day="today" title="${isToday?'Today':'Return to today'}">${selectedDateLabel}</button>
+                    <button type="button" class="mw-day-step" data-mw-day="1" aria-label="Next day">›</button>
+                    <label class="mw-calendar-trigger" aria-label="Choose date" title="Choose date">
+                        <span aria-hidden="true">▣</span>
+                        <input type="date" data-mw-date value="${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}">
+                    </label>
                 </div>`;
         }
         const shellScope=studioPageTools||genericView;
