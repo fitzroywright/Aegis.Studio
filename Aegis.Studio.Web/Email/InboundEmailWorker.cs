@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using Aegis.Studio.Application.EmailRouting;
-using Aegis.Studio.Infrastructure.Email;
+using Common.Messaging.Channels.MicrosoftGraph;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
@@ -10,7 +10,7 @@ namespace Aegis.Studio.Web.Email;
 
 public sealed class InboundEmailWorker : BackgroundService
 {
-    private readonly MicrosoftGraphEmailClient graphClient;
+    private readonly MicrosoftGraphMailboxClient graphClient;
     private readonly IInboundEmailRouter router;
     private readonly StudioStore store;
     private readonly StudioDatabase database;
@@ -23,7 +23,7 @@ public sealed class InboundEmailWorker : BackgroundService
     private readonly ILogger<InboundEmailWorker> logger;
 
     public InboundEmailWorker(
-        MicrosoftGraphEmailClient graphClient,
+        MicrosoftGraphMailboxClient graphClient,
         IInboundEmailRouter router,
         StudioStore store,
         StudioDatabase database,
@@ -63,10 +63,22 @@ public sealed class InboundEmailWorker : BackgroundService
             try
             {
                 string? deltaLink = deltaStateStore.GetDeltaLink();
-                GraphInboxDeltaBatch batch = await graphClient.GetInboxChangesAsync(deltaLink, stoppingToken);
+                MicrosoftGraphInboxDeltaBatch batch = await graphClient.GetInboxChangesAsync(deltaLink, stoppingToken);
 
-                foreach (InboundEmail email in batch.Messages)
+                foreach (MicrosoftGraphInboundMessage graphEmail in batch.Messages)
                 {
+                    InboundEmail email = new(
+                        graphEmail.MessageId,
+                        graphEmail.ConversationId,
+                        graphEmail.FromName,
+                        graphEmail.FromAddress,
+                        graphEmail.ToAddresses,
+                        graphEmail.CcAddresses,
+                        graphEmail.Headers,
+                        graphEmail.Subject,
+                        graphEmail.Body,
+                        graphEmail.ReceivedAtUtc,
+                        graphEmail.FileAttachments.Select(a => new InboundEmailAttachment(a.FileName, a.ContentType, a.Content, a.IsInline)).ToList());
                     string correlationId = email.MessageId;
                     operationsFlows.TryEnqueueInbound(correlationId, "Mailbox");
                     EmailRouteResult route = router.Route(email);
@@ -177,7 +189,7 @@ public sealed class InboundEmailWorker : BackgroundService
                     deltaStateStore.SaveDeltaLink(batch.DeltaLink);
                 }
             }
-            catch (GraphDeltaTokenExpiredException)
+            catch (MicrosoftGraphDeltaTokenExpiredException)
             {
                 logger.LogWarning("Microsoft Graph delta checkpoint expired. Clearing it so the next cycle can establish a fresh checkpoint.");
                 deltaStateStore.Clear();
