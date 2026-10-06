@@ -34,8 +34,7 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         this.logger = logger;
         this.recipientDirectory = new StudioMessageRecipientDirectory(profiles);
 
-        string connectionString = configuration.GetConnectionString("Studio")
-            ?? throw new InvalidOperationException("Studio PostgreSQL connection string is not configured for durable messaging.");
+        string connectionString = database.OpenConnection().ConnectionString;
 
         ExternalDeliveryOptions deliveryOptions = new()
         {
