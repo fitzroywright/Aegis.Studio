@@ -59,6 +59,7 @@
         dialog.showModal();
         await load();
     });
+    preferencesButton?.addEventListener('click', () => button.click());
     close?.addEventListener('click', () => dialog.close());
     cancel?.addEventListener('click', () => dialog.close());
 
