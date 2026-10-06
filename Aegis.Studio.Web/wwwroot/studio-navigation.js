@@ -171,14 +171,6 @@
                             </div>
                         </section>
 
-                        <section class="mw-list-panel mw-action-panel" data-mw-region="actions">
-                            <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
-                            <div class="mw-action-list">
-                                <button data-nav="schedule"><span>＋</span><span>My schedule</span><b>›</b></button>
-                                <button data-nav="tasks"><span>☑</span><span>My tasks</span><b>›</b></button>
-                            </div>
-                        </section>
-
                         <section class="mw-list-panel mw-quick-links-panel" data-mw-region="quick-links">
                             <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
                             <div class="mw-quick-link-list">
