@@ -1,6 +1,7 @@
 (() => {
     const dialog = document.getElementById('profileDialog');
     const button = document.getElementById('profileButton');
+    const preferencesButton = document.querySelector('[data-preferences]');
     const form = document.getElementById('profileForm');
     const close = document.getElementById('closeProfile');
     const cancel = document.getElementById('cancelProfile');
