@@ -16,7 +16,7 @@
 
     function renderMyWork(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date(),workspaceName:''};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date(),calendarMonth:new Date(),workspaceName:''};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['mywork','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         myWorkLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -80,6 +80,7 @@
         };
         state.selectDay=date=>{
             state.selectedDate=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+            state.calendarMonth=new Date(date.getFullYear(),date.getMonth(),1);
             urls.schedule=scheduleUrl(state.selectedDate);
             state.schedule=[];
             state.status.schedule='loading';
@@ -323,12 +324,24 @@
                 <span class="breadcrumb-date">· ${selectedDate.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>`;
         }
         if(studioPageTools){
+            const today=new Date();
+            const isToday=selectedDate.getFullYear()===today.getFullYear()
+                && selectedDate.getMonth()===today.getMonth()
+                && selectedDate.getDate()===today.getDate();
+            const selectedDateLabel=isToday
+                ? 'Today'
+                : selectedDate.toLocaleDateString([],{month:'short',day:'numeric'});
             studioPageTools.innerHTML=`
                 <div class="mw-day-nav" aria-label="My Work day navigator">
-                    <button type="button" data-mw-day="-1" aria-label="Previous day">‹</button>
-                    <button type="button" class="today" data-mw-day="today">Today</button>
-                    <button type="button" data-mw-day="1" aria-label="Next day">›</button>
-                    <label class="calendar" aria-label="Choose date"><span>▣</span><input type="date" data-mw-date value="${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}"></label>
+                    <button type="button" class="mw-day-step" data-mw-day="-1" aria-label="Previous day">‹</button>
+                    <button type="button" class="mw-day-current" data-mw-day="today" title="${isToday?'Today':'Return to today'}">${selectedDateLabel}</button>
+                    <button type="button" class="mw-day-step" data-mw-day="1" aria-label="Next day">›</button>
+                    <div class="mw-calendar-control">
+                        <button type="button" class="mw-calendar-trigger" data-mw-calendar-toggle aria-label="Choose date" aria-expanded="false" title="Choose date">
+                            <span aria-hidden="true">▣</span>
+                        </button>
+                        <div class="mw-calendar-popover" data-mw-calendar-popover hidden></div>
+                    </div>
                 </div>`;
         }
         const shellScope=studioPageTools||genericView;
@@ -340,11 +353,55 @@
                 state.selectDay(next);
             }
         });
-        const datePicker=shellScope.querySelector('[data-mw-date]');
-        if(datePicker)datePicker.onchange=()=>{
-            const parts=String(datePicker.value||'').split('-').map(Number);
-            if(parts.length===3&&parts.every(Number.isFinite))state.selectDay(new Date(parts[0],parts[1]-1,parts[2]));
+        const calendarToggle=shellScope.querySelector('[data-mw-calendar-toggle]');
+        const calendarPopover=shellScope.querySelector('[data-mw-calendar-popover]');
+        const renderCalendar=()=>{
+            if(!calendarPopover)return;
+            const cursor=state.calendarMonth||new Date(state.selectedDate||new Date());
+            const year=cursor.getFullYear(),month=cursor.getMonth();
+            const first=new Date(year,month,1),last=new Date(year,month+1,0);
+            const leading=(first.getDay()+6)%7;
+            const today=new Date();
+            const selected=state.selectedDate||today;
+            const cells=[];
+            for(let i=0;i<leading;i++)cells.push('<span class="mw-calendar-empty" aria-hidden="true"></span>');
+            for(let day=1;day<=last.getDate();day++){
+                const current=new Date(year,month,day);
+                const isSelected=current.getFullYear()===selected.getFullYear()&&current.getMonth()===selected.getMonth()&&current.getDate()===selected.getDate();
+                const isToday=current.getFullYear()===today.getFullYear()&&current.getMonth()===today.getMonth()&&current.getDate()===today.getDate();
+                cells.push('<button type="button" class="mw-calendar-day'+(isSelected?' selected':'')+(isToday?' is-today':'')+'" data-calendar-day="'+day+'" aria-label="'+current.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})+'">'+day+'</button>');
+            }
+            calendarPopover.innerHTML=
+                '<div class="mw-calendar-head"><button type="button" data-calendar-month="-1" aria-label="Previous month">‹</button><strong>'+cursor.toLocaleDateString([],{month:'long',year:'numeric'})+'</strong><button type="button" data-calendar-month="1" aria-label="Next month">›</button></div>'+
+                '<div class="mw-calendar-week"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>'+
+                '<div class="mw-calendar-grid">'+cells.join('')+'</div>'+
+                '<button type="button" class="mw-calendar-today" data-calendar-today>Today</button>';
+            calendarPopover.querySelectorAll('[data-calendar-month]').forEach(button=>button.onclick=()=>{
+                state.calendarMonth=new Date(year,month+Number(button.dataset.calendarMonth||0),1);
+                renderCalendar();
+            });
+            calendarPopover.querySelectorAll('[data-calendar-day]').forEach(button=>button.onclick=()=>{
+                calendarPopover.hidden=true;
+                calendarToggle?.setAttribute('aria-expanded','false');
+                state.selectDay(new Date(year,month,Number(button.dataset.calendarDay)));
+            });
+            calendarPopover.querySelector('[data-calendar-today]')?.addEventListener('click',()=>{
+                calendarPopover.hidden=true;
+                calendarToggle?.setAttribute('aria-expanded','false');
+                state.selectDay(new Date());
+            });
         };
+        if(calendarToggle&&calendarPopover){
+            calendarToggle.onclick=()=>{
+                const opening=calendarPopover.hidden;
+                calendarPopover.hidden=!opening;
+                calendarToggle.setAttribute('aria-expanded',String(opening));
+                if(opening){
+                    state.calendarMonth=new Date(state.selectedDate.getFullYear(),state.selectedDate.getMonth(),1);
+                    renderCalendar();
+                }
+            };
+        }
         studioBreadcrumb?.querySelector('[data-shell-nav="mywork"]')?.addEventListener('click',()=>window.studioNavigate?.('mywork'));
         studioBreadcrumb?.querySelector('[data-current-workspace]')?.addEventListener('click',()=>{
             if(typeof selectedWorkspace!=='undefined'&&selectedWorkspace){
