@@ -5,11 +5,21 @@ namespace Aegis.Studio.Web.Persistence;
 public sealed class StudioDatabase
 {
     private readonly NpgsqlDataSource dataSource;
+    private readonly string? connectionString;
 
     public StudioDatabase(NpgsqlDataSource dataSource)
     {
         this.dataSource = dataSource;
     }
+
+    public StudioDatabase(NpgsqlDataSource dataSource, string connectionString)
+    {
+        this.dataSource = dataSource;
+        this.connectionString = connectionString;
+    }
+
+    public string ConnectionString => connectionString
+        ?? throw new InvalidOperationException("The resolved Studio connection string is not available.");
 
     public NpgsqlConnection OpenConnection() => dataSource.OpenConnection();
 
