@@ -3233,3 +3233,541 @@ body[data-studio-view="tasks"] .mw-page{
   .studio-page-heading,.job-detail-header,.admin-page-header{min-height:98px}
   .op-metrics,.cards,.management-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Studio clean-polish reset inspired by Request Portal discipline 2026-10-06 */
+:root{
+  --studio-page:#f3f7fa;
+  --studio-card:#ffffff;
+  --studio-border:#d7e0e8;
+  --studio-border-soft:#e7edf2;
+  --studio-ink:#10243a;
+  --studio-muted:#647589;
+  --studio-accent:#176fc1;
+  --studio-accent-soft:#e9f3fc;
+  --studio-warm:#8a4b24;
+  --studio-success:#13894d;
+  --studio-warning:#d88a00;
+  --studio-danger:#d93c43;
+}
+
+/* Shell: quiet, crisp and consistent. */
+body[data-studio-view]{
+  background:var(--studio-page)
+}
+body[data-studio-view] .topbar{
+  height:58px;
+  padding:0 28px;
+  gap:12px;
+  background:#fff;
+  border-bottom:1px solid var(--studio-border);
+  box-shadow:0 1px 3px rgba(23,52,78,.05)
+}
+body[data-studio-view] .shell{
+  height:calc(100dvh - 58px)
+}
+body[data-studio-view] .shell-brand strong:before{
+  content:'◉  Studio';
+  color:#10243a;
+  font-size:19px;
+  font-weight:800
+}
+body[data-studio-view] .rail{
+  height:58px;
+  margin-left:12px
+}
+body[data-studio-view] .brand-button{
+  height:58px;
+  padding:0 10px;
+  color:#25394d;
+  border-bottom:3px solid transparent;
+  background:#fff;
+  font-size:12px;
+  font-weight:700
+}
+body[data-studio-view] .brand-button:hover{
+  color:var(--studio-accent);
+  background:#f8fbfd
+}
+body[data-studio-view] .brand-button.active{
+  height:58px;
+  color:#153d65;
+  border-bottom-color:#2789dc;
+  background:#f8fbfd;
+  box-shadow:none
+}
+body[data-studio-view] .studio-global-search{
+  height:36px;
+  width:280px
+}
+body[data-studio-view] .studio-global-search:before{
+  top:2px;
+  color:#718397
+}
+body[data-studio-view] .studio-global-search input{
+  height:36px;
+  border:1px solid var(--studio-border);
+  border-radius:7px;
+  background:#fff;
+  box-shadow:none
+}
+body[data-studio-view] .avatar{
+  width:36px;
+  height:36px;
+  background:#334c63;
+  box-shadow:none
+}
+body[data-studio-view] .shell-icon-button{
+  height:36px
+}
+
+/* Page surfaces: no decorative gradients. */
+body[data-studio-view] .generic,
+body:not([data-studio-view="mywork"]):not([data-studio-view="workspaces"]) .generic{
+  padding:16px 28px 24px;
+  background:var(--studio-page)
+}
+
+/* Compact page headers. */
+.mw-reference-header,
+.workspace-wow-header,
+.studio-page-heading,
+.job-detail-header,
+.admin-page-header{
+  min-height:82px;
+  height:auto;
+  margin:0 0 12px;
+  padding:15px 18px;
+  overflow:visible;
+  border:1px solid var(--studio-border);
+  border-radius:7px;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(23,52,78,.05)
+}
+.mw-reference-header:after,
+.workspace-wow-header:after,
+.studio-page-heading:after,
+.job-detail-header:after,
+.admin-page-header:after{
+  display:none
+}
+.mw-header-mark,
+.workspace-wow-header-art{
+  display:none
+}
+.mw-header-kicker,
+.workspace-wow-kicker{
+  margin-bottom:3px;
+  color:#a85d00;
+  font-size:9px;
+  font-weight:850;
+  letter-spacing:1.2px
+}
+.mw-reference-header h1,
+.workspace-wow-header h1,
+.studio-page-heading h1,
+.job-detail-header h1,
+.admin-page-header h1{
+  color:var(--studio-ink);
+  font-size:28px;
+  line-height:1.05;
+  letter-spacing:-.6px;
+  text-shadow:none
+}
+.mw-reference-header p,
+.workspace-wow-header p,
+.studio-page-heading p,
+.job-detail-header p,
+.admin-page-header p{
+  margin-top:5px;
+  color:var(--studio-muted);
+  font-size:13px
+}
+.mw-header-side{
+  gap:10px
+}
+.mw-header-side .mw-day-nav{
+  height:40px;
+  padding:0;
+  border:1px solid var(--studio-border);
+  border-radius:7px;
+  background:#fff;
+  backdrop-filter:none
+}
+.mw-header-side .mw-day-nav button{
+  height:38px;
+  min-width:40px;
+  border-right:1px solid var(--studio-border);
+  border-radius:0;
+  background:#fff;
+  color:#263d54
+}
+.mw-header-side .mw-day-nav button:first-child{border-radius:6px 0 0 6px}
+.mw-header-side .mw-day-nav .today{
+  min-width:74px;
+  color:#173b5e;
+  background:#fff
+}
+.mw-header-side .mw-day-nav .calendar{
+  margin-left:0;
+  border-right:0;
+  border-radius:0 6px 6px 0
+}
+.workspace-wow-new{
+  height:38px;
+  min-width:142px;
+  border:1px solid #176fc1;
+  border-radius:6px;
+  background:#176fc1;
+  color:#fff;
+  box-shadow:none
+}
+.workspace-wow-new:hover{background:#105da4}
+
+/* Cards: Request-Portal-like discipline. */
+.mw-reference-page .mw-card,
+.workspace-wow-list-card,
+.workspace-wow-side-card,
+.op-card,
+.production-queue-card,
+.pos-panel,
+.pos-history,
+.studio-card,
+.admin-summary-card,
+.admin-card{
+  border:1px solid var(--studio-border);
+  border-radius:8px;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(23,52,78,.045)
+}
+.mw-reference-page .mw-card,
+.workspace-wow-list-card,
+.workspace-wow-side-card,
+body[data-studio-view="frontdesk"] .op-card,
+body[data-studio-view="production"] .production-queue-card,
+body[data-studio-view="finance"] .op-card,
+body[data-studio-view="reports"] .op-card{
+  box-shadow:0 1px 3px rgba(23,52,78,.045)
+}
+.mw-reference-page .mw-card>header,
+.workspace-wow-list-card>header,
+.workspace-wow-side-card>header,
+.op-card>header,
+.production-queue-card>header,
+.pos-panel>.pane-heading,
+.admin-card-header{
+  min-height:44px;
+  padding:8px 14px;
+  border-bottom:1px solid var(--studio-border);
+  background:#fbfcfd
+}
+.mw-reference-page .mw-card>header h2,
+.workspace-wow-list-card>header h2,
+.workspace-wow-side-card>header h2,
+.op-card>header h2,
+.production-queue-card h2,
+.pos-panel h2{
+  color:var(--studio-ink);
+  font-size:14px;
+  font-weight:800
+}
+.mw-reference-page .mw-card>header button{
+  color:var(--studio-accent);
+  font-size:11px;
+  font-weight:750
+}
+
+/* My Work: tighter and cleaner while retaining two-line rows. */
+.mw-reference-page{
+  padding:0;
+  gap:12px;
+  background:transparent
+}
+.mw-reference-grid{
+  gap:12px
+}
+.mw-reference-left,.mw-reference-right{
+  gap:12px
+}
+.mw-reference-sessions,
+.mw-reference-attention{
+  height:300px
+}
+.mw-reference-sessions>div,
+.mw-reference-attention>div{
+  height:256px
+}
+.mw-reference-metrics{
+  height:104px;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid var(--studio-border);
+  border-radius:8px;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(23,52,78,.045)
+}
+.mw-reference-metrics article{
+  padding:9px 11px;
+  border:1px solid var(--studio-border-soft);
+  border-radius:6px;
+  background:#f8fbfd!important;
+  box-shadow:none
+}
+.mw-reference-metrics article:after{display:none}
+.mw-reference-metrics article>span{
+  color:#356f9f!important;
+  font-size:18px
+}
+.mw-reference-metrics strong{
+  color:var(--studio-ink);
+  font-size:21px
+}
+.mw-reference-metrics small{
+  color:#5f7183;
+  font-size:11px
+}
+.mw-reference-pipeline{
+  height:310px
+}
+.mw-reference-pipeline>div{
+  height:266px
+}
+.mw-reference-tasks{
+  height:176px
+}
+.mw-reference-tasks>div{
+  height:132px
+}
+.mw-reference-messages{
+  height:246px
+}
+.mw-reference-messages>div{
+  height:202px
+}
+.mw-session-row,
+.mw-attention-row,
+.mw-pipeline-row,
+.mw-task-row,
+.mw-message-row{
+  border-bottom-color:var(--studio-border-soft);
+  background:#fff;
+  transform:none
+}
+.mw-session-row:hover,
+.mw-attention-row:hover,
+.mw-pipeline-row:hover,
+.mw-task-row:hover,
+.mw-message-row:hover{
+  background:#f5f9fc;
+  transform:none
+}
+.mw-session-thumb,
+.mw-attention-thumb,
+.mw-pipeline-thumb,
+.mw-message-avatar{
+  box-shadow:none
+}
+.mw-two-line strong,.mw-session-main strong,.mw-message-copy strong{
+  color:#15283b
+}
+.mw-two-line small,.mw-session-main span,.mw-message-copy small{
+  color:#68798a
+}
+.mw-count{
+  background:#edf2f6;
+  color:#40566a
+}
+.mw-count.danger{
+  background:#fde7e8;
+  color:#bd3139
+}
+
+/* Workspaces: center the work list; side cards support it rather than decorate it. */
+.workspace-wow-page{
+  padding:0;
+  gap:12px
+}
+.workspace-wow-overview{
+  gap:10px
+}
+.workspace-wow-overview article{
+  min-height:76px;
+  padding:10px 12px;
+  border:1px solid var(--studio-border);
+  border-radius:7px;
+  background:#fff!important;
+  box-shadow:0 1px 3px rgba(23,52,78,.04)
+}
+.workspace-wow-overview article>span{
+  width:31px;
+  height:31px;
+  border-radius:6px;
+  background:#edf5fb;
+  color:#176fc1
+}
+.workspace-wow-overview strong{
+  color:var(--studio-ink);
+  font-size:21px
+}
+.workspace-wow-overview small{
+  color:#68798a;
+  font-size:11px
+}
+.workspace-wow-toolbar{
+  min-height:46px;
+  padding:5px 8px;
+  border:1px solid var(--studio-border);
+  border-radius:7px;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(23,52,78,.035)
+}
+.workspace-wow-toolbar .workspace-reference-tabs button{
+  min-height:34px;
+  color:#52677a
+}
+.workspace-wow-toolbar .workspace-reference-tabs button.active{
+  color:#125fa4;
+  background:#eaf4fc
+}
+.workspace-wow-search input,
+.workspace-wow-toolbar select{
+  border-color:var(--studio-border);
+  border-radius:6px
+}
+.workspace-wow-layout{
+  gap:12px
+}
+.workspace-wow-list-card{
+  min-height:500px
+}
+.workspace-wow-list-card>header p{
+  color:#708092
+}
+.workspace-wow-list-count{
+  background:#eaf4fc;
+  color:#176fc1
+}
+.workspace-wow-list{
+  padding:0 12px 8px
+}
+.workspace-wow-row{
+  border-bottom-color:var(--studio-border-soft)
+}
+.workspace-wow-main{
+  min-height:66px;
+  gap:10px;
+  background:#fff
+}
+.workspace-wow-main:hover{
+  background:#f5f9fc;
+  transform:none
+}
+.workspace-wow-thumb{
+  width:46px;
+  height:46px;
+  border-radius:6px;
+  box-shadow:none
+}
+.workspace-wow-copy strong{color:#15283b}
+.workspace-wow-copy small{color:#6b7c8d}
+.workspace-wow-stat b{color:#21384d}
+.workspace-wow-stat small{color:#7a8997}
+.workspace-wow-previews img,.workspace-wow-previews i{
+  border-color:#fff;
+  box-shadow:0 0 0 1px #dfe6ec
+}
+.workspace-wow-side{
+  gap:12px
+}
+.workspace-wow-side-card.announcements,
+.workspace-wow-side-card.actions{
+  min-height:0
+}
+.workspace-wow-announcement{
+  border-bottom-color:var(--studio-border-soft)
+}
+.workspace-wow-side-card.actions button{
+  border-bottom-color:var(--studio-border-soft)
+}
+.workspace-wow-side-card.actions button:hover{
+  background:#f5f9fc
+}
+.workspace-wow-side-card.actions button>span:first-child{
+  background:#eaf4fc;
+  color:#176fc1
+}
+
+/* Shared KPI / filters / tables. */
+.op-metric,.metric{
+  min-height:74px;
+  padding:11px 13px;
+  border:1px solid var(--studio-border);
+  border-radius:7px;
+  background:#fff!important;
+  box-shadow:0 1px 3px rgba(23,52,78,.04)
+}
+.op-metric:after,.metric:after{display:none}
+.op-metric strong,.metric strong{
+  color:var(--studio-ink);
+  font-size:21px
+}
+.workspace-tabs,.production-filters,.pipeline-planning-toolbar{
+  min-height:44px;
+  margin-bottom:12px;
+  padding:5px 7px;
+  border:1px solid var(--studio-border);
+  border-radius:7px;
+  background:#fff;
+  box-shadow:none
+}
+.workspace-tabs button.active,
+.production-filters>button.active,
+.pipeline-view-switch button.active{
+  color:#125fa4;
+  background:#eaf4fc
+}
+.studio-table thead th,.pos-grid thead th{
+  background:#eef4f8;
+  color:#425b72;
+  border-bottom-color:var(--studio-border)
+}
+.studio-table tbody td,.pos-grid tbody td{
+  border-bottom-color:var(--studio-border-soft)
+}
+.studio-table tbody tr:hover,.pos-grid tbody tr:hover{
+  background:#f5f9fc
+}
+.job-row,.front-desk-row,.frontdesk-client-row,.pos-catalog-item{
+  border-color:var(--studio-border-soft)!important
+}
+.job-row:hover,.front-desk-row:hover,.frontdesk-client-row:hover,.pos-catalog-item:hover{
+  background:#f5f9fc;
+  transform:none
+}
+
+/* Status colors remain useful but subdued. */
+.workspace-reference-pill.active,
+.mw-state-pill.in-progress{
+  background:#e4f5ea;
+  color:#147a43
+}
+.workspace-reference-pill.completed{
+  background:#e9f1fb;
+  color:#2d6396
+}
+.workspace-reference-pill.ready{
+  background:#fff2d8;
+  color:#8c5d00
+}
+.mw-pipeline-status,.mw-state-pill{
+  box-shadow:none
+}
+
+/* Responsive density. */
+@media(max-width:1250px){
+  body[data-studio-view] .topbar{padding-left:18px;padding-right:18px}
+  body[data-studio-view] .brand-button{padding-left:6px;padding-right:6px;font-size:11px}
+  body[data-studio-view] .studio-global-search{width:205px}
+  body[data-studio-view] .generic,
+  body:not([data-studio-view="mywork"]):not([data-studio-view="workspaces"]) .generic{padding-left:18px;padding-right:18px}
+}
