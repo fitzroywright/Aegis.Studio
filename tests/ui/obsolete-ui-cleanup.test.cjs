@@ -36,4 +36,5 @@ test('obsolete workspace sidebar presentation is not wired into the current shel
   assert.equal(outlook.includes('legacyAllButton'), false);
   assert.equal(outlook.includes("getElementById('workspaceSearch')"), false);
   assert.equal(outlook.includes("getElementById('workspaceRefresh')"), false);
+  assert.equal(outlook.includes('legacy-attachments'), false);
 });
