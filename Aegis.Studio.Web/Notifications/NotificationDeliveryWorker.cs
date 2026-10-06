@@ -34,7 +34,7 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         this.logger = logger;
         this.recipientDirectory = new StudioMessageRecipientDirectory(profiles);
 
-        string connectionString = database.OpenConnection().ConnectionString;
+        string connectionString = database.ConnectionString;
 
         ExternalDeliveryOptions deliveryOptions = new()
         {
