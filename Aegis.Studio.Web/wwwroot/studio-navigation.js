@@ -69,7 +69,7 @@
         const metric=(key,value)=>state.status[key]==='ready'?value:'…';
         const me=auth.user||auth,user=String(me.userName||me.loginName||'').toLowerCase();
         const displayName=String(me.displayName||me.name||me.userName||'Jordan').trim();
-        const firstName=(displayName.split(/[\\s\\\\@.]+/).filter(Boolean)[0]||'Jordan');
+        const firstName=(displayName.split(/[\s\\@.]+/).filter(Boolean)[0]||'Jordan');
         const hour=now.getHours(),greeting=hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
         const roles=[...(Array.isArray(me.roles)?me.roles:[]),...(Array.isArray(auth.roles)?auth.roles:[])].map(x=>String(x).toLowerCase());
         const isManager=me.isAdministrator===true||auth.isAdministrator===true||roles.some(r=>/administrator|manager|owner|finance/.test(r));
