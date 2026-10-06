@@ -91,117 +91,113 @@
             return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/preview?size=thumbnail':'';
         };
 
-        const recentCards=mediaSnapshots.slice(0,4).map(({job,media})=>{
-            const image=imageForJob(job.id);
-            const count=state.status.media==='ready'?media.assetCount:'…';
-            return `<button class="mw-recent-card" data-open-job="${job.id}">
-                <div class="mw-recent-image">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>📷</span>'}</div>
-                <div class="mw-recent-copy">
-                    <strong>${esc(job.title)}</strong>
-                    <span>${count} photos · ${esc(job.status||'')}</span>
-                </div>
-            </button>`;
-        }).join('');
-
-        const sessionRows=todaySchedule.map(entry=>{
+        const sessionRows=todaySchedule.slice(0,5).map((entry,index)=>{
             const job=scheduleJob(entry);
             const image=entry.jobId?imageForJob(entry.jobId):'';
+            const start=new Date(entry.startsAtUtc||entry.start||entry.startsAt);
+            const end=new Date(entry.endsAtUtc||entry.end||entry.endsAt);
+            const stateLabel=end<now?'Finished':start<=now?'In Progress':'Upcoming';
             return `<button class="mw-session-row" data-open-job="${entry.jobId||job.id||''}">
-                <div class="mw-session-time"><strong>${formatTime(entry.startsAtUtc||entry.start||entry.startsAt)}</strong><span>${formatTime(entry.endsAtUtc||entry.end||entry.endsAt)}</span></div>
+                <span class="mw-session-accent ${index===0?'active':''}"></span>
+                <div class="mw-session-time"><strong>${formatTime(start)} – ${formatTime(end)}</strong></div>
                 <div class="mw-session-thumb">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>📷</span>'}</div>
-                <div class="mw-session-main"><strong>${esc(job.title||entry.title||'Session')}</strong><span>${esc(job.clientName||'')}</span><span>${esc(entry.location||'Location not set')}</span></div>
-                <span class="mw-state-pill">${esc(entry.status||'Upcoming')}</span>
-                <span class="mw-kebab">⋮</span>
+                <div class="mw-session-main"><strong>${esc(job.title||entry.title||'Session')}</strong><span>${esc(job.clientName||entry.title||'Photography session')}</span></div>
+                <span class="mw-session-location">⌖ &nbsp;${esc(entry.location||'Location not set')}</span>
+                <span class="mw-state-pill ${stateLabel==='In Progress'?'in-progress':''}">${stateLabel}</span>
+                <span class="mw-kebab">•••</span>
             </button>`;
         }).join('')||'<div class="mw-empty">No sessions scheduled today.</div>';
 
-        const taskRows=myTasks.slice(0,5).map(task=>`<button class="mw-task-row" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
+        const taskRows=myTasks.slice(0,4).map(task=>`<button class="mw-task-row" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
             <span class="mw-check"></span>
-            <strong>${esc(task.title)}</strong>
-            <span>${esc(task.activityType||'Photography')}</span>
-            <span class="mw-due">${task.dueAtUtc?formatDay(task.dueAtUtc):'Open'}</span>
+            <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(task.activityType||'Photography')}</small></span>
+            <span class="mw-due">${task.dueAtUtc?formatDay(task.dueAtUtc):'Today'}</span>
             <span class="mw-priority ${String(task.priority||'').toLowerCase()}">${esc(task.priority||'Normal')}</span>
-            <span class="mw-kebab">⋮</span>
+            <span class="mw-chevron">›</span>
         </button>`).join('')||'<div class="mw-empty">No open tasks assigned to you.</div>';
 
-        const scheduleRows=todaySchedule.map((entry,index)=>{
-            const job=scheduleJob(entry);
-            return `<button class="mw-schedule-row" data-open-job="${entry.jobId||job.id||''}">
-                <span class="mw-timeline-dot ${index===0?'now':''}"></span>
-                <span class="mw-schedule-time">${formatTime(entry.startsAtUtc||entry.start||entry.startsAt)}</span>
-                <span class="mw-schedule-copy"><strong>${esc(job.title||entry.title||'Session')}</strong><small>${esc(entry.location||'Location not set')}</small></span>
-                <span class="mw-when">${new Date(entry.endsAtUtc)<now?'Finished':new Date(entry.startsAtUtc)<=now?'Now':'Upcoming'}</span>
-            </button>`;
-        }).join('')||'<div class="mw-empty">No schedule items today.</div>';
-
-        const messageRows=messageNotifications.slice(0,3).map(n=>`<button class="mw-message-row" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
+        const messageRows=messageNotifications.slice(0,5).map(n=>`<button class="mw-message-row" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
             <span class="mw-message-avatar">${esc(String(n.subject||n.title||n.eventType||'M').slice(0,1))}</span>
+            <span class="mw-activity-dot ${n.isRead?'read':'unread'}"></span>
             <span class="mw-message-copy"><strong>${esc(n.subject||n.title||'Studio message')}</strong><small>${esc(n.body||n.message||'New activity in Studio')}</small></span>
             <span class="mw-message-time">${n.createdAtUtc?formatTime(n.createdAtUtc):''}</span>
+            <span class="mw-chevron">›</span>
         </button>`).join('')||'<div class="mw-empty">No new messages.</div>';
 
-        const activityRows=activityNotifications.slice(0,4).map(n=>`<div class="mw-activity-row">
-            <span class="mw-activity-icon">✓</span>
-            <span><strong>${esc(n.subject||n.title||n.eventType||'Studio activity')}</strong><small>${esc(n.body||n.message||'')}</small></span>
-            <time>${n.createdAtUtc?formatTime(n.createdAtUtc):''}</time>
-        </div>`).join('')||'<div class="mw-empty">No recent activity.</div>';
+        const recentRows=mediaSnapshots.slice(0,5).map(({job,media})=>{
+            const image=imageForJob(job.id);
+            const count=state.status.media==='ready'?media.assetCount:'…';
+            const status=job.status||'Active';
+            return `<button class="mw-pipeline-row" data-open-job="${job.id}">
+                <span class="mw-pipeline-thumb">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>📷</span>'}</span>
+                <span class="mw-two-line"><strong>${esc(job.title)}</strong><small>${esc(job.clientName||job.jobType||'Photography')} · ${count} photos</small></span>
+                <span class="mw-pipeline-status">${esc(status)}</span>
+                <span class="mw-pipeline-due">${job.dueAtUtc?'Due '+formatDay(job.dueAtUtc):''}</span>
+                <span class="mw-chevron">›</span>
+            </button>`;
+        }).join('')||'<div class="mw-empty">No recent work.</div>';
 
-        const pipelineCounts={
-            capture:jobs.filter(j=>/photo|capture|scheduled/i.test(j.status||'')).length,
-            edit:jobs.filter(j=>/edit|process/i.test(j.status||'')).length,
-            review:jobs.filter(j=>/review|approval/i.test(j.status||'')).length,
-            deliver:jobs.filter(j=>/deliver|ready|complete/i.test(j.status||'')).length
-        };
         const overdueTasks=myTasks.filter(t=>t.dueAtUtc&&new Date(t.dueAtUtc)<now).length;
-        const blockedTasks=myTasks.filter(t=>/blocked|waiting/i.test(String(t.status||'')+' '+String(t.blockedReason||''))).length;
-        const attentionJobs=jobs.filter(j=>/blocked|overdue|needs scheduling|awaiting upload/i.test(j.status||'')).length;
-        const quickLinks=[
-            ['workspaces','Workspaces',jobs.length],
-            ['pipeline','Pipeline',todaySchedule.length],
-            ['production','Production',myTasks.filter(t=>/edit|retouch|qc|print|deliver|production/i.test(t.activityType||'')).length],
-            ['frontdesk','Front Desk',messageNotifications.length],
-            ...(isManager?[['finance','Finance',''],['management','Management','']]:[])
-        ];
+        const attentionJobs=jobs.filter(j=>/blocked|overdue|needs scheduling|awaiting upload|exception/i.test(j.status||'')).length;
+        const productionTasks=myTasks.filter(t=>/edit|retouch|qc|print|deliver|production|gallery|select|design|color|review|upload|schedule/i.test(String(t.activityType||'')+' '+String(t.title||'')));
+        const attentionItems=[...productionTasks,...myTasks.filter(t=>!productionTasks.includes(t))].slice(0,5);
+        const attentionRows=attentionItems.map((task,index)=>{
+            const job=jobById(task.jobId)||{};
+            const image=imageForJob(task.jobId);
+            const priority=task.priority||((task.dueAtUtc&&new Date(task.dueAtUtc)<now)?'High':'Medium');
+            return `<button class="mw-attention-row" data-open-job="${task.jobId||''}">
+                <span class="mw-attention-thumb">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>!</span>'}</span>
+                <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(job.title||task.activityType||'Studio work')}</small></span>
+                <span class="mw-due">${task.dueAtUtc?formatDay(task.dueAtUtc):'Today'}</span>
+                <span class="mw-priority ${String(priority).toLowerCase()}">${esc(priority)}</span>
+                <span class="mw-chevron">›</span>
+            </button>`;
+        }).join('')||'<div class="mw-empty">Nothing needs attention right now.</div>';
 
-        const productionTasks=myTasks.filter(t=>/edit|retouch|qc|print|deliver|production|gallery|select|design|color|review/i.test(String(t.activityType||'')+' '+String(t.title||'')));
-        const attentionItems=productionTasks.slice(0,5);
         const markup=`
-            <section class="mw-page">
-                <header class="mw-hero" data-mw-region="header">
-                    <div class="mw-hero-copy"><h1>${greeting}, ${esc(firstName)}</h1><p>Here's what's happening in your studio today.</p></div>
-                    <div class="mw-hero-date"><strong>${now.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</strong><div><button type="button">‹</button><button type="button" class="today">Today</button><button type="button">›</button></div></div>
+            <section class="mw-page mw-reference-page">
+                <header class="mw-reference-header" data-mw-region="header">
+                    <div><h1>My Work</h1><p>${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</p></div>
+                    <div class="mw-day-nav"><button type="button" aria-label="Previous day">‹</button><button type="button" class="today">Today</button><button type="button" aria-label="Next day">›</button><button type="button" class="calendar" aria-label="Choose date">▣</button></div>
                 </header>
-                <div class="mw-metrics" data-mw-region="metrics">
-                    <article class="mw-metric"><span class="mw-metric-icon blue">▣</span><div><strong>${metric('schedule',todaySchedule.length)}</strong><b>Appointments Today</b><small>${todaySchedule.filter(x=>new Date(x.startsAtUtc)>now).length} upcoming</small></div></article>
-                    <article class="mw-metric"><span class="mw-metric-icon green">▧</span><div><strong>${metric('jobs',jobs.length)}</strong><b>Items in Pipeline</b><small>${attentionJobs} need your action</small></div></article>
-                    <article class="mw-metric"><span class="mw-metric-icon orange">☑</span><div><strong>${metric('tasks',productionTasks.length)}</strong><b>Production Tasks</b><small>${productionTasks.filter(t=>/review|approval/i.test(String(t.status||'')+' '+String(t.title||''))).length} ready for review</small></div></article>
-                    <article class="mw-metric"><span class="mw-metric-icon purple">♧</span><div><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong><b>Client Messages</b><small>${messageNotifications.filter(n=>!n.isRead).length} unread</small></div></article>
-                </div>
-                <div class="mw-dashboard">
-                    <div class="mw-dashboard-main">
-                        <section class="mw-card mw-schedule-card" data-mw-region="schedule">
-                            <header><h2>▣ &nbsp; Today's Schedule</h2><button data-nav="schedule">View Schedule →</button></header>
-                            <div class="mw-schedule-list">${phase('schedule',sessionRows)}</div>
+
+                <div class="mw-reference-grid">
+                    <div class="mw-reference-left">
+                        <section class="mw-card mw-reference-sessions" data-mw-region="schedule">
+                            <header><h2>▣ &nbsp; Today's Sessions <span class="mw-count">${metric('schedule',todaySchedule.length)}</span></h2><button data-nav="schedule">View full schedule&nbsp; →</button></header>
+                            <div>${phase('schedule',sessionRows)}</div>
                         </section>
-                        <section class="mw-card mw-production-attention" data-mw-region="production-attention">
-                            <header><h2>▧ &nbsp; Production Items Needing Your Attention</h2><button data-nav="production">View Pipeline →</button></header>
-                            <div class="mw-attention-grid">${phase('tasks',attentionItems.length?attentionItems.map(task=>{const job=jobById(task.jobId)||{};const image=imageForJob(task.jobId);return `<button class="mw-attention-card" data-open-job="${task.jobId||''}"><span class="mw-attention-image">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>📷</span>'}</span><strong>${esc(job.clientName||job.title||task.title)}</strong><small>${esc(task.activityType||task.title)}</small><em>${task.dueAtUtc?'Due '+formatTime(task.dueAtUtc):esc(task.status||'Needs attention')}</em></button>`}).join(''):'<div class="mw-empty">No production items need attention.</div>')}</div>
+
+                        <div class="mw-reference-metrics" data-mw-region="metrics">
+                            <article><span>▣</span><strong>${metric('schedule',todaySchedule.length)}</strong><small>Today's Sessions</small></article>
+                            <article><span>☷</span><strong>${metric('jobs',jobs.length)}</strong><small>Active Jobs</small></article>
+                            <article><span>✉</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong><small>Unread Messages</small></article>
+                            <article><span>☑</span><strong>${metric('tasks',myTasks.length)}</strong><small>My Tasks</small></article>
+                            <article><span>⚠</span><strong>${metric('tasks',overdueTasks)}</strong><small>Overdue Items</small></article>
+                        </div>
+
+                        <section class="mw-card mw-reference-pipeline" data-mw-region="pipeline">
+                            <header><h2>▥ &nbsp; Recent Work / Pipeline</h2><button data-nav="pipeline">View all jobs&nbsp; →</button></header>
+                            <div>${phase('jobs',recentRows)}</div>
                         </section>
                     </div>
-                    <aside class="mw-dashboard-side">
-                        <section class="mw-card" data-mw-region="tasks">
-                            <header><h2>☑ &nbsp; My Tasks</h2><button data-nav="tasks">View All →</button></header>
+
+                    <div class="mw-reference-right">
+                        <section class="mw-card mw-reference-attention" data-mw-region="attention">
+                            <header><h2>⚠ &nbsp; Needs Attention <span class="mw-count danger">${attentionItems.length+attentionJobs}</span></h2><button data-nav="production">View all&nbsp; →</button></header>
+                            <div>${phase('tasks',attentionRows)}</div>
+                        </section>
+
+                        <section class="mw-card mw-reference-tasks" data-mw-region="tasks">
+                            <header><h2>☑ &nbsp; My Tasks <span class="mw-count">${metric('tasks',myTasks.length)}</span></h2><button data-nav="tasks">View all&nbsp; →</button></header>
                             <div>${phase('tasks',taskRows)}</div>
                         </section>
-                        <section class="mw-card" data-mw-region="messages">
-                            <header><h2>◯ &nbsp; Recent Messages</h2><button data-nav="messages">View All →</button></header>
+
+                        <section class="mw-card mw-reference-messages" data-mw-region="messages">
+                            <header><h2>◉ &nbsp; Messages &amp; Studio Activity</h2><button id="mwOpenNotifications">View all&nbsp; →</button></header>
                             <div>${phase('notifications',messageRows)}</div>
                         </section>
-                        <section class="mw-card mw-quick-actions">
-                            <header><h2>ϟ &nbsp; Quick Actions</h2></header>
-                            <div><button data-nav="pipeline">▣ &nbsp; Start Capture Session</button><button data-nav="production">⇧ &nbsp; Upload to Pipeline</button><button id="mwCreateJob">＋ &nbsp; Create New Job</button><button data-nav="schedule">▣ &nbsp; Check In Subject</button></div>
-                        </section>
-                    </aside>
+                    </div>
                 </div>
             </section>`;
         const next=document.createElement('div');next.innerHTML=markup;
