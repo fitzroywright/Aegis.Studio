@@ -5047,3 +5047,96 @@ body[data-studio-view="mywork"] .generic{
     width:160px;
   }
 }
+
+
+/* My Work card families: header tint and border share the same semantic color */
+.mw-list-panel{
+  --mw-card-color:#9aabba;
+  --mw-card-soft:#f5f8fa;
+  border-color:var(--mw-card-color);
+}
+.mw-list-panel>header{
+  background:var(--mw-card-soft);
+  border-bottom-color:color-mix(in srgb,var(--mw-card-color) 42%,white);
+}
+.mw-list-panel>header h2{
+  color:#17324f;
+}
+
+/* Status — blue */
+.mw-list-panel[data-mw-region="status"]{
+  --mw-card-color:#6da9df;
+  --mw-card-soft:#eef6fd;
+}
+
+/* Actions — purple */
+.mw-list-panel[data-mw-region="actions"]{
+  --mw-card-color:#9b82d4;
+  --mw-card-soft:#f5f0fc;
+}
+
+/* Quick Links — green */
+.mw-list-panel[data-mw-region="quick-links"]{
+  --mw-card-color:#72b88f;
+  --mw-card-soft:#eef8f2;
+}
+
+/* Assigned — studio blue/cyan */
+.mw-assigned-panel{
+  --mw-card-color:#5b9fc8;
+  --mw-card-soft:#edf7fb;
+}
+
+/* Needs Attention — red */
+.mw-list-panel[data-mw-region="attention"]{
+  --mw-card-color:#df6a75;
+  --mw-card-soft:#fff0f2;
+}
+
+/* My Tasks — teal/green */
+.mw-list-panel[data-mw-region="tasks"]{
+  --mw-card-color:#58a784;
+  --mw-card-soft:#eef8f3;
+}
+
+/* Messages — warm magenta */
+.mw-list-panel[data-mw-region="messages"]{
+  --mw-card-color:#cf6f91;
+  --mw-card-soft:#fdf0f5;
+}
+
+/* Keep title icon colors aligned with their card family. */
+.mw-list-panel[data-mw-region="status"] .mw-title-icon{
+  background:#dceeff;
+  color:#2878bc;
+}
+.mw-list-panel[data-mw-region="actions"] .mw-title-icon{
+  background:#e9ddf8;
+  color:#7250b4;
+}
+.mw-list-panel[data-mw-region="quick-links"] .mw-title-icon{
+  background:#dff2e7;
+  color:#2e8756;
+}
+.mw-assigned-panel .mw-title-icon{
+  background:#dceff8;
+  color:#2579a8;
+}
+.mw-list-panel[data-mw-region="attention"] .mw-title-icon{
+  background:#f9dde1;
+  color:#c73545;
+}
+.mw-list-panel[data-mw-region="tasks"] .mw-title-icon{
+  background:#dcefe6;
+  color:#267b58;
+}
+.mw-list-panel[data-mw-region="messages"] .mw-title-icon{
+  background:#f5dde6;
+  color:#b7436d;
+}
+
+/* Subsection bars inside Assigned stay related to the parent card. */
+.mw-assigned-panel .mw-section-title{
+  background:#f4fafc;
+  border-bottom-color:#d7eaf3;
+}
