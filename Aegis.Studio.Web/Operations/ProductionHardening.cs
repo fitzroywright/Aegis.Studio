@@ -125,15 +125,15 @@ public static class StudioProductionHardening
 
         admin.MapGet("/msgraph", async (MicrosoftGraphMailboxClient graphClient, MicrosoftGraphEmailOptions graphOptions, CancellationToken cancellationToken) =>
         {
-            MicrosoftGraphEmailVerification verification = await graphClient.VerifyConfigurationAsync(cancellationToken);
+            MicrosoftGraphMailboxVerification verification = await graphClient.VerifyConfigurationAsync(cancellationToken);
             return Results.Ok(new
             {
                 enabled = graphOptions.InboundEnabled,
                 tenantId = graphOptions.TenantId,
                 clientId = graphOptions.ClientId,
-                mailbox = graphOptions.Mailbox,
+                mailbox = graphOptions.SenderUpn,
                 pollSeconds = (int)graphClient.PollInterval.TotalSeconds,
-                pageSize = graphOptions.PageSize,
+                pageSize = graphOptions.InboundPageSize,
                 secretPresent = verification.ClientSecretConfigured,
                 state = verification.State,
                 authenticationSucceeded = verification.AuthenticationSucceeded,
