@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/pos.css?v=20260929-formpass">
   <link rel="stylesheet" href="/profile.css?v=20260929-formpass">
   <link rel="stylesheet" href="/training.css?v=20260929-namefix">
-  <link rel="stylesheet" href="/studio.css?v=20261005-reference-fidelity-v13">
+  <link rel="stylesheet" href="/studio.css?v=20261005-horizontal-shell-v14">
 </head>
 <body data-theme="studio-default">
   <svg aria-hidden="true" width="0" height="0" style="position:absolute"><defs>
@@ -26,42 +26,28 @@
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   </defs></svg>
   <header class="topbar">
-    <div class="shell-brand" aria-label="Aegis.Studio">
-      <span class="shell-brand-icon"><svg viewBox="0 0 24 24"><use href="#i-camera"></use></svg></span>
-      <span class="shell-brand-copy"><strong>Aegis.Studio</strong><small>Bryans Photography</small></span>
-    </div>
-    <div class="shell-top-main">
-      <form class="studio-global-search" id="studioSearchForm"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input id="studioSearch" type="search" placeholder="Search clients, jobs, bookings or subjects…" aria-label="Search Studio"></form>
-      <div class="top-actions">
-        <button id="topNewButton" class="primary top-new-button" type="button">＋ New</button>
-        <button id="trainingButton" class="action training-action" hidden>Training</button>
-        <button id="notificationButton" class="action icon-action" title="Notifications"><svg><use href="#i-bell"></use></svg><span class="top-action-label">Notifications</span></button>
-        <button id="profileButton" class="profile-button" title="Profile and messaging preferences"><span id="userAvatar" class="avatar">--</span><span id="signedInUser">Signed in</span></button>
-        <button id="signOutButton" class="action">Sign out</button>
-      </div>
-    </div>
+    <div class="shell-brand" aria-label="Aegis Studio"><strong>▲ <span>AEGIS STUDIO</span></strong></div>
+    <span class="studio-organization">Bryan's Photography</span>
+    <nav class="rail" aria-label="Main navigation">
+      <button type="button" class="brand-button active" data-view="mywork">⌂ <span>My Work</span></button>
+      <button type="button" class="brand-button" data-view="messages">◯ <span>Messages</span></button>
+      <button type="button" class="brand-button" data-view="schedule">▣ <span>My Schedule</span></button>
+      <button type="button" class="brand-button" data-view="tasks">☑ <span>My Tasks</span></button>
+      <i class="nav-divider"></i>
+      <button type="button" class="brand-button" data-view="workspaces">▱ <span>Workspaces</span></button>
+      <button type="button" class="brand-button" data-view="frontdesk">▣ <span>Front Desk</span></button>
+      <button type="button" class="brand-button" data-view="pipeline">▥ <span>Pipeline</span></button>
+      <button type="button" class="brand-button" data-view="production">▧ <span>Production</span></button>
+      <button type="button" class="brand-button" data-view="finance">▤ <span>Finance</span></button>
+    </nav>
+    <div class="shell-context"><button type="button" class="context-chip" title="Operating location">⌖ Kingston Office</button><button type="button" class="context-chip" title="Connection context">⌾ Remote</button></div>
+    <form class="studio-global-search" id="studioSearchForm"><input id="studioSearch" type="search" placeholder="Search" aria-label="Search Studio"></form>
+    <button id="notificationButton" class="action icon-action shell-icon-button" title="Notifications"><svg><use href="#i-bell"></use></svg></button>
+    <details class="user-menu"><summary><span id="userAvatar" class="avatar">--</span><span id="signedInUser" class="sr-only">Signed in</span>⌄</summary><div class="user-menu-popover"><button id="profileButton" type="button">Profile</button><button type="button" data-preferences>Preferences</button><button type="button" data-view="admin" id="adminMenuButton">Administration</button><button id="signOutButton" type="button">Sign Out</button></div></details>
+    <button id="topNewButton" class="primary top-new-button" type="button" hidden>＋ New</button>
+    <button id="trainingButton" class="action training-action" hidden>Training</button>
   </header>
   <div class="shell">
-    <aside class="navigation-pane">
-      <div class="workspaces" hidden><div id="workspaceList"></div></div>
-      <nav class="rail" aria-label="Main navigation">
-        <button type="button" class="brand-button active" data-view="mywork"><span class="nav-icon"><svg><use href="#i-work"></use></svg></span><span class="nav-label">My Work</span></button>
-        <button type="button" class="brand-button" data-view="workspaces"><span class="nav-icon"><svg><use href="#i-grid"></use></svg></span><span class="nav-label">Workspaces</span></button>
-        <button type="button" class="brand-button" data-view="pipeline"><span class="nav-icon"><svg><use href="#i-calendar"></use></svg></span><span class="nav-label">Pipeline</span></button>
-        <button type="button" class="brand-button" data-view="production"><span class="nav-icon"><svg><use href="#i-production"></use></svg></span><span class="nav-label">Production</span></button>
-        <button type="button" class="brand-button" data-view="frontdesk"><span class="nav-icon"><svg><use href="#i-pos"></use></svg></span><span class="nav-label">Front Desk</span></button>
-        <button type="button" class="brand-button" data-view="finance"><span class="nav-icon"><svg><use href="#i-accounts"></use></svg></span><span class="nav-label">Finance</span></button>
-        <button type="button" class="brand-button" data-view="admin"><span class="nav-icon"><svg><use href="#i-settings"></use></svg></span><span class="nav-label">Admin</span></button>
-      </nav>
-      <div class="studio-storage-card">
-        <div><span class="storage-cloud">☁</span><span><strong>Storage</strong><small>Studio media</small></span></div>
-        <i><b></b></i>
-      </div>
-      <div class="studio-sidebar-footer">
-        <span class="shell-brand-icon"><svg viewBox="0 0 24 24"><use href="#i-camera"></use></svg></span>
-        <div><strong>Bryan's Photography</strong><small>Aegis.Studio v1.0.0</small></div>
-      </div>
-    </aside>
     <main>
       <section id="conversationView" class="three-pane">
         <div class="list-pane">
@@ -78,7 +64,7 @@
   <dialog id="profileDialog" class="profile-dialog"><form id="profileForm" method="dialog"><div class="profile-heading"><div><h2>My Profile</h2><p>Identity comes from Active Directory. Studio stores your application, theme and messaging preferences.</p></div><button type="button" id="closeProfile" class="profile-close">×</button></div><div id="profileIdentity" class="profile-identity"></div><h3>Appearance</h3><div class="profile-grid delivery"><label>Theme<select id="prefTheme"></select></label></div><h3>Notification channels</h3><div class="profile-grid channels"><label><input type="checkbox" id="prefEmail"> Email</label><label><input type="checkbox" id="prefInApp"> In-app</label><label><input type="checkbox" id="prefSlack"> Slack</label><label><input type="checkbox" id="prefTeams"> Teams</label><label><input type="checkbox" id="prefWhatsApp"> WhatsApp</label></div><h3>Notify me about</h3><div class="profile-grid events"><label><input type="checkbox" id="prefWorkspaceMessage"> New workspace messages</label><label><input type="checkbox" id="prefJobAssigned"> Jobs assigned to me</label><label><input type="checkbox" id="prefBookingChanged"> Booking changes</label><label><input type="checkbox" id="prefPaymentChanged"> Payments and refunds</label><label><input type="checkbox" id="prefJobStatusChanged"> Job status changes</label><label><input type="checkbox" id="prefMentions"> Mentions and replies</label></div><div class="profile-grid delivery"><label>WhatsApp number<input id="prefWhatsAppMobile" type="tel" placeholder="+1 876 555 1234"></label><label>Delivery<select id="prefDelivery"><option value="Immediate">Immediate</option><option value="DailyDigest">Daily digest</option></select></label><label>Quiet hours start<input id="prefQuietStart" type="time"></label><label>Quiet hours end<input id="prefQuietEnd" type="time"></label></div><div id="profileStatus" class="profile-status"></div><div class="dialog-actions"><button type="button" id="cancelProfile">Cancel</button><button type="submit" class="primary">Save Preferences</button></div></form></dialog>
   <dialog id="trainingDialog" class="training-dialog"><div class="training-card"><div class="training-heading"><div><span class="training-kicker">TRAINING</span><h2 data-training-title></h2></div><button type="button" class="training-close" data-training-close aria-label="Close training">×</button></div><p class="training-description" data-training-description></p><div class="training-player" data-training-player></div><div class="training-meta" data-training-meta></div></div></dialog>
   <script src="/theme.js?v=20261004-storage-recovery-v10"></script><script src="/auth.js?v=20261004-storage-recovery-v10"></script><script src="/profile.js?v=20261004-storage-recovery-v10"></script><script src="/app.js?v=20261004-storage-recovery-v10"></script><script src="/workspace-access.js?v=20261004-storage-recovery-v10"></script><script src="/job-access.js?v=20261004-storage-recovery-v10"></script><script src="/workspaces.js?v=20261004-storage-recovery-v10"></script><script src="/gallery.js?v=20261004-storage-recovery-v10"></script><script src="/gallery-security.js?v=20261004-storage-recovery-v10"></script><script src="/global-roles.js?v=20261004-storage-recovery-v10"></script><script src="/scheduling.js?v=20261004-storage-recovery-v10"></script><script src="/production.js?v=20261004-storage-recovery-v10"></script><script src="/notifications.js?v=20261004-storage-recovery-v10"></script><script src="/messages.js?v=20261004-storage-recovery-v10"></script><script src="/pos.js?v=20261004-storage-recovery-v10"></script><script src="/frontdesk.js?v=20261004-storage-recovery-v10"></script><script src="/attachments.js?v=20261004-storage-recovery-v10"></script><script src="/management.js?v=20261004-storage-recovery-v10"></script><script src="/training.js?v=20261004-storage-recovery-v10"></script>
-  <script src="/job-handoff.js?v=20261004-storage-recovery-v10"></script><script src="/job-workspace.js?v=20261004-storage-recovery-v10"></script><script src="/media-production.js?v=20261004-storage-recovery-v10"></script><script src="/studio-workspace-actions.js?v=20261004-storage-recovery-v10"></script><script src="/workspace-outlook.js?v=20261004-storage-recovery-v10"></script><script src="/media-fallback.js?v=20261004-storage-recovery-v10"></script><script src="/demo-loader.js?v=20261004-storage-recovery-v10"></script><script src="/studio-navigation.js?v=20261005-workspace-access"></script>
+  <script src="/job-handoff.js?v=20261004-storage-recovery-v10"></script><script src="/job-workspace.js?v=20261004-storage-recovery-v10"></script><script src="/media-production.js?v=20261004-storage-recovery-v10"></script><script src="/studio-workspace-actions.js?v=20261004-storage-recovery-v10"></script><script src="/workspace-outlook.js?v=20261004-storage-recovery-v10"></script><script src="/media-fallback.js?v=20261004-storage-recovery-v10"></script><script src="/demo-loader.js?v=20261004-storage-recovery-v10"></script><script src="/studio-navigation.js?v=20261005-horizontal-shell-v14"></script>
   <script src="/studio-search.js?v=20261004-storage-recovery-v10"></script>
 </body>
 </html>
