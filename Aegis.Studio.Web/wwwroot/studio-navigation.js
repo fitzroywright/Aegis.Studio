@@ -157,8 +157,15 @@
         const markup=`
             <section class="mw-page mw-reference-page">
                 <header class="mw-reference-header" data-mw-region="header">
-                    <div><h1>My Work</h1><p>${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</p></div>
-                    <div class="mw-day-nav"><button type="button" aria-label="Previous day">‹</button><button type="button" class="today">Today</button><button type="button" aria-label="Next day">›</button><button type="button" class="calendar" aria-label="Choose date">▣</button></div>
+                    <div class="mw-header-copy">
+                        <span class="mw-header-kicker">STUDIO TODAY</span>
+                        <h1>My Work</h1>
+                        <p>${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</p>
+                    </div>
+                    <div class="mw-header-side">
+                        <span class="mw-header-mark" aria-hidden="true"></span>
+                        <div class="mw-day-nav"><button type="button" aria-label="Previous day">‹</button><button type="button" class="today">Today</button><button type="button" aria-label="Next day">›</button><button type="button" class="calendar" aria-label="Choose date">▣</button></div>
+                    </div>
                 </header>
 
                 <div class="mw-reference-grid">
