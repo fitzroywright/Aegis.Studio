@@ -1,6 +1,5 @@
 let currentWorkspacePermissions = null;
 
-const originalLoadWorkspacesForAccess = loadWorkspaces;
 loadWorkspaces = async function() {
     const access = await json('/api/workspace-access');
     workspaceCache = access.map(item => ({
@@ -10,18 +9,10 @@ loadWorkspaces = async function() {
         openCount: 0,
         permissions: item.permissions
     }));
-    const legacyWorkspaceList = document.getElementById('workspaceList');
-    if (legacyWorkspaceList) {
-        legacyWorkspaceList.innerHTML = workspaceCache.map(workspace => `
-            <button class="workspace" data-id="${workspace.id}">
-                <b>${esc(workspace.name)}</b>
-                <small>${esc(workspace.address)}</small>
-            </button>`).join('') || '<div class="muted" style="padding:10px">No workspace access assigned.</div>';
-        legacyWorkspaceList.querySelectorAll('.workspace').forEach(button => {
-            button.onclick = () => selectWorkspace(button.dataset.id, button.querySelector('b').textContent);
-        });
-    }
-    requestWorkspace.innerHTML = workspaceCache.filter(x => x.permissions.accessWorkspace).map(workspace => `<option value="${workspace.id}">${esc(workspace.name)}</option>`).join('');
+    requestWorkspace.innerHTML = workspaceCache
+        .filter(x => x.permissions.accessWorkspace)
+        .map(workspace => `<option value="${workspace.id}">${esc(workspace.name)}</option>`)
+        .join('');
 };
 
 const originalSelectWorkspaceForAccess = selectWorkspace;
