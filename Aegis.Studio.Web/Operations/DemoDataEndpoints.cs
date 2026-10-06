@@ -22,12 +22,36 @@ public static class DemoDataEndpoints
             context.Response.ContentType = "application/x-ndjson";
             context.Response.Headers.CacheControl = "no-store";
             context.Response.Headers["X-Accel-Buffering"] = "no";
+            bool progressChannelAvailable = true;
             async Task Write(DemoSeedProgress progress)
             {
-                context.RequestAborted.ThrowIfCancellationRequested();
-                await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(progress, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) + "\n", context.RequestAborted);
-                await context.Response.Body.FlushAsync(context.RequestAborted);
+                if (!progressChannelAvailable) return;
+                try
+                {
+                    await context.Response.WriteAsync(
+                        System.Text.Json.JsonSerializer.Serialize(
+                            progress,
+                            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) + "\n",
+                        CancellationToken.None);
+                    await context.Response.Body.FlushAsync(CancellationToken.None);
+                }
+                catch (Exception error) when (
+                    error is IOException ||
+                    error is ObjectDisposedException ||
+                    error is OperationCanceledException)
+                {
+                    // Demo seeding is an administrative server operation. A browser,
+                    // proxy, or mobile connection disappearing must not roll back
+                    // several minutes of deterministic seed work. Stop streaming
+                    // progress, but let the database/storage transaction finish.
+                    progressChannelAvailable = false;
+                    logs.CreateLogger("Studio.DemoSeed").LogWarning(
+                        error,
+                        "Demo seed progress client disconnected; continuing seed on the server Trace={Trace}",
+                        context.TraceIdentifier);
+                }
             }
+
             bool saved = false;
             try
             {
@@ -35,14 +59,12 @@ public static class DemoDataEndpoints
                 saved = true;
                 await Write(new(100, "Complete", 0, 0, message, Completed: true));
             }
-            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
             catch (Exception error)
             {
                 logs.CreateLogger("Studio.DemoSeed").LogError(error, "Demo seed failed Trace={Trace}", context.TraceIdentifier);
-                if (!context.RequestAborted.IsCancellationRequested)
-                    await Write(new(0, "Failed", 0, 0, saved
-                        ? "Demo data was saved, but progress delivery failed. Reload Admin to check the dataset."
-                        : "Demo data could not be loaded. Database changes were rolled back. See server logs for details.", Failed: true));
+                await Write(new(0, "Failed", 0, 0, saved
+                    ? "Demo data was saved, but progress delivery failed. Reload Admin to check the dataset."
+                    : "Demo data could not be loaded. Database changes were rolled back. See server logs for details.", Failed: true));
             }
             return Results.Empty;
         }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
