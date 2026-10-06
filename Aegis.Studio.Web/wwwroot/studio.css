@@ -4325,3 +4325,45 @@ body[data-studio-view="mywork"] .generic{
     gap:12px;
   }
 }
+
+
+/* My Work card title icon colors */
+.mw-title-icon{
+  display:inline-grid;
+  width:20px;
+  height:20px;
+  place-items:center;
+  margin-right:5px;
+  border-radius:6px;
+  font-size:12px;
+  font-weight:900;
+  vertical-align:-2px;
+}
+.mw-title-icon.status{
+  background:#e7f1ff;
+  color:#126ed2;
+}
+.mw-title-icon.actions{
+  background:#efe8ff;
+  color:#7651c9;
+}
+.mw-title-icon.links{
+  background:#e8f7ef;
+  color:#16834f;
+}
+.mw-title-icon.assigned{
+  background:#eaf5ff;
+  color:#0878c9;
+}
+.mw-title-icon.attention{
+  background:#fff0e1;
+  color:#d97706;
+}
+.mw-title-icon.tasks{
+  background:#e8f7ec;
+  color:#168a45;
+}
+.mw-title-icon.messages{
+  background:#fff0f2;
+  color:#d6334c;
+}
