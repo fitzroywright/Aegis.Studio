@@ -25,6 +25,9 @@ test('obsolete workspace sidebar presentation is not wired into the current shel
   assert.equal(app.includes('workspaceList'), false);
   assert.equal(app.includes('workspaceBandHue'), false);
   assert.equal(app.includes('allButton.onclick'), false);
+  assert.equal(app.includes('showJobs'), false);
+  assert.equal(app.includes('renderJobRows'), false);
+  assert.equal(app.includes("activateNavigation('jobs')"), false);
 
   assert.equal(access.includes('workspaceList'), false);
   assert.equal(access.includes('originalLoadWorkspacesForAccess'), false);
