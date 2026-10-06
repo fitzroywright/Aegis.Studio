@@ -27,6 +27,7 @@ selectWorkspace = async function(id, name) {
     }
     currentWorkspacePermissions = workspace.permissions;
     await originalSelectWorkspaceForAccess(id, name);
+    renderWorkspaceMenu();
 };
 
 const originalOpenConversationForAccess = openConversation;
