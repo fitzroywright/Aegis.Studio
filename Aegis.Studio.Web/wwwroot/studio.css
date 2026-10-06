@@ -2824,3 +2824,412 @@ body[data-studio-view="workspaces"] .studio-global-search input{
   .workspace-wow-previews img,.workspace-wow-previews i{width:28px;height:28px}
   .workspace-wow-header-art{display:none}
 }
+
+
+/* Studio-wide warm two-line design system 2026-10-06 */
+body:not([data-studio-view="mywork"]):not([data-studio-view="workspaces"]) .generic{
+  background:
+    radial-gradient(circle at 8% 4%,rgba(161,92,48,.075),transparent 23%),
+    radial-gradient(circle at 92% 12%,rgba(45,111,122,.055),transparent 22%),
+    linear-gradient(180deg,#f8f5f0 0%,#f1ede7 100%);
+  padding:18px 30px 30px
+}
+body[data-studio-view] .topbar{
+  height:64px;
+  padding:0 30px;
+  gap:13px;
+  background:rgba(255,253,249,.97);
+  border-bottom:1px solid #ddd7cf;
+  box-shadow:0 1px 0 #ddd7cf,0 5px 18px rgba(54,37,24,.035)
+}
+body[data-studio-view] .shell{
+  height:calc(100dvh - 64px)
+}
+body[data-studio-view] .shell-brand strong{
+  font-size:0
+}
+body[data-studio-view] .shell-brand strong:before{
+  content:'◉  Studio';
+  font-size:20px;
+  font-weight:750;
+  letter-spacing:0;
+  color:#25140c
+}
+body[data-studio-view] .studio-organization{
+  display:none
+}
+body[data-studio-view] .rail{
+  height:64px;
+  margin-left:12px;
+  gap:1px
+}
+body[data-studio-view] .brand-button{
+  height:64px;
+  padding:0 9px;
+  border:0;
+  border-bottom:3px solid transparent;
+  border-radius:0;
+  background:transparent;
+  color:#211a16;
+  font-size:12px;
+  font-weight:650
+}
+body[data-studio-view] .brand-button:hover{
+  background:linear-gradient(180deg,transparent,#f4ece5);
+  color:#633319
+}
+body[data-studio-view] .brand-button.active{
+  height:64px;
+  border-radius:0;
+  background:linear-gradient(180deg,transparent,rgba(139,72,35,.06));
+  color:#5d2b14;
+  border-bottom-color:#8d4a25;
+  box-shadow:none
+}
+body[data-studio-view] .nav-divider{
+  display:none
+}
+body[data-studio-view] .studio-global-search{
+  width:280px;
+  height:40px;
+  margin-left:auto;
+  position:relative
+}
+body[data-studio-view] .studio-global-search:before{
+  content:'⌕';
+  position:absolute;
+  left:12px;
+  top:4px;
+  z-index:1;
+  color:#6f675f;
+  font-size:24px
+}
+body[data-studio-view] .studio-global-search input{
+  display:block;
+  width:100%;
+  height:40px;
+  padding:8px 12px 8px 38px;
+  border:1px solid #ddd7cf;
+  border-radius:8px;
+  background:#fffefd;
+  color:#2c261f;
+  box-shadow:0 1px 2px rgba(48,30,17,.04)
+}
+body[data-studio-view] .studio-global-search input::placeholder{
+  color:#7b746d;
+  font-size:12px
+}
+body[data-studio-view] .avatar{
+  width:38px;
+  height:38px;
+  background:#3d2113;
+  color:#fff;
+  box-shadow:0 0 0 3px #efe4d8
+}
+
+/* Shared page hero used by operational screens. */
+.studio-page-heading,
+.job-detail-header,
+.admin-page-header{
+  min-height:108px;
+  position:relative;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  margin:0 0 16px;
+  padding:20px 24px;
+  border:1px solid #d8cfc5;
+  border-radius:14px;
+  background:
+    radial-gradient(circle at 85% 48%,rgba(255,255,255,.12) 0 2px,transparent 3px),
+    linear-gradient(105deg,#fbf7f1 0%,#f1e5d8 47%,#c8aa90 74%,#4b2d1d 100%);
+  box-shadow:0 10px 30px rgba(60,38,22,.075)
+}
+.studio-page-heading:after,
+.job-detail-header:after,
+.admin-page-header:after{
+  content:'';
+  position:absolute;
+  right:130px;
+  top:-75px;
+  width:250px;
+  height:250px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow:inset 0 0 0 34px rgba(255,255,255,.025),inset 0 0 0 68px rgba(255,255,255,.018);
+  pointer-events:none
+}
+.studio-page-heading>*,
+.job-detail-header>*,
+.admin-page-header>*{
+  position:relative;
+  z-index:1
+}
+.studio-page-heading h1,
+.job-detail-header h1,
+.admin-page-header h1{
+  color:#281409;
+  font-size:34px;
+  line-height:1;
+  letter-spacing:-1px;
+  font-weight:760
+}
+.studio-page-heading p,
+.job-detail-header p,
+.admin-page-header p{
+  margin-top:7px;
+  max-width:700px;
+  color:#675e56;
+  font-size:14px
+}
+.studio-page-heading .job-actions,
+.job-detail-header .job-actions,
+.admin-page-header .job-actions{
+  display:flex;
+  align-items:center;
+  gap:8px
+}
+.studio-page-heading .job-actions button,
+.job-detail-header .job-actions button,
+.admin-page-header button{
+  min-height:40px;
+  border-radius:8px;
+  box-shadow:0 4px 12px rgba(50,29,17,.08)
+}
+
+/* Shared KPI tiles. */
+.op-metrics,.cards,.management-metrics{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin:0 0 16px
+}
+.op-metric,.metric{
+  min-height:82px;
+  position:relative;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:13px 15px;
+  border:1px solid #ddd7cf;
+  border-radius:10px;
+  background:#fff9f4;
+  color:#4a4038;
+  box-shadow:0 7px 20px rgba(57,38,24,.035)
+}
+.op-metric:nth-child(2),.metric:nth-child(2){background:#f1f5fb}
+.op-metric:nth-child(3),.metric:nth-child(3){background:#fff1ef}
+.op-metric:nth-child(4),.metric:nth-child(4){background:#eff7f1}
+.op-metric:after,.metric:after{
+  content:'';
+  position:absolute;
+  width:64px;
+  height:64px;
+  right:-20px;
+  top:-22px;
+  border-radius:50%;
+  background:rgba(255,255,255,.48)
+}
+.op-metric strong,.metric strong{
+  display:block;
+  margin-top:3px;
+  color:#22160f;
+  font-size:24px;
+  line-height:1.05
+}
+
+/* Shared tabs and planning/filter bars. */
+.workspace-tabs,
+.production-filters,
+.pipeline-planning-toolbar{
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+  margin:0 0 14px;
+  padding:7px 9px;
+  border:1px solid #ddd7cf;
+  border-radius:10px;
+  background:rgba(255,255,255,.9);
+  box-shadow:0 5px 18px rgba(57,38,24,.025)
+}
+.workspace-tabs button,
+.production-filters>button,
+.pipeline-view-switch button{
+  min-height:34px;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:#655e57;
+  font-size:12px;
+  font-weight:700
+}
+.workspace-tabs button.active,
+.production-filters>button.active,
+.pipeline-view-switch button.active{
+  background:#eee1d4;
+  color:#69351b
+}
+.production-filters label,
+.pipeline-planning-toolbar label{
+  gap:3px;
+  color:#746c64;
+  font-size:10px;
+  font-weight:700
+}
+.production-filters input,
+.production-filters select,
+.pipeline-planning-toolbar select{
+  min-height:34px;
+  border-color:#ddd7cf;
+  background:#fff
+}
+
+/* Shared operational cards. */
+.op-grid,
+.finance-grid,
+.management-grid{
+  gap:16px
+}
+.op-card,
+.production-queue-card,
+.pos-panel,
+.pos-history,
+.studio-card{
+  border:1px solid #ddd7cf;
+  border-radius:11px;
+  background:#fff;
+  box-shadow:0 8px 24px rgba(57,38,24,.035);
+  overflow:hidden
+}
+.op-card>header,
+.production-queue-card>header,
+.pos-panel>.pane-heading{
+  min-height:50px;
+  padding:10px 16px;
+  border-bottom:1px solid #e9e4de;
+  background:linear-gradient(180deg,#fff,#fcfaf7)
+}
+.op-card>header h2,
+.production-queue-card h2,
+.pos-panel h2{
+  color:#21150f;
+  font-size:16px
+}
+.op-body{
+  padding:12px 15px
+}
+
+/* Two-line row baseline used across operational pages. */
+.job-row,
+.front-desk-row,
+.frontdesk-client-row,
+.pos-catalog-item{
+  min-height:52px;
+  border-color:#ece7e1!important;
+  background:#fff;
+  transition:background .12s ease,transform .12s ease
+}
+.job-row:hover,
+.front-desk-row:hover,
+.frontdesk-client-row:hover,
+.pos-catalog-item:hover{
+  background:#fbf7f2;
+  transform:translateX(1px)
+}
+.job-row strong,
+.front-desk-row strong,
+.frontdesk-client-row strong,
+.pos-catalog-item b{
+  color:#21150f;
+  font-weight:700
+}
+.job-row small,
+.front-desk-row small,
+.frontdesk-client-row small,
+.pos-catalog-item small{
+  color:#716a63
+}
+
+/* Tables use the same warm shell while retaining dense data. */
+.studio-table,
+.pos-grid{
+  border-collapse:separate;
+  border-spacing:0;
+  width:100%;
+  background:#fff
+}
+.studio-table thead th,
+.pos-grid thead th{
+  position:sticky;
+  top:0;
+  z-index:1;
+  background:#f7f2ec;
+  color:#554b43;
+  font-size:11px;
+  font-weight:800;
+  border-bottom:1px solid #ddd7cf
+}
+.studio-table tbody td,
+.pos-grid tbody td{
+  border-bottom:1px solid #eee9e3;
+  color:#312a24
+}
+.studio-table tbody tr:hover,
+.pos-grid tbody tr:hover{
+  background:#fcf8f4
+}
+
+/* Department-specific accent edges. */
+body[data-studio-view="frontdesk"] .op-card:first-child{box-shadow:inset 4px 0 0 #9b6238,0 8px 24px rgba(57,38,24,.035)}
+body[data-studio-view="frontdesk"] .op-card:nth-child(2){box-shadow:inset 4px 0 0 #2e8f8b,0 8px 24px rgba(57,38,24,.035)}
+body[data-studio-view="frontdesk"] .op-card:nth-child(3){box-shadow:inset 4px 0 0 #d59a47,0 8px 24px rgba(57,38,24,.035)}
+body[data-studio-view="production"] .production-queue-card{box-shadow:inset 4px 0 0 #6d58a8,0 8px 24px rgba(57,38,24,.035)}
+body[data-studio-view="pipeline"] .pipeline-stage-summary{filter:drop-shadow(0 6px 14px rgba(57,38,24,.03))}
+body[data-studio-view="finance"] .op-card:first-child{box-shadow:inset 4px 0 0 #2f8d68,0 8px 24px rgba(57,38,24,.035)}
+body[data-studio-view="reports"] .op-card:first-child{box-shadow:inset 4px 0 0 #4678ad,0 8px 24px rgba(57,38,24,.035)}
+body[data-studio-view="admin"] .admin-card{box-shadow:0 8px 24px rgba(57,38,24,.035)}
+
+/* Admin adopts the same product language. */
+.admin-page{
+  height:auto;
+  padding:0
+}
+.admin-page-header{
+  margin-bottom:16px
+}
+.admin-summary-grid,
+.workspace-admin-grid{
+  gap:12px
+}
+.admin-summary-card,
+.admin-card{
+  border:1px solid #ddd7cf;
+  border-radius:10px;
+  background:#fff;
+  box-shadow:0 7px 20px rgba(57,38,24,.035)
+}
+.admin-card-header{
+  border-bottom-color:#e9e4de
+}
+
+/* Messages / schedule / tasks opened from the shell should not revert to a cold gray surface. */
+body[data-studio-view="messages"] .studio-messages-page,
+body[data-studio-view="schedule"] .schedule-page,
+body[data-studio-view="tasks"] .mw-page{
+  color:#2b211b
+}
+
+/* Responsive preservation: density first, then wrap. */
+@media(max-width:1250px){
+  body[data-studio-view] .topbar{padding-left:18px;padding-right:18px;gap:8px}
+  body[data-studio-view] .brand-button{padding-left:6px;padding-right:6px;font-size:11px}
+  body[data-studio-view] .studio-global-search{width:210px}
+  body:not([data-studio-view="mywork"]):not([data-studio-view="workspaces"]) .generic{padding-left:22px;padding-right:22px}
+  .studio-page-heading,.job-detail-header,.admin-page-header{min-height:98px}
+  .op-metrics,.cards,.management-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
