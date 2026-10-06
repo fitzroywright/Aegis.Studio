@@ -4608,3 +4608,22 @@ body[data-studio-view="mywork"] .generic{
 .mw-list-page .mw-task-row:hover .mw-task-bullet{
   transform:scale(1.12);
 }
+
+
+/* My Work: give Recent Jobs more vertical room */
+.mw-assigned-panel .mw-work-section[data-mw-region="schedule"]{
+  flex:0 0 210px;
+}
+.mw-assigned-panel .mw-work-section[data-mw-region="pipeline"]{
+  flex:1 1 auto;
+  min-height:0;
+}
+.mw-assigned-panel .mw-work-section[data-mw-region="pipeline"] .mw-section-rows{
+  min-height:0;
+  overflow:auto;
+}
+@media(max-height:820px){
+  .mw-assigned-panel .mw-work-section[data-mw-region="schedule"]{
+    flex-basis:175px;
+  }
+}
