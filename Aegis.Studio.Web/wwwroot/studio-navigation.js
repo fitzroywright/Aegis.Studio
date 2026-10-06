@@ -177,8 +177,6 @@
                                 <button data-nav="schedule"><span>＋</span><span>My schedule</span><b>›</b></button>
                                 <button data-nav="tasks"><span>☑</span><span>My tasks</span><b>›</b></button>
                                 <button data-nav="messages"><span>✉</span><span>Messages</span><b>›</b></button>
-                                <button data-nav="workspaces"><span>▰</span><span>Workspaces</span><b>›</b></button>
-                                <button data-nav="production"><span>◆</span><span>Production</span><b>›</b></button>
                             </div>
                         </section>
 
