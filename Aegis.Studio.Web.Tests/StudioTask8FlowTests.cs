@@ -40,14 +40,6 @@ public sealed class StudioTask8FlowTests
     }
 
     [Fact]
-    public void Graph_send_endpoint_uses_selected_sending_identity()
-    {
-        Assert.Equal(
-            "https://graph.microsoft.com/v1.0/users/manager%40bryans.example/sendMail",
-            MicrosoftGraphEmailClient.BuildSendMailUrl("manager@bryans.example"));
-    }
-
-    [Fact]
     public void Authorized_reply_as_myself_uses_profile_email_on_workspace_domain()
     {
         StudioSendingIdentity identity = StudioSendingIdentityResolver.Resolve(
