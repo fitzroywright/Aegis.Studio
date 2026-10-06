@@ -14,7 +14,7 @@
 
     function renderMyWork(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date()};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date(),workspaceName:''};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['mywork','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         myWorkLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -53,12 +53,27 @@
             }
         }
         state.retry=key=>load(key);
+        state.resolveWorkspace=async()=>{
+            try{
+                if(typeof selectedWorkspace==='undefined'||!selectedWorkspace){state.workspaceName='';paintMyWork(state);return;}
+                let workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===String(selectedWorkspace));
+                if(!workspace&&typeof loadWorkspaces==='function'){
+                    await loadWorkspaces();
+                    workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===String(selectedWorkspace));
+                }
+                state.workspaceName=workspace?.name||'';
+                if(state.active())paintMyWork(state);
+            }catch{
+                state.workspaceName='';
+            }
+        };
         state.selectDay=date=>{
             state.selectedDate=new Date(date.getFullYear(),date.getMonth(),date.getDate());
             urls.schedule=scheduleUrl(state.selectedDate);
             state.schedule=[];
             state.status.schedule='loading';
             paintMyWork(state);
+        state.resolveWorkspace();
             load('schedule');
         };
         paintMyWork(state);diagnostics.shellMs=Math.round(performance.now()-started);
@@ -81,6 +96,9 @@
     function paintMyWork(state){
         if(!state.active())return;
         const {auth,jobs,tasks,schedule,notifications}=state;
+        const workspaceCrumb=state.workspaceName
+            ? '<span aria-hidden="true">›</span><button type="button" data-nav="workspaces" class="workspace-current">'+esc(state.workspaceName)+'</button>'
+            : '';
         const now=new Date(),selectedDate=state.selectedDate||now,startOfDay=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()),endOfDay=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+1);
         const phase=(key,content)=>state.status[key]==='ready'?content:state.status[key]==='error'?'<div class="mw-empty" role="alert">'+esc(state.errors[key])+' <button data-mw-retry="'+key+'">Retry</button></div>':'<div class="mw-empty" role="status">Loading…</div>';
         const metric=(key,value)=>state.status[key]==='ready'?value:'…';
@@ -182,6 +200,7 @@
                     <div class="mw-header-line">
                         <nav class="mw-breadcrumb" aria-label="Breadcrumb">
                             <button type="button" data-nav="workspaces">Workspaces</button>
+                            ${workspaceCrumb}
                             <span aria-hidden="true">›</span>
                             <button type="button" data-nav="mywork">My Work</button>
                             <span aria-hidden="true">›</span>
