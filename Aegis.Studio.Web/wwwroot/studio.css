@@ -5283,3 +5283,159 @@ body[data-studio-view] .user-menu-popover button:hover{
   background:#f1f7fd;
   color:#155f9f;
 }
+
+
+/* My Work date navigator: compact shell control + custom calendar */
+.studio-shell-page-tools .mw-day-nav{
+  display:flex;
+  align-items:center;
+  gap:3px;
+  height:34px;
+  padding:2px;
+  border:1px solid #d7e0e9;
+  border-radius:9px;
+  background:#f9fbfd;
+}
+.studio-shell-page-tools .mw-day-nav button{
+  border:0;
+  background:transparent;
+}
+.studio-shell-page-tools .mw-day-step{
+  width:28px;
+  height:28px;
+  padding:0;
+  border-radius:6px;
+  color:#526a80;
+  font-size:16px;
+}
+.studio-shell-page-tools .mw-day-step:hover{
+  background:#eaf2f9;
+  color:#175f99;
+}
+.studio-shell-page-tools .mw-day-current{
+  min-width:66px;
+  height:28px;
+  padding:0 9px;
+  border-radius:6px;
+  color:#17324f;
+  font-size:11px;
+  font-weight:800;
+}
+.studio-shell-page-tools .mw-day-current:hover{
+  background:#edf5fb;
+}
+.mw-calendar-control{
+  position:relative;
+}
+.studio-shell-page-tools .mw-calendar-trigger{
+  width:30px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border-radius:6px;
+  color:#4f6e89;
+}
+.studio-shell-page-tools .mw-calendar-trigger:hover,
+.studio-shell-page-tools .mw-calendar-trigger[aria-expanded="true"]{
+  background:#eaf2f9;
+  color:#155f9f;
+}
+.mw-calendar-popover{
+  position:absolute;
+  z-index:120;
+  top:calc(100% + 6px);
+  right:0;
+  width:238px;
+  padding:9px;
+  border:1px solid #d7e0e9;
+  border-radius:10px;
+  background:#fff;
+  box-shadow:0 14px 30px rgba(24,45,67,.17);
+}
+.mw-calendar-head{
+  display:grid;
+  grid-template-columns:28px 1fr 28px;
+  align-items:center;
+  gap:4px;
+  margin-bottom:7px;
+}
+.mw-calendar-head strong{
+  text-align:center;
+  color:#17324f;
+  font-size:12px;
+}
+.mw-calendar-head button{
+  width:28px;
+  height:28px;
+  padding:0;
+  border-radius:6px;
+  color:#587087;
+  font-size:15px;
+}
+.mw-calendar-head button:hover{
+  background:#eef5fa;
+}
+.mw-calendar-week,
+.mw-calendar-grid{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:2px;
+}
+.mw-calendar-week{
+  margin-bottom:3px;
+}
+.mw-calendar-week span{
+  padding:2px 0;
+  color:#8a98a7;
+  font-size:8px;
+  font-weight:800;
+  text-align:center;
+  text-transform:uppercase;
+}
+.mw-calendar-day,
+.mw-calendar-empty{
+  width:28px;
+  height:28px;
+}
+.mw-calendar-day{
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+  color:#2d4258;
+  font-size:10px;
+  font-weight:600;
+}
+.mw-calendar-day:hover{
+  background:#edf5fb;
+  color:#155f9f;
+}
+.mw-calendar-day.is-today{
+  box-shadow:inset 0 0 0 1px #6ea6d5;
+  color:#155f9f;
+}
+.mw-calendar-day.selected{
+  background:#2f6f9f;
+  color:#fff;
+  box-shadow:none;
+}
+.mw-calendar-day.selected:hover{
+  background:#255f8a;
+  color:#fff;
+}
+.mw-calendar-today{
+  width:100%;
+  min-height:28px;
+  margin-top:7px;
+  padding:4px 8px;
+  border:1px solid #d9e3eb!important;
+  border-radius:6px!important;
+  background:#f5f8fb!important;
+  color:#315f87!important;
+  font-size:10px!important;
+  font-weight:800!important;
+}
+.mw-calendar-today:hover{
+  background:#eaf2f8!important;
+}
