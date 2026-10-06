@@ -128,11 +128,15 @@
         const taskRows=myTasks.slice(0,8).map(task=>{
             const job=jobById(task.jobId)||{};
             const context=[job.title,job.clientName].filter(Boolean).join(' · ')||task.activityType||'Studio task';
-            return `<button class="mw-task-row" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
-                <span class="mw-task-bullet" aria-hidden="true"></span>
+            const due=task.dueAtUtc?new Date(task.dueAtUtc):null;
+            const dueDay=due?new Date(due.getFullYear(),due.getMonth(),due.getDate()):null;
+            const todayDay=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+            const dueState=!dueDay?'none':dueDay<todayDay?'overdue':dueDay.getTime()===todayDay.getTime()?'today':'upcoming';
+            const priority=String(task.priority||'Normal').toLowerCase();
+            return `<button class="mw-task-row due-${dueState}" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
+                <span class="mw-task-bullet priority-${esc(priority)}" aria-hidden="true"></span>
                 <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(context)}</small></span>
-                <span class="mw-due">${task.dueAtUtc?'Due '+formatDay(task.dueAtUtc):'No due date'}</span>
-                <span class="mw-priority ${String(task.priority||'').toLowerCase()}">${esc(task.priority||'Normal')}</span>
+                <span class="mw-due">${due?'<b>'+esc(dueState==='overdue'?'Overdue':dueState==='today'?'Today':'Due')+'</b><small>'+esc(formatDay(task.dueAtUtc))+'</small>':'<b>Open</b>'}</span>
                 <span class="mw-chevron">›</span>
             </button>`;
         }).join('')||'<div class="mw-empty">No open tasks assigned to you.</div>';
