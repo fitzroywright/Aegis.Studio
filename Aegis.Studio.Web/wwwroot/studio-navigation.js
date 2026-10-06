@@ -108,13 +108,17 @@
             </button>`;
         }).join('')||'<div class="mw-empty">No sessions scheduled today.</div>';
 
-        const taskRows=myTasks.slice(0,4).map(task=>`<button class="mw-task-row" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
-            <span class="mw-check"></span>
-            <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(task.activityType||'Photography')}</small></span>
-            <span class="mw-due">${task.dueAtUtc?formatDay(task.dueAtUtc):'Today'}</span>
-            <span class="mw-priority ${String(task.priority||'').toLowerCase()}">${esc(task.priority||'Normal')}</span>
-            <span class="mw-chevron">›</span>
-        </button>`).join('')||'<div class="mw-empty">No open tasks assigned to you.</div>';
+        const taskRows=myTasks.slice(0,8).map(task=>{
+            const job=jobById(task.jobId)||{};
+            const context=[job.title,job.clientName].filter(Boolean).join(' · ')||task.activityType||'Studio task';
+            return `<button class="mw-task-row" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
+                <span class="mw-check"></span>
+                <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(context)}</small></span>
+                <span class="mw-due">${task.dueAtUtc?'Due '+formatDay(task.dueAtUtc):'No due date'}</span>
+                <span class="mw-priority ${String(task.priority||'').toLowerCase()}">${esc(task.priority||'Normal')}</span>
+                <span class="mw-chevron">›</span>
+            </button>`;
+        }).join('')||'<div class="mw-empty">No open tasks assigned to you.</div>';
 
         const messageRows=messageNotifications.slice(0,5).map(n=>`<button class="mw-message-row" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
             <span class="mw-message-avatar">${esc(String(n.subject||n.title||n.eventType||'M').slice(0,1))}</span>

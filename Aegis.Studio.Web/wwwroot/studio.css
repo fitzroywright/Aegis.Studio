@@ -4243,25 +4243,42 @@ body[data-studio-view="mywork"] .generic{
   overflow:auto;
 }
 .mw-right-tasks .mw-task-row{
-  min-height:42px;
-  height:42px;
-  grid-template-columns:18px minmax(0,1fr) 52px 16px;
-  gap:6px;
-  padding:3px 0;
+  min-height:48px;
+  height:48px;
+  grid-template-columns:18px minmax(0,1fr) 62px 16px;
+  gap:7px;
+  padding:4px 0;
 }
-.mw-right-tasks .mw-task-row>span:nth-of-type(2),
-.mw-right-tasks .mw-task-row>span:nth-of-type(4){
+.mw-right-tasks .mw-task-row .mw-priority{
   display:none;
+}
+.mw-right-tasks .mw-task-row .mw-two-line{
+  display:block;
+  min-width:0;
 }
 .mw-right-tasks .mw-task-row .mw-two-line small{
   display:block;
   font-size:10px;
+  color:#6c7989;
+  line-height:13px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 .mw-right-tasks .mw-task-row .mw-two-line strong{
+  display:block;
   font-size:11px;
+  line-height:14px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 .mw-right-tasks .mw-due{
   font-size:9px;
+  color:#8a5a1e;
+  text-align:right;
+  white-space:normal;
+  line-height:12px;
 }
 .mw-messages-panel{
   flex:0 0 220px;
