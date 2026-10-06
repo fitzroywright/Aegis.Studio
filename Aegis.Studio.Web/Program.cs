@@ -148,10 +148,8 @@ global::Common.Messaging.Hosting.ServiceCollectionExtensions
         "aegis-studio");
 bool graphEmailEnabled = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
 bool graphInboundEnabled = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundEnabled", false);
-if (graphEmailEnabled || graphInboundEnabled)
-{
-    global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
-        .AddMicrosoftGraphEmailMessagingChannel(
+global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
+    .AddMicrosoftGraphEmailMessagingChannel(
             builder.Services,
             new global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphEmailOptions
             {
@@ -163,9 +161,8 @@ if (graphEmailEnabled || graphInboundEnabled)
                 SkipSenderRecipient = false,
                 InboundEnabled = graphInboundEnabled,
                 InboundPollSeconds = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundPollSeconds", 30),
-                InboundPageSize = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundPageSize", 50)
-            });
-}
+            InboundPageSize = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundPageSize", 50)
+        });
 global::Common.Messaging.Hosting.ServiceCollectionExtensions
     .AddCommonMessagingDiagnostics(builder.Services);
 builder.Services.AddSingleton<WorkspaceStore>();
