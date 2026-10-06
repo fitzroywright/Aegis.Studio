@@ -12,7 +12,9 @@ public static class DemoDataEndpoints
     {
         app.MapPost("/api/admin/demo/seed", async Task<IResult> (HttpContext context, StudioDatabase database, IWebHostEnvironment environment, IFileStorage storage, ILoggerFactory logs) =>
         {
-            if (!environment.IsDevelopment()) return Results.NotFound();
+            bool demoDataEnabled = environment.IsDevelopment()
+                || app.Configuration.GetValue("DemoData:Enabled", false);
+            if (!demoDataEnabled) return Results.NotFound();
             string? login = context.User.FindFirstValue("login_name") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrWhiteSpace(login)) return Results.BadRequest(new { error = "A login identifier is required." });
             bool streaming = context.Request.Headers.Accept.ToString().Contains("application/x-ndjson", StringComparison.OrdinalIgnoreCase);
