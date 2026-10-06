@@ -4105,3 +4105,45 @@ body[data-studio-view="reports"] .op-card{
     display:flex;
   }
 }
+
+
+/* My Work quick links */
+.mw-quick-links-panel{
+  margin-top:0;
+}
+.mw-quick-link-list{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+}
+.mw-quick-link-list button{
+  min-height:42px;
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr);
+  align-items:center;
+  gap:8px;
+  padding:8px 11px;
+  border:0;
+  border-right:1px solid #e2e8ef;
+  border-bottom:1px solid #e2e8ef;
+  border-radius:0;
+  background:#fff;
+  color:#244464;
+  text-align:left;
+  font-size:11px;
+  cursor:pointer;
+}
+.mw-quick-link-list button:nth-child(2n){
+  border-right:0;
+}
+.mw-quick-link-list button:nth-last-child(-n+2){
+  border-bottom:0;
+}
+.mw-quick-link-list button:hover{
+  background:#f7fbff;
+}
+.mw-quick-link-list button>span:first-child{
+  color:#1479df;
+  font-size:12px;
+  text-align:center;
+}

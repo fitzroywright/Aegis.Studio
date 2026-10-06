@@ -181,6 +181,17 @@
                                 <button data-nav="production"><span>◆</span><span>Production</span><b>›</b></button>
                             </div>
                         </section>
+
+                        <section class="mw-list-panel mw-quick-links-panel" data-mw-region="quick-links">
+                            <header><h2>↗ &nbsp; Quick Links</h2></header>
+                            <div class="mw-quick-link-list">
+                                <button data-nav="pipeline"><span>▥</span><span>Pipeline</span></button>
+                                <button data-nav="frontdesk"><span>▣</span><span>Front Desk</span></button>
+                                <button data-nav="finance"><span>$</span><span>Finance</span></button>
+                                <button data-nav="reports"><span>▤</span><span>Reports</span></button>
+                                ${isManager?'<button data-nav="admin"><span>⚙</span><span>Admin</span></button>':''}
+                            </div>
+                        </section>
                     </div>
 
                     <section class="mw-list-panel mw-assigned-panel">
