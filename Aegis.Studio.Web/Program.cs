@@ -32,6 +32,7 @@ using Common.Security.Abstractions;
 using Common.Security.Integration;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Npgsql;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -202,6 +203,15 @@ builder.Services.AddHostedService<Aegis.Studio.Web.Media.MediaDerivativeWorker>(
 builder.Services.AddSingleton<Aegis.Studio.Web.WorkDay.IWorkDaySchedulingService>(sp=>new Aegis.Studio.Web.WorkDay.WorkDaySchedulingService(sp.GetRequiredService<StudioDatabase>(),new PhotographerStore(sp.GetRequiredService<StudioDatabase>())));
 
 WebApplication app = builder.Build();
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+};
+// Studio is bound to loopback in production and Nginx is the trusted local reverse proxy.
+// Clear the framework defaults so the loopback proxy's forwarded headers are honored.
+forwardedHeadersOptions.KnownIPNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
 app.MapDiagnosticLevelRuntime();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioFeatureDatabase>().InitializeAsync();
