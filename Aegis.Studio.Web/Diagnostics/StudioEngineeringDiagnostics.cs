@@ -1,6 +1,6 @@
 namespace Aegis.Studio.Web.Diagnostics;
 
-using Aegis.Studio.Infrastructure.Email;
+using Common.Messaging.Channels.MicrosoftGraph;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Storage;
 using Common.Diagnostics;
@@ -130,7 +130,7 @@ public static class StudioEngineeringDiagnostics
 public sealed class StudioEngineeringDiagnosticCatalog
 {
     private readonly NpgsqlDataSource dataSource;
-    private readonly MicrosoftGraphEmailClient graphClient;
+    private readonly MicrosoftGraphMailboxClient graphClient;
     private readonly MicrosoftGraphEmailOptions graphOptions;
     private readonly ISecretProvider secretProvider;
     private readonly AttachmentStore attachmentStore;
@@ -138,7 +138,7 @@ public sealed class StudioEngineeringDiagnosticCatalog
 
     public StudioEngineeringDiagnosticCatalog(
         NpgsqlDataSource dataSource,
-        MicrosoftGraphEmailClient graphClient,
+        MicrosoftGraphMailboxClient graphClient,
         MicrosoftGraphEmailOptions graphOptions,
         ISecretProvider secretProvider,
         AttachmentStore attachmentStore,
@@ -235,9 +235,9 @@ public sealed class StudioEngineeringDiagnosticCatalog
 
     private async Task<EngineeringDiagnosticCheckResult> CheckGraphEmailAsync(CancellationToken cancellationToken)
     {
-        MicrosoftGraphEmailVerification verification = await graphClient.VerifyConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        MicrosoftGraphMailboxVerification verification = await graphClient.VerifyConfigurationAsync(cancellationToken).ConfigureAwait(false);
         string evidence = $"State={verification.State}; Authentication={verification.AuthenticationSucceeded}; MailboxAccessible={verification.MailboxAccessible}; SecretPresent={verification.ClientSecretConfigured}; GraphStatus={verification.GraphStatusCode?.ToString() ?? "none"}";
-        if (!graphOptions.Enabled)
+        if (!graphOptions.InboundEnabled)
         {
             return Warning("studio-l3-email", "Studio Microsoft Graph email", "Microsoft Graph email routing is disabled.", evidence);
         }
