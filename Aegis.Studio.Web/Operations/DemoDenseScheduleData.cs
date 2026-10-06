@@ -169,6 +169,7 @@ internal static class DemoDenseScheduleData
             jobId, workspaceId, conversationId, title, customer.Name, status, DateOnly.FromDateTime(start.UtcDateTime), Photographer(sequence), clientId);
 
         Execute(c, tx, "update studio_conversations set job_id=$2 where id=$1", conversationId, jobId);
+        Execute(c, tx, "insert into studio_media_galleries(id,name,default_lens,default_collection) values($1,'Media','Auto','Unclassified') on conflict(id) do nothing", jobId);
 
         Execute(c, tx,
             "insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'External',$4,now()) on conflict(id) do update set body=excluded.body",
