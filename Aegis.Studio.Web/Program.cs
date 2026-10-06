@@ -148,21 +148,25 @@ global::Common.Messaging.Hosting.ServiceCollectionExtensions
         "aegis-studio");
 bool graphEmailEnabled = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:Enabled", false);
 bool graphInboundEnabled = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundEnabled", false);
+global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphEmailOptions graphOptions = new()
+{
+    TenantId = builder.Configuration["Messaging:MicrosoftGraph:TenantId"] ?? string.Empty,
+    ClientId = builder.Configuration["Messaging:MicrosoftGraph:ClientId"] ?? string.Empty,
+    SenderUpn = builder.Configuration["Messaging:MicrosoftGraph:Email:SenderUpn"] ?? string.Empty,
+    ClientSecretName = builder.Configuration["Messaging:MicrosoftGraph:ClientSecretName"]
+        ?? "messaging/msgraph/client-secret",
+    SkipSenderRecipient = false,
+    InboundEnabled = graphInboundEnabled,
+    InboundPollSeconds = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundPollSeconds", 30),
+    InboundPageSize = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundPageSize", 50)
+};
 global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
-    .AddMicrosoftGraphEmailMessagingChannel(
-            builder.Services,
-            new global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphEmailOptions
-            {
-                TenantId = builder.Configuration["Messaging:MicrosoftGraph:TenantId"] ?? string.Empty,
-                ClientId = builder.Configuration["Messaging:MicrosoftGraph:ClientId"] ?? string.Empty,
-                SenderUpn = builder.Configuration["Messaging:MicrosoftGraph:Email:SenderUpn"] ?? string.Empty,
-                ClientSecretName = builder.Configuration["Messaging:MicrosoftGraph:ClientSecretName"]
-                    ?? "messaging/msgraph/client-secret",
-                SkipSenderRecipient = false,
-                InboundEnabled = graphInboundEnabled,
-                InboundPollSeconds = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundPollSeconds", 30),
-            InboundPageSize = builder.Configuration.GetValue("Messaging:MicrosoftGraph:Email:InboundPageSize", 50)
-        });
+    .AddMicrosoftGraphMailbox(builder.Services, graphOptions);
+if (graphEmailEnabled)
+{
+    global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
+        .AddMicrosoftGraphEmailMessagingChannel(builder.Services, graphOptions);
+}
 global::Common.Messaging.Hosting.ServiceCollectionExtensions
     .AddCommonMessagingDiagnostics(builder.Services);
 builder.Services.AddSingleton<WorkspaceStore>();
