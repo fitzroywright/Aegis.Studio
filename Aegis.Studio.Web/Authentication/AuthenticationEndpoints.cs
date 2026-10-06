@@ -31,7 +31,7 @@ public static class AuthenticationEndpoints
 
         app.MapPost("/api/auth/login", async (
             LoginRequest request,
-            IAuthenticator authenticator,
+            IServiceProvider services,
             StudioDatabase database,
             HttpContext httpContext) =>
         {
@@ -67,6 +67,7 @@ public static class AuthenticationEndpoints
                     return Results.BadRequest(new { error = "User name and password are required." });
                 }
 
+                IAuthenticator authenticator = services.GetRequiredService<IAuthenticator>();
                 AuthenticationResult result = authenticator.Authenticate(userName, request.Password);
                 if (!result.IsAuthenticated)
                 {
