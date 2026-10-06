@@ -155,56 +155,66 @@
         }).join('')||'<div class="mw-empty">Nothing needs attention right now.</div>';
 
         const markup=`
-            <section class="mw-page mw-reference-page">
-                <header class="mw-reference-header" data-mw-region="header">
-                    <div class="mw-header-copy">
-                        <span class="mw-header-kicker">STUDIO TODAY</span>
-                        <h1>My Work</h1>
-                        <p>${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</p>
+            <section class="mw-page mw-list-page">
+                <header class="mw-list-header" data-mw-region="header">
+                    <div>
+                        <span class="mw-list-kicker">WORK FOR</span>
+                        <h1>${esc(displayName)}</h1>
+                        <p>My Work · ${now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</p>
                     </div>
-                    <div class="mw-header-side">
-                        <span class="mw-header-mark" aria-hidden="true"></span>
-                        <div class="mw-day-nav"><button type="button" aria-label="Previous day">‹</button><button type="button" class="today">Today</button><button type="button" aria-label="Next day">›</button><button type="button" class="calendar" aria-label="Choose date">▣</button></div>
-                    </div>
+                    <div class="mw-day-nav"><button type="button" aria-label="Previous day">‹</button><button type="button" class="today">Today</button><button type="button" aria-label="Next day">›</button><button type="button" class="calendar" aria-label="Choose date">▣</button></div>
                 </header>
 
-                <div class="mw-reference-grid">
-                    <div class="mw-reference-left">
-                        <section class="mw-card mw-reference-sessions" data-mw-region="schedule">
-                            <header><h2>▣ &nbsp; Today's Sessions <span class="mw-count">${metric('schedule',todaySchedule.length)}</span></h2><button data-nav="schedule">View full schedule&nbsp; →</button></header>
-                            <div>${phase('schedule',sessionRows)}</div>
+                <div class="mw-list-layout">
+                    <div class="mw-list-summary">
+                        <section class="mw-list-panel" data-mw-region="status">
+                            <header><h2>▥ &nbsp; Work Status</h2><small>Assigned to ${esc(displayName)}</small></header>
+                            <div class="mw-status-list">
+                                <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>All work</span><strong>${metric('jobs',jobs.length)}</strong></button>
+                                <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Today's sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
+                                <button class="mw-status-row" data-nav="tasks"><span class="mw-status-icon">☑</span><span>Open tasks</span><strong>${metric('tasks',myTasks.length)}</strong></button>
+                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionItems.length+attentionJobs)}</strong></button>
+                                <button class="mw-status-row" id="mwOpenNotifications"><span class="mw-status-icon">✉</span><span>Unread messages</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong></button>
+                            </div>
                         </section>
 
-                        <div class="mw-reference-metrics" data-mw-region="metrics">
-                            <article><span>▣</span><strong>${metric('schedule',todaySchedule.length)}</strong><small>Today's Sessions</small></article>
-                            <article><span>☷</span><strong>${metric('jobs',jobs.length)}</strong><small>Active Jobs</small></article>
-                            <article><span>✉</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong><small>Unread Messages</small></article>
-                            <article><span>☑</span><strong>${metric('tasks',myTasks.length)}</strong><small>My Tasks</small></article>
-                            <article><span>⚠</span><strong>${metric('tasks',overdueTasks)}</strong><small>Overdue Items</small></article>
+                        <section class="mw-list-panel mw-action-panel" data-mw-region="actions">
+                            <header><h2>◆ &nbsp; Actions</h2></header>
+                            <div class="mw-action-list">
+                                <button data-nav="schedule"><span>＋</span><span>My schedule</span><b>›</b></button>
+                                <button data-nav="tasks"><span>☑</span><span>My tasks</span><b>›</b></button>
+                                <button data-nav="messages"><span>✉</span><span>Messages</span><b>›</b></button>
+                                <button data-nav="workspaces"><span>▰</span><span>Workspaces</span><b>›</b></button>
+                                <button data-nav="production"><span>◆</span><span>Production</span><b>›</b></button>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section class="mw-list-panel mw-assigned-panel">
+                        <header class="mw-assigned-header">
+                            <div><h2>Assigned Work</h2><small>Sessions, tasks and jobs currently belonging to ${esc(displayName)}</small></div>
+                        </header>
+
+                        <div class="mw-work-section" data-mw-region="schedule">
+                            <div class="mw-section-title"><h3>Today's Sessions</h3><span>${metric('schedule',todaySchedule.length)}</span></div>
+                            <div class="mw-section-rows">${phase('schedule',sessionRows)}</div>
                         </div>
 
-                        <section class="mw-card mw-reference-pipeline" data-mw-region="pipeline">
-                            <header><h2>▥ &nbsp; Recent Work / Pipeline</h2><button data-nav="pipeline">View all jobs&nbsp; →</button></header>
-                            <div>${phase('jobs',recentRows)}</div>
-                        </section>
-                    </div>
+                        <div class="mw-work-section" data-mw-region="attention">
+                            <div class="mw-section-title"><h3>Needs Attention</h3><span class="danger">${metric('tasks',attentionItems.length+attentionJobs)}</span></div>
+                            <div class="mw-section-rows">${phase('tasks',attentionRows)}</div>
+                        </div>
 
-                    <div class="mw-reference-right">
-                        <section class="mw-card mw-reference-attention" data-mw-region="attention">
-                            <header><h2>⚠ &nbsp; Needs Attention <span class="mw-count danger">${attentionItems.length+attentionJobs}</span></h2><button data-nav="production">View all&nbsp; →</button></header>
-                            <div>${phase('tasks',attentionRows)}</div>
-                        </section>
+                        <div class="mw-work-section" data-mw-region="tasks">
+                            <div class="mw-section-title"><h3>My Tasks</h3><span>${metric('tasks',myTasks.length)}</span></div>
+                            <div class="mw-section-rows">${phase('tasks',taskRows)}</div>
+                        </div>
 
-                        <section class="mw-card mw-reference-tasks" data-mw-region="tasks">
-                            <header><h2>☑ &nbsp; My Tasks <span class="mw-count">${metric('tasks',myTasks.length)}</span></h2><button data-nav="tasks">View all&nbsp; →</button></header>
-                            <div>${phase('tasks',taskRows)}</div>
-                        </section>
-
-                        <section class="mw-card mw-reference-messages" data-mw-region="messages">
-                            <header><h2>◉ &nbsp; Messages &amp; Studio Activity</h2><button id="mwOpenNotifications">View all&nbsp; →</button></header>
-                            <div>${phase('notifications',messageRows)}</div>
-                        </section>
-                    </div>
+                        <div class="mw-work-section" data-mw-region="pipeline">
+                            <div class="mw-section-title"><h3>Recent Work</h3><button data-nav="pipeline">View all →</button></div>
+                            <div class="mw-section-rows">${phase('jobs',recentRows)}</div>
+                        </div>
+                    </section>
                 </div>
             </section>`;
         const next=document.createElement('div');next.innerHTML=markup;
