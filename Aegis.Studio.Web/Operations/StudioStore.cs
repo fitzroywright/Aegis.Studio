@@ -71,7 +71,7 @@ public sealed class StudioStore
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id) from studio_jobs where id = $1";
+        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id),job_lead from studio_jobs where id = $1";
         command.Parameters.AddWithValue(id);
         using NpgsqlDataReader reader = command.ExecuteReader();
         return reader.Read() ? ReadJob(reader) : null;
@@ -81,7 +81,7 @@ public sealed class StudioStore
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id) from studio_jobs where ($1::uuid[] is null or id=any($1)) order by created_at_utc desc";
+        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id),job_lead from studio_jobs where ($1::uuid[] is null or id=any($1)) order by created_at_utc desc";
         command.Parameters.AddWithValue((object?)allowedIds??DBNull.Value);
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<StudioJob> values = [];
@@ -184,8 +184,8 @@ public sealed class StudioStore
         {
             command.Transaction = transaction;
             command.CommandText = """
-                insert into studio_jobs(id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to)
-                values ($1,$2,$3,$4,$5,'New',$6,$7,null)
+                insert into studio_jobs(id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, job_lead)
+                values ($1,$2,$3,$4,$5,'New',$6,$7,null,(select default_job_lead from studio_workspaces where id=$2))
                 """;
             command.Parameters.AddWithValue(id);
             command.Parameters.AddWithValue(conversation.WorkspaceId);
@@ -393,7 +393,7 @@ public sealed class StudioStore
     private StudioJob ReadJob(NpgsqlDataReader reader,bool readFinancials=true)
     {
         Guid id = reader.GetGuid(0);
-        return new StudioJob(id, reader.GetGuid(1), reader.GetGuid(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.IsDBNull(6) ? null : DateOnly.FromDateTime(reader.GetDateTime(6)), reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? null : reader.GetString(8), readFinancials?GetFinancialEvents(id):[], reader.IsDBNull(9)?null:reader.GetGuid(9), reader.IsDBNull(10)?null:reader.GetString(10),reader.FieldCount>11?reader.GetFieldValue<Guid[]>(11):null);
+        return new StudioJob(id, reader.GetGuid(1), reader.GetGuid(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.IsDBNull(6) ? null : DateOnly.FromDateTime(reader.GetDateTime(6)), reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? null : reader.GetString(8), readFinancials?GetFinancialEvents(id):[], reader.IsDBNull(9)?null:reader.GetGuid(9), reader.IsDBNull(10)?null:reader.GetString(10),reader.FieldCount>11?reader.GetFieldValue<Guid[]>(11):null, reader.FieldCount>12 && !reader.IsDBNull(12) ? reader.GetString(12) : null);
     }
 
     private List<StudioFinancialEvent> GetFinancialEvents(Guid jobId)
@@ -451,7 +451,7 @@ public sealed class StudioStore
 public sealed record StudioWorkspace(Guid Id, string Name, string Address, int OpenCount);
 public sealed record StudioConversation(Guid Id, Guid WorkspaceId, string Subject, string ContactName, string ContactAddress, string Channel, bool IsClosed, Guid? JobId, List<StudioMessage> Messages, string? ExternalThreadId = null);
 public sealed record StudioMessage(Guid Id, string Author, string Visibility, string Body, DateTimeOffset CreatedAt, string? ExternalMessageId = null, string? AuthorUserName = null);
-public sealed record StudioJob(Guid Id, Guid WorkspaceId, Guid ConversationId, string Title, string ClientName, string Status, DateOnly? EventDate, DateTimeOffset CreatedAt, string? AssignedTo = null, List<StudioFinancialEvent>? FinancialEvents = null, Guid? ClientId = null, string? LinkedClientName = null,IReadOnlyList<Guid>? ParticipatingWorkspaceIds=null);
+public sealed record StudioJob(Guid Id, Guid WorkspaceId, Guid ConversationId, string Title, string ClientName, string Status, DateOnly? EventDate, DateTimeOffset CreatedAt, string? AssignedTo = null, List<StudioFinancialEvent>? FinancialEvents = null, Guid? ClientId = null, string? LinkedClientName = null,IReadOnlyList<Guid>? ParticipatingWorkspaceIds=null,string? JobLead=null);
 public sealed record StudioFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt,string? PaymentMethod=null,string? RecordedBy=null);
 public sealed record EmailIngestResult(StudioConversation Conversation, bool CreatedConversation, bool WasDuplicate);
 public sealed record IncomingInteractionRequest(Guid? WorkspaceId, string? Destination, string ContactName, string ContactAddress, string Subject, string Body, string? Channel);
