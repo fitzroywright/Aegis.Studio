@@ -31,7 +31,7 @@
         };
         const scheduleUrl=date=>{
             const {from,to}=dayRange(date);
-            return '/api/schedule/entries?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
+            return '/api/my-work/schedule?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
         };
         const urls={tasks:'/api/my-work/tasks',schedule:scheduleUrl(state.selectedDate),jobs:'/api/my-work/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/my-work/media-summary'};
         let inFlight=0;const waiting=[];
@@ -123,7 +123,8 @@
         const isManager=me.isAdministrator===true||auth.isAdministrator===true||roles.some(r=>/administrator|manager|owner|finance/.test(r));
         const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status)&&(!user||String(t.assignedTo||'').toLowerCase()===user));
         const todaySchedule=schedule.filter(entry=>entry.status!=='Cancelled'&&new Date(entry.startsAtUtc)>=startOfDay&&new Date(entry.startsAtUtc)<endOfDay).sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
-        const recentJobs=[...jobs].sort((a,b)=>new Date(b.createdAtUtc||b.createdAt||0)-new Date(a.createdAtUtc||a.createdAt||0)).slice(0,4);
+        const leadJobs=jobs.filter(j=>!['Completed','Closed','Cancelled','Published'].includes(String(j.status||''))&&user&&String(j.jobLead||'').toLowerCase()===user);
+        const recentJobs=[...leadJobs].sort((a,b)=>new Date(b.createdAtUtc||b.createdAt||0)-new Date(a.createdAtUtc||a.createdAt||0)).slice(0,4);
         const mediaByJob=new Map(state.media.map(row=>[String(row.jobId),row]));
         const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assetCount:0}}));
         const totalPhotos=state.media.reduce((sum,row)=>sum+row.assetCount,0);
@@ -210,13 +211,13 @@
                 <span class="mw-pipeline-due">${job.dueAtUtc?'Due '+formatDay(job.dueAtUtc):''}</span>
                 <span class="mw-chevron">›</span>
             </button>`;
-        }).join('')||'<div class="mw-empty">No recent work.</div>';
+        }).join('')||'<div class="mw-empty">No active jobs currently led by you.</div>';
 
         const overdueTasks=myTasks.filter(t=>t.dueAtUtc&&new Date(t.dueAtUtc)<now).length;
         const blockedTasks=myTasks.filter(t=>/blocked|rework|required|failed/i.test(String(t.status||''))).length;
-        const schedulingJobs=jobs.filter(j=>/needs scheduling/i.test(String(j.status||''))).length;
-        const uploadJobs=jobs.filter(j=>/awaiting upload/i.test(String(j.status||''))).length;
-        const exceptionJobs=jobs.filter(j=>/blocked|overdue|exception/i.test(String(j.status||''))).length;
+        const schedulingJobs=leadJobs.filter(j=>/needs scheduling/i.test(String(j.status||''))).length;
+        const uploadJobs=leadJobs.filter(j=>/awaiting upload/i.test(String(j.status||''))).length;
+        const exceptionJobs=leadJobs.filter(j=>/blocked|overdue|exception/i.test(String(j.status||''))).length;
         const attentionJobs=schedulingJobs+uploadJobs+exceptionJobs;
         const productionTasks=myTasks.filter(t=>/edit|retouch|qc|print|deliver|production|gallery|select|design|color|review|upload|schedule/i.test(String(t.activityType||'')+' '+String(t.title||'')));
         const attentionItems=[...productionTasks,...myTasks.filter(t=>!productionTasks.includes(t))].slice(0,5);
@@ -229,7 +230,7 @@
                         <section class="mw-list-panel" data-mw-region="status">
                             <header><h2><span class="mw-title-icon status">▥</span> Status</h2><small>Assigned to ${esc(displayName)}</small></header>
                             <div class="mw-status-list">
-                                <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>All work</span><strong>${metric('jobs',jobs.length)}</strong></button>
+                                <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>Jobs I lead</span><strong>${metric('jobs',leadJobs.length)}</strong></button>
                                 <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Today's sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
                                 <button class="mw-status-row" data-nav="tasks"><span class="mw-status-icon">☑</span><span>Open tasks</span><strong>${metric('tasks',myTasks.length)}</strong></button>
                                 <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionTotal)}</strong></button>
@@ -268,7 +269,7 @@
                         </div>
 
                         <div class="mw-work-section" data-mw-region="pipeline">
-                            <div class="mw-section-title"><h3>Recent Jobs</h3><button data-nav="pipeline">View all →</button></div>
+                            <div class="mw-section-title"><h3>Jobs I Lead</h3><button data-nav="pipeline">View all →</button></div>
                             <div class="mw-section-rows">${phase('jobs',recentRows)}</div>
                         </div>
 
