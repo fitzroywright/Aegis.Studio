@@ -23,7 +23,18 @@ async function renderJobSubjects(job, panel, current, refresh) {
     if(!current()) return;
 
     const canEdit=(permissions.permissions||permissions).editJob;
+    const canUpload=(permissions.permissions||permissions).manageProduction;
     const realSubjects=subjects.filter(subject=>!subject.isSystem);
+    const uploadToSubject=async(subjectId,files)=>{
+        const subject=realSubjects.find(item=>item.id===subjectId),collection=subject?.collection||'Unclassified';
+        for(const file of files){
+            const form=new FormData();form.append('file',file);form.append('returned','false');form.append('note','Dropped on subject');form.append('collection',collection);
+            const uploaded=await json('/api/jobs/'+job.id+'/media/uploads',{method:'POST',body:form});
+            if(uploaded.assetId)await json('/api/jobs/'+job.id+'/media/assets/'+uploaded.assetId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'Needs Sorting',collection,subjects:[subjectId],assignedTo:null})});
+        }
+        await refresh();
+    };
+
     const representative=subject=>{
         const asset=assets.find(a=>(a.subjects||[]).includes(subject.id)&&String(a.contentType||'').startsWith('image/'));
         return asset?.versionId ? `/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content` : null;
@@ -55,7 +66,7 @@ async function renderJobSubjects(job, panel, current, refresh) {
                 ${realSubjects.map(subject=>{
                     const image=representative(subject);
                     return `
-                        <article class="person-card" data-search-person="${esc((subject.name+' '+(subject.reference||'')+' '+role(subject)).toLowerCase())}">
+                        <article class="person-card subject-drop-target" data-subject-drop="${esc(subject.id)}" data-search-person="${esc((subject.name+' '+(subject.reference||'')+' '+role(subject)).toLowerCase())}">
                             <div class="person-photo">
                                 ${image?`<img src="${image}" alt="">`:`<span>${esc((subject.name||'?').slice(0,1))}</span>`}
                             </div>
@@ -81,6 +92,8 @@ async function renderJobSubjects(job, panel, current, refresh) {
 
             ${canEdit?'<form class="subject-form people-editor" hidden><input name="subjectId" type="hidden"><label>Name<input name="name" maxlength="200" required></label><label>Reference / ID<input name="reference" maxlength="200"></label><label>Notes / role<textarea name="notes" maxlength="4000" placeholder="Bride, Groom, Student, Bridal Party…"></textarea></label><div class="dialog-actions"><button class="primary">Save</button><button type="button" data-cancel>Cancel</button></div><p role="alert"></p></form>':''}
         </section>`;
+
+    if(canUpload)panel.querySelectorAll('[data-subject-drop]').forEach(card=>{card.ondragover=e=>{if(e.dataTransfer?.types?.includes('Files')){e.preventDefault();card.classList.add('drag-target');}};card.ondragleave=()=>card.classList.remove('drag-target');card.ondrop=async e=>{e.preventDefault();e.stopPropagation();card.classList.remove('drag-target');try{const files=typeof studioDroppedPhotos==='function'?await studioDroppedPhotos(e.dataTransfer):Array.from(e.dataTransfer.files||[]);await uploadToSubject(card.dataset.subjectDrop,files);}catch(error){alert(error.message||String(error));}};});
 
     const search=panel.querySelector('.people-search input');
     if(search)search.oninput=()=>{
