@@ -1000,7 +1000,7 @@
         const me=await json('/api/auth/me').catch(()=>null);
         const isAdministrator=me?.user?.isAdministrator===true||me?.isAdministrator===true;
         if(!isAdministrator){
-            genericView.innerHTML='<section class="admin-page"><header class="admin-page-header"><div><h1>Admin</h1><p>Studio configuration and access management.</p></div></header><section class="admin-card"><h2>Administrator access required</h2><p class="muted">Your account does not have permission to administer Studio.</p></section></section>';
+            genericView.innerHTML='<section class="admin-page mw-list-page"><header class="admin-page-header"><div><h1>Admin</h1><p>Studio configuration and access management.</p></div></header><section class="admin-card"><h2>Administrator access required</h2><p class="muted">Your account does not have permission to administer Studio.</p></section></section>';
             return;
         }
 
@@ -1009,7 +1009,7 @@
         const manageable=workspaceAccessCache.filter(item=>item.permissions?.editWorkspace||item.permissions?.manageMembers||item.permissions?.adminWorkspace);
 
         genericView.innerHTML=`
-            <section class="admin-page">
+            <section class="admin-page mw-list-page">
                 <header class="admin-page-header">
                     <div><h1>Admin</h1><p>Configure Studio, workspaces, access, roles and workflow automation.</p></div>
                     <span class="admin-status-pill">Administrator</span>
