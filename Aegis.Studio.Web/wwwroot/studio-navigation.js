@@ -234,7 +234,7 @@
                                 <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>Jobs I lead</span><strong>${metric('jobs',leadJobs.length)}</strong></button>
                                 <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Today's sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
                                 <button class="mw-status-row" data-nav="tasks"><span class="mw-status-icon">☑</span><span>Open tasks</span><strong>${metric('tasks',myTasks.length)}</strong></button>
-                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionTotal)}</strong></button>
+                                <button class="mw-status-row warning" data-mywork-focus="attention"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionTotal)}</strong></button>
                                 <button class="mw-status-row" data-nav="messages"><span class="mw-status-icon">✉</span><span>Unread messages</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong></button>
                             </div>
                         </section>
@@ -445,6 +445,9 @@
         });
         genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b.dataset.mwFilter===state.taskFilter));
         genericView.querySelectorAll('[data-task-type]').forEach(row=>row.hidden=state.taskFilter!=='all'&&!row.dataset.taskType.toLowerCase().includes(state.taskFilter));
+        genericView.querySelectorAll('[data-mywork-focus="attention"]').forEach(button=>button.onclick=()=>{
+            genericView.querySelector('[data-mw-region="attention"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
         genericView.querySelectorAll('[data-nav]').forEach(button=>button.onclick=()=>window.studioNavigate(button.dataset.nav));
         const openNotifications=genericView.querySelector('#mwOpenNotifications');
         if(openNotifications)openNotifications.onclick=()=>document.getElementById('notificationButton')?.click();
