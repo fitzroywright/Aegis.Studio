@@ -560,7 +560,7 @@
                             <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
                             <div class="mw-action-list">
                                 <button data-workspace-admin><span>＋</span><span>Create Workspace</span><b>›</b></button>
-                                <button data-nav-quick="jobs"><span>▣</span><span>Open Jobs</span><b>›</b></button>
+                                <button data-nav-quick="pipeline"><span>▣</span><span>Open Jobs</span><b>›</b></button>
                                 <button data-nav-quick="production"><span>◆</span><span>Open Production</span><b>›</b></button>
                             </div>
                         </section>
