@@ -106,7 +106,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             <span class="job-row-client">${esc(job.clientName || job.linkedClientName || 'Client not linked')}</span>
             <span class="job-row-meta">
                 <span>Event: ${esc(job.eventDate || 'Not scheduled')}</span>
-                <span>Assigned to: ${esc(job.assignedTo ? messageFirstName(job.assignedTo, people, 'Team member', true) : 'Unassigned')}</span>
+                <span>Job Lead: ${esc(job.jobLead ? messageFirstName(job.jobLead, people, 'Team member', true) : 'Unassigned')}</span>
                 <span class="job-status">${esc(job.status)}</span>
             </span>
         </button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
