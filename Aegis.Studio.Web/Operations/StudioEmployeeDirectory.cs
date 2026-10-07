@@ -29,18 +29,23 @@ public sealed class StudioEmployeeDirectoryStore
               updated_at_utc timestamptz not null default now()
             );
             create index if not exists ix_studio_employees_assignable on studio_employees(is_active,is_assignable,display_name);
+            """;
+        cmd.ExecuteNonQuery();
+        RefreshFromStudioSources();
+    }
+
+    private void RefreshFromStudioSources()
+    {
+        using var c=database.OpenConnection();using var cmd=c.CreateCommand();
+        cmd.CommandText="""
             insert into studio_employees(user_name,display_name,is_active,is_assignable,source,last_synced_at_utc)
-              select user_name,max(display_name),bool_or(is_active),true,'Existing Studio identity',now()
-              from studio_global_operational_role_members group by user_name
+              select user_name,max(display_name),bool_or(is_active),true,'Existing Studio identity',now() from studio_global_operational_role_members group by user_name
               on conflict(user_name) do update set display_name=excluded.display_name,is_active=excluded.is_active,updated_at_utc=now();
             insert into studio_employees(user_name,display_name,is_active,is_assignable,source,workday_user_name,last_synced_at_utc)
-              select user_name,display_name,is_active,is_active,'Studio photographer',user_name,now()
-              from studio_photographers
-              on conflict(user_name) do update set display_name=excluded.display_name,is_active=excluded.is_active,
-                is_assignable=excluded.is_assignable,workday_user_name=excluded.workday_user_name,updated_at_utc=now();
+              select user_name,display_name,is_active,is_active,'Studio photographer',user_name,now() from studio_photographers
+              on conflict(user_name) do update set display_name=excluded.display_name,is_active=excluded.is_active,is_assignable=excluded.is_assignable,workday_user_name=excluded.workday_user_name,updated_at_utc=now();
             insert into studio_employees(user_name,display_name,is_active,is_assignable,source,last_synced_at_utc)
-              select user_name,max(display_name),bool_or(is_active),true,'Workspace member',now()
-              from studio_workspace_members group by user_name
+              select user_name,max(display_name),bool_or(is_active),true,'Workspace member',now() from studio_workspace_members group by user_name
               on conflict(user_name) do update set display_name=excluded.display_name,is_active=excluded.is_active,updated_at_utc=now();
             """;
         cmd.ExecuteNonQuery();
@@ -48,6 +53,7 @@ public sealed class StudioEmployeeDirectoryStore
 
     public IReadOnlyList<StudioEmployee> GetAll(bool assignableOnly=false)
     {
+        RefreshFromStudioSources();
         using var c=database.OpenConnection();using var cmd=c.CreateCommand();
         cmd.CommandText="""
             select e.user_name,e.display_name,e.email_address,e.is_active,e.is_assignable,e.source,e.external_id,e.skills,e.workday_user_name,e.last_synced_at_utc,
