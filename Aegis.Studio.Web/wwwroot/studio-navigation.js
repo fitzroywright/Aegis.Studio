@@ -530,68 +530,102 @@
         }).join('');
 
         genericView.innerHTML=`
-            <section class="workspace-wow-page">
-                <header class="workspace-wow-header">
-                    <div class="workspace-wow-header-copy">
-                        <span class="workspace-wow-kicker">STUDIO ORGANIZATION</span>
-                        <h1>Workspaces</h1>
-                        <p>Jobs, clients, conversations and media — organized by the way the studio actually works.</p>
-                    </div>
-                    <div class="workspace-wow-header-art" aria-hidden="true">
-                        <span></span><span></span><span></span>
-                    </div>
-                    <button type="button" class="workspace-wow-new" data-workspace-admin>＋ New Workspace</button>
-                </header>
+            <section class="workspace-list-page mw-list-page">
+                <div class="mw-list-layout workspace-list-layout">
+                    <aside class="mw-list-summary workspace-left-rail">
+                        <section class="mw-list-panel">
+                            <header><h2><span class="mw-title-icon status">▥</span> Workspace Status</h2><small>${workspaceData.length} total</small></header>
+                            <div class="mw-status-list">
+                                <button class="mw-status-row active" data-workspace-filter="all"><span class="mw-status-icon">▤</span><span>All workspaces</span><strong>${workspaceData.length}</strong></button>
+                                <button class="mw-status-row" data-workspace-filter="active"><span class="mw-status-icon">●</span><span>Active</span><strong>${activeCount}</strong></button>
+                                <button class="mw-status-row" data-workspace-filter="completed"><span class="mw-status-icon">✓</span><span>Completed</span><strong>${completedWorkspaceCount}</strong></button>
+                                <button class="mw-status-row" data-workspace-filter="ready"><span class="mw-status-icon">○</span><span>Ready</span><strong>${workspaceData.filter(item=>!item.jobs.length).length}</strong></button>
+                            </div>
+                        </section>
 
-                <section class="workspace-wow-overview">
-                    <article><span>▦</span><strong>${workspaceData.length}</strong><small>Total Workspaces</small></article>
-                    <article><span>●</span><strong>${activeCount}</strong><small>Active</small></article>
-                    <article><span>✓</span><strong>${completedWorkspaceCount}</strong><small>Completed</small></article>
-                    <article><span>▣</span><strong>${workspaceData.reduce((sum,item)=>sum+item.jobs.length,0)}</strong><small>Total Jobs</small></article>
-                    <article><span>▧</span><strong>${workspaceData.reduce((sum,item)=>sum+photoCount(item),0)}</strong><small>Photos</small></article>
-                </section>
+                        <section class="mw-list-panel mw-action-panel">
+                            <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
+                            <div class="mw-action-list">
+                                <button type="button" data-workspace-admin><span>＋</span><span>New Workspace</span><b>›</b></button>
+                                <button type="button" data-nav-quick="pipeline"><span>▥</span><span>Open Pipeline</span><b>›</b></button>
+                                <button type="button" data-nav-quick="frontdesk"><span>▣</span><span>Front Desk</span><b>›</b></button>
+                            </div>
+                        </section>
 
-                <div class="workspace-wow-toolbar">
-                    <div class="workspace-reference-tabs" role="tablist">
-                        <button class="active" data-workspace-filter="all">All <b>${workspaceData.length}</b></button>
-                        <button data-workspace-filter="active">Active <b>${activeCount}</b></button>
-                        <button data-workspace-filter="completed">Completed <b>${completedWorkspaceCount}</b></button>
-                    </div>
-                    <div class="workspace-wow-search">
-                        <span>⌕</span><input type="search" placeholder="Search workspaces…" data-workspace-search>
-                    </div>
-                    <select data-workspace-sort aria-label="Sort workspaces">
-                        <option value="name">Name A–Z</option>
-                        <option value="jobs">Most jobs</option>
-                        <option value="photos">Most photos</option>
-                    </select>
-                </div>
+                        <section class="mw-list-panel mw-quick-links-panel">
+                            <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
+                            <div class="mw-quick-link-list">
+                                <button type="button" data-nav-quick="mywork"><span>▤</span><span>My Work</span></button>
+                                <button type="button" data-nav-quick="production"><span>◆</span><span>Production</span></button>
+                                <button type="button" data-nav-quick="finance"><span>▧</span><span>Finance</span></button>
+                                <button type="button" data-nav-quick="reports"><span>▥</span><span>Reports</span></button>
+                            </div>
+                        </section>
+                    </aside>
 
-                <div class="workspace-wow-layout">
-                    <section class="workspace-wow-list-card">
-                        <header><div><h2>All Workspaces</h2><p>Open a workspace to see its jobs, people, messages and production state.</p></div><span class="workspace-wow-list-count">${workspaceData.length}</span></header>
-                        <div class="workspace-wow-list" data-workspace-list>${renderRows(workspaceData)}</div>
+                    <section class="mw-list-panel workspace-center-panel">
+                        <header class="workspace-center-header">
+                            <div>
+                                <h2><span class="mw-title-icon assigned">▰</span> Workspaces</h2>
+                                <small>Jobs, clients, conversations and media grouped by operational workspace.</small>
+                            </div>
+                            <span class="workspace-wow-list-count">${workspaceData.length}</span>
+                        </header>
+
+                        <div class="workspace-list-toolbar">
+                            <div class="workspace-wow-search">
+                                <span>⌕</span><input type="search" placeholder="Search workspaces…" data-workspace-search>
+                            </div>
+                            <select data-workspace-sort aria-label="Sort workspaces">
+                                <option value="name">Name A–Z</option>
+                                <option value="jobs">Most jobs</option>
+                                <option value="photos">Most photos</option>
+                            </select>
+                        </div>
+
+                        <div class="workspace-wow-list workspace-list-rows" data-workspace-list>${renderRows(workspaceData)}</div>
                     </section>
 
-                    <aside class="workspace-wow-side">
-                        <section class="workspace-wow-side-card announcements">
-                            <header><h2>Announcements</h2><span>📣</span></header>
-                            <div>
+                    <aside class="mw-list-right workspace-right-rail">
+                        <section class="mw-list-panel">
+                            <header><h2><span class="mw-title-icon attention">▤</span> Overview</h2><small>Studio totals</small></header>
+                            <div class="mw-status-list">
+                                <div class="workspace-summary-row"><span>▣</span><span>Total jobs</span><strong>${workspaceData.reduce((sum,item)=>sum+item.jobs.length,0)}</strong></div>
+                                <div class="workspace-summary-row"><span>▧</span><span>Photos</span><strong>${workspaceData.reduce((sum,item)=>sum+photoCount(item),0)}</strong></div>
+                                <div class="workspace-summary-row"><span>●</span><span>Active workspaces</span><strong>${activeCount}</strong></div>
+                                <div class="workspace-summary-row"><span>✓</span><span>Completed</span><strong>${completedWorkspaceCount}</strong></div>
+                            </div>
+                        </section>
+
+                        <section class="mw-list-panel workspace-announcements-panel">
+                            <header><h2><span class="mw-title-icon messages">✉</span> Announcements</h2><small>${announcements.length} recent</small></header>
+                            <div class="workspace-announcement-rail">
                                 ${announcements.length?announcements.map(a=>`<article class="workspace-wow-announcement"><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p><small>${esc(a.workspaceName)} · ${a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):''}</small></article>`).join(''):'<p class="mw-empty">No workspace announcements.</p>'}
                             </div>
                         </section>
 
-                        <section class="workspace-wow-side-card actions">
-                            <header><h2>Quick Actions</h2><span>ϟ</span></header>
-                            <div>
-                                <button type="button" data-workspace-admin><span>＋</span><span><strong>New Workspace</strong><small>Create a new operational workspace</small></span><i>›</i></button>
-                                <button type="button" data-nav-quick="pipeline"><span>▥</span><span><strong>Open Pipeline</strong><small>See work moving through production</small></span><i>›</i></button>
-                                <button type="button" data-nav-quick="frontdesk"><span>▣</span><span><strong>Front Desk</strong><small>Create or manage incoming work</small></span><i>›</i></button>
+                        <section class="mw-list-panel workspace-help-panel">
+                            <header><h2><span class="mw-title-icon links">↗</span> Navigation</h2></header>
+                            <div class="mw-action-list">
+                                <button type="button" data-nav-quick="mywork"><span>‹</span><span>Back to My Work</span><b>›</b></button>
+                                <button type="button" data-nav-quick="pipeline"><span>▥</span><span>View Pipeline</span><b>›</b></button>
                             </div>
                         </section>
                     </aside>
                 </div>
             </section>`;
+
+        if(studioBreadcrumb){
+            studioBreadcrumb.innerHTML=`
+                <button type="button" data-shell-nav="mywork">My Work</button>
+                <span class="breadcrumb-separator" aria-hidden="true">›</span>
+                <strong>Workspaces</strong>`;
+            studioBreadcrumb.querySelector('[data-shell-nav="mywork"]')?.addEventListener('click',()=>window.studioNavigate?.('mywork'));
+        }
+        if(studioPageTools){
+            studioPageTools.innerHTML='<button type="button" class="primary workspace-shell-new" data-workspace-admin>＋ New Workspace</button>';
+        }
+
 
         const allRows=()=>[...genericView.querySelectorAll('[data-workspace-row]')];
         let filter='all';
