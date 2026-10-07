@@ -116,8 +116,7 @@ public sealed class InboundEmailWorker : BackgroundService
 
                     StudioMessageThread? personThread = null;
                     StudioInAppMessage? personMessage = null;
-                    if (!result.WasDuplicate &&
-                        route.DestinationType.Equals("Person", StringComparison.OrdinalIgnoreCase) &&
+                    if (route.DestinationType.Equals("Person", StringComparison.OrdinalIgnoreCase) &&
                         !string.IsNullOrWhiteSpace(route.PersonUserName))
                     {
                         personThread = messages.EnsurePersonThread(result.Conversation, route.PersonUserName!);
