@@ -38,6 +38,7 @@ public sealed class StudioDatabase
                 created_at_utc timestamptz not null,
                 updated_at_utc timestamptz not null
             );
+            alter table studio_workspaces add column if not exists default_job_lead text null;
             create unique index if not exists ux_studio_workspaces_email on studio_workspaces(lower(email_address)) where email_address is not null;
             create unique index if not exists ux_studio_workspaces_route_key on studio_workspaces(lower(route_key)) where route_key is not null;
 
@@ -84,6 +85,8 @@ public sealed class StudioDatabase
                 assigned_to text null,
                 job_lead text null
             );
+            alter table studio_jobs add column if not exists job_lead text null;
+            update studio_jobs set job_lead=assigned_to where job_lead is null and assigned_to is not null;
             create index if not exists ix_studio_jobs_workspace on studio_jobs(workspace_id, created_at_utc desc);
             create index if not exists ix_studio_jobs_lead on studio_jobs(lower(job_lead),status,created_at_utc desc);
             alter table studio_conversations drop constraint if exists fk_studio_conversations_job;
