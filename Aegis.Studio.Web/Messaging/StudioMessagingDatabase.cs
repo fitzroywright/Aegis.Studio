@@ -74,7 +74,7 @@ public sealed class StudioMessagingDatabase
             create unique index if not exists ux_studio_inapp_messages_external_message on studio_inapp_messages(external_message_id) where external_message_id is not null;
             create index if not exists ix_studio_inapp_messages_thread on studio_inapp_messages(thread_id,created_at_utc);
 
-            alter table studio_outbound_email add column if not exists inapp_message_id uuid null references studio_inapp_messages(id) on delete set null;
+            alter table studio_outbound_email add column if not exists inapp_message_id uuid null;
 
             create table if not exists studio_message_reads
             (
