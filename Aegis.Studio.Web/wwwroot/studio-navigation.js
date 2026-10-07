@@ -269,7 +269,7 @@
                         </div>
 
                         <div class="mw-work-section" data-mw-region="pipeline">
-                            <div class="mw-section-title"><h3>Jobs I Lead</h3><button data-nav="pipeline">View all →</button></div>
+                            <div class="mw-section-title"><h3>Jobs I Lead</h3><span>${state.status.media==='error'?'<button class="action" data-mw-retry="media">Retry photos</button>':''}<button data-nav="pipeline">View all →</button></span></div>
                             <div class="mw-section-rows">${phase('jobs',recentRows)}</div>
                         </div>
 
