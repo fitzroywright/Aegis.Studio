@@ -10,67 +10,43 @@ public static class DemoDataEndpoints
 {
     public static void MapStudioDemoData(this WebApplication app)
     {
-        app.MapPost("/api/admin/demo/seed", async Task<IResult> (HttpContext context, StudioDatabase database, IWebHostEnvironment environment, IFileStorage storage, ILoggerFactory logs) =>
+        app.MapPost("/api/admin/demo/seed", (HttpContext context, IWebHostEnvironment environment, DemoSeedCoordinator coordinator) =>
         {
             bool demoDataEnabled = environment.IsDevelopment()
                 || app.Configuration.GetValue("DemoData:Enabled", false);
             if (!demoDataEnabled) return Results.NotFound();
-            string? login = context.User.FindFirstValue("login_name") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrWhiteSpace(login)) return Results.BadRequest(new { error = "A login identifier is required." });
-            bool streaming = context.Request.Headers.Accept.ToString().Contains("application/x-ndjson", StringComparison.OrdinalIgnoreCase);
-            if (!streaming) return Results.Ok(new { message = Seed(database, storage, login) });
-            context.Response.ContentType = "application/x-ndjson";
-            context.Response.Headers.CacheControl = "no-store";
-            context.Response.Headers["X-Accel-Buffering"] = "no";
-            bool progressChannelAvailable = true;
-            async Task Write(DemoSeedProgress progress)
-            {
-                if (!progressChannelAvailable) return;
-                try
-                {
-                    await context.Response.WriteAsync(
-                        System.Text.Json.JsonSerializer.Serialize(
-                            progress,
-                            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) + "\n",
-                        CancellationToken.None);
-                    await context.Response.Body.FlushAsync(CancellationToken.None);
-                }
-                catch (Exception error) when (
-                    error is IOException ||
-                    error is ObjectDisposedException ||
-                    error is OperationCanceledException)
-                {
-                    // Demo seeding is an administrative server operation. A browser,
-                    // proxy, or mobile connection disappearing must not roll back
-                    // several minutes of deterministic seed work. Stop streaming
-                    // progress, but let the database/storage transaction finish.
-                    progressChannelAvailable = false;
-                    logs.CreateLogger("Studio.DemoSeed").LogWarning(
-                        error,
-                        "Demo seed progress client disconnected; continuing seed on the server Trace={Trace}",
-                        context.TraceIdentifier);
-                }
-            }
 
-            bool saved = false;
-            try
-            {
-                string message = Seed(database, storage, login, progress => Write(progress).GetAwaiter().GetResult());
-                saved = true;
-                await Write(new(100, "Complete", 0, 0, message, Completed: true));
-            }
-            catch (Exception error)
-            {
-                logs.CreateLogger("Studio.DemoSeed").LogError(error, "Demo seed failed Trace={Trace}", context.TraceIdentifier);
-                await Write(new(0, "Failed", 0, 0, saved
-                    ? "Demo data was saved, but progress delivery failed. Reload Admin to check the dataset."
-                    : "Demo data could not be loaded. Database changes were rolled back. See server logs for details.", Failed: true));
-            }
-            return Results.Empty;
+            string? login = context.User.FindFirstValue("login_name")
+                ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(login))
+                return Results.BadRequest(new { error = "A login identifier is required." });
+
+            DemoSeedRunStatus run = coordinator.Start(login);
+            return Results.Accepted($"/api/admin/demo/seed/{run.RunId}", run);
+        }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
+
+        app.MapGet("/api/admin/demo/seed/{runId:guid}", (Guid runId, IWebHostEnvironment environment, DemoSeedCoordinator coordinator) =>
+        {
+            bool demoDataEnabled = environment.IsDevelopment()
+                || app.Configuration.GetValue("DemoData:Enabled", false);
+            if (!demoDataEnabled) return Results.NotFound();
+
+            DemoSeedRunStatus? run = coordinator.Get(runId);
+            return run is null ? Results.NotFound() : Results.Ok(run);
+        }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
+
+        app.MapGet("/api/admin/demo/seed/current", (IWebHostEnvironment environment, DemoSeedCoordinator coordinator) =>
+        {
+            bool demoDataEnabled = environment.IsDevelopment()
+                || app.Configuration.GetValue("DemoData:Enabled", false);
+            if (!demoDataEnabled) return Results.NotFound();
+
+            DemoSeedRunStatus? run = coordinator.Current;
+            return run is null ? Results.NoContent() : Results.Ok(run);
         }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
     }
 
-    private static string Seed(StudioDatabase database, IFileStorage storage, string login, Action<DemoSeedProgress>? report = null)
+    internal static string Seed(StudioDatabase database, IFileStorage storage, string login, Action<DemoSeedProgress>? report = null)
     {
         report?.Invoke(new(0, "Preparing", 0, 0, "Connecting to the database."));
 

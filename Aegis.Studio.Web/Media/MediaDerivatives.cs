@@ -21,7 +21,6 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
           preview_key text null, last_error text null, updated_at timestamptz not null default now());
         create or replace function studio_enqueue_media_preview() returns trigger language plpgsql as $$
         begin
-          if TG_OP='UPDATE' and new.sha256=old.sha256 and new.stored_path=old.stored_path then return new; end if;
           insert into studio_media_derivatives(version_id) values(new.id) on conflict(version_id)
             do update set status='Pending',attempts=0,next_attempt_at=now(),thumbnail_key=null,preview_key=null,last_error=null;
           return new;
@@ -112,6 +111,11 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
             finally { if (File.Exists(temp)) File.Delete(temp); }
         }
         catch (UnknownImageFormatException) { await SetState(id,"Unsupported",null,null,"Preview not available for this file format. The original can still be downloaded.",token); }
+        catch (StorageException error) when (error.Code=="STORAGE-MISSING-001")
+        {
+            logger.LogInformation("Preview deferred for version {VersionId}; original storage object is not available yet",id);
+            await SetState(id,"WaitingForOriginal",null,null,"Original unavailable. Preview will be queued when storage is restored.",token);
+        }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception error)
         {

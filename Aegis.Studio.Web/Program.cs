@@ -175,6 +175,7 @@ builder.Services.AddSingleton<WorkspaceStore>();
 builder.Services.AddSingleton<WorkspaceAccessService>();
 builder.Services.AddSingleton<JobAccessService>();
 builder.Services.AddSingleton<StudioStore>();
+builder.Services.AddSingleton<DemoSeedCoordinator>();
 builder.Services.AddSingleton<BookingStore>();
 builder.Services.AddSingleton<BookingApiAuthenticator>();
 builder.Services.AddSingleton<UserProfileStore>();
