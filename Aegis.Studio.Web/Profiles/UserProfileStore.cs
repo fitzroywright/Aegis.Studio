@@ -8,13 +8,9 @@ public sealed class UserProfileStore
 {
     private static readonly HashSet<string> AllowedThemes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "studio-default",
-        "office-light",
-        "fluent-dark",
-        "mid-century",
-        "steel",
-        "sakura",
-        "ocean"
+        "system",
+        "light",
+        "dark"
     };
 
     private readonly StudioDatabase database;
@@ -34,7 +30,7 @@ public sealed class UserProfileStore
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        StudioUserProfile profile = new(StableProfileId(userName), userName, user.Identity?.Name ?? userName, user.FindFirstValue(ClaimTypes.Email), user.FindFirstValue("department"), user.FindFirstValue("title"), "studio-default", UserMessagingPreferences.Default, now, now);
+        StudioUserProfile profile = new(StableProfileId(userName), userName, user.Identity?.Name ?? userName, user.FindFirstValue(ClaimTypes.Email), user.FindFirstValue("department"), user.FindFirstValue("title"), "system", UserMessagingPreferences.Default, now, now);
         Save(profile);
         return profile;
     }
@@ -147,8 +143,15 @@ public sealed class UserProfileStore
 
     private static string NormalizeTheme(string? value)
     {
-        string theme = string.IsNullOrWhiteSpace(value) ? "studio-default" : value.Trim().ToLowerInvariant();
-        return AllowedThemes.Contains(theme) ? theme : "studio-default";
+        string theme = string.IsNullOrWhiteSpace(value) ? "system" : value.Trim().ToLowerInvariant();
+        theme = theme switch
+        {
+            "office-light" => "light",
+            "fluent-dark" => "dark",
+            "studio-default" or "mid-century" or "steel" or "sakura" or "ocean" => "system",
+            _ => theme
+        };
+        return AllowedThemes.Contains(theme) ? theme : "system";
     }
 
     private static string? NormalizeClock(string? value) => string.IsNullOrWhiteSpace(value) ? null : TimeOnly.TryParse(value, out TimeOnly time) ? time.ToString("HH:mm") : null;
