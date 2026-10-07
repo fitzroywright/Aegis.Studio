@@ -22,15 +22,19 @@ The same underlying data is presented differently to each team:
 
 ## Microsoft 365 mail router
 
-Aegis uses one collection mailbox, `AegisHub@bryans.com`. Workspace addresses such as `weddings@bryans.com` are distribution lists that include the collection mailbox as a member. The collection mailbox is plumbing only and does not map to a workspace.
+Studio uses one Microsoft 365 collection mailbox for transport. The collection mailbox is infrastructure only and must not be presented as the user-facing source of a Studio message.
+
+Workspace addresses such as `weddings@bryanstudiosltd.com` and logical Person addresses such as `fwright@bryanstudiosltd.com` can be mail-enabled aliases or distribution addresses that deliver to the collection mailbox. A Person address does **not** require an individual Exchange mailbox. Studio resolves that address to the employee's persisted Studio identity; future AD synchronization can create/update the same identity association. Job routing is also supported through `X-Aegis-Route: job:<job-guid>` or the generated `job+<job-guid>@<Studio messaging domain>` address.
 
 Inbound routing order is:
 
-1. `X-Aegis-Route` header, when present.
-2. Original `To` recipients.
-3. Original `Cc` recipients.
-4. If exactly one workspace route matches, route automatically.
+1. Existing Microsoft Graph conversation/thread identity or a persisted `[AEGIS-XXXXXXXX]` conversation reference.
+2. `X-Aegis-Route`, when present, for Person, Workspace or Job routes.
+3. Original `To` and `Cc` recipients.
+4. If exactly one Person, Workspace or Job route matches, route automatically.
 5. If none or multiple match, place the message in the unrouted review queue.
+
+Outbound email to ordinary external recipients is sent through Common.Messaging using the configured Microsoft 365 transport. The Studio conversation keeps the logical Person identity and AEGIS reference even though the transport uses the shared Microsoft 365 sender. External replies therefore return to the same Studio conversation rather than creating unrelated threads.
 
 Microsoft Graph configuration must be provided through configuration/environment variables. Do not commit tenant credentials or client secrets to Git.
 
