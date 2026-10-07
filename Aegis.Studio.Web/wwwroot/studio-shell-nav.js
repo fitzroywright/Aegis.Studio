@@ -5,7 +5,8 @@
     const quickLinks = [
         ['mywork', 'My Work', '▤'],
         ['workspaces', 'Workspaces', '▰'],
-        ['pipeline', 'Jobs', '▥'],
+        ['jobs', 'Jobs', '▥'],
+        ['pipeline', 'Pipeline', '⇥'],
         ['production', 'Production', '◆'],
         ['frontdesk', 'Front Desk', '▣'],
         ['finance', 'Finance', '$'],
@@ -161,7 +162,11 @@
             const result = await original(view);
             ensureTools();
             ensureLeftRail();
-            if (view !== 'mywork') window.studioSetBreadcrumb([{ label: labelFor(view), view }]);
+            if (view !== 'mywork'
+                && !breadcrumb?.querySelector('[data-studio-crumb="mywork"]')
+                && !breadcrumb?.querySelector('[data-shell-nav="mywork"]')) {
+                window.studioSetBreadcrumb([{ label: labelFor(view), view }]);
+            }
             refreshBackState();
             return result;
         };
