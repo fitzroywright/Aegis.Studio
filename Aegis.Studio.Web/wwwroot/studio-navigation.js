@@ -673,7 +673,7 @@
                 await selectWorkspace(button.dataset.openWorkspace,button.dataset.workspaceName);
             };
         });
-        [...genericView.querySelectorAll('[data-workspace-admin]'),...studioPageTools?.querySelectorAll('[data-workspace-admin]')||[]].forEach(button=>{
+        [...genericView.querySelectorAll('[data-workspace-admin]'),...(studioPageTools?studioPageTools.querySelectorAll('[data-workspace-admin]'):[])].forEach(button=>{
             button.onclick=()=>window.studioNavigate('admin');
         });
         genericView.querySelectorAll('[data-nav-quick]').forEach(button=>{
