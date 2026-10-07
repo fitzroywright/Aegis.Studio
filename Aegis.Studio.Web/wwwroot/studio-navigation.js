@@ -175,7 +175,7 @@
             const priority=String(task.priority||'Normal').toLowerCase();
             return `<button class="mw-task-row due-${dueState}" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
                 <span class="mw-task-bullet priority-${esc(priority)}" aria-hidden="true"></span>
-                <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(context)}</small></span>
+                <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(context)}${task.estimatedMinutes?' · '+esc((task.estimatedMinutes/60).toFixed(task.estimatedMinutes%60?1:0))+'h':''}${task.assignmentIssue?' · Assignment review':''}</small></span>
                 <span class="mw-due">${due?'<b>'+esc(dueState==='overdue'?'Overdue':dueState==='today'?'Today':'Due')+'</b><small>'+esc(formatDay(task.dueAtUtc))+'</small>':'<b>Open</b>'}</span>
                 <span class="mw-chevron">›</span>
             </button>`;
@@ -215,13 +215,14 @@
 
         const overdueTasks=myTasks.filter(t=>t.dueAtUtc&&new Date(t.dueAtUtc)<now).length;
         const blockedTasks=myTasks.filter(t=>/blocked|rework|required|failed/i.test(String(t.status||''))).length;
+        const assignmentProblems=tasks.filter(t=>t.assignmentIssue||(!t.assignedTo&&t.recipeStepId&&!['Completed','Cancelled'].includes(t.status))).length;
         const schedulingJobs=leadJobs.filter(j=>/needs scheduling/i.test(String(j.status||''))).length;
         const uploadJobs=leadJobs.filter(j=>/awaiting upload/i.test(String(j.status||''))).length;
         const exceptionJobs=leadJobs.filter(j=>/blocked|overdue|exception/i.test(String(j.status||''))).length;
         const attentionJobs=schedulingJobs+uploadJobs+exceptionJobs;
         const productionTasks=myTasks.filter(t=>/edit|retouch|qc|print|deliver|production|gallery|select|design|color|review|upload|schedule/i.test(String(t.activityType||'')+' '+String(t.title||'')));
         const attentionItems=[...productionTasks,...myTasks.filter(t=>!productionTasks.includes(t))].slice(0,5);
-        const attentionTotal=overdueTasks+blockedTasks+attentionJobs;
+        const attentionTotal=overdueTasks+blockedTasks+assignmentProblems+attentionJobs;
 
         const markup=`
             <section class="mw-page mw-list-page">
@@ -280,7 +281,7 @@
                             <header><h2><span class="mw-title-icon attention">▲</span> Needs Attention</h2><small>${metric('tasks',attentionTotal)} items</small></header>
                             <div class="mw-status-list">
                                 <button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">◷</span><span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
-                                <button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">!</span><span>Blocked / rework</span><strong>${metric('tasks',blockedTasks)}</strong></button>
+                                <button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">!</span><span>Blocked / rework</span><strong>${metric('tasks',blockedTasks)}</strong></button><button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">?</span><span>Assignment review</span><strong>${metric('tasks',assignmentProblems)}</strong></button>
                                 <button class="mw-status-row warning" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Needs scheduling</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
                                 <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">⇧</span><span>Awaiting upload</span><strong>${metric('jobs',uploadJobs)}</strong></button>
                                 <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">◆</span><span>Production exceptions</span><strong>${metric('jobs',exceptionJobs)}</strong></button>
