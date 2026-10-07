@@ -5,6 +5,7 @@ using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Storage;
+using Aegis.Studio.Web.Messaging;
 
 namespace Aegis.Studio.Web.Email;
 
@@ -20,6 +21,8 @@ public sealed class InboundEmailWorker : BackgroundService
     private readonly NotificationService notifications;
     private readonly AttachmentStore attachments;
     private readonly StudioOperationsFlowPublisher operationsFlows;
+    private readonly StudioInAppMessageStore messages;
+    private readonly StudioMessageAttachmentStore messageAttachments;
     private readonly ILogger<InboundEmailWorker> logger;
 
     public InboundEmailWorker(
@@ -33,6 +36,8 @@ public sealed class InboundEmailWorker : BackgroundService
         NotificationService notifications,
         AttachmentStore attachments,
         StudioOperationsFlowPublisher operationsFlows,
+        StudioInAppMessageStore messages,
+        StudioMessageAttachmentStore messageAttachments,
         ILogger<InboundEmailWorker> logger)
     {
         this.graphClient = graphClient;
@@ -45,6 +50,8 @@ public sealed class InboundEmailWorker : BackgroundService
         this.notifications = notifications;
         this.attachments = attachments;
         this.operationsFlows = operationsFlows;
+        this.messages = messages;
+        this.messageAttachments = messageAttachments;
         this.logger = logger;
     }
 
@@ -107,6 +114,16 @@ public sealed class InboundEmailWorker : BackgroundService
                     operationsFlows.TryEnqueueInbound(correlationId, "Workspace", businessId: result.Conversation.Id.ToString("D"));
                     operationsFlows.TryEnqueueInbound(correlationId, "Conversation", businessId: result.Conversation.Id.ToString("D"));
 
+                    StudioMessageThread? personThread = null;
+                    StudioInAppMessage? personMessage = null;
+                    if (!result.WasDuplicate &&
+                        route.DestinationType.Equals("Person", StringComparison.OrdinalIgnoreCase) &&
+                        !string.IsNullOrWhiteSpace(route.PersonUserName))
+                    {
+                        personThread = messages.EnsurePersonThread(result.Conversation, route.PersonUserName!);
+                        personMessage = messages.AddExternalMessage(personThread.Id, email);
+                    }
+
                     int attachmentIndex = 0;
                     foreach (InboundEmailAttachment attachment in email.FileAttachments.Where(x => !x.IsInline))
                     {
@@ -145,6 +162,16 @@ public sealed class InboundEmailWorker : BackgroundService
                                 attachmentCorrelation,
                                 "Workspace",
                                 businessId: storedAttachment.Id.ToString("D"));
+                            if (personMessage is not null)
+                            {
+                                await messageAttachments.AddBytesAsync(
+                                    personMessage.Id,
+                                    attachment.FileName,
+                                    attachment.ContentType,
+                                    attachment.Content,
+                                    $"External: {email.FromAddress}",
+                                    stoppingToken);
+                            }
                         }
                         catch (Exception exception)
                         {
@@ -160,24 +187,26 @@ public sealed class InboundEmailWorker : BackgroundService
 
                     if (!result.WasDuplicate)
                     {
-                        if (result.CreatedConversation)
+                        if (result.CreatedConversation &&
+                            route.DestinationType.Equals("Workspace", StringComparison.OrdinalIgnoreCase))
                         {
                             outboundStore.QueueAcknowledgement(result.Conversation, route.WorkspaceName ?? "Studio");
                         }
 
-                        notifications.PublishToAll(
-                            "WorkspaceMessage",
-                            $"Email: {email.Subject}",
-                            $"New email from {email.FromName} routed to {route.WorkspaceName}.",
-                            "Conversation",
-                            result.Conversation.Id.ToString("D"));
+                        StudioMessageNotificationContext.PublishInbound(
+                            notifications,
+                            email,
+                            route,
+                            result.Conversation.Id,
+                            personThread?.Id);
                         operationsFlows.TryEnqueueInbound(correlationId, "Notification", businessId: result.Conversation.Id.ToString("D"));
                     }
 
                     logger.LogInformation(
-                        "Inbound email {MessageId} routed to {Workspace} conversation {ConversationId}. New conversation: {CreatedConversation}. Reference recovery: {ReferenceRecovered}. Attachments: {AttachmentCount}",
+                        "Inbound email {MessageId} routed to {DestinationType} {Destination} conversation {ConversationId}. New conversation: {CreatedConversation}. Reference recovery: {ReferenceRecovered}. Attachments: {AttachmentCount}",
                         email.MessageId,
-                        route.WorkspaceName,
+                        route.DestinationType,
+                        route.UserFacingContext,
                         result.Conversation.Id,
                         result.CreatedConversation,
                         recovery.Matched,
