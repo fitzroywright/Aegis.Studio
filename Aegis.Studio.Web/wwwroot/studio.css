@@ -5507,3 +5507,60 @@ body[data-studio-view] .user-menu-popover button:hover{
 .studio-quick-links-menu button:hover{
   background:#eef5fb;
 }
+
+
+/* Shared Studio page frame. My Work keeps its existing pixel layout unchanged. */
+body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell{
+  display:grid;
+  grid-template-columns:220px minmax(0,1fr);
+  gap:14px;
+  padding:14px 20px 16px;
+  box-sizing:border-box;
+  background:#f8f9fa;
+}
+body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell>main{
+  min-width:0;
+  min-height:0;
+}
+body[data-studio-view="mywork"] .studio-context-rail,
+body[data-studio-view="tasks"] .studio-context-rail{
+  display:none;
+}
+.studio-context-rail{
+  min-width:0;
+  min-height:0;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  overflow:hidden;
+}
+.studio-context-rail .studio-context-card{
+  flex:0 0 auto;
+}
+.studio-context-rail .mw-quick-links-panel{
+  margin-top:auto;
+}
+.studio-context-rail .mw-status-row strong{
+  font-size:10px;
+  color:#6d7b8a;
+  font-weight:700;
+}
+.studio-context-rail .mw-action-list button:disabled{
+  opacity:.45;
+  cursor:default;
+}
+body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .generic,
+body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .three-pane{
+  border:1px solid #e1e4e8;
+  border-radius:9px;
+  background:#fff;
+  overflow:auto;
+}
+@media(max-width:1050px){
+  body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell{
+    grid-template-columns:190px minmax(0,1fr);
+    gap:10px;
+    padding:10px;
+  }
+}
