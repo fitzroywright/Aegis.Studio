@@ -374,8 +374,7 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
     operationsFlows.TryEnqueueInbound(correlationId, route.DestinationType, businessId: result.Conversation.Id.ToString("D"));
     operationsFlows.TryEnqueueInbound(correlationId, "Conversation", businessId: result.Conversation.Id.ToString("D"));
     Guid? personThreadId = null;
-    if (!result.WasDuplicate &&
-        route.DestinationType.Equals("Person", StringComparison.OrdinalIgnoreCase) &&
+    if (route.DestinationType.Equals("Person", StringComparison.OrdinalIgnoreCase) &&
         !string.IsNullOrWhiteSpace(route.PersonUserName))
     {
         StudioMessageThread personThread = messages.EnsurePersonThread(result.Conversation, route.PersonUserName!);
