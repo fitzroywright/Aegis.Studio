@@ -165,7 +165,7 @@ internal static class DemoDenseScheduleData
             conversationId, workspaceId, title, customer.Name, customer.Email, sequence % 4 == 0 ? "Phone" : sequence % 3 == 0 ? "Portal" : "Email");
 
         Execute(c, tx,
-            "insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,client_id) values($1,$2,$3,$4,$5,$6,$7,now(),$8,$9) on conflict(id) do update set workspace_id=excluded.workspace_id,conversation_id=excluded.conversation_id,title=excluded.title,client_name=excluded.client_name,status=excluded.status,event_date=excluded.event_date,assigned_to=excluded.assigned_to,client_id=excluded.client_id",
+            "insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead,client_id) values($1,$2,$3,$4,$5,$6,$7,now(),$8,$8,$9) on conflict(id) do update set workspace_id=excluded.workspace_id,conversation_id=excluded.conversation_id,title=excluded.title,client_name=excluded.client_name,status=excluded.status,event_date=excluded.event_date,assigned_to=excluded.assigned_to,job_lead=excluded.job_lead,client_id=excluded.client_id",
             jobId, workspaceId, conversationId, title, customer.Name, status, DateOnly.FromDateTime(start.UtcDateTime), Photographer(sequence), clientId);
 
         Execute(c, tx, "update studio_conversations set job_id=$2 where id=$1", conversationId, jobId);
