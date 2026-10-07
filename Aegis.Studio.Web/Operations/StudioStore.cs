@@ -130,12 +130,28 @@ public sealed class StudioStore
             return new EmailIngestResult(duplicate, false, true);
         }
 
-        StudioConversation? existing = FindConversationForEmail(email, route.WorkspaceId.Value);
+        StudioConversation? existing = null;
+        if (route.DestinationType.Equals("Job", StringComparison.OrdinalIgnoreCase) && route.DestinationId is Guid routedJobId)
+        {
+            StudioJob? routedJob = GetJob(routedJobId);
+            existing = routedJob is null ? null : GetConversation(routedJob.ConversationId);
+        }
+        existing ??= FindConversationForEmail(email, route.WorkspaceId.Value);
+
         StudioMessage message = new(Guid.NewGuid(), email.FromName.Trim(), "External", email.Body.Trim(), email.ReceivedAt.ToUniversalTime(), email.MessageId, email.FromAddress.Trim());
         if (existing is not null)
         {
             using NpgsqlConnection connection = database.OpenConnection();
             using NpgsqlTransaction transaction = connection.BeginTransaction();
+            if (string.IsNullOrWhiteSpace(existing.ExternalThreadId) && !string.IsNullOrWhiteSpace(email.ThreadId))
+            {
+                using NpgsqlCommand bindThread = connection.CreateCommand();
+                bindThread.Transaction = transaction;
+                bindThread.CommandText = "update studio_conversations set external_thread_id=$2 where id=$1 and external_thread_id is null";
+                bindThread.Parameters.AddWithValue(existing.Id);
+                bindThread.Parameters.AddWithValue(NormaliseThreadId(email.ThreadId)!);
+                bindThread.ExecuteNonQuery();
+            }
             InsertMessage(connection, transaction, message, existing.Id);
             transaction.Commit();
             return new EmailIngestResult(GetConversation(existing.Id)!, false, false);
