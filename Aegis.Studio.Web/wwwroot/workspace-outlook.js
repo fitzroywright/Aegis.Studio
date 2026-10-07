@@ -106,7 +106,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         studioRememberPeople(people);
         tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(studioFirstName(m))}">${esc(studioFirstName(m).slice(0,1))}</span>`).join('');
         if (version !== revision) return;
-        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId||(x.participatingWorkspaceIds||[]).includes(workspaceId)).map(job => `<button class="conversation-card hierarchy-row compact-job-row studio-speedbump-row" data-search data-job="${job.id}">
+        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId||(x.participatingWorkspaceIds||[]).includes(workspaceId)).map(job => `<button class="studio-speedbump-row workspace-job-speedbump" data-search data-job="${job.id}">
             <span class="job-row-heading"><strong>${esc(job.title)}</strong></span>
             <span class="job-row-client">${esc(job.clientName || job.linkedClientName || 'Client not linked')}</span>
             <span class="job-row-meta">
@@ -204,7 +204,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const current=()=>version===revision;
 
             const lower=document.createElement('section');
-            lower.className='job-lower-pane job-detail-mywork-grid';
+            lower.className='job-detail-media-column';
             lower.innerHTML=`
                 <section class="job-center-panel job-media-section">
                     <header class="job-center-heading">
@@ -238,37 +238,13 @@ function mergeJobMessages(teamMessages, customerMessages) {
             messageHeader.innerHTML='<div><strong>Messages</strong></div><div class="panel-heading-actions"><button type="button" class="icon-button" data-message-search aria-label="Search messages">⌕</button><button type="button" class="icon-button" data-message-more aria-label="Message options">⋮</button></div>';
             messageColumn.append(messageHeader,messagesPanel,composer);
 
-            const side=document.createElement('section');
-            side.className='job-context-panel';
-
-            const details=document.createElement('details');
-            details.className='job-details-card';
-            details.open=true;
-            const detailRows=[
-                ['Status','<span class="studio-status-pill">'+esc(job.status||'')+'</span>'],
-                ['Priority',esc(job.priority||'Normal')],
-                ['Workspace',esc(workspaceName)],
-                ['Location','<span class="job-details-location">Location not set</span>'],
-                ['Date & Time',esc(job.eventDate||'Needs scheduling')],
-                ['Client',esc(job.linkedClientName||job.clientName||'Not linked')],
-                ['Type',esc(job.jobType||job.type||'Photography')],
-                ['Tags',esc(Array.isArray(job.tags)?job.tags.join(', '):(job.tags||'—'))],
-                ['Package charge',esc(money(studioFinancials(job).charges))],
-                ['Amount Paid',esc(money(studioFinancials(job).received))],
-                ['Remaining',esc(money(studioFinancials(job).balance))],
-                ['Job Code',esc(job.jobCode||job.code||String(job.id).slice(0,12))]
-            ];
-            details.innerHTML='<summary class="context-card-header"><strong>Job Details</strong><button class="text-button" type="button" data-edit-details>✎ Edit</button></summary><dl>'+detailRows.map(([label,value])=>'<dt>'+label+'</dt><dd>'+value+'</dd>').join('')+'</dl>';
-            details.querySelector('[data-edit-details]').onclick=()=>openJobDetailsEditor(job);
-            side.append(details,filesPanel);
-
             const board=document.createElement('div');
-            board.className='job-work-board job-detail-accepted-layout';
+            board.className='job-detail-board';
             const collections=document.createElement('section');
-            collections.className='job-mockup-collections';
+            collections.className='job-detail-collections';
             collections.innerHTML='<header><strong>▰&nbsp; Collections</strong><button type="button" class="action">＋ New Collection</button></header><div class="job-collection-list"><button class="active" data-collection="">All Media</button><button data-collection="Raw Uploads">Raw Uploads</button><button data-collection="Selections">Selections</button><button data-collection="Retouched">Retouched</button><button data-collection="Album – Main">Album – Main</button><button data-collection="Album – Family">Album – Family</button><button data-collection="Album – Friends">Album – Friends</button><button data-collection="Album – Ceremony">Album – Ceremony</button><button data-collection="Client Gallery">Client Gallery</button></div>';
-            const rightStack=document.createElement('div');rightStack.className='job-mockup-right-stack';
-            const quick=document.createElement('section');quick.className='job-mockup-quick';quick.innerHTML='<header><strong>▣&nbsp; Quick Actions</strong></header><div><button class="action" data-quick-upload>⇧ Upload Photos</button><button class="action">▱ Add to Collection</button><button class="action">◎ Create Client Gallery</button><button class="action" data-quick-task>☑ Add Task</button><button class="action" data-quick-production>⚙ Open in Production</button><button class="action" data-quick-edit>✎ Edit Details</button></div>';
+            const rightStack=document.createElement('div');rightStack.className='job-detail-right';
+            const quick=document.createElement('section');quick.className='job-detail-quick';quick.innerHTML='<header><strong>▣&nbsp; Quick Actions</strong></header><div><button class="action" data-quick-upload>⇧ Upload Photos</button><button class="action">▱ Add to Collection</button><button class="action">◎ Create Client Gallery</button><button class="action" data-quick-task>☑ Add Task</button><button class="action" data-quick-production>⚙ Open in Production</button><button class="action" data-quick-edit>✎ Edit Details</button></div>';
 
             const header=detailPane.querySelector('.detail-header');
             const existingThumb=header.querySelector('.studio-job-thumb');
@@ -322,11 +298,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
 
             board.append(collections,lower,rightStack);
             rightStack.append(lower.querySelector('.job-subjects-section'),quick);
-            const bottom=document.createElement('section');bottom.className='job-detail-bottom-grid';
+            const bottom=document.createElement('section');bottom.className='job-detail-bottom';
             const activityCard=document.createElement('section');activityCard.className='job-center-panel job-detail-activity-card';activityCard.innerHTML='<header class="job-center-heading"><h2>Recent Activity</h2></header><div class="job-detail-activity-content"></div>';
             const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.append(messageHeader,messagesPanel,composer);
-            const detailsCard=document.createElement('section');detailsCard.className='job-bottom-details';detailsCard.append(details,filesPanel);
             bottom.append(activityCard,messageCard,nextPanel);detailPane.appendChild(bottom);
+            filesPanel.remove();
             quick.querySelector('[data-quick-upload]')?.addEventListener('click',()=>lower.querySelector('.media-toolbar-host button')?.click());
             quick.querySelector('[data-quick-task]')?.addEventListener('click',()=>lower.querySelector('[data-job-add-task]')?.click());
             quick.querySelector('[data-quick-production]')?.addEventListener('click',()=>window.studioNavigate?.('production'));
