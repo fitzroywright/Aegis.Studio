@@ -12,20 +12,6 @@
         ['finance', 'Finance', '$'],
         ['messages', 'Messages', '✉']
     ];
-    const history = [];
-    const fallbackParent = {
-        workspaces: 'mywork',
-        jobs: 'workspaces',
-        pipeline: 'mywork',
-        production: 'mywork',
-        frontdesk: 'mywork',
-        finance: 'mywork',
-        messages: 'mywork',
-        schedule: 'mywork',
-        tasks: 'mywork',
-        reports: 'mywork',
-        admin: 'mywork'
-    };
     let currentView = document.body.dataset.studioView || 'mywork';
     let renderingTools = false;
 
@@ -43,17 +29,7 @@
     }
 
     function ensureTools() {
-        if (!pageTools || renderingTools) return;
-        if (pageTools.querySelector('[data-studio-persistent-tools]')) return;
-        renderingTools = true;
-        const host = document.createElement('div');
-        host.className = 'studio-persistent-tools';
-        host.dataset.studioPersistentTools = '';
-        host.innerHTML = '<button type="button" class="studio-shell-back" data-studio-back aria-label="Back within Studio">‹ <span>Back</span></button>';
-        pageTools.prepend(host);
-        host.querySelector('[data-studio-back]').onclick = goBack;
-        renderingTools = false;
-        refreshBackState();
+        pageTools?.querySelector('[data-studio-persistent-tools]')?.remove();
     }
 
     function ensureLeftRail() {
@@ -94,7 +70,6 @@
             <section class="mw-list-panel mw-action-panel studio-context-card">
                 <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
                 <div class="mw-action-list">
-                    <button type="button" data-studio-side-back><span>‹</span><span>Back</span><b>›</b></button>
                     <button type="button" data-studio-side="mywork"><span>▤</span><span>Go to My Work</span><b>›</b></button>
                     <button type="button" data-studio-focus-search><span>⌕</span><span>Search Studio</span><b>›</b></button>
                 </div>
@@ -112,30 +87,10 @@
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
             button.onclick = () => window.studioNavigate?.(button.dataset.studioSide);
         });
-        rail.querySelector('[data-studio-side-back]')?.addEventListener('click', goBack);
         rail.querySelector('[data-studio-focus-search]')?.addEventListener('click', () => {
             const search = document.getElementById('studioSearch');
             search?.focus();
         });
-    }
-
-    function goBack(event) {
-        event?.preventDefault?.();
-        event?.stopPropagation?.();
-        const target = history.pop() || fallbackParent[currentView] || 'mywork';
-        // Never delegate Studio's Back control to browser history. It is application navigation.
-        window.studioNavigate?.(target, { studioBack: true });
-    }
-
-    function refreshBackState() {
-        const disabled = currentView === 'mywork' && history.length === 0;
-        const button = pageTools?.querySelector('[data-studio-back]');
-        if (button) {
-            button.disabled = disabled;
-            button.title = disabled ? 'You are at My Work' : 'Back within Studio';
-        }
-        const sideBack = document.querySelector('[data-studio-side-back]');
-        if (sideBack) sideBack.disabled = disabled;
     }
 
     function ensureBreadcrumb() {
@@ -173,7 +128,9 @@
         const original = window.studioNavigate;
         const wrapped = async (view, options = {}) => {
             const previous = currentView;
-            if (!options.studioBack && previous && previous !== view) history.push(previous);
+            if (!options.browserHistory && previous !== view) {
+                window.history.pushState({ studioView: view }, '', '#studio=' + encodeURIComponent(view));
+            }
             currentView = view;
             const result = await original(view);
             ensureTools();
@@ -183,7 +140,6 @@
                 && !breadcrumb?.querySelector('[data-shell-nav="mywork"]')) {
                 window.studioSetBreadcrumb([{ label: labelFor(view), view }]);
             }
-            refreshBackState();
             return result;
         };
         wrapped.__studioShellWrapped = true;
@@ -197,12 +153,15 @@
         ensureTools();
         ensureLeftRail();
         ensureBreadcrumb();
-        refreshBackState();
+        if (!window.history.state?.studioView) window.history.replaceState({ studioView: currentView }, '', window.location.href);
+        window.addEventListener('popstate', event => {
+            const view = event.state?.studioView || 'mywork';
+            if (view !== currentView) window.studioNavigate?.(view, { browserHistory: true });
+        });
 
         if (pageTools) {
             new MutationObserver(() => {
                 ensureTools();
-                refreshBackState();
             }).observe(pageTools, { childList: true });
         }
         if (breadcrumb) {
@@ -213,7 +172,6 @@
             if (next !== currentView) {
                 currentView = next;
                 renderLeftRail();
-                refreshBackState();
             }
         }).observe(document.body, { attributes: true, attributeFilter: ['data-studio-view'] });
     }
