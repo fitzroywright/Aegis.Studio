@@ -15,7 +15,7 @@ async function createWorkspace() {
     const managerDisplay=document.getElementById('workspaceManagerDisplay').value.trim()||managerUser;
     if (!name) return alert('Workspace name is required.');
     if (!managerUser) return alert('A Workspace Manager user name is required.');
-    const workspace = await json('/api/admin/workspaces/', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, emailAddress:document.getElementById('workspaceEmail').value.trim()||null, routeKey:document.getElementById('workspaceRouteKey')?.value.trim()||null, isEnabled:true, sortOrder:0 }) });
+    const workspace = await json('/api/admin/workspaces/', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, emailAddress:document.getElementById('workspaceEmail').value.trim()||null, routeKey:document.getElementById('workspaceRouteKey')?.value.trim()||null, isEnabled:true, sortOrder:0, defaultJobLead:document.getElementById('workspaceDefaultLead')?.value||managerUser }) });
     try{
         await json('/api/workspaces/'+workspace.id+'/managers/'+encodeURIComponent(managerUser),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:managerUser,displayName:managerDisplay,isActive:true,permissions:null})});
     }catch(error){
@@ -36,14 +36,15 @@ async function hydrateWorkspaceManagers(items){
 }
 
 async function editWorkspace(id) {
-    const current = await json('/api/workspaces/' + id);
-    const dialog=studioDialog('Edit Workspace',`<form class="request-form"><label>Name<input name="name" required value="${esc(current.name)}"></label><label>Email address<input name="email" type="email" value="${esc(current.emailAddress||'')}"></label><label>Enabled<select name="enabled"><option value="true" ${current.isEnabled?'selected':''}>Yes</option><option value="false" ${!current.isEnabled?'selected':''}>No</option></select></label><details><summary>Advanced / Integration Settings</summary><label>Route key<input name="routeKey" value="${esc(current.routeKey||'')}" placeholder="Generated automatically"></label><small>Used by website booking and incoming-message integrations. Leaving blank keeps the current key or generates one if missing.</small></details><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`);
+    const [current,employees] = await Promise.all([json('/api/workspaces/' + id),json('/api/studio-employees?assignable=true')]);
+    const leadOptions='<option value="">No default Job Lead</option>'+employees.map(employee=>`<option value="${esc(employee.userName)}" ${String(current.defaultJobLead||'').toLowerCase()===String(employee.userName||'').toLowerCase()?'selected':''}>${esc(employee.displayName)}${employee.roles?.length?' · '+esc(employee.roles.join(', ')):''}</option>`).join('');
+    const dialog=studioDialog('Edit Workspace',`<form class="request-form"><label>Name<input name="name" required value="${esc(current.name)}"></label><label>Email address<input name="email" type="email" value="${esc(current.emailAddress||'')}"></label><label>Default Job Lead<select name="defaultJobLead">${leadOptions}</select></label><label>Enabled<select name="enabled"><option value="true" ${current.isEnabled?'selected':''}>Yes</option><option value="false" ${!current.isEnabled?'selected':''}>No</option></select></label><details><summary>Advanced / Integration Settings</summary><label>Route key<input name="routeKey" value="${esc(current.routeKey||'')}" placeholder="Generated automatically"></label><small>Used by website booking and incoming-message integrations. Leaving blank keeps the current key or generates one if missing.</small></details><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`);
     dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
     const form=dialog.querySelector('form');
     form.onsubmit=async event=>{
         event.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;
         try{
-            await json('/api/workspaces/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.elements.name.value.trim(),emailAddress:form.elements.email.value.trim()||null,routeKey:form.elements.routeKey.value.trim()||null,isEnabled:form.elements.enabled.value==='true',sortOrder:current.sortOrder||0})});
+            await json('/api/workspaces/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.elements.name.value.trim(),emailAddress:form.elements.email.value.trim()||null,routeKey:form.elements.routeKey.value.trim()||null,isEnabled:form.elements.enabled.value==='true',sortOrder:current.sortOrder||0,defaultJobLead:form.elements.defaultJobLead.value||null})});
             dialog.close();await loadWorkspaces();await showWorkspaces();
         }catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}
     };
