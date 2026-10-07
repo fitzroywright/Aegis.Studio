@@ -85,15 +85,16 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  assert.ok(w.document.querySelector('.job-work-board'));
  await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-context-sidebar .thread-next-tasks'));assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
  assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
- assert.ok(w.document.querySelector('details.job-details-card'));assert.match(w.document.querySelector('[data-job="job"]').textContent,/Assigned to: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
+ assert.ok(w.document.querySelector('details.job-details-card'));assert.match(w.document.querySelector('[data-job="job"]').textContent,/Job Lead: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
-test('left navigation has the seven operational destinations from the Studio workflow brief',()=>{
+test('current shell keeps obsolete left navigation removed',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const shell=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});
- assert.deepEqual(Array.from(shell.window.document.querySelectorAll('.rail [data-view]'),b=>b.textContent.trim()),['My Work','Workspaces','Pipeline','Production','Front Desk','Finance','Admin']);
+ const scripts=Array.from(shell.window.document.querySelectorAll('script[src]'),s=>s.getAttribute('src'));
+ assert.equal(shell.window.document.querySelector('.rail'),null);
+ assert.ok(scripts.some(src=>src.includes('studio-navigation.js')));
  assert.equal(shell.window.document.querySelector('[data-view="messages"]'),null);
  assert.equal(shell.window.document.querySelector('[data-view="jobs"]'),null);
- assert.equal(shell.window.document.querySelectorAll('.rail [data-view]').length,7);
 });
 test('announcement banner disappears only after dismissal succeeds',async()=>{
  const {w,panel}=environment();const calls=[];let fail=true;
