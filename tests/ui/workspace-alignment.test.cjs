@@ -79,13 +79,13 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
  assert.equal(w.messageFirstName('fwright',[],'Team member',true),'fwright');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'fwright');
- assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.textContent),['Overview','Messages','Media','Subjects','Tasks','Sessions','Activity']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.dataset.jobScroll),['media','subjects','tasks','messages','activity','overview']);
  assert.equal(w.document.querySelector('.detail-header .activity-button'),null);
- assert.equal(w.document.querySelector('[data-job-scroll=activity]')?.textContent,'Activity');
- assert.ok(w.document.querySelector('.job-work-board'));
- await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-context-sidebar .thread-next-tasks'));assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
+ assert.equal(w.document.querySelector('[data-job-scroll=activity]')?.dataset.jobScroll,'activity');
+ assert.ok(w.document.querySelector('.job-detail-board'));
+ await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-detail-right .thread-next-tasks'));assert.ok(w.document.querySelector('.job-detail-collections'));assert.ok(w.document.querySelector('.job-detail-quick'));assert.equal(w.document.querySelector('.job-context-sidebar'),null);assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
  assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
- assert.ok(w.document.querySelector('details.job-details-card'));assert.match(w.document.querySelector('[data-job="job"]').textContent,/Job Lead: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
+ assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Job Lead: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
 test('current shell keeps obsolete left navigation removed',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
