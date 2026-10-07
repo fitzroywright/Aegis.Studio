@@ -1,28 +1,44 @@
 (() => {
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    async function readRun(url) {
+        const response = await fetch(url, {headers:{Accept:'application/json'}, cache:'no-store'});
+        if (!response.ok) throw new Error('Demo loader status returned HTTP '+response.status+'.');
+        return await response.json();
+    }
+
     window.studioLoadDemoData = async onProgress => {
-        const response = await fetch('/api/admin/demo/seed', {method:'POST',headers:{Accept:'application/x-ndjson'}});
+        const response = await fetch('/api/admin/demo/seed', {
+            method:'POST',
+            headers:{Accept:'application/json'}
+        });
         if (!response.ok) throw new Error('Demo loader returned HTTP '+response.status+'.');
-        if (!response.headers.get('content-type')?.includes('application/x-ndjson') || !response.body)
-            throw new Error('The server did not return demo progress. Refresh the application and retry.');
-        const reader=response.body.getReader(),decoder=new TextDecoder();
-        let buffer='',complete=null;
-        function update(line){
-            if(!line.trim())return;
-            const progress=JSON.parse(line);
-            if(progress.failed)throw new Error(progress.message||'Demo data could not be loaded.');
-            onProgress(progress);
-            if(progress.completed)complete=progress;
+
+        let run = await response.json();
+        if (!run?.runId) throw new Error('The server did not return a demo run identifier.');
+
+        const statusUrl = '/api/admin/demo/seed/' + encodeURIComponent(run.runId);
+        onProgress(run);
+
+        while (!run.completed && !run.failed) {
+            await wait(1500);
+            run = await readRun(statusUrl);
+            onProgress(run);
         }
-        try{
-            while(true){
-                const {value,done}=await reader.read();
-                buffer+=decoder.decode(value,{stream:!done});
-                let newline;
-                while((newline=buffer.indexOf('\n'))>=0){update(buffer.slice(0,newline));buffer=buffer.slice(newline+1);}
-                if(done){update(buffer);break;}
-            }
-            if(!complete)throw new Error('Connection ended before demo loading completed. Retry to check or finish the dataset.');
-            return complete;
-        }finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+
+        if (run.failed)
+            throw new Error(run.message || 'Demo data could not be loaded.');
+
+        return run;
+    };
+
+    window.studioGetCurrentDemoDataRun = async () => {
+        const response = await fetch('/api/admin/demo/seed/current', {
+            headers:{Accept:'application/json'},
+            cache:'no-store'
+        });
+        if (response.status === 204 || response.status === 404) return null;
+        if (!response.ok) throw new Error('Demo loader status returned HTTP '+response.status+'.');
+        return await response.json();
     };
 })();
