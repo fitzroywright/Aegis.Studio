@@ -79,6 +79,12 @@ public sealed class ProductionConfigurationStore
               unique(recipe_id,task_template_id,sort_order)
             );
             create index if not exists ix_studio_recipe_steps_recipe on studio_recipe_steps(recipe_id,sort_order);
+            create table if not exists studio_recipe_step_dependencies(
+              recipe_step_id uuid not null references studio_recipe_steps(id) on delete cascade,
+              depends_on_step_id uuid not null references studio_recipe_steps(id) on delete cascade,
+              primary key(recipe_step_id,depends_on_step_id),
+              check(recipe_step_id<>depends_on_step_id)
+            );
 
             alter table studio_jobs add column if not exists job_type_id uuid null references studio_job_types(id) on delete set null;
             create index if not exists ix_studio_jobs_job_type on studio_jobs(job_type_id,status);
@@ -88,6 +94,12 @@ public sealed class ProductionConfigurationStore
             alter table studio_job_activities add column if not exists recipe_step_id uuid null references studio_recipe_steps(id) on delete set null;
             alter table studio_job_activities add column if not exists assignment_issue text null;
             create unique index if not exists ux_studio_generated_activity_step on studio_job_activities(job_id,recipe_step_id) where recipe_step_id is not null;
+            create table if not exists studio_activity_dependencies(
+              activity_id uuid not null references studio_job_activities(id) on delete cascade,
+              depends_on_activity_id uuid not null references studio_job_activities(id) on delete cascade,
+              primary key(activity_id,depends_on_activity_id),
+              check(activity_id<>depends_on_activity_id)
+            );
             """;
         cmd.ExecuteNonQuery();
     }
@@ -187,13 +199,14 @@ public sealed class ProductionConfigurationStore
     {
         using var c=database.OpenConnection();using var cmd=c.CreateCommand();
         cmd.CommandText="""
-          select s.id,s.recipe_id,s.task_template_id,s.sort_order,s.is_mandatory,s.assignee_override,s.role_override,s.due_offset_minutes_override,t.name
+          select s.id,s.recipe_id,s.task_template_id,s.sort_order,s.is_mandatory,s.assignee_override,s.role_override,s.due_offset_minutes_override,t.name,
+                 coalesce(array(select d.depends_on_step_id from studio_recipe_step_dependencies d where d.recipe_step_id=s.id),'{}')
           from studio_recipe_steps s join studio_task_templates t on t.id=s.task_template_id
           where s.recipe_id=$1 order by s.sort_order,s.created_at_utc
           """;
         cmd.Parameters.AddWithValue(recipeId);
         using var r=cmd.ExecuteReader();List<RecipeStep> rows=[];
-        while(r.Read())rows.Add(new(r.GetGuid(0),r.GetGuid(1),r.GetGuid(2),r.GetInt32(3),r.GetBoolean(4),r.IsDBNull(5)?null:r.GetString(5),r.IsDBNull(6)?null:r.GetString(6),r.IsDBNull(7)?null:r.GetInt32(7),r.GetString(8)));
+        while(r.Read())rows.Add(new(r.GetGuid(0),r.GetGuid(1),r.GetGuid(2),r.GetInt32(3),r.GetBoolean(4),r.IsDBNull(5)?null:r.GetString(5),r.IsDBNull(6)?null:r.GetString(6),r.IsDBNull(7)?null:r.GetInt32(7),r.GetString(8),r.GetFieldValue<Guid[]>(9)));
         return rows;
     }
 
@@ -209,6 +222,18 @@ public sealed class ProductionConfigurationStore
           """;
         object?[] values=[value,recipeId,request.TaskTemplateId,request.SortOrder,request.IsMandatory,(object?)Clean(request.AssigneeOverride)??DBNull.Value,(object?)Clean(request.RoleOverride)??DBNull.Value,(object?)request.DueOffsetMinutesOverride??DBNull.Value];
         foreach(var v in values)cmd.Parameters.AddWithValue(v??DBNull.Value);cmd.ExecuteNonQuery();
+        using(var clear=new NpgsqlCommand("delete from studio_recipe_step_dependencies where recipe_step_id=$1",c)){clear.Parameters.AddWithValue(value);clear.ExecuteNonQuery();}
+        foreach(Guid dependency in (request.DependsOnStepIds??[]).Distinct())
+        {
+            if(dependency==value)throw new ArgumentException("A recipe step cannot depend on itself.");
+            using var dep=new NpgsqlCommand("""
+              insert into studio_recipe_step_dependencies(recipe_step_id,depends_on_step_id)
+              select $1,$2 where exists(select 1 from studio_recipe_steps where id=$2 and recipe_id=$3)
+              on conflict do nothing
+              """,c);
+            dep.Parameters.AddWithValue(value);dep.Parameters.AddWithValue(dependency);dep.Parameters.AddWithValue(recipeId);
+            if(dep.ExecuteNonQuery()==0)throw new ArgumentException("Recipe dependencies must refer to steps in the same recipe.");
+        }
         return GetSteps(recipeId).Single(x=>x.Id==value);
     }
 
@@ -283,6 +308,16 @@ public sealed class ProductionConfigurationStore
                 result.Add(new(createdId,step.StepId,step.TemplateId,step.Name,assignment.UserName,assignment.Issue,step.EstimatedMinutes,due,step.RequiresScheduling));
             }
         }
+        using(var deps=new NpgsqlCommand("""
+          insert into studio_activity_dependencies(activity_id,depends_on_activity_id)
+          select activity.id,prerequisite.id
+          from studio_recipe_step_dependencies d
+          join studio_job_activities activity on activity.job_id=$1 and activity.recipe_step_id=d.recipe_step_id
+          join studio_job_activities prerequisite on prerequisite.job_id=$1 and prerequisite.recipe_step_id=d.depends_on_step_id
+          where exists(select 1 from studio_recipe_steps s where s.id=d.recipe_step_id and s.recipe_id=$2)
+          on conflict do nothing
+          """,c))
+        {deps.Parameters.AddWithValue(jobId);deps.Parameters.AddWithValue(selectedRecipe);deps.ExecuteNonQuery();}
         return result;
     }
 
@@ -425,7 +460,10 @@ public static class ProductionConfigurationEndpoints
         admin.MapPut("/recipes/{recipeId:guid}/steps/{id:guid}",(Guid recipeId,Guid id,SaveRecipeStepRequest request)=>Results.Ok(store.SaveStep(recipeId,id,request)));
 
         app.MapGet("/api/jobs/{jobId:guid}/production-config",(Guid jobId,ClaimsPrincipal user,JobAccessService access)=>
-            access.HasPermission(user,jobId,"ViewJob")?Results.Ok(store.GetJobConfiguration(jobId)):Results.Forbid()).RequireAuthorization();
+        {
+            if(!access.HasPermission(user,jobId,"ViewJob"))return Results.Forbid();
+            return Results.Ok(store.GetJobConfiguration(jobId));
+        }).RequireAuthorization();
 
         app.MapPut("/api/jobs/{jobId:guid}/job-type",(Guid jobId,SetJobTypeRequest request,ClaimsPrincipal user,JobAccessService access)=>
         {
@@ -454,8 +492,8 @@ public sealed record ProductionRecipe(Guid Id,Guid JobTypeId,string Name,string?
 public sealed record SaveRecipeRequest(Guid JobTypeId,string Name,string? Description,string? TriggerStatus,bool IsDefault=true,bool IsActive=true);
 public sealed record TaskTemplate(Guid Id,string Name,string? Description,string ActivityType,int EstimatedMinutes,string? RequiredRole,IReadOnlyList<string> RequiredSkills,string? DefaultAssignee,string? DefaultRole,string Priority,bool RequiresScheduling,int? DueOffsetMinutes,bool IsActive);
 public sealed record SaveTaskTemplateRequest(string Name,string? Description,string? ActivityType,int EstimatedMinutes=60,string? RequiredRole=null,IReadOnlyList<string>? RequiredSkills=null,string? DefaultAssignee=null,string? DefaultRole=null,string? Priority="Normal",bool RequiresScheduling=false,int? DueOffsetMinutes=null,bool IsActive=true);
-public sealed record RecipeStep(Guid Id,Guid RecipeId,Guid TaskTemplateId,int SortOrder,bool IsMandatory,string? AssigneeOverride,string? RoleOverride,int? DueOffsetMinutesOverride,string TemplateName);
-public sealed record SaveRecipeStepRequest(Guid TaskTemplateId,int SortOrder=0,bool IsMandatory=true,string? AssigneeOverride=null,string? RoleOverride=null,int? DueOffsetMinutesOverride=null);
+public sealed record RecipeStep(Guid Id,Guid RecipeId,Guid TaskTemplateId,int SortOrder,bool IsMandatory,string? AssigneeOverride,string? RoleOverride,int? DueOffsetMinutesOverride,string TemplateName,IReadOnlyList<Guid> DependsOnStepIds);
+public sealed record SaveRecipeStepRequest(Guid TaskTemplateId,int SortOrder=0,bool IsMandatory=true,string? AssigneeOverride=null,string? RoleOverride=null,int? DueOffsetMinutesOverride=null,IReadOnlyList<Guid>? DependsOnStepIds=null);
 public sealed record SetJobTypeRequest(Guid? JobTypeId);
 public sealed record GenerateProductionRequest(Guid? RecipeId=null);
 public sealed record JobProductionConfiguration(Guid JobId,Guid? JobTypeId,string? JobTypeName,Guid? RecipeId,string? RecipeName);
