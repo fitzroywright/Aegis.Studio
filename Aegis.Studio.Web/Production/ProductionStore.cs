@@ -30,24 +30,6 @@ public sealed class ProductionStore
         return ToTask(updated);
     }
 
-    public IReadOnlyList<ProductionTask> ApplyTemplate(Guid jobId, string templateName)
-    {
-        if (activities.GetActivities(jobId).Count == 0)
-        {
-            (string Type,string Title)[] steps = templateName.Trim().ToLowerInvariant() switch
-            {
-                "graduation" => [("FileIngest","Import images"),("Backup","Verify backup"),("Cull","Cull images"),("Edit","Color correction"),("Retouch","Retouch selections"),("Proof","Prepare proofs"),("QC","Quality control"),("Delivery","Final export and delivery"),("Archive","Archive deliverables")],
-                "id" or "id photos" => [("FileIngest","Import images"),("Backup","Verify backup"),("Edit","Match and crop to specification"),("QC","Quality check"),("Delivery","Export final files"),("Archive","Archive deliverables")],
-                _ => [("FileIngest","Import images"),("Backup","Verify backup"),("Cull","Cull and select"),("Edit","Edit and color correct"),("Retouch","Retouch selections"),("Proof","Client proof review"),("QC","Final quality control"),("Delivery","Deliver final files"),("Archive","Archive deliverables")]
-            };
-            foreach ((string type,string title) in steps)
-            {
-                activities.CreateActivity(jobId,new JobActivityRequest(type,title,null,"NotStarted","Normal",null,null,null,null,null,null),"compatibility");
-            }
-        }
-        return GetForJob(jobId);
-    }
-
     private static ProductionTask ToTask(JobActivity value)
         => new(value.Id,value.JobId,value.Title,value.Description,value.Status,value.AssignedTo,value.DueAtUtc,0,value.CreatedAtUtc,value.CompletedAtUtc);
 }
