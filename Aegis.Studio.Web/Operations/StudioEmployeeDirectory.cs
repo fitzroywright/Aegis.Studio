@@ -49,10 +49,10 @@ public sealed class StudioEmployeeDirectoryStore
         cmd.CommandText="""
             insert into studio_employees(user_name,display_name,is_active,is_assignable,source,last_synced_at_utc)
               select user_name,max(display_name),bool_or(is_active),true,'Existing Studio identity',now() from studio_global_operational_role_members group by user_name
-              on conflict(user_name) do update set display_name=excluded.display_name,source=excluded.source,last_synced_at_utc=excluded.last_synced_at_utc,updated_at_utc=now();
+              on conflict(user_name) do update set display_name=excluded.display_name,updated_at_utc=now();
             insert into studio_employees(user_name,display_name,is_active,is_assignable,source,workday_user_name,last_synced_at_utc)
               select user_name,display_name,is_active,is_active,'Studio photographer',user_name,now() from studio_photographers
-              on conflict(user_name) do update set display_name=excluded.display_name,source=excluded.source,workday_user_name=excluded.workday_user_name,last_synced_at_utc=excluded.last_synced_at_utc,updated_at_utc=now();
+              on conflict(user_name) do update set display_name=excluded.display_name,workday_user_name=coalesce(studio_employees.workday_user_name,excluded.workday_user_name),updated_at_utc=now();
             insert into studio_employees(user_name,display_name,is_active,is_assignable,source,last_synced_at_utc)
               select user_name,max(display_name),bool_or(is_active),true,'Workspace member',now() from studio_workspace_members group by user_name
               on conflict(user_name) do update set display_name=excluded.display_name,updated_at_utc=now();
@@ -67,12 +67,13 @@ public sealed class StudioEmployeeDirectoryStore
         cmd.CommandText="""
             select e.user_name,e.display_name,e.email_address,e.is_active,e.is_assignable,e.source,e.external_id,e.skills,e.workday_user_name,e.last_synced_at_utc,
               coalesce(array(select distinct r.name from studio_global_operational_role_members m join studio_global_operational_roles r on r.id=m.role_id
-                where m.is_active and r.is_active and lower(m.user_name)=lower(e.user_name) order by r.name),'{}')
+                where m.is_active and r.is_active and lower(m.user_name)=lower(e.user_name) order by r.name),'{}'),
+              e.source_active,e.sync_state
             from studio_employees e where not $1 or (e.is_active and e.is_assignable) order by e.display_name,e.user_name
             """;
         cmd.Parameters.AddWithValue(assignableOnly);
         using var r=cmd.ExecuteReader();List<StudioEmployee> rows=[];
-        while(r.Read())rows.Add(new(r.GetString(0),r.GetString(1),r.IsDBNull(2)?null:r.GetString(2),r.GetBoolean(3),r.GetBoolean(4),r.GetString(5),r.IsDBNull(6)?null:r.GetString(6),r.GetFieldValue<string[]>(7),r.IsDBNull(8)?null:r.GetString(8),r.IsDBNull(9)?null:r.GetFieldValue<DateTimeOffset>(9),r.GetFieldValue<string[]>(10)));
+        while(r.Read())rows.Add(new(r.GetString(0),r.GetString(1),r.IsDBNull(2)?null:r.GetString(2),r.GetBoolean(3),r.GetBoolean(4),r.GetString(5),r.IsDBNull(6)?null:r.GetString(6),r.GetFieldValue<string[]>(7),r.IsDBNull(8)?null:r.GetString(8),r.IsDBNull(9)?null:r.GetFieldValue<DateTimeOffset>(9),r.GetFieldValue<string[]>(10),r.IsDBNull(11)?null:r.GetBoolean(11),r.GetString(12)));
         return rows;
     }
 
@@ -148,7 +149,7 @@ public static class StudioEmployeeDirectoryEndpoints
         admin.MapPost("/sync/{provider}",(string provider,StudioEmployeeSyncRequest request)=>Results.Ok(store.SyncProvider(provider,request.Employees??[])));
     }
 }
-public sealed record StudioEmployee(string UserName,string DisplayName,string? EmailAddress,bool IsActive,bool IsAssignable,string Source,string? ExternalId,IReadOnlyList<string> Skills,string? WorkDayUserName,DateTimeOffset? LastSyncedAtUtc,IReadOnlyList<string> Roles);
+public sealed record StudioEmployee(string UserName,string DisplayName,string? EmailAddress,bool IsActive,bool IsAssignable,string Source,string? ExternalId,IReadOnlyList<string> Skills,string? WorkDayUserName,DateTimeOffset? LastSyncedAtUtc,IReadOnlyList<string> Roles,bool? SourceActive=null,string SyncState="Local");
 public sealed record StudioEmployeeRequest(string UserName,string? DisplayName,string? EmailAddress,bool IsActive=true,bool IsAssignable=true,string? Source="Manual",string? ExternalId=null,IReadOnlyList<string>? Skills=null,string? WorkDayUserName=null,DateTimeOffset? LastSyncedAtUtc=null);
 public sealed record StudioEmployeeSyncItem(string UserName,string? DisplayName,string? EmailAddress,string? ExternalId=null,bool SourceActive=true,string? WorkDayUserName=null);
 public sealed record StudioEmployeeSyncRequest(IReadOnlyList<StudioEmployeeSyncItem>? Employees);
