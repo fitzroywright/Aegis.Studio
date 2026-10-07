@@ -1,4 +1,5 @@
 using Common.Messaging;
+using Aegis.Studio.Web.Messaging;
 
 namespace Aegis.Studio.Web.Email;
 
@@ -7,6 +8,7 @@ public sealed class OutboundEmailWorker : BackgroundService
     private readonly IExternalMessageChannel? emailChannel;
     private readonly OutboundEmailStore outbox;
     private readonly StudioOperationsFlowPublisher operationsFlows;
+    private readonly StudioMessageAttachmentStore attachments;
     private readonly ILogger<OutboundEmailWorker> logger;
     private readonly TimeSpan pollInterval;
 
@@ -15,11 +17,13 @@ public sealed class OutboundEmailWorker : BackgroundService
         IConfiguration configuration,
         OutboundEmailStore outbox,
         StudioOperationsFlowPublisher operationsFlows,
+        StudioMessageAttachmentStore attachments,
         ILogger<OutboundEmailWorker> logger)
     {
         emailChannel = externalChannels.FirstOrDefault(channel => channel.Channel == MessageChannel.MsEmail);
         this.outbox = outbox;
         this.operationsFlows = operationsFlows;
+        this.attachments = attachments;
         this.logger = logger;
         pollInterval = TimeSpan.FromSeconds(Math.Max(
             5,
@@ -63,14 +67,33 @@ public sealed class OutboundEmailWorker : BackgroundService
                             message.ToAddress,
                             message.ToAddress,
                             PreferredChannels: MessageChannel.MsEmail);
+                        IReadOnlyCollection<Common.Messaging.MessageAttachment> deliveryAttachments =
+                            message.InAppMessageId is Guid inAppMessageId
+                                ? attachments.GetForMessage(inAppMessageId)
+                                    .Select(file => new Common.Messaging.MessageAttachment(
+                                        file.FileName,
+                                        file.ContentType,
+                                        attachments.ReadBytes(file)))
+                                    .ToArray()
+                                : Array.Empty<Common.Messaging.MessageAttachment>();
                         MessageRequest request = new()
                         {
                             RecipientIds = [message.ToAddress],
                             Title = message.Subject,
                             Body = message.Body,
+                            BodyIsHtml = false,
+                            Attachments = deliveryAttachments,
                             Channels = MessageChannel.MsEmail,
                             Source = "Aegis.Studio",
-                            CorrelationId = message.ConversationId.ToString("D")
+                            CorrelationId = message.ConversationId.ToString("D"),
+                            Metadata = new Dictionary<string,string>
+                            {
+                                ["StudioLogicalFrom"] = message.FromAddress,
+                                ["StudioConversationId"] = message.ConversationId.ToString("D"),
+                                ["ReplyTo"] = message.SendingIdentityType == nameof(StudioSendingIdentityType.Person)
+                                    ? message.FromAddress
+                                    : string.Empty
+                            }
                         };
 
                         await emailChannel.SendAsync(
