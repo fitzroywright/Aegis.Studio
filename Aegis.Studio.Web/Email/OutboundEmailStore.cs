@@ -28,6 +28,28 @@ public sealed class OutboundEmailStore
     public OutboundEmail QueueNotification(StudioConversation conversation, string subject, string body)
         => QueueMessage(conversation, body, subject, "Notification");
 
+    public OutboundEmail QueuePerson(
+        StudioConversation conversation,
+        string body,
+        string personAddress,
+        string userName,
+        Guid inAppMessageId)
+    {
+        string token = Aegis.Studio.Web.Messaging.StudioMessageAddressBook.ReferenceToken(conversation.Id);
+        string plainSubject = conversation.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase)
+            ? conversation.Subject[3..].Trim()
+            : conversation.Subject.Trim();
+        string subject = $"[{token}] {plainSubject}";
+        return QueueMessage(
+            conversation,
+            body,
+            subject,
+            "PersonMessage",
+            new StudioSendingIdentity(StudioSendingIdentityType.Person, personAddress, userName),
+            inAppMessageId,
+            DateTimeOffset.UtcNow.AddSeconds(10));
+    }
+
     public OutboundEmail? QueueAcknowledgement(StudioConversation conversation, string workspaceName)
     {
         if (ExistsAcknowledgement(conversation.Id)) return null;
@@ -144,7 +166,9 @@ public sealed class OutboundEmailStore
         string body,
         string subject,
         string kind = "Reply",
-        StudioSendingIdentity? sendingIdentity = null)
+        StudioSendingIdentity? sendingIdentity = null,
+        Guid? inAppMessageId = null,
+        DateTimeOffset? notBeforeUtc = null)
     {
         StudioWorkspaceDefinition workspace = workspaces.Get(conversation.WorkspaceId) ?? throw new InvalidOperationException("The conversation workspace no longer exists.");
         if (string.IsNullOrWhiteSpace(workspace.EmailAddress)) throw new InvalidOperationException("The conversation workspace has no outbound email identity configured.");
@@ -168,15 +192,16 @@ public sealed class OutboundEmailStore
             identity.Type.ToString(),
             0,
             null,
+            notBeforeUtc,
             null,
-            null);
+            inAppMessageId);
 
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             insert into studio_outbound_email
-            (id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type)
-            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            (id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,inapp_message_id,next_attempt_at_utc)
+            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
             """;
         object?[] values =
         [
@@ -192,7 +217,9 @@ public sealed class OutboundEmailStore
             (object?)message.ProviderMessageId ?? DBNull.Value,
             message.Kind,
             (object?)message.SentByUserName ?? DBNull.Value,
-            message.SendingIdentityType
+            message.SendingIdentityType,
+            (object?)message.InAppMessageId ?? DBNull.Value,
+            (object?)notBeforeUtc ?? DBNull.Value
         ];
         foreach (object? value in values) command.Parameters.AddWithValue(value ?? DBNull.Value);
         command.ExecuteNonQuery();
@@ -207,10 +234,11 @@ public sealed class OutboundEmailStore
         r.GetInt32(13),
         r.IsDBNull(14) ? null : r.GetString(14),
         r.IsDBNull(15) ? null : r.GetFieldValue<DateTimeOffset>(15),
-        r.IsDBNull(16) ? null : r.GetFieldValue<DateTimeOffset>(16));
+        r.IsDBNull(16) ? null : r.GetFieldValue<DateTimeOffset>(16),
+        r.IsDBNull(17) ? null : r.GetGuid(17));
 
     private const string SelectSql =
-        "select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,attempts,last_error,next_attempt_at_utc,provider_accepted_at_utc from studio_outbound_email ";
+        "select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,attempts,last_error,next_attempt_at_utc,provider_accepted_at_utc,inapp_message_id from studio_outbound_email ";
 }
 
 public sealed record OutboundEmail(
@@ -230,7 +258,8 @@ public sealed record OutboundEmail(
     int Attempts = 0,
     string? LastError = null,
     DateTimeOffset? NextAttemptAtUtc = null,
-    DateTimeOffset? ProviderAcceptedAtUtc = null);
+    DateTimeOffset? ProviderAcceptedAtUtc = null,
+    Guid? InAppMessageId = null);
 public sealed record OutboundEmailAuditRecord(
     Guid MessageId,
     Guid ConversationId,
