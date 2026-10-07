@@ -548,17 +548,8 @@ dialog::backdrop {
   color:#92580f;
   box-shadow:0 2px #1677ff
 }
-.job-work-board {
-  display:grid;
-  grid-template-columns:minmax(260px,1.3fr) minmax(380px,1.9fr) minmax(230px,1fr);
-  gap:12px;
-  min-height:0;
-  flex:1
-}
-.job-message-column,.job-context-sidebar,.job-lower-pane {
-  min-height:0;
-  min-width:0
-}
+
+.job-message-column,.job-context-sidebar,
 .job-message-column {
   display:flex;
   flex-direction:column;
@@ -647,12 +638,7 @@ dialog::backdrop {
   width:155px;
   font-size:11px
 }
-.job-lower-pane {
-  display:grid;
-  grid-template-rows:minmax(250px,1.8fr) minmax(130px,.75fr) minmax(150px,1fr);
-  gap:10px;
-  overflow:hidden
-}
+
 .job-center-panel {
   display:flex;
   flex-direction:column;
@@ -673,33 +659,17 @@ dialog::backdrop {
 .job-center-heading h2 {
   font-size:17px
 }
-.job-context-sidebar {
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  overflow:auto
-}
-.thread-next-tasks,.job-details-card,.thread-shared-files {
+
+.thread-next-tasks,.thread-shared-files {
   background:white;
   border:1px solid #e4e8ee;
   border-radius:8px;
   flex-shrink:0;
   overflow:hidden
 }
-.job-details-card dl {
-  display:grid;
-  grid-template-columns:95px minmax(0,1fr);
-  gap:10px;
-  padding:0 14px 14px;
-  font-size:12px
-}
-.job-details-card dt {
-  color:#69758b
-}
-.job-details-card dd {
-  margin:0;
-  overflow-wrap:anywhere
-}
+
+
+
 .task-card {
   padding:10px;
   border-bottom:1px solid #edf0f4
@@ -1449,9 +1419,7 @@ dialog::backdrop {
 .mw-session-thumb {
   width:45px
 }
-.job-work-board {
-  grid-template-columns:minmax(230px,1fr) minmax(330px,1.5fr) minmax(220px,.9fr)
-}
+
 .media-items {
   grid-template-columns:repeat(3,1fr)
 }
@@ -1539,19 +1507,9 @@ dialog::backdrop {
   height:auto;
   overflow:visible
 }
-.job-work-board {
-  grid-template-columns:1fr 1.5fr;
-  overflow:auto
-}
-.job-context-sidebar {
-  grid-column:span 2;
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  overflow:visible
-}
-.job-lower-pane {
-  height:700px
-}
+
+
+
 .has-open-job>.detail-pane {
   overflow:auto
 }
