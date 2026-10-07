@@ -815,7 +815,11 @@
             .slice(0,5);
         const activity=notifications
             .filter(n=>String(n.referenceType||'').toLowerCase()==='job'&&jobById.has(String(n.referenceId)))
-            .filter(n=>!workspaceFilter||String(jobById.get(String(n.referenceId))?.workspaceId)===workspaceFilter)
+            .filter(n=>{
+                if(!workspaceFilter)return true;
+                const job=jobById.get(String(n.referenceId));
+                return String(job?.workspaceId)===workspaceFilter||(job?.participatingWorkspaceIds||[]).map(String).includes(workspaceFilter);
+            })
             .sort((a,b)=>new Date(b.createdAtUtc||b.createdAt||0)-new Date(a.createdAtUtc||a.createdAt||0))
             .slice(0,6);
 
@@ -827,7 +831,7 @@
                             <header><h2><span class="mw-title-icon assigned">▰</span> Workspace</h2></header>
                             <button type="button" class="jobs-workspace-summary" data-return-workspace>
                                 <span class="jobs-workspace-photo">▰</span>
-                                <span><strong>${esc(workspaceForFilter.name)}</strong><small>${countGroup('all')} accessible jobs</small></span>
+                                <span><strong>${esc(workspaceForFilter.name)}</strong><small>${filteredBase().length} accessible jobs</small></span>
                                 <b>›</b>
                             </button>
                         </section>`:''}
