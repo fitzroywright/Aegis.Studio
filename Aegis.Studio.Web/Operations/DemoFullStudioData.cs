@@ -116,7 +116,7 @@ internal static class DemoFullStudioData
                 conversationId,workspaceId,job.Title,client.Name,client.Email,ordinal%4==0?"Phone":ordinal%3==0?"Portal":"Email",Math.Abs(job.DayOffset)+2);
 
             Execute(connection,transaction,
-                "insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,client_id) values($1,$2,$3,$4,$5,$6,$7,now()-($8 || ' days')::interval,$9,$10) on conflict(id) do update set workspace_id=excluded.workspace_id,conversation_id=excluded.conversation_id,title=excluded.title,client_name=excluded.client_name,status=excluded.status,event_date=excluded.event_date,assigned_to=excluded.assigned_to,client_id=excluded.client_id",
+                "insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead,client_id) values($1,$2,$3,$4,$5,$6,$7,now()-($8 || ' days')::interval,$9,$9,$10) on conflict(id) do update set workspace_id=excluded.workspace_id,conversation_id=excluded.conversation_id,title=excluded.title,client_name=excluded.client_name,status=excluded.status,event_date=excluded.event_date,assigned_to=excluded.assigned_to,job_lead=excluded.job_lead,client_id=excluded.client_id",
                 jobId,workspaceId,conversationId,job.Title,client.Name,NormalizeStatus(job.Status),DateOnly.FromDateTime(start.UtcDateTime),Math.Abs(job.DayOffset)+5,job.Photographer,clientId);
 
             Execute(connection,transaction,"update studio_conversations set job_id=$2 where id=$1",conversationId,jobId);
