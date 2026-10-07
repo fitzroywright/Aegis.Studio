@@ -90,15 +90,20 @@ public static class OperationalWorkEndpoints
         app.MapPost("/api/jobs/{jobId:guid}/operations/template/{templateName}", (Guid jobId,string templateName,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) =>
         {
             if(!access.HasPermission(user,jobId,"ManageProduction")) return Results.Forbid();
-            OperationalWorkStore store=new(database); if(store.GetActivities(jobId).Count>0) return Results.Ok(store.GetActivities(jobId));
-            (string Type,string Title)[] steps=templateName.Trim().ToLowerInvariant() switch
+            try
             {
-                "graduation"=>[("FileIngest","Import images"),("Backup","Verify backup"),("Cull","Cull images"),("Edit","Color correction"),("Retouch","Retouch selections"),("Proof","Prepare proofs"),("QC","Quality control"),("Delivery","Final export and delivery"),("Archive","Archive deliverables")],
-                "id" or "idphotos"=>[("FileIngest","Import images"),("Backup","Verify backup"),("Edit","Match and crop to specification"),("QC","Quality check"),("Delivery","Export final files"),("Archive","Archive deliverables")],
-                _=>[("FileIngest","Import images"),("Backup","Verify backup"),("Cull","Cull and select"),("Edit","Edit and color correct"),("Retouch","Retouch selections"),("Proof","Client proof review"),("QC","Final quality control"),("Delivery","Deliver final files"),("Archive","Archive deliverables")]
-            };
-            foreach((string type,string title) in steps) store.CreateActivity(jobId,new JobActivityRequest(type,title,null,"NotStarted","Normal",null,null,null,null,null,null),UserName(user));
-            return Results.Ok(store.GetActivities(jobId));
+                ProductionConfigurationStore configuration=new(database);
+                ProductionRecipeDefinition? recipe=configuration.GetRecipes(true).FirstOrDefault(x=>string.Equals(x.Name,templateName,StringComparison.OrdinalIgnoreCase));
+                if(recipe is null)
+                {
+                    JobTypeDefinition? type=configuration.GetJobTypes(true).FirstOrDefault(x=>string.Equals(x.Name,templateName,StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(x.Name.Replace(" ",""),templateName.Replace(" ",""),StringComparison.OrdinalIgnoreCase));
+                    if(type?.DefaultRecipeId is Guid recipeId) recipe=configuration.GetRecipes(true).FirstOrDefault(x=>x.Id==recipeId);
+                }
+                if(recipe is null)return Results.BadRequest(new{error="No active configurable Production Recipe matches that template name."});
+                return Results.Ok(configuration.GenerateTasks(jobId,UserName(user),recipe.Id));
+            }
+            catch(Exception exception){return Results.BadRequest(new{error=exception.Message});}
         }).RequireAuthorization();
 
         app.MapGet("/api/operations/shoots", (Guid? jobId,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) => Results.Ok(new OperationalWorkStore(database).GetShoots(jobId).Where(x=>access.HasPermission(user,x.JobId,"ViewJob")).ToList())).RequireAuthorization();
