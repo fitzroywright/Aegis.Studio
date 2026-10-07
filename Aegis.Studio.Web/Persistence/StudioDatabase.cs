@@ -34,6 +34,7 @@ public sealed class StudioDatabase
                 route_key text null,
                 is_enabled boolean not null default true,
                 sort_order integer not null default 0,
+                default_job_lead text null,
                 created_at_utc timestamptz not null,
                 updated_at_utc timestamptz not null
             );
@@ -80,9 +81,11 @@ public sealed class StudioDatabase
                 status text not null,
                 event_date date null,
                 created_at_utc timestamptz not null,
-                assigned_to text null
+                assigned_to text null,
+                job_lead text null
             );
             create index if not exists ix_studio_jobs_workspace on studio_jobs(workspace_id, created_at_utc desc);
+            create index if not exists ix_studio_jobs_lead on studio_jobs(lower(job_lead),status,created_at_utc desc);
             alter table studio_conversations drop constraint if exists fk_studio_conversations_job;
             alter table studio_conversations add constraint fk_studio_conversations_job foreign key(job_id) references studio_jobs(id) on delete set null;
 
