@@ -5439,3 +5439,71 @@ body[data-studio-view] .user-menu-popover button:hover{
 .mw-calendar-today:hover{
   background:#eaf2f8!important;
 }
+
+
+/* Persistent shell navigation: Back + Quick Links are available on every Studio page. */
+.studio-persistent-tools{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-right:8px;
+}
+.studio-shell-back,
+.studio-quick-links>summary{
+  height:34px;
+  border:1px solid #d8e0e8;
+  border-radius:7px;
+  background:#fff;
+  color:#17324f;
+  padding:0 10px;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+.studio-shell-back:hover:not(:disabled),
+.studio-quick-links>summary:hover{
+  border-color:#9db7cf;
+  background:#f5f9fc;
+}
+.studio-shell-back:disabled{
+  opacity:.45;
+  cursor:default;
+}
+.studio-quick-links{
+  position:relative;
+}
+.studio-quick-links>summary{
+  list-style:none;
+}
+.studio-quick-links>summary::-webkit-details-marker{
+  display:none;
+}
+.studio-quick-links-menu{
+  position:absolute;
+  z-index:1200;
+  top:calc(100% + 6px);
+  right:0;
+  min-width:180px;
+  padding:5px;
+  border:1px solid #dce3ea;
+  border-radius:8px;
+  background:#fff;
+  box-shadow:0 14px 34px rgba(21,45,70,.14);
+}
+.studio-quick-links-menu button{
+  width:100%;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  color:#203851;
+  padding:7px 9px;
+  text-align:left;
+  font-size:12px;
+  font-weight:650;
+}
+.studio-quick-links-menu button:hover{
+  background:#eef5fb;
+}
