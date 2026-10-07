@@ -17,7 +17,7 @@ public sealed class OperationalWorkStore
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
-            select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc,collection_name
+            select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc,collection_name,estimated_minutes,task_template_id,recipe_step_id,assignment_issue
             from studio_job_activities
             where ($1::uuid is null or job_id=$1)
               and ($2::text is null or status=$2)
@@ -39,7 +39,7 @@ public sealed class OperationalWorkStore
         JobActivity activity = new(
             Guid.NewGuid(), jobId, NormalizeActivityType(request.ActivityType), request.Title.Trim(), Clean(request.Description),
             NormalizeStatus(request.Status), NormalizePriority(request.Priority), Clean(request.AssignedTo), request.ScheduledAtUtc?.ToUniversalTime(),
-            request.DueAtUtc?.ToUniversalTime(), null, null, Clean(request.Location), Clean(request.BlockedReason), Clean(request.HandoffTo), userName, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+            request.DueAtUtc?.ToUniversalTime(), null, null, Clean(request.Location), Clean(request.BlockedReason), Clean(request.HandoffTo), userName, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, request.EstimatedMinutes, null, null, null);
         SaveActivity(activity);
         Log(jobId, activity.Id, "Created", userName, $"{activity.ActivityType}: {activity.Title}");
         return activity;
@@ -65,7 +65,7 @@ public sealed class OperationalWorkStore
             Status = status, Priority = NormalizePriority(request.Priority), AssignedTo = Clean(request.AssignedTo), ScheduledAtUtc = request.ScheduledAtUtc?.ToUniversalTime(),
             DueAtUtc = request.DueAtUtc?.ToUniversalTime(), StartedAtUtc = startedAt, CompletedAtUtc = completedAt,
             Location = Clean(request.Location), BlockedReason = status == "Blocked" ? Clean(request.BlockedReason) : null,
-            HandoffTo = Clean(request.HandoffTo), UpdatedAtUtc = DateTimeOffset.UtcNow
+            HandoffTo = Clean(request.HandoffTo), EstimatedMinutes = request.EstimatedMinutes ?? current.EstimatedMinutes, UpdatedAtUtc = DateTimeOffset.UtcNow
         };
         SaveActivity(updated);
         Log(updated.JobId, updated.Id, status, userName, request.BlockedReason ?? request.Description);
@@ -160,7 +160,7 @@ public sealed class OperationalWorkStore
     private JobActivity? GetActivity(Guid id)
     {
         using NpgsqlConnection connection=database.OpenConnection(); using NpgsqlCommand command=connection.CreateCommand();
-        command.CommandText="select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc,collection_name from studio_job_activities where id=$1";
+        command.CommandText="select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc,collection_name,estimated_minutes,task_template_id,recipe_step_id,assignment_issue from studio_job_activities where id=$1";
         command.Parameters.AddWithValue(id); using NpgsqlDataReader reader=command.ExecuteReader(); return reader.Read()?ReadActivity(reader):null;
     }
 
@@ -175,11 +175,11 @@ public sealed class OperationalWorkStore
     {
         using NpgsqlConnection connection=database.OpenConnection(); using NpgsqlCommand command=connection.CreateCommand();
         command.CommandText="""
-            insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc)
-            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
-            on conflict(id) do update set activity_type=excluded.activity_type,title=excluded.title,description=excluded.description,status=excluded.status,priority=excluded.priority,assigned_to=excluded.assigned_to,scheduled_at_utc=excluded.scheduled_at_utc,due_at_utc=excluded.due_at_utc,started_at_utc=excluded.started_at_utc,completed_at_utc=excluded.completed_at_utc,location=excluded.location,blocked_reason=excluded.blocked_reason,handoff_to=excluded.handoff_to,updated_at_utc=excluded.updated_at_utc
+            insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc,collection_name,estimated_minutes,task_template_id,recipe_step_id,assignment_issue)
+            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+            on conflict(id) do update set activity_type=excluded.activity_type,title=excluded.title,description=excluded.description,status=excluded.status,priority=excluded.priority,assigned_to=excluded.assigned_to,scheduled_at_utc=excluded.scheduled_at_utc,due_at_utc=excluded.due_at_utc,started_at_utc=excluded.started_at_utc,completed_at_utc=excluded.completed_at_utc,location=excluded.location,blocked_reason=excluded.blocked_reason,handoff_to=excluded.handoff_to,collection_name=excluded.collection_name,estimated_minutes=excluded.estimated_minutes,task_template_id=excluded.task_template_id,recipe_step_id=excluded.recipe_step_id,assignment_issue=excluded.assignment_issue,updated_at_utc=excluded.updated_at_utc
             """;
-        object?[] values=[a.Id,a.JobId,a.ActivityType,a.Title,(object?)a.Description??DBNull.Value,a.Status,a.Priority,(object?)a.AssignedTo??DBNull.Value,(object?)a.ScheduledAtUtc??DBNull.Value,(object?)a.DueAtUtc??DBNull.Value,(object?)a.StartedAtUtc??DBNull.Value,(object?)a.CompletedAtUtc??DBNull.Value,(object?)a.Location??DBNull.Value,(object?)a.BlockedReason??DBNull.Value,(object?)a.HandoffTo??DBNull.Value,a.CreatedBy,a.CreatedAtUtc,a.UpdatedAtUtc];
+        object?[] values=[a.Id,a.JobId,a.ActivityType,a.Title,(object?)a.Description??DBNull.Value,a.Status,a.Priority,(object?)a.AssignedTo??DBNull.Value,(object?)a.ScheduledAtUtc??DBNull.Value,(object?)a.DueAtUtc??DBNull.Value,(object?)a.StartedAtUtc??DBNull.Value,(object?)a.CompletedAtUtc??DBNull.Value,(object?)a.Location??DBNull.Value,(object?)a.BlockedReason??DBNull.Value,(object?)a.HandoffTo??DBNull.Value,a.CreatedBy,a.CreatedAtUtc,a.UpdatedAtUtc,(object?)a.CollectionName??DBNull.Value,(object?)a.EstimatedMinutes??DBNull.Value,(object?)a.TaskTemplateId??DBNull.Value,(object?)a.RecipeStepId??DBNull.Value,(object?)a.AssignmentIssue??DBNull.Value];
         foreach(object? value in values) command.Parameters.AddWithValue(value??DBNull.Value); command.ExecuteNonQuery();
     }
 
@@ -207,7 +207,7 @@ public sealed class OperationalWorkStore
         command.Parameters.AddWithValue(Guid.NewGuid()); command.Parameters.AddWithValue(jobId); command.Parameters.AddWithValue((object?)activityId??DBNull.Value); command.Parameters.AddWithValue(action); command.Parameters.AddWithValue(userName); command.Parameters.AddWithValue((object?)Clean(detail)??DBNull.Value); command.ExecuteNonQuery();
     }
 
-    private static JobActivity ReadActivity(NpgsqlDataReader r) => new(r.GetGuid(0),r.GetGuid(1),r.GetString(2),r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),r.GetString(5),r.GetString(6),r.IsDBNull(7)?null:r.GetString(7),r.IsDBNull(8)?null:r.GetFieldValue<DateTimeOffset>(8),r.IsDBNull(9)?null:r.GetFieldValue<DateTimeOffset>(9),r.IsDBNull(10)?null:r.GetFieldValue<DateTimeOffset>(10),r.IsDBNull(11)?null:r.GetFieldValue<DateTimeOffset>(11),r.IsDBNull(12)?null:r.GetString(12),r.IsDBNull(13)?null:r.GetString(13),r.IsDBNull(14)?null:r.GetString(14),r.GetString(15),r.GetFieldValue<DateTimeOffset>(16),r.GetFieldValue<DateTimeOffset>(17),r.IsDBNull(18)?null:r.GetString(18));
+    private static JobActivity ReadActivity(NpgsqlDataReader r) => new(r.GetGuid(0),r.GetGuid(1),r.GetString(2),r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),r.GetString(5),r.GetString(6),r.IsDBNull(7)?null:r.GetString(7),r.IsDBNull(8)?null:r.GetFieldValue<DateTimeOffset>(8),r.IsDBNull(9)?null:r.GetFieldValue<DateTimeOffset>(9),r.IsDBNull(10)?null:r.GetFieldValue<DateTimeOffset>(10),r.IsDBNull(11)?null:r.GetFieldValue<DateTimeOffset>(11),r.IsDBNull(12)?null:r.GetString(12),r.IsDBNull(13)?null:r.GetString(13),r.IsDBNull(14)?null:r.GetString(14),r.GetString(15),r.GetFieldValue<DateTimeOffset>(16),r.GetFieldValue<DateTimeOffset>(17),r.IsDBNull(18)?null:r.GetString(18),r.IsDBNull(19)?null:r.GetInt32(19),r.IsDBNull(20)?null:r.GetGuid(20),r.IsDBNull(21)?null:r.GetGuid(21),r.IsDBNull(22)?null:r.GetString(22));
     private static ShootSession ReadShoot(NpgsqlDataReader r) => new(r.GetGuid(0),r.GetGuid(1),r.IsDBNull(2)?null:r.GetGuid(2),r.GetString(3),r.IsDBNull(4)?null:r.GetString(4),r.GetFieldValue<DateTimeOffset>(5),r.GetFieldValue<DateTimeOffset>(6),r.IsDBNull(7)?null:r.GetString(7),r.GetString(8),r.IsDBNull(9)?null:r.GetFieldValue<DateTimeOffset>(9),r.IsDBNull(10)?null:r.GetFieldValue<DateTimeOffset>(10),r.GetInt32(11),r.GetBoolean(12),r.GetBoolean(13),r.IsDBNull(14)?null:r.GetString(14),r.IsDBNull(15)?null:r.GetString(15),r.GetString(16),r.IsDBNull(17)?null:r.GetString(17),r.GetFieldValue<DateTimeOffset>(18),r.GetFieldValue<DateTimeOffset>(19));
     private static string NormalizeActivityType(string? value) => value?.Trim() switch { "Shoot"=>"Shoot","Travel"=>"Travel","EquipmentPrep"=>"EquipmentPrep","FileIngest"=>"FileIngest","Backup"=>"Backup","Cull"=>"Cull","Edit"=>"Edit","Retouch"=>"Retouch","Proof"=>"Proof","Print"=>"Print","QC"=>"QC","Delivery"=>"Delivery","Archive"=>"Archive","Reshoot"=>"Reshoot",_=>"Other" };
     private static string NormalizeStatus(string? value) => value?.Trim() switch { "Scheduled"=>"Scheduled","InProgress"=>"InProgress","Blocked"=>"Blocked","Completed"=>"Completed","Cancelled"=>"Cancelled","WaitingOnCustomer"=>"WaitingOnCustomer","ReworkRequired"=>"ReworkRequired","Partial"=>"Partial","Failed"=>"Failed","ReprintRequired"=>"ReprintRequired","ReadyForDelivery"=>"ReadyForDelivery","Archived"=>"Archived",_=>"NotStarted" };
@@ -215,8 +215,8 @@ public sealed class OperationalWorkStore
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value)?null:value.Trim();
 }
 
-public sealed record JobActivity(Guid Id,Guid JobId,string ActivityType,string Title,string? Description,string Status,string Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,DateTimeOffset? StartedAtUtc,DateTimeOffset? CompletedAtUtc,string? Location,string? BlockedReason,string? HandoffTo,string CreatedBy,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc,string? CollectionName=null);
-public sealed record JobActivityRequest(string? ActivityType,string Title,string? Description,string? Status,string? Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,string? Location,string? BlockedReason,string? HandoffTo);
+public sealed record JobActivity(Guid Id,Guid JobId,string ActivityType,string Title,string? Description,string Status,string Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,DateTimeOffset? StartedAtUtc,DateTimeOffset? CompletedAtUtc,string? Location,string? BlockedReason,string? HandoffTo,string CreatedBy,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc,string? CollectionName=null,int? EstimatedMinutes=null,Guid? TaskTemplateId=null,Guid? RecipeStepId=null,string? AssignmentIssue=null);
+public sealed record JobActivityRequest(string? ActivityType,string Title,string? Description,string? Status,string? Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,string? Location,string? BlockedReason,string? HandoffTo,int? EstimatedMinutes=null);
 public sealed record ShootSession(Guid Id,Guid JobId,Guid? ScheduleEntryId,string PhotographerUserName,string? AssistantUserName,DateTimeOffset CallTimeUtc,DateTimeOffset PlannedEndUtc,string? Location,string Status,DateTimeOffset? CheckedInAtUtc,DateTimeOffset? CheckedOutAtUtc,int ImageCount,bool BackupConfirmed,bool ReshootRequired,string? CoverageNotes,string? EquipmentNotes,string HandoffStatus,string? HandoffTo,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc);
 public sealed record ShootSessionRequest(Guid? ScheduleEntryId,string PhotographerUserName,string? AssistantUserName,DateTimeOffset CallTimeUtc,DateTimeOffset PlannedEndUtc,string? Location,string? CoverageNotes,string? EquipmentNotes);
 public sealed record ShootSessionUpdateRequest(string? Action,int? ImageCount,bool? BackupConfirmed,bool? ReshootRequired,string? CoverageNotes,string? EquipmentNotes,string? HandoffTo);
