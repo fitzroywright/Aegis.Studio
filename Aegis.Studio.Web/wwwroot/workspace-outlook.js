@@ -204,7 +204,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const current=()=>version===revision;
 
             const lower=document.createElement('section');
-            lower.className='job-lower-pane';
+            lower.className='job-lower-pane job-detail-mywork-grid';
             lower.innerHTML=`
                 <section class="job-center-panel job-media-section">
                     <header class="job-center-heading">
@@ -264,18 +264,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
             side.append(details,filesPanel);
 
             const board=document.createElement('div');
-            board.className='job-work-board';
+            board.className='job-work-board job-detail-accepted-layout';
 
             const header=detailPane.querySelector('.detail-header');
             const existingThumb=header.querySelector('.studio-job-thumb');
             if(existingThumb) existingThumb.remove();
 
-            const breadcrumb=document.createElement('button');
-            breadcrumb.type='button';
-            breadcrumb.className='job-breadcrumb job-back-link';
-            breadcrumb.textContent='←  Back to Workspaces';
-            breadcrumb.onclick=()=>window.studioNavigate?.('workspaces');
-            header.before(breadcrumb);
 
             const meta=document.createElement('section');
             meta.className='job-meta-strip';
@@ -319,10 +313,15 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const nav=document.createElement('nav');
             nav.className='job-section-tabs';
             nav.setAttribute('aria-label','Job information');
-            nav.innerHTML='<button data-job-scroll="overview" class="active">Overview</button><button data-job-scroll="messages">Messages</button><button data-job-scroll="media">Media</button><button data-job-scroll="subjects">Subjects</button><button data-job-scroll="tasks">Tasks</button><button data-job-scroll="sessions">Sessions</button><button data-job-scroll="activity">Activity</button>';
+            nav.innerHTML='<button data-job-scroll="media" class="active">▣ Media</button><button data-job-scroll="subjects">♙ Subjects</button><button data-job-scroll="tasks">☑ Tasks</button><button data-job-scroll="messages">✉ Messages</button><button data-job-scroll="activity">◷ Activity</button><button data-job-scroll="overview">▧ Details</button>';
             meta.after(nav,board);
 
-            board.append(messageColumn,lower,side);
+            board.append(lower,side);
+            const bottom=document.createElement('section');bottom.className='job-detail-bottom-grid';
+            const activityCard=document.createElement('section');activityCard.className='job-center-panel job-detail-activity-card';activityCard.innerHTML='<header class="job-center-heading"><h2>Recent Activity</h2></header><div class="job-detail-activity-content"></div>';
+            const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.append(messageHeader,messagesPanel,composer);
+            bottom.append(activityCard,messageCard,nextPanel);detailPane.appendChild(bottom);
+            renderJobActivity(job,activityCard.querySelector('.job-detail-activity-content'),current).catch(()=>{});
             messageHeader.querySelector('[data-message-search]').onclick=()=>{
                 const term=prompt('Search this conversation');if(term===null)return;
                 messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));
