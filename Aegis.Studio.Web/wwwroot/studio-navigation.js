@@ -712,7 +712,7 @@
                                 <label>Name<input id="workspaceName"></label>
                                 <label>Email address<input id="workspaceEmail" type="email"></label>
                                 <label>Manager user name<input id="workspaceManagerUser" placeholder="domain user name"></label>
-                                <label>Manager display name<input id="workspaceManagerDisplay"></label>
+                                <label>Manager display name<input id="workspaceManagerDisplay"></label><label>Default Job Lead<select id="workspaceDefaultLead"><option value="">Use Workspace Manager</option></select></label>
                                 <details><summary>Advanced / Integration Settings</summary><label>Route key<input id="workspaceRouteKey" placeholder="Generated automatically"></label><small>Used by website booking and incoming-message integrations. Leave blank to generate automatically.</small></details>
                                 <button class="primary" type="button" onclick="createWorkspace()">Create Workspace</button>
                             </div>
