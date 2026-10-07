@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Aegis.Studio.Web.Notifications;
+using Aegis.Studio.Web.Email;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Profiles;
@@ -462,6 +463,8 @@ public static class StudioInAppMessagingEndpoints
                 .Select(x => new StudioMessageUser(x.UserName, x.DisplayName)));
         });
         group.MapPost("/threads/direct", (StartDirectMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.CreateDirect(user, request.UserName))));
+        group.MapPost("/threads/external", (StartExternalMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store) =>
+            Execute(() => Results.Ok(store.CreateExternal(user, request.Address, request.Subject))));
         group.MapPost("/threads/{scopeType}/{scopeId:guid}", (string scopeType, Guid scopeId, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetOrCreateScoped(user, scopeType, scopeId))));
         group.MapGet("/threads/{threadId:guid}", (Guid threadId, int? count, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetMessages(threadId, user, count ?? 100))));
         group.MapPost("/threads/{threadId:guid}/whatsapp", (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, NotificationService notifications) =>
@@ -488,11 +491,26 @@ public static class StudioInAppMessagingEndpoints
             catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
         });
 
-        group.MapPost("/threads/{threadId:guid}", async (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, NotificationService notifications, IHubContext<StudioMessageHub> hub) =>
+        group.MapPost("/threads/{threadId:guid}", async (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, NotificationService notifications, StudioStore studio, OutboundEmailStore outbox, StudioMessageAddressBook addresses, IHubContext<StudioMessageHub> hub) =>
         {
             try
             {
                 StudioInAppMessage message = store.AddMessage(threadId, user, request.Body);
+                StudioExternalThread? external = store.GetExternalThread(threadId, user);
+                if (external is not null)
+                {
+                    StudioConversation conversation = studio.GetConversation(external.ConversationId)
+                        ?? throw new InvalidOperationException("The external Studio conversation no longer exists.");
+                    StudioMessageAddress person = addresses.EnsureCurrentPerson(user);
+                    studio.AddMessage(conversation.Id, new AddMessageRequest(request.Body, false, "Person"), user);
+                    outbox.QueuePerson(
+                        studio.GetConversation(conversation.Id)!,
+                        request.Body,
+                        person.Address,
+                        external.OwnerUserName,
+                        message.Id);
+                }
+
                 IReadOnlyList<string> mentionedUsers = store.ResolveMentionedParticipants(threadId, message.SenderUserName, message.Body);
                 foreach (string mentionedUser in mentionedUsers)
                 {
