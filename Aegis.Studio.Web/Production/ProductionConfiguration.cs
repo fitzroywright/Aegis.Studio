@@ -299,6 +299,16 @@ public static class ProductionConfigurationEndpoints
         app.MapGet("/api/production/task-templates",(bool? active)=>Results.Ok(store.GetTemplates(active==true))).RequireAuthorization();
         app.MapGet("/api/production/capacity",()=>Results.Ok(store.GetCapacity())).RequireAuthorization();
 
+        app.MapGet("/api/jobs/{jobId:guid}/production-configuration",(Guid jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase database)=>{
+            if(!access.HasPermission(user,jobId,"ViewJob"))return Results.Forbid();
+            using var c=database.OpenConnection();using var cmd=new NpgsqlCommand("""
+              select j.job_type_id,j.production_recipe_id,jt.name,r.name
+              from studio_jobs j left join studio_job_types jt on jt.id=j.job_type_id left join studio_production_recipes r on r.id=j.production_recipe_id
+              where j.id=$1
+              """,c);cmd.Parameters.AddWithValue(jobId);using var row=cmd.ExecuteReader();if(!row.Read())return Results.NotFound();
+            return Results.Ok(new{jobTypeId=row.IsDBNull(0)?(Guid?)null:row.GetGuid(0),productionRecipeId=row.IsDBNull(1)?(Guid?)null:row.GetGuid(1),jobTypeName=row.IsDBNull(2)?null:row.GetString(2),productionRecipeName=row.IsDBNull(3)?null:row.GetString(3)});
+        }).RequireAuthorization();
+
         app.MapPut("/api/jobs/{jobId:guid}/production-configuration",(Guid jobId,JobProductionConfigurationRequest request,ClaimsPrincipal user,JobAccessService access)=>{
             if(!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
             try{store.AssignJobType(jobId,request.JobTypeId,request.ProductionRecipeId);return Results.NoContent();}
