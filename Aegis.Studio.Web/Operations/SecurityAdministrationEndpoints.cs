@@ -218,8 +218,12 @@ public static class AuthorizationAuditPolicy
 {
     public static bool IsApprovedAnonymousPath(string route)
         => route.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+        || route.Equals("/api/auth/options", StringComparison.OrdinalIgnoreCase)
         || route.Equals("/api/bookings", StringComparison.OrdinalIgnoreCase)
         || route.StartsWith("/api/bookings/{id:guid}", StringComparison.OrdinalIgnoreCase)
+        || route.Equals("/api/public/booking-requests", StringComparison.OrdinalIgnoreCase)
+        || route.StartsWith("/api/public/booking-requests/{id:guid}", StringComparison.OrdinalIgnoreCase)
+        || route.StartsWith("/api/engineering/diagnostics/", StringComparison.OrdinalIgnoreCase)
         || route.StartsWith("/public/gallery/", StringComparison.OrdinalIgnoreCase)
         || route.StartsWith("/api/public/galleries/", StringComparison.OrdinalIgnoreCase);
 }
