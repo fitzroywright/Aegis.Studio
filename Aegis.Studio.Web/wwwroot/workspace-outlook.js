@@ -76,6 +76,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         selectedWorkspace = id; selectedJob = null; selectedConversation = null;
         currentWorkspacePermissions = workspace.permissions;
         window.studioSetBreadcrumb?.([
+            {label:'My Work',view:'mywork'},
             {label:'Workspaces',view:'workspaces'},
             {label:name,view:'workspaces',workspaceId:id}
         ]);
