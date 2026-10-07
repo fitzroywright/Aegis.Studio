@@ -107,6 +107,16 @@ public static partial class AegisReferenceRecovery
             insertCommand.ExecuteNonQuery();
         }
 
+        if (!string.IsNullOrWhiteSpace(email.ThreadId))
+        {
+            using NpgsqlCommand bindThread = writeConnection.CreateCommand();
+            bindThread.Transaction = transaction;
+            bindThread.CommandText = "update studio_conversations set external_thread_id=coalesce(external_thread_id,$2) where id=$1";
+            bindThread.Parameters.AddWithValue(conversationId);
+            bindThread.Parameters.AddWithValue(email.ThreadId.Trim());
+            bindThread.ExecuteNonQuery();
+        }
+
         transaction.Commit();
         StudioConversation updated = store.GetConversation(conversationId)
             ?? throw new InvalidOperationException("Referenced Studio conversation disappeared after message ingestion.");
