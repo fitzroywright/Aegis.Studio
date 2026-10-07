@@ -22,6 +22,8 @@ public static class JobAccessEndpoints
             string? lead=string.IsNullOrWhiteSpace(request.UserName)?null:request.UserName.Trim();
             if(lead is not null)
             {
+                StudioEmployeeDirectoryStore directory=new(database);
+                if(!directory.IsAssignable(lead))return Results.BadRequest(new{error="Job Lead must be an active, assignable Studio employee."});
                 Guid? workspaceId=access.GetWorkspaceId(jobId);
                 if(workspaceId is null)return Results.NotFound();
                 WorkspaceAccessService workspaceAccess=new(database);
