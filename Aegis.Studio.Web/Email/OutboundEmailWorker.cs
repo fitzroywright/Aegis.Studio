@@ -89,7 +89,10 @@ public sealed class OutboundEmailWorker : BackgroundService
                             Metadata = new Dictionary<string,string>
                             {
                                 ["StudioLogicalFrom"] = message.FromAddress,
-                                ["StudioConversationId"] = message.ConversationId.ToString("D")
+                                ["StudioConversationId"] = message.ConversationId.ToString("D"),
+                                ["ReplyTo"] = message.SendingIdentityType == nameof(StudioSendingIdentityType.Person)
+                                    ? message.FromAddress
+                                    : string.Empty
                             }
                         };
 
