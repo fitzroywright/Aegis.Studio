@@ -49,10 +49,24 @@ public sealed class OperationalWorkStore
     {
         JobActivity current = GetActivity(id) ?? throw new KeyNotFoundException("Activity was not found.");
         string status = NormalizeStatus(request.Status);
-        if(status=="Completed")
+        if(status is "InProgress" or "Completed")
         {
-            using var c=database.OpenConnection();using var cmd=new NpgsqlCommand("select exists(select 1 from studio_production_items where activity_id=$1 and qc_state not in ('Passed','Cancelled'))",c);cmd.Parameters.AddWithValue(id);
-            if((bool)cmd.ExecuteScalar()!)throw new InvalidOperationException("Pass quality control on all production items before completing this activity.");
+            using var c=database.OpenConnection();
+            using(var dependencies=new NpgsqlCommand("""
+              select string_agg(prerequisite.title,', ' order by prerequisite.title)
+              from studio_activity_dependencies d join studio_job_activities prerequisite on prerequisite.id=d.depends_on_activity_id
+              where d.activity_id=$1 and prerequisite.status<>'Completed'
+              """,c))
+            {
+                dependencies.Parameters.AddWithValue(id);
+                string? waiting=dependencies.ExecuteScalar() as string;
+                if(!string.IsNullOrWhiteSpace(waiting))throw new InvalidOperationException($"Complete prerequisite work first: {waiting}.");
+            }
+            if(status=="Completed")
+            {
+                using var cmd=new NpgsqlCommand("select exists(select 1 from studio_production_items where activity_id=$1 and qc_state not in ('Passed','Cancelled'))",c);cmd.Parameters.AddWithValue(id);
+                if((bool)cmd.ExecuteScalar()!)throw new InvalidOperationException("Pass quality control on all production items before completing this activity.");
+            }
         }
         DateTimeOffset? startedAt = current.StartedAtUtc;
         DateTimeOffset? completedAt = current.CompletedAtUtc;
