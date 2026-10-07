@@ -574,7 +574,6 @@
                         <section class="mw-list-panel mw-action-panel">
                             <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
                             <div class="mw-action-list">
-                                <button type="button" data-workspace-admin><span>＋</span><span>New Workspace</span><b>›</b></button>
                                 <button type="button" data-workspace-jobs><span>▥</span><span>View Jobs</span><b>›</b></button>
                                 <button type="button" data-nav-quick="pipeline"><span>⇥</span><span>Open Pipeline</span><b>›</b></button>
                                 <button type="button" data-nav-quick="frontdesk"><span>▣</span><span>Front Desk</span><b>›</b></button>
@@ -653,9 +652,7 @@
                 <strong>Workspaces</strong>`;
             studioBreadcrumb.querySelector('[data-shell-nav="mywork"]')?.addEventListener('click',()=>window.studioNavigate?.('mywork'));
         }
-        if(studioPageTools){
-            studioPageTools.innerHTML='<button type="button" class="primary workspace-shell-new" data-workspace-admin>＋ New Workspace</button>';
-        }
+        if(studioPageTools) studioPageTools.innerHTML='';
 
 
         const allRows=()=>[...genericView.querySelectorAll('[data-workspace-row]')];
@@ -693,9 +690,6 @@
             button.onclick=async()=>{
                 await selectWorkspace(button.dataset.openWorkspace,button.dataset.workspaceName);
             };
-        });
-        [...genericView.querySelectorAll('[data-workspace-admin]'),...(studioPageTools?studioPageTools.querySelectorAll('[data-workspace-admin]'):[])].forEach(button=>{
-            button.onclick=()=>window.studioNavigate('admin');
         });
         genericView.querySelectorAll('[data-nav-quick]').forEach(button=>{
             button.onclick=()=>window.studioNavigate(button.dataset.navQuick);
