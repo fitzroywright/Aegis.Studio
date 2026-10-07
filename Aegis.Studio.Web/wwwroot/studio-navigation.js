@@ -194,7 +194,7 @@
             }
             const n=entry.item;
             return `<button class="mw-message-row message" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
-                <span class="mw-comm-type message" title="Message" aria-label="Message">✉</span>
+                <span class="mw-comm-type message" title="Message" aria-label="Message">📧</span>
                 <span class="mw-message-copy"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.eventType||'Studio message')}</small></span>
                 <span class="mw-message-time">${n.createdAtUtc?formatDay(n.createdAtUtc):''}</span>
                 <span class="mw-chevron">›</span>
@@ -294,7 +294,7 @@
                         </section>
 
                         <section class="mw-list-panel mw-messages-panel" data-mw-region="messages">
-                            <header><h2><span class="mw-title-icon messages">✉</span> Messages <span class="mw-title-icon announcements" title="Announcements" aria-label="Announcements">📣</span></h2></header>
+                            <header><h2><span class="mw-title-icon messages" title="Messages" aria-label="Messages">📧</span> Messages <span class="mw-title-icon announcements" title="Announcements" aria-label="Announcements">📣</span></h2></header>
                             <div class="mw-compact-messages">${phase('notifications',messageRows)}</div>
                         </section>
                     </aside>
