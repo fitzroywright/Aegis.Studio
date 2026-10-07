@@ -67,6 +67,7 @@ public sealed class StudioMessageAttachmentStore
             using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand q=c.CreateCommand();
             q.CommandText="insert into studio_inapp_message_attachments(id,message_id,file_name,stored_name,content_type,size_bytes,sha256,uploaded_by,created_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9)";
             q.Parameters.AddWithValue(result.Id);q.Parameters.AddWithValue(result.MessageId);q.Parameters.AddWithValue(result.FileName);q.Parameters.AddWithValue(result.StoredName);q.Parameters.AddWithValue(result.ContentType);q.Parameters.AddWithValue(result.Size);q.Parameters.AddWithValue(result.Sha256);q.Parameters.AddWithValue(result.UploadedBy);q.Parameters.AddWithValue(result.CreatedAtUtc);q.ExecuteNonQuery();
+            DelayOutbound(messageId,c);
             return result;
         }
         catch
@@ -93,6 +94,7 @@ public sealed class StudioMessageAttachmentStore
             using NpgsqlConnection db=database.OpenConnection();using NpgsqlCommand q=db.CreateCommand();
             q.CommandText="insert into studio_inapp_message_attachments(id,message_id,file_name,stored_name,content_type,size_bytes,sha256,uploaded_by,created_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9)";
             q.Parameters.AddWithValue(result.Id);q.Parameters.AddWithValue(result.MessageId);q.Parameters.AddWithValue(result.FileName);q.Parameters.AddWithValue(result.StoredName);q.Parameters.AddWithValue(result.ContentType);q.Parameters.AddWithValue(result.Size);q.Parameters.AddWithValue(result.Sha256);q.Parameters.AddWithValue(result.UploadedBy);q.Parameters.AddWithValue(result.CreatedAtUtc);q.ExecuteNonQuery();
+            DelayOutbound(messageId,db);
             return result;
         }
         catch
@@ -140,6 +142,18 @@ public sealed class StudioMessageAttachmentStore
         using Stream source=storage.OpenReadAsync(attachment.StoredName).GetAwaiter().GetResult();
         using FileStream destination=new(path,FileMode.Create,FileAccess.Write,FileShare.Read);
         source.CopyTo(destination);destination.Flush();return path;
+    }
+
+    private static void DelayOutbound(Guid messageId,NpgsqlConnection connection)
+    {
+        using NpgsqlCommand delay=connection.CreateCommand();
+        delay.CommandText="""
+            update studio_outbound_email
+            set next_attempt_at_utc=greatest(coalesce(next_attempt_at_utc,now()),now()+interval '5 seconds')
+            where inapp_message_id=$1 and status in ('Pending','Retry')
+            """;
+        delay.Parameters.AddWithValue(messageId);
+        delay.ExecuteNonQuery();
     }
 
     private static StudioMessageAttachment Read(NpgsqlDataReader r)=>new(
