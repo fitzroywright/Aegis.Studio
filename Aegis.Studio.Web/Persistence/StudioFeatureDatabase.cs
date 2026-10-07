@@ -31,6 +31,11 @@ public sealed class StudioFeatureDatabase
                 manage_production boolean not null default false,notify_members boolean not null default false,edit_workspace boolean not null default false,manage_members boolean not null default false,
                 admin_workspace boolean not null default false,send_as_self boolean not null default false,created_at_utc timestamptz not null,updated_at_utc timestamptz not null,primary key(workspace_id,user_name)
             );
+            alter table studio_workspaces add column if not exists default_job_lead text null;
+            alter table studio_jobs add column if not exists job_lead text null;
+            update studio_jobs set job_lead=assigned_to where job_lead is null and assigned_to is not null;
+            create index if not exists ix_studio_jobs_lead on studio_jobs(lower(job_lead),status,created_at_utc desc);
+
             create index if not exists ix_studio_workspace_members_user on studio_workspace_members(lower(user_name),workspace_id);
             alter table studio_workspace_members add column if not exists send_as_self boolean not null default false;
 
