@@ -66,7 +66,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
     banners.className = 'workspace-announcement-banners';
     banners.hidden = true;
     document.getElementById('conversationView').prepend(banners);
-    const display = () => { activateView('conversations'); activateNavigation('workspaces'); };
+    const display = () => { conversationView.classList.remove('hidden'); genericView.classList.add('hidden'); document.body.dataset.studioView='workspaces'; };
     const fail = error => empty('Unable to load', error.message || String(error));
     tabs.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { tab = button.dataset.tab; search.value=''; syncSearchField(); search.focus(); loadConversations().catch(fail); });
     selectWorkspace = async function(id, name) {

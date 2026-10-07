@@ -8,7 +8,6 @@ let posCatalog = [];
 let posDeviceAgentBaseUrl = null;
 
 async function showPos() {
-    activateNavigation('frontdesk');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
 
@@ -112,7 +111,6 @@ function editPosCatalogItem(serialized) {
 
 async function openPos(jobId,applyToBalance=false) {
     posApplyToJobBalance=applyToBalance;
-    activateNavigation('frontdesk');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
     posJobId = jobId;

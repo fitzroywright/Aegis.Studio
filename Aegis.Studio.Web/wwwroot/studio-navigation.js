@@ -1143,9 +1143,22 @@
         admin:renderAdmin
     };
 
-    window.studioNavigate=async function(view){
+    let currentNavigationView=document.body.dataset.studioView||'mywork';
+    const navigationLabels={mywork:'My Work',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'My Work',schedule:'Pipeline'};
+
+    function replaceNavigationHistory(view){
+        const url='#studio='+encodeURIComponent(view);
+        window.history.replaceState({studioView:view},'',url);
+    }
+
+    window.studioNavigate=async function(view,options={}){
         const route=routes[view];
         if(!route) throw new Error('Unknown Studio navigation view: '+view);
+        const previous=currentNavigationView;
+        if(!options.browserHistory&&options.history!==false&&previous!==view){
+            window.history.pushState({studioView:view},'','#studio='+encodeURIComponent(view));
+        }
+        currentNavigationView=view;
         const revision=++navigationRevision;
         myWorkLoad?.abort();
         setActive(view);
@@ -1177,6 +1190,11 @@
         }
     };
 
+    window.addEventListener('popstate',event=>{
+        const view=event.state?.studioView||'mywork';
+        if(view!==currentNavigationView)window.studioNavigate(view,{browserHistory:true,history:false}).catch(error=>console.error('Studio browser navigation failed.',error));
+    });
+
     document.querySelectorAll('[data-view]').forEach(button=>{
         button.type='button';
         button.onclick=()=>window.studioNavigate(button.dataset.view);
@@ -1186,7 +1204,11 @@
     if(topNew) topNew.onclick=async()=>{topNew.disabled=true;try{await loadWorkspaces();document.getElementById('newRequestDialog')?.showModal();}catch(error){alert(error.message);}finally{topNew.disabled=false;}};
 
     const startStudio=async()=>{
-        window.studioNavigate('mywork').catch(error=>{
+        const requested=new URLSearchParams(window.location.hash.replace(/^#/,'')).get('studio');
+        const initial=requested&&routes[requested]?requested:'mywork';
+        currentNavigationView=initial;
+        replaceNavigationHistory(initial);
+        window.studioNavigate(initial,{history:false}).catch(error=>{
             console.error('Studio startup navigation failed.',error);
         });
     };

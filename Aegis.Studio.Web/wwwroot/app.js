@@ -167,31 +167,7 @@ function money(value) {
     return new Intl.NumberFormat('en-JM', { style: 'currency', currency: 'JMD' }).format(value || 0);
 }
 
-function activateNavigation(view) {
-    document.body.dataset.studioView = view;
-    document.querySelectorAll('.brand-button').forEach(button => {
-        button.classList.toggle('active', button.dataset.view === view);
-    });
-}
-
-function activateView(view) {
-    if (view === 'conversations') {
-        activateNavigation(view);
-        conversationView.classList.remove('hidden');
-        genericView.classList.add('hidden');
-        return;
-    }
-
-    if(view==='frontdesk')return showFrontDesk();
-    if(view==='pos')return showPos();
-    if (view === 'production') {
-        showProduction();
-    } else if (view === 'accounts') {
-        showAccounts();
-    } else if (view === 'management') {
-        showManagement();
-    }
-}
+// Site navigation is owned exclusively by studio-navigation.js.
 
 newRequestButton.onclick = () => {
     if (selectedWorkspace) {
@@ -231,7 +207,4 @@ newRequestForm.onsubmit = async event => {
     await openConversation(created.id);
 };
 
-document.querySelectorAll('.brand-button').forEach(button => {
-    button.onclick = () => activateView(button.dataset.view);
-});
 
