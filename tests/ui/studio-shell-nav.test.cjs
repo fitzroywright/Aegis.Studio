@@ -35,6 +35,20 @@ test('Back stays inside Studio and My Work keeps its own left layout',async()=>{
  dom.window.close();
 });
 
+test('Back uses an in-app parent even when the page was opened without Studio history',async()=>{
+ const {w,dom,calls}=setup();
+ w.document.body.dataset.studioView='jobs';
+ // Simulate a direct/deep-linked page where the in-memory Studio history is empty.
+ w.eval(code);
+ w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+ const back=w.document.querySelector('[data-studio-back]');
+ back.click();
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(calls.at(-1),'workspaces');
+ assert.equal(w.location.href,'https://studio.test/');
+ dom.window.close();
+});
+
 test('Every non-My-Work page gets Status Actions and Quick Links cards',async()=>{
  const {w,dom}=setup();
  await w.studioNavigate('production');
