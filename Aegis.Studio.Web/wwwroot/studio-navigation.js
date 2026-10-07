@@ -460,7 +460,7 @@
             json('/api/jobs'),
             json('/api/production/media-summary'),
             json('/api/operations/activities').catch(()=>[]),
-            json('/api/schedule').catch(()=>[])
+            json('/api/schedule/entries?from='+encodeURIComponent(new Date().toISOString())+'&to='+encodeURIComponent(new Date(Date.now()+365*24*60*60*1000).toISOString())).catch(()=>[])
         ]);
         const workspaceData=[];
         // Announcement reads are bounded; galleries are represented by counts and three IDs.
