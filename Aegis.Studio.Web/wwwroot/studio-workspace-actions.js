@@ -3,8 +3,10 @@
 // navigation, job selection, messaging, media, or other existing handlers.
 
 window.openJobDetailsEditor ??= async function openJobDetailsEditor(job) {
-    const access = await json(`/api/jobs/${job.id}/access`);
+    const [access,productionConfig,jobTypes,recipes] = await Promise.all([json(`/api/jobs/${job.id}/access`),json(`/api/jobs/${job.id}/production-configuration`).catch(()=>({})),json('/api/production/job-types?active=true'),json('/api/production/recipes?active=true')]);
     const permissions = access.permissions || access;
+    const jobTypeOptions='<option value="">Unspecified</option>'+jobTypes.map(x=>`<option value="${esc(x.id)}" ${String(productionConfig.jobTypeId||'')===String(x.id)?'selected':''}>${esc(x.name)}</option>`).join('');
+    const recipeOptions='<option value="">Use Job Type default</option>'+recipes.map(x=>`<option value="${esc(x.id)}" ${String(productionConfig.productionRecipeId||'')===String(x.id)?'selected':''}>${esc(x.name)}</option>`).join('');
     if (!permissions.editJob) {
         alert('You do not have permission to edit this job.');
         return;
@@ -20,6 +22,12 @@ window.openJobDetailsEditor ??= async function openJobDetailsEditor(job) {
             </label>
             <label>Event Date
                 <input name="eventDate" type="date" value="${esc(job.eventDate || '')}">
+            </label>
+            <label>Job Type
+                <select name="jobTypeId">${jobTypeOptions}</select>
+            </label>
+            <label>Production Recipe
+                <select name="productionRecipeId">${recipeOptions}</select>
             </label>
             <div class="dialog-actions">
                 <button type="button" class="action" data-cancel>Cancel</button>
@@ -51,6 +59,9 @@ window.openJobDetailsEditor ??= async function openJobDetailsEditor(job) {
 
             if (permissions.assignStaff) {
                 await json(`/api/jobs/${job.id}/lead`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:form.elements.jobLead.value||null})});
+            }
+            if (permissions.manageProduction) {
+                await json(`/api/jobs/${job.id}/production-configuration`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({jobTypeId:form.elements.jobTypeId.value||null,productionRecipeId:form.elements.productionRecipeId.value||null})});
             }
             dialog.close();
             await openWorkspaceJob(job.id);
