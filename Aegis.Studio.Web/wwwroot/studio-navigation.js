@@ -701,6 +701,7 @@
 
                         <div class="admin-generated-sections">
                             ${renderEmployeeDirectorySection()}
+                            ${renderProductionConfigurationSection()}
                             ${renderSecurityRolesSection()}
                             ${renderWorkflowSection()}
                         </div>
@@ -738,6 +739,7 @@
         }
         await hydrateWorkspaceManagers(manageable);
         await refreshStudioEmployees();
+        await refreshProductionConfiguration();
         await refreshWorkflowList();
         await renderGlobalRoleAdministration();
         await renderAnnouncementAdministration();
