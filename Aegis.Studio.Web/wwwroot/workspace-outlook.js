@@ -204,7 +204,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const current=()=>version===revision;
 
             const lower=document.createElement('section');
-            lower.className='job-lower-pane job-detail-media-column';
+            lower.className='job-detail-media-column';
             lower.innerHTML=`
                 <section class="job-center-panel job-media-section">
                     <header class="job-center-heading">
