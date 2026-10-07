@@ -20,7 +20,6 @@
     }
 
     async function showMessages() {
-        activateNavigation('messages');
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
         genericView.innerHTML = `
