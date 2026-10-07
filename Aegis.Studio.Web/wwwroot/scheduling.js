@@ -90,7 +90,6 @@ function pipelineCalendar(items, resourceMap) {
 }
 
 async function showPipeline() {
-    activateNavigation('pipeline');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
     genericView.innerHTML = '<p>Loading Pipeline…</p>';
