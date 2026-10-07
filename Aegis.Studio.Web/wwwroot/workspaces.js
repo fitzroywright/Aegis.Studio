@@ -156,6 +156,61 @@ async function saveStudioEmployee(){
     await refreshStudioEmployees();
 }
 
+
+function renderProductionConfigurationSection() {
+    return `<section class="job-section"><h2>Job Types & Production Recipes</h2><p class="muted">Configure production without creating a second Task system. Recipe steps generate normal Studio Tasks.</p>
+      <div id="productionConfigSummary"><p class="muted">Loading…</p></div>
+      <h3>Job Type</h3><div class="pos-entry"><label>Name<input id="jobTypeName"></label><label>Description<input id="jobTypeDescription"></label><button class="primary" onclick="createStudioJobType()">Add Job Type</button></div>
+      <h3>Task Template</h3><div class="pos-entry"><label>Name<input id="taskTemplateName"></label><label>Activity type<select id="taskTemplateActivity"><option>Cull</option><option>Edit</option><option>Retouch</option><option>Proof</option><option>Print</option><option>QC</option><option>Delivery</option><option>Archive</option><option>Other</option></select></label><label>Effort minutes<input id="taskTemplateMinutes" type="number" min="1" value="60"></label><label>Required role<input id="taskTemplateRole"></label><label>Required skills<input id="taskTemplateSkills" placeholder="comma separated"></label><label>Default assignee<input id="taskTemplateAssignee"></label><label>Default role<input id="taskTemplateDefaultRole"></label><label>Due after hours<input id="taskTemplateDueHours" type="number" min="0"></label><button class="primary" onclick="createStudioTaskTemplate()">Add Task Template</button></div>
+      <h3>Production Recipe</h3><div class="pos-entry"><label>Job Type<select id="recipeJobType"></select></label><label>Name<input id="recipeName"></label><label>Generate when status becomes<input id="recipeTrigger" placeholder="e.g. Production"></label><label><input id="recipeDefault" type="checkbox" checked> Default recipe</label><button class="primary" onclick="createStudioRecipe()">Add Recipe</button></div>
+      <div id="productionRecipeSteps"></div>
+    </section>`;
+}
+let productionConfigCache={jobTypes:[],templates:[],recipes:[]};
+async function refreshProductionConfiguration(){
+    const holder=document.getElementById('productionConfigSummary');if(!holder)return;
+    const [jobTypes,templates,recipes]=await Promise.all([json('/api/production-config/job-types'),json('/api/production-config/templates'),json('/api/production-config/recipes')]);
+    productionConfigCache={jobTypes,templates,recipes};
+    holder.innerHTML=`<div class="job-row"><div><b>${jobTypes.length} Job Types</b><div class="meta">${templates.length} Task Templates · ${recipes.length} Production Recipes</div></div></div>`+
+      jobTypes.map(type=>`<div class="job-row"><div><b>${esc(type.name)}</b><div class="meta">${esc(type.description||'No description')}</div></div></div>`).join('');
+    const typeSelect=document.getElementById('recipeJobType');if(typeSelect)typeSelect.innerHTML=jobTypes.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+    const stepsHost=document.getElementById('productionRecipeSteps');if(!stepsHost)return;
+    const blocks=[];
+    for(const recipe of recipes){
+        const steps=await json('/api/production-config/recipes/'+recipe.id+'/steps');
+        blocks.push(`<article class="admin-card"><header class="admin-card-header"><div><h3>${esc(recipe.name)}</h3><p>${esc(recipe.jobTypeName)} · ${recipe.triggerStatus?'Generates at '+esc(recipe.triggerStatus):'Manual generation'}${recipe.isDefault?' · Default':''}</p></div></header>
+          <div>${steps.map(step=>`<div class="job-row"><div><b>${step.sortOrder}. ${esc(step.templateName)}</b><div class="meta">${step.assigneeOverride?'Assignee '+esc(step.assigneeOverride):step.roleOverride?'Role '+esc(step.roleOverride):'Template assignment rules'}</div></div></div>`).join('')||'<p class="muted">No steps yet.</p>'}</div>
+          <div class="pos-entry"><label>Template<select data-step-template="${recipe.id}">${templates.map(t=>`<option value="${t.id}">${esc(t.name)} · ${t.estimatedMinutes}m</option>`).join('')}</select></label><label>Order<input data-step-order="${recipe.id}" type="number" value="${steps.length+1}"></label><label>Assignee override<input data-step-assignee="${recipe.id}"></label><label>Role override<input data-step-role="${recipe.id}"></label><button class="action" onclick="addStudioRecipeStep('${recipe.id}')">Add step</button></div>
+        </article>`);
+    }
+    stepsHost.innerHTML=blocks.join('')||'<p class="muted">Create a recipe to add ordered Task Templates.</p>';
+}
+async function createStudioJobType(){
+    const name=document.getElementById('jobTypeName').value.trim();if(!name)return alert('Job Type name is required.');
+    await json('/api/admin/production-config/job-types',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,description:document.getElementById('jobTypeDescription').value.trim()||null,isActive:true})});
+    document.getElementById('jobTypeName').value='';document.getElementById('jobTypeDescription').value='';await refreshProductionConfiguration();
+}
+async function createStudioTaskTemplate(){
+    const name=document.getElementById('taskTemplateName').value.trim();if(!name)return alert('Task Template name is required.');
+    const due=Number(document.getElementById('taskTemplateDueHours').value);
+    await json('/api/admin/production-config/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      name,description:null,activityType:document.getElementById('taskTemplateActivity').value,estimatedMinutes:Number(document.getElementById('taskTemplateMinutes').value)||60,
+      requiredRole:document.getElementById('taskTemplateRole').value.trim()||null,requiredSkills:document.getElementById('taskTemplateSkills').value.split(',').map(x=>x.trim()).filter(Boolean),
+      defaultAssignee:document.getElementById('taskTemplateAssignee').value.trim()||null,defaultRole:document.getElementById('taskTemplateDefaultRole').value.trim()||null,
+      priority:'Normal',requiresScheduling:false,dueOffsetMinutes:Number.isFinite(due)&&due>0?due*60:null,isActive:true})});
+    document.getElementById('taskTemplateName').value='';await refreshProductionConfiguration();
+}
+async function createStudioRecipe(){
+    const jobTypeId=document.getElementById('recipeJobType').value,name=document.getElementById('recipeName').value.trim();if(!jobTypeId||!name)return alert('Choose a Job Type and enter a recipe name.');
+    await json('/api/admin/production-config/recipes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jobTypeId,name,description:null,triggerStatus:document.getElementById('recipeTrigger').value.trim()||null,isDefault:document.getElementById('recipeDefault').checked,isActive:true})});
+    document.getElementById('recipeName').value='';await refreshProductionConfiguration();
+}
+async function addStudioRecipeStep(recipeId){
+    const template=document.querySelector('[data-step-template="'+recipeId+'"]'),order=document.querySelector('[data-step-order="'+recipeId+'"]'),assignee=document.querySelector('[data-step-assignee="'+recipeId+'"]'),role=document.querySelector('[data-step-role="'+recipeId+'"]');
+    await json('/api/admin/production-config/recipes/'+recipeId+'/steps',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({taskTemplateId:template.value,sortOrder:Number(order.value)||0,isMandatory:true,assigneeOverride:assignee.value.trim()||null,roleOverride:role.value.trim()||null,dueOffsetMinutesOverride:null})});
+    await refreshProductionConfiguration();
+}
+
 function renderSecurityRolesSection() {
     return `<section class="job-section"><h2>Reusable security roles</h2><p class="muted">Roles can be reused across Workspaces and Jobs. Updating a role propagates its permissions to members assigned that role.</p><div id="securityRoleList">${studioRolesCache.map(x=>`<div class="job-row"><div><b>${esc(x.name)}</b><div class="meta">${esc(x.scope)} · ${esc(x.description||'')}</div></div><button class="action" onclick="deleteStudioRole('${x.id}')">Delete</button></div>`).join('')||'<p class="muted">No reusable roles yet.</p>'}</div><h3>Create role</h3><div class="pos-entry"><label>Name<input id="roleName"></label><label>Scope<select id="roleScope"><option>Workspace</option><option>Job</option></select></label><label>Description<input id="roleDescription"></label><label>Template<select id="roleTemplate"><option value="viewer">Viewer</option><option value="worker">Worker</option><option value="manager">Manager</option><option value="admin">Administrator</option></select></label><button class="primary" onclick="createStudioRole()">Create role</button></div></section>`;
 }
