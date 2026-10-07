@@ -179,6 +179,8 @@ builder.Services.AddSingleton<DemoSeedCoordinator>();
 builder.Services.AddSingleton<BookingStore>();
 builder.Services.AddSingleton<BookingApiAuthenticator>();
 builder.Services.AddSingleton<UserProfileStore>();
+builder.Services.AddSingleton<StudioMessageAddressBook>();
+builder.Services.AddSingleton<StudioMessageAttachmentStore>();
 builder.Services.AddSingleton<StudioInAppMessageStore>();
 builder.Services.AddSingleton<StudioRecipientResolver>();
 builder.Services.AddSingleton<NotificationService>();
