@@ -5788,3 +5788,97 @@ body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .three-pan
     display:none;
   }
 }
+
+
+/* Workspaces final My Work parity pass 2026-10-07 */
+/* Workspaces owns its left and right rails; suppress the generic shell rail so
+   the screen remains exactly three columns like My Work. */
+body[data-studio-view="workspaces"] .studio-context-rail{
+  display:none;
+}
+body[data-studio-view="workspaces"] .shell{
+  grid-template-columns:minmax(0,1fr);
+}
+body[data-studio-view="workspaces"] .generic{
+  padding:14px 22px 20px;
+}
+
+/* Match My Work proportions and card geometry. */
+.workspace-list-layout{
+  grid-template-columns:250px minmax(0,1fr) 280px;
+  gap:16px;
+}
+.workspace-list-page .mw-list-panel{
+  border-radius:12px;
+  border-color:#d7e0e9;
+  box-shadow:0 2px 7px rgba(34,58,85,.06);
+}
+.workspace-list-page .mw-list-panel>header{
+  min-height:52px;
+  padding:10px 15px;
+  background:#fff;
+  border-bottom-color:#dce4ec;
+}
+.workspace-center-header{
+  min-height:52px!important;
+}
+.workspace-list-toolbar{
+  min-height:44px;
+  padding:5px 12px;
+}
+.workspace-list-toolbar .workspace-wow-search input,
+.workspace-list-toolbar select{
+  height:32px;
+}
+.workspace-list-rows{
+  max-height:calc(100dvh - 174px);
+  padding:0 13px 8px;
+}
+.workspace-list-page .workspace-wow-main{
+  min-height:58px;
+  grid-template-columns:42px minmax(180px,1fr) 44px 52px 44px minmax(68px,.5fr) 88px 16px;
+  gap:8px;
+  padding:5px 0;
+}
+.workspace-list-page .workspace-wow-thumb{
+  width:38px;
+  height:38px;
+}
+.workspace-list-page .workspace-wow-copy strong{
+  font-size:12px;
+  line-height:15px;
+}
+.workspace-list-page .workspace-wow-copy small{
+  font-size:10px;
+  line-height:13px;
+}
+.workspace-list-page .workspace-wow-stat b{
+  font-size:13px;
+  line-height:16px;
+}
+.workspace-left-rail .mw-list-panel,
+.workspace-right-rail .mw-list-panel{
+  width:100%;
+}
+.workspace-right-rail .workspace-announcements-panel{
+  flex:1 1 auto;
+}
+.workspace-announcement-rail{
+  max-height:280px;
+}
+.workspace-help-panel{
+  margin-top:auto;
+}
+
+/* Breadcrumb is the persistent way home from Workspaces and nested workspace views. */
+body[data-studio-view="workspaces"] .studio-shell-breadcrumb{
+  min-width:230px;
+}
+body[data-studio-view="workspaces"] .studio-shell-breadcrumb button{
+  color:#1c66a5;
+  font-weight:700;
+}
+body[data-studio-view="workspaces"] .studio-shell-breadcrumb strong{
+  color:#102b4e;
+  font-weight:800;
+}
