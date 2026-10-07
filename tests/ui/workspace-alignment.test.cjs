@@ -224,3 +224,14 @@ test('large galleries render one bounded page of previews and advance using a se
  assert.equal(panel.querySelectorAll('.job-file-tile').length,100);assert.ok([...panel.querySelectorAll('img')].every(i=>i.src.endsWith('/preview?size=thumbnail')));assert.equal(panel.querySelector('[data-drag-asset]').dataset.dragAsset,'000000');
  await panel.querySelector('[data-next-page]').onclick();assert.equal(panel.querySelectorAll('.job-file-tile').length,100);assert.equal(panel.querySelector('[data-drag-asset]').dataset.dragAsset,'000100');assert.ok(requests.some(u=>u.includes('after=000099')));w.close();
 });
+
+
+test('Workspaces keeps My Work breadcrumb and three-column rails',()=>{
+ const source=fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8');
+ assert.match(source,/workspace-list-layout/);
+ assert.match(source,/workspace-left-rail/);
+ assert.match(source,/workspace-center-panel/);
+ assert.match(source,/workspace-right-rail/);
+ assert.match(source,/data-shell-nav="mywork">My Work/);
+ assert.match(source,/breadcrumb-separator/);
+});
