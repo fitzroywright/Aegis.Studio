@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Text.RegularExpressions;
+using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Web.Notifications;
+using Aegis.Studio.Web.Email;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Profiles;
@@ -47,19 +49,22 @@ public sealed class StudioInAppMessageStore
     private readonly WorkspaceAccessService workspaceAccess;
     private readonly JobAccessService jobAccess;
     private readonly StudioStore studio;
+    private readonly StudioMessageAddressBook addresses;
 
     public StudioInAppMessageStore(
         StudioDatabase database,
         UserProfileStore profiles,
         WorkspaceAccessService workspaceAccess,
         JobAccessService jobAccess,
-        StudioStore studio)
+        StudioStore studio,
+        StudioMessageAddressBook addresses)
     {
         this.database = database;
         this.profiles = profiles;
         this.workspaceAccess = workspaceAccess;
         this.jobAccess = jobAccess;
         this.studio = studio;
+        this.addresses = addresses;
     }
 
     public IReadOnlyList<StudioMessageThreadSummary> GetThreads(ClaimsPrincipal user)
@@ -83,6 +88,7 @@ public sealed class StudioInAppMessageStore
             where (t.scope_type='Direct' and tm.user_name is not null)
                or (t.scope_type='Workspace' and exists(select 1 from studio_workspace_members wm where wm.workspace_id=t.scope_id and lower(wm.user_name)=lower($1) and wm.is_active))
                or (t.scope_type='Job' and exists(select 1 from studio_job_members jm where jm.job_id=t.scope_id and lower(jm.user_name)=lower($1) and jm.is_active))
+               or (t.scope_type='Person' and tm.user_name is not null)
             group by t.id,t.scope_type,t.scope_id,t.title,t.created_by,t.created_at_utc,r.last_read_at_utc
             order by coalesce(max(m.created_at_utc),t.created_at_utc) desc
             """;
@@ -142,6 +148,152 @@ public sealed class StudioInAppMessageStore
         return new StudioMessageThread(id, "Direct", null, other, current, now);
     }
 
+    public StudioMessageThread CreateExternal(ClaimsPrincipal user, string address, string subject)
+    {
+        string current = CurrentUser(user);
+        string recipient = address.Trim();
+        if (!StudioMessageAddressBook.IsExternalEmail(recipient))
+            throw new InvalidOperationException("A valid external email address is required.");
+
+        StudioMessageAddress? internalDestination = addresses.ResolveAddress(recipient);
+        if (internalDestination?.DestinationType == "Person" && !string.IsNullOrWhiteSpace(internalDestination.PersonUserName))
+            return CreateDirect(user, internalDestination.PersonUserName);
+        if (internalDestination?.DestinationType == "Workspace" && internalDestination.WorkspaceId.HasValue)
+            return GetOrCreateScoped(user, "Workspace", internalDestination.WorkspaceId.Value);
+        if (internalDestination?.DestinationType == "Job" && internalDestination.JobId.HasValue)
+            return GetOrCreateScoped(user, "Job", internalDestination.JobId.Value);
+
+        StudioMessageAddress person = addresses.EnsureCurrentPerson(user);
+        string title = string.IsNullOrWhiteSpace(subject) ? recipient : subject.Trim();
+        Guid conversationId = Guid.NewGuid();
+        Guid threadId = Guid.NewGuid();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
+        using (NpgsqlCommand conversation = connection.CreateCommand())
+        {
+            conversation.Transaction = transaction;
+            conversation.CommandText = """
+                insert into studio_conversations
+                    (id,workspace_id,subject,contact_name,contact_address,channel,is_closed,job_id,external_thread_id,created_at_utc)
+                values($1,$2,$3,$4,$4,'Email',false,null,null,$5)
+                """;
+            conversation.Parameters.AddWithValue(conversationId);
+            conversation.Parameters.AddWithValue(person.WorkspaceId!.Value);
+            conversation.Parameters.AddWithValue(title);
+            conversation.Parameters.AddWithValue(recipient);
+            conversation.Parameters.AddWithValue(now);
+            conversation.ExecuteNonQuery();
+        }
+        using (NpgsqlCommand thread = connection.CreateCommand())
+        {
+            thread.Transaction = transaction;
+            thread.CommandText = """
+                insert into studio_message_threads
+                    (id,scope_type,scope_id,direct_key,title,created_by,created_at_utc,external_conversation_id,owner_user_name,external_address)
+                values($1,'Person',$2,null,$3,$4,$5,$2,$4,$6)
+                """;
+            thread.Parameters.AddWithValue(threadId);
+            thread.Parameters.AddWithValue(conversationId);
+            thread.Parameters.AddWithValue(title);
+            thread.Parameters.AddWithValue(current);
+            thread.Parameters.AddWithValue(now);
+            thread.Parameters.AddWithValue(recipient);
+            thread.ExecuteNonQuery();
+        }
+        AddDirectMember(connection, transaction, threadId, current, now);
+        transaction.Commit();
+        return new StudioMessageThread(threadId, "Person", conversationId, title, current, now);
+    }
+
+    public StudioExternalThread? GetExternalThread(Guid threadId, ClaimsPrincipal user)
+    {
+        AssertThreadAccess(threadId, user);
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            select t.external_conversation_id,t.external_address,t.owner_user_name,c.subject
+            from studio_message_threads t
+            join studio_conversations c on c.id=t.external_conversation_id
+            where t.id=$1 and t.scope_type='Person' and t.external_conversation_id is not null
+            """;
+        command.Parameters.AddWithValue(threadId);
+        using NpgsqlDataReader reader = command.ExecuteReader();
+        return reader.Read()
+            ? new StudioExternalThread(reader.GetGuid(0),reader.GetString(1),reader.GetString(2),reader.GetString(3))
+            : null;
+    }
+
+    public StudioMessageThread EnsurePersonThread(StudioConversation conversation, string ownerUserName)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand find = connection.CreateCommand();
+        find.CommandText = """
+            select id,title,created_by,created_at_utc
+            from studio_message_threads
+            where scope_type='Person' and external_conversation_id=$1
+            """;
+        find.Parameters.AddWithValue(conversation.Id);
+        using NpgsqlDataReader reader = find.ExecuteReader();
+        if (reader.Read())
+            return new StudioMessageThread(reader.GetGuid(0),"Person",conversation.Id,reader.GetString(1),reader.GetString(2),reader.GetFieldValue<DateTimeOffset>(3));
+        reader.Close();
+
+        Guid id = Guid.NewGuid();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        using NpgsqlTransaction tx = connection.BeginTransaction();
+        using NpgsqlCommand insert = connection.CreateCommand();
+        insert.Transaction = tx;
+        insert.CommandText = """
+            insert into studio_message_threads
+                (id,scope_type,scope_id,direct_key,title,created_by,created_at_utc,external_conversation_id,owner_user_name,external_address)
+            values($1,'Person',$2,null,$3,$4,$5,$2,$4,$6)
+            """;
+        insert.Parameters.AddWithValue(id);
+        insert.Parameters.AddWithValue(conversation.Id);
+        insert.Parameters.AddWithValue(conversation.Subject);
+        insert.Parameters.AddWithValue(ownerUserName);
+        insert.Parameters.AddWithValue(now);
+        insert.Parameters.AddWithValue(conversation.ContactAddress);
+        insert.ExecuteNonQuery();
+        AddDirectMember(connection,tx,id,ownerUserName,now);
+        tx.Commit();
+        return new StudioMessageThread(id,"Person",conversation.Id,conversation.Subject,ownerUserName,now);
+    }
+
+    public StudioInAppMessage AddExternalMessage(Guid threadId, InboundEmail email)
+    {
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand duplicate = connection.CreateCommand();
+        duplicate.CommandText = "select id,thread_id,sender_user_name,body,created_at_utc,sender_display_name,sender_address from studio_inapp_messages where external_message_id=$1";
+        duplicate.Parameters.AddWithValue(email.MessageId);
+        using NpgsqlDataReader existing = duplicate.ExecuteReader();
+        if (existing.Read())
+            return new StudioInAppMessage(existing.GetGuid(0),existing.GetGuid(1),existing.GetString(2),existing.GetString(3),existing.GetFieldValue<DateTimeOffset>(4),
+                existing.IsDBNull(5)?null:existing.GetString(5),existing.IsDBNull(6)?null:existing.GetString(6));
+        existing.Close();
+
+        StudioInAppMessage message = new(Guid.NewGuid(),threadId,email.FromAddress.Trim(),email.Body.Trim(),email.ReceivedAt.ToUniversalTime(),
+            string.IsNullOrWhiteSpace(email.FromName)?email.FromAddress.Trim():email.FromName.Trim(),email.FromAddress.Trim());
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            insert into studio_inapp_messages
+                (id,thread_id,sender_user_name,body,created_at_utc,sender_display_name,sender_address,external_message_id)
+            values($1,$2,$3,$4,$5,$6,$7,$8)
+            """;
+        command.Parameters.AddWithValue(message.Id);
+        command.Parameters.AddWithValue(threadId);
+        command.Parameters.AddWithValue(message.SenderUserName);
+        command.Parameters.AddWithValue(message.Body);
+        command.Parameters.AddWithValue(message.CreatedAtUtc);
+        command.Parameters.AddWithValue((object?)message.SenderDisplayName??DBNull.Value);
+        command.Parameters.AddWithValue((object?)message.SenderAddress??DBNull.Value);
+        command.Parameters.AddWithValue(email.MessageId);
+        command.ExecuteNonQuery();
+        return message;
+    }
+
     public StudioMessageThread GetOrCreateScoped(ClaimsPrincipal user, string scopeType, Guid scopeId)
     {
         string current = CurrentUser(user);
@@ -170,11 +322,11 @@ public sealed class StudioInAppMessageStore
         AssertThreadAccess(threadId, user);
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id,thread_id,sender_user_name,body,created_at_utc from studio_inapp_messages where thread_id=$1 order by created_at_utc desc limit $2";
+        command.CommandText = "select id,thread_id,sender_user_name,body,created_at_utc,sender_display_name,sender_address from studio_inapp_messages where thread_id=$1 order by created_at_utc desc limit $2";
         command.Parameters.AddWithValue(threadId); command.Parameters.AddWithValue(Math.Clamp(count, 1, 500));
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<StudioInAppMessage> values = [];
-        while (reader.Read()) values.Add(new StudioInAppMessage(reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4)));
+        while (reader.Read()) values.Add(new StudioInAppMessage(reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4), reader.IsDBNull(5)?null:reader.GetString(5), reader.IsDBNull(6)?null:reader.GetString(6)));
         values.Reverse();
         return values;
     }
@@ -230,7 +382,7 @@ public sealed class StudioInAppMessageStore
         scopeReader.Close();
 
         using NpgsqlCommand command = connection.CreateCommand();
-        if (scopeType == "Direct")
+        if (scopeType is "Direct" or "Person")
         {
             command.CommandText = "select user_name from studio_message_thread_members where thread_id=$1 order by user_name";
             command.Parameters.AddWithValue(threadId);
@@ -268,7 +420,7 @@ public sealed class StudioInAppMessageStore
         string scopeType = reader.GetString(0);
         Guid? scopeId = reader.IsDBNull(1) ? null : reader.GetGuid(1);
         reader.Close();
-        if (scopeType == "Direct")
+        if (scopeType is "Direct" or "Person")
         {
             using NpgsqlCommand member = connection.CreateCommand();
             member.CommandText = "select exists(select 1 from studio_message_thread_members where thread_id=$1 and lower(user_name)=lower($2))";
@@ -303,15 +455,22 @@ public static class StudioInAppMessagingEndpoints
     {
         RouteGroupBuilder group = app.MapGroup("/api/messages").RequireAuthorization();
         group.MapGet("/threads", (ClaimsPrincipal user, StudioInAppMessageStore store) => Results.Ok(store.GetThreads(user)));
-        group.MapGet("/users", (ClaimsPrincipal user, UserProfileStore profiles) =>
+        group.MapGet("/users", (ClaimsPrincipal user, UserProfileStore profiles, StudioMessageAddressBook addresses) =>
         {
             string current = user.FindFirstValue("login_name") ?? user.Identity?.Name ?? string.Empty;
             return Results.Ok(profiles.GetAll()
                 .Where(x => !string.Equals(x.UserName, current, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(x => x.DisplayName)
-                .Select(x => new StudioMessageUser(x.UserName, x.DisplayName)));
+                .Select(x => new StudioMessageUser(x.UserName, x.DisplayName, addresses.PersonAddress(x.UserName))));
+        });
+        group.MapGet("/address", (ClaimsPrincipal user, StudioMessageAddressBook addresses) =>
+        {
+            StudioMessageAddress address = addresses.EnsureCurrentPerson(user);
+            return Results.Ok(new { address.Address, address.DisplayName, address.PersonUserName });
         });
         group.MapPost("/threads/direct", (StartDirectMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.CreateDirect(user, request.UserName))));
+        group.MapPost("/threads/external", (StartExternalMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store) =>
+            Execute(() => Results.Ok(store.CreateExternal(user, request.Address, request.Subject))));
         group.MapPost("/threads/{scopeType}/{scopeId:guid}", (string scopeType, Guid scopeId, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetOrCreateScoped(user, scopeType, scopeId))));
         group.MapGet("/threads/{threadId:guid}", (Guid threadId, int? count, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.GetMessages(threadId, user, count ?? 100))));
         group.MapPost("/threads/{threadId:guid}/whatsapp", (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, NotificationService notifications) =>
@@ -338,11 +497,26 @@ public static class StudioInAppMessagingEndpoints
             catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
         });
 
-        group.MapPost("/threads/{threadId:guid}", async (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, NotificationService notifications, IHubContext<StudioMessageHub> hub) =>
+        group.MapPost("/threads/{threadId:guid}", async (Guid threadId, SendStudioMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store, NotificationService notifications, StudioStore studio, OutboundEmailStore outbox, StudioMessageAddressBook addresses, IHubContext<StudioMessageHub> hub) =>
         {
             try
             {
                 StudioInAppMessage message = store.AddMessage(threadId, user, request.Body);
+                StudioExternalThread? external = store.GetExternalThread(threadId, user);
+                if (external is not null)
+                {
+                    StudioConversation conversation = studio.GetConversation(external.ConversationId)
+                        ?? throw new InvalidOperationException("The external Studio conversation no longer exists.");
+                    StudioMessageAddress person = addresses.EnsureCurrentPerson(user);
+                    studio.AddMessage(conversation.Id, new AddMessageRequest(request.Body, false, "Person"), user);
+                    outbox.QueuePerson(
+                        studio.GetConversation(conversation.Id)!,
+                        request.Body,
+                        person.Address,
+                        external.OwnerUserName,
+                        message.Id);
+                }
+
                 IReadOnlyList<string> mentionedUsers = store.ResolveMentionedParticipants(threadId, message.SenderUserName, message.Body);
                 foreach (string mentionedUser in mentionedUsers)
                 {
@@ -387,7 +561,9 @@ public static class StudioInAppMessagingEndpoints
 
 public sealed record StudioMessageThread(Guid Id, string ScopeType, Guid? ScopeId, string Title, string CreatedBy, DateTimeOffset CreatedAtUtc);
 public sealed record StudioMessageThreadSummary(Guid Id, string ScopeType, Guid? ScopeId, string Title, string CreatedBy, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastMessageAtUtc, long UnreadCount);
-public sealed record StudioInAppMessage(Guid Id, Guid ThreadId, string SenderUserName, string Body, DateTimeOffset CreatedAtUtc);
-public sealed record StudioMessageUser(string UserName, string DisplayName);
+public sealed record StudioInAppMessage(Guid Id, Guid ThreadId, string SenderUserName, string Body, DateTimeOffset CreatedAtUtc, string? SenderDisplayName = null, string? SenderAddress = null);
+public sealed record StudioExternalThread(Guid ConversationId,string ExternalAddress,string OwnerUserName,string Subject);
+public sealed record StudioMessageUser(string UserName, string DisplayName, string? MessageAddress = null);
 public sealed record StartDirectMessageRequest(string UserName);
+public sealed record StartExternalMessageRequest(string Address,string Subject);
 public sealed record SendStudioMessageRequest(string Body);

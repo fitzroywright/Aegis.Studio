@@ -179,6 +179,8 @@ builder.Services.AddSingleton<DemoSeedCoordinator>();
 builder.Services.AddSingleton<BookingStore>();
 builder.Services.AddSingleton<BookingApiAuthenticator>();
 builder.Services.AddSingleton<UserProfileStore>();
+builder.Services.AddSingleton<StudioMessageAddressBook>();
+builder.Services.AddSingleton<StudioMessageAttachmentStore>();
 builder.Services.AddSingleton<StudioInAppMessageStore>();
 builder.Services.AddSingleton<StudioRecipientResolver>();
 builder.Services.AddSingleton<NotificationService>();
@@ -355,7 +357,7 @@ app.MapPost("/api/interactions", (IncomingInteractionRequest request, ClaimsPrin
     try { StudioConversation conversation = store.ReceiveInteraction(request); notifications.PublishToAll("WorkspaceMessage", $"New request: {conversation.Subject}", $"{conversation.ContactName} sent a new {conversation.Channel} request.", "Conversation", conversation.Id.ToString("D")); return Results.Created("/api/conversations", conversation); }
     catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
 });
-app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter router, StudioStore store, UnroutedEmailStore unrouted, NotificationService notifications, StudioOperationsFlowPublisher operationsFlows) =>
+app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter router, StudioStore store, UnroutedEmailStore unrouted, NotificationService notifications, StudioInAppMessageStore messages, StudioOperationsFlowPublisher operationsFlows) =>
 {
     bool evidence = email.ToAddresses.Count > 0 || email.CcAddresses.Count > 0 || email.InternetHeaders.ContainsKey("X-Aegis-Route");
     if (string.IsNullOrWhiteSpace(email.MessageId) || string.IsNullOrWhiteSpace(email.FromAddress) || !evidence || string.IsNullOrWhiteSpace(email.Subject) || string.IsNullOrWhiteSpace(email.Body)) return Results.BadRequest(new { error = "Message id, sender, routing evidence, subject and body are required." });
@@ -369,14 +371,22 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
     }
     operationsFlows.TryEnqueueInbound(correlationId, "Router", businessId: route.WorkspaceId?.ToString("D"));
     EmailIngestResult result = store.ReceiveEmail(email, route);
-    operationsFlows.TryEnqueueInbound(correlationId, "Workspace", businessId: result.Conversation.Id.ToString("D"));
+    operationsFlows.TryEnqueueInbound(correlationId, route.DestinationType, businessId: result.Conversation.Id.ToString("D"));
     operationsFlows.TryEnqueueInbound(correlationId, "Conversation", businessId: result.Conversation.Id.ToString("D"));
+    Guid? personThreadId = null;
+    if (route.DestinationType.Equals("Person", StringComparison.OrdinalIgnoreCase) &&
+        !string.IsNullOrWhiteSpace(route.PersonUserName))
+    {
+        StudioMessageThread personThread = messages.EnsurePersonThread(result.Conversation, route.PersonUserName!);
+        messages.AddExternalMessage(personThread.Id, email);
+        personThreadId = personThread.Id;
+    }
     if (!result.WasDuplicate)
     {
-        notifications.PublishToAll("WorkspaceMessage", $"Email: {email.Subject}", $"New email from {email.FromName} routed to {route.WorkspaceName}.", "Conversation", result.Conversation.Id.ToString("D"));
+        StudioMessageNotificationContext.PublishInbound(notifications,email,route,result.Conversation.Id,personThreadId);
         operationsFlows.TryEnqueueInbound(correlationId, "Notification", businessId: result.Conversation.Id.ToString("D"));
     }
-    return Results.Ok(new { routed = true, workspaceId = route.WorkspaceId, conversationId = result.Conversation.Id, result.CreatedConversation, result.WasDuplicate });
+    return Results.Ok(new { routed = true, destinationType = route.DestinationType, destinationId = route.DestinationId, workspaceId = route.WorkspaceId, conversationId = result.Conversation.Id, personThreadId, result.CreatedConversation, result.WasDuplicate });
 });
 app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen()));
 app.MapGet("/api/email/outbox", (OutboundEmailStore store) => Results.Ok(store.GetPending()));

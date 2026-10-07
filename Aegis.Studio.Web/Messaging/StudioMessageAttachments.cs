@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Aegis.Studio.Web.Persistence;
 using Common.Storage;
 using Npgsql;
@@ -66,12 +67,54 @@ public sealed class StudioMessageAttachmentStore
             using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand q=c.CreateCommand();
             q.CommandText="insert into studio_inapp_message_attachments(id,message_id,file_name,stored_name,content_type,size_bytes,sha256,uploaded_by,created_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9)";
             q.Parameters.AddWithValue(result.Id);q.Parameters.AddWithValue(result.MessageId);q.Parameters.AddWithValue(result.FileName);q.Parameters.AddWithValue(result.StoredName);q.Parameters.AddWithValue(result.ContentType);q.Parameters.AddWithValue(result.Size);q.Parameters.AddWithValue(result.Sha256);q.Parameters.AddWithValue(result.UploadedBy);q.Parameters.AddWithValue(result.CreatedAtUtc);q.ExecuteNonQuery();
+            DelayOutbound(messageId,c);
             return result;
         }
         catch
         {
             await storage.DeleteAsync(storedName,token);throw;
         }
+    }
+
+    public async Task<StudioMessageAttachment> AddBytesAsync(Guid messageId,string fileName,string contentType,byte[] bytes,string uploadedBy,CancellationToken token)
+    {
+        if(bytes.Length<=0||bytes.LongLength>maximumBytes)throw new InvalidOperationException($"Attachment must be between 1 byte and {maximumBytes/1024L/1024L} MB.");
+        string name=Path.GetFileName(fileName).Trim();if(string.IsNullOrWhiteSpace(name))throw new InvalidOperationException("Attachment file name is required.");
+        string incomingSha=Convert.ToHexString(SHA256.HashData(bytes));
+        StudioMessageAttachment? existing=GetForMessage(messageId).FirstOrDefault(x=>x.FileName.Equals(name,StringComparison.OrdinalIgnoreCase)&&x.Sha256.Equals(incomingSha,StringComparison.OrdinalIgnoreCase));
+        if(existing is not null)return existing;
+        Guid id=Guid.NewGuid();string storedName=id.ToString("N")+Path.GetExtension(name).ToLowerInvariant();
+        await using var source=new MemoryStream(bytes,false);
+        StoredFile stored=await storage.StoreAsync(new StorageWriteRequest(
+            storedName,source,string.IsNullOrWhiteSpace(contentType)?"application/octet-stream":contentType,
+            name,uploadedBy,new Dictionary<string,string>{{"Application","Aegis.Studio"},{"MessageId",messageId.ToString("D")}},maximumBytes),token);
+        StudioMessageAttachment result=new(id,messageId,name,storedName,string.IsNullOrWhiteSpace(contentType)?"application/octet-stream":contentType,stored.Length,stored.Sha256,uploadedBy,DateTimeOffset.UtcNow);
+        try
+        {
+            using NpgsqlConnection db=database.OpenConnection();using NpgsqlCommand q=db.CreateCommand();
+            q.CommandText="insert into studio_inapp_message_attachments(id,message_id,file_name,stored_name,content_type,size_bytes,sha256,uploaded_by,created_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9)";
+            q.Parameters.AddWithValue(result.Id);q.Parameters.AddWithValue(result.MessageId);q.Parameters.AddWithValue(result.FileName);q.Parameters.AddWithValue(result.StoredName);q.Parameters.AddWithValue(result.ContentType);q.Parameters.AddWithValue(result.Size);q.Parameters.AddWithValue(result.Sha256);q.Parameters.AddWithValue(result.UploadedBy);q.Parameters.AddWithValue(result.CreatedAtUtc);q.ExecuteNonQuery();
+            DelayOutbound(messageId,db);
+            return result;
+        }
+        catch
+        {
+            await storage.DeleteAsync(storedName,token);throw;
+        }
+    }
+
+    public IReadOnlyList<StudioMessageAttachment> GetForMessage(Guid messageId)
+    {
+        using NpgsqlConnection c=database.OpenConnection();using NpgsqlCommand q=c.CreateCommand();
+        q.CommandText="select id,message_id,file_name,stored_name,content_type,size_bytes,sha256,uploaded_by,created_at_utc from studio_inapp_message_attachments where message_id=$1 order by created_at_utc";
+        q.Parameters.AddWithValue(messageId);using NpgsqlDataReader r=q.ExecuteReader();List<StudioMessageAttachment> values=[];
+        while(r.Read())values.Add(Read(r));return values;
+    }
+
+    public byte[] ReadBytes(StudioMessageAttachment attachment)
+    {
+        using Stream source=storage.OpenReadAsync(attachment.StoredName).GetAwaiter().GetResult();
+        using var memory=new MemoryStream();source.CopyTo(memory);return memory.ToArray();
     }
 
     public IReadOnlyList<StudioMessageAttachment> GetForThread(Guid threadId)
@@ -101,6 +144,18 @@ public sealed class StudioMessageAttachmentStore
         source.CopyTo(destination);destination.Flush();return path;
     }
 
+    private static void DelayOutbound(Guid messageId,NpgsqlConnection connection)
+    {
+        using NpgsqlCommand delay=connection.CreateCommand();
+        delay.CommandText="""
+            update studio_outbound_email
+            set next_attempt_at_utc=greatest(coalesce(next_attempt_at_utc,now()),now()+interval '5 seconds')
+            where inapp_message_id=$1 and status in ('Pending','Retry')
+            """;
+        delay.Parameters.AddWithValue(messageId);
+        delay.ExecuteNonQuery();
+    }
+
     private static StudioMessageAttachment Read(NpgsqlDataReader r)=>new(
         r.GetGuid(0),r.GetGuid(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetInt64(5),r.GetString(6),r.GetString(7),r.GetFieldValue<DateTimeOffset>(8));
 }
@@ -111,11 +166,7 @@ public static class StudioMessageAttachmentEndpoints
 {
     public static void MapStudioMessageAttachments(this WebApplication app)
     {
-        StudioMessageAttachmentStore files=new(
-            app.Services.GetRequiredService<IWebHostEnvironment>(),
-            app.Services.GetRequiredService<IConfiguration>(),
-            app.Services.GetRequiredService<StudioDatabase>(),
-            app.Services.GetRequiredService<IFileStorage>());
+        StudioMessageAttachmentStore files=app.Services.GetRequiredService<StudioMessageAttachmentStore>();
         files.EnsureSchema();
 
         app.MapGet("/api/messages/threads/{threadId:guid}/attachments",(Guid threadId,ClaimsPrincipal user,StudioInAppMessageStore messages)=>{
@@ -128,6 +179,12 @@ public static class StudioMessageAttachmentEndpoints
             try
             {
                 messages.AssertThreadAccess(threadId.Value,user);
+                if(messages.GetExternalThread(threadId.Value,user) is not null)
+                {
+                    long existingBytes=files.GetForMessage(messageId).Sum(x=>x.Size);
+                    if(existingBytes+file.Length>2_500_000)
+                        return Results.BadRequest(new{error="External email attachments cannot exceed 2.5 MB total through the Microsoft 365 transport."});
+                }
                 StudioMessageAttachment attachment=await files.AddAsync(messageId,file,user.FindFirstValue("login_name")??user.Identity?.Name??"Studio",token);
                 return Results.Created($"/api/message-attachments/{attachment.Id}",attachment);
             }
