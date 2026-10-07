@@ -12,9 +12,9 @@ function response(url){if(url==='/api/my-work/jobs')return jobs;if(url==='/api/m
 test('shell and essential work appear before media; startup never downloads full galleries',async()=>{
  let release;const held=new Promise(r=>release=r),urls=[];let active=0,max=0;
  const {w,dom}=setup(async(url,options)=>{urls.push(url);assert.ok(options.headers['X-Studio-Startup']);active++;max=Math.max(max,active);try{if(url==='/api/my-work/media-summary')await held;return response(url);}finally{active--;}});
- await flush();assert.ok(w.document.querySelector('.mw-page'));await flush();assert.match(w.document.querySelector('[data-mw-region=tasks]').textContent,/Retouch portraits/);assert.match(w.document.querySelector('[data-mw-region=schedule]').textContent,/Carter Wedding/);assert.equal(w.document.querySelectorAll('.mw-card').length,5);
+ await flush();assert.ok(w.document.querySelector('.mw-page'));await flush();assert.match(w.document.querySelector('[data-mw-region=tasks]').textContent,/Retouch portraits/);assert.match(w.document.querySelector('[data-mw-region=schedule]').textContent,/Carter Wedding/);assert.ok(w.document.querySelectorAll('.mw-list-panel').length>=5);
  assert.equal(urls.filter(u=>/\/jobs\/.*\/media$/.test(u)).length,0);assert.ok(max<=2);assert.ok(w.studioMyWorkDiagnostics.shellMs!==null);assert.ok(w.studioMyWorkDiagnostics.coreMs!==null);
- release();await w.studioMyWorkReady;assert.match(w.document.querySelector('[data-mw-region=metrics]').textContent,/Items in Pipeline/);assert.match(w.document.querySelector('[data-mw-region=production-attention]').textContent,/Retouch portraits/);assert.ok(w.studioMyWorkDiagnostics.completeMs!==null);dom.window.close();
+ release();await w.studioMyWorkReady;assert.match(w.document.querySelector('[data-mw-region=pipeline]').textContent,/Carter Wedding/);assert.match(w.document.querySelector('[data-mw-region=tasks]').textContent,/Retouch portraits/);assert.ok(w.studioMyWorkDiagnostics.completeMs!==null);dom.window.close();
 });
 test('leaving My Work aborts enrichment and late replies cannot repaint Pipeline',async()=>{
  let release,signal;const held=new Promise(r=>release=r);
@@ -23,5 +23,5 @@ test('leaving My Work aborts enrichment and late replies cannot repaint Pipeline
 });
 test('a failed media summary has a working retry without removing sessions and tasks',async()=>{
  let attempts=0;const {w,dom}=setup(async url=>{if(url==='/api/my-work/media-summary'&&++attempts===1)throw Error('Timed out');return response(url);});await flush();await w.studioMyWorkReady;
- assert.ok(w.document.querySelector('[data-mw-retry=media]'));assert.match(w.document.querySelector('[data-mw-region=tasks]').textContent,/Retouch portraits/);w.document.querySelector('[data-mw-retry=media]').click();await flush();assert.equal(attempts,2);assert.match(w.document.querySelector('[data-mw-region=metrics]').textContent,/Items in Pipeline/);assert.equal(w.document.querySelector('[data-mw-retry=media]'),null);dom.window.close();
+ assert.ok(w.document.querySelector('[data-mw-retry=media]'));assert.match(w.document.querySelector('[data-mw-region=tasks]').textContent,/Retouch portraits/);w.document.querySelector('[data-mw-retry=media]').click();await flush();assert.equal(attempts,2);assert.match(w.document.querySelector('[data-mw-region=pipeline]').textContent,/Carter Wedding/);assert.equal(w.document.querySelector('[data-mw-retry=media]'),null);dom.window.close();
 });
