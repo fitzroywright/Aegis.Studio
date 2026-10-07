@@ -3,6 +3,7 @@ namespace Aegis.Studio.Web.Email;
 public enum StudioSendingIdentityType
 {
     Workspace,
+    Person,
     Self
 }
 
