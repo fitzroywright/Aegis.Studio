@@ -18,14 +18,12 @@ async function showFrontDesk() {
     if (!frontDeskRole) await loadFrontDeskRole();
     const me = await json('/api/auth/me');
     if (!frontDeskRole?.frontDesk && !(me.user || me).isAdministrator) {
-        activateNavigation('frontdesk');
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
         genericView.innerHTML = '<h1>Front Desk</h1><p class="muted">You are not assigned to the Front Desk operational role.</p>';
         return;
     }
 
-    activateNavigation('frontdesk');
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
 
@@ -52,12 +50,11 @@ function frontDeskRequestStage(item){return item.jobId?'Confirmed':item.recorded
 function renderFrontDesk(){
     const today=new Date().toLocaleDateString(),sessions=frontDeskSchedule.filter(s=>new Date(s.startsAtUtc).toLocaleDateString()===today&&s.status!=='Cancelled').sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
     const tabs=[['today','Walk-in / Today'],['requests','Bookings'],['jobs','Jobs'],['delivery','Pickup / Delivery'],['completed','Completed'],['enquiries','Inquiries']];
-    genericView.innerHTML=`<header class="studio-page-heading"><div><h1>Front Desk</h1><p>Welcome clients, manage bookings, sales and customer service.</p></div><div class="job-actions"><button class="primary" id="newBookingRequest">＋ New Booking</button><button onclick="showPos()">＋ New Sale</button></div></header>
+    genericView.innerHTML=`<section class="studio-operational-page mw-list-page"><header class="studio-page-heading"><div><h1>Front Desk</h1><p>Welcome clients, manage bookings, sales and customer service.</p></div><div class="job-actions"><button class="primary" id="newBookingRequest">＋ New Booking</button><button onclick="showPos()">＋ New Sale</button></div></header>
     <nav class="workspace-tabs" aria-label="Front Desk queues">${tabs.map(([key,label])=>`<button data-frontdesk-tab="${key}" class="${key===frontDeskTab?'active':''}">${label}</button>`).join('')}</nav>
     <div class="op-grid frontdesk-board"><section class="op-card"><header><h2>Client Lookup</h2></header><div class="op-body"><input id="frontDeskClientSearch" type="search" placeholder="Search name, phone or email…" value="${esc(frontDeskClientTerm)}" aria-label="Find client"><div id="frontDeskClientResults" class="frontdesk-client-results"></div><button class="text-button" data-new-client>＋ New Client</button></div></section>
     <section class="op-card"><header><h2>${frontDeskTab==='today'?"Today's Schedule":tabs.find(t=>t[0]===frontDeskTab)?.[1]||'Jobs'}</h2><button onclick="studioNavigate('pipeline')">View Calendar →</button></header><div class="op-body">${frontDeskTab==='today'?`<div class="frontdesk-today-list">${sessions.map(s=>`<article class="job-row"><button class="link-button" data-frontdesk-job="${s.jobId}"><strong>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))} · ${esc(s.title)}</strong><small>${esc(s.location||'')} · ${esc(s.status)}</small></button><button data-check-in="${s.jobId}">Check In</button></article>`).join('')||'<p>No sessions today.</p>'}</div>`:''}<input id="frontDeskSearch" type="search" placeholder="Search this queue…" aria-label="Find job, booking or customer" value="${esc(frontDeskTerm)}" ${frontDeskTab==='today'?'hidden':''}><div id="frontDeskJobList" ${frontDeskTab==='today'?'hidden':''}></div></div></section>
-    <section class="op-card"><header><h2>Quick Actions</h2></header><div class="op-body frontdesk-actions"><button data-new-client>＋ New Customer</button><button data-new-booking>New Booking</button><button data-take-payment>Take Payment</button><button onclick="showPos()">New Sale</button><button onclick="studioNavigate('pipeline')">Check Availability / Reschedule</button><button data-pickups>Pickup / Delivery</button><button onclick="studioNavigate('finance')">Invoices / Finance</button><h3>Walk-in Sales</h3><p class="muted">Use New Sale to select a client's job, add products and take payment.</p></div></section></div>`;
-    genericView.querySelector('#newBookingRequest').onclick=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
+    <section class="op-card"><header><h2>Quick Actions</h2></header><div class="op-body frontdesk-actions"><button data-new-client>＋ New Customer</button><button data-new-booking>New Booking</button><button data-take-payment>Take Payment</button><button onclick="showPos()">New Sale</button><button onclick="studioNavigate('pipeline')">Check Availability / Reschedule</button><button data-pickups>Pickup / Delivery</button><button onclick="studioNavigate('finance')">Invoices / Finance</button><h3>Walk-in Sales</h3><p class="muted">Use New Sale to select a client's job, add products and take payment.</p></div></section></div></section>`;\n    genericView.querySelector('#newBookingRequest').onclick=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
     genericView.querySelector('[data-new-booking]').onclick=()=>genericView.querySelector('#newBookingRequest').click();
     genericView.querySelectorAll('[data-new-client]').forEach(b=>b.onclick=async()=>{await showFrontDeskClients();document.querySelector('dialog[open] [data-new]')?.click();});
     genericView.querySelector('[data-take-payment]').onclick=()=>frontDeskSelectedClientId?takeFrontDeskClientPayment(frontDeskSelectedClientId):showPos();
