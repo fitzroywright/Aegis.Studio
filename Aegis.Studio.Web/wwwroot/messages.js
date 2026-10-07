@@ -64,10 +64,6 @@
 
     async function startDirect() {
         const users = await loadMentionUsers();
-        if (!users.length) {
-            alert('No other Studio users are available for direct messaging yet.');
-            return;
-        }
         let dialog = document.getElementById('directMessageDialog');
         if (!dialog) {
             dialog = document.createElement('dialog');
@@ -80,8 +76,8 @@
                 <div class="message-dialog-heading"><div><h2>New message</h2><p>Start a Studio conversation or send email to an external recipient.</p></div><button type="button" class="message-dialog-close" aria-label="Close">×</button></div>
                 <label>Recipient type
                     <select id="directMessageKind">
-                        <option value="Person">Studio person</option>
-                        <option value="External">External email</option>
+                        <option value="Person" ${users.length?'':'disabled'}>Studio person</option>
+                        <option value="External" ${users.length?'':'selected'}>External email</option>
                     </select>
                 </label>
                 <label data-person-recipient>Studio person
