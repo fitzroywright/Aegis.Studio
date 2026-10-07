@@ -304,12 +304,34 @@
         toastTimer = setTimeout(() => host.classList.remove('show'), 7000);
     }
 
-    async function showAwayDigestOnce() {
+    async function showAwayDigestOnce(attempt = 0) {
         if (sessionStorage.getItem('studio-away-digest-shown') === '1') return;
         let threads;
-        try { threads = await json('/api/messages/threads'); } catch { return; }
-        const unread = threads.filter(x => Number(x.unreadCount || 0) > 0);
+        try {
+            threads = await json('/api/messages/threads');
+        } catch {
+            // Startup can race authentication/session initialization. Retry briefly instead
+            // of silently losing the once-per-session digest.
+            if (attempt < 3) setTimeout(() => showAwayDigestOnce(attempt + 1), 1200 * (attempt + 1));
+            return;
+        }
+        const unread = threads
+            .filter(x => Number(x.unreadCount || 0) > 0)
+            .sort((a,b) => new Date(b.lastMessageAtUtc || b.createdAtUtc || 0) - new Date(a.lastMessageAtUtc || a.createdAtUtc || 0));
         if (!unread.length) { sessionStorage.setItem('studio-away-digest-shown', '1'); return; }
+
+        const digest = await Promise.all(unread.slice(0, 8).map(async thread => {
+            let preview = '';
+            let sender = '';
+            try {
+                const messages = await json(`/api/messages/threads/${thread.id}`);
+                const latest = Array.isArray(messages) ? messages.at(-1) : null;
+                preview = latest?.body || '';
+                sender = latest?.senderUserName ? studioFirstName(latest.senderUserName) : '';
+            } catch { }
+            return { thread, preview, sender };
+        }));
+
         let dialog = document.getElementById('studioAwayDigest');
         if (!dialog) {
             dialog = document.createElement('dialog');
@@ -318,11 +340,26 @@
             document.body.appendChild(dialog);
         }
         const total = unread.reduce((sum, x) => sum + Number(x.unreadCount || 0), 0);
-        dialog.innerHTML = `<div class="away-digest-card"><div class="message-dialog-heading"><div><h2>While You Were Away</h2><p>${total} unread message${total === 1 ? '' : 's'} across ${unread.length} conversation${unread.length === 1 ? '' : 's'}.</p></div><button type="button" class="message-dialog-close">×</button></div><div class="away-digest-list">${unread.slice(0, 8).map(x => `<button type="button" data-away-thread="${x.id}"><span><strong>${esc(x.title)}</strong><small>${esc(x.scopeType)}</small></span><b>${x.unreadCount}</b></button>`).join('')}</div><div class="dialog-actions"><button type="button" class="primary" id="openAllStudioMessages">Open Messages</button></div></div>`;
-        const close = () => { dialog.close(); sessionStorage.setItem('studio-away-digest-shown', '1'); };
-        dialog.querySelector('.message-dialog-close').onclick = close;
-        dialog.querySelector('#openAllStudioMessages').onclick = async () => { close(); await showMessages(); };
-        dialog.querySelectorAll('[data-away-thread]').forEach(button => button.onclick = async () => { const id = button.dataset.awayThread; close(); await showMessages(); await openThread(id); });
+        const remaining = Math.max(0, unread.length - digest.length);
+        dialog.innerHTML = `<div class="away-digest-card">
+            <div class="away-digest-heading">
+                <div class="away-digest-mark" aria-hidden="true">✉</div>
+                <div><span class="away-digest-kicker">MESSAGE DIGEST</span><h2>While You Were Away</h2><p>${total} unread message${total === 1 ? '' : 's'} across ${unread.length} conversation${unread.length === 1 ? '' : 's'}.</p></div>
+                <button type="button" class="message-dialog-close" aria-label="Close">×</button>
+            </div>
+            <div class="away-digest-list">${digest.map(({thread,preview,sender}) => `<button type="button" data-away-thread="${thread.id}">
+                <span class="away-digest-thread-icon" aria-hidden="true">✉</span>
+                <span class="away-digest-copy"><strong>${esc(thread.title || 'Message')}</strong><small>${esc([sender, thread.scopeType].filter(Boolean).join(' · '))}</small>${preview ? `<span>${esc(String(preview).replace(/\\s+/g,' ').trim().slice(0,140))}</span>` : ''}</span>
+                <span class="away-digest-meta"><b>${thread.unreadCount}</b><small>unread</small></span>
+            </button>`).join('')}</div>
+            ${remaining ? `<p class="away-digest-more">+${remaining} more unread conversation${remaining === 1 ? '' : 's'}</p>` : ''}
+            <div class="away-digest-actions"><button type="button" class="action" id="dismissAwayDigest">Not now</button><button type="button" class="primary" id="openAllStudioMessages">Open Messages</button></div>
+        </div>`;
+        const close = () => { if (dialog.open) dialog.close(); sessionStorage.setItem('studio-away-digest-shown', '1'); };
+        dialog.querySelector('.message-dialog-close').addEventListener('click', close);
+        dialog.querySelector('#dismissAwayDigest').addEventListener('click', close);
+        dialog.querySelector('#openAllStudioMessages').addEventListener('click', async () => { close(); await showMessages(); });
+        dialog.querySelectorAll('[data-away-thread]').forEach(button => button.addEventListener('click', async () => { const id = button.dataset.awayThread; close(); await showMessages(); await openThread(id); }));
         dialog.addEventListener('close', () => sessionStorage.setItem('studio-away-digest-shown', '1'), { once: true });
         dialog.showModal();
     }
@@ -461,5 +498,6 @@
     installNavigation();
     startRefresh();
     connectRealtime();
-    refreshIfVisible().then(showAwayDigestOnce);
+    // Give authentication and the initial shell a moment to settle, then show the digest once.
+    setTimeout(() => showAwayDigestOnce(), 450);
 })();
