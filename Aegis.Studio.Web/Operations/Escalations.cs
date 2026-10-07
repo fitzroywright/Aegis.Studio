@@ -196,7 +196,7 @@ public sealed class EscalationStore
         HashSet<string> recipients=new(StringComparer.OrdinalIgnoreCase);using NpgsqlConnection connection=database.OpenConnection();
         using(NpgsqlCommand command=connection.CreateCommand())
         {
-            command.CommandText="select assigned_to from studio_jobs where id=$1 and assigned_to is not null";command.Parameters.AddWithValue(jobId);object? assigned=command.ExecuteScalar();if(assigned is string user&&!string.IsNullOrWhiteSpace(user))recipients.Add(user);
+            command.CommandText="select job_lead from studio_jobs where id=$1 and job_lead is not null";command.Parameters.AddWithValue(jobId);object? assigned=command.ExecuteScalar();if(assigned is string user&&!string.IsNullOrWhiteSpace(user))recipients.Add(user);
         }
         using(NpgsqlCommand command=connection.CreateCommand())
         {

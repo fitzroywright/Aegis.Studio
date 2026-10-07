@@ -15,7 +15,7 @@ async function createWorkspace() {
     const managerDisplay=document.getElementById('workspaceManagerDisplay').value.trim()||managerUser;
     if (!name) return alert('Workspace name is required.');
     if (!managerUser) return alert('A Workspace Manager user name is required.');
-    const workspace = await json('/api/admin/workspaces/', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, emailAddress:document.getElementById('workspaceEmail').value.trim()||null, routeKey:document.getElementById('workspaceRouteKey')?.value.trim()||null, isEnabled:true, sortOrder:0 }) });
+    const workspace = await json('/api/admin/workspaces/', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, emailAddress:document.getElementById('workspaceEmail').value.trim()||null, routeKey:document.getElementById('workspaceRouteKey')?.value.trim()||null, isEnabled:true, sortOrder:0, defaultJobLead:document.getElementById('workspaceDefaultLead')?.value||managerUser }) });
     try{
         await json('/api/workspaces/'+workspace.id+'/managers/'+encodeURIComponent(managerUser),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:managerUser,displayName:managerDisplay,isActive:true,permissions:null})});
     }catch(error){
@@ -36,14 +36,15 @@ async function hydrateWorkspaceManagers(items){
 }
 
 async function editWorkspace(id) {
-    const current = await json('/api/workspaces/' + id);
-    const dialog=studioDialog('Edit Workspace',`<form class="request-form"><label>Name<input name="name" required value="${esc(current.name)}"></label><label>Email address<input name="email" type="email" value="${esc(current.emailAddress||'')}"></label><label>Enabled<select name="enabled"><option value="true" ${current.isEnabled?'selected':''}>Yes</option><option value="false" ${!current.isEnabled?'selected':''}>No</option></select></label><details><summary>Advanced / Integration Settings</summary><label>Route key<input name="routeKey" value="${esc(current.routeKey||'')}" placeholder="Generated automatically"></label><small>Used by website booking and incoming-message integrations. Leaving blank keeps the current key or generates one if missing.</small></details><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`);
+    const [current,employees] = await Promise.all([json('/api/workspaces/' + id),json('/api/studio-employees?assignable=true')]);
+    const leadOptions='<option value="">No default Job Lead</option>'+employees.map(employee=>`<option value="${esc(employee.userName)}" ${String(current.defaultJobLead||'').toLowerCase()===String(employee.userName||'').toLowerCase()?'selected':''}>${esc(employee.displayName)}${employee.roles?.length?' · '+esc(employee.roles.join(', ')):''}</option>`).join('');
+    const dialog=studioDialog('Edit Workspace',`<form class="request-form"><label>Name<input name="name" required value="${esc(current.name)}"></label><label>Email address<input name="email" type="email" value="${esc(current.emailAddress||'')}"></label><label>Default Job Lead<select name="defaultJobLead">${leadOptions}</select></label><label>Enabled<select name="enabled"><option value="true" ${current.isEnabled?'selected':''}>Yes</option><option value="false" ${!current.isEnabled?'selected':''}>No</option></select></label><details><summary>Advanced / Integration Settings</summary><label>Route key<input name="routeKey" value="${esc(current.routeKey||'')}" placeholder="Generated automatically"></label><small>Used by website booking and incoming-message integrations. Leaving blank keeps the current key or generates one if missing.</small></details><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`);
     dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
     const form=dialog.querySelector('form');
     form.onsubmit=async event=>{
         event.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;
         try{
-            await json('/api/workspaces/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.elements.name.value.trim(),emailAddress:form.elements.email.value.trim()||null,routeKey:form.elements.routeKey.value.trim()||null,isEnabled:form.elements.enabled.value==='true',sortOrder:current.sortOrder||0})});
+            await json('/api/workspaces/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.elements.name.value.trim(),emailAddress:form.elements.email.value.trim()||null,routeKey:form.elements.routeKey.value.trim()||null,isEnabled:form.elements.enabled.value==='true',sortOrder:current.sortOrder||0,defaultJobLead:form.elements.defaultJobLead.value||null})});
             dialog.close();await loadWorkspaces();await showWorkspaces();
         }catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}
     };
@@ -130,6 +131,29 @@ async function runMailboxImport(workspaceId) {
         const data = await json(`/api/workspaces/${workspaceId}/email-import`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:document.getElementById('importProvider').value,userName:document.getElementById('importUser').value.trim(),secret:document.getElementById('importSecret').value,folder:document.getElementById('importFolder').value.trim()||null,fromUtc:fromValue ? new Date(fromValue).toISOString() : null,toUtc:null,maximumMessages:Number(document.getElementById('importMax').value)||5000})});
         result.textContent = `Imported ${data.importedMessages} messages and ${data.importedAttachments} attachments. ${data.duplicateMessages} duplicates skipped; ${data.failedMessages} failed.`;
     } catch (error) { result.textContent = error.message || error; }
+}
+
+function renderEmployeeDirectorySection() {
+    return `<section class="job-section"><h2>Employees & Roles</h2><p class="muted">Studio's operational employee directory. Directory providers populate identity; Studio controls whether a person is active and assignable.</p><div id="studioEmployeeList"><p class="muted">Loading…</p></div><h3>Add or maintain employee</h3><div class="pos-entry"><label>User name<input id="employeeUserName"></label><label>Display name<input id="employeeDisplayName"></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><button class="primary" onclick="saveStudioEmployee()">Save employee</button></div></section>`;
+}
+async function refreshStudioEmployees(){
+    const holder=document.getElementById('studioEmployeeList');if(!holder)return;
+    const employees=await json('/api/admin/studio-employees/');
+    holder.innerHTML=employees.map(e=>`<div class="job-row"><div><b>${esc(e.displayName)}</b><div class="meta">${esc(e.userName)} · ${e.isActive?'Active':'Inactive'} · ${e.isAssignable?'Assignable':'Not assignable'}</div><div class="meta">${esc((e.roles||[]).join(', ')||e.source||'Studio')}</div></div><button class="action" data-edit-employee="${esc(e.userName)}">Edit</button></div>`).join('')||'<p class="muted">No employees yet.</p>';
+    holder.querySelectorAll('[data-edit-employee]').forEach(button=>button.onclick=()=>{
+        const employee=employees.find(e=>String(e.userName).toLowerCase()===String(button.dataset.editEmployee).toLowerCase());if(!employee)return;
+        document.getElementById('employeeUserName').value=employee.userName||'';
+        document.getElementById('employeeDisplayName').value=employee.displayName||'';
+        document.getElementById('employeeEmail').value=employee.emailAddress||'';
+        document.getElementById('employeeAssignable').value=String(employee.isAssignable!==false);
+    });
+}
+async function saveStudioEmployee(){
+    const userName=document.getElementById('employeeUserName').value.trim();if(!userName)return alert('User name is required.');
+    const existing=(await json('/api/admin/studio-employees/')).find(e=>String(e.userName).toLowerCase()===userName.toLowerCase());
+    const payload={userName,displayName:document.getElementById('employeeDisplayName').value.trim()||userName,emailAddress:document.getElementById('employeeEmail').value.trim()||null,isActive:existing?.isActive!==false,isAssignable:document.getElementById('employeeAssignable').value==='true',source:existing?.source||'Manual',externalId:existing?.externalId||null,skills:existing?.skills||[],workDayUserName:existing?.workDayUserName||null,lastSyncedAtUtc:existing?.lastSyncedAtUtc||null};
+    await json('/api/admin/studio-employees/'+encodeURIComponent(userName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    await refreshStudioEmployees();
 }
 
 function renderSecurityRolesSection() {

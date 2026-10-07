@@ -28,6 +28,8 @@ public static class OperationalWorkEndpoints
             if(!access.HasPermission(user,jobId,"ManageProduction")) return Results.Forbid();
             try
             {
+                if(!string.IsNullOrWhiteSpace(request.AssignedTo) && !new StudioEmployeeDirectoryStore(database).IsAssignable(request.AssignedTo))
+                    return Results.BadRequest(new { error="Task assignee must be an active, assignable Studio employee." });
                 OperationalWorkStore store=new(database);
                 JobActivity activity=store.CreateActivity(jobId,request,UserName(user));
                 if(!string.IsNullOrWhiteSpace(activity.AssignedTo))
@@ -46,6 +48,8 @@ public static class OperationalWorkEndpoints
             OperationalWorkStore store=new(database); JobActivity? current=store.GetActivities().FirstOrDefault(x=>x.Id==id); if(current is null) return Results.NotFound(); if(!access.HasPermission(user,current.JobId,"ManageProduction")) return Results.Forbid();
             try
             {
+                if(!string.IsNullOrWhiteSpace(request.AssignedTo) && !new StudioEmployeeDirectoryStore(database).IsAssignable(request.AssignedTo))
+                    return Results.BadRequest(new { error="Task assignee must be an active, assignable Studio employee." });
                 if(string.Equals(request.Status,"Completed",StringComparison.OrdinalIgnoreCase) && (current.ActivityType=="FileIngest" || current.ActivityType=="Backup"))
                 {
                     MediaArchiveStore media=new(database,configuration,environment);

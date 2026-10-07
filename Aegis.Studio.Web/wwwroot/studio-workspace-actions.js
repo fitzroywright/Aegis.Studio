@@ -15,8 +15,8 @@ window.openJobDetailsEditor ??= async function openJobDetailsEditor(job) {
             <label>Status
                 <input name="status" value="${esc(job.status || '')}" ${permissions.changeStatus ? '' : 'disabled'}>
             </label>
-            <label>Assigned To
-                <input name="assignedTo" value="${esc(job.assignedTo || '')}" ${permissions.assignStaff ? '' : 'disabled'}>
+            <label>Job Lead
+                <input name="jobLead" value="${esc(job.jobLead || '')}" ${permissions.assignStaff ? '' : 'disabled'}>
             </label>
             <label>Event Date
                 <input name="eventDate" type="date" value="${esc(job.eventDate || '')}">
@@ -44,11 +44,14 @@ window.openJobDetailsEditor ??= async function openJobDetailsEditor(job) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     status: permissions.changeStatus ? form.elements.status.value : null,
-                    assignedTo: permissions.assignStaff ? (form.elements.assignedTo.value || null) : null,
+                    assignedTo: null,
                     eventDate: form.elements.eventDate.value || null
                 })
             });
 
+            if (permissions.assignStaff) {
+                await json(`/api/jobs/${job.id}/lead`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:form.elements.jobLead.value||null})});
+            }
             dialog.close();
             await openWorkspaceJob(job.id);
         } catch (cause) {

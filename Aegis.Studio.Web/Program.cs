@@ -262,6 +262,7 @@ app.MapStudioOperationsEnhancements();
 app.MapStudioScheduling();
 app.MapStudioProduction();
 app.MapWorkspaceAccess();
+app.MapStudioEmployeeDirectory();
 app.MapStudioDemoData();
 new WorkspaceJobStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
 StudioVersionSchema.EnsureCreated(app.Services.GetRequiredService<StudioDatabase>());

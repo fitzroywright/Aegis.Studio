@@ -157,7 +157,9 @@ async function renderJobTasks(job,panel,current,refresh) {
     };
     panel.querySelectorAll('[data-task-view]').forEach(b=>b.onclick=()=>render(b.dataset.taskView));render('list');
     if(!(access.permissions||access).manageProduction)return;
-    const form=document.createElement('form');form.className='subject-form';form.innerHTML='<h3>Add task</h3><label>Title<input name="title" required maxlength="200"></label><label>Assigned to<input name="assignedTo"></label><label>Scheduled<input name="scheduled" type="datetime-local"></label><label>Due<input name="due" type="datetime-local"></label><button class="primary">Add task</button><p role="alert"></p>';panel.appendChild(form);
+    const employees=await json('/api/studio-employees?assignable=true');
+    if(!current())return;
+    const form=document.createElement('form');form.className='subject-form';form.innerHTML='<h3>Add task</h3><label>Title<input name="title" required maxlength="200"></label><label>Assigned to<select name="assignedTo"><option value="">Unassigned</option>'+employees.map(e=>'<option value="'+esc(e.userName)+'">'+esc(e.displayName)+(e.roles?.length?' · '+esc(e.roles.join(', ')):'')+'</option>').join('')+'</select></label><label>Scheduled<input name="scheduled" type="datetime-local"></label><label>Due<input name="due" type="datetime-local"></label><button class="primary">Add task</button><p role="alert"></p>';panel.appendChild(form);
     form.onsubmit=async e=>{e.preventDefault();const button=form.querySelector('button');button.disabled=true;try{await json(`/api/jobs/${job.id}/operations/activities`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:form.elements.title.value,activityType:'Other',status:'NotStarted',priority:'Normal',assignedTo:form.elements.assignedTo.value||null,scheduledAtUtc:form.elements.scheduled.value?new Date(form.elements.scheduled.value).toISOString():null,dueAtUtc:form.elements.due.value?new Date(form.elements.due.value).toISOString():null})});if(current())await refresh();}catch(error){form.querySelector('[role=alert]').textContent=error.message;}finally{button.disabled=false;}};
 }
 

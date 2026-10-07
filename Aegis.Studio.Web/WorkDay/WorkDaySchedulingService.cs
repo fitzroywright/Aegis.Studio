@@ -133,7 +133,6 @@ public sealed class WorkDaySchedulingService : IWorkDaySchedulingService
             update studio_shoot_sessions set photographer_user_name=$2,assistant_user_name=$3,call_time_utc=$4,planned_end_utc=$5,
               location=$6,coverage_notes=$7,equipment_notes=$8,updated_at_utc=now() where id=$1
             """,shootId,photographer.UserName,request.AssistantUserName,request.CallTimeUtc.ToUniversalTime(),request.PlannedEndUtc.ToUniversalTime(),request.Location,request.CoverageNotes,request.EquipmentNotes);
-        Sql("update studio_jobs set assigned_to=$2 where id=$1 and (assigned_to is null or lower(assigned_to)=lower($3))",jobId,photographer.UserName,oldPhotographer);
         Sql("insert into studio_schedule_assignment_history(id,entry_id,job_id,changed_by,changed_at_utc,previous_resource_ids,new_resource_ids,reason) values($1,$2,$3,$4,now(),$5,$6,$7)",Guid.NewGuid(),schedule,jobId,actor,previous,next,"Studio embedded reschedule / photographer change");
         Sql("insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,'ShootRescheduled',$3,$4,now())",Guid.NewGuid(),jobId,actor,$"{oldPhotographer} → {photographer.UserName}, {request.CallTimeUtc:u} to {request.PlannedEndUtc:u}; schedule {schedule}");
         tx.Commit();return new OperationalWorkStore(database).GetShoots(jobId).Single(s=>s.Id==shootId);

@@ -136,7 +136,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
                 if(enquiry.ExecuteScalar() is null)throw new ArgumentException("This enquiry already has a job. Resolve the existing job before recording this deposit.");
             }
             else Execute(connection,tx,"insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values($1,$2,$3,$4,$5,'Email',false,now())",conversation,r.WorkspaceId,r.Title,r.ClientName,r.ClientEmail);
-            Execute(connection,tx,"insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc) values($1,$2,$3,$4,$5,'Needs Scheduling',$6,now())",job,r.WorkspaceId,conversation,r.Title,r.ClientName,r.EventDate);
+            Execute(connection,tx,"insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,job_lead) values($1,$2,$3,$4,$5,'Needs Scheduling',$6,now(),(select default_job_lead from studio_workspaces where id=$2))",job,r.WorkspaceId,conversation,r.Title,r.ClientName,r.EventDate);
             Guid clientId=r.ClientId??Guid.Empty;
             if(clientId==Guid.Empty)
             {
