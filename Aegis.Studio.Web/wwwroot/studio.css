@@ -5884,6 +5884,23 @@ body[data-studio-view="workspaces"] .studio-shell-breadcrumb strong{
 }
 
 
+/* Shell correction 2026-10-07: the persistent context rail was removed from the current HTML shell.
+   Non-My-Work pages must therefore let <main> own the full shell width instead of leaving it
+   auto-placed in the retired 220px rail column. */
+body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell{
+  display:block;
+  padding:0;
+}
+body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell>main{
+  width:100%;
+  height:100%;
+}
+body[data-studio-view="workspaces"] .generic,
+body[data-studio-view="jobs"] .generic{
+  width:100%;
+  box-sizing:border-box;
+}
+
 /* Jobs page - real Studio data, My Work visual system 2026-10-07 */
 body[data-studio-view="jobs"] .studio-context-rail{
   display:none;
