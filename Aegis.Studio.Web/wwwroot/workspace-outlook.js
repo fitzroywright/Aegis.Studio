@@ -106,7 +106,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         studioRememberPeople(people);
         tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(studioFirstName(m))}">${esc(studioFirstName(m).slice(0,1))}</span>`).join('');
         if (version !== revision) return;
-        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId||(x.participatingWorkspaceIds||[]).includes(workspaceId)).map(job => `<button class="conversation-card hierarchy-row compact-job-row" data-search data-job="${job.id}">
+        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId||(x.participatingWorkspaceIds||[]).includes(workspaceId)).map(job => `<button class="conversation-card hierarchy-row compact-job-row studio-speedbump-row" data-search data-job="${job.id}">
             <span class="job-row-heading"><strong>${esc(job.title)}</strong></span>
             <span class="job-row-client">${esc(job.clientName || job.linkedClientName || 'Client not linked')}</span>
             <span class="job-row-meta">
@@ -238,9 +238,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
             messageHeader.innerHTML='<div><strong>Messages</strong></div><div class="panel-heading-actions"><button type="button" class="icon-button" data-message-search aria-label="Search messages">⌕</button><button type="button" class="icon-button" data-message-more aria-label="Message options">⋮</button></div>';
             messageColumn.append(messageHeader,messagesPanel,composer);
 
-            const side=document.createElement('aside');
-            side.className='job-context-sidebar';
-            side.append(nextPanel);
+            const side=document.createElement('section');
+            side.className='job-context-panel';
 
             const details=document.createElement('details');
             details.className='job-details-card';
@@ -316,11 +315,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
             nav.innerHTML='<button data-job-scroll="media" class="active">▣ Media</button><button data-job-scroll="subjects">♙ Subjects</button><button data-job-scroll="tasks">☑ Tasks</button><button data-job-scroll="messages">✉ Messages</button><button data-job-scroll="activity">◷ Activity</button><button data-job-scroll="overview">▧ Details</button>';
             meta.after(nav,board);
 
-            board.append(lower,side);
+            board.append(lower);
             const bottom=document.createElement('section');bottom.className='job-detail-bottom-grid';
             const activityCard=document.createElement('section');activityCard.className='job-center-panel job-detail-activity-card';activityCard.innerHTML='<header class="job-center-heading"><h2>Recent Activity</h2></header><div class="job-detail-activity-content"></div>';
             const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.append(messageHeader,messagesPanel,composer);
-            bottom.append(activityCard,messageCard,nextPanel);detailPane.appendChild(bottom);
+            const detailsCard=document.createElement('section');detailsCard.className='job-bottom-details';detailsCard.append(details,filesPanel);
+            bottom.append(activityCard,messageCard,nextPanel,detailsCard);detailPane.appendChild(bottom);
             renderJobActivity(job,activityCard.querySelector('.job-detail-activity-content'),current).catch(()=>{});
             messageHeader.querySelector('[data-message-search]').onclick=()=>{
                 const term=prompt('Search this conversation');if(term===null)return;
