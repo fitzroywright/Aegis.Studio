@@ -347,9 +347,28 @@ public sealed class ProductionConfigurationStore
             q.Parameters.AddWithValue(user);q.Parameters.AddWithValue((object?)role??DBNull.Value);q.Parameters.AddWithValue(skills);
             return (bool)q.ExecuteScalar()!;
         }
+        bool CapacityAllows(string user)
+        {
+            double weeklyCapacity=Math.Clamp(configuration.GetValue<double?>("Scheduling:DefaultDailyCapacityHours")??8d,1d,24d)*5d*60d;
+            using var q=new NpgsqlCommand("""
+              select
+                coalesce((select sum(coalesce(a.estimated_minutes,60)) from studio_job_activities a
+                  where lower(a.assigned_to)=lower($1) and a.status not in ('Completed','Cancelled')),0)
+                + coalesce((select sum(extract(epoch from (s.planned_end_utc-s.call_time_utc))/60.0)
+                  from studio_shoot_sessions s where s.status<>'Cancelled'
+                    and (lower(s.photographer_user_name)=lower($1) or lower(coalesce(s.assistant_user_name,''))=lower($1))
+                    and s.call_time_utc<now()+interval '7 days' and s.planned_end_utc>now()),0)
+              """,c);
+            q.Parameters.AddWithValue(user);
+            double assigned=Convert.ToDouble(q.ExecuteScalar());
+            return assigned+step.EstimatedMinutes<=weeklyCapacity;
+        }
 
         if(requested is not null)
-            return Eligible(requested)?new(requested,null):new(null,$"Default assignee {requested} is inactive, unassignable, or does not meet role/skill requirements.");
+        {
+            if(!Eligible(requested))return new(null,$"Default assignee {requested} is inactive, unassignable, or does not meet role/skill requirements.");
+            return CapacityAllows(requested)?new(requested,null):new(null,$"Default assignee {requested} is at or over configured capacity; assignment requires review.");
+        }
 
         using var candidates=new NpgsqlCommand("""
           select e.user_name
@@ -360,11 +379,18 @@ public sealed class ProductionConfigurationStore
               where m.is_active and r.is_active and lower(m.user_name)=lower(e.user_name) and lower(r.name)=lower($1)))
             and ($2::text[] <@ e.skills)
           order by coalesce((select sum(coalesce(a.estimated_minutes,60)) from studio_job_activities a where lower(a.assigned_to)=lower(e.user_name) and a.status not in ('Completed','Cancelled')),0),e.display_name
-          limit 1
+          limit 20
           """,c);
         candidates.Parameters.AddWithValue((object?)role??DBNull.Value);candidates.Parameters.AddWithValue(skills);
-        string? selected=candidates.ExecuteScalar() as string;
-        return selected is null?new(null,"No active assignable employee meets the required role/skill criteria."):new(selected,null);
+        using var reader=candidates.ExecuteReader();
+        List<string> eligible=[];
+        while(reader.Read())eligible.Add(reader.GetString(0));
+        reader.Close();
+        string? selected=eligible.FirstOrDefault(CapacityAllows);
+        if(selected is not null)return new(selected,null);
+        return eligible.Count==0
+            ? new(null,"No active assignable employee meets the required role/skill criteria.")
+            : new(null,"Eligible employees are at or over configured capacity; assignment requires review.");
     }
 
     private static string? Clean(string? value)=>string.IsNullOrWhiteSpace(value)?null:value.Trim();
