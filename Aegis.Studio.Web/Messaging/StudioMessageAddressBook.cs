@@ -173,6 +173,7 @@ public sealed class StudioMessageAddressBook
             using NpgsqlDataReader reader = thread.ExecuteReader();
             List<Guid> matches = [];
             while (reader.Read()) matches.Add(reader.GetGuid(0));
+            reader.Close();
             if (matches.Count == 1) return ClassifyConversation(matches[0]);
         }
 
