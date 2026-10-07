@@ -13,8 +13,7 @@ public static class StudioMessageNotificationContext
         Guid? personThreadId = null)
     {
         string sender = SenderLabel(email);
-        string context = string.IsNullOrWhiteSpace(route.UserFacingContext) ? "Aegis Studio" : route.UserFacingContext;
-        string subject = $"{context} — New message from {sender}";
+        string subject = BuildInboundSubject(email, route);
         string body = string.IsNullOrWhiteSpace(email.FromName) || string.Equals(email.FromName.Trim(), email.FromAddress.Trim(), StringComparison.OrdinalIgnoreCase)
             ? email.Subject
             : $"{email.Subject} · {email.FromAddress.Trim()}";
@@ -46,6 +45,12 @@ public static class StudioMessageNotificationContext
         }
 
         notifications.PublishToAll("WorkspaceMessage", $"Aegis Studio — New message from {sender}", body);
+    }
+
+    public static string BuildInboundSubject(InboundEmail email, EmailRouteResult route)
+    {
+        string context = string.IsNullOrWhiteSpace(route.UserFacingContext) ? "Aegis Studio" : route.UserFacingContext;
+        return $"{context} — New message from {SenderLabel(email)}";
     }
 
     public static string SenderLabel(InboundEmail email)
