@@ -179,6 +179,12 @@ public static class StudioMessageAttachmentEndpoints
             try
             {
                 messages.AssertThreadAccess(threadId.Value,user);
+                if(messages.GetExternalThread(threadId.Value,user) is not null)
+                {
+                    long existingBytes=files.GetForMessage(messageId).Sum(x=>x.Size);
+                    if(existingBytes+file.Length>2_500_000)
+                        return Results.BadRequest(new{error="External email attachments cannot exceed 2.5 MB total through the Microsoft 365 transport."});
+                }
                 StudioMessageAttachment attachment=await files.AddAsync(messageId,file,user.FindFirstValue("login_name")??user.Identity?.Name??"Studio",token);
                 return Results.Created($"/api/message-attachments/{attachment.Id}",attachment);
             }
