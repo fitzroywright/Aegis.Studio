@@ -327,19 +327,19 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.append(messageHeader,messagesPanel,composer);
             const detailsCard=document.createElement('section');detailsCard.className='job-bottom-details';detailsCard.append(details,filesPanel);
             bottom.append(activityCard,messageCard,nextPanel);detailPane.appendChild(bottom);
-            quick.querySelector('[data-quick-upload]').onclick=()=>lower.querySelector('.media-toolbar-host button')?.click();
-            quick.querySelector('[data-quick-task]').onclick=()=>lower.querySelector('[data-job-add-task]')?.click();
-            quick.querySelector('[data-quick-production]').onclick=()=>window.studioNavigate?.('production');
-            quick.querySelector('[data-quick-edit]').onclick=()=>openJobDetailsEditor(job);
+            quick.querySelector('[data-quick-upload]')?.addEventListener('click',()=>lower.querySelector('.media-toolbar-host button')?.click());
+            quick.querySelector('[data-quick-task]')?.addEventListener('click',()=>lower.querySelector('[data-job-add-task]')?.click());
+            quick.querySelector('[data-quick-production]')?.addEventListener('click',()=>window.studioNavigate?.('production'));
+            quick.querySelector('[data-quick-edit]')?.addEventListener('click',()=>openJobDetailsEditor(job));
             collections.querySelectorAll('[data-collection]').forEach(button=>button.onclick=()=>{collections.querySelectorAll('[data-collection]').forEach(x=>x.classList.toggle('active',x===button));const select=lower.querySelector('.gallery-tab-filter select');if(select){select.value=button.dataset.collection||'';select.dispatchEvent(new Event('change',{bubbles:true}));}});
             renderJobActivity(job,activityCard.querySelector('.job-detail-activity-content'),current).catch(()=>{});
-            messageHeader.querySelector('[data-message-search]').onclick=()=>{
+            messageHeader.querySelector('[data-message-search]')?.addEventListener('click',()=>{
                 const term=prompt('Search this conversation');if(term===null)return;
                 messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));
-            };
-            messageHeader.querySelector('[data-message-more]').onclick=()=>{
-                messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();
-            };
+            });
+            messageHeader.querySelector('[data-message-more]')?.addEventListener('click',()=>{
+                messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea')?.focus();
+            });
 
             const mediaPanel=lower.querySelector('.job-media-content');
             const subjectsPanel=lower.querySelector('.job-subjects-content');
