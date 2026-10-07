@@ -122,6 +122,11 @@ public sealed class MessagingRoutingTests
         Assert.Equal("Campbell Wedding",job.UserFacingContext);
         Assert.DoesNotContain("Hub",person.UserFacingContext,StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Hub",job.UserFacingContext,StringComparison.OrdinalIgnoreCase);
+
+        InboundEmail email = Email("n1","lisa@example.net",["collection@example.net"],"Question");
+        Assert.Equal("Fitzroy Wright — New message from Lisa",StudioMessageNotificationContext.BuildInboundSubject(email,person));
+        Assert.Equal("Weddings — New message from Lisa",StudioMessageNotificationContext.BuildInboundSubject(email,workspace));
+        Assert.Equal("Campbell Wedding — New message from Lisa",StudioMessageNotificationContext.BuildInboundSubject(email,job));
     }
 
     private static InboundEmail Email(string id,string from,IReadOnlyCollection<string> to,string subject)
