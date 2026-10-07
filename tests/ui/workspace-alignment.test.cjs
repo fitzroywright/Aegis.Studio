@@ -240,3 +240,27 @@ test('Workspaces keeps My Work breadcrumb and three-column rails',()=>{
  assert.match(workspaceSource,/\{label:'Workspaces',view:'workspaces'\}/);
  assert.match(css,/body\[data-studio-view="workspaces"\] \.studio-context-rail\{\s*display:none;/);
 });
+
+
+test('Jobs page uses real Studio data and keeps the three-rail navigation path',()=>{
+ const navigation=fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8');
+ const shell=fs.readFileSync(path.join(root,'studio-shell-nav.js'),'utf8');
+ const css=fs.readFileSync(path.join(root,'studio.css'),'utf8');
+ assert.match(navigation,/jobs:renderJobs/);
+ assert.match(navigation,/\/api\/jobs/);
+ assert.match(navigation,/\/api\/operations\/activities/);
+ assert.match(navigation,/\/api\/schedule\/entries\?/);
+ assert.match(navigation,/\/api\/production\/media-summary/);
+ assert.match(navigation,/\/api\/notifications\?count=100/);
+ assert.match(navigation,/jobs-left-rail/);
+ assert.match(navigation,/jobs-center/);
+ assert.match(navigation,/jobs-right-rail/);
+ assert.match(navigation,/\{label:'My Work',view:'mywork'\}/);
+ assert.match(navigation,/\{label:'Workspaces',view:'workspaces'\}/);
+ assert.match(navigation,/\{label:'Jobs',view:'jobs'\}/);
+ assert.doesNotMatch(navigation,/Workspace Links/);
+ assert.match(navigation,/data-workspace-jobs/);
+ assert.match(shell,/\['jobs', 'Jobs'/);
+ assert.match(shell,/\['pipeline', 'Pipeline'/);
+ assert.match(css,/body\[data-studio-view="jobs"\] \.studio-context-rail\{\s*display:none;/);
+});
