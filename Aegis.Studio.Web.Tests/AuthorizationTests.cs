@@ -11,6 +11,14 @@ public sealed class AuthorizationTests
     [InlineData("/api/bookings")]
     [InlineData("/api/bookings/{id:guid}")]
     [InlineData("/api/bookings/{id:guid}/payment-confirmations")]
+    [InlineData("/api/auth/options")]
+    [InlineData("/api/public/booking-requests")]
+    [InlineData("/api/public/booking-requests/{id:guid}")]
+    [InlineData("/api/public/booking-requests/{id:guid}/payment-confirmations")]
+    [InlineData("/api/engineering/diagnostics/run")]
+    [InlineData("/api/engineering/diagnostics/runs")]
+    [InlineData("/api/engineering/diagnostics/runs/{runId:guid}")]
+    [InlineData("/api/engineering/diagnostics/runs/{runId:guid}/resolve")]
     public void ApprovedAnonymousRoutesAreExplicit(string route)
     {
         Assert.True(AuthorizationAuditPolicy.IsApprovedAnonymousPath(route));
