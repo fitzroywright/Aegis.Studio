@@ -27,7 +27,7 @@
             <div class="studio-messaging">
                 <aside class="message-thread-pane">
                     <div class="message-pane-heading">
-                        <div><h1>Messages</h1><p>Studio staff conversations</p></div>
+                        <div><h1>Messages</h1><p>Studio conversations</p></div>
                         <button class="primary" id="newDirectMessage">New</button>
                     </div>
                     <div class="message-scope-actions">
