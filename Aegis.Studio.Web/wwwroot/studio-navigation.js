@@ -700,6 +700,7 @@
                         <section id="workspaceImportPanel" class="admin-card job-section hidden"></section>
 
                         <div class="admin-generated-sections">
+                            ${renderEmployeeDirectorySection()}
                             ${renderSecurityRolesSection()}
                             ${renderWorkflowSection()}
                         </div>
@@ -736,6 +737,7 @@
             readStatus();
         }
         await hydrateWorkspaceManagers(manageable);
+        await refreshStudioEmployees();
         await refreshWorkflowList();
         await renderGlobalRoleAdministration();
         await renderAnnouncementAdministration();
