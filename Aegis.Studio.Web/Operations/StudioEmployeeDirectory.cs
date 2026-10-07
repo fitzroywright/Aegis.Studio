@@ -84,7 +84,8 @@ public sealed class StudioEmployeeDirectoryStore
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         foreach(var item in employees??[])
         {
-            string user=Clean(item.UserName)??continue;
+            string? cleanedUser=Clean(item.UserName);if(cleanedUser is null)continue;
+            string user=cleanedUser;
             string display=Clean(item.DisplayName)??user;
             using var cmd=new NpgsqlCommand("""
               insert into studio_employees(user_name,display_name,email_address,is_active,is_assignable,source,external_id,skills,workday_user_name,source_active,sync_state,last_synced_at_utc,created_at_utc,updated_at_utc)
