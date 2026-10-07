@@ -81,8 +81,15 @@ public sealed class MessagingRoutingTests
                     externalConversation,personAddress.WorkspaceId!.Value);
             }
             StudioConversation external = studio.GetConversation(externalConversation)!;
+            Guid externalThread=Guid.NewGuid(),inAppMessage=Guid.NewGuid();
+            using (NpgsqlConnection connection = database.OpenConnection())
+            {
+                Sql(connection,"insert into studio_message_threads(id,scope_type,scope_id,direct_key,title,created_by,created_at_utc,external_conversation_id,owner_user_name,external_address) values($1,'Person',$2,null,'Outside test','fwright',now(),$2,'fwright','outside@example.net')",externalThread,externalConversation);
+                Sql(connection,"insert into studio_message_thread_members(thread_id,user_name,joined_at_utc) values($1,'fwright',now())",externalThread);
+                Sql(connection,"insert into studio_inapp_messages(id,thread_id,sender_user_name,body,created_at_utc) values($1,$2,'fwright','Hello outside',now())",inAppMessage,externalThread);
+            }
             var outbox = new OutboundEmailStore(database,workspaces);
-            OutboundEmail queued = outbox.QueuePerson(external,"Hello outside",personAddress.Address,"fwright",Guid.NewGuid());
+            OutboundEmail queued = outbox.QueuePerson(external,"Hello outside",personAddress.Address,"fwright",inAppMessage);
             Assert.Equal("outside@example.net",queued.ToAddress);
             Assert.Equal("Person",queued.SendingIdentityType);
             Assert.Equal(personAddress.Address,queued.FromAddress);
