@@ -186,7 +186,7 @@
             if(entry.kind==='announcement'){
                 const a=entry.item;
                 return `<button class="mw-message-row announcement" data-announcement-workspace="${a.workspaceId||''}">
-                    <span class="mw-comm-type announcement" title="Announcement" aria-label="Announcement">!</span>
+                    <span class="mw-comm-type announcement" title="Announcement" aria-label="Announcement">📣</span>
                     <span class="mw-message-copy"><strong>${esc(a.title||'Announcement')}</strong><small>${esc((a.workspaceName?a.workspaceName+' · ':'')+(a.body||''))}</small></span>
                     <span class="mw-message-time">${a.createdAtUtc?formatDay(a.createdAtUtc):''}</span>
                     <span class="mw-chevron">›</span>
@@ -194,7 +194,7 @@
             }
             const n=entry.item;
             return `<button class="mw-message-row message" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
-                <span class="mw-comm-type message" title="Message" aria-label="Message">✉</span>
+                <span class="mw-comm-type message" title="Message" aria-label="Message">📧</span>
                 <span class="mw-message-copy"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.eventType||'Studio message')}</small></span>
                 <span class="mw-message-time">${n.createdAtUtc?formatDay(n.createdAtUtc):''}</span>
                 <span class="mw-chevron">›</span>
@@ -231,11 +231,11 @@
                         <section class="mw-list-panel" data-mw-region="status">
                             <header><h2><span class="mw-title-icon status">▥</span> Status</h2><small>Assigned to ${esc(displayName)}</small></header>
                             <div class="mw-status-list">
-                                <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>Jobs I lead</span><strong>${metric('jobs',leadJobs.length)}</strong></button>
-                                <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Today's sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
-                                <button class="mw-status-row" data-nav="tasks"><span class="mw-status-icon">☑</span><span>Open tasks</span><strong>${metric('tasks',myTasks.length)}</strong></button>
-                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionTotal)}</strong></button>
-                                <button class="mw-status-row" data-nav="messages"><span class="mw-status-icon">✉</span><span>Unread messages</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong></button>
+                                <button class="mw-status-row active" data-mywork-focus="jobs"><span class="mw-status-icon">▤</span><span>Jobs I lead</span><strong>${metric('jobs',leadJobs.length)}</strong></button>
+                                <button class="mw-status-row" data-mywork-focus="schedule"><span class="mw-status-icon">▣</span><span>Today's sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
+                                <button class="mw-status-row" data-mywork-focus="tasks"><span class="mw-status-icon">☑</span><span>Open tasks</span><strong>${metric('tasks',myTasks.length)}</strong></button>
+                                <button class="mw-status-row warning" data-mywork-focus="attention"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionTotal)}</strong></button>
+                                <button class="mw-status-row" data-mywork-focus="messages"><span class="mw-status-icon">✉</span><span>Unread messages</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong></button>
                             </div>
                         </section>
 
@@ -294,7 +294,7 @@
                         </section>
 
                         <section class="mw-list-panel mw-messages-panel" data-mw-region="messages">
-                            <header><h2><span class="mw-title-icon messages">✉</span> Messages &amp; Announcements</h2></header>
+                            <header><h2><span class="mw-title-icon messages" title="Messages" aria-label="Messages">📧</span> Messages <span class="mw-title-icon announcements" title="Announcements" aria-label="Announcements">📣</span></h2></header>
                             <div class="mw-compact-messages">${phase('notifications',messageRows)}</div>
                         </section>
                     </aside>
@@ -445,6 +445,10 @@
         });
         genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b.dataset.mwFilter===state.taskFilter));
         genericView.querySelectorAll('[data-task-type]').forEach(row=>row.hidden=state.taskFilter!=='all'&&!row.dataset.taskType.toLowerCase().includes(state.taskFilter));
+        genericView.querySelectorAll('[data-mywork-focus]').forEach(button=>button.onclick=()=>{
+            const region=button.dataset.myworkFocus;
+            genericView.querySelector('[data-mw-region="'+region+'"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
         genericView.querySelectorAll('[data-nav]').forEach(button=>button.onclick=()=>window.studioNavigate(button.dataset.nav));
         const openNotifications=genericView.querySelector('#mwOpenNotifications');
         if(openNotifications)openNotifications.onclick=()=>document.getElementById('notificationButton')?.click();
