@@ -455,7 +455,13 @@
         genericView.classList.remove('hidden');
         genericView.innerHTML='<div class="mywork-loading">Loading workspaces…</div>';
 
-        const [workspaces,jobs,mediaSummary]=await Promise.all([loadWorkspaces().then(()=>workspaceCache),json('/api/jobs'),json('/api/production/media-summary')]);
+        const [workspaces,jobs,mediaSummary,allTasks,schedule]=await Promise.all([
+            loadWorkspaces().then(()=>workspaceCache),
+            json('/api/jobs'),
+            json('/api/production/media-summary'),
+            json('/api/operations/activities').catch(()=>[]),
+            json('/api/schedule/entries?from='+encodeURIComponent(new Date().toISOString())+'&to='+encodeURIComponent(new Date(Date.now()+365*24*60*60*1000).toISOString())).catch(()=>[])
+        ]);
         const workspaceData=[];
         // Announcement reads are bounded; galleries are represented by counts and three IDs.
         for(const workspace of workspaces){
@@ -489,34 +495,53 @@
             return values;
         };
 
-        const activeCount=workspaceData.filter(item=>item.jobs.some(job=>String(job.status||'').toLowerCase()!=='completed')).length;
-        const completedWorkspaceCount=workspaceData.filter(item=>item.jobs.length&&item.jobs.every(job=>String(job.status||'').toLowerCase()==='completed')).length;
+        const completedStatus=status=>String(status||'').toLowerCase()==='completed';
+        const productionStatuses=new Set(['needs review','in production','production','culling','editing','retouching','qc','printing','ready for client','ready for delivery']);
+        const jobIds=item=>new Set(item.jobs.map(job=>String(job.id)));
+        const metricsFor=item=>{
+            const ids=jobIds(item);
+            const tasks=(allTasks||[]).filter(task=>ids.has(String(task.jobId)));
+            const shoots=(schedule||[]).filter(entry=>entry.jobId&&ids.has(String(entry.jobId))&&String(entry.status||'').toLowerCase()!=='cancelled');
+            return {
+                activeJobs:item.jobs.filter(job=>!completedStatus(job.status)).length,
+                completedJobs:item.jobs.filter(job=>completedStatus(job.status)).length,
+                upcomingShoots:shoots.filter(entry=>new Date(entry.startsAtUtc||entry.start||entry.startsAt)>new Date()).length,
+                openTasks:tasks.filter(task=>!['completed','cancelled'].includes(String(task.status||'').toLowerCase())).length,
+                overdueTasks:tasks.filter(task=>!['completed','cancelled'].includes(String(task.status||'').toLowerCase())&&task.dueAtUtc&&new Date(task.dueAtUtc)<new Date()).length,
+                awaitingProduction:item.jobs.filter(job=>productionStatuses.has(String(job.status||'').toLowerCase())).length
+            };
+        };
+        workspaceData.forEach(item=>item.metrics=metricsFor(item));
+        const totals=workspaceData.reduce((sum,item)=>{
+            Object.keys(sum).forEach(key=>sum[key]+=item.metrics[key]);
+            return sum;
+        },{activeJobs:0,completedJobs:0,upcomingShoots:0,openTasks:0,overdueTasks:0,awaitingProduction:0});
         const announcements=workspaceData
             .flatMap(item=>(item.announcements||[]).map(a=>({...a,workspaceName:item.workspace.name})))
             .sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0))
             .slice(0,4);
 
         const renderRows=items=>items.map(item=>{
-            const current=item.jobs.filter(job=>String(job.status||'').toLowerCase()!=='completed');
+            const current=item.jobs.filter(job=>!completedStatus(job.status));
             const latest=latestJob(item);
             const photos=photoCount(item);
             const hero=heroFor(item);
             const previews=previewsFor(item);
-            const status=current.length?'Active':item.jobs.length?'Completed':'Ready';
-            const statusClass=status.toLowerCase();
+            const status=current.length?'Active':item.jobs.length?'No active jobs':'Ready';
+            const statusClass=current.length?'active':'ready';
             const subtitle=latest?.clientName||item.workspace.emailAddress||item.workspace.routeKey||'Studio workspace';
             const secondary=latest?.title||latest?.jobType||'No recent job';
             const lastActivity=latest?.eventDate||latest?.createdAtUtc||latest?.createdAt;
-            return `<article class="workspace-wow-row" data-workspace-row data-status="${statusClass}" data-search="${esc((item.workspace.name+' '+subtitle+' '+secondary+' '+status).toLowerCase())}">
+            return `<article class="workspace-wow-row" data-workspace-row data-status="${item.metrics.activeJobs?'active':'inactive'}" data-search="${esc((item.workspace.name+' '+subtitle+' '+secondary+' '+status).toLowerCase())}">
                 <button type="button" class="workspace-wow-main" data-open-workspace="${item.workspace.id}" data-workspace-name="${esc(item.workspace.name)}">
                     <span class="workspace-wow-thumb">${hero?`<img src="${hero}" alt="">`:'<span class="workspace-photo-fallback">📷</span>'}</span>
                     <span class="workspace-wow-copy">
                         <strong>${esc(item.workspace.name)}</strong>
                         <small>${esc(subtitle)} · ${esc(secondary)}</small>
                     </span>
-                    <span class="workspace-wow-stat"><b>${item.jobs.length}</b><small>Jobs</small></span>
-                    <span class="workspace-wow-stat"><b>${photos}</b><small>Photos</small></span>
-                    <span class="workspace-wow-stat"><b>${current.length}</b><small>Active</small></span>
+                    <span class="workspace-wow-stat"><b>${item.metrics.activeJobs}</b><small>Active Jobs</small></span>
+                    <span class="workspace-wow-stat"><b>${item.metrics.completedJobs}</b><small>Completed Jobs</small></span>
+                    <span class="workspace-wow-stat"><b>${item.metrics.upcomingShoots}</b><small>Upcoming Shoots</small></span>
                     <span class="workspace-wow-previews">
                         ${previews.map(url=>`<img src="${url}" alt="">`).join('')}
                         ${photos>previews.length?`<i>+${photos-previews.length}</i>`:''}
@@ -537,10 +562,12 @@
                         <section class="mw-list-panel">
                             <header><h2><span class="mw-title-icon status">▥</span> Workspace Status</h2><small>${workspaceData.length} total</small></header>
                             <div class="mw-status-list">
-                                <button class="mw-status-row active" data-workspace-filter="all"><span class="mw-status-icon">▤</span><span>All workspaces</span><strong>${workspaceData.length}</strong></button>
-                                <button class="mw-status-row" data-workspace-filter="active"><span class="mw-status-icon">●</span><span>Active</span><strong>${activeCount}</strong></button>
-                                <button class="mw-status-row" data-workspace-filter="completed"><span class="mw-status-icon">✓</span><span>Completed</span><strong>${completedWorkspaceCount}</strong></button>
-                                <button class="mw-status-row" data-workspace-filter="ready"><span class="mw-status-icon">○</span><span>Ready</span><strong>${workspaceData.filter(item=>!item.jobs.length).length}</strong></button>
+                                <div class="workspace-summary-row"><span>▥</span><span>Active Jobs</span><strong>${totals.activeJobs}</strong></div>
+                                <div class="workspace-summary-row"><span>✓</span><span>Completed Jobs</span><strong>${totals.completedJobs}</strong></div>
+                                <div class="workspace-summary-row"><span>▣</span><span>Upcoming Shoots</span><strong>${totals.upcomingShoots}</strong></div>
+                                <div class="workspace-summary-row"><span>☑</span><span>Open Tasks</span><strong>${totals.openTasks}</strong></div>
+                                <div class="workspace-summary-row"><span>◷</span><span>Overdue Tasks</span><strong>${totals.overdueTasks}</strong></div>
+                                <div class="workspace-summary-row"><span>◆</span><span>Jobs Awaiting Production</span><strong>${totals.awaitingProduction}</strong></div>
                             </div>
                         </section>
 
@@ -592,10 +619,12 @@
                         <section class="mw-list-panel">
                             <header><h2><span class="mw-title-icon attention">▤</span> Overview</h2><small>Studio totals</small></header>
                             <div class="mw-status-list">
-                                <div class="workspace-summary-row"><span>▣</span><span>Total jobs</span><strong>${workspaceData.reduce((sum,item)=>sum+item.jobs.length,0)}</strong></div>
-                                <div class="workspace-summary-row"><span>▧</span><span>Photos</span><strong>${workspaceData.reduce((sum,item)=>sum+photoCount(item),0)}</strong></div>
-                                <div class="workspace-summary-row"><span>●</span><span>Active workspaces</span><strong>${activeCount}</strong></div>
-                                <div class="workspace-summary-row"><span>✓</span><span>Completed</span><strong>${completedWorkspaceCount}</strong></div>
+                                <div class="workspace-summary-row"><span>▥</span><span>Active Jobs</span><strong>${totals.activeJobs}</strong></div>
+                                <div class="workspace-summary-row"><span>✓</span><span>Completed Jobs</span><strong>${totals.completedJobs}</strong></div>
+                                <div class="workspace-summary-row"><span>▣</span><span>Upcoming Shoots</span><strong>${totals.upcomingShoots}</strong></div>
+                                <div class="workspace-summary-row"><span>☑</span><span>Open Tasks</span><strong>${totals.openTasks}</strong></div>
+                                <div class="workspace-summary-row"><span>◷</span><span>Overdue Tasks</span><strong>${totals.overdueTasks}</strong></div>
+                                <div class="workspace-summary-row"><span>◆</span><span>Jobs Awaiting Production</span><strong>${totals.awaitingProduction}</strong></div>
                             </div>
                         </section>
 
@@ -630,7 +659,6 @@
 
 
         const allRows=()=>[...genericView.querySelectorAll('[data-workspace-row]')];
-        let filter='all';
         let term='';
         let sort='name';
 
@@ -638,10 +666,8 @@
             const list=genericView.querySelector('[data-workspace-list]');
             const rows=allRows();
             rows.forEach(row=>{
-                const status=row.dataset.status;
-                const matchesFilter=filter==='all'||status===filter;
                 const matchesTerm=!term||row.dataset.search.includes(term);
-                row.hidden=!(matchesFilter&&matchesTerm);
+                row.hidden=!matchesTerm;
             });
 
             rows.sort((a,b)=>{
@@ -653,13 +679,6 @@
             }).forEach(row=>list.appendChild(row));
         };
 
-        genericView.querySelectorAll('[data-workspace-filter]').forEach(button=>{
-            button.onclick=()=>{
-                filter=button.dataset.workspaceFilter;
-                genericView.querySelectorAll('[data-workspace-filter]').forEach(x=>x.classList.toggle('active',x===button));
-                refresh();
-            };
-        });
         const search=genericView.querySelector('[data-workspace-search]');
         const updateTerm=value=>{
             term=String(value||'').trim().toLowerCase();

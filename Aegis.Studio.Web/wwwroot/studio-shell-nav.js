@@ -13,6 +13,19 @@
         ['messages', 'Messages', '✉']
     ];
     const history = [];
+    const fallbackParent = {
+        workspaces: 'mywork',
+        jobs: 'workspaces',
+        pipeline: 'mywork',
+        production: 'mywork',
+        frontdesk: 'mywork',
+        finance: 'mywork',
+        messages: 'mywork',
+        schedule: 'mywork',
+        tasks: 'mywork',
+        reports: 'mywork',
+        admin: 'mywork'
+    };
     let currentView = document.body.dataset.studioView || 'mywork';
     let renderingTools = false;
 
@@ -106,8 +119,11 @@
         });
     }
 
-    function goBack() {
-        const target = history.pop() || 'mywork';
+    function goBack(event) {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        const target = history.pop() || fallbackParent[currentView] || 'mywork';
+        // Never delegate Studio's Back control to browser history. It is application navigation.
         window.studioNavigate?.(target, { studioBack: true });
     }
 

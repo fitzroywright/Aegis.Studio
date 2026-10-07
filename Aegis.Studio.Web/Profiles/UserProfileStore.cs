@@ -8,13 +8,9 @@ public sealed class UserProfileStore
 {
     private static readonly HashSet<string> AllowedThemes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "studio-default",
-        "office-light",
-        "fluent-dark",
-        "mid-century",
-        "steel",
-        "sakura",
-        "ocean"
+        "standard",
+        "light",
+        "dark"
     };
 
     private readonly StudioDatabase database;
@@ -34,7 +30,7 @@ public sealed class UserProfileStore
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        StudioUserProfile profile = new(StableProfileId(userName), userName, user.Identity?.Name ?? userName, user.FindFirstValue(ClaimTypes.Email), user.FindFirstValue("department"), user.FindFirstValue("title"), "studio-default", UserMessagingPreferences.Default, now, now);
+        StudioUserProfile profile = new(StableProfileId(userName), userName, user.Identity?.Name ?? userName, user.FindFirstValue(ClaimTypes.Email), user.FindFirstValue("department"), user.FindFirstValue("title"), "standard", UserMessagingPreferences.Default, now, now);
         Save(profile);
         return profile;
     }
@@ -147,8 +143,12 @@ public sealed class UserProfileStore
 
     private static string NormalizeTheme(string? value)
     {
-        string theme = string.IsNullOrWhiteSpace(value) ? "studio-default" : value.Trim().ToLowerInvariant();
-        return AllowedThemes.Contains(theme) ? theme : "studio-default";
+        string theme = string.IsNullOrWhiteSpace(value) ? "standard" : value.Trim().ToLowerInvariant();
+        // Preserve existing users safely while retiring the old theme menu.
+        if (theme == "office-light") return "light";
+        if (theme == "fluent-dark") return "dark";
+        if (!AllowedThemes.Contains(theme)) return "standard";
+        return theme;
     }
 
     private static string? NormalizeClock(string? value) => string.IsNullOrWhiteSpace(value) ? null : TimeOnly.TryParse(value, out TimeOnly time) ? time.ToString("HH:mm") : null;
