@@ -84,6 +84,10 @@ public sealed class StudioMessageAddressBook
         string address = NormalizeAddress(value);
         if (string.IsNullOrWhiteSpace(address)) return null;
 
+        StudioUserProfile? inferredPerson = profiles.GetAll().FirstOrDefault(profile =>
+            string.Equals(PersonAddress(profile.UserName), address, StringComparison.OrdinalIgnoreCase));
+        if (inferredPerson is not null) return EnsurePerson(inferredPerson);
+
         using NpgsqlConnection connection = database.OpenConnection();
         using (NpgsqlCommand configured = connection.CreateCommand())
         {
