@@ -562,7 +562,11 @@ app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrin
         };
         if(flowStage is not null) flows.TryEnqueueJobFlow(id.ToString("D"),flowStage,id.ToString("D"),$"Job status changed to {updated.Status}.");
         string actor=user.FindFirstValue("login_name")??user.Identity?.Name??"Studio";
-        new ProductionConfigurationStore(database,configuration).GenerateForJobIfTriggered(id,updated.Status,actor);
+        foreach(var task in new ProductionConfigurationStore(database,configuration).GenerateForJobIfTriggered(id,updated.Status,actor).Where(x=>!string.IsNullOrWhiteSpace(x.AssignedTo)))
+        {
+            access.EnsureAssignedMember(id,task.AssignedTo!);
+            notifications.PublishToUser(task.AssignedTo!,"JobAssigned",$"Production task assigned: {task.TemplateName}",$"Estimated effort: {task.EstimatedMinutes} minutes.","Job",id.ToString("D"));
+        }
     }
     if (!string.Equals(before.AssignedTo, updated.AssignedTo, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(updated.AssignedTo))
     {
@@ -574,7 +578,7 @@ app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrin
 });
 
 
-app.MapPost("/api/jobs/{id:guid}/pipeline-transition", (Guid id, PipelineJobTransitionRequest request, ClaimsPrincipal user, StudioStore store, JobAccessService access, WorkspaceAccessService workspaceAccess, StudioDatabase database, StudioInAppMessageStore messages, JobEventNotifier jobEvents, StudioOperationsFlowPublisher flows, IConfiguration configuration) =>
+app.MapPost("/api/jobs/{id:guid}/pipeline-transition", (Guid id, PipelineJobTransitionRequest request, ClaimsPrincipal user, StudioStore store, JobAccessService access, WorkspaceAccessService workspaceAccess, StudioDatabase database, StudioInAppMessageStore messages, JobEventNotifier jobEvents, StudioOperationsFlowPublisher flows, IConfiguration configuration, NotificationService notifications) =>
 {
     StudioJob? before=store.GetJob(id);if(before is null)return Results.NotFound();
     if(!access.HasPermission(user,id,"EditJob"))return Results.Forbid();
@@ -612,7 +616,11 @@ app.MapPost("/api/jobs/{id:guid}/pipeline-transition", (Guid id, PipelineJobTran
     {
         jobEvents.Publish(id,"JobStatusChanged",$"Job status: {updated.Title}",$"{before.Status} → {updated.Status}",requesterEligible:true);
         flows.TryEnqueueJobFlow(id.ToString("D"),"InProgress",id.ToString("D"),detail);
-        new ProductionConfigurationStore(database,configuration).GenerateForJobIfTriggered(id,updated.Status,actor);
+        foreach(var task in new ProductionConfigurationStore(database,configuration).GenerateForJobIfTriggered(id,updated.Status,actor).Where(x=>!string.IsNullOrWhiteSpace(x.AssignedTo)))
+        {
+            access.EnsureAssignedMember(id,task.AssignedTo!);
+            notifications.PublishToUser(task.AssignedTo!,"JobAssigned",$"Production task assigned: {task.TemplateName}",$"Estimated effort: {task.EstimatedMinutes} minutes.","Job",id.ToString("D"));
+        }
     }
     if(workspaceChanged)flows.TryEnqueueJobFlow(id.ToString("D"),"Workspace",id.ToString("D"),detail);
     return Results.Ok(updated);
