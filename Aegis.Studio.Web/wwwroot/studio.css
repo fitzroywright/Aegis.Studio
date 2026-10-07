@@ -548,17 +548,8 @@ dialog::backdrop {
   color:#92580f;
   box-shadow:0 2px #1677ff
 }
-.job-work-board {
-  display:grid;
-  grid-template-columns:minmax(260px,1.3fr) minmax(380px,1.9fr) minmax(230px,1fr);
-  gap:12px;
-  min-height:0;
-  flex:1
-}
-.job-message-column,.job-context-sidebar,.job-lower-pane {
-  min-height:0;
-  min-width:0
-}
+
+.job-message-column,.job-context-sidebar,
 .job-message-column {
   display:flex;
   flex-direction:column;
@@ -647,12 +638,7 @@ dialog::backdrop {
   width:155px;
   font-size:11px
 }
-.job-lower-pane {
-  display:grid;
-  grid-template-rows:minmax(250px,1.8fr) minmax(130px,.75fr) minmax(150px,1fr);
-  gap:10px;
-  overflow:hidden
-}
+
 .job-center-panel {
   display:flex;
   flex-direction:column;
@@ -673,33 +659,17 @@ dialog::backdrop {
 .job-center-heading h2 {
   font-size:17px
 }
-.job-context-sidebar {
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  overflow:auto
-}
-.thread-next-tasks,.job-details-card,.thread-shared-files {
+
+.thread-next-tasks,.thread-shared-files {
   background:white;
   border:1px solid #e4e8ee;
   border-radius:8px;
   flex-shrink:0;
   overflow:hidden
 }
-.job-details-card dl {
-  display:grid;
-  grid-template-columns:95px minmax(0,1fr);
-  gap:10px;
-  padding:0 14px 14px;
-  font-size:12px
-}
-.job-details-card dt {
-  color:#69758b
-}
-.job-details-card dd {
-  margin:0;
-  overflow-wrap:anywhere
-}
+
+
+
 .task-card {
   padding:10px;
   border-bottom:1px solid #edf0f4
@@ -1449,9 +1419,7 @@ dialog::backdrop {
 .mw-session-thumb {
   width:45px
 }
-.job-work-board {
-  grid-template-columns:minmax(230px,1fr) minmax(330px,1.5fr) minmax(220px,.9fr)
-}
+
 .media-items {
   grid-template-columns:repeat(3,1fr)
 }
@@ -1539,19 +1507,9 @@ dialog::backdrop {
   height:auto;
   overflow:visible
 }
-.job-work-board {
-  grid-template-columns:1fr 1.5fr;
-  overflow:auto
-}
-.job-context-sidebar {
-  grid-column:span 2;
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  overflow:visible
-}
-.job-lower-pane {
-  height:700px
-}
+
+
+
 .has-open-job>.detail-pane {
   overflow:auto
 }
@@ -6321,38 +6279,6 @@ body[data-studio-view="jobs"] .generic{
   font-weight:800;
 }
 
-/* Grid is a real alternate presentation of the same job data. */
-.jobs-list.grid-view{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-  padding:10px;
-}
-.jobs-list.grid-view .jobs-row{
-  min-height:132px;
-  grid-template-columns:48px minmax(0,1fr) auto;
-  grid-template-areas:
-    "thumb primary status"
-    "thumb client status"
-    "context context context"
-    "date progress open";
-  gap:6px 10px;
-  padding:10px;
-  border:1px solid #dce4ec;
-  border-radius:8px;
-}
-.jobs-list.grid-view .jobs-thumb{grid-area:thumb;width:46px;height:46px}
-.jobs-list.grid-view .jobs-primary{grid-area:primary}
-.jobs-list.grid-view .jobs-context{grid-area:context}
-.jobs-list.grid-view .jobs-client{grid-area:client}
-.jobs-list.grid-view .jobs-date{grid-area:date}
-.jobs-list.grid-view .jobs-status{grid-area:status}
-.jobs-list.grid-view .jobs-progress{grid-area:progress}
-.jobs-list.grid-view .jobs-open{grid-area:open}
-.jobs-center:has(.jobs-list.grid-view) .jobs-table-head{
-  display:none;
-}
-
 /* Existing status vocabulary mapped to calm, readable badges. */
 .workspace-reference-pill.pending{background:#edf2f6;color:#516779}
 .workspace-reference-pill.booked{background:#e6f2ff;color:#176fc1}
@@ -6417,11 +6343,186 @@ body[data-studio-view="jobs"] .generic{
   .jobs-toolbar{flex-wrap:wrap}
 }
 
-/* Accepted Job Detail: My Work-aligned, media-first, no page sidebar. */
-.job-reading-view{overflow:auto!important}.job-detail-accepted-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;min-height:520px}.job-detail-accepted-layout>.job-detail-mywork-grid{grid-column:1}.job-detail-accepted-layout>.job-context-sidebar{grid-column:2}.job-detail-mywork-grid{grid-template-rows:minmax(360px,2fr) minmax(180px,1fr) minmax(160px,.8fr);overflow:visible}.job-detail-mywork-grid .job-media-section{grid-row:1}.job-detail-mywork-grid .job-subjects-section{grid-row:2}.job-detail-mywork-grid .job-tasks-section{grid-row:3}.job-detail-bottom-grid{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:12px;margin-top:12px}.job-detail-bottom-grid>.job-center-panel,.job-detail-bottom-grid>.job-message-column,.job-detail-bottom-grid>.thread-next-tasks{min-height:220px}.job-detail-accepted-layout .job-context-sidebar>.thread-next-tasks{display:none}.subject-drop-target{transition:border-color .15s,box-shadow .15s,background .15s}.subject-drop-target.drag-target,.media-drop-surface.drag-over{border-color:#1677ff!important;box-shadow:0 0 0 3px rgba(22,119,255,.12);background:#f4f9ff}.subject-drop-target:after{content:'Drop images here';display:none;font-size:11px;color:#1677ff;margin-top:5px}.subject-drop-target.drag-target:after{display:block}@media(max-width:1100px){.job-detail-accepted-layout{grid-template-columns:1fr}.job-detail-accepted-layout>.job-context-sidebar{grid-column:1}.job-detail-bottom-grid{grid-template-columns:1fr}}
+/* Canonical speed-bump navigation rows: one treatment for Jobs and workspace job lists. */
+.studio-speedbump-row{
+  width:100%;
+  min-height:58px;
+  display:grid;
+  align-items:center;
+  gap:10px;
+  margin:0 0 7px;
+  padding:9px 12px;
+  border:1px solid #dce4ec;
+  border-radius:8px;
+  background:#fff;
+  color:#223b53;
+  text-align:left;
+  box-sizing:border-box;
+}
+.studio-speedbump-row:hover{
+  border-color:#b8c7da;
+  background:#f7fbff;
+  box-shadow:0 2px 7px rgba(27,43,65,.08);
+}
+.jobs-row.studio-speedbump-row{
+  grid-template-columns:44px minmax(155px,1.15fr) minmax(120px,.95fr) minmax(120px,.9fr) 106px 108px 120px 18px;
+}
+.workspace-job-speedbump{
+  grid-template-columns:minmax(220px,1.4fr) minmax(160px,.9fr) minmax(300px,1.6fr);
+}
+.workspace-job-speedbump .job-row-heading,
+.workspace-job-speedbump .job-row-client{min-width:0}
+.workspace-job-speedbump .job-row-heading strong,
+.workspace-job-speedbump .job-row-client{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.workspace-job-speedbump .job-row-meta{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:12px;
+  min-width:0;
+}
+.workspace-job-speedbump .job-status{white-space:nowrap}
 
-/* Job Detail regression correction: My Work composition, no sidebar. */
-.job-detail-accepted-layout{display:block!important;min-height:0}.job-detail-accepted-layout>.job-detail-mywork-grid{width:100%;grid-column:auto}.job-detail-mywork-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,.85fr);grid-template-rows:minmax(340px,auto) minmax(210px,auto);gap:12px;overflow:visible}.job-detail-mywork-grid .job-media-section{grid-column:1;grid-row:1 / span 2}.job-detail-mywork-grid .job-subjects-section{grid-column:2;grid-row:1}.job-detail-mywork-grid .job-tasks-section{grid-column:2;grid-row:2}.job-detail-bottom-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}.job-bottom-details{display:flex;flex-direction:column;gap:10px;min-width:0}.job-context-panel,.job-context-sidebar{display:none!important}.job-media-section .media-drop-surface{min-height:270px;border:1px dashed #d5dde8;border-radius:8px;padding:10px}.job-media-section .media-drop-surface.drag-over{border-style:solid}.studio-speedbump-row{display:grid!important;grid-template-columns:minmax(220px,1.4fr) minmax(160px,.9fr) minmax(260px,1.5fr);align-items:center;gap:10px;width:100%;padding:11px 14px!important;margin:0 0 7px;border:1px solid #e1e6ed!important;border-radius:8px!important;background:#fff!important;text-align:left}.studio-speedbump-row:hover{border-color:#b8c7da!important;box-shadow:0 2px 7px rgba(27,43,65,.08)}.studio-speedbump-row .job-row-heading,.studio-speedbump-row .job-row-client{min-width:0}.studio-speedbump-row .job-row-heading strong,.studio-speedbump-row .job-row-client{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.studio-speedbump-row .job-row-meta{display:flex;align-items:center;justify-content:flex-end;gap:12px;min-width:0}.studio-speedbump-row .job-status{white-space:nowrap}@media(max-width:1200px){.job-detail-mywork-grid{grid-template-columns:1fr}.job-detail-mywork-grid .job-media-section,.job-detail-mywork-grid .job-subjects-section,.job-detail-mywork-grid .job-tasks-section{grid-column:1;grid-row:auto}.job-detail-bottom-grid{grid-template-columns:1fr 1fr}}@media(max-width:760px){.job-detail-bottom-grid{grid-template-columns:1fr}.studio-speedbump-row{grid-template-columns:1fr}.studio-speedbump-row .job-row-meta{justify-content:flex-start;flex-wrap:wrap}}
+/* Job Detail: accepted mockup is the implementation, not an overlay. */
+.job-reading-view{overflow:auto}
+.job-detail-board{
+  display:grid;
+  grid-template-columns:260px minmax(0,1fr) 330px;
+  gap:12px;
+  align-items:stretch;
+}
+.job-detail-media-column{min-width:0}
+.job-detail-media-column>.job-subjects-section,
+.job-detail-media-column>.job-tasks-section{display:none}
+.job-detail-media-column .job-media-section{
+  min-height:490px;
+  height:100%;
+}
+.job-detail-collections,
+.job-detail-quick{
+  min-width:0;
+  overflow:hidden;
+  border:1px solid #dfe6ef;
+  border-radius:9px;
+  background:#fff;
+}
+.job-detail-collections>header,
+.job-detail-quick>header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:10px 12px;
+  border-bottom:1px solid #e6dcfb;
+}
+.job-detail-collections>header{
+  background:#f5efff;
+  color:#53209b;
+}
+.job-collection-list{padding:5px 8px}
+.job-collection-list button{
+  display:block;
+  width:100%;
+  padding:10px 9px;
+  border:0;
+  border-bottom:1px solid #edf0f4;
+  border-radius:6px;
+  background:#fff;
+  color:#17345c;
+  text-align:left;
+}
+.job-collection-list button.active{
+  outline:1px solid #93c5fd;
+  background:#eaf3ff;
+}
+.job-detail-right{
+  display:grid;
+  grid-template-rows:auto 1fr;
+  gap:12px;
+  min-width:0;
+}
+.job-detail-right>.job-subjects-section{
+  display:flex;
+  min-height:240px;
+}
+.job-detail-quick>header{
+  background:#eaf5ff;
+  color:#07559b;
+}
+.job-detail-quick>div{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:10px;
+}
+.job-detail-quick .action{
+  min-height:42px;
+  text-align:left;
+}
+.job-detail-bottom{
+  display:grid;
+  grid-template-columns:1fr 1.1fr 1fr;
+  gap:12px;
+  margin-top:12px;
+}
+.job-detail-bottom>.job-center-panel,
+.job-detail-bottom>.job-message-column,
+.job-detail-bottom>.thread-next-tasks{min-height:210px}
+.job-media-section .job-center-heading{
+  border-bottom:1px solid #e6ebf1;
+  background:#f7f9fc;
+}
+.job-subjects-section .job-center-heading{
+  border-bottom:1px solid #cdeed9;
+  background:#eafaf0;
+  color:#126137;
+}
+.job-detail-board .media-items{grid-template-columns:repeat(5,minmax(0,1fr))}
+.job-detail-board .job-file-tile>img{height:105px}
+.job-detail-board .media-drop-surface{
+  min-height:350px;
+  padding:10px;
+  border:1px dashed #d5dde8;
+  border-radius:8px;
+}
+.subject-drop-target{transition:border-color .15s,box-shadow .15s,background .15s}
+.subject-drop-target.drag-target,
+.media-drop-surface.drag-over{
+  border-color:#1677ff;
+  background:#f4f9ff;
+  box-shadow:0 0 0 3px rgba(22,119,255,.12);
+}
+.subject-drop-target:after{
+  content:'Drop images here';
+  display:none;
+  margin-top:5px;
+  color:#1677ff;
+  font-size:11px;
+}
+.subject-drop-target.drag-target:after{display:block}
+.job-section-tabs{margin-bottom:12px}
 
-/* Accepted Job Detail mockup is the visual specification. */
-.job-detail-accepted-layout{display:grid!important;grid-template-columns:260px minmax(0,1fr) 330px!important;gap:12px!important;align-items:stretch}.job-detail-accepted-layout>.job-detail-mywork-grid{display:block!important;width:auto!important;min-width:0}.job-detail-mywork-grid>.job-subjects-section{display:none!important}.job-detail-mywork-grid>.job-tasks-section{display:none!important}.job-detail-mywork-grid .job-media-section{min-height:490px;height:100%}.job-mockup-collections,.job-mockup-quick{background:#fff;border:1px solid #dfe6ef;border-radius:9px;overflow:hidden;min-width:0}.job-mockup-collections>header,.job-mockup-quick>header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:#f5efff;border-bottom:1px solid #e6dcfb;color:#53209b}.job-collection-list{padding:5px 8px}.job-collection-list button{display:block;width:100%;border:0;border-bottom:1px solid #edf0f4;background:#fff;text-align:left;padding:10px 9px;border-radius:6px;color:#17345c}.job-collection-list button.active{background:#eaf3ff;outline:1px solid #93c5fd}.job-mockup-right-stack{display:grid;grid-template-rows:auto 1fr;gap:12px;min-width:0}.job-mockup-right-stack>.job-subjects-section{display:flex!important;min-height:240px}.job-mockup-quick>header{background:#eaf5ff;color:#07559b}.job-mockup-quick>div{display:grid;grid-template-columns:1fr 1fr;padding:10px;gap:8px}.job-mockup-quick .action{min-height:42px;text-align:left}.job-detail-bottom-grid{grid-template-columns:1fr 1.1fr 1fr!important}.job-detail-bottom-grid>.job-center-panel,.job-detail-bottom-grid>.job-message-column,.job-detail-bottom-grid>.thread-next-tasks{min-height:210px}.job-bottom-details{display:none!important}.job-media-section .job-center-heading{background:#f7f9fc;border-bottom:1px solid #e6ebf1}.job-subjects-section .job-center-heading{background:#eafaf0;border-bottom:1px solid #cdeed9;color:#126137}.job-detail-accepted-layout .media-items{grid-template-columns:repeat(5,minmax(0,1fr))}.job-detail-accepted-layout .job-file-tile>img{height:105px}.job-detail-accepted-layout .media-drop-surface{min-height:350px}.job-section-tabs{margin-bottom:12px}@media(max-width:1250px){.job-detail-accepted-layout{grid-template-columns:220px minmax(0,1fr)!important}.job-mockup-right-stack{grid-column:1 / -1;grid-template-columns:1fr 1fr;grid-template-rows:auto}.job-detail-accepted-layout .media-items{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:850px){.job-detail-accepted-layout{grid-template-columns:1fr!important}.job-mockup-right-stack{grid-column:auto;grid-template-columns:1fr}.job-detail-bottom-grid{grid-template-columns:1fr!important}}
+@media(max-width:1250px){
+  .job-detail-board{grid-template-columns:220px minmax(0,1fr)}
+  .job-detail-right{
+    grid-column:1 / -1;
+    grid-template-columns:1fr 1fr;
+    grid-template-rows:auto;
+  }
+  .job-detail-board .media-items{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:850px){
+  .job-detail-board{grid-template-columns:1fr}
+  .job-detail-right{
+    grid-column:auto;
+    grid-template-columns:1fr;
+  }
+  .job-detail-bottom{grid-template-columns:1fr}
+  .workspace-job-speedbump{grid-template-columns:1fr}
+  .workspace-job-speedbump .job-row-meta{justify-content:flex-start;flex-wrap:wrap}
+}

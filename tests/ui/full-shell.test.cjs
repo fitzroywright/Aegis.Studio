@@ -51,7 +51,7 @@ test('the full shell loads every operational screen with a shared data graph',as
  assert.equal(demoButton.disabled,true);assert.equal(w.document.querySelector('[data-demo-progress]').value,52);assert.match(w.document.querySelector('[data-demo-status]').textContent,/photo 17\/320/);assert.equal(w.document.getElementById('studioDemoLoader').getAttribute('aria-busy'),'true');
  finishDemo();await loadingDemo;assert.equal(demoButton.disabled,false);assert.equal(w.document.querySelector('[data-demo-progress]').value,100);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Full Studio demo loaded/);
  w.studioLoadDemoData=async()=>{throw Error('Rolled back');};await demoButton.onclick();assert.equal(demoButton.disabled,false);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Rolled back/);
- try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-work-board'));assert.equal(w.document.querySelectorAll('.job-file-tile').length,20)}catch(e){errors.push('job: '+e.message)}
+ try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-detail-board'));assert.equal(w.document.querySelectorAll('.job-file-tile').length,20)}catch(e){errors.push('job: '+e.message)}
  dom.window.close();assert.deepEqual(errors,[]);});
 
 test('cold workspace opening loads server permissions and keeps actual denial on the landing page',async()=>{
