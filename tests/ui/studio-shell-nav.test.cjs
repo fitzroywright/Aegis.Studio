@@ -7,7 +7,7 @@ const {JSDOM}=require('jsdom');
 const code=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/studio-shell-nav.js'),'utf8');
 
 function setup(){
- const dom=new JSDOM('<body data-studio-view="mywork"><nav id="studioBreadcrumb"></nav><div id="studioPageTools"></div></body>',{url:'https://studio.test/',runScripts:'outside-only'});
+ const dom=new JSDOM('<body data-studio-view="mywork"><nav id="studioBreadcrumb"></nav><div id="studioPageTools"></div><div class="shell"><main></main></div><input id="studioSearch"></body>',{url:'https://studio.test/',runScripts:'outside-only'});
  const w=dom.window;
  const calls=[];
  w.studioNavigate=async view=>{calls.push(view);w.document.body.dataset.studioView=view;};
@@ -16,14 +16,18 @@ function setup(){
  return {w,dom,calls};
 }
 
-test('Back stays inside Studio and Quick Links persist',async()=>{
+test('Back stays inside Studio and My Work keeps its own left layout',async()=>{
  const {w,dom,calls}=setup();
  const tools=w.document.getElementById('studioPageTools');
+ const rail=w.document.getElementById('studioContextRail');
  assert.ok(tools.querySelector('[data-studio-back]'));
- assert.ok(tools.querySelector('.studio-quick-links'));
+ assert.ok(rail);
+ assert.equal(w.document.body.dataset.studioView,'mywork');
  assert.ok(w.document.getElementById('studioBreadcrumb').textContent.includes('My Work'));
 
  await w.studioNavigate('workspaces');
+ assert.equal(w.document.body.dataset.studioView,'workspaces');
+ assert.equal(rail.querySelectorAll('.studio-context-card').length,3);
  tools.querySelector('[data-studio-back]').click();
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.deepEqual(calls,['workspaces','mywork']);
@@ -31,14 +35,20 @@ test('Back stays inside Studio and Quick Links persist',async()=>{
  dom.window.close();
 });
 
-test('Quick Links and breadcrumbs are present after page tools are repainted',async()=>{
+test('Every non-My-Work page gets Status Actions and Quick Links cards',async()=>{
  const {w,dom}=setup();
- const tools=w.document.getElementById('studioPageTools');
  await w.studioNavigate('production');
+ const rail=w.document.getElementById('studioContextRail');
+ assert.equal(rail.querySelectorAll('.studio-context-card').length,3);
+ assert.match(rail.textContent,/Status/);
+ assert.match(rail.textContent,/Actions/);
+ assert.match(rail.textContent,/Quick Links/);
+ assert.match(w.document.getElementById('studioBreadcrumb').textContent,/My Work.*Production/);
+
+ const tools=w.document.getElementById('studioPageTools');
  tools.innerHTML='<div class="page-specific">Page tool</div>';
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.ok(tools.querySelector('[data-studio-persistent-tools]'));
  assert.ok(tools.querySelector('.page-specific'));
- assert.match(w.document.getElementById('studioBreadcrumb').textContent,/My Work.*Production/);
  dom.window.close();
 });
