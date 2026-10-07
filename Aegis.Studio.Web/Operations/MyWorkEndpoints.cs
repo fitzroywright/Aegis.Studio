@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Claims;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Production;
+using Aegis.Studio.Web.Scheduling;
 using Npgsql;
 
 namespace Aegis.Studio.Web.Operations;
@@ -16,12 +17,12 @@ public static class MyWorkEndpoints
             Guid[] allowed = Allowed(context, access, logger);
             Stopwatch timer = Stopwatch.StartNew();
             await using var connection = database.OpenConnection();
-            await using var command = new NpgsqlCommand("select j.id,j.workspace_id,j.conversation_id,j.title,j.client_name,j.status,j.event_date,j.created_at_utc,j.assigned_to,j.client_id,c.display_name,coalesce(t.total,0),coalesce(t.completed,0) from studio_jobs j left join studio_clients c on c.id=j.client_id left join lateral (select count(*) total,count(*) filter(where status='Completed') completed from studio_job_activities where job_id=j.id) t on true where j.id=any($1) order by j.created_at_utc desc", connection);
+            await using var command = new NpgsqlCommand("select j.id,j.workspace_id,j.conversation_id,j.title,j.client_name,j.status,j.event_date,j.created_at_utc,j.assigned_to,j.client_id,c.display_name,coalesce(t.total,0),coalesce(t.completed,0),j.job_lead from studio_jobs j left join studio_clients c on c.id=j.client_id left join lateral (select count(*) total,count(*) filter(where status='Completed') completed from studio_job_activities where job_id=j.id) t on true where j.id=any($1) order by j.created_at_utc desc", connection);
             command.Parameters.AddWithValue(allowed);
             await using var reader = await command.ExecuteReaderAsync(context.RequestAborted);
             List<MyWorkJobSummary> jobs = [];
             while (await reader.ReadAsync(context.RequestAborted))
-                jobs.Add(new(reader.GetGuid(0),reader.GetGuid(1),reader.GetGuid(2),reader.GetString(3),reader.GetString(4),reader.GetString(5),reader.IsDBNull(6)?null:DateOnly.FromDateTime(reader.GetDateTime(6)),reader.GetFieldValue<DateTimeOffset>(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.IsDBNull(9)?null:reader.GetGuid(9),reader.IsDBNull(10)?null:reader.GetString(10),reader.GetInt64(11),reader.GetInt64(12)));
+                jobs.Add(new(reader.GetGuid(0),reader.GetGuid(1),reader.GetGuid(2),reader.GetString(3),reader.GetString(4),reader.GetString(5),reader.IsDBNull(6)?null:DateOnly.FromDateTime(reader.GetDateTime(6)),reader.GetFieldValue<DateTimeOffset>(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.IsDBNull(9)?null:reader.GetGuid(9),reader.IsDBNull(10)?null:reader.GetString(10),reader.GetInt64(11),reader.GetInt64(12),reader.IsDBNull(13)?null:reader.GetString(13)));
             QueryComplete(context, logger, "job-list", timer, jobs.Count);
             return Results.Ok(jobs);
         }).RequireAuthorization();
@@ -34,6 +35,38 @@ public static class MyWorkEndpoints
             var tasks = new OperationalWorkStore(database).GetActivities(assignedTo: Name(context.User)).Where(t=>allowed.Contains(t.JobId)).ToList();
             QueryComplete(context, logger, "assigned-tasks", timer, tasks.Count);
             return Results.Ok(tasks);
+        }).RequireAuthorization();
+
+
+        app.MapGet("/api/my-work/schedule", async (DateTimeOffset? from, DateTimeOffset? to, HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
+        {
+            ILogger logger = logs.CreateLogger("Studio.MyWork");
+            Guid[] allowed = Allowed(context, access, logger);
+            DateTimeOffset start=(from??DateTimeOffset.UtcNow.Date).ToUniversalTime();
+            DateTimeOffset end=(to??start.AddDays(1)).ToUniversalTime();
+            Stopwatch timer=Stopwatch.StartNew();
+            string user=Name(context.User);
+            await using var connection=database.OpenConnection();
+            await using var command=new NpgsqlCommand("""
+                select e.id,e.job_id,e.booking_id,e.title,e.starts_at_utc,e.ends_at_utc,e.location,e.status,e.notes,e.created_at_utc,
+                       coalesce(array_agg(er.resource_id) filter(where er.resource_id is not null),'{}')
+                from studio_schedule_entries e
+                join studio_shoot_sessions s on s.schedule_entry_id=e.id
+                left join studio_schedule_entry_resources er on er.entry_id=e.id
+                where e.starts_at_utc<$2 and e.ends_at_utc>$1
+                  and e.status<>'Cancelled' and s.status<>'Cancelled'
+                  and e.job_id=any($3)
+                  and (lower(s.photographer_user_name)=lower($4) or lower(coalesce(s.assistant_user_name,''))=lower($4))
+                group by e.id
+                order by e.starts_at_utc
+                """,connection);
+            command.Parameters.AddWithValue(start);command.Parameters.AddWithValue(end);command.Parameters.AddWithValue(allowed);command.Parameters.AddWithValue(user);
+            await using var reader=await command.ExecuteReaderAsync(context.RequestAborted);
+            List<ScheduleEntry> rows=[];
+            while(await reader.ReadAsync(context.RequestAborted))
+                rows.Add(new(reader.GetGuid(0),reader.IsDBNull(1)?null:reader.GetGuid(1),reader.IsDBNull(2)?null:reader.GetGuid(2),reader.GetString(3),reader.GetFieldValue<DateTimeOffset>(4),reader.GetFieldValue<DateTimeOffset>(5),reader.IsDBNull(6)?null:reader.GetString(6),reader.GetString(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.GetFieldValue<DateTimeOffset>(9),reader.GetFieldValue<Guid[]>(10)));
+            QueryComplete(context,logger,"personal-schedule",timer,rows.Count);
+            return Results.Ok(rows);
         }).RequireAuthorization();
 
         app.MapGet("/api/my-work/media-summary", async (HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
@@ -80,4 +113,4 @@ public static class MyWorkEndpoints
 }
 public sealed record MyWorkMediaSummary(Guid JobId, long AssetCount, Guid? ThumbnailVersionId);
 
-public sealed record MyWorkJobSummary(Guid Id,Guid WorkspaceId,Guid ConversationId,string Title,string ClientName,string Status,DateOnly? EventDate,DateTimeOffset CreatedAt,string? AssignedTo,Guid? ClientId,string? LinkedClientName,long TaskCount,long CompletedTaskCount);
+public sealed record MyWorkJobSummary(Guid Id,Guid WorkspaceId,Guid ConversationId,string Title,string ClientName,string Status,DateOnly? EventDate,DateTimeOffset CreatedAt,string? AssignedTo,Guid? ClientId,string? LinkedClientName,long TaskCount,long CompletedTaskCount,string? JobLead=null);
