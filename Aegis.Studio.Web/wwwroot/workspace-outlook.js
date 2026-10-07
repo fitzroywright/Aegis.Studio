@@ -204,7 +204,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const current=()=>version===revision;
 
             const lower=document.createElement('section');
-            lower.className='job-detail-media-column';
+            lower.className='job-lower-pane job-detail-media-column';
             lower.innerHTML=`
                 <section class="job-center-panel job-media-section">
                     <header class="job-center-heading">
@@ -242,9 +242,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
             board.className='job-detail-board';
             const collections=document.createElement('section');
             collections.className='job-detail-collections';
-            collections.innerHTML='<header><strong>▰&nbsp; Collections</strong><button type="button" class="action">＋ New Collection</button></header><div class="job-collection-list"><button class="active" data-collection="">All Media</button><button data-collection="Raw Uploads">Raw Uploads</button><button data-collection="Selections">Selections</button><button data-collection="Retouched">Retouched</button><button data-collection="Album – Main">Album – Main</button><button data-collection="Album – Family">Album – Family</button><button data-collection="Album – Friends">Album – Friends</button><button data-collection="Album – Ceremony">Album – Ceremony</button><button data-collection="Client Gallery">Client Gallery</button></div>';
+            collections.innerHTML='<header><strong>▰&nbsp; Collections</strong><button type="button" class="action" data-collection-new>＋ New Collection</button></header><div class="job-collection-list"><button class="active" data-collection="">All Media</button><button data-collection="Raw Uploads">Raw Uploads</button><button data-collection="Selections">Selections</button><button data-collection="Retouched">Retouched</button><button data-collection="Album – Main">Album – Main</button><button data-collection="Album – Family">Album – Family</button><button data-collection="Album – Friends">Album – Friends</button><button data-collection="Album – Ceremony">Album – Ceremony</button><button data-collection="Client Gallery">Client Gallery</button></div>';
             const rightStack=document.createElement('div');rightStack.className='job-detail-right';
-            const quick=document.createElement('section');quick.className='job-detail-quick';quick.innerHTML='<header><strong>▣&nbsp; Quick Actions</strong></header><div><button class="action" data-quick-upload>⇧ Upload Photos</button><button class="action">▱ Add to Collection</button><button class="action">◎ Create Client Gallery</button><button class="action" data-quick-task>☑ Add Task</button><button class="action" data-quick-production>⚙ Open in Production</button><button class="action" data-quick-edit>✎ Edit Details</button></div>';
+            const quick=document.createElement('section');quick.className='job-detail-quick';quick.innerHTML='<header><strong>▣&nbsp; Quick Actions</strong></header><div><button class="action" data-quick-upload>⇧ Upload Photos</button><button class="action" data-quick-collection>▱ Add to Collection</button><button class="action" data-quick-gallery>◎ Create Client Gallery</button><button class="action" data-quick-task>☑ Add Task</button><button class="action" data-quick-production>⚙ Open in Production</button><button class="action" data-quick-edit>✎ Edit Details</button></div>';
 
             const header=detailPane.querySelector('.detail-header');
             const existingThumb=header.querySelector('.studio-job-thumb');
@@ -303,7 +303,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.append(messageHeader,messagesPanel,composer);
             bottom.append(activityCard,messageCard,nextPanel);detailPane.appendChild(bottom);
             filesPanel.remove();
-            quick.querySelector('[data-quick-upload]')?.addEventListener('click',()=>lower.querySelector('.media-toolbar-host button')?.click());
+            quick.querySelector('[data-quick-upload]')?.addEventListener('click',()=>lower.querySelector('[data-add]')?.click());
+            collections.querySelector('[data-collection-new]')?.addEventListener('click',()=>lower.querySelector('[data-new-collection]')?.click());
+            quick.querySelector('[data-quick-collection]')?.addEventListener('click',()=>lower.querySelector('[data-new-collection]')?.click());
+            quick.querySelector('[data-quick-gallery]')?.addEventListener('click',()=>window.studioNavigate?.('production'));
             quick.querySelector('[data-quick-task]')?.addEventListener('click',()=>lower.querySelector('[data-job-add-task]')?.click());
             quick.querySelector('[data-quick-production]')?.addEventListener('click',()=>window.studioNavigate?.('production'));
             quick.querySelector('[data-quick-edit]')?.addEventListener('click',()=>openJobDetailsEditor(job));
