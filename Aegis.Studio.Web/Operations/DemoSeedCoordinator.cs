@@ -97,17 +97,18 @@ public sealed class DemoSeedCoordinator
 
     private void Run(Guid id, string login)
     {
+        DateTimeOffset started = Get(id)?.StartedAtUtc ?? DateTimeOffset.UtcNow;
         try
         {
             string result = DemoDataEndpoints.Seed(database, storage, login, progress =>
             {
                 Write(new DemoSeedRunStatus(id, "Running", progress.Percent, progress.Stage,
                     progress.Current, progress.Total, progress.Message,
-                    Started(id), DateTimeOffset.UtcNow));
+                    started, DateTimeOffset.UtcNow));
             });
             DateTimeOffset now = DateTimeOffset.UtcNow;
             Write(new DemoSeedRunStatus(id, "Completed", 100, "Complete", 0, 0, result,
-                Started(id), now, now));
+                started, now, now));
         }
         catch (Exception error)
         {
@@ -115,7 +116,7 @@ public sealed class DemoSeedCoordinator
             DateTimeOffset now = DateTimeOffset.UtcNow;
             Write(new DemoSeedRunStatus(id, "Failed", 0, "Failed", 0, 0,
                 "Demo data could not be loaded. See server logs for details.",
-                Started(id), now, now));
+                started, now, now));
         }
         finally
         {
@@ -129,8 +130,6 @@ public sealed class DemoSeedCoordinator
             }
         }
     }
-
-    private DateTimeOffset Started(Guid id) => Get(id)?.StartedAtUtc ?? DateTimeOffset.UtcNow;
 
     private DemoSeedRunStatus? ReadLatestRunning()
     {
