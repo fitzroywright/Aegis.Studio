@@ -5564,3 +5564,227 @@ body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .three-pan
     padding:10px;
   }
 }
+
+
+/* Workspaces aligned to My Work three-column rails 2026-10-07 */
+.workspace-list-page{
+  min-height:100%;
+  background:transparent;
+}
+.workspace-list-layout{
+  grid-template-columns:250px minmax(0,1fr) 280px;
+  gap:16px;
+  align-items:start;
+}
+.workspace-left-rail,
+.workspace-right-rail{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  min-width:0;
+}
+.workspace-center-panel{
+  min-width:0;
+}
+.workspace-center-header{
+  min-height:58px!important;
+}
+.workspace-center-header>div{
+  min-width:0;
+}
+.workspace-center-header small{
+  display:block;
+  margin-top:3px;
+  text-align:left!important;
+}
+.workspace-list-toolbar{
+  min-height:48px;
+  padding:7px 12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border-bottom:1px solid #dfe6ed;
+  background:#f8fafc;
+}
+.workspace-list-toolbar .workspace-wow-search{
+  width:min(360px,70%);
+  margin-left:0;
+}
+.workspace-list-toolbar .workspace-wow-search input{
+  height:34px;
+  border:1px solid #d7e0e9;
+  border-radius:7px;
+  background:#fff;
+}
+.workspace-list-toolbar select{
+  width:132px;
+  height:34px;
+  margin-left:auto;
+  border:1px solid #d7e0e9;
+  border-radius:7px;
+  background:#fff;
+  color:#415870;
+  font-size:11px;
+}
+.workspace-list-rows{
+  max-height:calc(100dvh - 205px);
+  overflow:auto;
+  padding:0 13px 10px;
+}
+.workspace-list-page .workspace-wow-row{
+  border-bottom:1px solid #e7ecf1;
+}
+.workspace-list-page .workspace-wow-row:last-child{
+  border-bottom:0;
+}
+.workspace-list-page .workspace-wow-main{
+  min-height:62px;
+  grid-template-columns:46px minmax(180px,1fr) 48px 56px 48px minmax(70px,.55fr) 92px 16px;
+  gap:8px;
+  padding:6px 0;
+  border:0;
+  border-radius:0;
+  background:#fff;
+}
+.workspace-list-page .workspace-wow-main:hover{
+  background:#f7fbff;
+}
+.workspace-list-page .workspace-wow-thumb{
+  width:42px;
+  height:42px;
+  border-radius:7px;
+}
+.workspace-list-page .workspace-wow-copy strong{
+  color:#102b4e;
+  font-size:12px;
+  font-weight:800;
+  line-height:16px;
+}
+.workspace-list-page .workspace-wow-copy small{
+  color:#6e7e91;
+  font-size:10px;
+  line-height:14px;
+}
+.workspace-list-page .workspace-wow-stat b{
+  color:#173c63;
+  font-size:14px;
+  line-height:17px;
+}
+.workspace-list-page .workspace-wow-stat small{
+  color:#7a8797;
+  font-size:9px;
+}
+.workspace-list-page .workspace-wow-previews img,
+.workspace-list-page .workspace-wow-previews i{
+  width:25px;
+  height:25px;
+  border-radius:5px;
+}
+.workspace-list-page .workspace-wow-activity em{
+  display:inline-block;
+  padding:3px 8px;
+  font-size:9px;
+}
+.workspace-list-page .workspace-wow-activity small{
+  margin-top:3px;
+  font-size:9px;
+}
+.workspace-summary-row{
+  min-height:38px;
+  display:grid;
+  grid-template-columns:20px minmax(0,1fr) 34px;
+  gap:9px;
+  align-items:center;
+  padding:7px 12px;
+  border-bottom:1px solid #e2e8ef;
+  color:#244464;
+  font-size:12px;
+}
+.workspace-summary-row:last-child{
+  border-bottom:0;
+}
+.workspace-summary-row>span:first-child{
+  color:#3974a8;
+}
+.workspace-summary-row strong{
+  justify-self:end;
+  color:#092c55;
+  font-size:12px;
+}
+.workspace-announcement-rail{
+  max-height:310px;
+  overflow:auto;
+  padding:0 12px;
+}
+.workspace-list-page .workspace-wow-announcement{
+  padding:10px 2px;
+  border-bottom:1px solid #e6ebf0;
+}
+.workspace-list-page .workspace-wow-announcement:last-child{
+  border-bottom:0;
+}
+.workspace-list-page .workspace-wow-announcement strong{
+  color:#18344f;
+  font-size:11px;
+  line-height:14px;
+}
+.workspace-list-page .workspace-wow-announcement p{
+  max-height:32px;
+  margin:2px 0 0;
+  color:#68798b;
+  font-size:10px;
+  line-height:14px;
+}
+.workspace-list-page .workspace-wow-announcement small{
+  margin-top:4px;
+  color:#8895a4;
+  font-size:9px;
+}
+.workspace-shell-new{
+  min-height:34px;
+  padding:7px 12px;
+  border-radius:7px;
+  font-size:11px;
+  font-weight:800;
+}
+.workspace-left-rail .mw-status-row.active{
+  background:#eaf4ff;
+  color:#1264b5;
+}
+.workspace-left-rail .mw-status-row.active:before{
+  content:'';
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:4px;
+  border-radius:0 4px 4px 0;
+  background:#147df5;
+}
+@media(max-width:1080px){
+  .workspace-list-layout{
+    grid-template-columns:235px minmax(0,1fr);
+  }
+  .workspace-right-rail{
+    grid-column:1 / -1;
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+  }
+}
+@media(max-width:700px){
+  .workspace-list-layout{
+    grid-template-columns:1fr;
+  }
+  .workspace-right-rail{
+    grid-column:auto;
+    display:flex;
+  }
+  .workspace-list-page .workspace-wow-main{
+    grid-template-columns:42px minmax(0,1fr) 48px 16px;
+  }
+  .workspace-list-page .workspace-wow-stat:nth-of-type(n+2),
+  .workspace-list-page .workspace-wow-previews,
+  .workspace-list-page .workspace-wow-activity{
+    display:none;
+  }
+}
