@@ -186,7 +186,7 @@
             if(entry.kind==='announcement'){
                 const a=entry.item;
                 return `<button class="mw-message-row announcement" data-announcement-workspace="${a.workspaceId||''}">
-                    <span class="mw-comm-type announcement" title="Announcement" aria-label="Announcement">!</span>
+                    <span class="mw-comm-type announcement" title="Announcement" aria-label="Announcement">📣</span>
                     <span class="mw-message-copy"><strong>${esc(a.title||'Announcement')}</strong><small>${esc((a.workspaceName?a.workspaceName+' · ':'')+(a.body||''))}</small></span>
                     <span class="mw-message-time">${a.createdAtUtc?formatDay(a.createdAtUtc):''}</span>
                     <span class="mw-chevron">›</span>
@@ -294,7 +294,7 @@
                         </section>
 
                         <section class="mw-list-panel mw-messages-panel" data-mw-region="messages">
-                            <header><h2><span class="mw-title-icon messages">✉</span> Messages &amp; Announcements</h2></header>
+                            <header><h2><span class="mw-title-icon messages">✉</span> Messages</h2></header>
                             <div class="mw-compact-messages">${phase('notifications',messageRows)}</div>
                         </section>
                     </aside>
