@@ -1,19 +1,29 @@
 (() => {
     const themes = [
-        ['studio-default', 'Studio Default'],
-        ['office-light', 'Office Light'],
-        ['fluent-dark', 'Fluent Dark'],
-        ['mid-century', 'Mid Century'],
-        ['steel', 'Steel'],
-        ['sakura', 'Sakura'],
-        ['ocean', 'Ocean']
+        ['standard', 'Standard'],
+        ['light', 'Light'],
+        ['dark', 'Dark']
     ];
 
     const storageKey = 'aegis.studio.theme';
 
+    function normalizeTheme(themeName) {
+        const value = String(themeName || '').trim().toLowerCase();
+        if (value === 'light' || value === 'office-light') return 'light';
+        if (value === 'dark' || value === 'fluent-dark') return 'dark';
+        return 'standard';
+    }
+
+    function effectiveTheme(themeName) {
+        const normalized = normalizeTheme(themeName);
+        if (normalized === 'light') return 'office-light';
+        if (normalized === 'dark') return 'fluent-dark';
+        return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'fluent-dark' : 'studio-default';
+    }
+
     function applyTheme(themeName) {
-        const valid = themes.some(([value]) => value === themeName) ? themeName : 'studio-default';
-        document.body.dataset.theme = valid;
+        const valid = normalizeTheme(themeName);
+        document.body.dataset.theme = effectiveTheme(valid);
         localStorage.setItem(storageKey, valid);
         const quick = document.getElementById('themePicker');
         const profile = document.getElementById('prefTheme');
@@ -59,14 +69,18 @@
             const response = await fetch('/api/profile');
             if (!response.ok) return;
             const profile = await response.json();
-            applyTheme(profile.themeName || localStorage.getItem(storageKey) || 'studio-default');
+            applyTheme(profile.themeName || localStorage.getItem(storageKey) || 'standard');
         } catch {
-            applyTheme(localStorage.getItem(storageKey) || 'studio-default');
+            applyTheme(localStorage.getItem(storageKey) || 'standard');
         }
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-        applyTheme(localStorage.getItem(storageKey) || 'studio-default');
+        applyTheme(localStorage.getItem(storageKey) || 'standard');
+        const systemTheme = window.matchMedia?.('(prefers-color-scheme: dark)');
+        systemTheme?.addEventListener?.('change', () => {
+            if (normalizeTheme(localStorage.getItem(storageKey)) === 'standard') applyTheme('standard');
+        });
         wireSelectors();
         await loadProfileTheme();
 
