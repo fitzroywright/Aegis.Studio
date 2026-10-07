@@ -659,7 +659,6 @@
 
 
         const allRows=()=>[...genericView.querySelectorAll('[data-workspace-row]')];
-        let filter='all';
         let term='';
         let sort='name';
 
@@ -667,10 +666,8 @@
             const list=genericView.querySelector('[data-workspace-list]');
             const rows=allRows();
             rows.forEach(row=>{
-                const status=row.dataset.status;
-                const matchesFilter=filter==='all'||status===filter;
                 const matchesTerm=!term||row.dataset.search.includes(term);
-                row.hidden=!(matchesFilter&&matchesTerm);
+                row.hidden=!matchesTerm;
             });
 
             rows.sort((a,b)=>{
