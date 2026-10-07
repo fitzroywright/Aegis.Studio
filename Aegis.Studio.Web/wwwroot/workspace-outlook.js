@@ -75,6 +75,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
         window.studioRememberView?.({view:'workspaces',workspaceId:id,jobId:null});
         selectedWorkspace = id; selectedJob = null; selectedConversation = null;
         currentWorkspacePermissions = workspace.permissions;
+        window.studioSetBreadcrumb?.([
+            {label:'Workspaces',view:'workspaces'},
+            {label:name,view:'workspaces',workspaceId:id}
+        ]);
         tab = 'jobs'; search.value = ''; workspaceTitle.textContent = name;
         document.querySelectorAll('.workspace').forEach(button => button.classList.toggle('active', button.dataset.id === id));
         display();
@@ -122,6 +126,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
     };
     async function showJobMessages(job) {
         window.studioRememberView?.({view:'workspaces',workspaceId:job.workspaceId,jobId:job.id});
+        const workspace=(window.workspaceCache||[]).find(item=>String(item.id)===String(job.workspaceId));
+        window.studioSetBreadcrumb?.([
+            {label:'Workspaces',view:'workspaces'},
+            {label:workspace?.name||'Workspace',view:'workspaces',workspaceId:job.workspaceId},
+            {label:job.title||'Job'}
+        ]);
         selectedJob = job;
         const version = ++revision;
         conversationList.querySelectorAll('[data-job]').forEach(row => row.classList.toggle('active', row.dataset.job === job.id));
