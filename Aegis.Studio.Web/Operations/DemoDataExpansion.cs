@@ -248,7 +248,10 @@ internal static class DemoDataExpansion
             existingId=reader.GetGuid(0);path=reader.GetString(1);note=reader.IsDBNull(2)?null:reader.GetString(2);
         }
         // A later user upload at the same tuple is not ours to replace.
-        bool owned=existingId==id || (note?.StartsWith("CC0 wedding photograph from Wikimedia Commons, seeded for Studio demonstration data.",StringComparison.Ordinal)==true) || (note?.StartsWith("Real CC0/public-domain photograph from Wikimedia Commons.",StringComparison.Ordinal)==true);
+        bool owned=existingId==id
+            || (note?.StartsWith("CC0 wedding photograph from Wikimedia Commons, seeded for Studio demonstration data.",StringComparison.Ordinal)==true)
+            || (note?.StartsWith("Real CC0/public-domain photograph from Wikimedia Commons.",StringComparison.Ordinal)==true)
+            || (note?.StartsWith("Demo photograph from ",StringComparison.Ordinal)==true);
         if(!owned)return existingId;
         id=existingId;
         try { using Stream file=storage.OpenReadAsync(path).GetAwaiter().GetResult();return existingId; }
@@ -334,10 +337,10 @@ internal static class DemoDataExpansion
                 ["AssetKey"]=key,
                 ["VersionId"]=id.ToString("D"),
                 ["Demo"]="true",
-                ["DemoSource"]="Wikimedia Commons CC0",
+                ["DemoSource"]=demoPhotoSourceNameCache.FirstOrDefault(x=>x.Value==selectedUrl).Value??"Demo image source",
                 ["DemoSourceUrl"]=selectedUrl??string.Empty,
-                ["DemoSourcePage"]=DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==selectedUrl)?.Page??selectedUrl??string.Empty,
-                ["DemoSourceLicense"]=DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==selectedUrl)?.License??"CC0/Public Domain"
+                ["DemoSourcePage"]=demoPhotoPageCache.FirstOrDefault(x=>demoPhotoSourceCache.GetValueOrDefault(x.Key)==selectedUrl).Value??selectedUrl??string.Empty,
+                ["DemoSourceLicense"]=demoPhotoLicenseCache.FirstOrDefault(x=>demoPhotoSourceCache.GetValueOrDefault(x.Key)==selectedUrl).Value??"Provider terms apply"
             })).GetAwaiter().GetResult();
 
         using(var verified=storage.OpenReadAsync(stored).GetAwaiter().GetResult())
@@ -363,7 +366,7 @@ internal static class DemoDataExpansion
         object[] values=[
             id,job,key,version,fileName,storedFile.Length,storedFile.Sha256,stored,login,
             (object?)source??DBNull.Value,
-            "CC0 wedding photograph from Wikimedia Commons, seeded for Studio demonstration data."
+            $"Demo photograph from {demoPhotoSourceNameCache.FirstOrDefault(x=>x.Value==selectedUrl).Value??"configured source"}, seeded for Studio demonstration data."
         ];
         foreach(object value in values)command.Parameters.AddWithValue(value);
         Guid result=(Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo wedding media upsert did not return an id."));
@@ -478,7 +481,7 @@ internal static class DemoDataExpansion
         object[] values=[
             id,job,key,version,fileName,contentType,storedFile.Length,storedFile.Sha256,stored,login,
             (object?)source??DBNull.Value,
-            "Real CC0/public-domain photograph from Wikimedia Commons. Source URL retained in Common.Storage metadata."
+            $"Demo photograph from {(sourceUrl is not null?demoPhotoSourceNameCache.GetValueOrDefault(sourceUrl,"configured source"):"configured source")}. Source URL retained in Common.Storage metadata."
         ];
         foreach(object value in values)command.Parameters.AddWithValue(value);
         Guid result=(Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo photograph upsert did not return an id."));
