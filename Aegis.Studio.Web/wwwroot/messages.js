@@ -77,25 +77,56 @@
         }
         dialog.innerHTML = `
             <form method="dialog" class="direct-message-form">
-                <div class="message-dialog-heading"><div><h2>New message</h2><p>Start a private Studio conversation.</p></div><button type="button" class="message-dialog-close" aria-label="Close">×</button></div>
-                <label>Studio user
-                    <select id="directMessageUser" required>
-                        ${users.map(user => `<option value="${esc(user.userName)}">${esc(studioFirstName(user))}</option>`).join('')}
+                <div class="message-dialog-heading"><div><h2>New message</h2><p>Start a Studio conversation or send email to an external recipient.</p></div><button type="button" class="message-dialog-close" aria-label="Close">×</button></div>
+                <label>Recipient type
+                    <select id="directMessageKind">
+                        <option value="Person">Studio person</option>
+                        <option value="External">External email</option>
                     </select>
+                </label>
+                <label data-person-recipient>Studio person
+                    <select id="directMessageUser">
+                        ${users.map(user => `<option value="${esc(user.userName)}">${esc(user.displayName||studioFirstName(user))}</option>`).join('')}
+                    </select>
+                </label>
+                <label data-external-recipient hidden>Email address
+                    <input id="directMessageAddress" type="email" autocomplete="email" placeholder="name@example.com">
+                </label>
+                <label data-external-subject hidden>Subject
+                    <input id="directMessageSubject" maxlength="200" placeholder="Message subject">
                 </label>
                 <div class="dialog-actions"><button type="button" class="direct-message-cancel">Cancel</button><button type="submit" class="primary">Open conversation</button></div>
             </form>`;
         const close = () => dialog.close();
+        const kind = dialog.querySelector('#directMessageKind');
+        const personRow = dialog.querySelector('[data-person-recipient]');
+        const externalRow = dialog.querySelector('[data-external-recipient]');
+        const subjectRow = dialog.querySelector('[data-external-subject]');
+        const syncKind = () => {
+            const external = kind.value === 'External';
+            personRow.hidden = external;
+            externalRow.hidden = !external;
+            subjectRow.hidden = !external;
+            dialog.querySelector('#directMessageUser').required = !external;
+            dialog.querySelector('#directMessageAddress').required = external;
+            dialog.querySelector('#directMessageSubject').required = external;
+        };
+        kind.onchange = syncKind;
+        syncKind();
         dialog.querySelector('.message-dialog-close').onclick = close;
         dialog.querySelector('.direct-message-cancel').onclick = close;
         dialog.querySelector('form').onsubmit = async event => {
             event.preventDefault();
-            const userName = document.getElementById('directMessageUser').value;
-            if (!userName) return;
-            const thread = await json('/api/messages/threads/direct', {
+            const external = kind.value === 'External';
+            const url = external ? '/api/messages/threads/external' : '/api/messages/threads/direct';
+            const payload = external
+                ? { address: dialog.querySelector('#directMessageAddress').value.trim(), subject: dialog.querySelector('#directMessageSubject').value.trim() }
+                : { userName: dialog.querySelector('#directMessageUser').value };
+            if ((!external && !payload.userName) || (external && (!payload.address || !payload.subject))) return;
+            const thread = await json(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userName })
+                body: JSON.stringify(payload)
             });
             dialog.close();
             await loadThreads();
@@ -148,7 +179,7 @@
     function renderMessage(message, attachments = []) {
         const files=(attachments||[]).filter(file=>file.messageId===message.id);
         return `<article class="studio-chat-message">
-            <div class="studio-chat-meta"><strong>${esc(studioFirstName(message.senderUserName))}</strong><span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
+            <div class="studio-chat-meta"><strong>${esc(message.senderDisplayName||studioFirstName(message.senderUserName))}</strong>${message.senderAddress?'<small>'+esc(message.senderAddress)+'</small>':''}<span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
             <div class="studio-chat-body">${renderMentions(message.body)}</div>
             ${files.length?`<div class="studio-message-files">${files.map(file=>`<a href="/api/message-attachments/${file.id}" target="_blank" rel="noopener"><strong>${esc(file.fileName)}</strong><small>${formatBytes(file.size)}</small></a>`).join('')}</div>`:''}
         </article>`;
