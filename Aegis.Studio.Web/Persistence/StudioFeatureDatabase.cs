@@ -170,7 +170,6 @@ public sealed class StudioFeatureDatabase
             alter table studio_outbound_email add column if not exists last_error text null;
             alter table studio_outbound_email add column if not exists next_attempt_at_utc timestamptz null;
             alter table studio_outbound_email add column if not exists provider_accepted_at_utc timestamptz null;
-            alter table studio_outbound_email add column if not exists inapp_message_id uuid null references studio_inapp_messages(id) on delete set null;
             """;
 
         await using NpgsqlCommand command = dataSource.CreateCommand(sql + Aegis.Studio.Web.Operations.JobWorkspaceParticipation.Schema);
