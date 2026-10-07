@@ -432,11 +432,17 @@ public static class ProductionConfigurationEndpoints
             store.SetJobType(jobId,request.JobTypeId);return Results.Ok(store.GetJobConfiguration(jobId));
         }).RequireAuthorization();
 
-        app.MapPost("/api/jobs/{jobId:guid}/production/generate",(Guid jobId,GenerateProductionRequest request,ClaimsPrincipal user,JobAccessService access)=>
+        app.MapPost("/api/jobs/{jobId:guid}/production/generate",(Guid jobId,GenerateProductionRequest request,ClaimsPrincipal user,JobAccessService access,NotificationService notifications)=>
         {
             if(!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
             string actor=user.FindFirst("login_name")?.Value??user.Identity?.Name??"Studio";
-            return Results.Ok(store.GenerateForJob(jobId,actor,request.RecipeId));
+            IReadOnlyList<GeneratedProductionTask> created=store.GenerateForJob(jobId,actor,request.RecipeId);
+            foreach(var task in created.Where(x=>!string.IsNullOrWhiteSpace(x.AssignedTo)))
+            {
+                access.EnsureAssignedMember(jobId,task.AssignedTo!);
+                notifications.PublishToUser(task.AssignedTo!,"JobAssigned",$"Production task assigned: {task.TemplateName}",$"Estimated effort: {task.EstimatedMinutes} minutes.","Job",jobId.ToString("D"));
+            }
+            return Results.Ok(created);
         }).RequireAuthorization();
     }
 }
