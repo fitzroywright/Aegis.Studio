@@ -454,13 +454,18 @@ public static class StudioInAppMessagingEndpoints
     {
         RouteGroupBuilder group = app.MapGroup("/api/messages").RequireAuthorization();
         group.MapGet("/threads", (ClaimsPrincipal user, StudioInAppMessageStore store) => Results.Ok(store.GetThreads(user)));
-        group.MapGet("/users", (ClaimsPrincipal user, UserProfileStore profiles) =>
+        group.MapGet("/users", (ClaimsPrincipal user, UserProfileStore profiles, StudioMessageAddressBook addresses) =>
         {
             string current = user.FindFirstValue("login_name") ?? user.Identity?.Name ?? string.Empty;
             return Results.Ok(profiles.GetAll()
                 .Where(x => !string.Equals(x.UserName, current, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(x => x.DisplayName)
-                .Select(x => new StudioMessageUser(x.UserName, x.DisplayName)));
+                .Select(x => new StudioMessageUser(x.UserName, x.DisplayName, addresses.PersonAddress(x.UserName))));
+        });
+        group.MapGet("/address", (ClaimsPrincipal user, StudioMessageAddressBook addresses) =>
+        {
+            StudioMessageAddress address = addresses.EnsureCurrentPerson(user);
+            return Results.Ok(new { address.Address, address.DisplayName, address.PersonUserName });
         });
         group.MapPost("/threads/direct", (StartDirectMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store) => Execute(() => Results.Ok(store.CreateDirect(user, request.UserName))));
         group.MapPost("/threads/external", (StartExternalMessageRequest request, ClaimsPrincipal user, StudioInAppMessageStore store) =>
@@ -557,7 +562,7 @@ public sealed record StudioMessageThread(Guid Id, string ScopeType, Guid? ScopeI
 public sealed record StudioMessageThreadSummary(Guid Id, string ScopeType, Guid? ScopeId, string Title, string CreatedBy, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastMessageAtUtc, long UnreadCount);
 public sealed record StudioInAppMessage(Guid Id, Guid ThreadId, string SenderUserName, string Body, DateTimeOffset CreatedAtUtc, string? SenderDisplayName = null, string? SenderAddress = null);
 public sealed record StudioExternalThread(Guid ConversationId,string ExternalAddress,string OwnerUserName,string Subject);
-public sealed record StudioMessageUser(string UserName, string DisplayName);
+public sealed record StudioMessageUser(string UserName, string DisplayName, string? MessageAddress = null);
 public sealed record StartDirectMessageRequest(string UserName);
 public sealed record StartExternalMessageRequest(string Address,string Subject);
 public sealed record SendStudioMessageRequest(string Body);
