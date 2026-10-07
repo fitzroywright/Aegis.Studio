@@ -13,6 +13,7 @@
 
     let myWorkLoad=null;
     let navigationRevision=0;
+    let jobsWorkspaceFilter=null;
 
     function renderMyWork(){
         const controller=new AbortController(),revision=navigationRevision;
@@ -547,7 +548,8 @@
                             <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
                             <div class="mw-action-list">
                                 <button type="button" data-workspace-admin><span>＋</span><span>New Workspace</span><b>›</b></button>
-                                <button type="button" data-nav-quick="pipeline"><span>▥</span><span>Open Pipeline</span><b>›</b></button>
+                                <button type="button" data-workspace-jobs><span>▥</span><span>View Jobs</span><b>›</b></button>
+                                <button type="button" data-nav-quick="pipeline"><span>⇥</span><span>Open Pipeline</span><b>›</b></button>
                                 <button type="button" data-nav-quick="frontdesk"><span>▣</span><span>Front Desk</span><b>›</b></button>
                             </div>
                         </section>
@@ -569,7 +571,7 @@
                                 <h2><span class="mw-title-icon assigned">▰</span> Workspaces</h2>
                                 <small>Jobs, clients, conversations and media grouped by operational workspace.</small>
                             </div>
-                            <span class="workspace-wow-list-count">${workspaceData.length}</span>
+                            <div class="workspace-center-actions"><button type="button" data-workspace-jobs>View Jobs →</button><span class="workspace-wow-list-count">${workspaceData.length}</span></div>
                         </header>
 
                         <div class="workspace-list-toolbar">
@@ -678,6 +680,9 @@
         });
         genericView.querySelectorAll('[data-nav-quick]').forEach(button=>{
             button.onclick=()=>window.studioNavigate(button.dataset.navQuick);
+        });
+        genericView.querySelectorAll('[data-workspace-jobs]').forEach(button=>{
+            button.onclick=()=>{ jobsWorkspaceFilter=''; window.studioNavigate('jobs'); };
         });
     }
 
