@@ -133,6 +133,29 @@ async function runMailboxImport(workspaceId) {
     } catch (error) { result.textContent = error.message || error; }
 }
 
+function renderEmployeeDirectorySection() {
+    return `<section class="job-section"><h2>Employees & Roles</h2><p class="muted">Studio's operational employee directory. Directory providers populate identity; Studio controls whether a person is active and assignable.</p><div id="studioEmployeeList"><p class="muted">Loading…</p></div><h3>Add or maintain employee</h3><div class="pos-entry"><label>User name<input id="employeeUserName"></label><label>Display name<input id="employeeDisplayName"></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><button class="primary" onclick="saveStudioEmployee()">Save employee</button></div></section>`;
+}
+async function refreshStudioEmployees(){
+    const holder=document.getElementById('studioEmployeeList');if(!holder)return;
+    const employees=await json('/api/admin/studio-employees/');
+    holder.innerHTML=employees.map(e=>`<div class="job-row"><div><b>${esc(e.displayName)}</b><div class="meta">${esc(e.userName)} · ${e.isActive?'Active':'Inactive'} · ${e.isAssignable?'Assignable':'Not assignable'}</div><div class="meta">${esc((e.roles||[]).join(', ')||e.source||'Studio')}</div></div><button class="action" data-edit-employee="${esc(e.userName)}">Edit</button></div>`).join('')||'<p class="muted">No employees yet.</p>';
+    holder.querySelectorAll('[data-edit-employee]').forEach(button=>button.onclick=()=>{
+        const employee=employees.find(e=>String(e.userName).toLowerCase()===String(button.dataset.editEmployee).toLowerCase());if(!employee)return;
+        document.getElementById('employeeUserName').value=employee.userName||'';
+        document.getElementById('employeeDisplayName').value=employee.displayName||'';
+        document.getElementById('employeeEmail').value=employee.emailAddress||'';
+        document.getElementById('employeeAssignable').value=String(employee.isAssignable!==false);
+    });
+}
+async function saveStudioEmployee(){
+    const userName=document.getElementById('employeeUserName').value.trim();if(!userName)return alert('User name is required.');
+    const existing=(await json('/api/admin/studio-employees/')).find(e=>String(e.userName).toLowerCase()===userName.toLowerCase());
+    const payload={userName,displayName:document.getElementById('employeeDisplayName').value.trim()||userName,emailAddress:document.getElementById('employeeEmail').value.trim()||null,isActive:existing?.isActive!==false,isAssignable:document.getElementById('employeeAssignable').value==='true',source:existing?.source||'Manual',externalId:existing?.externalId||null,skills:existing?.skills||[],workDayUserName:existing?.workDayUserName||null,lastSyncedAtUtc:existing?.lastSyncedAtUtc||null};
+    await json('/api/admin/studio-employees/'+encodeURIComponent(userName),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    await refreshStudioEmployees();
+}
+
 function renderSecurityRolesSection() {
     return `<section class="job-section"><h2>Reusable security roles</h2><p class="muted">Roles can be reused across Workspaces and Jobs. Updating a role propagates its permissions to members assigned that role.</p><div id="securityRoleList">${studioRolesCache.map(x=>`<div class="job-row"><div><b>${esc(x.name)}</b><div class="meta">${esc(x.scope)} · ${esc(x.description||'')}</div></div><button class="action" onclick="deleteStudioRole('${x.id}')">Delete</button></div>`).join('')||'<p class="muted">No reusable roles yet.</p>'}</div><h3>Create role</h3><div class="pos-entry"><label>Name<input id="roleName"></label><label>Scope<select id="roleScope"><option>Workspace</option><option>Job</option></select></label><label>Description<input id="roleDescription"></label><label>Template<select id="roleTemplate"><option value="viewer">Viewer</option><option value="worker">Worker</option><option value="manager">Manager</option><option value="admin">Administrator</option></select></label><button class="primary" onclick="createStudioRole()">Create role</button></div></section>`;
 }
