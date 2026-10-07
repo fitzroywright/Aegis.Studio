@@ -192,7 +192,7 @@ public sealed class OutboundEmailStore
             identity.Type.ToString(),
             0,
             null,
-            null,
+            notBeforeUtc,
             null,
             inAppMessageId);
 
