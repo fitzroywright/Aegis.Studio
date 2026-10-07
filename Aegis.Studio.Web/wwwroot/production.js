@@ -9,7 +9,7 @@ let productionSelectedJob = '';
 let productionView='queue';
 let productionQueueScope='mine',productionStageFilter='',productionWorkspaceFilter='',productionAssigneeFilter='',productionDueFilter='';
 async function showProduction(){
-    activateNavigation('production');conversationView.classList.add('hidden');genericView.classList.remove('hidden');
+    conversationView.classList.add('hidden');genericView.classList.remove('hidden');
     const [activities,shoots,jobs,photographers,resources,auth,workspaces]=await Promise.all([json('/api/operations/activities'),json('/api/operations/shoots'),json('/api/jobs'),json('/api/photographers'),json('/api/schedule/resources'),json('/api/auth/me'),json('/api/workspaces')]);
     operationalActivityCache=new Map(activities.map(a=>[a.id,a]));shootCache=new Map(shoots.map(a=>[a.id,a]));operationalJobs=new Map(jobs.map(j=>[j.id,j]));photographerCache=photographers;scheduleResourceCache=resources;studioRememberPeople(photographers);
     const me=auth.user||auth,user=String(me.userName||me.loginName||'').toLowerCase(),manager=me.isAdministrator===true;
