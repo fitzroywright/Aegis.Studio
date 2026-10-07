@@ -767,6 +767,19 @@
                 clearInterval(timer);tick();panel.setAttribute('aria-busy','false');button.disabled=false;
             }
         };
+
+        try{
+            const current=await window.studioGetCurrentDemoDataRun?.();
+            if(current){
+                const button=panel.querySelector('[data-load-demo]');
+                const status=panel.querySelector('[data-demo-status]');
+                const meter=panel.querySelector('[data-demo-progress]');
+                meter.hidden=false;meter.value=current.percent||0;
+                meter.setAttribute('aria-valuetext',(current.percent||0)+'% — '+(current.stage||current.status||'Demo load'));
+                status.textContent=(current.percent||0)+'% · '+(current.stage||current.status)+' — '+(current.message||'');
+                if(current.status==='Running')button.textContent='Reconnect to Demo Load';
+            }
+        }catch{/* Demo status is advisory; the load action remains available. */}
     }
 
     const routes={
