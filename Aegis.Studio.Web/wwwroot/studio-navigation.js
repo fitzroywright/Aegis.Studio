@@ -805,7 +805,7 @@
         };
         const filteredBase=()=>workspaceFilter?jobs.filter(job=>String(job.workspaceId)===workspaceFilter||(job.participatingWorkspaceIds||[]).map(String).includes(workspaceFilter)):jobs;
 
-        let groupFilter='all',statusFilter='',personFilter='',dateFilter='all',term='',sort='date-desc',grid=false;
+        let groupFilter='all',statusFilter='',personFilter='',dateFilter='all',term='',sort='date-desc';
         const renderRows=items=>items.map(job=>{
             const workspace=workspaceMap.get(String(job.workspaceId));
             const shoot=nextShoot(job);
@@ -815,7 +815,7 @@
             const shootDate=shoot?.startsAtUtc||job.eventDate||null;
             const lead=job.jobLead||job.assignedTo||'';
             const context=[workspace?.name||'Workspace',job.jobType||job.type].filter(Boolean).join(' · ');
-            return `<button type="button" class="jobs-row" data-job-row data-job-id="${job.id}" data-status="${esc(String(job.status||''))}" data-group="${stageGroup(job.status)}" data-person="${esc(String(lead))}" data-date="${shootDate?esc(String(shootDate)):''}" data-search="${esc([job.title,job.clientName,workspace?.name,job.jobType,job.status,lead].filter(Boolean).join(' ').toLowerCase())}">
+            return `<button type="button" class="jobs-row studio-speedbump-row" data-job-row data-job-id="${job.id}" data-status="${esc(String(job.status||''))}" data-group="${stageGroup(job.status)}" data-person="${esc(String(lead))}" data-date="${shootDate?esc(String(shootDate)):''}" data-search="${esc([job.title,job.clientName,workspace?.name,job.jobType,job.status,lead].filter(Boolean).join(' ').toLowerCase())}">
                 <span class="jobs-thumb">${thumb?`<img src="${thumb}" alt="">`:'<span>📷</span>'}</span>
                 <span class="jobs-primary"><strong>${esc(job.reference||job.jobNumber||job.title)}</strong><small>${esc(job.reference||job.jobNumber?job.title:(job.clientName||'Job'))}</small></span>
                 <span class="jobs-context"><strong>${esc(workspace?.name||'Workspace')}</strong><small>${esc(job.jobType||job.type||'Photography')}</small></span>
@@ -885,7 +885,7 @@
                     <section class="mw-list-panel jobs-center">
                         <header class="jobs-center-header">
                             <div><h2><span class="mw-title-icon assigned">▥</span> Jobs <span class="jobs-count">(${filteredBase().length})</span></h2><small>Open a job to work with its messages, media, subjects, tasks, sessions and activity.</small></div>
-                            <div class="jobs-view-toggle"><button type="button" class="active" data-jobs-view="list" title="List view">☷</button><button type="button" data-jobs-view="grid" title="Grid view">▦</button></div>
+                            
                         </header>
                         <div class="jobs-toolbar">
                             <label class="jobs-search"><span>⌕</span><input type="search" data-jobs-search placeholder="Search jobs…"></label>
@@ -970,11 +970,6 @@
         genericView.querySelector('[data-jobs-sort]').onchange=e=>{sort=e.target.value;apply();};
         const workspaceSelect=genericView.querySelector('[data-jobs-workspace]');
         if(workspaceSelect)workspaceSelect.onchange=e=>{jobsWorkspaceFilter=e.target.value;renderJobs().catch(error=>alert(error.message));};
-        genericView.querySelectorAll('[data-jobs-view]').forEach(button=>button.onclick=()=>{
-            grid=button.dataset.jobsView==='grid';
-            list.classList.toggle('grid-view',grid);
-            genericView.querySelectorAll('[data-jobs-view]').forEach(x=>x.classList.toggle('active',x===button));
-        });
         genericView.querySelectorAll('[data-job-row],[data-open-job]').forEach(button=>button.onclick=()=>openWorkspaceJob(button.dataset.jobId||button.dataset.openJob).catch(error=>alert(error.message)));
         genericView.querySelectorAll('[data-job-nav]').forEach(button=>button.onclick=()=>{if(button.dataset.jobNav==='workspaces')jobsWorkspaceFilter=null;window.studioNavigate(button.dataset.jobNav);});
         const allActionButtons=[...genericView.querySelectorAll('[data-job-action]'),...(studioPageTools?studioPageTools.querySelectorAll('[data-job-action]'):[])];
