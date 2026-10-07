@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Aegis.Studio.Web.Persistence;
 using Common.Storage;
 using Npgsql;
@@ -78,6 +79,9 @@ public sealed class StudioMessageAttachmentStore
     {
         if(bytes.Length<=0||bytes.LongLength>maximumBytes)throw new InvalidOperationException($"Attachment must be between 1 byte and {maximumBytes/1024L/1024L} MB.");
         string name=Path.GetFileName(fileName).Trim();if(string.IsNullOrWhiteSpace(name))throw new InvalidOperationException("Attachment file name is required.");
+        string incomingSha=Convert.ToHexString(SHA256.HashData(bytes));
+        StudioMessageAttachment? existing=GetForMessage(messageId).FirstOrDefault(x=>x.FileName.Equals(name,StringComparison.OrdinalIgnoreCase)&&x.Sha256.Equals(incomingSha,StringComparison.OrdinalIgnoreCase));
+        if(existing is not null)return existing;
         Guid id=Guid.NewGuid();string storedName=id.ToString("N")+Path.GetExtension(name).ToLowerInvariant();
         await using var source=new MemoryStream(bytes,false);
         StoredFile stored=await storage.StoreAsync(new StorageWriteRequest(
