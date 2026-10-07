@@ -686,6 +686,300 @@
         });
     }
 
+    async function renderJobs(){
+        conversationView.classList.add('hidden');
+        genericView.classList.remove('hidden');
+        genericView.innerHTML='<div class="mywork-loading">Loading jobs…</div>';
+
+        if(typeof loadWorkspaces==='function'&&(!Array.isArray(workspaceCache)||!workspaceCache.length))await loadWorkspaces();
+        const now=new Date();
+        const from=new Date(now.getFullYear(),now.getMonth()-3,1);
+        const to=new Date(now.getFullYear()+1,now.getMonth()+1,1);
+        const [jobs,activities,schedule,mediaSummary,notifications]=await Promise.all([
+            json('/api/jobs'),
+            json('/api/operations/activities').catch(()=>[]),
+            json('/api/schedule/entries?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString())).catch(()=>[]),
+            json('/api/production/media-summary').catch(()=>[]),
+            json('/api/notifications?count=100').catch(()=>[])
+        ]);
+
+        const workspaceMap=new Map((workspaceCache||[]).map(w=>[String(w.id),w]));
+        const explicitWorkspace=jobsWorkspaceFilter;
+        const inheritedWorkspace=(explicitWorkspace===null&&typeof selectedWorkspace!=='undefined'&&selectedWorkspace)?String(selectedWorkspace):'';
+        let workspaceFilter=explicitWorkspace===null?inheritedWorkspace:String(explicitWorkspace||'');
+        const workspaceForFilter=workspaceMap.get(workspaceFilter)||null;
+        const jobById=new Map(jobs.map(job=>[String(job.id),job]));
+        const mediaByJob=new Map();
+        for(const row of mediaSummary){
+            const key=String(row.jobId);
+            const existing=mediaByJob.get(key)||{assetCount:0,thumbnailVersionIds:[]};
+            existing.assetCount+=Number(row.assetCount||0);
+            for(const id of row.thumbnailVersionIds||[])if(id&&!existing.thumbnailVersionIds.includes(id))existing.thumbnailVersionIds.push(id);
+            mediaByJob.set(key,existing);
+        }
+        const tasksByJob=new Map();
+        for(const task of activities){
+            const key=String(task.jobId);
+            if(!tasksByJob.has(key))tasksByJob.set(key,[]);
+            tasksByJob.get(key).push(task);
+        }
+        const scheduleByJob=new Map();
+        for(const entry of schedule){
+            if(!entry.jobId)continue;
+            const key=String(entry.jobId);
+            if(!scheduleByJob.has(key))scheduleByJob.set(key,[]);
+            scheduleByJob.get(key).push(entry);
+        }
+        for(const rows of scheduleByJob.values())rows.sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
+
+        const stageGroup=status=>{
+            const value=String(status||'').toLowerCase();
+            if(/cancel|reject/.test(value))return 'cancelled';
+            if(/complete|published|delivered|closed/.test(value))return 'completed';
+            if(/ready for review|needs review|client review|ready for client/.test(value))return 'review';
+            if(/production|editing|printing|retouch|design/.test(value))return 'production';
+            if(/awaiting upload|upload/.test(value))return 'upload';
+            if(/photography|in progress|shoot/.test(value))return 'progress';
+            if(/needs scheduling|unscheduled/.test(value))return 'scheduling';
+            if(/booked|scheduled|confirmed/.test(value))return 'booked';
+            if(/inquiry|enquiry|pending|request/.test(value))return 'pending';
+            return 'active';
+        };
+        const groups=[
+            ['all','All jobs'],
+            ['pending','Inquiry / Pending'],
+            ['booked','Booked'],
+            ['scheduling','Needs Scheduling'],
+            ['progress','In Progress'],
+            ['upload','Awaiting Upload'],
+            ['production','In Production'],
+            ['review','Ready for Review'],
+            ['completed','Completed'],
+            ['cancelled','Cancelled']
+        ];
+        const countGroup=key=>key==='all'?jobs.length:jobs.filter(job=>stageGroup(job.status)===key).length;
+        const uniqueStatuses=[...new Set(jobs.map(j=>String(j.status||'Active')).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+        const staff=[...new Set(jobs.map(j=>j.jobLead||j.assignedTo).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));
+        const dateText=value=>{
+            if(!value)return 'Not scheduled';
+            const date=new Date(value);
+            return Number.isFinite(+date)?date.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}):String(value);
+        };
+        const timeText=value=>{
+            if(!value)return '';
+            const date=new Date(value);
+            return Number.isFinite(+date)?date.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'';
+        };
+        const nextShoot=job=>{
+            const rows=scheduleByJob.get(String(job.id))||[];
+            return rows.find(entry=>entry.status!=='Cancelled'&&new Date(entry.endsAtUtc||entry.startsAtUtc)>=now)||rows[0]||null;
+        };
+        const jobThumb=job=>{
+            const media=mediaByJob.get(String(job.id));
+            const versionId=media?.thumbnailVersionIds?.[0];
+            return versionId?'/api/jobs/'+job.id+'/versions/by-id/'+versionId+'/preview?size=thumbnail':'';
+        };
+        const progress=job=>{
+            const rows=(tasksByJob.get(String(job.id))||[]).filter(task=>String(task.status||'')!=='Cancelled');
+            const completed=rows.filter(task=>String(task.status||'')==='Completed').length;
+            return {completed,total:rows.length,percent:rows.length?Math.round(completed/rows.length*100):0};
+        };
+        const filteredBase=()=>workspaceFilter?jobs.filter(job=>String(job.workspaceId)===workspaceFilter||(job.participatingWorkspaceIds||[]).map(String).includes(workspaceFilter)):jobs;
+
+        let groupFilter='all',statusFilter='',personFilter='',dateFilter='all',term='',sort='date-desc',grid=false;
+        const renderRows=items=>items.map(job=>{
+            const workspace=workspaceMap.get(String(job.workspaceId));
+            const shoot=nextShoot(job);
+            const media=mediaByJob.get(String(job.id))||{assetCount:0};
+            const p=progress(job);
+            const thumb=jobThumb(job);
+            const shootDate=shoot?.startsAtUtc||job.eventDate||null;
+            const lead=job.jobLead||job.assignedTo||'';
+            const context=[workspace?.name||'Workspace',job.jobType||job.type].filter(Boolean).join(' · ');
+            return `<button type="button" class="jobs-row" data-job-row data-job-id="${job.id}" data-status="${esc(String(job.status||''))}" data-group="${stageGroup(job.status)}" data-person="${esc(String(lead))}" data-date="${shootDate?esc(String(shootDate)):''}" data-search="${esc([job.title,job.clientName,workspace?.name,job.jobType,job.status,lead].filter(Boolean).join(' ').toLowerCase())}">
+                <span class="jobs-thumb">${thumb?`<img src="${thumb}" alt="">`:'<span>📷</span>'}</span>
+                <span class="jobs-primary"><strong>${esc(job.reference||job.jobNumber||job.title)}</strong><small>${esc(job.reference||job.jobNumber?job.title:(job.clientName||'Job'))}</small></span>
+                <span class="jobs-context"><strong>${esc(workspace?.name||'Workspace')}</strong><small>${esc(job.jobType||job.type||'Photography')}</small></span>
+                <span class="jobs-client"><strong>${esc(job.clientName||'Client not linked')}</strong><small>${lead?'Lead: '+esc(typeof studioFirstName==='function'?studioFirstName(lead):lead):'Lead unassigned'}</small></span>
+                <span class="jobs-date"><strong>${esc(dateText(shootDate))}</strong><small>${esc(timeText(shoot?.startsAtUtc))}${shoot?.location?' · '+esc(shoot.location):''}</small></span>
+                <span class="jobs-status workspace-reference-pill ${stageGroup(job.status)}">${esc(job.status||'Active')}</span>
+                <span class="jobs-progress"><span><i style="width:${p.percent}%"></i></span><small>${p.total?p.completed+'/'+p.total:'No tasks'}${media.assetCount?' · '+media.assetCount+' photos':''}</small></span>
+                <span class="jobs-open">›</span>
+            </button>`;
+        }).join('')||'<div class="mw-empty">No jobs match these filters.</div>';
+
+        const upcoming=filteredBase()
+            .map(job=>({job,entry:nextShoot(job)}))
+            .filter(x=>x.entry&&x.entry.status!=='Cancelled'&&new Date(x.entry.startsAtUtc)>=now)
+            .sort((a,b)=>new Date(a.entry.startsAtUtc)-new Date(b.entry.startsAtUtc))
+            .slice(0,5);
+        const activity=notifications
+            .filter(n=>String(n.referenceType||'').toLowerCase()==='job'&&jobById.has(String(n.referenceId)))
+            .filter(n=>!workspaceFilter||String(jobById.get(String(n.referenceId))?.workspaceId)===workspaceFilter)
+            .sort((a,b)=>new Date(b.createdAtUtc||b.createdAt||0)-new Date(a.createdAtUtc||a.createdAt||0))
+            .slice(0,6);
+
+        genericView.innerHTML=`
+            <section class="jobs-page mw-list-page">
+                <div class="jobs-layout">
+                    <aside class="jobs-left-rail">
+                        ${workspaceForFilter?`<section class="mw-list-panel jobs-workspace-card">
+                            <header><h2><span class="mw-title-icon assigned">▰</span> Workspace</h2></header>
+                            <button type="button" class="jobs-workspace-summary" data-return-workspace>
+                                <span class="jobs-workspace-photo">▰</span>
+                                <span><strong>${esc(workspaceForFilter.name)}</strong><small>${countGroup('all')} accessible jobs</small></span>
+                                <b>›</b>
+                            </button>
+                        </section>`:''}
+
+                        <section class="mw-list-panel">
+                            <header><h2><span class="mw-title-icon status">▥</span> Job Status</h2><small>${filteredBase().length} jobs</small></header>
+                            <div class="mw-status-list jobs-status-list">
+                                ${groups.map(([key,label])=>`<button type="button" class="mw-status-row ${key==='all'?'active':''}" data-job-group="${key}"><span class="mw-status-icon">${key==='completed'?'✓':key==='cancelled'?'×':'○'}</span><span>${label}</span><strong>${key==='all'?filteredBase().length:filteredBase().filter(job=>stageGroup(job.status)===key).length}</strong></button>`).join('')}
+                            </div>
+                        </section>
+
+                        <section class="mw-list-panel mw-action-panel">
+                            <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
+                            <div class="mw-action-list">
+                                <button type="button" data-job-action="new"><span>＋</span><span>Create job</span><b>›</b></button>
+                                <button type="button" data-job-action="pipeline"><span>⇥</span><span>Open Pipeline</span><b>›</b></button>
+                                <button type="button" data-job-action="export"><span>⇩</span><span>Export list</span><b>›</b></button>
+                            </div>
+                        </section>
+
+                        <section class="mw-list-panel mw-quick-links-panel">
+                            <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
+                            <div class="mw-quick-link-list">
+                                <button type="button" data-job-nav="workspaces"><span>▰</span><span>Workspaces</span></button>
+                                <button type="button" data-job-nav="mywork"><span>▤</span><span>My Work</span></button>
+                                <button type="button" data-job-nav="production"><span>◆</span><span>Production</span></button>
+                                <button type="button" data-job-nav="frontdesk"><span>▣</span><span>Front Desk</span></button>
+                            </div>
+                        </section>
+                    </aside>
+
+                    <section class="mw-list-panel jobs-center">
+                        <header class="jobs-center-header">
+                            <div><h2><span class="mw-title-icon assigned">▥</span> Jobs <span class="jobs-count">(${filteredBase().length})</span></h2><small>Open a job to work with its messages, media, subjects, tasks, sessions and activity.</small></div>
+                            <div class="jobs-view-toggle"><button type="button" class="active" data-jobs-view="list" title="List view">☷</button><button type="button" data-jobs-view="grid" title="Grid view">▦</button></div>
+                        </header>
+                        <div class="jobs-toolbar">
+                            <label class="jobs-search"><span>⌕</span><input type="search" data-jobs-search placeholder="Search jobs…"></label>
+                            <select data-jobs-status><option value="">All statuses</option>${uniqueStatuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select>
+                            <select data-jobs-person><option value="">All photographers</option>${staff.map(x=>`<option value="${esc(String(x))}">${esc(typeof studioFirstName==='function'?studioFirstName(x):x)}</option>`).join('')}</select>
+                            <select data-jobs-date><option value="all">All dates</option><option value="upcoming">Upcoming</option><option value="past">Past</option><option value="unscheduled">Not scheduled</option></select>
+                            ${workspaceFilter?'':`<select data-jobs-workspace><option value="">All workspaces</option>${(workspaceCache||[]).map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select>`}
+                            <select data-jobs-sort><option value="date-desc">Sort: Date (newest)</option><option value="date-asc">Date (oldest)</option><option value="name">Job name</option><option value="status">Status</option></select>
+                        </div>
+                        <div class="jobs-table-head"><span></span><span>Job</span><span>Workspace / Type</span><span>Client</span><span>Shoot Date</span><span>Status</span><span>Progress</span><span></span></div>
+                        <div class="jobs-list" data-jobs-list>${renderRows(filteredBase())}</div>
+                        <footer class="jobs-footer"><span data-jobs-showing>Showing ${filteredBase().length} jobs</span><span>Rows use live Studio job, schedule, task and media data.</span></footer>
+                    </section>
+
+                    <aside class="jobs-right-rail">
+                        <section class="mw-list-panel jobs-upcoming">
+                            <header><h2><span class="mw-title-icon tasks">▣</span> Upcoming Shoots</h2><button type="button" data-job-action="pipeline">View calendar</button></header>
+                            <div class="jobs-upcoming-list">
+                                ${upcoming.map(({job,entry})=>`<button type="button" data-open-job="${job.id}" class="jobs-upcoming-row"><span class="jobs-date-tile"><b>${new Date(entry.startsAtUtc).toLocaleDateString([],{month:'short'}).toUpperCase()}</b><strong>${new Date(entry.startsAtUtc).getDate()}</strong></span><span><strong>${esc(job.title)}</strong><small>${esc(timeText(entry.startsAtUtc))}${entry.location?' · '+esc(entry.location):''}</small></span><em class="workspace-reference-pill ${stageGroup(job.status)}">${esc(job.status||'Scheduled')}</em></button>`).join('')||'<div class="mw-empty">No upcoming shoots.</div>'}
+                            </div>
+                        </section>
+
+                        <section class="mw-list-panel jobs-activity">
+                            <header><h2><span class="mw-title-icon messages">◉</span> Recent Activity</h2><button type="button" data-job-action="notifications">View all</button></header>
+                            <div class="jobs-activity-list">
+                                ${activity.map(n=>{const job=jobById.get(String(n.referenceId));return `<button type="button" data-open-job="${job?.id||''}" class="jobs-activity-row"><span class="jobs-activity-icon">•</span><span><strong>${esc(n.subject||n.title||n.eventType||'Job activity')}</strong><small>${esc(job?.title||'Job')}${n.body?' · '+esc(n.body):''}</small></span><time>${n.createdAtUtc?new Date(n.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):''}</time></button>`;}).join('')||'<div class="mw-empty">No recent job activity.</div>'}
+                            </div>
+                        </section>
+                    </aside>
+                </div>
+            </section>`;
+
+        const crumbItems=[{label:'My Work',view:'mywork'},{label:'Workspaces',view:'workspaces'}];
+        if(workspaceForFilter)crumbItems.push({label:workspaceForFilter.name,view:'workspaces',workspaceId:workspaceForFilter.id});
+        crumbItems.push({label:'Jobs',view:'jobs'});
+        window.studioSetBreadcrumb?.(crumbItems);
+        if(studioPageTools){
+            studioPageTools.innerHTML='<button type="button" class="primary jobs-new-button" data-job-action="new">＋ New Job</button>';
+        }
+
+        const list=genericView.querySelector('[data-jobs-list]');
+        const rows=()=>[...genericView.querySelectorAll('[data-job-row]')];
+        const apply=()=>{
+            let visible=rows().filter(row=>{
+                if(groupFilter!=='all'&&row.dataset.group!==groupFilter)return false;
+                if(statusFilter&&row.dataset.status!==statusFilter)return false;
+                if(personFilter&&row.dataset.person!==personFilter)return false;
+                if(term&&!row.dataset.search.includes(term))return false;
+                if(dateFilter!=='all'){
+                    if(dateFilter==='unscheduled'&&row.dataset.date)return false;
+                    if(dateFilter!=='unscheduled'){
+                        if(!row.dataset.date)return false;
+                        const date=new Date(row.dataset.date);
+                        if(dateFilter==='upcoming'&&date<now)return false;
+                        if(dateFilter==='past'&&date>=now)return false;
+                    }
+                }
+                return true;
+            });
+            const value=row=>row.dataset.date?+new Date(row.dataset.date):0;
+            visible.sort((a,b)=>{
+                if(sort==='date-asc')return value(a)-value(b);
+                if(sort==='name')return a.dataset.search.localeCompare(b.dataset.search);
+                if(sort==='status')return a.dataset.status.localeCompare(b.dataset.status);
+                return value(b)-value(a);
+            });
+            const shown=new Set(visible);
+            rows().forEach(row=>row.hidden=!shown.has(row));
+            visible.forEach(row=>list.appendChild(row));
+            genericView.querySelector('[data-jobs-showing]').textContent='Showing '+visible.length+' of '+rows().length+' jobs';
+        };
+
+        genericView.querySelectorAll('[data-job-group]').forEach(button=>button.onclick=()=>{
+            groupFilter=button.dataset.jobGroup;
+            genericView.querySelectorAll('[data-job-group]').forEach(x=>x.classList.toggle('active',x===button));
+            apply();
+        });
+        genericView.querySelector('[data-jobs-search]').oninput=e=>{term=e.target.value.trim().toLowerCase();apply();};
+        genericView.querySelector('[data-jobs-status]').onchange=e=>{statusFilter=e.target.value;apply();};
+        genericView.querySelector('[data-jobs-person]').onchange=e=>{personFilter=e.target.value;apply();};
+        genericView.querySelector('[data-jobs-date]').onchange=e=>{dateFilter=e.target.value;apply();};
+        genericView.querySelector('[data-jobs-sort]').onchange=e=>{sort=e.target.value;apply();};
+        const workspaceSelect=genericView.querySelector('[data-jobs-workspace]');
+        if(workspaceSelect)workspaceSelect.onchange=e=>{jobsWorkspaceFilter=e.target.value;renderJobs().catch(error=>alert(error.message));};
+        genericView.querySelectorAll('[data-jobs-view]').forEach(button=>button.onclick=()=>{
+            grid=button.dataset.jobsView==='grid';
+            list.classList.toggle('grid-view',grid);
+            genericView.querySelectorAll('[data-jobs-view]').forEach(x=>x.classList.toggle('active',x===button));
+        });
+        genericView.querySelectorAll('[data-job-row],[data-open-job]').forEach(button=>button.onclick=()=>openWorkspaceJob(button.dataset.jobId||button.dataset.openJob).catch(error=>alert(error.message)));
+        genericView.querySelectorAll('[data-job-nav]').forEach(button=>button.onclick=()=>{if(button.dataset.jobNav==='workspaces')jobsWorkspaceFilter=null;window.studioNavigate(button.dataset.jobNav);});
+        const allActionButtons=[...genericView.querySelectorAll('[data-job-action]'),...(studioPageTools?studioPageTools.querySelectorAll('[data-job-action]'):[])];
+        allActionButtons.forEach(button=>button.onclick=()=>{
+            const action=button.dataset.jobAction;
+            if(action==='new')return window.studioNavigate('frontdesk');
+            if(action==='pipeline')return window.studioNavigate('pipeline');
+            if(action==='notifications')return document.getElementById('notificationButton')?.click();
+            if(action==='export'){
+                const visible=rows().filter(row=>!row.hidden).map(row=>{
+                    const job=jobById.get(String(row.dataset.jobId));
+                    const workspace=workspaceMap.get(String(job?.workspaceId));
+                    return [job?.title||'',job?.clientName||'',workspace?.name||'',job?.status||'',job?.eventDate||''].map(value=>'"'+String(value).replaceAll('"','""')+'"').join(',');
+                });
+                const csv='Job,Client,Workspace,Status,Event Date\n'+visible.join('\n');
+                const blob=new Blob([csv],{type:'text/csv'});
+                const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='studio-jobs.csv';link.click();URL.revokeObjectURL(link.href);
+            }
+        });
+        genericView.querySelector('[data-return-workspace]')?.addEventListener('click',()=>selectWorkspace(workspaceForFilter.id,workspaceForFilter.name));
+        apply();
+    }
+
+    window.studioOpenJobs=workspaceId=>{
+        jobsWorkspaceFilter=workspaceId==null?'':String(workspaceId);
+        return window.studioNavigate('jobs');
+    };
+
     async function renderAdmin(){
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
@@ -827,6 +1121,7 @@
         schedule:()=>showPipeline(),
         tasks:renderMyWork,
         workspaces:renderWorkspaces,
+        jobs:renderJobs,
         pipeline:()=>showPipeline(),
         production:()=>showProduction(),
         frontdesk:()=>showFrontDesk(),
