@@ -13,6 +13,60 @@
 
     let myWorkLoad=null;
     let navigationRevision=0;
+    let restoringHistory=false;
+
+    const normalizeStudioState=value=>({
+        view:value?.view||'mywork',
+        workspaceId:value?.workspaceId||null,
+        jobId:value?.jobId||null
+    });
+    const stateFromUrl=()=>{
+        const params=new URLSearchParams(location.search);
+        return normalizeStudioState({
+            view:params.get('view')||'mywork',
+            workspaceId:params.get('workspace'),
+            jobId:params.get('job')
+        });
+    };
+    const studioStateUrl=state=>{
+        const url=new URL(location.href);
+        const value=normalizeStudioState(state);
+        if(value.view&&value.view!=='mywork')url.searchParams.set('view',value.view);else url.searchParams.delete('view');
+        if(value.workspaceId)url.searchParams.set('workspace',value.workspaceId);else url.searchParams.delete('workspace');
+        if(value.jobId)url.searchParams.set('job',value.jobId);else url.searchParams.delete('job');
+        return url.pathname+url.search+url.hash;
+    };
+    const sameStudioState=(a,b)=>{
+        const left=normalizeStudioState(a),right=normalizeStudioState(b);
+        return left.view===right.view&&String(left.workspaceId||'')===String(right.workspaceId||'')&&String(left.jobId||'')===String(right.jobId||'');
+    };
+    window.studioRememberView=(value,options={})=>{
+        const state=normalizeStudioState(value);
+        if(restoringHistory)return;
+        const current=normalizeStudioState(history.state?.studio||stateFromUrl());
+        if(sameStudioState(current,state)&&history.state?.studio)return;
+        const method=options.replace?'replaceState':'pushState';
+        history[method]({...(history.state||{}),studio:state},'',studioStateUrl(state));
+    };
+    async function restoreStudioState(value){
+        const state=normalizeStudioState(value);
+        restoringHistory=true;
+        try{
+            if(state.jobId){
+                await window.studioNavigate('workspaces',{history:false});
+                await openWorkspaceJob(state.jobId);
+                return;
+            }
+            if(state.workspaceId){
+                await window.studioNavigate('workspaces',{history:false});
+                if(!workspaceCache.length)await loadWorkspaces();
+                const workspace=workspaceCache.find(w=>String(w.id)===String(state.workspaceId));
+                if(workspace)await selectWorkspace(workspace.id,workspace.name);
+                return;
+            }
+            await window.studioNavigate(state.view,{history:false});
+        }finally{restoringHistory=false;}
+    }
 
     function renderMyWork(){
         const controller=new AbortController(),revision=navigationRevision;
@@ -787,7 +841,7 @@
         admin:renderAdmin
     };
 
-    window.studioNavigate=async function(view){
+    window.studioNavigate=async function(view,options={}){
         const route=routes[view];
         if(!route) throw new Error('Unknown Studio navigation view: '+view);
         const revision=++navigationRevision;
@@ -811,6 +865,7 @@
             if(revision===navigationRevision){
                 setActive(view);
                 if(view!=='mywork'&&typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
+                if(options.history!==false)window.studioRememberView({view,workspaceId:null,jobId:null});
             }
         }catch(error){
             if(revision!==navigationRevision)return;
@@ -830,10 +885,16 @@
     if(topNew) topNew.onclick=async()=>{topNew.disabled=true;try{await loadWorkspaces();document.getElementById('newRequestDialog')?.showModal();}catch(error){alert(error.message);}finally{topNew.disabled=false;}};
 
     const startStudio=async()=>{
-        window.studioNavigate('mywork').catch(error=>{
+        const initial=history.state?.studio||stateFromUrl();
+        if(!history.state?.studio)history.replaceState({...(history.state||{}),studio:normalizeStudioState(initial)},'',studioStateUrl(initial));
+        restoreStudioState(initial).catch(error=>{
             console.error('Studio startup navigation failed.',error);
         });
     };
+    addEventListener('popstate',event=>{
+        const state=event.state?.studio||stateFromUrl();
+        restoreStudioState(state).catch(error=>console.error('Studio history restoration failed.',error));
+    });
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
