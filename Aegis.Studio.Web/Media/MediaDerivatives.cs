@@ -2,10 +2,7 @@ using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Versioning;
 using Common.Storage;
 using Npgsql;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 
 namespace Aegis.Studio.Web.Media;
 
@@ -94,14 +91,7 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
                 await using var staged = new FileStream(temp, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
                     65536, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
                 await original.CopyToAsync(staged, token); staged.Position = 0;
-                var info = await Image.IdentifyAsync(staged, token);
-                if ((long)info.Width * info.Height > 60_000_000)
-                { await SetState(id, "Unsupported", null, null, "Preview exceeds the supported pixel limit; download the original.", token); return; }
-                staged.Position = 0;
-                var configuration=SixLabors.ImageSharp.Configuration.Default.Clone();configuration.MaxDegreeOfParallelism=1;
-                var decoder=new DecoderOptions{Configuration=configuration};
-                using var image = await Image.LoadAsync(decoder,staged, token);
-                image.Mutate(x => x.AutoOrient());
+                using var image = StudioImageProcessor.DecodeOriented(staged);
                 string thumb = $"MediaDerivatives/{job:N}/{id:N}/thumbnail.jpg";
                 string preview = $"MediaDerivatives/{job:N}/{id:N}/preview.jpg";
                 await Write(image, 384, thumb, token);
@@ -110,7 +100,7 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
             }
             finally { if (File.Exists(temp)) File.Delete(temp); }
         }
-        catch (UnknownImageFormatException) { await SetState(id,"Unsupported",null,null,"Preview not available for this file format. The original can still be downloaded.",token); }
+        catch (StudioUnsupportedImageException error) { await SetState(id,"Unsupported",null,null,error.Message,token); }
         catch (StorageException error) when (error.Code=="STORAGE-MISSING-001")
         {
             logger.LogInformation("Preview deferred for version {VersionId}; original storage object is not available yet",id);
@@ -123,12 +113,10 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
             await SetState(id, "Failed", null, null, "Preview unavailable. Retry generation or download the original.", token);
         }
     }
-    private async Task Write(Image original, int edge, string key, CancellationToken token)
+    private async Task Write(SKBitmap original, int edge, string key, CancellationToken token)
     {
-        using var resized = original.Clone(x => x.Resize(new ResizeOptions { Mode=ResizeMode.Max, Size=new Size(edge,edge) }));
-        resized.Metadata.ExifProfile=null; resized.Metadata.IptcProfile=null; resized.Metadata.XmpProfile=null;
-        using var encoded = new MemoryStream();
-        await resized.SaveAsJpegAsync(encoded,new JpegEncoder { Quality=80 },token); encoded.Position=0;
+        using var resized = StudioImageProcessor.ResizeMax(original, edge);
+        using var encoded = new MemoryStream(StudioImageProcessor.EncodeJpeg(resized, 80), writable: false);
         await storage.StoreAsync(new StorageWriteRequest(key, encoded, "image/jpeg", "preview.jpg", "Studio preview worker"),token);
         await using var verify=await storage.OpenReadAsync(key,token);
         if(verify.ReadByte()<0)throw new IOException("Preview storage verification failed.");

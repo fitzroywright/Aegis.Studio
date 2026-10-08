@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
+using Aegis.Studio.Web.Media;
 using System.Net.Http;
 using Npgsql;
 using Common.Storage;
@@ -301,11 +300,10 @@ internal static class DemoDataExpansion
                     demoPhotoSourceNameCache[url]=Header(response,"X-Aegis-Demo-Source","Wikimedia Commons");
                     demoPhotoLicenseCache[url]=Header(response,"X-Aegis-Demo-License","Public domain/CC0 as catalogued");
                     demoPhotoPageCache[url]=Header(response,"X-Aegis-Demo-Page",url);
-                    using var photograph=Image.Load(sourceBytes);
-                    photograph.Mutate(x=>x.Resize(new ResizeOptions { Size=new Size(1200,1200),Mode=ResizeMode.Max }));
-                    using var derivative=new MemoryStream();
-                    photograph.SaveAsJpeg(derivative,new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality=85 });
-                    bytes=derivative.ToArray();
+                    using var sourceStream=new MemoryStream(sourceBytes,writable:false);
+                    using var photograph=StudioImageProcessor.DecodeOriented(sourceStream);
+                    using var resized=StudioImageProcessor.ResizeMax(photograph,1200);
+                    bytes=StudioImageProcessor.EncodeJpeg(resized,85);
                     if(weddingPhotoCache.Count>=32)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
                     weddingPhotoCache[url]=bytes;
                 }
@@ -415,11 +413,10 @@ internal static class DemoDataExpansion
                     demoPhotoSourceNameCache[url]=Header(response,"X-Aegis-Demo-Source","Wikimedia Commons");
                     demoPhotoLicenseCache[url]=Header(response,"X-Aegis-Demo-License","Public domain/CC0 as catalogued");
                     demoPhotoPageCache[url]=Header(response,"X-Aegis-Demo-Page",url);
-                    using var photograph=Image.Load(sourceBytes);
-                    photograph.Mutate(x=>x.Resize(new ResizeOptions { Size=new Size(1200,1200),Mode=ResizeMode.Max }));
-                    using var derivative=new MemoryStream();
-                    photograph.SaveAsJpeg(derivative,new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality=85 });
-                    bytes=derivative.ToArray();
+                    using var sourceStream=new MemoryStream(sourceBytes,writable:false);
+                    using var photograph=StudioImageProcessor.DecodeOriented(sourceStream);
+                    using var resized=StudioImageProcessor.ResizeMax(photograph,1200);
+                    bytes=StudioImageProcessor.EncodeJpeg(resized,85);
                     if(weddingPhotoCache.Count>=32)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
                     weddingPhotoCache[url]=bytes;
                 }

@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using SkiaSharp;
 
 namespace Aegis.Studio.Web.Tests;
 public sealed class IntegratedWorkflowTests
@@ -103,7 +104,7 @@ public sealed class IntegratedWorkflowTests
         var worker=new MediaDerivativeWorker(db,new LocalFileStorage(root),new TestEnvironment(root),NullLogger<MediaDerivativeWorker>.Instance);
         var generate=typeof(MediaDerivativeWorker).GetMethod("Generate",BindingFlags.Instance|BindingFlags.NonPublic)!;
         await (Task)generate.Invoke(worker,[realPhoto.Id,CancellationToken.None])!;
-        using(var state=new NpgsqlCommand("select status,thumbnail_key from studio_media_derivatives where version_id=$1",c)){state.Parameters.AddWithValue(realPhoto.Id);using var row=state.ExecuteReader();Assert.True(row.Read());Assert.Equal("Ready",row.GetString(0));using var thumbnail=new LocalFileStorage(root).OpenReadAsync(row.GetString(1)).GetAwaiter().GetResult();using var image=SixLabors.ImageSharp.Image.Load(thumbnail);Assert.True(Math.Max(image.Width,image.Height)<=384);}
+        using(var state=new NpgsqlCommand("select status,thumbnail_key from studio_media_derivatives where version_id=$1",c)){state.Parameters.AddWithValue(realPhoto.Id);using var row=state.ExecuteReader();Assert.True(row.Read());Assert.Equal("Ready",row.GetString(0));using var thumbnail=new LocalFileStorage(root).OpenReadAsync(row.GetString(1)).GetAwaiter().GetResult();using var image=SKBitmap.Decode(thumbnail);Assert.NotNull(image);Assert.True(Math.Max(image.Width,image.Height)<=384);}
         await (Task)generate.Invoke(worker,[v3.Id,CancellationToken.None])!;
         using(var state=new NpgsqlCommand("select status from studio_media_derivatives where version_id=$1",c)){state.Parameters.AddWithValue(v3.Id);Assert.Equal("Unsupported",state.ExecuteScalar());}
         using(var intact=versions.Open(job,v3.Id,out _))Assert.Equal(3,intact.ReadByte());

@@ -1,11 +1,9 @@
 using System.Security.Claims;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Media;
 using Common.Storage;
 using Npgsql;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
 
 namespace Aegis.Studio.Web.Versioning;
 
@@ -114,24 +112,19 @@ public static class StudioVersionEndpoints
                 {
                     await original.CopyToAsync(staged,context.RequestAborted);
                     staged.Position=0;
-                    var info=await Image.IdentifyAsync(staged,context.RequestAborted);
-                    if((long)info.Width*info.Height>60_000_000)
+                    try
+                    {
+                        using var image=StudioImageProcessor.DecodeOriented(staged);
+                        using var resized=StudioImageProcessor.ResizeMax(image,384);
+                        byte[] encoded=StudioImageProcessor.EncodeJpeg(resized,78);
+                        context.Response.Headers.CacheControl="private, max-age=60";
+                        return Results.File(encoded,"image/jpeg");
+                    }
+                    catch(StudioUnsupportedImageException)
+                    {
                         return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
-                    staged.Position=0;
-                    using var image=await Image.LoadAsync(staged,context.RequestAborted);
-                    image.Mutate(x=>x.AutoOrient().Resize(new ResizeOptions{Mode=ResizeMode.Max,Size=new Size(384,384)}));
-                    image.Metadata.ExifProfile=null;
-                    image.Metadata.IptcProfile=null;
-                    image.Metadata.XmpProfile=null;
-                    using var encoded=new MemoryStream();
-                    await image.SaveAsJpegAsync(encoded,new JpegEncoder{Quality=78},context.RequestAborted);
-                    context.Response.Headers.CacheControl="private, max-age=60";
-                    return Results.File(encoded.ToArray(),"image/jpeg");
+                    }
                 }
-            }
-            catch(UnknownImageFormatException)
-            {
-                return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
             }
             catch(StorageException e) when(e.Code=="STORAGE-MISSING-001")
             {
