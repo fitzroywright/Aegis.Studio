@@ -231,3 +231,17 @@ create table if not exists studio_workflow_upload_batches(
  constraint upload_batch_counts_valid check(completed_files+failed_files<=expected_files)
 );
 create index if not exists ix_studio_workflow_upload_batches_session on studio_workflow_upload_batches(session_id,recorded_at_utc desc);
+
+-- A newly persisted asset version invalidates earlier operator-recorded upload receipts.
+-- Preserve the receipts for audit instead of deleting them.
+alter table studio_workflow_upload_batches add column if not exists invalidated_at_utc timestamptz;
+create or replace function studio_workflow_invalidate_upload_proof() returns trigger language plpgsql as $$
+begin
+ update studio_workflow_upload_batches
+ set invalidated_at_utc=now()
+ where job_id=new.job_id and invalidated_at_utc is null;
+ return new;
+end $$;
+drop trigger if exists workflow_invalidate_upload_proof on studio_asset_versions;
+create trigger workflow_invalidate_upload_proof after insert on studio_asset_versions
+for each row execute function studio_workflow_invalidate_upload_proof();
