@@ -53,6 +53,7 @@ internal static class ConnectedWorkflowDemo
 
     private static object GenerateData(NpgsqlConnection c,NpgsqlTransaction tx,string actor)
     {
+        Exec(c,tx,"select set_config('studio.demo_seed','true',true)");
         int created=0;
         for(int w=0;w<WorkspaceNames.Length;w++)
         {
