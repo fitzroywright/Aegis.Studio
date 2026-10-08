@@ -55,3 +55,12 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - Last verified remote code commit at this checkpoint: `9bd116c23124eea60ab4cdf69501b2a1e3ece141`.
 - Not built or tested; no .NET SDK, application database, or Common sibling source available through GitHub-only execution. These changes are unverified.
 - Known next work: inspect transfer approval lifecycle (avoid superseding the approved request), validate SQL migration against actual schema, harden upload batch proofs and no-op commands, fix permission edge cases, integrate generic schedule writers, complete end-to-end tests and UI compatibility. Preserve My Work styling.
+
+## Continuation checkpoint — saved October 8
+
+- Added destination-manager transfer-decision authorization independent of existing Job view grants, limited to a matching pending transfer.
+- Added live elapsed-stage clock in connected Job panel using the actual `enteredAt` snapshot field; refreshes every 60 seconds while the panel is mounted.
+- Rejected repeat delivery and waiver commands for already resolved requirements.
+- JavaScript syntax for `wwwroot/connected-workflow.js` parsed successfully in the connector execution runtime. This does not constitute a browser/UI test.
+- Last CODE commit `520b07eebb8bd3169b2d0061b94245642bd96e2e`. All changes on recovery branch; main unchanged.
+- Remaining: native .NET build/test, SQL migration integration test, booking and legacy route adapters, upload-batch proofs, generic schedule reservation concurrency, full A–T acceptance, permissions and operational smoke tests. Not release-ready.
