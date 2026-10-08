@@ -87,6 +87,15 @@ public sealed class WorkflowMonitorWorker(IServiceScopeFactory scopes,ILogger<Wo
                 var failures=new List<(Guid Job,string Key,string Audience,string Subject,string Body)>();
                 using(var q=WorkflowStore.Command(c,tx,"select job_id,event_key,audience,subject,body from studio_workflow_delivery_failures order by created_at_utc limit 100"))using(var r=q.ExecuteReader()){while(r.Read())failures.Add((r.GetGuid(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4)));}
                 foreach(var f in failures)WorkflowStore.Sql(c,tx,"select studio_workflow_notify($1,$2,$3,$4,$5)",f.Job,f.Key,f.Audience,f.Subject,f.Body);
+                // A recipient may lose their employment or email permission after queuing.
+                // Cancel unsent workflow email before the existing delivery worker leases it.
+                WorkflowStore.Sql(c,tx,"""
+                    update studio_notifications n set status='Cancelled'
+                    where n.workflow_event_key is not null and n.channel='Email' and n.status='Pending'
+                      and (exists(select 1 from studio_employees e where lower(e.user_name)=lower(n.user_name) and not e.is_active)
+                        or not exists(select 1 from studio_user_profiles p where lower(p.user_name)=lower(n.user_name)
+                          and p.email_enabled and p.email is not null and lower(p.email)=lower(n.destination)))
+                    """);
                 tx.Commit();
             }
             catch(Exception e)when(!stoppingToken.IsCancellationRequested){log.LogError(e,"Workflow timing/recipient recovery failed; durable records retained for retry");}
