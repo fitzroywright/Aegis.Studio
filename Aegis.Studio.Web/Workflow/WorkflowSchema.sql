@@ -70,27 +70,8 @@ begin
   values(p_event,p_job,p_audience,p_subject,p_body,'No active recipient profile configured') on conflict do nothing;
  else delete from studio_workflow_delivery_failures where event_key=p_event; end if;
 end $$;
--- Map historical statuses only once. Unknown dates remain NULL, never backdated from last edit.
-do $$ begin
- if not exists(select 1 from studio_workflow_migrations where version=1) then
-  update studio_jobs set legacy_workflow_status=status,status=case status
-   when 'New' then 'Pending' when 'Inquiry' then 'Pending' when 'Confirmed' then 'Needs Assignment'
-   when 'Needs Scheduling' then case when job_lead is null then 'Needs Assignment' else 'Awaiting Scheduling' end
-   when 'InProgress' then 'Photography In Progress' when 'Needs Review' then 'Awaiting Production Review'
-   when 'In Production' then 'Active Production' when 'Ready for Client' then 'Ready for Delivery'
-   when 'Published' then 'Ready for Delivery' when 'Closed' then 'Completed' else status end;
-  insert into studio_workflow_reconciliation(job_id,legacy_status,reason)
-   select id,legacy_workflow_status,'Legacy state/approval must be checked against recorded evidence' from studio_jobs
-   where status not in ('Pending','Needs Assignment','Needs Photographer Assignment','Awaiting Scheduling','Scheduled','Photography In Progress','Awaiting Upload','Awaiting Production Review','Active Production','Awaiting Approval','Changes Requested','Ready for Delivery','Delivered','Completed','Cancelled') or legacy_workflow_status in ('Published','Changes Requested','Ready for Client','Confirmed') on conflict do nothing;
-  insert into studio_workflow_sessions(id,job_id,title,shoot_id,required,crew_finalized)
-   select id,job_id,'Photography',id,status<>'Cancelled',true from studio_shoot_sessions on conflict do nothing;
-  insert into studio_workflow_crew(session_id,user_name,role,assigned_by)
-   select id,lower(photographer_user_name),'Lead','Migration' from studio_shoot_sessions on conflict do nothing;
-  insert into studio_workflow_crew(session_id,user_name,role,assigned_by)
-   select id,lower(assistant_user_name),'Additional','Migration' from studio_shoot_sessions where nullif(trim(assistant_user_name),'') is not null and lower(assistant_user_name)<>lower(photographer_user_name) on conflict do nothing;
-  insert into studio_workflow_migrations(version) values(1);
- end if;
-end $$;
+-- Fresh Connected Workflow only. Historical demo Jobs are not migrated.
+-- Reset disposable demo data before applying this schema to a fresh demo environment.
 create or replace function studio_workflow_job_before() returns trigger language plpgsql as $$
 begin
  if tg_op='INSERT' then new.stage_entered_at_utc:=now(); return new; end if;
