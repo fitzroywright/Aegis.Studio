@@ -1,0 +1,1244 @@
+# Aegis Studio — Complete Workflow Implementation Brief
+
+**Project:** Aegis.Studio  
+**Priority:** High  
+**Revision:** October 8, 2026 — approved decisions integrated  
+**Implementation scope:** Booking → FrontDesk → Workspaces → Jobs → Photographer Assignment → Scheduling → Photoshoot → Upload → Production  
+**Objective:** Establish a complete, connected operational workflow across Studio while preserving its existing design and functionality.
+
+**Decision precedence:** This revision replaces the earlier brief. Section 21 provides the binding implementation contracts and resolves legacy code or documentation conflicts. Preserve working data and integrations while replacing the operational flow as specified. Deposit eligibility uses any recorded positive deposit in this phase; business-hours timing and advanced deposit policy are deferred.
+
+**Instructions to the development agent:** Implement the requirements below. Inspect the existing code before making changes, reuse functioning components, and complete the work in logical stages. Do not stop after producing an implementation plan.
+
+---
+
+## 1. Fundamental design principles
+
+Aegis Studio must operate as one integrated business management system.
+
+**My Work is the visual design reference for the entire application.**
+
+Preserve its existing appearance pixel-for-pixel wherever practical.
+
+Requirements:
+
+1. Maintain the existing Studio visual design, typography, spacing, rounded corners, and compact layouts.
+2. Apply the established My Work grid and scrolling behavior consistently to other operational pages.
+3. Preserve existing functionality.
+4. Avoid duplicate business logic, workflow states, and data.
+5. Use the existing authentication, messaging, storage, and notification infrastructure.
+6. Ensure every page has reliable navigation to related pages.
+7. Make all workflow actions available from their appropriate operational context.
+8. Keep Jobs as the authoritative source for job workflow state.
+9. Implement role-based permissions for managerial actions.
+10. Preserve existing working integrations with Common libraries.
+
+Do not redesign My Work, Workspaces, Production, or Jobs unnecessarily.
+
+**The objective is functional integration, not visual reinvention.**
+
+---
+
+# 2. Complete Studio navigation structure
+
+Implement a consistent navigation system that supports the entire operational workflow.
+
+### Primary navigation
+
+```text
+AEGIS STUDIO
+│
+├── Dashboard
+│
+├── My Work
+│   ├── Needs Attention
+│   ├── My Jobs
+│   ├── My Tasks
+│   ├── My Schedule
+│   └── Assignment Requests
+│
+├── FrontDesk
+│   ├── Overview
+│   ├── Pending Jobs
+│   ├── Unassigned Jobs
+│   ├── Customer Communications
+│   ├── Payment Follow-up
+│   └── Needs Attention
+│
+├── Workspaces
+│   ├── Workspace List
+│   └── Workspace Detail
+│       ├── Jobs
+│       ├── Needs Assignment
+│       ├── Members
+│       └── Messages
+│
+├── Jobs (reuse the existing Pipeline destination and retain its route as an alias)
+│   ├── All Jobs
+│   ├── Job Detail
+│   │   ├── Overview
+│   │   ├── Assignments
+│   │   ├── Schedule
+│   │   ├── Tasks
+│   │   ├── Media / Gallery / Subjects
+│   │   ├── Messages
+│   │   └── Activity
+│   └── Workflow Monitoring
+│
+├── Production
+│   ├── Awaiting Review
+│   ├── Active Production
+│   ├── Production Tasks
+│   ├── Awaiting Approval
+│   └── Completed
+│
+├── WorkDay
+│   ├── Calendar
+│   ├── Photographer Schedule
+│   └── Availability
+│
+└── Administration
+    ├── Employees
+    ├── Roles
+    ├── Workspace Configuration
+    ├── Workflow Configuration
+    └── Notification Configuration
+```
+
+These are logical navigation destinations, not necessarily separate pages.
+
+Use existing tabs, panels, and routes wherever appropriate.
+
+Do not introduce unnecessary top-level navigation entries.
+
+### Navigation requirements
+
+Every operational screen must provide:
+
+- A reliable route back to My Work.
+- A route to the associated Job.
+- A route to the parent Workspace.
+- Contextual navigation to related tasks.
+- Appropriate breadcrumbs or equivalent navigation.
+- Preservation of filters and scroll position when returning to a list.
+
+**No operational page should become a navigation dead end.**
+
+For example:
+
+```text
+My Work
+   ↓
+Assigned Job
+   ↓
+Photographer Assignment
+   ↓
+Job Schedule
+   ↓
+Back to Job
+   ↓
+Back to My Work
+```
+
+Use the existing Studio navigation framework. Preserve existing Clients, Messaging, POS/Billing, gallery, Subjects, and administration routes. The structure above is an operational map, not permission to remove destinations. Publish a route-to-destination mapping as part of the implementation report.
+
+---
+
+# 3. Booking and pending jobs
+
+A customer submits a booking through Brian's website.
+
+The booking creates a real Studio Job immediately.
+
+Initial workflow state:
+
+`Pending`
+
+Create the authoritative Pending Job immediately. Retain any existing booking/request record only as linked intake or financial provenance, never as a later source of a second Job. Migrate existing pending bookings idempotently to this model.
+
+### Booking information
+
+Capture:
+
+- Customer
+- Contact information
+- Requested service
+- Preferred date and time
+- Booking notes
+- Destination email address
+- Booking source
+- Workspace
+- Deposit requirement
+- Submission timestamp
+
+Use a stable external booking identifier and idempotent submission handling to prevent duplicate jobs.
+
+### Workspace routing
+
+The destination email address determines the initial workspace.
+
+Example:
+
+```text
+weddings@bryanstudiosltd.com
+             ↓
+       Wedding Workspace
+```
+
+Mappings must be configurable.
+
+If no workspace mapping exists:
+
+`Workspace = the predefined permanent Unassigned Workspace`
+
+The job enters FrontDesk's Unassigned Jobs queue. Seed the permanent Unassigned Workspace once under a stable system identifier; retries must not duplicate it. Prevent deletion, disabling, or reassignment of its system identity. It is an intake container managed by FrontDesk, not a newly created workspace for each booking.
+
+FrontDesk can assign or correct the workspace.
+
+**Do not automatically create a new workspace for each booking.**
+
+---
+
+# 4. FrontDesk workflow
+
+FrontDesk owns the initial processing of pending jobs.
+
+Pending Jobs is one operational channel within FrontDesk.
+
+### Pending job actions
+
+FrontDesk employees must be able to:
+
+1. View pending jobs.
+2. Claim a job for processing.
+3. Review booking details.
+4. Assign or correct the workspace.
+5. Contact the customer.
+6. Check scheduling availability.
+7. Review deposit requirements.
+8. Confirm eligible bookings.
+9. Cancel bookings with a reason.
+10. Escalate to the operations manager.
+
+### Booking confirmation rules
+
+For now, there are two permitted confirmation paths.
+
+**Path A — Deposit received**
+
+Any positive deposit has been recorded against the booking or Job by an authorized FrontDesk employee. For this phase, any recorded deposit satisfies confirmation eligibility regardless of the configured required amount. Do not implement minimum-amount enforcement, provider verification, credit, or pay-later policy. Preserve amounts, currency, receipts, and audit records using existing financial infrastructure.
+
+FrontDesk confirms the booking.
+
+**Path B — Operations manager override**
+
+The operations manager authorizes the booking to proceed without the required deposit.
+
+Record:
+
+- Authorizing manager
+- Timestamp
+- Reason
+- Original deposit requirement
+
+An override must not incorrectly mark the deposit as paid.
+
+Maintain separate payment and job workflow states.
+
+**Deferred:** Customer credit arrangements and pay-later account privileges.
+
+Do not implement customer credit policy during this phase.
+
+### Confirmation outcome
+
+Once confirmed, record the **Booking Confirmed event** and immediately transition:
+
+```text
+Pending → Needs Assignment
+```
+
+Confirmed is an event, not a persistent workflow stage. A real business workspace is required before confirmation; Jobs in Unassigned remain Pending.
+
+The confirmed job remains within its assigned workspace.
+
+The workspace manager receives responsibility for ensuring assignment.
+
+---
+
+# 5. Job responsibility model
+
+Implement three distinct responsibilities.
+
+| Responsibility | Function |
+|---|---|
+| Workspace Manager | Oversight and managerial accountability |
+| Job Owner | Coordination and execution of the job |
+| Photographer | Photography assignment and execution |
+
+One employee may hold multiple responsibilities.
+
+For example, a small portrait session may have one person acting as job owner and photographer.
+
+A wedding may require a workspace manager, job owner, lead photographer, and several additional photographers.
+
+### Assignment workflow
+
+After confirmation:
+
+1. The job enters Needs Assignment (displayed as Needs Job Owner where helpful).
+2. The workspace manager is notified.
+3. The job appears in the workspace's Needs Assignment view.
+4. The manager assigns a job owner.
+5. After a Job Owner is assigned, the job enters Needs Photographer Assignment.
+6. Once the planned shoot crew is complete, the job enters Awaiting Scheduling until all required shoot sessions have valid dates, times, and locations.
+7. The job owner or workspace manager arranges photographer assignments and scheduling using the same Job records.
+
+Job ownership and photographer assignment must remain separate.
+
+---
+
+# 6. Photographer assignment — immediate implementation priority
+
+**Implement the photographer assignment interface as a priority.**
+
+Photographer assignments must be managed primarily from the Job page.
+
+### Required action
+
+`Assign Photographers`
+
+The action opens a dedicated assignment panel or page.
+
+### Multi-photographer support
+
+Implement multi-photographer assignment immediately.
+
+Each Job may have multiple shoot sessions. Each session has:
+
+- Exactly one lead photographer once its crew is finalized.
+- Any number of additional photographers.
+- Its own schedule, location, crew, execution, and media-readiness records.
+
+Assign people before scheduling if needed. Crew members may share the session time by default; support individual attendance windows inside that session. See Section 21.3 for completion and migration rules.
+
+Assignment fields:
+
+| Field | Requirement |
+|---|---|
+| Photographer | Employee selection |
+| Assignment Role | Lead / Additional |
+| Scheduled Date | Optional during assignment; required before scheduling |
+| Start Time | Optional during assignment; required before scheduling |
+| End Time | Optional during assignment; must be after start before scheduling |
+| Location | Optional during assignment; required before scheduling |
+| Assigned By | Manager or job owner |
+| Notes | Instructions |
+| Assignment Status | Current scheduling state |
+
+The system must detect scheduling conflicts.
+
+Allow authorized users to resolve conflicts through an explicit decision rather than silently overwriting existing assignments.
+
+### Permissions
+
+Either the workspace manager or job owner may assign photographers.
+
+All assignment changes must be recorded.
+
+### Photographer confirmation
+
+Do not implement an accept/decline workflow inside Studio.
+
+Photographers can communicate scheduling conflicts directly to management.
+
+The manager or authorized job owner adjusts the assignment.
+
+Preserve existing WorkDay photographer confirmation functionality where present, but it must not gate Studio assignment or scheduling. Further confirmation improvements are outside this phase.
+
+Do not make the present implementation dependent on that future functionality.
+
+---
+
+# 7. Job and task assignment actions
+
+The Job page is the authoritative location for assignments.
+
+Required actions:
+
+- Assign Job Owner
+- Reassign Job Owner
+- Assign Photographers
+- Reassign Photographer
+- Create Task
+- Assign Task
+- Reassign Task
+- View Assignment History
+
+### My Work integration
+
+Managers see the relevant assignment actions.
+
+Employees see their assignments and may request assignment to a job or task.
+
+Assignment requests must:
+
+1. Identify the job or task.
+2. Capture the requesting employee.
+3. Capture an optional explanation.
+4. Route to the manager responsible for the job.
+5. Notify the manager.
+6. Allow approval, rejection, or redirection.
+7. Notify the employee of the decision.
+
+Use the existing messaging and notification infrastructure.
+
+Do not create a competing notification service.
+
+---
+
+# 8. WorkDay scheduling
+
+Assignment and scheduling are distinct.
+
+**Assignment answers:** Who is responsible?
+
+**Scheduling answers:** When and where will the work occur?
+
+Either the workspace manager or job owner can schedule photographers.
+
+The scheduling interface must:
+
+- Display assigned photographers.
+- Show availability where available.
+- Detect conflicts.
+- Support rescheduling.
+- Update the shared calendar.
+- Notify affected employees.
+- Maintain assignment history.
+
+Use the existing scheduling models and interfaces where possible.
+
+Do not create a separate scheduling system that will later conflict with WorkDay.
+
+---
+
+# 9. Photography execution and upload
+
+Assigned photographers access their jobs through My Work.
+
+The Job page provides:
+
+- Customer information
+- Job instructions
+- Scheduled time
+- Location
+- Assigned photographers
+- Tasks
+- Messages
+- Media
+- Activity history
+
+After the photoshoot, images are uploaded through the existing Studio media system.
+
+### Production notification
+
+When the required media is ready:
+
+1. Record the media-ready event.
+2. Update the job workflow.
+3. Notify Production automatically.
+4. Display the job in Awaiting Production Review.
+
+Avoid generating duplicate notifications for individual file uploads.
+
+A completed upload batch is evidence, not automatic readiness. The Job Owner or Workspace Manager explicitly submits the Job for Production Review after required sessions and photographer submissions are ready or an authorized missing submission has been waived with a reason. See Section 21.6. Use this idempotent readiness event to initiate the handoff.
+
+---
+
+# 10. Production workflow
+
+Production receives jobs automatically when photography material is ready.
+
+The Production team reviews the material.
+
+### Workflow
+
+```text
+Images Uploaded
+       ↓
+Awaiting Production Review
+       ↓
+Production Reviews Material
+       │
+       ├── Incomplete
+       │       ↓
+       │   Correction Requested
+       │
+       └── Accepted
+               ↓
+         Production Tasks
+               ↓
+         Task Assignment
+               ↓
+             My Work
+               ↓
+         Production Execution
+               ↓
+         Awaiting Approval
+               ↓
+          Approved Work
+```
+
+Production must be able to:
+
+- Review uploaded material.
+- Request corrections.
+- Create production tasks.
+- Assign tasks.
+- Monitor task progress.
+- Record completion.
+- Move work toward approval.
+
+Assigned tasks must appear in My Work.
+
+Replace the current operational approval flow with the process in this brief. Source-media acceptance starts Active Production; finished-work approval is a separate stage after production execution. Reuse existing permission configuration, quality checks, approved asset versions, publishing adapters, and customer delivery capabilities. Do not add mandatory customer sign-off, payment clearance, or a new approval hierarchy. Section 21.5 defines the complete process.
+
+---
+
+# 11. Jobs page — workflow status lights
+
+**This is a major new requirement.**
+
+The Jobs page must visually communicate the current operational state of every job.
+
+Each job must display:
+
+1. Current workflow stage.
+2. Activity status light.
+3. Time spent in the current stage.
+4. Responsible person or team.
+5. Next required action.
+
+### Example Jobs grid
+
+| Job | Customer | Current Stage | Time in Stage | Status |
+|---|---|---|---|---|
+| J-1042 | Morgan Wedding | Photographer Assignment | 2 hours | 🟢 |
+| J-1043 | Taylor Portrait | Awaiting Production | 9 hours | 🟡 |
+| J-1044 | Campbell Event | Production Review | 3 days | 🔴 |
+| J-1045 | Jordan Graduation | Scheduled | 1 day | 🟢 |
+
+These values are illustrative, not real Studio records.
+
+### Status light meanings
+
+🟢 **Green — Normal**
+
+The job is progressing within its expected time allowance.
+
+🟡 **Amber — Attention**
+
+The job is approaching or has crossed a warning threshold.
+
+🔴 **Red — Overdue**
+
+The job has exceeded its permitted time in the current workflow state.
+
+⚪ **Grey — Inactive**
+
+The job is cancelled, closed, or otherwise inactive.
+
+Use icons and text alongside colors for accessibility.
+
+### Time in state
+
+The system must record when a job enters each workflow state.
+
+Example:
+
+```text
+Current State: Awaiting Production Review
+Entered State: October 6, 2026, 10:30 AM
+Elapsed Time: 1 day, 22 hours
+Status: RED
+```
+
+Calculate elapsed time from authoritative timestamps.
+
+Do not reset the timer merely because someone opens or edits the job.
+
+Only a genuine workflow transition should change the state's entry timestamp.
+
+### Configurable thresholds
+
+Different stages require different turnaround times.
+
+Implement configurable warning and overdue thresholds.
+
+Illustrative initial values:
+
+| Workflow Stage | Amber After | Red After |
+|---|---:|---:|
+| Pending FrontDesk Review | 2 hours | 8 hours |
+| Pending in Unassigned Workspace | 2 hours | 8 hours |
+| Needs Job Owner | 4 hours | 1 day |
+| Needs Photographer Assignment | 4 hours | 1 day |
+| Awaiting Scheduling | 8 hours | 2 days |
+| Awaiting Production Review | 4 hours | 1 day |
+| Active Production | 1 day | 3 days |
+| Awaiting Approval | 1 day | 3 days |
+
+**These are proposed defaults, not agreed business service levels.**
+
+Administrators must be able to change them.
+
+Use a regular elapsed clock in this phase: UTC timestamps and continuous elapsed time, including nights, weekends, and holidays. Business-hours calendars, holidays, and pause-adjusted service clocks are deferred. Do not implement them or test them as current functionality.
+
+Scheduled jobs must not become overdue simply because their future photoshoot date has not arrived. Each state requires an appropriate clock-start and timing policy.
+
+### Workflow visibility
+
+Clicking a job's workflow indicator should reveal its progression.
+
+Example:
+
+```text
+JOB J-1044
+
+✓ Booking Received
+✓ FrontDesk Confirmed
+✓ Workspace Assigned
+✓ Job Owner Assigned
+✓ Photographers Assigned
+✓ Shoot Scheduled
+✓ Photography Completed
+✓ Images Uploaded
+
+● Production Review
+  Status: OVERDUE
+  Time in Stage: 3 days
+  Responsible: Production
+
+○ Production Execution
+○ Approval
+○ Delivery
+○ Completion
+```
+
+This should be a compact timeline or expandable panel, consistent with Studio styling.
+
+---
+
+# 12. Workflow monitoring
+
+The Jobs page must support filtering and sorting by:
+
+- Workflow stage
+- Status light
+- Workspace
+- Job owner
+- Photographer
+- Production responsibility
+- Time in current state
+- Scheduled date
+- Customer
+
+Provide an **Overdue First** sorting option.
+
+Managers must be able to identify stalled jobs without opening each record.
+
+### Workflow history
+
+Record every transition:
+
+- Job
+- Previous state
+- New state
+- Timestamp
+- Initiating user or system process
+- Reason, where applicable
+
+Maintain a complete history.
+
+The system must distinguish operational workflow state from payment state, assignment state, and individual task state.
+
+---
+
+# 13. My Work integration
+
+My Work remains the personal execution dashboard.
+
+Do not turn it into a second management system.
+
+### Employees see
+
+- Assigned jobs
+- Assigned tasks
+- Scheduled work
+- Items requiring attention
+- Assignment request status
+
+### Managers additionally see
+
+- Jobs needing ownership
+- Tasks requiring assignment
+- Assignment requests
+- Overdue responsibilities
+- Relevant scheduling actions
+
+### Navigation
+
+My Work actions must open the appropriate Job, Task, or Schedule interface.
+
+Do not duplicate the full assignment editor inside My Work.
+
+**Preserve the current My Work appearance.**
+
+---
+
+# 14. Workspaces integration
+
+Workspaces remain persistent containers of jobs.
+
+A workspace must show:
+
+- Active jobs
+- Pending jobs
+- Jobs needing assignment
+- Overdue jobs
+- Workspace manager
+- Workspace members
+- Relevant messages
+
+Use the same job records and workflow state as the Jobs page.
+
+A job must not have one status in Workspaces and another in My Work.
+
+The Workspaces page should provide clear navigation to the Job page and its assignment actions.
+
+---
+
+# 15. Notifications
+
+Use the existing Studio notification infrastructure.
+
+Required notification events:
+
+| Event | Recipient |
+|---|---|
+| Pending booking received | FrontDesk |
+| Workspace assignment required | FrontDesk |
+| Job confirmed | Workspace Manager |
+| Job owner assigned | Job Owner |
+| Photographer assigned | Photographer |
+| Photographer schedule changed | Affected Photographer |
+| Assignment requested | Responsible Manager |
+| Assignment request decided | Requesting Employee |
+| Media ready for production | Production |
+| Production task assigned | Assigned Employee |
+| Job overdue | Responsible Manager or Team |
+
+Avoid duplicate notifications.
+
+Notifications must link directly to the relevant Job or Task.
+
+---
+
+# 16. Workflow architecture
+
+Implement the workflow as a coherent state model.
+
+Recommended principles:
+
+- One authoritative Job aggregate or equivalent existing domain model.
+- Explicit workflow transitions.
+- Transition validation.
+- Permission checks.
+- Durable state-entry timestamps.
+- Complete activity history.
+- Idempotent event handling.
+- Consistent notifications.
+- Shared state across all Studio screens.
+
+Do not maintain independent copies of job workflow status in FrontDesk, Workspaces, My Work, and Production.
+
+Those screens should be different views of the same underlying records.
+
+### Concurrency
+
+Prevent conflicting updates when multiple employees work on the same job.
+
+Use optimistic concurrency or the existing equivalent.
+
+A stale assignment or workflow update must not silently overwrite a newer decision.
+
+---
+
+# 17. Implementation sequence
+
+Implement in the following order.
+
+### Phase 1 — Inspect and stabilize
+
+- Inspect existing models, pages, routes, and services.
+- Identify already implemented functionality.
+- Preserve My Work styling.
+- Repair broken navigation.
+- Establish the shared workflow contract.
+
+### Phase 2 — Job assignment
+
+- Job owner assignment.
+- Task assignment.
+- Multi-photographer assignment.
+- Assignment history.
+- Role permissions.
+
+**This phase is a high priority.**
+
+### Phase 3 — Booking and FrontDesk
+
+- Booking integration.
+- Pending job creation.
+- Workspace routing.
+- Unassigned queue.
+- FrontDesk confirmation.
+- Any recorded positive deposit or Operations Manager override; advanced deposit logic deferred.
+
+### Phase 4 — Scheduling
+
+- Shared photographer schedule.
+- Availability checks.
+- Conflict detection.
+- Rescheduling.
+- WorkDay integration points.
+
+### Phase 5 — Photography and Production
+
+- Photography workflow transitions.
+- Media-ready event.
+- Automatic Production notification.
+- Production review.
+- Production task assignment.
+- My Work integration.
+
+### Phase 6 — Workflow visibility
+
+- Job status lights.
+- Time-in-state tracking.
+- Configurable thresholds.
+- Workflow timeline.
+- Overdue filtering.
+- Manager notifications.
+
+### Phase 7 — Navigation and verification
+
+- Complete navigation audit.
+- Cross-page consistency.
+- End-to-end testing, including the additional acceptance scenarios in Section 21.11.
+- UI regression checks.
+- Final implementation report.
+
+Implement the status-tracking data model early enough that earlier phases generate accurate history. Phase 6 is primarily the presentation and monitoring layer.
+
+---
+
+# 18. Acceptance tests
+
+The implementation is not complete until the following scenarios pass.
+
+### Scenario A — Normal booking
+
+1. Customer submits booking.
+2. Studio creates pending job.
+3. Workspace is selected from destination email.
+4. FrontDesk reviews booking.
+5. Any positive deposit is recorded by authorized FrontDesk staff.
+6. FrontDesk explicitly confirms; payment recording does not auto-confirm.
+7. Job enters Needs Assignment.
+8. Workspace manager is notified.
+
+**Expected:** One job record exists throughout the process.
+
+### Scenario B — Unassigned booking
+
+1. Customer submits booking.
+2. Destination email has no workspace mapping.
+3. Job enters Unassigned queue.
+4. FrontDesk assigns workspace.
+5. Job continues normally.
+
+**Expected:** No unnecessary workspace is created.
+
+### Scenario C — Manager override
+
+1. Booking requires deposit.
+2. Deposit is not received.
+3. Operations manager authorizes override.
+4. Job is confirmed.
+
+**Expected:** Override is audited and payment remains outstanding.
+
+### Scenario D — Multi-photographer assignment
+
+1. Manager opens Job.
+2. Assigns lead photographer.
+3. Assigns two additional photographers to the same shoot session.
+4. Schedules all three using that session and their individual attendance windows where needed.
+5. Saves assignments.
+
+**Expected:** All three assignments appear correctly in the Job, schedule, and relevant My Work views.
+
+### Scenario E — Scheduling conflict
+
+1. Photographer is already scheduled.
+2. Manager attempts overlapping assignment.
+
+**Expected:** Conflict is identified before saving and handled according to authorization rules.
+
+### Scenario F — Production handoff
+
+1. Photography is completed.
+2. Required images are uploaded.
+3. Required photographer submissions are declared ready and the Job Owner or Workspace Manager explicitly submits for Production Review.
+4. Production receives notification.
+5. Job appears in Awaiting Production Review.
+
+**Expected:** One production handoff occurs, without duplicate tasks or notifications.
+
+### Scenario G — Workflow status lights
+
+1. Job enters Needs Photographer Assignment.
+2. State-entry timestamp is recorded.
+3. Warning threshold is reached.
+4. Status becomes amber at the warning boundary using elapsed time.
+5. Overdue threshold is reached.
+6. Status becomes red.
+7. Photographer assignment is completed.
+8. Job transitions to the next state.
+
+**Expected:** The timer and status update correctly, and the prior state's duration remains in history.
+
+### Scenario H — Navigation
+
+Navigate:
+
+```text
+My Work
+ → Job
+ → Photographer Assignment
+ → Schedule
+ → Job
+ → Workspace
+ → Job
+ → Production
+ → My Work
+```
+
+**Expected:** No broken links, dead ends, or lost job context.
+
+### Scenario I — Permissions
+
+Verify that:
+
+- Employees cannot perform unauthorized manager assignments.
+- Workspace managers can assign jobs.
+- Job owners can schedule photographers.
+- Operations manager overrides are restricted.
+- Assignment requests reach the responsible manager.
+
+### Scenario J — Existing functionality
+
+Verify that:
+
+- Existing messaging still works.
+- Existing media storage still works.
+- Existing authentication still works.
+- Existing Production functionality remains intact.
+- Existing My Work styling is preserved.
+
+---
+
+# 19. Build, test, and delivery instructions
+
+Follow the established Aegis development workflow.
+
+1. Inspect the repository before editing.
+2. Create an implementation branch.
+3. Implement changes in logical commits.
+4. Add or update automated tests.
+5. Check for integration and navigation regressions.
+6. Preserve existing working functionality.
+7. Avoid unrelated refactoring.
+8. Do not merge incomplete or failing work into main.
+
+**Build policy:** Prefer local restore, build, test, and deployment to minimize metered cloud-agent usage. Do not initiate repeated cloud builds unnecessarily.
+
+If the agent cannot execute a build, it must report that explicitly rather than claiming success.
+
+### Required final report
+
+Provide:
+
+- Implemented features.
+- Existing features reused.
+- Files changed.
+- Database migrations.
+- New routes and navigation changes.
+- Tests added.
+- Tests executed and results.
+- Known limitations.
+- Outstanding work.
+- Branch name and commit identifiers.
+- Exact local commands to pull, build, test, and deploy.
+
+Do not report an untested feature as verified.
+
+---
+
+# 20. Final implementation objective
+
+The completed Studio workflow must allow the business to follow a job from its initial customer booking through photographer assignment and Production without losing operational visibility.
+
+At any point, a manager should be able to answer five questions:
+
+**1. Where is this job?**  
+The current workflow stage.
+
+**2. Who is responsible?**  
+The assigned employee, job owner, manager, or team.
+
+**3. How long has it been there?**  
+The elapsed time in the current state.
+
+**4. Is something wrong?**  
+A green, amber, or red activity indicator.
+
+**5. What happens next?**  
+The next required action, accessible through the appropriate Studio page.
+
+The system must make those answers immediately available without requiring the manager to navigate through multiple disconnected screens.
+
+**Final instruction to the development agent:**
+
+Implement the complete workflow, preserving the existing Studio design and functionality. Prioritize the photographer assignment interface, multi-photographer support, connected navigation, and consistent job workflow state. Integrate all operational pages around the existing Job model. Add configurable status lights and time-in-state monitoring to the Jobs page. Verify the complete workflow through automated tests and report precisely what was implemented and what remains outstanding.
+
+**Do not redesign Studio. Make the existing Studio work as one connected system.**
+
+---
+
+# 21. Binding decisions and implementation contracts
+
+This section integrates the additional approved decisions. Apply it throughout Sections 1–20, automated tests, migrations, legacy status adapters, and repository documentation. Where older code or documentation describes a different process, replace that process without losing historical records. Do not ask again about routine implementation choices resolved here.
+
+## 21.1. Permanent Unassigned Workspace and booking migration
+
+- Seed exactly one permanent system Workspace named Unassigned under an immutable system key. Use a unique constraint and repeat-safe initialization. It must have a real Workspace ID, not a null ID, placeholder GUID, or transient queue-only record.
+- FrontDesk owns access to its Pending Jobs. Ordinary workspace members must not gain access to this cross-business intake queue merely by belonging to another workspace. Administrators retain existing access.
+- Existing enabled workspace email mappings route new bookings. An unknown, disabled, or ambiguous mapping routes to Unassigned and records the routing reason. Normalize addresses consistently with the existing router. Do not create workspaces from customer input.
+- A website submission atomically creates or returns its Pending Job and linked intake provenance. Scope the external booking identifier by source/provider and enforce uniqueness. The same identifier and booking facts return the same Job; conflicting reuse returns a clear error. A separate booking/request record may remain for existing integrations, but it always links to this Job.
+- A confirmed Job cannot remain in Unassigned. FrontDesk must route it to an enabled business workspace before confirmation. Unknown service or deposit requirements must not prevent capture of the Pending Job.
+- Migrate old pending booking/request records without a Job to one Pending Job. Preserve already linked Jobs and their IDs, conversations, clients, media, schedules, and deposit references. Payment callbacks and legacy routes must resolve that same Job and must no longer create another one.
+- Rerunning a migration must produce no additional Jobs, Workspaces, deposit events, conversations, crew rows, or notifications. Record provenance and reconcile malformed/ambiguous records in a migration report instead of silently discarding them.
+
+## 21.2. Canonical transition table
+
+One stored Job workflow stage is authoritative. Readiness substates, payment, task, crew, and shoot execution states remain separate. Use stable internal stage identifiers and map existing display strings once.
+
+| Current stage | Entry / meaning | Responsible role | Action and next stage |
+|---|---|---|---|
+| Pending | Booking captured; review and workspace routing required | FrontDesk; assigned claimant coordinates | Confirm eligible booking into Needs Assignment, or cancel with reason |
+| Needs Assignment | Confirmation event recorded; no Job Owner | Workspace Manager | Assign Job Owner → Needs Photographer Assignment |
+| Needs Photographer Assignment | Owner exists; at least one required shoot/session lacks a finalized crew | Job Owner; Workspace Manager oversees | Finalize all required crews → Awaiting Scheduling |
+| Awaiting Scheduling | Required crews finalized; at least one session lacks a valid schedule/location | Job Owner or Workspace Manager | Schedule all required sessions → Scheduled |
+| Scheduled | Required sessions scheduled; no required session has started | Job Owner and session leads | Start first required session → Photography In Progress |
+| Photography In Progress | Required photography has started; sessions remain unfinished | Session leads; Job Owner coordinates | Finish all required sessions → Awaiting Upload |
+| Awaiting Upload | Required photography finished; submissions being prepared | Assigned photographers; Job Owner coordinates | Explicitly submit ready media → Awaiting Production Review |
+| Awaiting Production Review | An immutable review submission awaits inspection | Production Lead / authorized reviewer | Accept source material → Active Production; request source corrections → Changes Requested |
+| Active Production | Accepted source material; assigned production tasks and quality checks underway | Production Lead and task assignees | Submit finished work → Awaiting Approval |
+| Awaiting Approval | Finished output and required tasks ready for final internal approval | Existing authorized Production approver | Approve output → Ready for Delivery; request production corrections → Changes Requested |
+| Changes Requested | Specific correction request with source or production target | Job Owner for source corrections; Production Lead for production corrections | Source resubmission → Awaiting Production Review; production rework → Active Production |
+| Ready for Delivery | Approved output ready for existing gallery publishing / customer delivery | FrontDesk and Job Owner | Record actual delivery → Delivered |
+| Delivered | Delivery recorded; final operational closure pending | Job Owner or Workspace Manager | Close after required work is resolved → Completed |
+| Completed | Operational work closed | Workspace Manager | Authorized reopening only, with reason and selected applicable stage |
+| Cancelled | Job cancelled with reason | Cancelling authorized role | Authorized reopening only, with reason and selected applicable stage |
+
+Booking Confirmed is an audited event immediately entering Needs Assignment; it is not a stored stage. Needs Assignment means Needs Job Owner and can use that more descriptive text in queues. Photographer and scheduling readiness are distinct following stages.
+
+If owner, crew, and schedule are saved together, validate each gate and record each genuine intermediate transition in the same transaction; intermediate states may have zero duration. One edit must not bypass a missing prerequisite. A no-op update never resets a clock.
+
+When different sessions are at different points, the Job reflects the aggregate process: Photography In Progress continues until every required active session is finished. Show each session's progress alongside the Job stage. Media can be uploaded earlier without moving the Job into Production automatically.
+
+Publishing is an audited delivery action with its existing receipt; Published is not a substitute for Delivered or Completed. Source approval is not final finished-work approval.
+
+Migrate unambiguous legacy statuses (for example Needs Scheduling, Awaiting Upload, Needs Review, In Production, Ready for Client) to the corresponding new stage using recorded facts. Legacy Confirmed becomes a confirmation event followed by the first applicable assignment gate. Where evidence contradicts a status or approval meaning is unclear, preserve the old value and flag for reconciliation; do not fabricate completed approvals or delivered work. Preserve legacy links and adapt route/API clients together.
+
+## 21.3. Shoot sessions and crew
+
+- A Job contains one or more required shoot sessions. Draft sessions can exist before a date is chosen. Provide an initial draft Photography session for confirmed photography Jobs that have none.
+- Each finalized session has exactly one Lead and zero or more Additional photographers. Multiple crew members are first-class assignments, not free-text notes or generic resource rows masquerading as employees.
+- A photographer appears only once in the active crew of a session. The same photographer may serve in several sessions or Jobs when times permit. Leads may differ between sessions; the Job Owner remains one coordinating person.
+- Store each person's role, assigned-by identity, assignment time, notes, active/cancelled status, and optional attendance window. Default attendance to the session range. Individual ranges must fall inside it.
+- Scheduling requires a finalized crew, valid start/end, and a location (including a named studio or an explicit remote location). Check every active crew member and any separately reserved equipment/resources.
+- Treat back-to-back attendance windows as non-overlapping. Cancelled reservations do not create conflicts. Availability and reservation conflict checks must serialize competing saves so simultaneous managers cannot double-book silently.
+- Resolve conflicts by changing staff/time or, where the existing permission model allows it, an explicit manager override with the conflict list and a reason. Add a specific conflict-override permission if necessary; the default is denied. A boolean supplied by the client is never sufficient authorization. An override retains both reservations and never overwrites another Job's assignment.
+- Migrate primary photographer to Lead and assistant to Additional on the same session. Preserve historical attendance, image counts, backup, reshoot, handoff, and WorkDay references. Resolve any other explicitly linked staff without duplicating them; ambiguous generic resources require reconciliation.
+- Update Studio, calendars, My Work, and WorkDay to read the same session/crew model. Preserve compatible old clients through an adapter where needed. Existing WorkDay acceptance must not block Studio schedules.
+
+## 21.4. Responsibility and permission rules
+
+| Role / relationship | Permitted operational actions |
+|---|---|
+| FrontDesk | Review and claim Pending Jobs; contact customers; route Pending Jobs; record deposits under existing billing permissions; confirm eligible bookings; cancel Pending Jobs with reason |
+| Workspace Manager | Assign/reassign Job Owner, crew and tasks within managed workspace; schedule; resolve assignment requests; transfer eligible Jobs; oversee exceptions, cancellation and closure |
+| Job Owner | Coordinate own Jobs; assign/reassign crew and tasks; schedule; review photographer readiness; submit source media for Production Review; respond to source corrections; close delivered Jobs |
+| Assigned photographer | View relevant Job instructions, sessions, tasks and messages; upload media; record own session execution/readiness through existing capabilities; request assignment |
+| Production Lead / existing authorized reviewer | Review source submissions; request corrections; create/assign production tasks; submit finished output; perform final approval only where existing permissions authorize it |
+| Operations Manager | Cross-workspace operational oversight and explicit deposit overrides; conflict overrides only with the corresponding permission |
+| Administrator | Existing administration and operational access; financial deposit overrides require the explicit Operations Manager/override capability rather than inference from an account name |
+
+Enforce these rules at server endpoints and in the UI. Reuse existing role/permission infrastructure rather than introducing a parallel authorization system. Assigning Job Owner grants the operational capabilities necessary for that Job; it does not grant billing, refunds, role administration, or deposit override.
+
+Assignments must grant enough Job access for recipients to see and act on their work. Reassignment/removal removes only access derived from that assignment; retain independently authorized membership and role access. Removed employees must not retain assignment-derived access indefinitely.
+
+The Workspace Manager handles requests to become Job Owner. Other Job/task assignment requests route to the current Job Owner, with the Workspace Manager as fallback and oversight. Duplicate pending requests for the same employee/target are suppressed. Approval applies the assignment atomically and records the decision; rejection requires a brief reason; redirection selects an authorized responsible manager. Revalidate recipients when ownership changes.
+
+A FrontDesk claim coordinates processing, not exclusive permission or permanent ownership. Allow authorized reassignment/release of a claim, audit it, and use concurrency checks.
+
+Mock-auth Studio administrator accounts must expose and execute ordinary Job Owner, crew, task, and scheduling actions. They must not accidentally acquire deposit override merely from the login name. Preserve existing mock-auth security boundaries.
+
+## 21.5. Replace the operational approval flow
+
+1. Photography submissions become an explicit Source Review submission.
+2. Production accepts source material or requests named corrections. Acceptance enters Active Production and creates/reuses the existing production work without duplicating tasks.
+3. Production creates and assigns required tasks; those tasks appear in My Work.
+4. Finished work can enter Awaiting Approval only after required production tasks are Completed or explicitly Cancelled/waived by an authorized lead and current output versions satisfy existing quality checks. Unrelated administrative tasks do not automatically block production submission.
+5. An existing authorized approver approves the exact submitted finished-output versions or requests corrections. Do not invent a requirement for a different approver unless current policy already requires it.
+6. Final approval enters Ready for Delivery. Publishing uses approved versions and the existing provider-neutral adapter; customer delivery records method, timestamp, actor, and a reference/receipt where available. A successful publication alone does not falsely attest to other physical deliverables.
+7. Required deliverables must be recorded as delivered before Delivered. Completed requires required operational tasks to be resolved. Do not introduce deferred deposit-clearance or credit gates at these stages.
+
+Retain existing immutable media/version history, quality control, publication receipts, delivery integrations, and authorization where compatible. Replace the old state-changing routes or adapt them to these exact semantics. Update the UI labels, automation triggers, tests, and documentation together.
+
+## 21.6. Media completion, corrections, and resubmission
+
+- Each required session tracks required photographer submissions. Default every active assigned photographer to required; an authorized Job Owner or Workspace Manager can waive a contribution with a reason (for example, all material uploaded by the lead).
+- Upload completion is recorded by batch. A photographer declares their session contribution Ready only after intended files have finished ingesting and required existing backup checks pass. Successful individual uploads never automatically dispatch Production.
+- The Job Owner or Workspace Manager explicitly submits when all required sessions are finished and contributions are Ready or waived. Validate nonempty accessible media, completed ingest, and no failed/pending required files. Block partial submissions with a list of missing contributions. Do not introduce partial Job production in this phase.
+- Each review submission records an immutable manifest of asset/version IDs, included sessions/contributions, submitting actor, timestamp, and revision. A new upload cannot silently alter a submitted or approved manifest.
+- Production correction requests identify affected files/sessions, instructions, responsible role, and whether the correction is Source or Production. Source corrections return through a new Source Review revision; production corrections return to Active Production and then a new final Approval revision.
+- Adding/replacing material after submission requires an explicit withdrawal or correction/resubmission action by the responsible authorized role. Keep prior revisions and approvals as historical records; do not treat new versions as approved.
+- Deduplicate by Job, submission revision and event type. One readiness event creates one review queue entry and notification set; retries of that event create neither extra tasks nor notifications. A genuine new revision produces a new, linked notification.
+
+## 21.7. Regular-clock timing for this phase
+
+Use UTC for storage and elapsed calculations; use the configured Studio display timezone, default America/Jamaica. Display hours/days continuously across nights, weekends, and holidays. Business-hours calendars and pause-adjusted service clocks are explicitly deferred.
+
+Persist stage-entry time and stage-transition history atomically with each real stage change. Time in stage is always now minus stage-entry time for an active stage. Historical durations use the recorded exit time. Do not reset timestamps for viewing, notes, assignments that do not change stage, notifications, restarts, or repeated commands.
+
+Proposed editable defaults, not agreed business service levels:
+
+| Stage | Amber after | Red after |
+|---|---|---|
+| Pending (including Unassigned) | 2 hours | 8 hours |
+| Needs Assignment | 4 hours | 24 hours |
+| Needs Photographer Assignment | 4 hours | 24 hours |
+| Awaiting Scheduling | 8 hours | 48 hours |
+| Awaiting Upload | 8 hours | 24 hours |
+| Awaiting Production Review | 4 hours | 24 hours |
+| Active Production | 24 hours | 72 hours |
+| Awaiting Approval | 24 hours | 72 hours |
+| Changes Requested | 8 hours | 24 hours |
+| Ready for Delivery | 24 hours | 72 hours |
+| Delivered (awaiting closure) | 24 hours | 72 hours |
+
+Scheduled and Photography In Progress use session deadlines instead of stage age: for the earliest required unfinished session, amber begins one hour after planned end and red begins four hours after planned end. Before that deadline, a future scheduled session remains Normal irrespective of how long the Job has been Scheduled. Recompute the next relevant deadline as sessions finish; rescheduling changes the deadline and is audited but does not reset time in the unchanged Job stage.
+
+Boundary behavior: Green below warning; Amber at or above warning and below overdue; Red at or above overdue. Validate positive warning and overdue greater than warning. Administrators may change thresholds; changes affect current evaluations and are audited without rewriting history. Overdue First sorts overdue items first, then by time beyond the applicable deadline; unknown timing remains clearly identifiable.
+
+Completed and Cancelled use Grey / Inactive and freeze their stage duration at closure. A separate Blocked flag with reason, responsible person, and review date highlights impediments without silently pausing the ordinary clock.
+
+Legacy stage entry can be backfilled only from reliable transition evidence. Otherwise leave it unknown, show Timing unavailable with a neutral indicator, and record a separate Monitoring started timestamp. Do not imply Normal, Overdue, or a fabricated historical duration. The next real transition creates a trustworthy timestamp. Any unsupported timing policy must be rejected rather than silently evaluated as business hours.
+
+## 21.8. Simplified deposit rule and explicit deferrals
+
+For this phase, any authorized recorded positive deposit makes a Pending Job eligible for FrontDesk confirmation, regardless of the configured required deposit. Preserve existing financial amounts, receipts, currency validation, links, and repeat-safe posting. Recording money enables confirmation; it does not automatically confirm or create a new Job.
+
+Without a recorded positive deposit, the existing brief's Operations Manager override path permits confirmation. Record manager identity, timestamp, reason and original requirement, and preserve unpaid balances. Permit zero or unknown required-deposit metadata at intake; do not create a new zero-deposit automatic-confirmation path. Such bookings can proceed through a recorded deposit or an explicit override for now.
+
+Do not implement minimum deposit calculation, provider verification, partial-payment eligibility rules, credit privileges, customer account terms, refund policy, automated chargebacks, or retroactive override revocation. Keep existing financial behavior available; cancellation directs any financial follow-up to existing FrontDesk/Billing processes. Keep this simplified rule explicit and replaceable later. Replayed receipts do not create duplicate financial entries; a receipt reused with conflicting facts returns an error.
+
+## 21.9. Exception and transfer rules
+
+- Rescheduling: authorized owner/manager changes session dates and crew with conflict checks, an audit entry, and employee notifications. Changing a future date does not erase the existing stage's duration. Started/completed session times retain actual history; correcting actual attendance uses existing authorized correction processes.
+- No-show: record a session exception and notify the Job Owner/manager; do not automatically complete, cancel, or refund the Job. Management chooses rescheduling or cancellation.
+- Reshoot: add a required linked session with a reason. Before Production submission, aggregate readiness reflects the new required session. After submission, explicitly withdraw/reopen the affected review under authorized correction controls before changing downstream readiness.
+- Removing a lead or cancelling a required session before execution forces a crew/schedule readiness recheck. Do not allow a finalized session with no lead. Replace a required session or waive that requirement with a reason; cancellation alone is not proof the photography obligation was fulfilled.
+- Job cancellation: FrontDesk may cancel Pending Jobs; Workspace Manager or Operations Manager may cancel confirmed active Jobs. Audit the reason, release unstarted reservations, cancel/suspend relevant open tasks, remove the Job from active queues, notify affected employees, and retain all historical media, payments and completed work. Do not erase or silently unpublish an existing customer gallery; flag its existing unpublish action for the authorized operator.
+- Blocked work: record a reason and responsible party; show the flag in Jobs and My Work. The regular clock keeps running. Avoid a separate timer-pausing On Hold stage in this phase.
+- Workspace transfer: FrontDesk routes Pending Jobs; confirmed Jobs require Operations Manager authority or both source and destination managers' recorded approval. Lock/version-check the Job, record transfer, and notify both sides. The destination manager becomes accountable. Retain explicit Job Owner and crew assignments and Job-specific grants unless deliberately reassigned; inherited workspace access follows the destination. Recheck readiness, request routing and permissions. Transfer changes the stage only if prerequisites genuinely become unmet.
+- Reopening: only Workspace Manager or Operations Manager may reopen a closed Job, with a reason and an applicable valid stage. Start a new stage occurrence without deleting prior closure, delivery, payment, approval, or publication history.
+
+## 21.10. Navigation, concurrency and notification contracts
+
+Navigation:
+- Reuse the existing Pipeline destination for Jobs/Workflow Monitoring or provide a compatible route alias. Do not add a second competing board with separate Job state.
+- Publish a logical destination → concrete route/tab/action mapping. Each assignment, schedule, review, task, gallery and delivery screen must retain Job/Workspace context and a reliable route to My Work.
+- Link crew editing from Job → Assignments → Assign Photographers. My Work and Workspace actions deep-link there. Keep existing Subjects/collections, gallery, clients, messages, billing and WorkDay screens accessible.
+- Preserve list filters, selected workspace, sort, pagination and scroll on return. Refresh changed rows without losing list context. Unauthorized deep links show a clear access message and working navigation.
+
+Concurrency:
+- Use a Job revision/version token for state, owner, crew, workspace and relevant readiness changes; use session/task revision tokens where independently edited. Expected status alone does not detect two conflicting edits in the same stage.
+- Apply validation, changes, audit and durable event enqueueing in one transaction. Reject stale writes with a clear conflict response and refresh option, preserving newer data. Never silently retry an obsolete assignment decision.
+- Serialize resource reservations across all scheduling writers and validate permissions at commit time. Idempotency keys match target, action and submitted facts; conflicting reuse is rejected.
+
+Notifications:
+- Extend the existing durable notification/event infrastructure; do not create a parallel service. Commit an outbox/event entry with the business change, then deliver asynchronously through existing infrastructure.
+- Resolve actual employee identities from existing roles, assignments, and team configuration. FrontDesk, Production and responsible-manager audiences must be configured; missing recipients appear as an actionable delivery/configuration failure, never as silent success.
+- Use a stable event ID plus recipient/channel for deduplication. Preserve delivery attempts, failures and retry status. A delivery failure does not roll back completed business work or cause duplicate Jobs/tasks when retried.
+- Trigger overdue notifications once per stage occurrence, threshold crossing and recipient; repeat reminders are configurable and off by default. A new stage occurrence can alert again. Unknown historical timing does not generate invented overdue alerts.
+- Include direct Job/task links; respect current permissions when opening them. Capture intended recipients and revalidate authorization before delivery, suppressing superseded assignments where appropriate.
+- Guarantee durable enqueueing and deduplication under Studio's control; do not claim external email exactly-once delivery if the existing provider cannot guarantee it. Test crash/retry boundaries and retain provider correlation IDs where supported.
+
+## 21.11. Additional acceptance scenarios
+
+Extend existing scenarios A–J with the following. These are implementation gates; they are not claims that tests have already passed.
+
+### K — Migration without duplication
+Create fixtures containing an old pending booking without a Job, a linked confirmed booking, existing Jobs at several stages, two sessions, legacy primary/assistant staff, schedules, conversations, deposits and financial references. Run migration twice. Verify exactly one permanent Unassigned Workspace, one Job per booking, preserved existing IDs/links/amounts, no duplicate deposit posting or reservations, preserved media/attendance/backup data, and an explicit report for ambiguous status or resource mappings. Replay a legacy booking/payment event and verify the same Job is returned.
+
+### L — Two managers edit concurrently
+Two authorized managers load the same Job revision and submit different ownership or crew changes. One succeeds; the other receives a conflict and cannot overwrite it. Repeat with two different Jobs reserving the same photographer at overlapping times: conflict checks must remain effective under concurrent saves. Verify no partial audit, crew, schedule, or notification changes survive a rejected transaction. Repeat with the stage unchanged to prove revision checks do not rely only on status strings.
+
+### M — Three-person crew across two sessions
+Create one Job, one Job Owner, and two shoot sessions with a Lead plus two Additional photographers on each. Assign crew before scheduling, then schedule both sessions. Confirm roles, individual attendance windows, My Work entries, Job permissions and WorkDay/calendar reservations for all three. Finish session one: the Job does not enter Awaiting Upload while session two remains required and unfinished. Finish session two: the Job advances once. Attempt duplicate crew membership and a second Lead on one session; both are rejected.
+
+### N — Partial uploads, corrections and resubmission
+Upload one photographer's first batch while others remain incomplete. The Job must not enter Production Review or send the handoff notification. Complete required contributions, submit explicitly, and verify one immutable submission/notification set. Request source corrections; resubmit a new revision and preserve the earlier manifest. Test production corrections separately through Active Production and Awaiting Approval. New uploads never inherit prior approval silently.
+
+### O — Notification failure and successful retry
+Commit an assignment or readiness event, simulate delivery failure, and verify the business action remains saved with a durable pending/failed delivery record. Retry and verify the intended recipient receives the correlated notification without another assignment, Job, task or outbox event. Restart the worker around delivery acknowledgments; verify deduplication and accurately report any external-provider limitation.
+
+### P — Unknown history, clock boundaries and future work
+Migrate a Job with no reliable stage-entry timestamp: show Timing unavailable and suppress false overdue alerts. Transition it: start a trustworthy clock while retaining migration history. Test exact warning/overdue boundaries, overnight/weekend elapsed time, threshold edits, restart, notes and no-op saves. A Job scheduled weeks ahead stays Normal before its applicable session deadline. A missed session becomes Amber/Red at the configured post-end boundaries; rescheduling changes deadlines without resetting unchanged-stage age. Verify Cancelled/Completed durations freeze.
+
+Business-hours timing is intentionally deferred: test that the current configuration and UI do not enable it, and that unsupported policy input is rejected clearly. Record working-hours/holiday/pause-aware tests as deferred future cases; they must not block this phase or be reported as passed implemented functionality.
+
+### Q — Workspace transfer, cancellation and reassignment
+Verify FrontDesk routing of Pending Jobs, denial of ordinary-employee transfer/cancellation, and the required cross-workspace transfer authority. Confirm destination-manager accountability, changed inherited access, retained deliberate Job grants, rerouted assignment requests and notifications. Reassign owner/crew and verify assignment-derived access is removed only where no independent grant remains. Cancel a confirmed Job and verify released future reservations, preserved payments/media/history, and correct task/queue handling. Reopen with authorization and reason; retain prior stage occurrences.
+
+### R — Studio administrator mock account
+Sign in through the existing Studio administrator mock-auth account(s). From My Work or a Workspace, open the Job and use Assign Job Owner, Assign Photographers, Create/Assign/Reassign Task and Schedule. Assign a three-person crew and verify saved data appears in Job, My Work and calendar. Verify actions are visible, server-authorized, and do not depend on the literal login name. Repeat with an ordinary mock employee to verify denied managerial actions and usable assignment-request flow. Verify deposit override requires its explicit capability.
+
+### S — Revised approvals and delivery
+Accept source media and verify Active Production, not finished-work approval. Finish required production tasks and quality checks, submit exact output versions for approval, request corrections, resubmit, approve, publish through the existing adapter, and record required delivery. Verify Ready for Delivery, Delivered and Completed transitions and unchanged approved historical versions. Publishing retries must preserve correlation and not create duplicate delivery attestations.
+
+### T — Simplified deposit eligibility
+Record a positive deposit below the configured requirement; explicit FrontDesk confirmation succeeds and enters Needs Assignment. Confirm that deposit recording alone neither confirms nor creates another Job. With no deposit, unauthorized confirmation/override is denied and an authorized Operations Manager override succeeds without marking money paid. Capture zero/unknown required-deposit metadata without intake failure. Replay a receipt and verify financial records are not duplicated. Test that minimum-amount/provider-verification/credit policies are not newly introduced in this phase.
+
+## 21.12. Delivery and deferred work
+
+The final implementation report must include the original Section 19 items plus the canonical status mapping, migration reconciliation report, route mapping, responsibility/permission mapping, crew/session compatibility changes, notification retry behavior, and results for scenarios A–T. Clearly separate implemented, executed-and-passed, unexecuted, and deferred items.
+
+Deferred improvements: business-hours/holiday calendars; pause-adjusted service clocks; advanced deposit verification and minimum amounts; customer credit/pay-later privileges; new refund/chargeback or override-revocation policy; expanded WorkDay acceptance; partial Job production handoffs. Do not expand this phase to implement them. Preserve current working capabilities where they already exist.
+
+Implement the complete revised workflow in logical commits on an implementation branch. Preserve My Work styling and existing Common integrations. Prioritize Job assignment, multiple session crews, shared workflow history, connected navigation and Jobs status lights. This document authorizes the routine decisions specified here; it does not authorize claiming unexecuted tests passed or merging incomplete work.
