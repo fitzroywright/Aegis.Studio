@@ -75,6 +75,18 @@ public static class WorkflowEndpoints
                 warning="Inventory only: foreign-key dependencies are not a deletion plan. Business-data classification and storage ownership must be verified before reset.",
                 tables});
         }));
+        admin.MapPost("/demo-data/generate",(StudioDatabase db,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config)=>Run(()=>
+        {
+            if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
+            return Results.Ok(ConnectedWorkflowDemo.Generate(db,WorkflowStore.Name(user)));
+        }));
+        admin.MapPost("/demo-data/remove",(StudioDatabase db,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request)=>Run(()=>
+        {
+            if(!config.GetValue("DemoData:AllowDestructiveReset",false))return Results.NotFound();
+            if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
+            if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
+            return Results.Ok(ConnectedWorkflowDemo.Reset(db));
+        }));
         admin.MapPut("/thresholds",(WorkflowThreshold request,ClaimsPrincipal user,StudioDatabase db)=>Run(()=>
         {
             WorkflowRules.ValidateThreshold(request);using var c=db.OpenConnection();using var tx=c.BeginTransaction();
@@ -133,3 +145,5 @@ public sealed class WorkflowMonitorWorker(IServiceScopeFactory scopes,ILogger<Wo
         }while(await timer.WaitForNextTickAsync(stoppingToken));
     }
 }
+
+public sealed record DemoResetConfirmation(string Confirmation);
