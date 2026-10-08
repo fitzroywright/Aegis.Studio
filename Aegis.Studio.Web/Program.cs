@@ -1,3 +1,4 @@
+using Aegis.Studio.Web.Workflow;
 using Aegis.Studio.Web.Media;
 using Aegis.Studio.Web.FrontDesk;
 using Aegis.Studio.Web.WorkspaceJobs;
@@ -198,6 +199,8 @@ builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
 builder.Services.AddHostedService<InboundEmailWorker>();
 builder.Services.AddHostedService<OutboundEmailWorker>();
 builder.Services.AddHostedService<NotificationDeliveryWorker>();
+builder.Services.AddSingleton<WorkflowStore>();
+builder.Services.AddHostedService<WorkflowMonitorWorker>();
 builder.Services.AddHostedService<ConfigurationContractPublisher>();
 builder.Services.AddSingleton<IClientGalleryPublisher,ManifestClientGalleryPublisher>();
 builder.Services.AddHostedService<Aegis.Studio.Web.Media.MediaDerivativeWorker>();
@@ -277,6 +280,7 @@ new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>
 Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(app.Services.GetRequiredService<StudioDatabase>());
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).MigratePendingJobs();
 app.MapFrontDeskBookingRequests();
+app.MapConnectedWorkflow();
 app.MapStudioClients();
 app.MapStudioFulfillment();
 app.MapStudioQuotes();

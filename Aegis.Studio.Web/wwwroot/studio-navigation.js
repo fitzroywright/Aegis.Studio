@@ -498,10 +498,11 @@
                 try{
                     const jobId=form.elements.jobId.value;
                     const userName=form.elements.userName.value||null;
-                    const result=await json('/api/jobs/'+encodeURIComponent(jobId)+'/lead',{
+                    const wf=await json('/api/jobs/'+encodeURIComponent(jobId)+'/connected-workflow');
+                    const result=await json('/api/jobs/'+encodeURIComponent(jobId)+'/connected-workflow',{
                         method:'PUT',
                         headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({userName})
+                        body:JSON.stringify({action:'owner',userName,reason:'My Work owner assignment',expectedRevision:wf.data.revision,operationId:crypto.randomUUID()})
                     });
                     state.jobs=state.jobs.map(job=>String(job.id)===String(jobId)?{...job,jobLead:result.jobLead??userName}:job);
                     dialog.close();
@@ -805,15 +806,17 @@
         const now=new Date();
         const from=new Date(now.getFullYear(),now.getMonth()-3,1);
         const to=new Date(now.getFullYear()+1,now.getMonth()+1,1);
-        const [jobs,activities,schedule,mediaSummary,notifications]=await Promise.all([
+        const [jobs,activities,schedule,mediaSummary,notifications,workflow]=await Promise.all([
             json('/api/jobs'),
             json('/api/operations/activities').catch(()=>[]),
             json('/api/schedule/entries?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString())).catch(()=>[]),
             json('/api/production/media-summary').catch(()=>[]),
-            json('/api/notifications?count=100').catch(()=>[])
+            json('/api/notifications?count=100').catch(()=>[]),
+            json('/api/workflow/jobs')
         ]);
 
         const workspaceMap=new Map((workspaceCache||[]).map(w=>[String(w.id),w]));
+        const workflowMap=new Map(workflow.map(w=>[String(w.jobId),w]));
         const explicitWorkspace=jobsWorkspaceFilter;
         const inheritedWorkspace=(explicitWorkspace===null&&typeof selectedWorkspace!=='undefined'&&selectedWorkspace)?String(selectedWorkspace):'';
         let workspaceFilter=explicitWorkspace===null?inheritedWorkspace:String(explicitWorkspace||'');
@@ -869,7 +872,7 @@
         ];
         const countGroup=key=>key==='all'?jobs.length:jobs.filter(job=>stageGroup(job.status)===key).length;
         const uniqueStatuses=[...new Set(jobs.map(j=>String(j.status||'Active')).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-        const staff=[...new Set(jobs.map(j=>j.jobLead||j.assignedTo).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));
+        const staff=[...new Set(workflow.flatMap(w=>[w.owner,...(w.photographers||[])]).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));
         const dateText=value=>{
             if(!value)return 'Not scheduled';
             const date=new Date(value);
@@ -896,7 +899,8 @@
         };
         const filteredBase=()=>workspaceFilter?jobs.filter(job=>String(job.workspaceId)===workspaceFilter||(job.participatingWorkspaceIds||[]).map(String).includes(workspaceFilter)):jobs;
 
-        let groupFilter='all',statusFilter='',personFilter='',dateFilter='all',term='',sort='date-desc';
+        let savedJobs={};try{savedJobs=JSON.parse(sessionStorage.getItem('studio-jobs-filters:'+workspaceFilter)||'{}');}catch{}
+        let groupFilter=savedJobs.groupFilter||'all',statusFilter=savedJobs.statusFilter||'',personFilter=savedJobs.personFilter||'',dateFilter=savedJobs.dateFilter||'all',term=savedJobs.term||'',sort=savedJobs.sort||'date-desc',lightFilter=savedJobs.lightFilter||'';
         const renderRows=items=>items.map(job=>{
             const workspace=workspaceMap.get(String(job.workspaceId));
             const shoot=nextShoot(job);
@@ -905,14 +909,15 @@
             const thumb=jobThumb(job);
             const shootDate=shoot?.startsAtUtc||job.eventDate||null;
             const lead=job.jobLead||job.assignedTo||'';
+            const wf=workflowMap.get(String(job.id));
             const context=[workspace?.name||'Workspace',job.jobType||job.type].filter(Boolean).join(' · ');
-            return `<button type="button" class="jobs-row studio-speedbump-row" data-job-row data-job-id="${job.id}" data-status="${esc(String(job.status||''))}" data-group="${stageGroup(job.status)}" data-person="${esc(String(lead))}" data-date="${shootDate?esc(String(shootDate)):''}" data-search="${esc([job.title,job.clientName,workspace?.name,job.jobType,job.status,lead].filter(Boolean).join(' ').toLowerCase())}">
+            return `<button type="button" class="jobs-row studio-speedbump-row" data-job-row data-job-id="${job.id}" data-status="${esc(String(job.status||''))}" data-group="${stageGroup(job.status)}" data-person="${esc(String(lead))}" data-people="${esc(JSON.stringify([wf?.owner,...(wf?.photographers||[])]))}" data-light="${wf?.timing.light||'neutral'}" data-age="${wf?.timing.elapsedHours??-1}" data-overdue="${wf?.timing.overdueHours??-1}" data-date="${shootDate?esc(String(shootDate)):''}" data-search="${esc([job.title,job.clientName,workspace?.name,job.jobType,job.status,lead].filter(Boolean).join(' ').toLowerCase())}">
                 <span class="jobs-thumb">${thumb?`<img src="${thumb}" alt="">`:'<span>📷</span>'}</span>
                 <span class="jobs-primary"><strong>${esc(job.reference||job.jobNumber||job.title)}</strong><small>${esc(job.reference||job.jobNumber?job.title:(job.clientName||'Job'))}</small></span>
                 <span class="jobs-context"><strong>${esc(workspace?.name||'Workspace')}</strong><small>${esc(job.jobType||job.type||'Photography')}</small></span>
                 <span class="jobs-client"><strong>${esc(job.clientName||'Client not linked')}</strong><small>${lead?'Lead: '+esc(typeof studioFirstName==='function'?studioFirstName(lead):lead):'Lead unassigned'}</small></span>
                 <span class="jobs-date"><strong>${esc(dateText(shootDate))}</strong><small>${esc(timeText(shoot?.startsAtUtc))}${shoot?.location?' · '+esc(shoot.location):''}</small></span>
-                <span class="jobs-status workspace-reference-pill ${stageGroup(job.status)}">${esc(job.status||'Active')}</span>
+                <span class="jobs-status workspace-reference-pill ${stageGroup(job.status)}" title="${esc(wf?.nextAction)}"><span class="workflow-light ${wf?.timing.light||'neutral'}">${esc(job.status||'Active')} · ${esc(wf?.timing.label||'Timing unavailable')}</span><small>${window.StudioWorkflow?StudioWorkflow.elapsed(wf?.timing.elapsedHours):''} · ${esc(wf?.responsible||lead||'Workspace Manager')}</small><small>${esc(wf?.nextAction||'Open Job')}</small></span>
                 <span class="jobs-progress"><span><i style="width:${p.percent}%"></i></span><small>${p.total?p.completed+'/'+p.total:'No tasks'}${media.assetCount?' · '+media.assetCount+' photos':''}</small></span>
                 <span class="jobs-open">›</span>
             </button>`;
@@ -981,10 +986,10 @@
                         <div class="jobs-toolbar">
                             <label class="jobs-search"><span>⌕</span><input type="search" data-jobs-search placeholder="Search jobs…"></label>
                             <select data-jobs-status><option value="">All statuses</option>${uniqueStatuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select>
-                            <select data-jobs-person><option value="">All photographers</option>${staff.map(x=>`<option value="${esc(String(x))}">${esc(typeof studioFirstName==='function'?studioFirstName(x):x)}</option>`).join('')}</select>
+                            <select data-jobs-light><option value="">All activity lights</option><option value="green">Normal</option><option value="amber">Attention</option><option value="red">Overdue</option><option value="neutral">Timing unavailable</option><option value="grey">Inactive</option></select><select data-jobs-person><option value="">All owners / photographers</option>${staff.map(x=>`<option value="${esc(String(x))}">${esc(typeof studioFirstName==='function'?studioFirstName(x):x)}</option>`).join('')}</select>
                             <select data-jobs-date><option value="all">All dates</option><option value="upcoming">Upcoming</option><option value="past">Past</option><option value="unscheduled">Not scheduled</option></select>
                             ${workspaceFilter?'':`<select data-jobs-workspace><option value="">All workspaces</option>${(workspaceCache||[]).map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('')}</select>`}
-                            <select data-jobs-sort><option value="date-desc">Sort: Date (newest)</option><option value="date-asc">Date (oldest)</option><option value="name">Job name</option><option value="status">Status</option></select>
+                            <select data-jobs-sort><option value="date-desc">Sort: Date (newest)</option><option value="date-asc">Date (oldest)</option><option value="name">Job name</option><option value="status">Status</option><option value="overdue-first">Overdue First</option><option value="age">Time in stage</option></select>
                         </div>
                         <div class="jobs-table-head"><span></span><span>Job</span><span>Workspace / Type</span><span>Client</span><span>Shoot Date</span><span>Status</span><span>Progress</span><span></span></div>
                         <div class="jobs-list" data-jobs-list>${renderRows(filteredBase())}</div>
@@ -1023,7 +1028,8 @@
             let visible=rows().filter(row=>{
                 if(groupFilter!=='all'&&row.dataset.group!==groupFilter)return false;
                 if(statusFilter&&row.dataset.status!==statusFilter)return false;
-                if(personFilter&&row.dataset.person!==personFilter)return false;
+                if(personFilter&&!JSON.parse(row.dataset.people||'[]').includes(personFilter))return false;
+                if(lightFilter&&row.dataset.light!==lightFilter)return false;
                 if(term&&!row.dataset.search.includes(term))return false;
                 if(dateFilter!=='all'){
                     if(dateFilter==='unscheduled'&&row.dataset.date)return false;
@@ -1038,6 +1044,8 @@
             });
             const value=row=>row.dataset.date?+new Date(row.dataset.date):0;
             visible.sort((a,b)=>{
+                if(sort==='overdue-first')return (b.dataset.light==='red')-(a.dataset.light==='red')||Number(b.dataset.overdue)-Number(a.dataset.overdue);
+                if(sort==='age')return Number(b.dataset.age)-Number(a.dataset.age);
                 if(sort==='date-asc')return value(a)-value(b);
                 if(sort==='name')return a.dataset.search.localeCompare(b.dataset.search);
                 if(sort==='status')return a.dataset.status.localeCompare(b.dataset.status);
@@ -1047,6 +1055,7 @@
             rows().forEach(row=>row.hidden=!shown.has(row));
             visible.forEach(row=>list.appendChild(row));
             genericView.querySelector('[data-jobs-showing]').textContent='Showing '+visible.length+' of '+rows().length+' jobs';
+            try{sessionStorage.setItem('studio-jobs-filters:'+workspaceFilter,JSON.stringify({groupFilter,statusFilter,personFilter,dateFilter,term,sort,lightFilter,scroll:list.scrollTop}));}catch{}
         };
 
         genericView.querySelectorAll('[data-job-group]').forEach(button=>button.onclick=()=>{
@@ -1054,6 +1063,9 @@
             genericView.querySelectorAll('[data-job-group]').forEach(x=>x.classList.toggle('active',x===button));
             apply();
         });
+        for(const [selector,value] of [['[data-jobs-search]',term],['[data-jobs-status]',statusFilter],['[data-jobs-person]',personFilter],['[data-jobs-date]',dateFilter],['[data-jobs-sort]',sort],['[data-jobs-light]',lightFilter]]){const control=genericView.querySelector(selector);if(control)control.value=value;}
+        list.scrollTop=savedJobs.scroll||0;list.addEventListener('scroll',()=>{try{const state=JSON.parse(sessionStorage.getItem('studio-jobs-filters:'+workspaceFilter)||'{}');state.scroll=list.scrollTop;sessionStorage.setItem('studio-jobs-filters:'+workspaceFilter,JSON.stringify(state));}catch{}});
+        genericView.querySelector('[data-jobs-light]').onchange=e=>{lightFilter=e.target.value;apply();};
         genericView.querySelector('[data-jobs-search]').oninput=e=>{term=e.target.value.trim().toLowerCase();apply();};
         genericView.querySelector('[data-jobs-status]').onchange=e=>{statusFilter=e.target.value;apply();};
         genericView.querySelector('[data-jobs-person]').onchange=e=>{personFilter=e.target.value;apply();};

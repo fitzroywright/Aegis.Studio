@@ -56,7 +56,7 @@ public static class MyWorkEndpoints
                 where e.starts_at_utc<$2 and e.ends_at_utc>$1
                   and e.status<>'Cancelled' and s.status<>'Cancelled'
                   and e.job_id=any($3)
-                  and (lower(s.photographer_user_name)=lower($4) or lower(coalesce(s.assistant_user_name,''))=lower($4))
+                  and exists(select 1 from studio_workflow_sessions ws join studio_workflow_crew wc on wc.session_id=ws.id where ws.shoot_id=s.id and lower(wc.user_name)=lower($4))
                 group by e.id
                 order by e.starts_at_utc
                 """,connection);
