@@ -42,9 +42,10 @@ alter table studio_notifications add column if not exists workflow_event_key tex
 create unique index if not exists ux_notification_workflow_event on studio_notifications(workflow_event_key,lower(user_name),channel) where workflow_event_key is not null;
 create table if not exists studio_workflow_delivery_failures(event_key text primary key,job_id uuid not null references studio_jobs(id),audience text not null,subject text not null,body text not null,last_error text not null,created_at_utc timestamptz not null default now());
 create table if not exists studio_workflow_audiences(audience text not null,user_name text not null,primary key(audience,user_name));
-create or replace function studio_workflow_notify(p_job uuid,p_event text,p_audience text,p_subject text,p_body text) returns void language plpgsql as $$
+create or replace function studio_workflow_notify(p_job uuid,p_event text,p_audience text,p_subject text,p_body text) returns void language plpgsql as $
 declare p record; found_user boolean:=false;
 begin
+ if current_setting('studio.demo_seed',true)='true' then return; end if;
  for p in
   select distinct u.* from studio_user_profiles u join (
     select a.user_name from studio_workflow_audiences a where a.audience=p_audience
