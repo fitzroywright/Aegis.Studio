@@ -1127,17 +1127,17 @@
                 <div class="admin-summary-grid">
                     <article class="admin-summary-card"><strong>${manageable.length}</strong><span>Managed Workspaces</span><small>Membership and routing</small></article>
                     <article class="admin-summary-card"><strong>${studioRolesCache.filter(x=>x.isActive).length}</strong><span>Active Roles</span><small>Reusable permission sets</small></article>
-                    <article class="admin-summary-card"><strong>Ready</strong><span>Demo Environment</span><small>Deterministic seed data</small></article>
+                    <article class="admin-summary-card"><strong>Pending</strong><span>Demo Reset</span><small>Cleanup and Connected Workflow seed not yet available</small></article>
                 </div>
 
                 <div class="admin-layout">
                     <div class="admin-main-column">
                         <section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
-                                <div><h2>Demo Data</h2><p>Load the complete working-studio demonstration dataset.</p></div>
+                                <div><h2>Demo Data</h2><p>Inspect the cleanup scope. Reset and workflow-native generation remain disabled until implemented.</p></div>
                                 <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove disabled title="Reset backend is not implemented">Remove Demo Data</button><button class="primary" type="button" data-load-demo disabled title="Legacy seed disabled until Connected Workflow seed is implemented">Generate Demo Data</button></div>
                             </header>
-                            <p class="admin-card-note">Creates interconnected workspaces, clients, jobs, schedules, photographers, payments, media, production states, messages and history.</p>
+                            <p class="admin-card-note">Preview lists candidate Studio tables without deleting records. No demo data will be changed.</p>
                             <progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress>
                             <p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p>
                             <small data-demo-elapsed hidden></small>
