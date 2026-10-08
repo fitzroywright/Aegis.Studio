@@ -44,3 +44,14 @@ Still pending: UI compatibility/version payloads, exception paths, runnable acce
 ## Execution interruption — recovery checkpoint
 
 Last verified code commit: `2eebc4ff03c3a9c499ebcd7ca329ade83f6a56b98`. Terminal service became unavailable during the fifth checkpoint save. Later code and tests exist locally but have not been verified as remotely saved. Read `docs/STUDIO-CONNECTED-WORKFLOW-RECOVERY.md` before resuming. The implementation remains incomplete and must not be merged/deployed. Focused local DOM tests passed 5/5 and embedded PostgreSQL checks passed 3/3; native .NET tests remain unexecuted.
+
+## Recovery branch checkpoint — October 8, continuation
+
+Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge to main before local build and acceptance.
+- Saved Front Desk exclusive claims, release and supervisor reassignment.
+- Added cross-workspace transfer request, destination-manager decision API/UI and durable SQL records.
+- Destination manager may decide a transfer without pre-existing Job ViewJob grant; access remains limited to the specific pending decision.
+- Added required deliverable records, delivery/waiver commands, UI and read endpoint. Both the Delivered transition and Completed transition block outstanding requirements.
+- Last verified remote code commit at this checkpoint: `9bd116c23124eea60ab4cdf69501b2a1e3ece141`.
+- Not built or tested; no .NET SDK, application database, or Common sibling source available through GitHub-only execution. These changes are unverified.
+- Known next work: inspect transfer approval lifecycle (avoid superseding the approved request), validate SQL migration against actual schema, harden upload batch proofs and no-op commands, fix permission edge cases, integrate generic schedule writers, complete end-to-end tests and UI compatibility. Preserve My Work styling.
