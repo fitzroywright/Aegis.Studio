@@ -32,6 +32,13 @@ public static class WorkflowEndpoints
             }
             return Results.Ok(pending);
         }).RequireAuthorization();
+        app.MapGet("/api/jobs/{job:guid}/delivery-requirements",(Guid job,ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>Run(()=>
+        {
+            if(!store.CanManage(user,job))throw new UnauthorizedAccessException();
+            using var c=db.OpenConnection();
+            using var q=WorkflowStore.Command(c,null,"select coalesce(jsonb_agg(to_jsonb(r) order by r.created_at_utc),'[]'::jsonb)::text from studio_workflow_delivery_requirements r where r.job_id=$1",job);
+            return Results.Ok(JsonSerializer.Deserialize<JsonElement>((string)q.ExecuteScalar()!));
+        })).RequireAuthorization();
         var admin=app.MapGroup("/api/admin/connected-workflow").RequireAuthorization(policy=>policy.RequireRole("Administrator"));
         admin.MapGet("/configuration",(StudioDatabase db)=>
         {
