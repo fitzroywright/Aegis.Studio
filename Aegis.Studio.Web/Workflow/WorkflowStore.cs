@@ -292,7 +292,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
             case "deliver":
                 if(!IsFrontDesk(user)&&!manage)throw new UnauthorizedAccessException();
                 if(request.Method=="Gallery"&&!Exists(c,tx,"select exists(select 1 from studio_workflow_publications where job_id=$1)",job))throw new ArgumentException("Publish the approved gallery before recording Gallery delivery.");
-                if(string.IsNullOrWhiteSpace(request.Method))throw new ArgumentException("Record delivery method and reference.");
+                if(string.IsNullOrWhiteSpace(request.Method)||string.IsNullOrWhiteSpace(request.Reference))throw new ArgumentException("Record delivery method and receipt reference.");
                 if(Exists(c,tx,"select exists(select 1 from studio_workflow_delivery_requirements where job_id=$1 and required and not waived and delivered_at_utc is null)",job))
                     throw new ArgumentException("Record delivery evidence or an authorized waiver for every required deliverable first.");
                 Sql(c,tx,"insert into studio_workflow_deliveries(id,job_id,method,reference,actor) values($1,$2,$3,$4,$5)",request.OperationId,job,request.Method,request.Reference,actor);stateAction=true;break;
