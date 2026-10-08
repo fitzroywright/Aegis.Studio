@@ -61,7 +61,12 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         using(var q=Command(c,tx,"select workspace_id,status,job_lead,workflow_revision,correction_kind from studio_jobs where id=$1 for update",job))using(var r=q.ExecuteReader())
         {if(!r.Read())throw new KeyNotFoundException();workspace=r.GetGuid(0);stage=r.GetString(1);owner=r.IsDBNull(2)?null:r.GetString(2);if(r.GetInt64(3)!=request.ExpectedRevision)throw new WorkflowConflictException();correction=r.IsDBNull(4)?null:r.GetString(4);}
         bool manager=Manager(user,workspace),manage=manager||string.Equals(owner,actor,StringComparison.OrdinalIgnoreCase),review=access.HasPermission(user,job,"ManageProduction")&&access.HasPermission(user,job,"ChangeStatus");
-        if(!access.HasPermission(user,job,"ViewJob"))throw new UnauthorizedAccessException();
+        // Destination managers may decide a pending transfer before acquiring Job access.
+        bool destinationTransferReviewer=request.Action=="decide-transfer"&&
+            Exists(c,tx,"select exists(select 1 from studio_workflow_transfer_requests r where r.id=$1 and r.job_id=$2 and r.status='Pending' and r.source_workspace_id=$3)",request.AssignmentRequestId,job,workspace)&&
+            request.AssignmentRequestId.HasValue&&
+            CanReviewTransfer(c,tx,user,request.AssignmentRequestId.Value,job);
+        if(!destinationTransferReviewer&&!access.HasPermission(user,job,"ViewJob"))throw new UnauthorizedAccessException();
         Sql(c,tx,"select set_config('studio.connected_command','true',true)");
         Sql(c,tx,"select set_config('studio.actor',$1,true),set_config('studio.reason',$2,true)",actor,request.Reason??"");
         bool stateAction=false;
@@ -316,6 +321,11 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         Sql(c,tx,"insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,$3,$4,$5,now())",request.OperationId,job,"ConnectedWorkflow:"+request.Action,actor,JsonSerializer.Serialize(request));
         Sql(c,tx,"insert into studio_workflow_commands(operation_id,job_id,fingerprint,result_revision) select $1,id,$3,workflow_revision from studio_jobs where id=$2",request.OperationId,job,fingerprint);
         var result=Snapshot(c,tx,job);tx.Commit();return result;
+    }
+    private bool CanReviewTransfer(NpgsqlConnection c,NpgsqlTransaction tx,ClaimsPrincipal user,Guid transferId,Guid job)
+    {
+        var destination=Scalar(c,tx,"select destination_workspace_id from studio_workflow_transfer_requests where id=$1 and job_id=$2 and status='Pending'",transferId,job);
+        return destination is Guid id&&Manager(user,id);
     }
     private static void ApplyTransfer(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,Guid destination)
     {
