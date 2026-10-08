@@ -223,6 +223,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     <div class="job-tasks-content"></div>
                 </section>`;
             detailPane.appendChild(lower);
+            const workflowHost=document.createElement('section');lower.prepend(workflowHost);
+            if(window.StudioWorkflow)window.StudioWorkflow.render(workflowHost,job.id,current).catch(error=>{workflowHost.textContent=error.message;});
 
             const messagesPanel=document.getElementById('combinedJobMessages');
             const composer=document.getElementById('hierarchyCompose');

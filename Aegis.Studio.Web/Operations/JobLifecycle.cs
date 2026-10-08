@@ -1,126 +1,39 @@
 using System.Security.Claims;
+using Aegis.Studio.Web.Workflow;
 using Aegis.Studio.Web.Persistence;
-using Aegis.Studio.Web.Galleries;
 using Common.Storage;
-using Aegis.Studio.Web.Notifications;
-using Npgsql;
-using Aegis.Studio.Web.Production;
-
 namespace Aegis.Studio.Web.Operations;
 
+// Compatibility names map to the revised source and finished-work approval process.
 public static class JobLifecycleRules
 {
-    public static string Target(string action)=>action switch
-    {
-        "submit-review"=>"Needs Review",
-        "request-changes"=>"Changes Requested",
-        "approve"=>"In Production",
-        "finish-production"=>"Ready for Client",
-        "publish"=>"Published",
-        _=>throw new ArgumentException("Choose a supported job action.")
-    };
-    public static bool Allowed(string status,string action)=>action switch
-    {
-        "submit-review"=>status is "Awaiting Upload" or "Changes Requested",
-        "request-changes"=>status is "Needs Review" or "In Production" or "Ready for Client",
-        "approve"=>status=="Needs Review",
-        "finish-production"=>status=="In Production",
-        "publish"=>status=="Ready for Client",
-        _=>false
-    };
+    public static string Canonical(string action)=>action switch {"submit-review"=>"submit-source","approve"=>"accept-source","finish-production"=>"submit-finished",_=>action};
+    public static string Target(string action)=>Canonical(action) switch {"submit-source"=>"Awaiting Production Review","accept-source"=>"Active Production","submit-finished"=>"Awaiting Approval","approve-finished"=>"Ready for Delivery","request-changes"=>"Changes Requested","publish"=>"Ready for Delivery",_=>throw new ArgumentException("Choose a supported action.")};
+    public static bool Allowed(string status,string action)
+    {try{if(action=="publish")return status=="Ready for Delivery";WorkflowRules.Target(status,Canonical(action),status=="Changes Requested"?"Source":null);return true;}catch(ArgumentException){return false;}}
     public static void Validate(string status,string action,int mediaCount,bool openProduction,bool publishConfigured)
     {
-        if(!Allowed(status,action))throw new ArgumentException("This action is unavailable at the job's current stage. Refresh the job.");
-        if(action is "submit-review" or "approve" or "finish-production" or "publish" && mediaCount==0)
-            throw new ArgumentException("Upload job media before continuing.");
-        if(action=="finish-production"&&openProduction)throw new ArgumentException("Complete or cancel the outstanding production tasks before finishing production.");
-        if(action=="publish"&&!publishConfigured)throw new ArgumentException("A client gallery provider must be configured before publishing.");
+        if(!Allowed(status,action))throw new ArgumentException("Refresh the Job before changing its stage.");
+        if(action!="request-changes"&&mediaCount==0)throw new ArgumentException("Upload completed media first.");
+        if(Canonical(action)=="submit-finished"&&openProduction)throw new ArgumentException("Resolve required production tasks first.");
+        if(action=="publish"&&!publishConfigured)throw new ArgumentException("Configure the gallery provider first.");
     }
 }
-
-public sealed record JobLifecycleRequest(string Action,string? Note,string ExpectedStatus,Guid OperationId);
-
+public sealed record JobLifecycleRequest(string Action,string? Note,string ExpectedStatus,Guid OperationId,long? ExpectedRevision=null);
 public static class JobLifecycleEndpoints
 {
     public static void MapJobLifecycle(this WebApplication app)
     {
-        using(var connection=app.Services.GetRequiredService<StudioDatabase>().OpenConnection())
-        using(var command=new NpgsqlCommand("create table if not exists studio_job_workflow_actions(operation_id uuid primary key,job_id uuid not null references studio_jobs(id),action text not null,result_status text not null,acted_by text not null,acted_at_utc timestamptz not null default now())",connection))command.ExecuteNonQuery();
-        app.MapGet("/api/jobs/{jobId:guid}/workflow",(Guid jobId,ClaimsPrincipal user,JobAccessService access,StudioStore store,IConfiguration configuration)=>
+        app.MapGet("/api/jobs/{jobId:guid}/workflow",(Guid jobId,ClaimsPrincipal user,WorkflowStore workflow,IConfiguration configuration)=>WorkflowEndpoints.Run(()=>
         {
-            if(!access.HasPermission(user,jobId,"ViewJob"))return Results.Forbid();
-            StudioJob? job=store.GetJob(jobId);if(job is null)return Results.NotFound();
-            bool editor=access.HasPermission(user,jobId,"ManageProduction")&&access.HasPermission(user,jobId,"ChangeStatus");
-            bool reviewer=access.HasPermission(user,jobId,"ChangeStatus");
-            return Results.Ok(new{job.Status,actions=new[]{"submit-review","request-changes","approve","finish-production","publish"}.Where(a=>editor&&JobLifecycleRules.Allowed(job.Status,a)&&(!(a is "approve" or "request-changes")||reviewer)),galleryProvider=configuration["ClientGallery:Provider"]??"Unconfigured"});
-        }).RequireAuthorization();
-        app.MapPost("/api/jobs/{jobId:guid}/workflow",async(Guid jobId,JobLifecycleRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase database,IConfiguration configuration,IClientGalleryPublisher publisher,JobEventNotifier notifier,ILoggerFactory logs,CancellationToken token)=>
+            var view=System.Text.Json.JsonSerializer.SerializeToElement(workflow.View(jobId,user));var data=view.GetProperty("data");
+            // Assignment/review controls are centralized in the Job panel; this legacy summary retains gallery handoff.
+            return Results.Ok(new{status=data.GetProperty("stage").GetString(),revision=data.GetProperty("revision").GetInt64(),actions=data.GetProperty("stage").GetString()=="Ready for Delivery"&&(view.GetProperty("canFrontDesk").GetBoolean()||view.GetProperty("canManage").GetBoolean()||view.GetProperty("canReview").GetBoolean())?new[]{"publish"}:Array.Empty<string>(),galleryProvider=configuration["ClientGallery:Provider"]??"Unconfigured"});
+        })).RequireAuthorization();
+        app.MapPost("/api/jobs/{jobId:guid}/workflow",(Guid jobId,JobLifecycleRequest request,ClaimsPrincipal user,WorkflowStore workflow)=>WorkflowEndpoints.Run(()=>
         {
-            if(!access.HasPermission(user,jobId,"ManageProduction")||!access.HasPermission(user,jobId,"ChangeStatus"))return Results.Forbid();
-            try
-            {
-                if((request.Note?.Length??0)>4000)throw new ArgumentException("Notes must be at most 4000 characters.");
-                if(request.OperationId==Guid.Empty)throw new ArgumentException("An operation reference is required for safe retries.");
-                if(request.Action=="request-changes"&&string.IsNullOrWhiteSpace(request.Note))throw new ArgumentException("Describe the changes needed.");
-                string actor=user.FindFirstValue("login_name")??user.Identity?.Name??"Studio";
-                using var connection=database.OpenConnection();using var transaction=connection.BeginTransaction();
-                Execute(connection,transaction,"select pg_advisory_xact_lock(hashtextextended($1,0))","job-action:"+request.OperationId);
-                using(var previous=new NpgsqlCommand("select job_id,action,result_status from studio_job_workflow_actions where operation_id=$1",connection,transaction))
-                {
-                    previous.Parameters.AddWithValue(request.OperationId);using var reader=previous.ExecuteReader();
-                    if(reader.Read())
-                    {
-                        if(reader.GetGuid(0)!=jobId||reader.GetString(1)!=request.Action)throw new ArgumentException("This operation reference belongs to another action.");
-                        return Results.Ok(new{status=reader.GetString(2),alreadyApplied=true});
-                    }
-                }
-                // All lifecycle actions serialize on the existing Job row, including safe repeats.
-                using var get=new NpgsqlCommand("select status,title from studio_jobs where id=$1 for update",connection,transaction);get.Parameters.AddWithValue(jobId);
-                string status,title;using(var reader=get.ExecuteReader()){if(!reader.Read())return Results.NotFound();status=reader.GetString(0);title=reader.GetString(1);}
-                string target=JobLifecycleRules.Target(request.Action);
-                if(status==target)return Results.Ok(new{status,alreadyApplied=true});
-                if(status!=request.ExpectedStatus)throw new ArgumentException("The job changed since you opened it. Refresh and try again.");
-                using var count=new NpgsqlCommand("select count(*) from studio_media_assets where job_id=$1",connection,transaction);count.Parameters.AddWithValue(jobId);int mediaCount=Convert.ToInt32(count.ExecuteScalar());
-                using var tasks=new NpgsqlCommand("select exists(select 1 from studio_job_activities where job_id=$1 and status not in ('Completed','Cancelled'))",connection,transaction);tasks.Parameters.AddWithValue(jobId);bool openTasks=(bool)tasks.ExecuteScalar()!;
-                string provider=configuration["ClientGallery:Provider"]??"";
-                JobLifecycleRules.Validate(status,request.Action,mediaCount,openTasks,provider=="Manifest");
-                if(request.Action=="finish-production")
-                {
-                    using var quality=new NpgsqlCommand("""
-                        select exists(select 1 from studio_media_assets a where a.job_id=$1 and (a.approved_version_id is null
-                          or exists(select 1 from studio_production_items i where i.asset_id=a.id and i.source_version_id=a.approved_version_id and i.qc_state not in ('Passed','Cancelled'))))
-                        """,connection,transaction);quality.Parameters.AddWithValue(jobId);
-                    if((bool)quality.ExecuteScalar()!)throw new ArgumentException("Pass quality control for the current approved production items before handing this job to Front Desk.");
-                }
-                string? receipt=null;
-                if(request.Action=="publish")
-                {
-                    var media=new List<ClientGalleryMedia>();
-                    using(var assets=new NpgsqlCommand("select a.asset_key,v.id,v.file_name,v.stored_path,v.content_type from studio_media_assets a join studio_asset_versions v on v.id=a.approved_version_id where a.job_id=$1 order by a.asset_key",connection,transaction))
-                    {
-                        assets.Parameters.AddWithValue(jobId);using var reader=assets.ExecuteReader();
-                        while(reader.Read())media.Add(new(reader.GetString(0),reader.GetGuid(1),reader.GetString(2),"VersionStore/"+reader.GetString(3),reader.GetString(4)));
-                    }
-                    if(media.Count!=mediaCount)throw new ArgumentException("Finish quality control for all job media before publication.");
-                    var publication=await publisher.PublishAsync(new ClientGalleryPublishRequest(jobId,title,media),token);
-                    receipt=publication.Reference;
-                }
-                Execute(connection,transaction,"update studio_jobs set status=$2 where id=$1",jobId,target);
-                if(request.Action=="approve")ProductionItems.CreateApprovedBatch(connection,transaction,jobId,actor);
-                Execute(connection,transaction,"insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,$3,$4,$5,now())",Guid.NewGuid(),jobId,"Workflow:"+request.Action,actor,request.Note??$"{status} → {target}");
-                using var conversation=new NpgsqlCommand("select conversation_id from studio_jobs where id=$1",connection,transaction);conversation.Parameters.AddWithValue(jobId);Guid conversationId=(Guid)conversation.ExecuteScalar()!;
-                Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'Internal',$4,now())",Guid.NewGuid(),conversationId,actor,$"{status} → {target}. {request.Note}");
-                Execute(connection,transaction,"insert into studio_job_workflow_actions(operation_id,job_id,action,result_status,acted_by) values($1,$2,$3,$4,$5)",request.OperationId,jobId,request.Action,target,actor);
-                transaction.Commit();
-                try{notifier.Publish(jobId,"JobStatusChanged",$"Job update: {title}",$"{status} → {target}");}
-                catch(Exception error){logs.CreateLogger("JobLifecycle").LogError(error,"Job action completed but notification enqueue failed for {JobId}",jobId);}
-                return Results.Ok(new{status=target,publicationReference=receipt});
-            }
-            catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}
-            catch(StorageException e){logs.CreateLogger("JobLifecycle").LogError(e,"Gallery publication failed for {JobId}",jobId);return Results.Problem("Gallery publication could not be completed. The job remains ready for retry.",statusCode:503);}
-        }).RequireAuthorization();
+            if(request.ExpectedRevision is null)return Results.BadRequest(new{error="Refresh the Job for its current revision."});
+            return Results.Ok(workflow.Execute(jobId,new(JobLifecycleRules.Canonical(request.Action),request.ExpectedRevision.Value,request.OperationId,Reason:request.Note),user));
+        })).RequireAuthorization();
     }
-    private static void Execute(NpgsqlConnection connection,NpgsqlTransaction transaction,string sql,params object[] values)
-    {using var command=new NpgsqlCommand(sql,connection,transaction);foreach(var value in values)command.Parameters.AddWithValue(value);command.ExecuteNonQuery();}
 }
-

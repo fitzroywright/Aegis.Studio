@@ -186,8 +186,29 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         return values;
     }
 
+    private bool IsWorkflowEmailStillAllowed(PendingNotification item)
+    {
+        using var connection=database.OpenConnection();
+        using var cmd=connection.CreateCommand();
+        cmd.CommandText="""
+            select not exists(select 1 from studio_employees e where lower(e.user_name)=lower($1) and not e.is_active)
+              and exists(select 1 from studio_user_profiles p where lower(p.user_name)=lower($1)
+                and p.email_enabled and p.email is not null and lower(p.email)=lower($2))
+            """;
+        cmd.Parameters.AddWithValue(item.UserName);
+        cmd.Parameters.AddWithValue(item.Destination??"");
+        return (bool)cmd.ExecuteScalar()!;
+    }
+
     private async Task QueueAsync(PendingNotification item, CancellationToken cancellationToken)
     {
+        // Recheck at the actual enqueue boundary; the monitor runs less frequently.
+        if(item.Channel=="Email" && !string.IsNullOrWhiteSpace(item.ReferenceType) && item.ReferenceType=="Job" &&
+            !IsWorkflowEmailStillAllowed(item))
+        {
+            Update(item.Id,"Cancelled","Recipient is inactive or email preferences have changed.",false,false);
+            return;
+        }
         MessageChannel channel = item.Channel switch
         {
             "Email" => MessageChannel.MsEmail,

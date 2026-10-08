@@ -149,7 +149,7 @@ public sealed class StudioVersionStore
     {
         using var command=new NpgsqlCommand("select status from studio_jobs where id=$1 for update",connection,transaction);command.Parameters.AddWithValue(jobId);
         string status=command.ExecuteScalar() as string??throw new KeyNotFoundException("Job was not found.");
-        if(status is "Ready for Client" or "Published" or "Completed" or "Closed" or "Cancelled")
+        if(status is "Ready for Delivery" or "Delivered" or "Awaiting Approval" or "Awaiting Production Review" or "Ready for Client" or "Published" or "Completed" or "Closed" or "Cancelled")
             throw new ArgumentException("This job's approved media is closed for changes. Request changes before uploading a revision.");
     }
 

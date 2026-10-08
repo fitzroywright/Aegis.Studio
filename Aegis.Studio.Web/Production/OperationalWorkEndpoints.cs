@@ -1,3 +1,4 @@
+using Aegis.Studio.Web.Workflow;
 using Npgsql;
 using System.Security.Claims;
 using Aegis.Studio.Web.Notifications;
@@ -23,73 +24,38 @@ public static class OperationalWorkEndpoints
 
         app.MapGet("/api/operations/activities", (Guid? jobId,string? status,string? assignedTo,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) => Results.Ok(new OperationalWorkStore(database).GetActivities(jobId,status,assignedTo).Where(x=>access.HasPermission(user,x.JobId,"ViewJob")).ToList())).RequireAuthorization();
 
-        app.MapPost("/api/jobs/{jobId:guid}/operations/activities", (Guid jobId,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,JobEventNotifier notifier) =>
+        app.MapPost("/api/jobs/{jobId:guid}/operations/activities", (Guid jobId,JobActivityRequest request,ClaimsPrincipal user,WorkflowStore workflow,StudioDatabase database) => WorkflowEndpoints.Run(()=>
         {
-            if(!access.HasPermission(user,jobId,"ManageProduction")) return Results.Forbid();
-            try
-            {
-                if(!string.IsNullOrWhiteSpace(request.AssignedTo) && !new StudioEmployeeDirectoryStore(database).IsAssignable(request.AssignedTo))
-                    return Results.BadRequest(new { error="Task assignee must be an active, assignable Studio employee." });
-                OperationalWorkStore store=new(database);
-                JobActivity activity=store.CreateActivity(jobId,request,UserName(user));
-                if(!string.IsNullOrWhiteSpace(activity.AssignedTo))
-                {
-                    access.EnsureAssignedMember(jobId,activity.AssignedTo);
-                    notifications.PublishToUser(activity.AssignedTo,"JobAssigned",$"Activity assigned: {activity.Title}",$"You were assigned {activity.ActivityType} work.","Job",jobId.ToString("D"));
-                }
-                notifier.Publish(jobId,"ProductionChanged",$"Production activity added: {activity.Title}",$"{activity.ActivityType} activity was added to the job.");
-                return Results.Created($"/api/operations/activities/{activity.Id}",activity);
-            }
-            catch(Exception exception){ return Results.BadRequest(new { error=exception.Message }); }
-        }).RequireAuthorization();
-
-        app.MapPut("/api/operations/activities/{id:guid}", (Guid id,JobActivityRequest request,ClaimsPrincipal user,StudioDatabase database,JobAccessService access,NotificationService notifications,IConfiguration configuration,IWebHostEnvironment environment,JobEventNotifier notifier,StudioInAppMessageStore messages) =>
+            if(request.ExpectedRevision is null||request.OperationId==Guid.Empty)throw new ArgumentException("Refresh the Job before creating a task.");
+            workflow.Execute(jobId,new("task",request.ExpectedRevision.Value,request.OperationId,UserName:request.AssignedTo,Title:request.Title,TaskId:request.OperationId,Kind:request.ActivityType,Priority:request.Priority,ScheduledAtUtc:request.ScheduledAtUtc,DueAtUtc:request.DueAtUtc,Description:request.Description,Location:request.Location,HandoffTo:request.HandoffTo),user);
+            return Results.Ok(new OperationalWorkStore(database).GetActivities(jobId).Single(x=>x.Id==request.OperationId));
+        })).RequireAuthorization();
+        app.MapPut("/api/operations/activities/{id:guid}", (Guid id,JobActivityRequest request,ClaimsPrincipal user,WorkflowStore workflow,StudioDatabase database,IConfiguration configuration,IWebHostEnvironment environment) => WorkflowEndpoints.Run(()=>
         {
-            OperationalWorkStore store=new(database); JobActivity? current=store.GetActivities().FirstOrDefault(x=>x.Id==id); if(current is null) return Results.NotFound(); if(!access.HasPermission(user,current.JobId,"ManageProduction")) return Results.Forbid();
-            try
+            var store=new OperationalWorkStore(database);var current=store.GetActivities().FirstOrDefault(x=>x.Id==id)??throw new KeyNotFoundException();
+            if(request.ExpectedRevision is null||request.OperationId==Guid.Empty)throw new ArgumentException("Refresh the task before saving.");
+            bool metadata=current.Title!=request.Title||current.ActivityType!=(request.ActivityType??current.ActivityType)||current.AssignedTo!=request.AssignedTo||current.Description!=request.Description||current.Priority!=(request.Priority??current.Priority)||current.ScheduledAtUtc!=request.ScheduledAtUtc||current.DueAtUtc!=request.DueAtUtc||current.Location!=request.Location||current.HandoffTo!=request.HandoffTo;
+            if(metadata)
             {
-                if(!string.IsNullOrWhiteSpace(request.AssignedTo) && !new StudioEmployeeDirectoryStore(database).IsAssignable(request.AssignedTo))
-                    return Results.BadRequest(new { error="Task assignee must be an active, assignable Studio employee." });
-                if(string.Equals(request.Status,"Completed",StringComparison.OrdinalIgnoreCase) && (current.ActivityType=="FileIngest" || current.ActivityType=="Backup"))
-                {
-                    MediaArchiveStore media=new(database,configuration,environment);
-                    IReadOnlyList<MediaArchiveRecord> records=media.GetForJob(current.JobId);
-                    bool primary=records.Any(x=>x.PrimaryVerifiedAtUtc.HasValue&&x.FileCount>0);
-                    bool backup=records.Any(x=>x.BackupVerifiedAtUtc.HasValue&&x.FileCount>0);
-                    if(current.ActivityType=="FileIngest"&&!primary) return Results.BadRequest(new { error="File ingest cannot be completed until Studio verifies files in the configured media archive." });
-                    if(current.ActivityType=="Backup"&&!backup) return Results.BadRequest(new { error="Backup cannot be completed until Studio verifies the backup directory." });
-                }
-                JobActivity updated=store.UpdateActivity(id,request,UserName(user));
-                bool scheduleChanged=current.ScheduledAtUtc!=updated.ScheduledAtUtc||current.DueAtUtc!=updated.DueAtUtc;
-                if(scheduleChanged)
-                {
-                    using var connection=database.OpenConnection();
-                    using var workspace=connection.CreateCommand();
-                    workspace.CommandText="select workspace_id from studio_jobs where id=$1";
-                    workspace.Parameters.AddWithValue(updated.JobId);
-                    if(workspace.ExecuteScalar() is Guid workspaceId)
-                    {
-                        try
-                        {
-                            StudioMessageThread thread=messages.GetOrCreateScoped(user,"Workspace",workspaceId);
-                            string detail=$"Production activity rescheduled: {updated.Title}{(updated.ScheduledAtUtc.HasValue?$" · starts {updated.ScheduledAtUtc.Value:u}":string.Empty)}{(updated.DueAtUtc.HasValue?$" · due {updated.DueAtUtc.Value:u}":string.Empty)}.";
-                            messages.AddMessage(thread.Id,user,detail);
-                        }
-                        catch(UnauthorizedAccessException){ }
-                    }
-                }
-                if(updated.Status=="Blocked") notifications.PublishToUser(updated.AssignedTo??UserName(user),"JobStatusChanged",$"Blocked: {updated.Title}",updated.BlockedReason??"Production activity is blocked.","Job",updated.JobId.ToString("D"));
-                bool requesterMilestone=updated.Status=="Completed" && (updated.ActivityType=="Proof" || updated.ActivityType=="Delivery");
-                string eventType=updated.ActivityType=="Delivery" && updated.Status=="Completed" ? "DeliveryChanged" : "ProductionChanged";
-                notifier.Publish(updated.JobId,eventType,$"Production update: {updated.Title}",$"{updated.Title} is now {updated.Status}.{(string.IsNullOrWhiteSpace(updated.BlockedReason)?string.Empty:$" {updated.BlockedReason}")}",requesterMilestone);
-                return Results.Ok(updated);
+                // A metadata edit and a progress edit are distinct versioned decisions.
+                if(current.Status!=request.Status)throw new ArgumentException("Save task assignment/details before changing progress.");
+                workflow.Execute(current.JobId,new("task",request.ExpectedRevision.Value,request.OperationId,UserName:request.AssignedTo,Title:request.Title,TaskId:id,Kind:request.ActivityType,Priority:request.Priority,ScheduledAtUtc:request.ScheduledAtUtc,DueAtUtc:request.DueAtUtc,Description:request.Description,Location:request.Location,HandoffTo:request.HandoffTo),user);
             }
-            catch(Exception exception){ return Results.BadRequest(new { error=exception.Message }); }
-        }).RequireAuthorization();
+            else
+            {
+                if(request.Status=="Completed"&&current.ActivityType is "FileIngest" or "Backup")
+                {
+                    var records=new MediaArchiveStore(database,configuration,environment).GetForJob(current.JobId);
+                    if(current.ActivityType=="FileIngest"?!records.Any(x=>x.PrimaryVerifiedAtUtc.HasValue&&x.FileCount>0):!records.Any(x=>x.BackupVerifiedAtUtc.HasValue&&x.FileCount>0))throw new ArgumentException("Verify the configured media archive/backup before completing this task.");
+                }
+                workflow.Execute(current.JobId,new("task-progress",request.ExpectedRevision.Value,request.OperationId,TaskId:id,Status:request.Status,BlockedReason:request.BlockedReason),user);
+            }
+            return Results.Ok(store.GetActivities(current.JobId).Single(x=>x.Id==id));
+        })).RequireAuthorization();
 
         app.MapPost("/api/jobs/{jobId:guid}/operations/template/{templateName}", (Guid jobId,string templateName,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) =>
         {
-            if(!access.HasPermission(user,jobId,"ManageProduction")) return Results.Forbid();
+            if(!new WorkflowStore(database,access,new WorkspaceAccessService(database),app.Services.GetRequiredService<Aegis.Studio.Web.Galleries.IClientGalleryPublisher>(),app.Configuration).CanManage(user,jobId)) return Results.Forbid();
             OperationalWorkStore store=new(database); if(store.GetActivities(jobId).Count>0) return Results.Ok(store.GetActivities(jobId));
             (string Type,string Title)[] steps=templateName.Trim().ToLowerInvariant() switch
             {
@@ -110,8 +76,8 @@ public static class OperationalWorkEndpoints
             {
                 ShootCoordinator coordinator=new(database,new PhotographerStore(database));
                 ShootSession shoot=coordinator.Create(jobId,request,UserName(user));
-                access.EnsureAssignedMember(jobId,shoot.PhotographerUserName);
-                if(!string.IsNullOrWhiteSpace(shoot.AssistantUserName)) access.EnsureAssignedMember(jobId,shoot.AssistantUserName);
+
+
                 notifications.PublishToUser(shoot.PhotographerUserName,"JobAssigned","Photography assignment",$"Call time {shoot.CallTimeUtc:u}{(shoot.Location is null?string.Empty:$" at {shoot.Location}")}.","Job",jobId.ToString("D"));
                 notifier.Publish(jobId,"ScheduleChanged","Photography scheduled",$"Photography is scheduled for {shoot.CallTimeUtc:u} to {shoot.PlannedEndUtc:u}{(string.IsNullOrWhiteSpace(shoot.Location)?string.Empty:$" at {shoot.Location}")}.",requesterEligible:true);
                 return Results.Created($"/api/operations/shoots/{shoot.Id}",shoot);
@@ -141,8 +107,8 @@ public static class OperationalWorkEndpoints
             try
             {
                 var shoot=scheduling.Reschedule(jobId,shootId,request,UserName(user));
-                access.EnsureAssignedMember(jobId,shoot.PhotographerUserName);
-                if(!string.IsNullOrWhiteSpace(shoot.AssistantUserName))access.EnsureAssignedMember(jobId,shoot.AssistantUserName);
+
+
                 try{notifier.Publish(jobId,"JobAssigned","Shoot rescheduled",$"{shoot.PhotographerUserName}, {shoot.CallTimeUtc:u}");}
                 catch(Exception notificationError){app.Logger.LogWarning(notificationError,"Shoot {ShootId} rescheduled; optional notification failed",shootId);}
                 return Results.Ok(shoot);

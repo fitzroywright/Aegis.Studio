@@ -225,7 +225,7 @@ public static class ScheduleEndpoints
         foreach (PhotographerProfile photographer in photographers.GetByScheduleResourceIds(entry.ResourceIds))
         {
             if (!photographer.IsActive) continue;
-            access.EnsureAssignedMember(effectiveJobId, photographer.UserName);
+
         }
     }
 
