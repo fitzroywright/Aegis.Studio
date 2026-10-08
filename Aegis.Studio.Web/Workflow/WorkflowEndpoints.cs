@@ -32,6 +32,13 @@ public static class WorkflowEndpoints
             }
             return Results.Ok(pending);
         }).RequireAuthorization();
+        app.MapGet("/api/jobs/{job:guid}/upload-batches",(Guid job,ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>Run(()=>
+        {
+            if(!store.CanManage(user,job))throw new UnauthorizedAccessException();
+            using var c=db.OpenConnection();
+            using var q=WorkflowStore.Command(c,null,"select coalesce(jsonb_agg(to_jsonb(b) order by b.recorded_at_utc desc),'[]'::jsonb)::text from studio_workflow_upload_batches b where b.job_id=$1",job);
+            return Results.Ok(JsonSerializer.Deserialize<JsonElement>((string)q.ExecuteScalar()!));
+        })).RequireAuthorization();
         app.MapGet("/api/jobs/{job:guid}/delivery-requirements",(Guid job,ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>Run(()=>
         {
             if(!store.CanManage(user,job))throw new UnauthorizedAccessException();
