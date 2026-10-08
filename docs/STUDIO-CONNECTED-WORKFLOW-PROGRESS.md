@@ -83,3 +83,10 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 
 - Owner assignment now rejects an unchanged owner rather than incrementing workflow revision or notifying again. Code commit e53e89a.
 - No local .NET build or database integration tests have been run. Main remains unchanged.
+
+## Notification and transfer continuation checkpoint
+
+- Destination-manager transfer approval idempotent retry now accepts the original operation ID without an existing Job view grant, while verifying the pending transfer. Commit e299b80.
+- Workflow notification fanout excludes explicitly inactive employees, without suppressing active staff marked nonassignable. Commits 429237c and f192a98.
+- Workflow monitor retries durable no-recipient failures and now cancels Pending workflow email if the employee becomes inactive or email preference/destination changes. Commit 6846a97.
+- Unverified: pending cancellation assumes studio_notifications supports status Cancelled; confirm notification delivery worker honors it. Native build and database tests not run.
