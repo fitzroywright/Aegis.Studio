@@ -11,7 +11,7 @@ using Npgsql;
 namespace Aegis.Studio.Web.Workflow;
 
 public sealed record CrewChange(string UserName,string Role,string? Notes=null,DateTimeOffset? Start=null,DateTimeOffset? End=null);
-public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null,string? Status=null,string? Priority=null,DateTimeOffset? ScheduledAtUtc=null,DateTimeOffset? DueAtUtc=null,string? Description=null,string? BlockedReason=null,string? HandoffTo=null);
+public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null,string? Status=null,string? Priority=null,DateTimeOffset? ScheduledAtUtc=null,DateTimeOffset? DueAtUtc=null,string? Description=null,string? BlockedReason=null,string? HandoffTo=null,int? ExpectedFiles=null,int? CompletedFiles=null,int? FailedFiles=null);
 
 public sealed class WorkflowStore(StudioDatabase database,JobAccessService access,WorkspaceAccessService workspaces,IClientGalleryPublisher publisher,IConfiguration configuration)
 {
@@ -256,6 +256,16 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                     Sql(c,tx,"insert into studio_workflow_overrides(id,job_id,kind,actor,reason,original_requirement) select $1,$2,'Deposit',$3,$4,coalesce((select (payload->>'requiredDeposit')::numeric from studio_frontdesk_requests where job_id=$2 limit 1),0)",request.OperationId,job,actor,request.Reason);
                 }
                 Sql(c,tx,"update studio_frontdesk_requests set status='Confirmed' where job_id=$1",job);EnsureDraft(c,tx,job);stateAction=true;break;
+            case "record-upload-batch":
+                if(!manage)throw new UnauthorizedAccessException();
+                if(stage is not ("Awaiting Upload" or "Changes Requested"))throw new ArgumentException("Upload batches are recorded after photography.");
+                if(stage=="Changes Requested"&&correction!="Source")throw new ArgumentException("Only source corrections may record upload batches.");
+                if(request.SessionId is not Guid uploadSession||!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions where id=$1 and job_id=$2)",uploadSession,job))
+                    throw new ArgumentException("Choose a session belonging to this Job.");
+                if(request.ExpectedFiles is null||request.ExpectedFiles<1||request.CompletedFiles is null||request.CompletedFiles<0||request.FailedFiles is null||request.FailedFiles<0||request.CompletedFiles+request.FailedFiles>request.ExpectedFiles)
+                    throw new ArgumentException("Provide a valid expected, completed and failed file count.");
+                Sql(c,tx,"insert into studio_workflow_upload_batches(id,job_id,session_id,expected_files,completed_files,failed_files,backup_confirmed,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8)",request.OperationId,job,uploadSession,request.ExpectedFiles.Value,request.CompletedFiles.Value,request.FailedFiles.Value,request.BackupConfirmed,actor);
+                break;
             case "submit-source":
                 if(!manage)throw new UnauthorizedAccessException();ValidateSourceReady(c,tx,job);CreateSubmission(c,tx,job,"Source",actor);stateAction=true;break;
             case "accept-source":case "approve-finished":
@@ -430,6 +440,8 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         if(!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions where job_id=$1 and required)",job)||Exists(c,tx,"select exists(select 1 from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=$1 and w.required and (s.id is null or s.status='Cancelled' or s.checked_out_at_utc is null or exists(select 1 from studio_workflow_crew c where c.session_id=w.id and not c.ready and c.waiver_reason is null)))",job))throw new ArgumentException("Complete all required sessions and photographer contributions, or explicitly waive missing contributions.");
         if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and activity_type in ('FileIngest','Backup') and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Complete the required ingest and backup verification tasks before submission.");
         if(!Exists(c,tx,"select exists(select 1 from studio_media_assets a join studio_asset_versions v on v.job_id=a.job_id and v.asset_key=a.asset_key where a.job_id=$1)",job))throw new ArgumentException("Upload required material before submitting.");
+        if(Exists(c,tx,"select exists(select 1 from studio_workflow_sessions s where s.job_id=$1 and s.required and not exists(select 1 from studio_workflow_upload_batches b where b.session_id=s.id and b.expected_files=b.completed_files and b.failed_files=0 and b.backup_confirmed))",job))
+            throw new ArgumentException("Each required session needs a verified upload batch with every expected file completed, no failures and backup confirmed.");
     }
     private static void ValidateFinished(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
     {
