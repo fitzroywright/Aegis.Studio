@@ -78,3 +78,8 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - Added upload batch schema, source-review readiness gate and Job UI input for expected/completed/failed files and backup confirmation. Code commits 517b48f, 4f88e3f, 8a85d48, fb87ddc.
 - JS syntax passed. .NET build, database migration and integration tests are unexecuted.
 - Important gap: upload counts are operator-entered; reconcile them with actual stored-file manifests before production use.
+
+## Owner assignment guard
+
+- Owner assignment now rejects an unchanged owner rather than incrementing workflow revision or notifying again. Code commit e53e89a.
+- No local .NET build or database integration tests have been run. Main remains unchanged.
