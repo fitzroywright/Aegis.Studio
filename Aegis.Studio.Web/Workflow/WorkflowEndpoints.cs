@@ -87,6 +87,13 @@ public static class WorkflowEndpoints
             if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
             return Results.Ok(ConnectedWorkflowDemo.Reset(db));
         }));
+        admin.MapPost("/demo-data/reset-and-generate",(StudioDatabase db,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request)=>Run(()=>
+        {
+            if(!config.GetValue("DemoData:AllowDestructiveReset",false))return Results.NotFound();
+            if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
+            if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
+            return Results.Ok(ConnectedWorkflowDemo.ResetAndGenerate(db,WorkflowStore.Name(user)));
+        }));
         admin.MapPut("/thresholds",(WorkflowThreshold request,ClaimsPrincipal user,StudioDatabase db)=>Run(()=>
         {
             WorkflowRules.ValidateThreshold(request);using var c=db.OpenConnection();using var tx=c.BeginTransaction();
