@@ -26,7 +26,8 @@
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="MailKit" Version="4.17.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="SkiaSharp" Version="4.152.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.0" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="../configuration/Aegis.Studio.configuration-contract.json" Link="configuration/Aegis.Studio.configuration-contract.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
