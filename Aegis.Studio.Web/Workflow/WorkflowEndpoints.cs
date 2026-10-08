@@ -18,6 +18,20 @@ public static class WorkflowEndpoints
             using var c=db.OpenConnection();using var q=WorkflowStore.Command(c,null,"select coalesce(jsonb_agg(to_jsonb(r) order by r.created_at_utc desc),'[]'::jsonb)::text from studio_workflow_assignment_requests r where lower(r.user_name)=lower($1) or r.job_id=any($2)",WorkflowStore.Name(user),store.Monitor(user).Select(x=>JsonSerializer.SerializeToElement(x).GetProperty("jobId").GetGuid()).Where(id=>store.CanManage(user,id)).ToArray());
             return Results.Ok(JsonSerializer.Deserialize<JsonElement>((string)q.ExecuteScalar()!));
         }).RequireAuthorization();
+        app.MapGet("/api/workflow/transfer-requests",(ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>
+        {
+            using var c=db.OpenConnection();
+            using var q=WorkflowStore.Command(c,null,"select id,job_id,source_workspace_id,destination_workspace_id,requested_by,reason,status,created_at_utc from studio_workflow_transfer_requests where status='Pending' order by created_at_utc desc limit 250");
+            using var reader=q.ExecuteReader();
+            var pending=new List<object>();
+            while(reader.Read())
+            {
+                var destination=reader.GetGuid(3);
+                if(!store.Manager(user,destination))continue;
+                pending.Add(new{id=reader.GetGuid(0),jobId=reader.GetGuid(1),sourceWorkspaceId=reader.GetGuid(2),destinationWorkspaceId=destination,requestedBy=reader.GetString(4),reason=reader.GetString(5),status=reader.GetString(6),createdAt=reader.GetFieldValue<DateTimeOffset>(7)});
+            }
+            return Results.Ok(pending);
+        }).RequireAuthorization();
         var admin=app.MapGroup("/api/admin/connected-workflow").RequireAuthorization(policy=>policy.RequireRole("Administrator"));
         admin.MapGet("/configuration",(StudioDatabase db)=>
         {
