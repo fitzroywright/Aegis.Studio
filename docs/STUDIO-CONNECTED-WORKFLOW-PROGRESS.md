@@ -104,3 +104,10 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - Source readiness refuses invalidated receipts. Commit 5889c01.
 - Authorized Job managers can inspect upload batch receipt history via GET /api/jobs/{job}/upload-batches. Commit 520c1e8.
 - Important limitation: upload counts are still operator-reported, not independently reconciled against storage. The schema and triggers need PostgreSQL migration testing, and the project requires local dotnet build/test. Do not merge into main or deploy until validated.
+
+## Final-pass hardening checkpoint — 2026-10-08
+
+- Required deliverable completion now requires a receipt reference; Gallery completion also requires an existing publication. Commit 13dc7ed.
+- Whole-Job Delivered transition requires both method and receipt reference. Commit 4b5b21d.
+- Remaining implementation and acceptance risks: operator-reported upload counts are not independently verified against storage; existing gallery publication check must be validated against actual provider behavior; legacy route adapters and all A-T acceptance cases require local validation. No .NET build or test run was performed in this environment per user instruction.
+- Keep branch recovery/studio-connected-workflow-safety-20261008 separate from main. Do not merge or deploy until local validation and user approval.
