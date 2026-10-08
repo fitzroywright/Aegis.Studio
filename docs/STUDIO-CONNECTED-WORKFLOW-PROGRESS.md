@@ -7,7 +7,7 @@ Specification: `docs/STUDIO-CONNECTED-WORKFLOW-BRIEF.txt` (approved revision, Oc
 ## Status
 
 - Specification and read-only inspection complete.
-- No application changes yet.
+- Implementation is in progress on the isolated feature branch; see checkpoints below.
 - Main remains unchanged; never merge unfinished work.
 - .NET SDK and Common projects are unavailable in this execution environment. Application build/database tests must be run locally; never claim they passed here.
 
@@ -17,7 +17,7 @@ Implement shared stage history and revision checks, permanent Unassigned workspa
 
 ## Verification
 
-Document consistency checked. No application tests executed.
+Document consistency checked. Later validation results and remaining limits are recorded below.
 
 ## Recovery
 
@@ -40,3 +40,7 @@ Verification: edited JavaScript syntax checks pass. No .NET compilation or datab
 Centralized legacy lead/lifecycle/pipeline mutations into the versioned service; generic Job writes cannot assign staff or skip stages. Temporary assignment access no longer creates permanent grants. Added immutable approved gallery publication, contribution evidence, upload invalidation, task assignment/progress commands, compatibility shoot synchronization and individual attendance reservations.
 
 Still pending: UI compatibility/version payloads, exception paths, runnable acceptance coverage and validation. Known environment blocker remains .NET SDK/Common dependencies/PostgreSQL unavailable. No merge/deployment authorized or performed.
+
+## Execution interruption — recovery checkpoint
+
+Last verified code commit: `2eebc4ff03c3a9c499ebcd7ca329ade83f6a56b98`. Terminal service became unavailable during the fifth checkpoint save. Later code and tests exist locally but have not been verified as remotely saved. Read `docs/STUDIO-CONNECTED-WORKFLOW-RECOVERY.md` before resuming. The implementation remains incomplete and must not be merged/deployed. Focused local DOM tests passed 5/5 and embedded PostgreSQL checks passed 3/3; native .NET tests remain unexecuted.
