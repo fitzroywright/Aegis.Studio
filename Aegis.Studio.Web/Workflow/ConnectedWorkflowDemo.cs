@@ -46,6 +46,13 @@ internal static class ConnectedWorkflowDemo
         using var c=db.OpenConnection();
         using var tx=c.BeginTransaction();
         Lock(c,tx);
+        var result=GenerateData(c,tx,actor);
+        tx.Commit();
+        return result;
+    }
+
+    private static object GenerateData(NpgsqlConnection c,NpgsqlTransaction tx,string actor)
+    {
         int created=0;
         for(int w=0;w<WorkspaceNames.Length;w++)
         {
@@ -105,7 +112,6 @@ internal static class ConnectedWorkflowDemo
                     values($1,$2,'Edit','Review and finish production','NotStarted','Normal',$3,$3,now(),now()) on conflict(id) do nothing",Id("task:"+i),job,actor);
             created++;
         }
-        tx.Commit();
         return new {jobs=created,workspaces=WorkspaceNames.Length,stages=Stages.Length,message="Connected Workflow demo records generated. All contacts use example.invalid; no real client addresses."};
     }
 
@@ -114,6 +120,24 @@ internal static class ConnectedWorkflowDemo
         using var c=db.OpenConnection();
         using var tx=c.BeginTransaction();
         Lock(c,tx);
+        var result=ResetData(c,tx);
+        tx.Commit();
+        return result;
+    }
+
+    internal static object ResetAndGenerate(StudioDatabase db,string actor)
+    {
+        using var c=db.OpenConnection();
+        using var tx=c.BeginTransaction();
+        Lock(c,tx);
+        var removed=ResetData(c,tx);
+        var generated=GenerateData(c,tx,actor);
+        tx.Commit();
+        return new {removed,generated,message="Studio business data reset and Connected Workflow demonstration generated atomically."};
+    }
+
+    private static object ResetData(NpgsqlConnection c,NpgsqlTransaction tx)
+    {
         // Reset only business records, and every table that has a direct or
         // indirect foreign key into them. PostgreSQL TRUNCATE checks the
         // entire dependency set atomically. Protected configuration must never
@@ -156,7 +180,6 @@ internal static class ConnectedWorkflowDemo
         var tableList=string.Join(",",tables.Order(StringComparer.Ordinal)
             .Select(name=>"public.\""+name.Replace("\"","\"\"")+"\""));
         Exec(c,tx,"truncate table "+tableList+" restart identity");
-        tx.Commit();
         return new {clearedTables=tables.Count,message="Studio business records and their database dependents cleared. Workspace/security configuration was preserved; external storage objects were not deleted."};
     }
 
