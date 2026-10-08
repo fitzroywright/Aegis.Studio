@@ -56,17 +56,23 @@ public static class WorkflowEndpoints
         admin.MapGet("/demo-data/preview",(StudioDatabase db)=>Run(()=>
         {
             using var c=db.OpenConnection();
+            // Metadata only: never execute a destructive operation from an inventory endpoint.
             using var q=new NpgsqlCommand(@"select t.table_name,
-                (select count(*) from information_schema.columns col where col.table_schema='public' and col.table_name=t.table_name) as columns
+                (select count(*) from information_schema.columns col where col.table_schema='public' and col.table_name=t.table_name) as columns,
+                (select count(*) from pg_constraint fk
+                   join pg_class child on child.oid=fk.conrelid
+                   join pg_namespace ns on ns.oid=child.relnamespace
+                  where fk.contype='f' and ns.nspname='public'
+                    and fk.confrelid=to_regclass('public.'||quote_ident(t.table_name))) as inbound_foreign_keys
                 from information_schema.tables t
                 where t.table_schema='public' and t.table_type='BASE TABLE'
-                  and (t.table_name like 'studio_%')
+                  and t.table_name like 'studio_%'
                 order by t.table_name",c);
             using var reader=q.ExecuteReader();
             var tables=new List<object>();
-            while(reader.Read())tables.Add(new {table=reader.GetString(0),columns=reader.GetInt64(1)});
+            while(reader.Read())tables.Add(new {table=reader.GetString(0),columns=reader.GetInt64(1),inboundForeignKeys=reader.GetInt64(2)});
             return Results.Ok(new {readyForReset=false,requiresExplicitDemoEnvironment=true,
-                warning="Preview only. Demo deletion is disabled until all dependent tables and storage objects are accounted for.",
+                warning="Inventory only: foreign-key dependencies are not a deletion plan. Business-data classification and storage ownership must be verified before reset.",
                 tables});
         }));
         admin.MapPut("/thresholds",(WorkflowThreshold request,ClaimsPrincipal user,StudioDatabase db)=>Run(()=>
