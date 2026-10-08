@@ -1,11 +1,9 @@
 using System.Security.Cryptography;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Media;
 using Common.Storage;
 using Npgsql;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
 
 namespace Aegis.Studio.Web.Galleries;
 
@@ -284,11 +282,12 @@ public sealed class GalleryStore
             await using (FileStream output = new(originalTemp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
                 await file.CopyToAsync(output, cancellationToken);
 
-            using Image image = await Image.LoadAsync(originalTemp, cancellationToken);
-            using Image previewImage = image.Clone(x => x.AutoOrient().Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(1600, 1600) }));
-            using Image thumbnailImage = image.Clone(x => x.AutoOrient().Resize(new ResizeOptions { Mode = ResizeMode.Crop, Size = new Size(360, 240) }));
-            await previewImage.SaveAsJpegAsync(previewTemp, new JpegEncoder { Quality = 86 }, cancellationToken);
-            await thumbnailImage.SaveAsJpegAsync(thumbnailTemp, new JpegEncoder { Quality = 80 }, cancellationToken);
+            await using FileStream imageSource = File.OpenRead(originalTemp);
+            using var image = StudioImageProcessor.DecodeOriented(imageSource);
+            using var previewImage = StudioImageProcessor.ResizeMax(image, 1600);
+            using var thumbnailImage = StudioImageProcessor.ResizeCrop(image, 360, 240);
+            await File.WriteAllBytesAsync(previewTemp, StudioImageProcessor.EncodeJpeg(previewImage, 86), cancellationToken);
+            await File.WriteAllBytesAsync(thumbnailTemp, StudioImageProcessor.EncodeJpeg(thumbnailImage, 80), cancellationToken);
 
             IReadOnlyDictionary<string,string> metadata = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase)
             {
