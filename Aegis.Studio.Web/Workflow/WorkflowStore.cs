@@ -264,7 +264,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(stage=="Changes Requested"&&correction!="Source")throw new ArgumentException("Only source corrections may record upload batches.");
                 if(request.SessionId is not Guid uploadSession||!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions where id=$1 and job_id=$2)",uploadSession,job))
                     throw new ArgumentException("Choose a session belonging to this Job.");
-                if(request.ExpectedFiles is null||request.ExpectedFiles<1||request.CompletedFiles is null||request.CompletedFiles<0||request.FailedFiles is null||request.FailedFiles<0||request.CompletedFiles+request.FailedFiles>request.ExpectedFiles)
+                if(request.ExpectedFiles is null||request.ExpectedFiles<1||request.CompletedFiles is null||request.CompletedFiles<0||request.FailedFiles is null||request.FailedFiles<0||request.CompletedFiles.Value>request.ExpectedFiles.Value||request.FailedFiles.Value>request.ExpectedFiles.Value-request.CompletedFiles.Value)
                     throw new ArgumentException("Provide a valid expected, completed and failed file count.");
                 Sql(c,tx,"insert into studio_workflow_upload_batches(id,job_id,session_id,expected_files,completed_files,failed_files,backup_confirmed,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8)",request.OperationId,job,uploadSession,request.ExpectedFiles.Value,request.CompletedFiles.Value,request.FailedFiles.Value,request.BackupConfirmed,actor);
                 break;
