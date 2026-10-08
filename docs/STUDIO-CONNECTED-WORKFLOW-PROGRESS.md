@@ -22,3 +22,9 @@ Document consistency checked. No application tests executed.
 ## Recovery
 
 Fetch this branch and read this checkpoint and the specification. Compare branch head with latest main before resuming; preserve all approved decisions. This branch is isolated, so returning to unchanged main leaves the feature out of the running application. Database migrations must preserve prior records and be repeat-safe; branch switching alone does not reverse deployed database changes.
+
+## Checkpoint 2 — foundation in progress
+
+Implemented additive workflow schema, permanent protected Unassigned workspace, stage history/revision columns, elapsed timing rules, distinct source/final approval rule contract, existing notification queue deduplication, immediate Pending Job intake, repeat-safe pending-booking migration, source-scoped intake IDs and deposit recording without automatic confirmation. Added C# timing/transition unit tests (not executed: no .NET SDK).
+
+Next: workflow mutation endpoints and permissions, crew/session scheduling, review submissions and UI. This checkpoint is not a runnable feature release and must remain on the branch.

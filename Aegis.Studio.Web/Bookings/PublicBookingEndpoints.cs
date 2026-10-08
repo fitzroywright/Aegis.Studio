@@ -1,6 +1,7 @@
 using Aegis.Studio.Web.FrontDesk;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Workflow;
 
 namespace Aegis.Studio.Web.Bookings;
 
@@ -26,12 +27,12 @@ public static class PublicBookingEndpoints
             if(request.EndsAt<=request.StartsAt || request.StartsAt==default)throw new ArgumentException("Choose a valid start and end time.");
             StudioWorkspaceDefinition? workspace=request.WorkspaceId.HasValue?workspaces.Get(request.WorkspaceId.Value):
                 string.IsNullOrWhiteSpace(request.Destination)?null:workspaces.FindByRouteKey(request.Destination)??workspaces.FindByAddress(request.Destination);
-            if(workspace is null||!workspace.IsEnabled)throw new ArgumentException("Choose an enabled workspace or a valid booking destination.");
+            if(workspace is null||!workspace.IsEnabled)workspace=workspaces.Get(WorkflowRules.UnassignedWorkspaceId)??throw new InvalidOperationException("Unassigned Workspace was not initialized.");
             decimal deposit=configuration.GetValue<decimal?>("BookingApi:RequiredDeposit")??0;
-            if(deposit<=0)return Results.Problem("Website booking intake requires a configured deposit policy. Contact FrontDesk.",statusCode:503);
+            deposit=Math.Max(0,deposit);
             var pending=new PendingBookingRequest(workspace.Id,request.ClientName,request.ClientEmail,request.SessionType,
                 DateOnly.FromDateTime(request.StartsAt.DateTime),deposit,"JMD",request.Notes,null,null,request.ExternalBookingId,
-                request.StartsAt.ToUniversalTime(),request.EndsAt.ToUniversalTime(),request.Location,request.ClientPhone);
+                request.StartsAt.ToUniversalTime(),request.EndsAt.ToUniversalTime(),request.Location,request.ClientPhone,request.Destination,"Website");
             FrontDeskRequest result=new FrontDeskBookingRequestStore(database).Create(pending,"Website booking");
             return Results.Created($"/api/public/booking-requests/{result.Id}",new{bookingRequestId=result.Id,result.Status,result.JobId,result.Request.RequiredDeposit,result.RecordedDeposit});
         }

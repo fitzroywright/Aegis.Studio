@@ -274,6 +274,8 @@ app.MapProductionItems();
 app.MapProductionOrders();
 app.MapJobLifecycle();
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
+Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(app.Services.GetRequiredService<StudioDatabase>());
+new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).MigratePendingJobs();
 app.MapFrontDeskBookingRequests();
 app.MapStudioClients();
 app.MapStudioFulfillment();
