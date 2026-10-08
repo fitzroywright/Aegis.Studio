@@ -196,3 +196,22 @@ create table if not exists studio_workflow_transfer_requests(
  decided_at_utc timestamptz
 );
 create unique index if not exists ux_workflow_pending_transfer on studio_workflow_transfer_requests(job_id) where status='Pending';
+
+-- Independent delivery obligations survive the workflow's overall Delivered stage.
+create table if not exists studio_workflow_delivery_requirements(
+ id uuid primary key,
+ job_id uuid not null references studio_jobs(id),
+ title text not null,
+ required boolean not null default true,
+ created_by text not null,
+ created_at_utc timestamptz not null default now(),
+ delivered_at_utc timestamptz,
+ delivery_method text,
+ delivery_reference text,
+ delivered_by text,
+ waived boolean not null default false,
+ waiver_reason text,
+ waived_by text,
+ constraint delivery_proof_or_waiver check(not (waived and delivered_at_utc is not null))
+);
+create index if not exists ix_studio_workflow_delivery_requirements_job on studio_workflow_delivery_requirements(job_id);
