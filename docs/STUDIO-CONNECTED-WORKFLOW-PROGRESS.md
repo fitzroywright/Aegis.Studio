@@ -64,3 +64,10 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - JavaScript syntax for `wwwroot/connected-workflow.js` parsed successfully in the connector execution runtime. This does not constitute a browser/UI test.
 - Last CODE commit `520b07eebb8bd3169b2d0061b94245642bd96e2e`. All changes on recovery branch; main unchanged.
 - Remaining: native .NET build/test, SQL migration integration test, booking and legacy route adapters, upload-batch proofs, generic schedule reservation concurrency, full A–T acceptance, permissions and operational smoke tests. Not release-ready.
+
+## Schedule concurrency checkpoint
+
+- Generic ScheduleStore Create, Update and Reassign now acquire sorted per-resource PostgreSQL advisory transaction locks BEFORE conflict checks. The lock key is the same `hashtextextended(resource-id-string,0)` used by connected shoot scheduling.
+- Update/Reassign also lock resources previously assigned to the entry, avoiding conflicting resource removals and additions.
+- Remote code commit: `91e4bf9ba228fd7dd57cf95e61514daff7e22a40`.
+- NOT compiled or database-tested. Still investigate stale entry data and external schedule writers that bypass ScheduleStore.
