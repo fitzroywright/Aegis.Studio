@@ -78,6 +78,14 @@ internal static class ConnectedWorkflowDemo
                 values($1,$2,$3,$4,$5,$6,$7,now()-($8*interval '1 day'),$9,$9,$10) on conflict(id) do nothing",
                 job,workspace,conversation,Titles[i],Clients[i],Stages[i],DateOnly.FromDateTime(DateTime.UtcNow.AddDays(i-5)),i+1,(object?)owner??DBNull.Value,client);
             Exec(c,tx,"update studio_conversations set job_id=$2 where id=$1 and job_id is null",conversation,job);
+            // Give monitoring meaningful elapsed times rather than fifteen
+            // identical just-created status lights.
+            Exec(c,tx,@"update studio_jobs set stage_entered_at_utc=now()-($2*interval '1 hour')
+                where id=$1 and stage_entered_at_utc>now()-interval '1 hour'",job,(i%5+1)*5);
+            Exec(c,tx,@"update studio_workflow_history set entered_at_utc=
+                (select stage_entered_at_utc from studio_jobs where id=$1)
+                where job_id=$1 and exited_at_utc is null",job);
+
             // Front Desk and Finance see the same Job rather than a detached
             // demonstration card. A fictional booking and its verified receipt
             // share a deterministic reference with the workflow Job.
