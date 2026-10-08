@@ -1135,7 +1135,7 @@
                         <section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
                                 <div><h2>Demo Data</h2><p>Load the complete working-studio demonstration dataset.</p></div>
-                                <button class="primary" type="button" data-load-demo>Load Demo Data</button>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove disabled title="Reset backend is not implemented">Remove Demo Data</button><button class="primary" type="button" data-load-demo disabled title="Legacy seed disabled until Connected Workflow seed is implemented">Generate Demo Data</button></div>
                             </header>
                             <p class="admin-card-note">Creates interconnected workspaces, clients, jobs, schedules, photographers, payments, media, production states, messages and history.</p>
                             <progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress>
@@ -1197,6 +1197,19 @@
         await renderAnnouncementAdministration();
 
         const panel=document.getElementById('studioDemoLoader');
+        panel.querySelector('[data-demo-preview]').onclick=async()=>{
+            const status=panel.querySelector('[data-demo-status]');
+            const button=panel.querySelector('[data-demo-preview]');
+            button.disabled=true;status.textContent='Inspecting Studio database schema…';
+            try{
+                const result=await json('/api/admin/connected-workflow/demo-data/preview');
+                const rows=result.tables||[];
+                status.textContent=rows.length+' Studio tables inventoried. Reset and regeneration are disabled until dependency-safe implementation is complete.';
+                const dialog=studioDialog('Demo reset preview','<p>'+esc(result.warning||'Preview only')+'</p><p>'+rows.length+' Studio tables identified. No records were changed.</p><div style="max-height:45vh;overflow:auto">'+rows.map(x=>'<div>'+esc(x.table)+'</div>').join('')+'</div>');
+            }catch(error){status.textContent='Preview failed: '+error.message;}
+            finally{button.disabled=false;}
+        };
+        // Legacy loader must not generate data incompatible with Connected Workflow.
         panel.querySelector('[data-load-demo]').onclick=async()=>{
             const button=panel.querySelector('[data-load-demo]');
             const status=panel.querySelector('[data-demo-status]');
