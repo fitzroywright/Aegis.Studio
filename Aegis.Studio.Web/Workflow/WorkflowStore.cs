@@ -311,6 +311,9 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(stage is not ("Ready for Delivery" or "Delivered"))throw new ArgumentException("Approve the finished work before delivery.");
                 if(request.TaskId is not Guid deliveryId)throw new ArgumentException("Choose a deliverable.");
                 if(string.IsNullOrWhiteSpace(request.Method))throw new ArgumentException("Provide the delivery method.");
+                if(string.IsNullOrWhiteSpace(request.Reference))throw new ArgumentException("Record delivery evidence or a receipt reference.");
+                if(string.Equals(request.Method,"Gallery",StringComparison.OrdinalIgnoreCase)&&!Exists(c,tx,"select exists(select 1 from studio_workflow_publications where job_id=$1)",job))
+                    throw new ArgumentException("Publish the approved gallery before recording Gallery delivery.");
                 if(!Exists(c,tx,"select exists(select 1 from studio_workflow_delivery_requirements where id=$1 and job_id=$2 and not waived and delivered_at_utc is null)",deliveryId,job))
                     throw new ArgumentException("Deliverable is missing or already completed. Refresh this Job.");
                 Sql(c,tx,"update studio_workflow_delivery_requirements set delivered_at_utc=now(),delivery_method=$3,delivery_reference=$4,delivered_by=$5 where id=$1 and job_id=$2 and delivered_at_utc is null and not waived",deliveryId,job,request.Method,request.Reference,actor);
