@@ -17,7 +17,7 @@
 
     function renderMyWork(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date(),calendarMonth:new Date(),workspaceName:''};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['mywork','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         myWorkLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -30,11 +30,26 @@
             const to=new Date(date.getFullYear(),date.getMonth(),date.getDate()+1);
             return {from,to};
         };
-        const scheduleUrl=date=>{
-            const {from,to}=dayRange(date);
+        const scheduleRange=(date,view=state.calendarView)=>{
+            if(view==='month'){
+                return {
+                    from:new Date(date.getFullYear(),date.getMonth(),1),
+                    to:new Date(date.getFullYear(),date.getMonth()+1,1)
+                };
+            }
+            if(view==='week'){
+                const from=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+                from.setDate(from.getDate()-((from.getDay()+6)%7));
+                return {from,to:new Date(from.getFullYear(),from.getMonth(),from.getDate()+7)};
+            }
+            return dayRange(date);
+        };
+        state.scheduleRange=scheduleRange;
+        const scheduleUrl=(date,view=state.calendarView)=>{
+            const {from,to}=scheduleRange(date,view);
             return '/api/my-work/schedule?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
         };
-        const urls={tasks:'/api/my-work/tasks',schedule:scheduleUrl(state.selectedDate),jobs:'/api/my-work/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/my-work/media-summary'};
+        const urls={tasks:'/api/my-work/tasks',schedule:scheduleUrl(state.selectedDate,state.calendarView),jobs:'/api/my-work/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/my-work/media-summary'};
         let inFlight=0;const waiting=[];
         async function load(key){
             while(inFlight>=2)await new Promise(resolve=>waiting.push(resolve));
@@ -82,11 +97,34 @@
         state.selectDay=date=>{
             state.selectedDate=new Date(date.getFullYear(),date.getMonth(),date.getDate());
             state.calendarMonth=new Date(date.getFullYear(),date.getMonth(),1);
-            urls.schedule=scheduleUrl(state.selectedDate);
+            urls.schedule=scheduleUrl(state.selectedDate,state.calendarView);
             state.schedule=[];
             state.status.schedule='loading';
             paintMyWork(state);
             load('schedule');
+        };
+        state.setCalendarView=view=>{
+            if(!['month','week','day'].includes(view)||view===state.calendarView)return;
+            state.calendarView=view;
+            state.calendarMonth=new Date(state.selectedDate.getFullYear(),state.selectedDate.getMonth(),1);
+            urls.schedule=scheduleUrl(state.selectedDate,state.calendarView);
+            state.schedule=[];
+            state.status.schedule='loading';
+            paintMyWork(state);
+            load('schedule');
+        };
+        state.stepCalendar=direction=>{
+            const current=new Date(state.selectedDate||new Date());
+            if(state.calendarView==='month'){
+                const desiredDay=current.getDate();
+                const target=new Date(current.getFullYear(),current.getMonth()+direction,1);
+                const lastDay=new Date(target.getFullYear(),target.getMonth()+1,0).getDate();
+                target.setDate(Math.min(desiredDay,lastDay));
+                state.selectDay(target);
+                return;
+            }
+            current.setDate(current.getDate()+direction*(state.calendarView==='week'?7:1));
+            state.selectDay(current);
         };
         paintMyWork(state);
         state.resolveWorkspace();
@@ -113,7 +151,9 @@
         const workspaceCrumb=state.workspaceName
             ? '<span aria-hidden="true">›</span><button type="button" class="workspace-current" data-current-workspace>'+esc(state.workspaceName)+'</button>'
             : '';
-        const now=new Date(),selectedDate=state.selectedDate||now,startOfDay=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()),endOfDay=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+1);
+        const now=new Date(),selectedDate=state.selectedDate||now;
+        const activeScheduleRange=state.scheduleRange?state.scheduleRange(selectedDate,state.calendarView):{from:new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()),to:new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+1)};
+        const startOfDay=activeScheduleRange.from,endOfDay=activeScheduleRange.to;
         const phase=(key,content)=>state.status[key]==='ready'?content:state.status[key]==='error'?'<div class="mw-empty" role="alert">'+esc(state.errors[key])+' <button data-mw-retry="'+key+'">Retry</button></div>':'<div class="mw-empty" role="status">Loading…</div>';
         const metric=(key,value)=>state.status[key]==='ready'?value:'…';
         const me=auth.user||auth,user=String(me.userName||me.loginName||'').toLowerCase();
@@ -164,7 +204,7 @@
                 <span class="mw-state-pill ${stateLabel==='In Progress'?'in-progress':''}">${stateLabel}</span>
                 <span class="mw-chevron">›</span>
             </button>`;
-        }).join('')||'<div class="mw-empty">No sessions scheduled today.</div>';
+        }).join('')||'<div class="mw-empty">No sessions scheduled in this '+esc(state.calendarView||'day')+'.</div>';
 
         const taskRows=myTasks.slice(0,8).map(task=>{
             const job=jobById(task.jobId)||{};
@@ -232,7 +272,7 @@
                             <header><h2><span class="mw-title-icon status">▥</span> Status</h2><small>Assigned to ${esc(displayName)}</small></header>
                             <div class="mw-status-list">
                                 <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>Jobs I lead</span><strong>${metric('jobs',leadJobs.length)}</strong></button>
-                                <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Today's sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
+                                <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Scheduled sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
                                 <button class="mw-status-row" data-nav="tasks"><span class="mw-status-icon">☑</span><span>Open tasks</span><strong>${metric('tasks',myTasks.length)}</strong></button>
                                 <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionTotal)}</strong></button>
                                 <button class="mw-status-row" data-nav="messages"><span class="mw-status-icon">✉</span><span>Unread messages</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong></button>
@@ -265,7 +305,7 @@
                         </header>
 
                         <div class="mw-work-section" data-mw-region="schedule">
-                            <div class="mw-section-title"><h3>Today's Sessions</h3><span>${metric('schedule',todaySchedule.length)}</span></div>
+                            <div class="mw-section-title"><h3>${state.calendarView==='month'?'Month Sessions':state.calendarView==='week'?'Week Sessions':((selectedDate.getFullYear()===now.getFullYear()&&selectedDate.getMonth()===now.getMonth()&&selectedDate.getDate()===now.getDate())?"Today's Sessions":'Day Sessions')}</h3><span>${metric('schedule',todaySchedule.length)}</span></div>
                             <div class="mw-section-rows">${phase('schedule',sessionRows)}</div>
                         </div>
 
@@ -330,14 +370,23 @@
             const isToday=selectedDate.getFullYear()===today.getFullYear()
                 && selectedDate.getMonth()===today.getMonth()
                 && selectedDate.getDate()===today.getDate();
-            const selectedDateLabel=isToday
-                ? 'Today'
-                : selectedDate.toLocaleDateString([],{month:'short',day:'numeric'});
+            const calendarView=state.calendarView||'day';
+            const range=state.scheduleRange?state.scheduleRange(selectedDate,calendarView):{from:selectedDate,to:selectedDate};
+            const inclusiveEnd=new Date(range.to);inclusiveEnd.setDate(inclusiveEnd.getDate()-1);
+            const selectedDateLabel=calendarView==='month'
+                ? selectedDate.toLocaleDateString([],{month:'long',year:'numeric'})
+                : calendarView==='week'
+                    ? range.from.toLocaleDateString([],{month:'short',day:'numeric'})+' – '+inclusiveEnd.toLocaleDateString([],{month:'short',day:'numeric'})
+                    : isToday?'Today':selectedDate.toLocaleDateString([],{month:'short',day:'numeric'});
+            const viewLabel=calendarView[0].toUpperCase()+calendarView.slice(1);
             studioPageTools.innerHTML=`
-                <div class="mw-day-nav" aria-label="My Work day navigator">
-                    <button type="button" class="mw-day-step" data-mw-day="-1" aria-label="Previous day">‹</button>
+                <div class="mw-calendar-view-switch" role="group" aria-label="Calendar view">
+                    ${['month','week','day'].map(view=>'<button type="button" data-mw-calendar-view="'+view+'" class="'+(calendarView===view?'active':'')+'" aria-pressed="'+String(calendarView===view)+'">'+view[0].toUpperCase()+view.slice(1)+'</button>').join('')}
+                </div>
+                <div class="mw-day-nav" aria-label="My Work ${viewLabel.toLowerCase()} navigator">
+                    <button type="button" class="mw-day-step" data-mw-day="-1" aria-label="Previous ${calendarView}">‹</button>
                     <button type="button" class="mw-day-current" data-mw-day="today" title="${isToday?'Today':'Return to today'}">${selectedDateLabel}</button>
-                    <button type="button" class="mw-day-step" data-mw-day="1" aria-label="Next day">›</button>
+                    <button type="button" class="mw-day-step" data-mw-day="1" aria-label="Next ${calendarView}">›</button>
                     <div class="mw-calendar-control">
                         <button type="button" class="mw-calendar-trigger" data-mw-calendar-toggle aria-label="Choose date" aria-expanded="false" title="Choose date">
                             <span aria-hidden="true">▣</span>
@@ -347,13 +396,10 @@
                 </div>`;
         }
         const shellScope=studioPageTools||genericView;
+        shellScope.querySelectorAll('[data-mw-calendar-view]').forEach(button=>button.onclick=()=>state.setCalendarView(button.dataset.mwCalendarView));
         shellScope.querySelectorAll('[data-mw-day]').forEach(button=>button.onclick=()=>{
             if(button.dataset.mwDay==='today')state.selectDay(new Date());
-            else{
-                const next=new Date(state.selectedDate||new Date());
-                next.setDate(next.getDate()+Number(button.dataset.mwDay||0));
-                state.selectDay(next);
-            }
+            else state.stepCalendar(Number(button.dataset.mwDay||0));
         });
         const calendarToggle=shellScope.querySelector('[data-mw-calendar-toggle]');
         const calendarPopover=shellScope.querySelector('[data-mw-calendar-popover]');
