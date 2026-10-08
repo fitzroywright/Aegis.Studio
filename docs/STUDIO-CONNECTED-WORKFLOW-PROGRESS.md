@@ -71,3 +71,10 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - Update/Reassign also lock resources previously assigned to the entry, avoiding conflicting resource removals and additions.
 - Remote code commit: `91e4bf9ba228fd7dd57cf95e61514daff7e22a40`.
 - NOT compiled or database-tested. Still investigate stale entry data and external schedule writers that bypass ScheduleStore.
+
+## Checkpoint: scheduling and upload proof
+
+- ScheduleStore Create/Update/Reassign now acquire transaction resource locks before conflict checks. Code commit 91e4bf9.
+- Added upload batch schema, source-review readiness gate and Job UI input for expected/completed/failed files and backup confirmation. Code commits 517b48f, 4f88e3f, 8a85d48, fb87ddc.
+- JS syntax passed. .NET build, database migration and integration tests are unexecuted.
+- Important gap: upload counts are operator-entered; reconcile them with actual stored-file manifests before production use.
