@@ -119,3 +119,10 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - Added Administrator-only GET /api/admin/connected-workflow/demo-data/preview to inventory Studio tables without deleting anything: 4a1ac9e.
 - IMPORTANT: Remove Demo Data and Generate Demo Data buttons, destructive cleanup service, workflow-native seeder and removal of legacy write routes remain unimplemented. Do not claim complete, merge, deploy or run destructive SQL. Local build/tests not run.
 - Next: inventory table foreign keys and provider-owned objects; implement explicit environment-guarded reset with dry run and admin confirmation; implement deterministic seed and UI buttons; retire old writers; validate locally.
+
+## Administration UI checkpoint (2026-10-08)
+
+- Added Preview Reset Scope button to the existing Studio Admin Demo Data card, calling the administrator-only read-only inventory API (e248a0d).
+- Added visible Remove Demo Data and Generate Demo Data buttons, deliberately disabled until dependency-safe reset and Connected Workflow-native seed are implemented. Disabled legacy seed invocation so it cannot populate old workflow records (e248a0d).
+- Corrected misleading Demo Environment Ready indicator and loader copy to Pending/preview-only (29d5ce5).
+- This is NOT completion: reset and seed services, actual destructive execution, legacy writer retirement, and build/integration tests are outstanding. No data was deleted; main remains unchanged.
