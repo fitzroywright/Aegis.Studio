@@ -96,13 +96,20 @@ internal static class ConnectedWorkflowDemo
         using var c=db.OpenConnection();
         using var tx=c.BeginTransaction();
         Lock(c,tx);
-        // Only delete records owned by this fixture. Never truncate unrelated business,
-        // security, configuration or storage tables without an audited ownership model.
-        var ids=Enumerable.Range(0,Stages.Length).Select(i=>Id("job:"+i)).ToArray();
-        // FK descendants are discovered from the live schema; if a protected table
-        // references a fixture record, the transaction fails and rolls back.
+        // Reset only business records, and every table that has a direct or
+        // indirect foreign key into them. PostgreSQL TRUNCATE checks the
+        // entire dependency set atomically. Protected configuration must never
+        // be silently added to the reset.
         var roots=new[]{"studio_jobs","studio_clients","studio_conversations"};
         var tables=new HashSet<string>(roots,StringComparer.Ordinal);
+        var protectedTables=new HashSet<string>(StringComparer.Ordinal)
+        {
+            "studio_workspaces","studio_workspace_members","studio_user_profiles",
+            "studio_employees","studio_state","studio_demo_seed_runs",
+            "studio_workflow_thresholds","studio_workflow_audiences",
+            "studio_workflow_migrations","studio_global_operational_roles",
+            "studio_global_operational_role_members"
+        };
         bool changed;
         do
         {
@@ -113,33 +120,26 @@ internal static class ConnectedWorkflowDemo
                 join pg_namespace ns on ns.oid=child.relnamespace
                 where fk.contype='f' and ns.nspname='public'",c,tx);
             using var r=q.ExecuteReader();
+            var discovered=new List<string>();
             while(r.Read())
             {
-                var child=r.GetString(0);
-                if(tables.Contains(r.GetString(1)) && !tables.Contains(child))
-                {
-                    if(!child.StartsWith("studio_",StringComparison.Ordinal))
-                        throw new InvalidOperationException("Reset blocked by a non-Studio dependent table: "+child);
-                    changed|=tables.Add(child);
-                }
+                string child=r.GetString(0),parent=r.GetString(1);
+                if(tables.Contains(parent)&&!tables.Contains(child))discovered.Add(child);
+            }
+            foreach(string child in discovered)
+            {
+                if(!child.StartsWith("studio_",StringComparison.Ordinal)||protectedTables.Contains(child))
+                    throw new InvalidOperationException("Reset blocked: protected dependent table "+child);
+                changed|=tables.Add(child);
             }
         }while(changed);
-        // Restrict reset to fixture rows and their descendants. A general-purpose
-        // database-wide reset cannot be inferred safely from the table inventory.
-        // Use FK cascade only where the database explicitly declares it.
-        foreach(var job in ids)
-        {
-            using var q=new NpgsqlCommand("delete from studio_jobs where id=$1",c,tx);
-            q.Parameters.AddWithValue(job);
-            q.ExecuteNonQuery();
-        }
-        for(int i=0;i<Stages.Length;i++)
-        {
-            Exec(c,tx,"delete from studio_conversations where id=$1",Id("conversation:"+i));
-            Exec(c,tx,"delete from studio_clients where id=$1",Id("client:"+i));
-        }
+        // Quote every name obtained from PostgreSQL's catalog; never concatenate
+        // user input into an identifier.
+        var tableList=string.Join(",",tables.Order(StringComparer.Ordinal)
+            .Select(name=>"public.\""+name.Replace("\"","\"\"")+"\""));
+        Exec(c,tx,"truncate table "+tableList+" restart identity");
         tx.Commit();
-        return new {removedFixtureJobs=ids.Length,message="Connected Workflow fixture records removed. Other legacy demo records were not deleted."};
+        return new {clearedTables=tables.Count,message="Studio business records and their database dependents cleared. Workspace/security configuration was preserved; external storage objects were not deleted."};
     }
 
     private static void Lock(NpgsqlConnection c,NpgsqlTransaction tx)
