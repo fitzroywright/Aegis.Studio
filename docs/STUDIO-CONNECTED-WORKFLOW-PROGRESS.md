@@ -111,3 +111,11 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - Whole-Job Delivered transition requires both method and receipt reference. Commit 4b5b21d.
 - Remaining implementation and acceptance risks: operator-reported upload counts are not independently verified against storage; existing gallery publication check must be validated against actual provider behavior; legacy route adapters and all A-T acceptance cases require local validation. No .NET build or test run was performed in this environment per user instruction.
 - Keep branch recovery/studio-connected-workflow-safety-20261008 separate from main. Do not merge or deploy until local validation and user approval.
+
+## Clean demo reset implementation checkpoint (2026-10-08)
+
+- Decision: all Studio customer and business data are disposable demo records. New Connected Workflow is the sole intended write path; no legacy migration required.
+- Removed historical demo Job migration block from WorkflowSchema.sql: e13c0f1.
+- Added Administrator-only GET /api/admin/connected-workflow/demo-data/preview to inventory Studio tables without deleting anything: 4a1ac9e.
+- IMPORTANT: Remove Demo Data and Generate Demo Data buttons, destructive cleanup service, workflow-native seeder and removal of legacy write routes remain unimplemented. Do not claim complete, merge, deploy or run destructive SQL. Local build/tests not run.
+- Next: inventory table foreign keys and provider-owned objects; implement explicit environment-guarded reset with dry run and admin confirmation; implement deterministic seed and UI buttons; retire old writers; validate locally.
