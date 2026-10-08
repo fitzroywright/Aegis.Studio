@@ -105,7 +105,24 @@ internal static class ConnectedWorkflowDemo
                 Exec(c,tx,@"insert into studio_workflow_sessions(id,job_id,title,required,crew_finalized)
                     values($1,$2,'Main photography session',true,true) on conflict(id) do nothing",session,job);
                 Exec(c,tx,@"insert into studio_workflow_crew(session_id,user_name,role,assigned_by,ready)
-                    values($1,$2,'Lead',$2,$3) on conflict(session_id,user_name) do nothing",session,actor,i>=6);
+                    values($1,$2,'Lead',$2,false) on conflict(session_id,user_name) do nothing",session,actor);
+                if(i>=4)
+                {
+                    var entry=Id("schedule:"+i);
+                    var shoot=Id("shoot:"+i);
+                    var start=DateTimeOffset.UtcNow.AddDays(i==4?3:-(i-3));
+                    var finish=start.AddHours(2);
+                    Exec(c,tx,@"insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc)
+                        values($1,$2,$3,$4,$5,'Kingston, Jamaica','Confirmed','Connected Workflow demo schedule',now()) on conflict(id) do nothing",
+                        entry,job,Titles[i],start,finish);
+                    // The session is created by Connected Workflow; avoid the legacy
+                    // compatibility trigger replacing its crew assignments.
+                    Exec(c,tx,"select set_config('studio.connected_command','true',true)");
+                    Exec(c,tx,@"insert into studio_shoot_sessions(id,job_id,schedule_entry_id,photographer_user_name,call_time_utc,planned_end_utc,location,status,created_at_utc,updated_at_utc)
+                        values($1,$2,$3,$4,$5,$6,'Kingston, Jamaica',$7,now(),now()) on conflict(id) do nothing",
+                        shoot,job,entry,actor,start,finish,i==4?"Scheduled":i==5?"InProgress":"Completed");
+                    Exec(c,tx,"update studio_workflow_sessions set shoot_id=$2 where id=$1 and shoot_id is null",session,shoot);
+                }
             }
             if(i>=8 && i<=13)
                 Exec(c,tx,@"insert into studio_job_activities(id,job_id,activity_type,title,status,priority,assigned_to,created_by,created_at_utc,updated_at_utc)
