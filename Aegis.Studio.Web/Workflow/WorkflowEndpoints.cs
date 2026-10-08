@@ -51,6 +51,24 @@ public static class WorkflowEndpoints
         {
             using var c=db.OpenConnection();return Results.Ok(JsonSerializer.Deserialize<JsonElement>((string)WorkflowStore.Scalar(c,null,"select jsonb_build_object('thresholds',coalesce((select jsonb_agg(to_jsonb(t)) from studio_workflow_thresholds t),'[]'::jsonb),'audiences',coalesce((select jsonb_agg(to_jsonb(a)) from studio_workflow_audiences a),'[]'::jsonb),'failures',coalesce((select jsonb_agg(to_jsonb(f)) from studio_workflow_delivery_failures f),'[]'::jsonb),'reconciliation',coalesce((select jsonb_agg(to_jsonb(r)) from studio_workflow_reconciliation r),'[]'::jsonb),'timingPolicy','Elapsed','timezone','America/Jamaica')::text")!));
         });
+        // Read-only reset inventory. No destructive endpoint is exposed until the
+        // complete dependency-aware cleanup and demo seeder are implemented.
+        admin.MapGet("/demo-data/preview",(StudioDatabase db)=>Run(()=>
+        {
+            using var c=db.OpenConnection();
+            using var q=new NpgsqlCommand(@"select t.table_name,
+                (select count(*) from information_schema.columns col where col.table_schema='public' and col.table_name=t.table_name) as columns
+                from information_schema.tables t
+                where t.table_schema='public' and t.table_type='BASE TABLE'
+                  and (t.table_name like 'studio_%')
+                order by t.table_name",c);
+            using var reader=q.ExecuteReader();
+            var tables=new List<object>();
+            while(reader.Read())tables.Add(new {table=reader.GetString(0),columns=reader.GetInt64(1)});
+            return Results.Ok(new {readyForReset=false,requiresExplicitDemoEnvironment=true,
+                warning="Preview only. Demo deletion is disabled until all dependent tables and storage objects are accounted for.",
+                tables});
+        }));
         admin.MapPut("/thresholds",(WorkflowThreshold request,ClaimsPrincipal user,StudioDatabase db)=>Run(()=>
         {
             WorkflowRules.ValidateThreshold(request);using var c=db.OpenConnection();using var tx=c.BeginTransaction();
