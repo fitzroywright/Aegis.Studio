@@ -126,10 +126,6 @@ public static class StudioVersionEndpoints
                     }
                 }
             }
-            catch(UnknownImageFormatException)
-            {
-                return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
-            }
             catch(StorageException e) when(e.Code=="STORAGE-MISSING-001")
             {
                 return Results.NotFound();
