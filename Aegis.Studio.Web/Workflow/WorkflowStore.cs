@@ -190,13 +190,48 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 }
                 break;
             case "transfer":
-                EnsureMutable(stage);RequireReason(request);if(request.WorkspaceId is not Guid destination||destination==WorkflowRules.UnassignedWorkspaceId&&stage!="Pending")throw new ArgumentException("Choose an enabled business workspace.");
-                if(stage=="Pending"?!IsFrontDesk(user)&&!manager:!IsOperations(user)&&!(manager&&Manager(user,destination)))throw new UnauthorizedAccessException();
-                if(!Exists(c,tx,"select exists(select 1 from studio_workspaces where id=$1 and is_enabled)",destination))throw new ArgumentException("Workspace is disabled or missing.");
-                Sql(c,tx,"update studio_jobs set workspace_id=$2 where id=$1",job,destination);
-                Sql(c,tx,"update studio_conversations set workspace_id=$2 where job_id=$1",job,destination);
-                Sql(c,tx,"update studio_frontdesk_requests set workspace_id=$2,payload=jsonb_set(payload,'{workspaceId}',to_jsonb($2::uuid)) where job_id=$1",job,destination);
+                EnsureMutable(stage);RequireReason(request);
+                if(request.WorkspaceId is not Guid destination||destination==workspace||destination==WorkflowRules.UnassignedWorkspaceId&&stage!="Pending")
+                    throw new ArgumentException("Choose a different enabled business workspace.");
+                if(!Exists(c,tx,"select exists(select 1 from studio_workspaces where id=$1 and is_enabled)",destination))
+                    throw new ArgumentException("Workspace is disabled or missing.");
+                if(stage=="Pending")
+                {
+                    if(!IsFrontDesk(user)&&!manager)throw new UnauthorizedAccessException();
+                }
+                else if(!IsOperations(user))
+                {
+                    if(!manager)throw new UnauthorizedAccessException();
+                    if(!Manager(user,destination))
+                    {
+                        Sql(c,tx,"insert into studio_workflow_transfer_requests(id,job_id,source_workspace_id,destination_workspace_id,requested_by,reason) values($1,$2,$3,$4,$5,$6)",request.OperationId,job,workspace,destination,actor,request.Reason);
+                        Notify(c,tx,job,request.OperationId.ToString(),"Manager","Workspace transfer approval requested");
+                        break;
+                    }
+                }
+                ApplyTransfer(c,tx,job,destination);
                 Notify(c,tx,job,request.OperationId.ToString(),"Manager","Job transferred");break;
+            case "decide-transfer":
+                EnsureMutable(stage);RequireReason(request);
+                if(request.AssignmentRequestId is not Guid transferId||request.Method is not ("Approved" or "Rejected"))
+                    throw new ArgumentException("Choose a pending transfer and approve or reject it.");
+                Guid targetWorkspace;
+                using(var q=Command(c,tx,"select destination_workspace_id from studio_workflow_transfer_requests where id=$1 and job_id=$2 and source_workspace_id=$3 and status='Pending' for update",transferId,job,workspace))
+                {
+                    var value=q.ExecuteScalar();
+                    if(value is not Guid id)throw new ArgumentException("Transfer request is no longer pending.");
+                    targetWorkspace=id;
+                }
+                if(!Manager(user,targetWorkspace))throw new UnauthorizedAccessException();
+                if(request.Method=="Approved")
+                {
+                    if(!Exists(c,tx,"select exists(select 1 from studio_workspaces where id=$1 and is_enabled)",targetWorkspace))
+                        throw new ArgumentException("Destination workspace is disabled.");
+                    ApplyTransfer(c,tx,job,targetWorkspace);
+                }
+                Sql(c,tx,"update studio_workflow_transfer_requests set status=$2,decided_by=$3,decision_reason=$4,decided_at_utc=now() where id=$1",transferId,request.Method,actor,request.Reason);
+                Notify(c,tx,job,request.OperationId.ToString(),"Manager","Workspace transfer "+request.Method);
+                break;
             case "blocked":
                 EnsureMutable(stage);
                 if(!manage&&!review)throw new UnauthorizedAccessException();Sql(c,tx,"update studio_jobs set blocked_reason=$2 where id=$1",job,string.IsNullOrWhiteSpace(request.Reason)?null:request.Reason);break;
@@ -259,6 +294,13 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         Sql(c,tx,"insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,$3,$4,$5,now())",request.OperationId,job,"ConnectedWorkflow:"+request.Action,actor,JsonSerializer.Serialize(request));
         Sql(c,tx,"insert into studio_workflow_commands(operation_id,job_id,fingerprint,result_revision) select $1,id,$3,workflow_revision from studio_jobs where id=$2",request.OperationId,job,fingerprint);
         var result=Snapshot(c,tx,job);tx.Commit();return result;
+    }
+    private static void ApplyTransfer(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,Guid destination)
+    {
+        Sql(c,tx,"update studio_jobs set workspace_id=$2 where id=$1",job,destination);
+        Sql(c,tx,"update studio_conversations set workspace_id=$2 where job_id=$1",job,destination);
+        Sql(c,tx,"update studio_frontdesk_requests set workspace_id=$2,payload=jsonb_set(payload,'{workspaceId}',to_jsonb($2::uuid)) where job_id=$1",job,destination);
+        Sql(c,tx,"update studio_workflow_transfer_requests set status='Superseded',decided_at_utc=now() where job_id=$1 and status='Pending'",job);
     }
     private void SaveSession(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,WorkflowCommand req,string actor,ClaimsPrincipal user)
     {
