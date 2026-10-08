@@ -96,3 +96,11 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - NotificationDeliveryWorker now revalidates Studio Job email recipient activity, email opt-in, and current destination immediately before external queue insertion; cancelled notifications are not retried. Code commit c1d5fd6.
 - This complements the one-minute workflow monitor reconciliation, but already-leased external messages may still need downstream cancellation support.
 - Build and integration validation remain unexecuted; main unchanged.
+
+## Upload proof invalidation checkpoint (2026-10-08)
+
+- Fixed upload count validation to avoid nullable arithmetic ambiguity and integer overflow. Commit 45f1a69.
+- A new studio_asset_versions insert now invalidates all previous Job upload-batch receipts, preserving audit history. Commit b12e70f.
+- Source readiness refuses invalidated receipts. Commit 5889c01.
+- Authorized Job managers can inspect upload batch receipt history via GET /api/jobs/{job}/upload-batches. Commit 520c1e8.
+- Important limitation: upload counts are still operator-reported, not independently reconciled against storage. The schema and triggers need PostgreSQL migration testing, and the project requires local dotnet build/test. Do not merge into main or deploy until validated.
