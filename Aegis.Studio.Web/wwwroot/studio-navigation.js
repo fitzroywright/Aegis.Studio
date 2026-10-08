@@ -1127,17 +1127,17 @@
                 <div class="admin-summary-grid">
                     <article class="admin-summary-card"><strong>${manageable.length}</strong><span>Managed Workspaces</span><small>Membership and routing</small></article>
                     <article class="admin-summary-card"><strong>${studioRolesCache.filter(x=>x.isActive).length}</strong><span>Active Roles</span><small>Reusable permission sets</small></article>
-                    <article class="admin-summary-card"><strong>Pending</strong><span>Demo Reset</span><small>Cleanup and Connected Workflow seed not yet available</small></article>
+                    <article class="admin-summary-card"><strong>Pending</strong><span>Demo Reset</span><small>Connected Workflow fixture tools</small></article>
                 </div>
 
                 <div class="admin-layout">
                     <div class="admin-main-column">
                         <section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
-                                <div><h2>Demo Data</h2><p>Inspect the cleanup scope. Reset and workflow-native generation remain disabled until implemented.</p></div>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove disabled title="Reset backend is not implemented">Remove Demo Data</button><button class="primary" type="button" data-load-demo disabled title="Legacy seed disabled until Connected Workflow seed is implemented">Generate Demo Data</button></div>
+                                <div><h2>Demo Data</h2><p>Generate workflow-native examples or remove the owned demo fixture.</p></div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Generate Demo Data</button></div>
                             </header>
-                            <p class="admin-card-note">Preview lists candidate Studio tables without deleting records. No demo data will be changed.</p>
+                            <p class="admin-card-note">Removal requires server-side DemoData:AllowDestructiveReset and an explicit confirmation. Generation uses fictional contacts only.</p>
                             <progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress>
                             <p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p>
                             <small data-demo-elapsed hidden></small>
@@ -1204,35 +1204,38 @@
             try{
                 const result=await json('/api/admin/connected-workflow/demo-data/preview');
                 const rows=result.tables||[];
-                status.textContent=rows.length+' Studio tables inventoried. Reset and regeneration are disabled until dependency-safe implementation is complete.';
+                status.textContent=rows.length+' Studio tables inventoried. Generation is available; removal requires the explicit server safeguard.';
                 const dialog=studioDialog('Demo reset preview','<p>'+esc(result.warning||'Preview only')+'</p><p>'+rows.length+' Studio tables identified. No records were changed.</p><div style="max-height:45vh;overflow:auto">'+rows.map(x=>'<div>'+esc(x.table)+'</div>').join('')+'</div>');
             }catch(error){status.textContent='Preview failed: '+error.message;}
             finally{button.disabled=false;}
         };
-        // Legacy loader must not generate data incompatible with Connected Workflow.
+        panel.querySelector('[data-demo-remove]').onclick=async()=>{
+            const status=panel.querySelector('[data-demo-status]');
+            const confirmation=window.prompt('Type REMOVE STUDIO DEMO DATA to remove the Connected Workflow fixture. This cannot be undone.');
+            if(confirmation!=='REMOVE STUDIO DEMO DATA')return;
+            const button=panel.querySelector('[data-demo-remove]');
+            button.disabled=true;
+            status.textContent='Removing owned demo records…';
+            try{
+                const result=await json('/api/admin/connected-workflow/demo-data/remove',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({confirmation})
+                });
+                status.textContent=result.message||'Demo fixture removed.';
+                await loadWorkspaces();
+            }catch(e){status.textContent='Removal failed: '+e.message;}
+            finally{button.disabled=false;}
+        };
         panel.querySelector('[data-load-demo]').onclick=async()=>{
             const button=panel.querySelector('[data-load-demo]');
             const status=panel.querySelector('[data-demo-status]');
-            const meter=panel.querySelector('[data-demo-progress]'),elapsed=panel.querySelector('[data-demo-elapsed]');
-            button.disabled=true;panel.setAttribute('aria-busy','true');
-            meter.hidden=false;meter.value=0;elapsed.hidden=false;
-            status.textContent='Starting demo loader…';
-            const started=Date.now();
-            const tick=()=>{elapsed.textContent='Elapsed: '+Math.floor((Date.now()-started)/1000)+' seconds. Progress follows completed seed steps; photo downloads may pause the meter.';};
-            tick();const timer=setInterval(tick,1000);
+            button.disabled=true;status.textContent='Generating Connected Workflow records…';
             try{
-                const result=await window.studioLoadDemoData(progress=>{
-                    meter.value=progress.percent;
-                    meter.setAttribute('aria-valuetext',progress.percent+'% — '+progress.stage);
-                    status.textContent=progress.completed?progress.message:progress.percent+'% · '+progress.stage+' — '+progress.message;
-                });
-                status.textContent=result.message||'Demo data loaded.';
-                try{await loadWorkspaces();}catch{status.textContent+=' Workspace refresh failed; reopen Workspaces to refresh.';}
-            }catch(error){
-                status.textContent='Demo data could not be loaded: '+(error.message||error);
-            }finally{
-                clearInterval(timer);tick();panel.setAttribute('aria-busy','false');button.disabled=false;
-            }
+                const result=await json('/api/admin/connected-workflow/demo-data/generate',{method:'POST'});
+                status.textContent=result.message||'Connected Workflow demo generated.';
+                await loadWorkspaces();
+            }catch(e){status.textContent='Generation failed: '+e.message;}
+            finally{button.disabled=false;}
         };
 
         try{
