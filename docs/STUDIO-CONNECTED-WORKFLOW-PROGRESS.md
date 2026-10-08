@@ -90,3 +90,9 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - Workflow notification fanout excludes explicitly inactive employees, without suppressing active staff marked nonassignable. Commits 429237c and f192a98.
 - Workflow monitor retries durable no-recipient failures and now cancels Pending workflow email if the employee becomes inactive or email preference/destination changes. Commit 6846a97.
 - Unverified: pending cancellation assumes studio_notifications supports status Cancelled; confirm notification delivery worker honors it. Native build and database tests not run.
+
+## Notification enqueue boundary checkpoint
+
+- NotificationDeliveryWorker now revalidates Studio Job email recipient activity, email opt-in, and current destination immediately before external queue insertion; cancelled notifications are not retried. Code commit c1d5fd6.
+- This complements the one-minute workflow monitor reconciliation, but already-leased external messages may still need downstream cancellation support.
+- Build and integration validation remain unexecuted; main unchanged.
