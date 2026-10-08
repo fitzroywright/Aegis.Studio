@@ -161,7 +161,8 @@
         const firstName=(displayName.split(/[\s\\@.]+/).filter(Boolean)[0]||'Jordan');
         const hour=now.getHours(),greeting=hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
         const roles=[...(Array.isArray(me.roles)?me.roles:[]),...(Array.isArray(auth.roles)?auth.roles:[])].map(x=>String(x).toLowerCase());
-        const isManager=me.isAdministrator===true||auth.isAdministrator===true||roles.some(r=>/administrator|manager|owner|finance/.test(r));
+        const isAdmin=me.isAdministrator===true||auth.isAdministrator===true||roles.some(r=>/administrator/.test(r));
+        const isManager=isAdmin||roles.some(r=>/manager|owner|finance/.test(r));
         const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status)&&(!user||String(t.assignedTo||'').toLowerCase()===user));
         const todaySchedule=schedule.filter(entry=>entry.status!=='Cancelled'&&new Date(entry.startsAtUtc)>=startOfDay&&new Date(entry.startsAtUtc)<endOfDay).sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
         const leadJobs=jobs.filter(j=>!['Completed','Closed','Cancelled','Published'].includes(String(j.status||''))&&user&&String(j.jobLead||'').toLowerCase()===user);
@@ -282,6 +283,7 @@
                         <section class="mw-list-panel mw-action-panel" data-mw-region="actions">
                             <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
                             <div class="mw-action-list">
+                                ${isAdmin?'<button type="button" data-assign-job-lead><span>★</span><span>Assign Job Lead</span><b>›</b></button>':''}
                                 <button data-nav="messages"><span>✉</span><span>Send Message</span><b>›</b></button>
                                 <button data-nav="schedule"><span>▣</span><span>Book a Schedule</span><b>›</b></button>
                                 <button data-nav="tasks"><span>＋</span><span>Create Task</span><b>›</b></button>
@@ -459,6 +461,55 @@
         });
         if(typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
         genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
+        genericView.querySelector('[data-assign-job-lead]')?.addEventListener('click',async()=>{
+            const activeJobs=jobs.filter(job=>!['Completed','Closed','Cancelled','Published'].includes(String(job.status||'')))
+                .sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));
+            if(!activeJobs.length){alert('There are no active jobs available to assign.');return;}
+            let employees;
+            try{employees=await json('/api/studio-employees?assignable=true');}
+            catch(error){alert(error.message);return;}
+            const dialog=studioDialog('Assign Job Lead',`
+                <form class="subject-form" data-job-lead-form>
+                    <label>Job
+                        <select name="jobId" required>
+                            ${activeJobs.map(job=>'<option value="'+esc(job.id)+'">'+esc(job.title)+' · '+esc(job.clientName||'Client')+'</option>').join('')}
+                        </select>
+                    </label>
+                    <label>Job Lead
+                        <select name="userName">
+                            <option value="">Unassigned</option>
+                            ${(employees||[]).map(employee=>'<option value="'+esc(employee.userName)+'">'+esc(employee.displayName||employee.userName)+(employee.roles?.length?' · '+esc(employee.roles.join(', ')):'')+'</option>').join('')}
+                        </select>
+                    </label>
+                    <p class="form-help">The selected employee must be an active member of the job or its workspace.</p>
+                    <p role="alert"></p>
+                    <div class="dialog-actions">
+                        <button type="button" data-cancel>Cancel</button>
+                        <button type="submit" class="primary">Assign Lead</button>
+                    </div>
+                </form>`);
+            const form=dialog.querySelector('[data-job-lead-form]');
+            form.querySelector('[data-cancel]').onclick=()=>dialog.close();
+            form.onsubmit=async event=>{
+                event.preventDefault();
+                const submit=form.querySelector('button[type="submit"]');
+                const error=form.querySelector('[role="alert"]');
+                submit.disabled=true;error.textContent='';
+                try{
+                    const jobId=form.elements.jobId.value;
+                    const userName=form.elements.userName.value||null;
+                    const result=await json('/api/jobs/'+encodeURIComponent(jobId)+'/lead',{
+                        method:'PUT',
+                        headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({userName})
+                    });
+                    state.jobs=state.jobs.map(job=>String(job.id)===String(jobId)?{...job,jobLead:result.jobLead??userName}:job);
+                    dialog.close();
+                    if(state.active())paintMyWork(state);
+                }catch(errorValue){error.textContent=errorValue.message||String(errorValue);}
+                finally{submit.disabled=false;}
+            };
+        });
         genericView.querySelectorAll('.mw-session-thumb img[data-fallback-src]').forEach(img=>{
             img.addEventListener('error',()=>{
                 const fallback=img.dataset.fallbackSrc;
