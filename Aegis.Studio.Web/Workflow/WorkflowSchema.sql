@@ -215,3 +215,18 @@ create table if not exists studio_workflow_delivery_requirements(
  constraint delivery_proof_or_waiver check(not (waived and delivered_at_utc is not null))
 );
 create index if not exists ix_studio_workflow_delivery_requirements_job on studio_workflow_delivery_requirements(job_id);
+
+-- Upload proof is a separate immutable receipt, not a photographer's assertion of readiness.
+create table if not exists studio_workflow_upload_batches(
+ id uuid primary key,
+ job_id uuid not null references studio_jobs(id),
+ session_id uuid not null references studio_workflow_sessions(id),
+ expected_files integer not null check(expected_files>0),
+ completed_files integer not null check(completed_files>=0),
+ failed_files integer not null check(failed_files>=0),
+ backup_confirmed boolean not null default false,
+ recorded_by text not null,
+ recorded_at_utc timestamptz not null default now(),
+ constraint upload_batch_counts_valid check(completed_files+failed_files<=expected_files)
+);
+create index if not exists ix_studio_workflow_upload_batches_session on studio_workflow_upload_batches(session_id,recorded_at_utc desc);
