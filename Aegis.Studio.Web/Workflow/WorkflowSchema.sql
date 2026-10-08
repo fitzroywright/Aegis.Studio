@@ -180,3 +180,19 @@ begin
 end $$;
 drop trigger if exists workflow_shoot_change on studio_shoot_sessions;
 create trigger workflow_shoot_change after insert or update on studio_shoot_sessions for each row execute function studio_workflow_shoot_change();
+
+-- Transfer requests preserve the original workspace until its destination manager approves.
+create table if not exists studio_workflow_transfer_requests(
+ id uuid primary key,
+ job_id uuid not null references studio_jobs(id),
+ source_workspace_id uuid not null references studio_workspaces(id),
+ destination_workspace_id uuid not null references studio_workspaces(id),
+ requested_by text not null,
+ reason text not null,
+ status text not null default 'Pending' check(status in ('Pending','Approved','Rejected','Superseded')),
+ decided_by text,
+ decision_reason text,
+ created_at_utc timestamptz not null default now(),
+ decided_at_utc timestamptz
+);
+create unique index if not exists ux_workflow_pending_transfer on studio_workflow_transfer_requests(job_id) where status='Pending';
