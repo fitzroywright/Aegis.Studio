@@ -279,7 +279,27 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 Sql(c,tx,"insert into studio_workflow_deliveries(id,job_id,method,reference,actor) values($1,$2,$3,$4,$5)",request.OperationId,job,request.Method,request.Reference,actor);stateAction=true;break;
             case "close":
                 if(!manage)throw new UnauthorizedAccessException();
-                if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Resolve open required operational tasks before closing.");stateAction=true;break;
+                if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Resolve open required operational tasks before closing.");
+                if(Exists(c,tx,"select exists(select 1 from studio_workflow_delivery_requirements where job_id=$1 and required and not waived and delivered_at_utc is null)",job))throw new ArgumentException("Deliver or explicitly waive every required deliverable before closing.");
+                stateAction=true;break;
+            case "require-delivery":
+                if(!manage||stage is not ("Active Production" or "Awaiting Approval" or "Ready for Delivery" or "Delivered"))throw new UnauthorizedAccessException();
+                if(string.IsNullOrWhiteSpace(request.Title))throw new ArgumentException("Name the required deliverable.");
+                Sql(c,tx,"insert into studio_workflow_delivery_requirements(id,job_id,title,required,created_by) values($1,$2,$3,true,$4)",request.OperationId,job,request.Title.Trim(),actor);
+                break;
+            case "complete-delivery":
+                if(!manage&&!IsFrontDesk(user))throw new UnauthorizedAccessException();
+                if(stage is not ("Ready for Delivery" or "Delivered"))throw new ArgumentException("Approve the finished work before delivery.");
+                if(request.TaskId is not Guid deliveryId)throw new ArgumentException("Choose a deliverable.");
+                if(string.IsNullOrWhiteSpace(request.Method))throw new ArgumentException("Provide the delivery method.");
+                Sql(c,tx,"update studio_workflow_delivery_requirements set delivered_at_utc=now(),delivery_method=$3,delivery_reference=$4,delivered_by=$5 where id=$1 and job_id=$2 and delivered_at_utc is null and not waived",deliveryId,job,request.Method,request.Reference,actor);
+                break;
+            case "waive-delivery":
+                if(!manager)throw new UnauthorizedAccessException();
+                RequireReason(request);
+                if(request.TaskId is not Guid waiverId)throw new ArgumentException("Choose a deliverable.");
+                Sql(c,tx,"update studio_workflow_delivery_requirements set waived=true,waiver_reason=$3,waived_by=$4 where id=$1 and job_id=$2 and delivered_at_utc is null",waiverId,job,request.Reason,actor);
+                break;
             case "cancel":
                 if(stage=="Pending"?!IsFrontDesk(user)&&!manager:!manager)throw new UnauthorizedAccessException();RequireReason(request);
                 Sql(c,tx,"update studio_schedule_entries set status='Cancelled' where job_id=$1 and id in(select schedule_entry_id from studio_shoot_sessions where job_id=$1 and checked_in_at_utc is null)",job);
