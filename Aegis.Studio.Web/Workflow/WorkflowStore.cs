@@ -299,13 +299,17 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(stage is not ("Ready for Delivery" or "Delivered"))throw new ArgumentException("Approve the finished work before delivery.");
                 if(request.TaskId is not Guid deliveryId)throw new ArgumentException("Choose a deliverable.");
                 if(string.IsNullOrWhiteSpace(request.Method))throw new ArgumentException("Provide the delivery method.");
+                if(!Exists(c,tx,"select exists(select 1 from studio_workflow_delivery_requirements where id=$1 and job_id=$2 and not waived and delivered_at_utc is null)",deliveryId,job))
+                    throw new ArgumentException("Deliverable is missing or already completed. Refresh this Job.");
                 Sql(c,tx,"update studio_workflow_delivery_requirements set delivered_at_utc=now(),delivery_method=$3,delivery_reference=$4,delivered_by=$5 where id=$1 and job_id=$2 and delivered_at_utc is null and not waived",deliveryId,job,request.Method,request.Reference,actor);
                 break;
             case "waive-delivery":
                 if(!manager)throw new UnauthorizedAccessException();
                 RequireReason(request);
                 if(request.TaskId is not Guid waiverId)throw new ArgumentException("Choose a deliverable.");
-                Sql(c,tx,"update studio_workflow_delivery_requirements set waived=true,waiver_reason=$3,waived_by=$4 where id=$1 and job_id=$2 and delivered_at_utc is null",waiverId,job,request.Reason,actor);
+                if(!Exists(c,tx,"select exists(select 1 from studio_workflow_delivery_requirements where id=$1 and job_id=$2 and not waived and delivered_at_utc is null)",waiverId,job))
+                    throw new ArgumentException("Deliverable is missing or already completed. Refresh this Job.");
+                Sql(c,tx,"update studio_workflow_delivery_requirements set waived=true,waiver_reason=$3,waived_by=$4 where id=$1 and job_id=$2 and delivered_at_utc is null and not waived",waiverId,job,request.Reason,actor);
                 break;
             case "cancel":
                 if(stage=="Pending"?!IsFrontDesk(user)&&!manager:!manager)throw new UnauthorizedAccessException();RequireReason(request);
