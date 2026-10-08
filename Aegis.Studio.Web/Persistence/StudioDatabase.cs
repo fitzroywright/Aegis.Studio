@@ -140,6 +140,7 @@ public sealed class StudioDatabase
             );
             create unique index if not exists ux_studio_booking_payments_reference on studio_booking_payments(lower(reference));
 
+            alter table studio_jobs add column if not exists workflow_revision bigint not null default 0;
             create table if not exists studio_user_profiles
             (
                 id uuid primary key,

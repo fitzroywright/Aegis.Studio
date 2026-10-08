@@ -31,6 +31,7 @@ create unique index if not exists ux_session_one_lead on studio_workflow_crew(se
 create table if not exists studio_workflow_commands(operation_id uuid primary key,job_id uuid not null references studio_jobs(id),fingerprint text not null,result_revision bigint not null);
 create table if not exists studio_workflow_submissions(id uuid primary key,job_id uuid not null references studio_jobs(id),kind text not null,revision integer not null,manifest jsonb not null,submitted_by text not null,submitted_at_utc timestamptz not null default now(),status text not null default 'Pending',reviewed_by text,reviewed_at_utc timestamptz,note text,unique(job_id,kind,revision));
 create table if not exists studio_workflow_overrides(id uuid primary key,job_id uuid not null references studio_jobs(id),kind text not null,actor text not null,reason text not null,original_requirement numeric,created_at_utc timestamptz not null default now());
+create table if not exists studio_workflow_publications(id uuid primary key,job_id uuid not null references studio_jobs(id),submission_id uuid not null references studio_workflow_submissions(id),reference text not null,provider text not null,actor text not null,created_at_utc timestamptz not null default now());
 create table if not exists studio_workflow_deliveries(id uuid primary key,job_id uuid not null references studio_jobs(id),method text not null,reference text,actor text not null,created_at_utc timestamptz not null default now());
 create table if not exists studio_workflow_assignment_requests(id uuid primary key,job_id uuid not null references studio_jobs(id),task_id uuid references studio_job_activities(id),user_name text not null,kind text not null,note text,status text not null default 'Pending',decision_by text,decision_reason text,redirect_to text,created_at_utc timestamptz not null default now());
 create unique index if not exists ux_assignment_request_pending on studio_workflow_assignment_requests(job_id,user_name,kind,coalesce(task_id,'00000000-0000-0000-0000-000000000000'::uuid)) where status='Pending';
@@ -116,3 +117,66 @@ drop trigger if exists workflow_job_before on studio_jobs;
 create trigger workflow_job_before before insert or update on studio_jobs for each row execute function studio_workflow_job_before();
 drop trigger if exists workflow_job_after on studio_jobs;
 create trigger workflow_job_after after insert or update on studio_jobs for each row execute function studio_workflow_job_after();
+
+-- History/extra schedule staff are reconciled additively, including installations already at v1.
+do $$ begin
+ if not exists(select 1 from studio_workflow_migrations where version=2) then
+  insert into studio_workflow_history(id,job_id,new_stage,entered_at_utc,actor,reason,revision)
+  select gen_random_uuid(),id,status,stage_entered_at_utc,'Migration','Historical stage entry timestamp is unknown',workflow_revision from studio_jobs
+  where not exists(select 1 from studio_workflow_history h where h.job_id=studio_jobs.id) on conflict do nothing;
+  insert into studio_workflow_crew(session_id,user_name,role,assigned_by)
+  select w.id,lower(p.user_name),'Additional','Migration' from studio_workflow_sessions w join studio_shoot_sessions s on s.id=w.shoot_id
+  join studio_schedule_entry_resources er on er.entry_id=s.schedule_entry_id join studio_photographers p on p.schedule_resource_id=er.resource_id
+  where not exists(select 1 from studio_workflow_crew c where c.session_id=w.id and lower(c.user_name)=lower(p.user_name)) on conflict do nothing;
+  insert into studio_workflow_migrations(version) values(2);
+ end if;
+end $$;
+
+create table if not exists studio_workflow_configuration_audit(id uuid primary key,action text not null,actor text not null,detail jsonb not null,created_at_utc timestamptz not null default now());
+alter table studio_schedule_entry_resources add column if not exists attendance_start_utc timestamptz;
+alter table studio_schedule_entry_resources add column if not exists attendance_end_utc timestamptz;
+alter table studio_workflow_submissions add column if not exists contribution_evidence jsonb not null default '[]';
+-- Any completed upload invalidates the declared contribution readiness, and any review/QC mutation changes the Job revision.
+create or replace function studio_workflow_media_change() returns trigger language plpgsql as $$
+begin
+ update studio_jobs set workflow_revision=workflow_revision+1 where id=new.job_id;
+ update studio_workflow_crew set ready=false where waiver_reason is null and session_id in(select id from studio_workflow_sessions where job_id=new.job_id);
+ return new;
+end $$;
+drop trigger if exists workflow_media_change on studio_asset_versions;
+create trigger workflow_media_change after insert on studio_asset_versions for each row execute function studio_workflow_media_change();
+create or replace function studio_workflow_activity_change() returns trigger language plpgsql as $$
+begin
+ update studio_jobs set workflow_revision=workflow_revision+1 where id=new.job_id;
+ if new.assigned_to is not null and (tg_op='INSERT' or new.assigned_to is distinct from old.assigned_to) then
+  perform studio_workflow_notify(new.job_id,new.id::text||':'||new.updated_at_utc::text||':assignment',new.assigned_to,'Task assigned: '||new.title,new.title);
+ end if;
+ return new;
+end $$;
+drop trigger if exists workflow_activity_change on studio_job_activities;
+create trigger workflow_activity_change after insert or update on studio_job_activities for each row execute function studio_workflow_activity_change();
+-- WorkDay retains the authoritative shoot record; compatibility writes keep the session model in step.
+create or replace function studio_workflow_shoot_change() returns trigger language plpgsql as $$
+declare session uuid;
+begin
+ if current_setting('studio.connected_command',true)='true' then return new; end if;
+ select id into session from studio_workflow_sessions where shoot_id=new.id;
+ if session is null then
+  select id into session from studio_workflow_sessions where job_id=new.job_id and shoot_id is null order by created_at_utc limit 1;
+  if session is null then session:=new.id;insert into studio_workflow_sessions(id,job_id,title,shoot_id,crew_finalized) values(session,new.job_id,'Photography',new.id,true);
+  else update studio_workflow_sessions set shoot_id=new.id,crew_finalized=true where id=session;end if;
+ end if;
+ if tg_op='INSERT' or new.photographer_user_name is distinct from old.photographer_user_name or new.assistant_user_name is distinct from old.assistant_user_name then
+  delete from studio_workflow_crew where session_id=session;
+  insert into studio_workflow_crew(session_id,user_name,role,assigned_by) values(session,lower(new.photographer_user_name),'Lead',coalesce(nullif(current_setting('studio.actor',true),''),'WorkDay'));
+  if nullif(trim(new.assistant_user_name),'') is not null and lower(new.assistant_user_name)<>lower(new.photographer_user_name) then
+   insert into studio_workflow_crew(session_id,user_name,role,assigned_by) values(session,lower(new.assistant_user_name),'Additional','WorkDay');
+  end if;
+  insert into studio_workflow_crew(session_id,user_name,role,assigned_by)
+   select session,lower(p.user_name),'Additional','WorkDay' from studio_schedule_entry_resources er join studio_photographers p on p.schedule_resource_id=er.resource_id where er.entry_id=new.schedule_entry_id on conflict do nothing;
+ end if;
+ update studio_jobs set workflow_revision=workflow_revision+1 where id=new.job_id;
+ return new;
+end $$;
+drop trigger if exists workflow_shoot_change on studio_shoot_sessions;
+create trigger workflow_shoot_change after insert or update on studio_shoot_sessions for each row execute function studio_workflow_shoot_change();

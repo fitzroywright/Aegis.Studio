@@ -71,7 +71,7 @@ public sealed class StudioStore
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id),job_lead from studio_jobs where id = $1";
+        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id),job_lead,workflow_revision from studio_jobs where id = $1";
         command.Parameters.AddWithValue(id);
         using NpgsqlDataReader reader = command.ExecuteReader();
         return reader.Read() ? ReadJob(reader) : null;
@@ -81,7 +81,7 @@ public sealed class StudioStore
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id),job_lead from studio_jobs where ($1::uuid[] is null or id=any($1)) order by created_at_utc desc";
+        command.CommandText = "select id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, client_id, (select display_name from studio_clients where id=client_id),array(select workspace_id from studio_job_workspace_links where job_id=studio_jobs.id),job_lead,workflow_revision from studio_jobs where ($1::uuid[] is null or id=any($1)) order by created_at_utc desc";
         command.Parameters.AddWithValue((object?)allowedIds??DBNull.Value);
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<StudioJob> values = [];
@@ -185,7 +185,7 @@ public sealed class StudioStore
             command.Transaction = transaction;
             command.CommandText = """
                 insert into studio_jobs(id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, job_lead)
-                values ($1,$2,$3,$4,$5,'New',$6,$7,null,(select default_job_lead from studio_workspaces where id=$2))
+                values ($1,$2,$3,$4,$5,'Pending',$6,$7,null,null)
                 """;
             command.Parameters.AddWithValue(id);
             command.Parameters.AddWithValue(conversation.WorkspaceId);
@@ -220,24 +220,13 @@ public sealed class StudioStore
     public StudioJob UpdateJob(Guid id, UpdateJobRequest request)
     {
         StudioJob current = GetJob(id) ?? throw new KeyNotFoundException("Job was not found.");
-        string status = string.IsNullOrWhiteSpace(request.Status) ? current.Status : request.Status.Trim();
-        if(status!=current.Status && current.Status is "Completed" or "Closed" or "Cancelled" or "Published")
-            throw new ArgumentException("This job is finished and cannot move to another stage.");
-        if(status!=current.Status && status is "Needs Review" or "Changes Requested" or "In Production" or "Ready for Client" or "Published")
-            throw new ArgumentException("Use the job workflow action to advance review, production or publication.");
-        if(status!=current.Status && current.Status is "Needs Review" or "Changes Requested" or "In Production" or "Ready for Client")
-            throw new ArgumentException("Use the job workflow action to change the review or production stage.");
-        string? assignedTo = string.IsNullOrWhiteSpace(request.AssignedTo) ? current.AssignedTo : request.AssignedTo.Trim();
-        DateOnly? eventDate = request.EventDate ?? current.EventDate;
-        using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "update studio_jobs set status=$2, assigned_to=$3, event_date=$4 where id=$1 and status=$5";
-        command.Parameters.AddWithValue(id);
-        command.Parameters.AddWithValue(status);
-        command.Parameters.AddWithValue((object?)assignedTo ?? DBNull.Value);
-        command.Parameters.AddWithValue((object?)eventDate ?? DBNull.Value);
-        command.Parameters.AddWithValue(current.Status);
-        if(command.ExecuteNonQuery()!=1)throw new ArgumentException("The job changed while saving. Refresh and try again.");
+        if(!string.IsNullOrWhiteSpace(request.Status)&&request.Status.Trim()!=current.Status || !string.IsNullOrWhiteSpace(request.AssignedTo)&&request.AssignedTo.Trim()!=current.AssignedTo)
+            throw new ArgumentException("Use the versioned Job workflow actions for status and owner changes.");
+        if(request.ExpectedRevision is null)throw new ArgumentException("The current Job revision is required.");
+        using var connection=database.OpenConnection();using var command=connection.CreateCommand();
+        command.CommandText="update studio_jobs set event_date=$2 where id=$1 and workflow_revision=$3";
+        command.Parameters.AddWithValue(id);command.Parameters.AddWithValue((object?)(request.EventDate??current.EventDate)??DBNull.Value);command.Parameters.AddWithValue(request.ExpectedRevision.Value);
+        if(command.ExecuteNonQuery()!=1)throw new Aegis.Studio.Web.Workflow.WorkflowConflictException();
         return GetJob(id)!;
     }
 
@@ -393,7 +382,7 @@ public sealed class StudioStore
     private StudioJob ReadJob(NpgsqlDataReader reader,bool readFinancials=true)
     {
         Guid id = reader.GetGuid(0);
-        return new StudioJob(id, reader.GetGuid(1), reader.GetGuid(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.IsDBNull(6) ? null : DateOnly.FromDateTime(reader.GetDateTime(6)), reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? null : reader.GetString(8), readFinancials?GetFinancialEvents(id):[], reader.IsDBNull(9)?null:reader.GetGuid(9), reader.IsDBNull(10)?null:reader.GetString(10),reader.FieldCount>11?reader.GetFieldValue<Guid[]>(11):null, reader.FieldCount>12 && !reader.IsDBNull(12) ? reader.GetString(12) : null);
+        return new StudioJob(id, reader.GetGuid(1), reader.GetGuid(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.IsDBNull(6) ? null : DateOnly.FromDateTime(reader.GetDateTime(6)), reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? null : reader.GetString(8), readFinancials?GetFinancialEvents(id):[], reader.IsDBNull(9)?null:reader.GetGuid(9), reader.IsDBNull(10)?null:reader.GetString(10),reader.FieldCount>11?reader.GetFieldValue<Guid[]>(11):null, reader.FieldCount>12 && !reader.IsDBNull(12) ? reader.GetString(12) : null,reader.GetInt64(13));
     }
 
     private List<StudioFinancialEvent> GetFinancialEvents(Guid jobId)
@@ -451,14 +440,14 @@ public sealed class StudioStore
 public sealed record StudioWorkspace(Guid Id, string Name, string Address, int OpenCount);
 public sealed record StudioConversation(Guid Id, Guid WorkspaceId, string Subject, string ContactName, string ContactAddress, string Channel, bool IsClosed, Guid? JobId, List<StudioMessage> Messages, string? ExternalThreadId = null);
 public sealed record StudioMessage(Guid Id, string Author, string Visibility, string Body, DateTimeOffset CreatedAt, string? ExternalMessageId = null, string? AuthorUserName = null);
-public sealed record StudioJob(Guid Id, Guid WorkspaceId, Guid ConversationId, string Title, string ClientName, string Status, DateOnly? EventDate, DateTimeOffset CreatedAt, string? AssignedTo = null, List<StudioFinancialEvent>? FinancialEvents = null, Guid? ClientId = null, string? LinkedClientName = null,IReadOnlyList<Guid>? ParticipatingWorkspaceIds=null,string? JobLead=null);
+public sealed record StudioJob(Guid Id, Guid WorkspaceId, Guid ConversationId, string Title, string ClientName, string Status, DateOnly? EventDate, DateTimeOffset CreatedAt, string? AssignedTo = null, List<StudioFinancialEvent>? FinancialEvents = null, Guid? ClientId = null, string? LinkedClientName = null,IReadOnlyList<Guid>? ParticipatingWorkspaceIds=null,string? JobLead=null,long WorkflowRevision=0);
 public sealed record StudioFinancialEvent(Guid Id, string Kind, decimal Amount, string? Note, DateTimeOffset CreatedAt,string? PaymentMethod=null,string? RecordedBy=null);
 public sealed record EmailIngestResult(StudioConversation Conversation, bool CreatedConversation, bool WasDuplicate);
 public sealed record IncomingInteractionRequest(Guid? WorkspaceId, string? Destination, string ContactName, string ContactAddress, string Subject, string Body, string? Channel);
 public sealed record AddMessageRequest(string Body, bool IsInternal, string? SendingIdentity = null);
 public sealed record CreateJobRequest(string Title, DateOnly? EventDate);
-public sealed record UpdateJobRequest(string? Status, string? AssignedTo, DateOnly? EventDate);
-public sealed record PipelineJobTransitionRequest(string? Status, Guid? WorkspaceId, string? Reason);
+public sealed record UpdateJobRequest(string? Status, string? AssignedTo, DateOnly? EventDate,long? ExpectedRevision=null);
+public sealed record PipelineJobTransitionRequest(string? Status, Guid? WorkspaceId, string? Reason,long ExpectedRevision=0,Guid OperationId=default);
 public sealed record AddFinancialEventRequest(string Kind, decimal Amount, string? Note,string? PaymentMethod=null);
 public sealed record AccountsSummary(decimal RecordedAmount, int JobsWithFinancialActivity, int TotalJobs);
 

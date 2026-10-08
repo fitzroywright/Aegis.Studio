@@ -11,11 +11,11 @@ public static class JobShootLifecycle
         {jobLock.Parameters.AddWithValue(jobId);jobLock.ExecuteScalar();}
         using var update=new NpgsqlCommand("""
             update studio_jobs set status=case
-                when not exists(select 1 from studio_shoot_sessions where job_id=$1 and status<>'Cancelled' and checked_out_at_utc is null)
+                when not exists(select 1 from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=$1 and w.required and (s.id is null or s.status='Cancelled' or s.checked_out_at_utc is null))
                      and exists(select 1 from studio_shoot_sessions where job_id=$1 and checked_out_at_utc is not null) then 'Awaiting Upload'
-                when exists(select 1 from studio_shoot_sessions where job_id=$1 and status='InProgress') then 'InProgress'
+                when exists(select 1 from studio_shoot_sessions where job_id=$1 and status='InProgress') then 'Photography In Progress'
                 else status end
-            where id=$1 and status in ('New','Needs Scheduling','Scheduled','Accepted','Arrived','InProgress')
+            where id=$1 and status in ('Scheduled','Photography In Progress')
             returning status,conversation_id
             """,connection,transaction);
         update.Parameters.AddWithValue(jobId);string? status=null;Guid conversation=Guid.Empty;

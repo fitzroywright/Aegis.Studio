@@ -12,6 +12,7 @@ public static class WorkflowEndpoints
         app.MapGet("/api/workflow/jobs",(ClaimsPrincipal user,WorkflowStore store)=>Results.Ok(store.Monitor(user))).RequireAuthorization();
         app.MapGet("/api/jobs/{job:guid}/connected-workflow",(Guid job,ClaimsPrincipal user,WorkflowStore store)=>Run(()=>Results.Ok(store.View(job,user)))).RequireAuthorization();
         app.MapPost("/api/jobs/{job:guid}/connected-workflow",(Guid job,WorkflowCommand request,ClaimsPrincipal user,WorkflowStore store)=>Run(()=>Results.Ok(store.Execute(job,request,user)))).RequireAuthorization();
+        app.MapGet("/api/workflow/workspaces",(ClaimsPrincipal user,WorkflowStore workflow,WorkspaceStore store)=>Results.Ok(store.GetAll().Where(w=>w.IsEnabled&&(workflow.IsFrontDesk(user)||workflow.Manager(user,w.Id))))).RequireAuthorization();
         app.MapGet("/api/workflow/assignment-requests",(ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>
         {
             using var c=db.OpenConnection();using var q=WorkflowStore.Command(c,null,"select coalesce(jsonb_agg(to_jsonb(r) order by r.created_at_utc desc),'[]'::jsonb)::text from studio_workflow_assignment_requests r where lower(r.user_name)=lower($1) or r.job_id=any($2)",WorkflowStore.Name(user),store.Monitor(user).Select(x=>JsonSerializer.SerializeToElement(x).GetProperty("jobId").GetGuid()).Where(id=>store.CanManage(user,id)).ToArray());
@@ -26,7 +27,7 @@ public static class WorkflowEndpoints
         {
             WorkflowRules.ValidateThreshold(request);using var c=db.OpenConnection();using var tx=c.BeginTransaction();
             WorkflowStore.Sql(c,tx,"insert into studio_workflow_thresholds values($1,$2,$3) on conflict(stage) do update set warning_hours=excluded.warning_hours,overdue_hours=excluded.overdue_hours",request.Stage,request.WarningHours,request.OverdueHours);
-            WorkflowStore.Sql(c,tx,"insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,null,'WorkflowThreshold',$2,$3,now())",Guid.NewGuid(),WorkflowStore.Name(user),JsonSerializer.Serialize(request));tx.Commit();return Results.NoContent();
+            WorkflowStore.Sql(c,tx,"insert into studio_workflow_configuration_audit(id,action,actor,detail) values($1,'WorkflowThreshold',$2,$3::jsonb)",Guid.NewGuid(),WorkflowStore.Name(user),JsonSerializer.Serialize(request));tx.Commit();return Results.NoContent();
         }));
         admin.MapPut("/audiences",(WorkflowAudience request,StudioDatabase db)=>Run(()=>
         {

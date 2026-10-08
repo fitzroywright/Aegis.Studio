@@ -58,7 +58,7 @@ public static class ProductionItems
                 Validate(request);
                 string actor=user.FindFirstValue("login_name")??user.Identity?.Name??"Studio";
                 using var c=db.OpenConnection();using var tx=c.BeginTransaction();
-                using(var guard=new NpgsqlCommand("select id from studio_jobs where id=$1 and status not in ('Ready for Client','Published','Completed','Cancelled') for update",c,tx))
+                using(var guard=new NpgsqlCommand("select id from studio_jobs where id=$1 and status in ('Active Production','Changes Requested') for update",c,tx))
                 {guard.Parameters.AddWithValue(jobId);if(guard.ExecuteScalar() is null)throw new ArgumentException("This job is closed for production changes.");}
                 using var update=new NpgsqlCommand("""
                     update studio_production_items i set completed_quantity=$4,qc_state=$5,qc_reason=$6,qc_by=$7,qc_at=now()

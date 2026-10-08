@@ -426,7 +426,7 @@ public static class WorkDayEndpoints
 
         // Assignment is the grant boundary: ensure a globally defined photographer receives
         // job-scoped staff access even when they are not a standing member of the workspace.
-        access.EnsureAssignedMember(effectiveJobId,userName);
+
         return access.HasPermission(user,effectiveJobId,permission);
     }
 
@@ -440,7 +440,7 @@ public static class WorkDayEndpoints
     {
         Guid? jobId=ResolveAssignmentJobId(entry,db);
         if(jobId is not Guid effectiveJobId) return null;
-        access.EnsureAssignedMember(effectiveJobId,profile.UserName);
+
         if(!access.HasPermission(user,effectiveJobId,"ViewJob")) return null;
         return MapAssignment(entry,db,store);
     }

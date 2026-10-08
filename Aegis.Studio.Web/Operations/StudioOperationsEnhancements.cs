@@ -45,9 +45,7 @@ public static class StudioOperationsEnhancements
     {
         app.MapGet("/api/workflow/stages", (IConfiguration configuration) =>
         {
-            string[] stages = configuration.GetSection("Studio:Workflow:Stages").Get<string[]>() ?? [];
-            if (stages.Length == 0) return Results.Problem("Studio workflow stages are not configured.");
-            return Results.Ok(stages);
+            return Results.Ok(Aegis.Studio.Web.Workflow.WorkflowRules.Stages);
         }).RequireAuthorization();
 
         app.MapPost("/api/frontdesk/clients/{clientId:guid}/jobs", (
@@ -87,9 +85,9 @@ public static class StudioOperationsEnhancements
                 return Results.Forbid();
             StudioJob? job = studio.GetJob(jobId);
             if (job is null) return Results.NotFound();
-            if(job.Status is not ("Scheduled" or "Confirmed" or "Arrived"))return Results.BadRequest(new{error="Only a booked session can be checked in. Open the job for its current next action."});
-            if(job.Status=="Arrived")return Results.Ok(job);
-            StudioJob updated = studio.UpdateJob(jobId, new UpdateJobRequest("Arrived", null, null));
+            if(job.Status is not ("Scheduled" or "Photography In Progress"))return Results.BadRequest(new{error="Only a booked session can be checked in. Open the job for its current next action."});
+            // Client arrival is an audit event; only session start advances photography.
+            StudioJob updated = job;
             using NpgsqlConnection connection = database.OpenConnection();
             using NpgsqlCommand audit = connection.CreateCommand();
             audit.CommandText = "insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,'FrontDeskCheckIn',$3,$4,now())";

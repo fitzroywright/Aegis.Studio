@@ -135,10 +135,8 @@ public sealed class JobAccessService
 
     public void EnsureAssignedMember(Guid jobId, string userName)
     {
-        if (string.IsNullOrWhiteSpace(userName)) return;
-        JobMember? existing = GetMembers(jobId).FirstOrDefault(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null) return;
-        SaveMember(jobId, new JobMemberRequest(userName, userName, true, true, JobPermissionSet.JobStaff));
+        // Legacy callers must not create permanent grants for temporary assignments.
+        // Owner, crew and task-assignee capabilities are derived by GetPermissions.
     }
 
     public Guid? GetWorkspaceId(Guid jobId)

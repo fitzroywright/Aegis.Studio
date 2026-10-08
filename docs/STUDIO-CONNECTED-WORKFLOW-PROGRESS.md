@@ -34,3 +34,9 @@ Next: workflow mutation endpoints and permissions, crew/session scheduling, revi
 Added transactional versioned workflow commands, owner/crew-derived access, draft sessions and multi-person scheduling, source/final submission manifests, notification monitoring/retry and a Job action panel. Front Desk now opens Pending Jobs and explicitly confirms them. Jobs lists include elapsed timing and owner/crew filters.
 
 Verification: edited JavaScript syntax checks pass. No .NET compilation or database tests executed. Pending: close legacy mutation bypasses, validate SQL/C# and complete acceptance tests. These changes are still in progress; do not merge or deploy.
+
+## Checkpoint 4 — legacy routes and review integrity in progress
+
+Centralized legacy lead/lifecycle/pipeline mutations into the versioned service; generic Job writes cannot assign staff or skip stages. Temporary assignment access no longer creates permanent grants. Added immutable approved gallery publication, contribution evidence, upload invalidation, task assignment/progress commands, compatibility shoot synchronization and individual attendance reservations.
+
+Still pending: UI compatibility/version payloads, exception paths, runnable acceptance coverage and validation. Known environment blocker remains .NET SDK/Common dependencies/PostgreSQL unavailable. No merge/deployment authorized or performed.

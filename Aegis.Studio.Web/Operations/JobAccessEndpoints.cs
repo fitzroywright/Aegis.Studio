@@ -1,3 +1,4 @@
+using Aegis.Studio.Web.Workflow;
 using System.Security.Claims;
 using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Persistence;
@@ -15,30 +16,8 @@ public static class JobAccessEndpoints
             return Results.Ok(new { permissions = access.GetPermissions(user, jobId) });
         }).RequireAuthorization();
 
-        app.MapPut("/api/jobs/{jobId:guid}/lead", (Guid jobId, JobLeadRequest request, ClaimsPrincipal user, JobAccessService access, StudioDatabase database) =>
-        {
-            JobPermissionSet permissions=access.GetPermissions(user,jobId);
-            if(!user.IsInRole("Administrator")&&!permissions.AssignStaff&&!permissions.AdminJob)return Results.Forbid();
-            string? lead=string.IsNullOrWhiteSpace(request.UserName)?null:request.UserName.Trim();
-            if(lead is not null)
-            {
-                StudioEmployeeDirectoryStore directory=new(database);
-                if(!directory.IsAssignable(lead))return Results.BadRequest(new{error="Job Lead must be an active, assignable Studio employee."});
-                Guid? workspaceId=access.GetWorkspaceId(jobId);
-                if(workspaceId is null)return Results.NotFound();
-                WorkspaceAccessService workspaceAccess=new(database);
-                bool eligible=workspaceAccess.GetMembers(workspaceId.Value).Any(m=>m.IsActive&&string.Equals(m.UserName,lead,StringComparison.OrdinalIgnoreCase))
-                    || access.GetMembers(jobId).Any(m=>m.IsActive&&string.Equals(m.UserName,lead,StringComparison.OrdinalIgnoreCase));
-                if(!eligible)return Results.BadRequest(new{error="Job Lead must be an active Studio member of the job or workspace."});
-                access.EnsureAssignedMember(jobId,lead);
-            }
-            using var connection=database.OpenConnection();
-            using var command=connection.CreateCommand();
-            command.CommandText="update studio_jobs set job_lead=$2 where id=$1";
-            command.Parameters.AddWithValue(jobId);command.Parameters.AddWithValue((object?)lead??DBNull.Value);
-            if(command.ExecuteNonQuery()!=1)return Results.NotFound();
-            return Results.Ok(new{jobId,jobLead=lead});
-        }).RequireAuthorization();
+        app.MapPut("/api/jobs/{jobId:guid}/lead", (Guid jobId, JobLeadRequest request, ClaimsPrincipal user, WorkflowStore workflow) =>
+            WorkflowEndpoints.Run(()=>Results.Ok(workflow.Execute(jobId,new WorkflowCommand("owner",request.ExpectedRevision,request.OperationId,UserName:request.UserName,Reason:request.Reason),user)))).RequireAuthorization();
 
         app.MapGet("/api/jobs/{jobId:guid}/members", (Guid jobId, ClaimsPrincipal user, JobAccessService access) =>
         {
@@ -147,7 +126,7 @@ public static class JobAccessEndpoints
         && (!requested.AdminJob || caller.AdminJob);
 }
 
-public sealed record JobLeadRequest(string? UserName);
+public sealed record JobLeadRequest(string? UserName,long ExpectedRevision,Guid OperationId,string? Reason=null);
 public sealed record JobMemberNotificationRequest(string UserName,string Subject,string Body);
 public sealed record NotifiableJobMember(string UserName,string DisplayName,string Source);
 

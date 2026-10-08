@@ -1,3 +1,4 @@
+using Aegis.Studio.Web.Galleries;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -10,9 +11,9 @@ using Npgsql;
 namespace Aegis.Studio.Web.Workflow;
 
 public sealed record CrewChange(string UserName,string Role,string? Notes=null,DateTimeOffset? Start=null,DateTimeOffset? End=null);
-public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null);
+public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null,string? Status=null,string? Priority=null,DateTimeOffset? ScheduledAtUtc=null,DateTimeOffset? DueAtUtc=null,string? Description=null,string? BlockedReason=null,string? HandoffTo=null);
 
-public sealed class WorkflowStore(StudioDatabase database,JobAccessService access,WorkspaceAccessService workspaces)
+public sealed class WorkflowStore(StudioDatabase database,JobAccessService access,WorkspaceAccessService workspaces,IClientGalleryPublisher publisher,IConfiguration configuration)
 {
     public static string Name(ClaimsPrincipal user)=>user.FindFirstValue("login_name")??user.FindFirstValue(ClaimTypes.NameIdentifier)??user.Identity?.Name??throw new UnauthorizedAccessException();
     public bool IsOperations(ClaimsPrincipal u)=>u.IsInRole("Operations Manager")||u.HasClaim("permission","studio.deposit.override")||new GlobalOperationalRoleStore(database).GetDirectRoleKeysAsync(Name(u)).GetAwaiter().GetResult().Contains("Operations Manager");
@@ -61,6 +62,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         {if(!r.Read())throw new KeyNotFoundException();workspace=r.GetGuid(0);stage=r.GetString(1);owner=r.IsDBNull(2)?null:r.GetString(2);if(r.GetInt64(3)!=request.ExpectedRevision)throw new WorkflowConflictException();correction=r.IsDBNull(4)?null:r.GetString(4);}
         bool manager=Manager(user,workspace),manage=manager||string.Equals(owner,actor,StringComparison.OrdinalIgnoreCase),review=access.HasPermission(user,job,"ManageProduction")&&access.HasPermission(user,job,"ChangeStatus");
         if(!access.HasPermission(user,job,"ViewJob"))throw new UnauthorizedAccessException();
+        Sql(c,tx,"select set_config('studio.connected_command','true',true)");
         Sql(c,tx,"select set_config('studio.actor',$1,true),set_config('studio.reason',$2,true)",actor,request.Reason??"");
         bool stateAction=false;
         switch(request.Action)
@@ -78,8 +80,10 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 SaveSession(c,tx,job,request,actor,user);Recalculate(c,tx,job);break;
             case "start-session":case "finish-session":
                 if(!manage&&!IsCrew(c,tx,job,request.SessionId,actor,true))throw new UnauthorizedAccessException();
+                if(stage is not ("Scheduled" or "Photography In Progress"))throw new ArgumentException("Photography can only start or finish at the scheduled photography stages.");
                 ExecuteSession(c,tx,job,request);break;
             case "contribution-ready":case "waive-contribution":
+                if(stage=="Changes Requested"&&correction!="Source")throw new ArgumentException("Production corrections do not reopen source contributions.");
                 string contributor=request.UserName??actor;
                 if(!manage&&(request.Action=="waive-contribution"||!contributor.Equals(actor,StringComparison.OrdinalIgnoreCase)))throw new UnauthorizedAccessException();
                 if(!IsCrew(c,tx,job,request.SessionId,contributor,false))throw new ArgumentException("Choose a photographer in this Job's session.");
@@ -91,19 +95,32 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                     if(!Exists(c,tx,"select exists(select 1 from studio_asset_versions where job_id=$1)",job))throw new ArgumentException("Upload completed material first.");
                 }
                 Sql(c,tx,"update studio_workflow_crew set ready=$3,waiver_reason=$4 where session_id=$1 and lower(user_name)=lower($2)",request.SessionId,contributor,request.Action=="contribution-ready",request.Action=="waive-contribution"?request.Reason:null);break;
+            case "task-progress":
+                EnsureMutable(stage);
+                if(request.TaskId is not Guid progressTask)throw new ArgumentException("Choose a task.");
+                string? assignee;
+                using(var q=Command(c,tx,"select assigned_to from studio_job_activities where id=$1 and job_id=$2 for update",progressTask,job))using(var reader=q.ExecuteReader())
+                {if(!reader.Read())throw new KeyNotFoundException();assignee=reader.IsDBNull(0)?null:reader.GetString(0);}
+                if(!manage&&!review&&!string.Equals(assignee,actor,StringComparison.OrdinalIgnoreCase))throw new UnauthorizedAccessException();
+                if(request.Status is not ("NotStarted" or "Scheduled" or "InProgress" or "Blocked" or "Completed" or "Cancelled" or "WaitingOnCustomer" or "ReworkRequired" or "Partial" or "Failed" or "ReprintRequired" or "ReadyForDelivery" or "Archived"))throw new ArgumentException("Choose a supported task status.");
+                if(request.Status=="Blocked"&&string.IsNullOrWhiteSpace(request.BlockedReason))throw new ArgumentException("Record the blocked reason.");
+                if(request.Status=="Completed"&&Exists(c,tx,"select exists(select 1 from studio_production_items where activity_id=$1 and qc_state not in ('Passed','Cancelled'))",progressTask))throw new ArgumentException("Pass all required item QC checks first.");
+                Sql(c,tx,"update studio_job_activities set status=$3,blocked_reason=$4,started_at_utc=case when $3='InProgress' then coalesce(started_at_utc,now()) else started_at_utc end,completed_at_utc=case when $3='Completed' then now() else null end,updated_at_utc=now() where id=$1 and job_id=$2",progressTask,job,request.Status,request.Status=="Blocked"?request.BlockedReason:null);
+                Notify(c,tx,job,request.OperationId.ToString(),"Owner","Task updated: "+request.Status);break;
             case "task":
                 if(!manage&&!review)throw new UnauthorizedAccessException();EnsureMutable(stage);
                 if(string.IsNullOrWhiteSpace(request.Title)||request.Title.Length>200)throw new ArgumentException("Task title is required (maximum 200 characters).");
                 if(!string.IsNullOrWhiteSpace(request.UserName))RequireEmployee(request.UserName);
                 Guid task=request.TaskId??Guid.NewGuid();
-                if(request.TaskId.HasValue&&!Exists(c,tx,"select exists(select 1 from studio_job_activities where id=$1 and job_id=$2)",task,job))throw new ArgumentException("Task belongs to another Job.");
+                if(request.TaskId.HasValue&&Exists(c,tx,"select exists(select 1 from studio_job_activities where id=$1 and job_id<>$2)",task,job))throw new ArgumentException("Task belongs to another Job.");
                 Sql(c,tx,"""
-                    insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,created_by,created_at_utc,updated_at_utc)
-                    values($1,$2,$3,$4,$5,'NotStarted','Normal',$6,$7,now(),now())
-                    on conflict(id) do update set title=excluded.title,description=excluded.description,assigned_to=excluded.assigned_to,updated_at_utc=now()
-                    """,task,job,request.Kind??"Other",request.Title,request.Reason,request.UserName,actor);
+                    insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,created_by,created_at_utc,updated_at_utc,scheduled_at_utc,due_at_utc,location,handoff_to)
+                    values($1,$2,$3,$4,$5,'NotStarted',$8,$6,$7,now(),now(),$9,$10,$11,$12)
+                    on conflict(id) do update set title=excluded.title,description=excluded.description,assigned_to=excluded.assigned_to,priority=excluded.priority,scheduled_at_utc=excluded.scheduled_at_utc,due_at_utc=excluded.due_at_utc,location=excluded.location,handoff_to=excluded.handoff_to,updated_at_utc=now()
+                    """,task,job,request.Kind??"Other",request.Title,request.Description??request.Reason,request.UserName,actor,request.Priority??"Normal",request.ScheduledAtUtc?.ToUniversalTime(),request.DueAtUtc?.ToUniversalTime(),request.Location,request.HandoffTo);
                 if(!string.IsNullOrWhiteSpace(request.UserName))Notify(c,tx,job,request.OperationId.ToString(),request.UserName,"Task assigned: "+request.Title);break;
             case "request-assignment":
+                EnsureMutable(stage);
                 if(request.Kind is not ("Owner" or "Photographer" or "Task"))throw new ArgumentException("Choose Owner, Photographer or Task.");
                 if(request.Kind=="Task"&&(!request.TaskId.HasValue||!Exists(c,tx,"select exists(select 1 from studio_job_activities where id=$1 and job_id=$2)",request.TaskId,job)))throw new ArgumentException("Choose a task in this Job.");
                 Sql(c,tx,"insert into studio_workflow_assignment_requests(id,job_id,task_id,user_name,kind,note) values($1,$2,$3,$4,$5,$6) on conflict do nothing",request.OperationId,job,request.TaskId,actor,request.Kind,request.Reason);
@@ -139,10 +156,11 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 }
                 Notify(c,tx,job,request.OperationId.ToString(),requester,"Assignment request: "+request.Method);break;
             case "claim":
+                if(request.UserName is not null&&!request.UserName.Equals(actor,StringComparison.OrdinalIgnoreCase))throw new UnauthorizedAccessException();
                 if(!IsFrontDesk(user)||stage!="Pending")throw new UnauthorizedAccessException();
                 Sql(c,tx,"update studio_jobs set frontdesk_claim=$2 where id=$1",job,request.UserName??actor);break;
             case "transfer":
-                RequireReason(request);if(request.WorkspaceId is not Guid destination||destination==WorkflowRules.UnassignedWorkspaceId&&stage!="Pending")throw new ArgumentException("Choose an enabled business workspace.");
+                EnsureMutable(stage);RequireReason(request);if(request.WorkspaceId is not Guid destination||destination==WorkflowRules.UnassignedWorkspaceId&&stage!="Pending")throw new ArgumentException("Choose an enabled business workspace.");
                 if(stage=="Pending"?!IsFrontDesk(user)&&!manager:!IsOperations(user)&&!(manager&&Manager(user,destination)))throw new UnauthorizedAccessException();
                 if(!Exists(c,tx,"select exists(select 1 from studio_workspaces where id=$1 and is_enabled)",destination))throw new ArgumentException("Workspace is disabled or missing.");
                 Sql(c,tx,"update studio_jobs set workspace_id=$2 where id=$1",job,destination);
@@ -150,6 +168,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 Sql(c,tx,"update studio_frontdesk_requests set workspace_id=$2,payload=jsonb_set(payload,'{workspaceId}',to_jsonb($2::uuid)) where job_id=$1",job,destination);
                 Notify(c,tx,job,request.OperationId.ToString(),"Manager","Job transferred");break;
             case "blocked":
+                EnsureMutable(stage);
                 if(!manage&&!review)throw new UnauthorizedAccessException();Sql(c,tx,"update studio_jobs set blocked_reason=$2 where id=$1",job,string.IsNullOrWhiteSpace(request.Reason)?null:request.Reason);break;
             case "reopen":
                 if(!manager||!WorkflowRules.Inactive(stage))throw new UnauthorizedAccessException();RequireReason(request);
@@ -183,8 +202,14 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 stateAction=true;break;
             case "resume-production":
                 if(!review)throw new UnauthorizedAccessException();stateAction=true;break;
+            case "publish":
+                if(!IsFrontDesk(user)&&!manage&&!review)throw new UnauthorizedAccessException();
+                if(stage!="Ready for Delivery")throw new ArgumentException("Finished work must be approved before publication.");
+                if(configuration["ClientGallery:Provider"]!="Manifest")throw new ArgumentException("Configure the existing gallery provider before publication.");
+                Publish(c,tx,job,request.OperationId,actor,publisher);break;
             case "deliver":
                 if(!IsFrontDesk(user)&&!manage)throw new UnauthorizedAccessException();
+                if(request.Method=="Gallery"&&!Exists(c,tx,"select exists(select 1 from studio_workflow_publications where job_id=$1)",job))throw new ArgumentException("Publish the approved gallery before recording Gallery delivery.");
                 if(string.IsNullOrWhiteSpace(request.Method))throw new ArgumentException("Record delivery method and reference.");
                 Sql(c,tx,"insert into studio_workflow_deliveries(id,job_id,method,reference,actor) values($1,$2,$3,$4,$5)",request.OperationId,job,request.Method,request.Reference,actor);stateAction=true;break;
             case "close":
@@ -230,13 +255,14 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(resource is not Guid id)throw new ArgumentException(person.UserName+" needs an active photographer profile.");resources.Add((person,id));
                 if(person.Start.HasValue!=person.End.HasValue||person.Start<req.Start||person.End>req.End||person.End<=person.Start)throw new ArgumentException("Individual attendance must be a valid range inside the session.");
             }
-            foreach(var resource in resources.Select(x=>x.Resource).Distinct().Order())Sql(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))",resource.ToString());
+            var previousResources=shoot.HasValue?(Guid[])Scalar(c,tx,"select coalesce(array_agg(er.resource_id),'{}'::uuid[]) from studio_schedule_entry_resources er join studio_shoot_sessions s on s.schedule_entry_id=er.entry_id where s.id=$1",shoot.Value)!:[];
+            foreach(var resource in resources.Select(x=>x.Resource).Concat(previousResources).Distinct().Order())Sql(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))",resource.ToString());
             Guid schedule=shoot.HasValue?(Guid)Scalar(c,tx,"select schedule_entry_id from studio_shoot_sessions where id=$1",shoot.Value)!:Guid.NewGuid();
             var conflicts=new List<string>();
             foreach(var item in resources)
             {
                 var start=(item.Person.Start??req.Start!.Value).ToUniversalTime();var end=(item.Person.End??req.End!.Value).ToUniversalTime();
-                if(Exists(c,tx,"select exists(select 1 from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id where er.resource_id=$1 and e.status<>'Cancelled' and e.id<>$2 and e.starts_at_utc<$4 and e.ends_at_utc>$3)",item.Resource,schedule,start,end)||Exists(c,tx,"select exists(select 1 from studio_photographer_availability where lower(user_name)=lower($1) and availability_type in ('Unavailable','Leave') and starts_at_utc<$3 and ends_at_utc>$2)",item.Person.UserName,start,end))conflicts.Add(item.Person.UserName);
+                if(Exists(c,tx,"select exists(select 1 from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id where er.resource_id=$1 and e.status<>'Cancelled' and e.id<>$2 and coalesce(er.attendance_start_utc,e.starts_at_utc)<$4 and coalesce(er.attendance_end_utc,e.ends_at_utc)>$3)",item.Resource,schedule,start,end)||Exists(c,tx,"select exists(select 1 from studio_photographer_availability where lower(user_name)=lower($1) and availability_type in ('Unavailable','Leave') and starts_at_utc<$3 and ends_at_utc>$2)",item.Person.UserName,start,end))conflicts.Add(item.Person.UserName);
             }
             if(conflicts.Count>0)
             {
@@ -246,7 +272,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
             }
             Sql(c,tx,"insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,$3,$4,$5,$6,'Scheduled',$7,now()) on conflict(id) do update set title=excluded.title,starts_at_utc=excluded.starts_at_utc,ends_at_utc=excluded.ends_at_utc,location=excluded.location,status='Scheduled',notes=excluded.notes",schedule,job,req.Title??"Photography",req.Start.Value.ToUniversalTime(),req.End!.Value.ToUniversalTime(),req.Location,req.Reason);
             Sql(c,tx,"delete from studio_schedule_entry_resources where entry_id=$1",schedule);
-            foreach(var item in resources)Sql(c,tx,"insert into studio_schedule_entry_resources(entry_id,resource_id) values($1,$2)",schedule,item.Resource);
+            foreach(var item in resources)Sql(c,tx,"insert into studio_schedule_entry_resources(entry_id,resource_id,attendance_start_utc,attendance_end_utc) values($1,$2,$3,$4)",schedule,item.Resource,(item.Person.Start??req.Start.Value).ToUniversalTime(),(item.Person.End??req.End!.Value).ToUniversalTime());
             var lead=crew.Single(x=>x.Role=="Lead").UserName;var additional=crew.FirstOrDefault(x=>x.Role=="Additional")?.UserName;Guid shootId=shoot??Guid.NewGuid();
             Sql(c,tx,"""
                 insert into studio_shoot_sessions(id,job_id,schedule_entry_id,photographer_user_name,assistant_user_name,call_time_utc,planned_end_utc,location,status,image_count,backup_confirmed,reshoot_required,handoff_status,created_at_utc,updated_at_utc)
@@ -294,6 +320,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
     private static void ValidateSourceReady(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
     {
         if(!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions where job_id=$1 and required)",job)||Exists(c,tx,"select exists(select 1 from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=$1 and w.required and (s.id is null or s.status='Cancelled' or s.checked_out_at_utc is null or exists(select 1 from studio_workflow_crew c where c.session_id=w.id and not c.ready and c.waiver_reason is null)))",job))throw new ArgumentException("Complete all required sessions and photographer contributions, or explicitly waive missing contributions.");
+        if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and activity_type in ('FileIngest','Backup') and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Complete the required ingest and backup verification tasks before submission.");
         if(!Exists(c,tx,"select exists(select 1 from studio_media_assets a join studio_asset_versions v on v.job_id=a.job_id and v.asset_key=a.asset_key where a.job_id=$1)",job))throw new ArgumentException("Upload required material before submitting.");
     }
     private static void ValidateFinished(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
@@ -304,8 +331,10 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
     private static void CreateSubmission(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,string kind,string actor)
     {
         var manifest=Scalar(c,tx,"select coalesce(jsonb_agg(jsonb_build_object('assetId',a.id,'versionId',v.id,'sha256',v.sha256)),'[]'::jsonb)::text from studio_media_assets a join lateral(select id,sha256 from studio_asset_versions v where v.job_id=a.job_id and v.asset_key=a.asset_key order by v.version_number desc limit 1) v on true where a.job_id=$1",job) as string;
-        if(manifest=="[]")throw new ArgumentException("No completed media is available.");
-        Sql(c,tx,"insert into studio_workflow_submissions(id,job_id,kind,revision,manifest,submitted_by) select $1,$2,$3,coalesce(max(revision),0)+1,$4::jsonb,$5 from studio_workflow_submissions where job_id=$2 and kind=$3",Guid.NewGuid(),job,kind,manifest,actor);
+        if(string.IsNullOrWhiteSpace(manifest)||manifest=="[]")throw new ArgumentException("No completed media is available.");
+        // Store the readiness declarations and explicit waivers as evidence beside the immutable version manifest.
+        var evidence=(string)Scalar(c,tx,"select coalesce(jsonb_agg(to_jsonb(c)),'[]'::jsonb)::text from studio_workflow_crew c join studio_workflow_sessions w on w.id=c.session_id where w.job_id=$1 and w.required",job)!;
+        Sql(c,tx,"insert into studio_workflow_submissions(id,job_id,kind,revision,manifest,submitted_by,contribution_evidence) select $1,$2,$3,coalesce(max(revision),0)+1,$4::jsonb,$5,$6::jsonb from studio_workflow_submissions where job_id=$2 and kind=$3",Guid.NewGuid(),job,kind,manifest,actor,evidence);
     }
     private static void ApproveSubmission(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,string kind,string actor,string? note)
     {
@@ -314,6 +343,19 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         if(Exists(c,tx,"select exists(select 1 from studio_media_assets a join lateral(select id from studio_asset_versions where job_id=a.job_id and asset_key=a.asset_key order by version_number desc limit 1) v on true where a.job_id=$1 and not exists(select 1 from jsonb_array_elements($2::jsonb) x where (x->>'assetId')::uuid=a.id and (x->>'versionId')::uuid=v.id))",job,manifest))throw new ArgumentException("Material changed after submission. Request corrections and resubmit the new versions.");
         Sql(c,tx,"update studio_media_assets a set approved_version_id=(x->>'versionId')::uuid from jsonb_array_elements($2::jsonb) x where a.job_id=$1 and a.id=(x->>'assetId')::uuid",job,manifest);
         Sql(c,tx,"update studio_workflow_submissions set status='Approved',reviewed_by=$3,reviewed_at_utc=now(),note=$4 where job_id=$1 and kind=$2 and status='Pending'",job,kind,actor,note);
+    }
+    private static void Publish(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,Guid operation,string actor,IClientGalleryPublisher publisher)
+    {
+        Guid submission;string manifest,title;
+        using(var q=Command(c,tx,"select s.id,s.manifest::text,j.title from studio_workflow_submissions s join studio_jobs j on j.id=s.job_id where s.job_id=$1 and s.kind='Finished' and s.status='Approved' order by s.revision desc limit 1",job))using(var reader=q.ExecuteReader())
+        {if(!reader.Read())throw new ArgumentException("Approve a finished submission before publication.");submission=reader.GetGuid(0);manifest=reader.GetString(1);title=reader.GetString(2);}
+        var media=new List<ClientGalleryMedia>();
+        using(var q=Command(c,tx,"select a.asset_key,v.id,v.file_name,v.stored_path,v.content_type from jsonb_array_elements($2::jsonb) x join studio_media_assets a on a.id=(x->>'assetId')::uuid join studio_asset_versions v on v.id=(x->>'versionId')::uuid and v.job_id=a.job_id and v.asset_key=a.asset_key where a.job_id=$1 order by a.asset_key",job,manifest))using(var reader=q.ExecuteReader())
+        {while(reader.Read())media.Add(new(reader.GetString(0),reader.GetGuid(1),reader.GetString(2),"VersionStore/"+reader.GetString(3),reader.GetString(4)));}
+        if(media.Count!=JsonSerializer.Deserialize<JsonElement>(manifest).GetArrayLength())throw new ArgumentException("A pinned approved version is unavailable.");
+        var publication=publisher.PublishAsync(new(job,title,media),CancellationToken.None).GetAwaiter().GetResult();
+        Sql(c,tx,"insert into studio_workflow_publications(id,job_id,submission_id,reference,provider,actor) values($1,$2,$3,$4,$5,$6)",operation,job,submission,publication.Reference,publication.Provider,actor);
+        Notify(c,tx,job,operation.ToString(),"Front Desk","Approved gallery handoff recorded");
     }
     public static JsonElement Snapshot(NpgsqlConnection c,NpgsqlTransaction? tx,Guid job)
     {
@@ -326,7 +368,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
             """,job) as string??throw new KeyNotFoundException();return JsonSerializer.Deserialize<JsonElement>(value);
     }
     internal static void SetStage(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,string stage)=>Sql(c,tx,"update studio_jobs set status=$2 where id=$1 and status is distinct from $2",job,stage);
-    internal static void Notify(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,string key,string audience,string subject)=>Sql(c,tx,"select studio_workflow_notify($1,$2,$3,$4,$5)",job,key,audience,subject,subject);
+    internal static void Notify(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,string key,string audience,string subject)=>Sql(c,tx,"select studio_workflow_notify($1,$2,$3,$4,$5)",job,key+":"+audience.ToLowerInvariant(),audience,subject,subject);
     internal static NpgsqlCommand Command(NpgsqlConnection c,NpgsqlTransaction? tx,string sql,params object?[] values)
     {var q=new NpgsqlCommand(sql,c,tx);foreach(var value in values)q.Parameters.AddWithValue(value??DBNull.Value);return q;}
     internal static void Sql(NpgsqlConnection c,NpgsqlTransaction? tx,string sql,params object?[] values){using var q=Command(c,tx,sql,values);q.ExecuteNonQuery();}

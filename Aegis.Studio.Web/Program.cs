@@ -549,78 +549,20 @@ app.MapGet("/api/jobs/{id:guid}/timeline", (Guid id, int? count, ClaimsPrincipal
     if (!access.HasPermission(user, id, "ViewJob")) return Results.Forbid();
     return Results.Ok(timeline.GetForJob(id, count ?? 200));
 });
-app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrincipal user, StudioStore store, NotificationService notifications, JobEventNotifier jobEvents, JobAccessService access, StudioOperationsFlowPublisher flows) =>
-{
-    StudioJob? before = store.GetJob(id); if (before is null) return Results.NotFound();
-    if (!access.HasPermission(user, id, "EditJob")) return Results.Forbid();
-    if (!string.IsNullOrWhiteSpace(request.Status) && !string.Equals(before.Status, request.Status, StringComparison.OrdinalIgnoreCase) && !access.HasPermission(user, id, "ChangeStatus")) return Results.Forbid();
-    if (!string.IsNullOrWhiteSpace(request.AssignedTo) && !string.Equals(before.AssignedTo, request.AssignedTo, StringComparison.OrdinalIgnoreCase) && !access.HasPermission(user, id, "AssignStaff")) return Results.Forbid();
-    StudioJob updated = store.UpdateJob(id, request);
-    if (!string.Equals(before.Status, updated.Status, StringComparison.OrdinalIgnoreCase))
+app.MapPut("/api/jobs/{id:guid}", (Guid id, UpdateJobRequest request, ClaimsPrincipal user, StudioStore store, JobAccessService access) =>
+    WorkflowEndpoints.Run(()=>
     {
-        jobEvents.Publish(id, "JobStatusChanged", $"Job status: {updated.Title}", $"{before.Status} → {updated.Status}", requesterEligible: true);
-        string? flowStage=updated.Status.Trim() switch
-        {
-            "Accepted"=>"Accepted",
-            "Arrived"=>"Arrived",
-            "InProgress"=>"InProgress",
-            "Completed"=>"Completed",
-            _=>null
-        };
-        if(flowStage is not null) flows.TryEnqueueJobFlow(id.ToString("D"),flowStage,id.ToString("D"),$"Job status changed to {updated.Status}.");
-    }
-    if (!string.Equals(before.AssignedTo, updated.AssignedTo, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(updated.AssignedTo))
-    {
-        access.EnsureAssignedMember(id, updated.AssignedTo);
-        notifications.PublishToUser(updated.AssignedTo, "JobAssigned", $"Job assigned: {updated.Title}", $"You were assigned to {updated.Title} for {updated.ClientName}.", "Job", id.ToString("D"));
-        flows.TryEnqueueJobFlow(id.ToString("D"),"Assigned",id.ToString("D"),$"Assigned to {updated.AssignedTo}.");
-    }
-    return Results.Ok(updated);
-});
+        if (!access.HasPermission(user,id,"EditJob")) return Results.Forbid();
+        return Results.Ok(store.UpdateJob(id,request));
+    }));
 
-
-app.MapPost("/api/jobs/{id:guid}/pipeline-transition", (Guid id, PipelineJobTransitionRequest request, ClaimsPrincipal user, StudioStore store, JobAccessService access, WorkspaceAccessService workspaceAccess, StudioDatabase database, StudioInAppMessageStore messages, JobEventNotifier jobEvents, StudioOperationsFlowPublisher flows) =>
-{
-    StudioJob? before=store.GetJob(id);if(before is null)return Results.NotFound();
-    if(!access.HasPermission(user,id,"EditJob"))return Results.Forbid();
-    bool statusChanged=!string.IsNullOrWhiteSpace(request.Status)&&!string.Equals(before.Status,request.Status,StringComparison.OrdinalIgnoreCase);
-    bool workspaceChanged=request.WorkspaceId.HasValue&&request.WorkspaceId.Value!=before.WorkspaceId;
-    if(statusChanged&&!access.HasPermission(user,id,"ChangeStatus"))return Results.Forbid();
-    if(workspaceChanged&&!workspaceAccess.HasPermission(user,request.WorkspaceId!.Value,"CreateJob"))return Results.Forbid();
-    if(!statusChanged&&!workspaceChanged)return Results.Ok(before);
-    StudioJob updated=before;
-    if(statusChanged)updated=store.UpdateJob(id,new UpdateJobRequest(request.Status,before.AssignedTo,before.EventDate));
-    if(workspaceChanged)updated=store.MoveJobWorkspace(id,request.WorkspaceId!.Value);
-    string actor=user.FindFirstValue("login_name")??user.Identity?.Name??"Studio";
-    string oldWorkspaceName=store.GetWorkspaces().FirstOrDefault(x=>x.Id==before.WorkspaceId)?.Name??"previous workspace";
-    string newWorkspaceName=store.GetWorkspaces().FirstOrDefault(x=>x.Id==updated.WorkspaceId)?.Name??"new workspace";
-    List<string> changes=[];
-    if(statusChanged)changes.Add($"stage/status {before.Status} → {updated.Status}");
-    if(workspaceChanged)changes.Add($"workspace {oldWorkspaceName} → {newWorkspaceName}");
-    string detail=$"Pipeline change for {updated.Title}: {string.Join("; ",changes)}{(string.IsNullOrWhiteSpace(request.Reason)?string.Empty:". "+request.Reason.Trim())}";
-    using(NpgsqlConnection connection=database.OpenConnection())
-    using(NpgsqlCommand audit=connection.CreateCommand())
+// Pipeline cards open the Job action panel. Workspace transfer uses the same versioned command.
+app.MapPost("/api/jobs/{id:guid}/pipeline-transition", (Guid id, PipelineJobTransitionRequest request, ClaimsPrincipal user, WorkflowStore workflow) =>
+    WorkflowEndpoints.Run(()=>
     {
-        audit.CommandText="insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'PipelineChanged',$3,$4,now())";
-        audit.Parameters.AddWithValue(Guid.NewGuid());audit.Parameters.AddWithValue(id);audit.Parameters.AddWithValue(actor);audit.Parameters.AddWithValue(detail);audit.ExecuteNonQuery();
-    }
-    foreach(Guid workspaceId in new[]{before.WorkspaceId,updated.WorkspaceId}.Distinct())
-    {
-        try
-        {
-            StudioMessageThread thread=messages.GetOrCreateScoped(user,"Workspace",workspaceId);
-            messages.AddMessage(thread.Id,user,detail);
-        }
-        catch(UnauthorizedAccessException){ }
-    }
-    if(statusChanged)
-    {
-        jobEvents.Publish(id,"JobStatusChanged",$"Job status: {updated.Title}",$"{before.Status} → {updated.Status}",requesterEligible:true);
-        flows.TryEnqueueJobFlow(id.ToString("D"),"InProgress",id.ToString("D"),detail);
-    }
-    if(workspaceChanged)flows.TryEnqueueJobFlow(id.ToString("D"),"Workspace",id.ToString("D"),detail);
-    return Results.Ok(updated);
-});
+        if(!string.IsNullOrWhiteSpace(request.Status)) return Results.BadRequest(new{error="Open the Job and use its workflow action to change stages."});
+        return Results.Ok(workflow.Execute(id,new WorkflowCommand("transfer",request.ExpectedRevision,request.OperationId,Reason:request.Reason,WorkspaceId:request.WorkspaceId),user));
+    }));
 
 app.MapGet("/api/bookings", (BookingStore store) => Results.Ok(store.GetAll()));
 app.MapGet("/api/bookings/{id:guid}", (Guid id, HttpContext context, BookingStore store, BookingApiAuthenticator security) => { if (!security.IsAuthorized(context)) return Results.Unauthorized(); return store.Get(id) is Booking booking ? Results.Ok(new { booking, payments = store.GetPayments(id) }) : Results.NotFound(); }).AllowAnonymous();
