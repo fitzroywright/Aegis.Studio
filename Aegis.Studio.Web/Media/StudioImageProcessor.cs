@@ -2,18 +2,22 @@ using SkiaSharp;
 
 namespace Aegis.Studio.Web.Media;
 
+internal sealed class StudioUnsupportedImageException(string message) : InvalidOperationException(message);
+
 internal static class StudioImageProcessor
 {
     public const long MaxPixels = 60_000_000;
 
     public static SKBitmap DecodeOriented(Stream source, long maxPixels = MaxPixels)
     {
-        using var codec = SKCodec.Create(source) ?? throw new InvalidOperationException("Unsupported image format.");
+        using var codec = SKCodec.Create(source) ?? throw new StudioUnsupportedImageException("Unsupported image format.");
         SKImageInfo info = codec.Info;
-        if (info.Width <= 0 || info.Height <= 0 || (long)info.Width * info.Height > maxPixels)
-            throw new InvalidOperationException("Image exceeds the supported pixel limit.");
+        if (info.Width <= 0 || info.Height <= 0)
+            throw new StudioUnsupportedImageException("Unsupported image dimensions.");
+        if ((long)info.Width * info.Height > maxPixels)
+            throw new StudioUnsupportedImageException("Image exceeds the supported pixel limit.");
 
-        using SKBitmap decoded = SKBitmap.Decode(codec) ?? throw new InvalidOperationException("Unable to decode image.");
+        using SKBitmap decoded = SKBitmap.Decode(codec) ?? throw new StudioUnsupportedImageException("Unable to decode image.");
         return ApplyOrientation(decoded, codec.EncodedOrigin);
     }
 
@@ -61,20 +65,39 @@ internal static class StudioImageProcessor
         int height = swap ? source.Width : source.Height;
         var output = new SKBitmap(width, height, source.ColorType, source.AlphaType);
 
-        SKMatrix matrix = origin switch
-        {
-            SKEncodedOrigin.TopRight => new SKMatrix(-1, 0, source.Width, 0, 1, 0, 0, 0, 1),
-            SKEncodedOrigin.BottomRight => new SKMatrix(-1, 0, source.Width, 0, -1, source.Height, 0, 0, 1),
-            SKEncodedOrigin.BottomLeft => new SKMatrix(1, 0, 0, 0, -1, source.Height, 0, 0, 1),
-            SKEncodedOrigin.LeftTop => new SKMatrix(0, 1, 0, 1, 0, 0, 0, 0, 1),
-            SKEncodedOrigin.RightTop => new SKMatrix(0, -1, source.Width, 1, 0, 0, 0, 0, 1),
-            SKEncodedOrigin.RightBottom => new SKMatrix(0, -1, source.Width, -1, 0, source.Height, 0, 0, 1),
-            SKEncodedOrigin.LeftBottom => new SKMatrix(0, 1, 0, -1, 0, source.Height, 0, 0, 1),
-            _ => SKMatrix.CreateIdentity()
-        };
-
         using var canvas = new SKCanvas(output);
-        canvas.SetMatrix(matrix);
+        switch (origin)
+        {
+            case SKEncodedOrigin.TopRight:
+                canvas.Translate(width, 0);
+                canvas.Scale(-1, 1);
+                break;
+            case SKEncodedOrigin.BottomRight:
+                canvas.Translate(width, height);
+                canvas.RotateDegrees(180);
+                break;
+            case SKEncodedOrigin.BottomLeft:
+                canvas.Translate(0, height);
+                canvas.Scale(1, -1);
+                break;
+            case SKEncodedOrigin.LeftTop:
+                canvas.RotateDegrees(90);
+                canvas.Scale(1, -1);
+                break;
+            case SKEncodedOrigin.RightTop:
+                canvas.Translate(width, 0);
+                canvas.RotateDegrees(90);
+                break;
+            case SKEncodedOrigin.RightBottom:
+                canvas.Translate(width, height);
+                canvas.RotateDegrees(90);
+                canvas.Scale(-1, 1);
+                break;
+            case SKEncodedOrigin.LeftBottom:
+                canvas.Translate(0, height);
+                canvas.RotateDegrees(-90);
+                break;
+        }
         canvas.DrawBitmap(source, 0, 0);
         canvas.Flush();
         return output;
