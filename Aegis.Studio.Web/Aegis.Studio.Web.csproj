@@ -53,7 +53,8 @@
   <Target Name="StageAuthenticationPluginForPublish" AfterTargets="Publish">
     <MSBuild Projects="$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\Common.Security.Plugin.ActiveDirectory.csproj"
              Targets="Build"
-             Properties="Configuration=$(Configuration)" />
+             Properties="Configuration=$(Configuration)"
+             Condition="'$(NoBuild)' != 'true'" />
     <PropertyGroup>
       <AuthenticationPluginOutput>$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\bin\$(Configuration)\net10.0</AuthenticationPluginOutput>
     </PropertyGroup>
