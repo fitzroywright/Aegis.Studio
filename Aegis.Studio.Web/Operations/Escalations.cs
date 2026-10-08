@@ -211,7 +211,7 @@ public sealed class EscalationStore
         }
         if(sourceType=="Invoice")
         {
-            using NpgsqlCommand command=connection.CreateCommand();command.CommandText="select m.user_name from studio_global_operational_role_members m join studio_global_operational_roles r on r.id=m.role_id where m.is_active and r.is_active and r.billing";using NpgsqlDataReader reader=command.ExecuteReader();while(reader.Read())recipients.Add(reader.GetString(0));
+            using NpgsqlCommand command=connection.CreateCommand();command.CommandText="select m.user_name from studio_global_operational_role_members m join studio_global_operational_roles r on r.id=m.role_id where m.is_active and r.is_active and lower(r.name) in ('billing','finance','accounts')";using NpgsqlDataReader reader=command.ExecuteReader();while(reader.Read())recipients.Add(reader.GetString(0));
         }
         return recipients.ToList();
     }
