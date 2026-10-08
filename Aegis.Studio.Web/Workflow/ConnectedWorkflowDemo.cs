@@ -86,7 +86,7 @@ internal static class ConnectedWorkflowDemo
                 requestId,workspace,payload,i==0?"Pending":"Confirmed",job,actor);
             if(i>0 && i<14)
                 Exec(c,tx,@"insert into studio_frontdesk_deposits(id,request_id,amount,currency,provider,reference,recorded_by)
-                    values($1,$2,5000,'JMD','demo','CONNECTED-DEMO-'+$3,$4) on conflict(id) do nothing",
+                    values($1,$2,5000,'JMD','demo','CONNECTED-DEMO-'||$3,$4) on conflict(id) do nothing",
                     Id("deposit:"+i),requestId,i.ToString(),actor);
 
             Exec(c,tx,@"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc)
