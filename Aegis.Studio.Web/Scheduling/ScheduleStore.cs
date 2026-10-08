@@ -87,15 +87,12 @@ public sealed class ScheduleStore
     public ScheduleEntry Create(ScheduleEntryRequest request)
     {
         ValidateEntry(request);
-        IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, null);
-        if (conflicts.Count > 0 && !request.AllowConflicts)
-        {
-            throw new ScheduleConflictException(conflicts);
-        }
-
         Guid id = Guid.NewGuid();
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
+        LockScheduleResources(connection,transaction,request.ResourceIds);
+        IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, null);
+        if (conflicts.Count > 0 && !request.AllowConflicts) throw new ScheduleConflictException(conflicts);
         using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
@@ -113,10 +110,12 @@ public sealed class ScheduleStore
         ValidateEntry(request);
         if(ChangeLinkedShoot(id,request.ResourceIds??[],request.StartsAtUtc,request.EndsAtUtc,request.Location,request.Notes,request.JobId,status:request.Status??"Scheduled"))
             return GetEntries(request.StartsAtUtc.AddMinutes(-1),request.EndsAtUtc.AddMinutes(1)).Single(e=>e.Id==id);
-        IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, id);
-        if (conflicts.Count > 0 && !request.AllowConflicts) throw new ScheduleConflictException(conflicts);
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
+        Guid[] existing=GetAssignedResources(connection,transaction,id);
+        LockScheduleResources(connection,transaction,existing.Concat(request.ResourceIds??[]));
+        IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, id);
+        if (conflicts.Count > 0 && !request.AllowConflicts) throw new ScheduleConflictException(conflicts);
         using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
@@ -128,6 +127,27 @@ public sealed class ScheduleStore
         SaveResources(connection, transaction, id, request.ResourceIds);
         transaction.Commit();
         return GetEntries(request.StartsAtUtc.AddMinutes(-1), request.EndsAtUtc.AddMinutes(1)).First(x => x.Id == id);
+    }
+
+    // Shared with WorkflowStore.SaveSession: resource-specific transaction advisory locks.
+    // The conflict query runs only after all locks have been acquired.
+    private static void LockScheduleResources(NpgsqlConnection connection,NpgsqlTransaction tx,IEnumerable<Guid>? ids)
+    {
+        foreach(Guid id in (ids??[]).Distinct().Order())
+        {
+            using var cmd=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",connection,tx);
+            cmd.Parameters.AddWithValue(id.ToString());
+            cmd.ExecuteNonQuery();
+        }
+    }
+    private static Guid[] GetAssignedResources(NpgsqlConnection connection,NpgsqlTransaction tx,Guid entryId)
+    {
+        using var cmd=new NpgsqlCommand("select resource_id from studio_schedule_entry_resources where entry_id=$1",connection,tx);
+        cmd.Parameters.AddWithValue(entryId);
+        using var reader=cmd.ExecuteReader();
+        var ids=new List<Guid>();
+        while(reader.Read())ids.Add(reader.GetGuid(0));
+        return ids.ToArray();
     }
 
     public IReadOnlyList<ScheduleConflict> FindConflicts(DateTimeOffset startsAtUtc, DateTimeOffset endsAtUtc, IReadOnlyList<Guid>? resourceIds, Guid? excludingEntryId)
@@ -207,11 +227,12 @@ public sealed class ScheduleStore
         Guid[] next=(newResourceIds??[]).Distinct().ToArray();
         if(ChangeLinkedShoot(entryId,next,current.StartsAtUtc,current.EndsAtUtc,current.Location,current.Notes,current.JobId,changedBy))
             return GetAssignmentHistory(entryId,1).Single();
-        IReadOnlyList<ScheduleConflict> conflicts=FindConflicts(current.StartsAtUtc,current.EndsAtUtc,next,entryId);
-        if(conflicts.Count>0) throw new ScheduleConflictException(conflicts);
-
         using NpgsqlConnection connection=database.OpenConnection();
         using NpgsqlTransaction tx=connection.BeginTransaction();
+        Guid[] previous=GetAssignedResources(connection,tx,entryId);
+        LockScheduleResources(connection,tx,previous.Concat(next));
+        IReadOnlyList<ScheduleConflict> conflicts=FindConflicts(current.StartsAtUtc,current.EndsAtUtc,next,entryId);
+        if(conflicts.Count>0) throw new ScheduleConflictException(conflicts);
         using(NpgsqlCommand delete=connection.CreateCommand())
         {
             delete.Transaction=tx;delete.CommandText="delete from studio_schedule_entry_resources where entry_id=$1";delete.Parameters.AddWithValue(entryId);delete.ExecuteNonQuery();
