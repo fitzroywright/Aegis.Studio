@@ -1135,7 +1135,7 @@
                         <section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
                                 <div><h2>Demo Data</h2><p>Generate workflow-native examples or remove the owned demo fixture.</p></div>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Generate Demo Data</button></div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Generate Demo Data</button><button class="primary" type="button" data-demo-reset>Reset and Regenerate</button></div>
                             </header>
                             <p class="admin-card-note">Removal requires server-side DemoData:AllowDestructiveReset and an explicit confirmation. Generation uses fictional contacts only.</p>
                             <progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress>
@@ -1208,6 +1208,23 @@
                 const dialog=studioDialog('Demo reset preview','<p>'+esc(result.warning||'Preview only')+'</p><p>'+rows.length+' Studio tables identified. No records were changed.</p><div style="max-height:45vh;overflow:auto">'+rows.map(x=>'<div>'+esc(x.table)+'</div>').join('')+'</div>');
             }catch(error){status.textContent='Preview failed: '+error.message;}
             finally{button.disabled=false;}
+        };
+        panel.querySelector('[data-demo-reset]').onclick=async()=>{
+            const status=panel.querySelector('[data-demo-status]');
+            const confirmation=window.prompt('This removes all Studio business records and regenerates the Connected Workflow demo. Type REMOVE STUDIO DEMO DATA to continue.');
+            if(confirmation!=='REMOVE STUDIO DEMO DATA')return;
+            const button=panel.querySelector('[data-demo-reset]');
+            button.disabled=true;panel.setAttribute('aria-busy','true');
+            status.textContent='Resetting and regenerating Studio demo data…';
+            try{
+                const result=await json('/api/admin/connected-workflow/demo-data/reset-and-generate',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({confirmation})
+                });
+                status.textContent=result.message||'Reset and regeneration completed.';
+                await loadWorkspaces();
+            }catch(e){status.textContent='Reset/regeneration failed: '+e.message;}
+            finally{button.disabled=false;panel.setAttribute('aria-busy','false');}
         };
         panel.querySelector('[data-demo-remove]').onclick=async()=>{
             const status=panel.querySelector('[data-demo-status]');
