@@ -156,9 +156,39 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 }
                 Notify(c,tx,job,request.OperationId.ToString(),requester,"Assignment request: "+request.Method);break;
             case "claim":
-                if(request.UserName is not null&&!request.UserName.Equals(actor,StringComparison.OrdinalIgnoreCase))throw new UnauthorizedAccessException();
+            case "release-claim":
+            case "reassign-claim":
                 if(!IsFrontDesk(user)||stage!="Pending")throw new UnauthorizedAccessException();
-                Sql(c,tx,"update studio_jobs set frontdesk_claim=$2 where id=$1",job,request.UserName??actor);break;
+                string? currentClaim;
+                using(var q=Command(c,tx,"select frontdesk_claim from studio_jobs where id=$1",job))
+                    currentClaim=q.ExecuteScalar() as string;
+                bool ownsClaim=string.Equals(currentClaim,actor,StringComparison.OrdinalIgnoreCase);
+                bool supervisor=manager||IsOperations(user)||user.IsInRole("Administrator");
+                if(request.Action=="claim")
+                {
+                    if(!string.IsNullOrWhiteSpace(currentClaim)&&!ownsClaim)throw new WorkflowConflictException();
+                    if(request.UserName is not null&&!request.UserName.Equals(actor,StringComparison.OrdinalIgnoreCase))throw new UnauthorizedAccessException();
+                    Sql(c,tx,"update studio_jobs set frontdesk_claim=$2 where id=$1",job,actor);
+                }
+                else if(request.Action=="release-claim")
+                {
+                    if(!ownsClaim&&!supervisor)throw new UnauthorizedAccessException();
+                    if(!string.IsNullOrWhiteSpace(currentClaim))
+                    {
+                        if(!ownsClaim)RequireReason(request);
+                        Sql(c,tx,"update studio_jobs set frontdesk_claim=null where id=$1",job);
+                    }
+                }
+                else
+                {
+                    if(!supervisor)throw new UnauthorizedAccessException();
+                    RequireReason(request);
+                    if(string.IsNullOrWhiteSpace(request.UserName))throw new ArgumentException("Choose the Front Desk employee receiving this claim.");
+                    RequireEmployee(request.UserName);
+                    Sql(c,tx,"update studio_jobs set frontdesk_claim=$2 where id=$1",job,request.UserName.Trim());
+                    Notify(c,tx,job,request.OperationId.ToString(),request.UserName.Trim(),"Front Desk booking assigned");
+                }
+                break;
             case "transfer":
                 EnsureMutable(stage);RequireReason(request);if(request.WorkspaceId is not Guid destination||destination==WorkflowRules.UnassignedWorkspaceId&&stage!="Pending")throw new ArgumentException("Choose an enabled business workspace.");
                 if(stage=="Pending"?!IsFrontDesk(user)&&!manager:!IsOperations(user)&&!(manager&&Manager(user,destination)))throw new UnauthorizedAccessException();
