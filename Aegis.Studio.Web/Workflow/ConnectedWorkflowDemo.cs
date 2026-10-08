@@ -71,6 +71,24 @@ internal static class ConnectedWorkflowDemo
                 values($1,$2,$3,$4,$5,$6,$7,now()-($8*interval '1 day'),$9,$9,$10) on conflict(id) do nothing",
                 job,workspace,conversation,Titles[i],Clients[i],Stages[i],DateOnly.FromDateTime(DateTime.UtcNow.AddDays(i-5)),i+1,(object?)owner??DBNull.Value,client);
             Exec(c,tx,"update studio_conversations set job_id=$2 where id=$1 and job_id is null",conversation,job);
+            // Front Desk and Finance see the same Job rather than a detached
+            // demonstration card. A fictional booking and its verified receipt
+            // share a deterministic reference with the workflow Job.
+            var requestId=Id("booking:"+i);
+            var payload=System.Text.Json.JsonSerializer.Serialize(new {
+                workspaceId=workspace,clientName=Clients[i],clientEmail=email,
+                title=Titles[i],eventDate=DateOnly.FromDateTime(DateTime.UtcNow.AddDays(i-5)),
+                requiredDeposit=5000,currency="JMD",bookingSource="Demo",
+                externalBookingId="CONNECTED-DEMO-"+i
+            });
+            Exec(c,tx,@"insert into studio_frontdesk_requests(id,workspace_id,payload,status,job_id,created_by)
+                values($1,$2,$3::jsonb,$4,$5,$6) on conflict(id) do nothing",
+                requestId,workspace,payload,i==0?"Pending":"Confirmed",job,actor);
+            if(i>0 && i<14)
+                Exec(c,tx,@"insert into studio_frontdesk_deposits(id,request_id,amount,currency,provider,reference,recorded_by)
+                    values($1,$2,5000,'JMD','demo','CONNECTED-DEMO-'+$3,$4) on conflict(id) do nothing",
+                    Id("deposit:"+i),requestId,i.ToString(),actor);
+
             Exec(c,tx,@"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc)
                 values($1,$2,$3,'External',$4,now()-($5*interval '1 day')) on conflict(id) do nothing",
                 Id("message:"+i),conversation,Clients[i],"Demo enquiry: please confirm availability and next steps for "+Titles[i]+".",i+1);
