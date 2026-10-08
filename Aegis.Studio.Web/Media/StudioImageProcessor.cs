@@ -52,7 +52,7 @@ internal static class StudioImageProcessor
         var output = new SKBitmap(width, height, source.ColorType, source.AlphaType);
         using var canvas = new SKCanvas(output);
         canvas.Clear(SKColors.Black);
-        canvas.DrawBitmap(source, destination);
+        canvas.DrawBitmap(source, destination, new SKSamplingOptions(SKFilterMode.Linear));
         canvas.Flush();
         return output;
     }
@@ -98,7 +98,7 @@ internal static class StudioImageProcessor
                 canvas.RotateDegrees(-90);
                 break;
         }
-        canvas.DrawBitmap(source, 0, 0);
+        canvas.DrawBitmap(source, 0, 0, SKSamplingOptions.Default);
         canvas.Flush();
         return output;
     }
