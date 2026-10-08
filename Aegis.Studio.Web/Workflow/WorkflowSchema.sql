@@ -54,6 +54,7 @@ begin
     union select c.user_name from studio_workflow_crew c join studio_workflow_sessions s on s.id=c.session_id where s.job_id=p_job and p_audience='Crew'
     union select p_audience where p_audience not in ('Owner','Manager','Crew','Front Desk','Production')
   ) targets on lower(targets.user_name)=lower(u.user_name)
+  where not exists(select 1 from studio_employees e where lower(e.user_name)=lower(u.user_name) and (not e.is_active or not e.is_assignable))
  loop
   found_user:=true;
   if p.in_app_enabled then
