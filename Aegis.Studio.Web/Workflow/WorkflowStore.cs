@@ -76,6 +76,8 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(!manager)throw new UnauthorizedAccessException();EnsureMutable(stage);
                 if(!string.IsNullOrWhiteSpace(request.UserName))RequireEmployee(request.UserName);
                 else RequireReason(request);
+                if(string.Equals(owner?.Trim(),request.UserName?.Trim(),StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("This employee is already the Job Owner; no assignment change is needed.");
                 Sql(c,tx,"update studio_jobs set job_lead=$2,assigned_to=$2 where id=$1",job,string.IsNullOrWhiteSpace(request.UserName)?null:request.UserName.Trim());
                 if(!string.IsNullOrWhiteSpace(request.UserName))Notify(c,tx,job,request.OperationId.ToString(),request.UserName,"Job Owner assigned");
                 EnsureDraft(c,tx,job);Recalculate(c,tx,job);break;
