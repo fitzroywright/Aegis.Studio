@@ -25,3 +25,27 @@ test('a failed media summary has a working retry without removing sessions and t
  let attempts=0;const {w,dom}=setup(async url=>{if(url==='/api/my-work/media-summary'&&++attempts===1)throw Error('Timed out');return response(url);});await flush();await w.studioMyWorkReady;
  assert.ok(w.document.querySelector('[data-mw-retry=media]'));assert.match(w.document.querySelector('[data-mw-region=tasks]').textContent,/Retouch portraits/);w.document.querySelector('[data-mw-retry=media]').click();await flush();assert.equal(attempts,2);assert.match(w.document.querySelector('[data-mw-region=pipeline]').textContent,/Carter Wedding/);assert.equal(w.document.querySelector('[data-mw-retry=media]'),null);dom.window.close();
 });
+
+test('administrator can assign a job lead from My Work',async()=>{
+ const calls=[];
+ const read=async(url,options)=>{
+  if(options?.method==='PUT'){calls.push({url,body:JSON.parse(options.body)});return {jobId:'job',jobLead:'lead.user'};}
+  if(url==='/api/auth/me')return {user:{userName:'admin',displayName:'Admin User',isAdministrator:true}};
+  if(url==='/api/studio-employees?assignable=true')return [{userName:'lead.user',displayName:'Lead User',roles:['Photographer']}];
+  return response(url);
+ };
+ const {w,dom}=setup(read);
+ w.studioDialog=(title,body)=>{const dialog=w.document.createElement('dialog');dialog.innerHTML=body;dialog.close=()=>dialog.remove();w.document.body.append(dialog);return dialog;};
+ await w.studioMyWorkReady;
+ const action=w.document.querySelector('[data-assign-job-lead]');assert.ok(action);
+ action.click();await flush();
+ const form=w.document.querySelector('[data-job-lead-form]');assert.ok(form);form.elements.userName.value='lead.user';
+ await form.onsubmit({preventDefault(){}});
+ assert.deepEqual(calls,[{url:'/api/jobs/job/lead',body:{userName:'lead.user'}}]);
+ assert.equal(w.document.querySelector('[data-job-lead-form]'),null);
+ dom.window.close();
+});
+test('non-administrator does not see the My Work job lead action',async()=>{
+ const {w,dom}=setup(async(url,options)=>response(url));await w.studioMyWorkReady;
+ assert.equal(w.document.querySelector('[data-assign-job-lead]'),null);dom.window.close();
+});
