@@ -7276,10 +7276,10 @@ body[data-studio-view="today"] .studio-context-card:nth-child(1)>header{
  background:#e7f2ff;border-bottom-color:#c9def3;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(2){
- border-color:#c6b6dc;background:#fcf9ff;
+ border-color:#c6d6cd;background:#f7fbf8;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(2)>header{
- background:#f0e9fa;border-bottom-color:#ded0ef;
+ background:#e9f3ec;border-bottom-color:#d3e6d8;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(3){
  border-color:#b6d7c1;background:#f7fcf8;
@@ -7300,10 +7300,10 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(2)>heade
  background:#fff0de;border-bottom-color:#f0d4b4;
 }
 body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(3){
- border-color:#d3b8d8;background:#fdf9fd;
+ border-color:#b9d5cf;background:#f8fbfa;
 }
 body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(3)>header{
- background:#f6eafa;border-bottom-color:#e7d2ed;
+ background:#e6f3ef;border-bottom-color:#d1e7df;
 }
 body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links button>span:first-child{
  width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;
@@ -7311,7 +7311,7 @@ body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links button>
  font-size:15px;font-weight:800;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(2) .mw-today-rail-links button>span:first-child{
- background:#ece2fa;color:#7442a4;
+ background:#e2f0e7;color:#397b60;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(3) .mw-today-rail-links button>span:first-child{
  background:#dff2e4;color:#247d4b;
@@ -7321,7 +7321,7 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel>header h2{
 }
 body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(1)>header h2{color:#235b8c}
 body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(2)>header h2{color:#945b23}
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(3)>header h2{color:#804c8b}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(3)>header h2{color:#397966}
 @media(max-width:1050px){
  body[data-studio-view="today"] .mw-today-right{overflow-y:auto}
 }
@@ -7346,7 +7346,7 @@ body[data-studio-view="today"] .studio-card-icon{
  background:#d9e9fb;color:#245c90;font-size:14px;font-weight:800;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(2) .studio-card-icon{
- background:#e9ddf9;color:#7442a4;
+ background:#e0efe7;color:#397b60;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(3) .studio-card-icon{
  background:#d9f0e0;color:#247d4b;
@@ -7355,7 +7355,7 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(2) .stud
  background:#f9e3c8;color:#955923;
 }
 body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(3) .studio-card-icon{
- background:#eedcf4;color:#804c8b;
+ background:#deeee8;color:#397966;
 }
 body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links{
  padding:3px 6px;gap:1px;
@@ -7538,7 +7538,7 @@ body[data-studio-view="today"] .studio-status-pill[data-status*="reject"]{
 body[data-studio-view="today"] .studio-status-pill[data-status*="review"],
 body[data-studio-view="today"] .studio-status-pill[data-status*="upload"],
 body[data-studio-view="today"] .studio-status-pill[data-status*="editing"]{
- background:#f1e7ff;border-color:#d7baf3;color:#7441a2;
+ background:#e6f2ec;border-color:#c2dfd1;color:#36765c;
 }
 body[data-studio-view="today"] .studio-context-card .mw-today-rail-links button:nth-child(3n+1)>span:first-child{
  background:#dceafb;color:#2165a2;
@@ -7547,7 +7547,7 @@ body[data-studio-view="today"] .studio-context-card .mw-today-rail-links button:
  background:#ffe8cf;color:#a05c1c;
 }
 body[data-studio-view="today"] .studio-context-card .mw-today-rail-links button:nth-child(3n)>span:first-child{
- background:#e8dff9;color:#7045a4;
+ background:#e1efe9;color:#3a7865;
 }
 body[data-studio-view="today"] .mw-today-right .mw-status-row:nth-child(1) .studio-attention-label>span{
  background:#fce0df;color:#ad3535;
@@ -7556,7 +7556,7 @@ body[data-studio-view="today"] .mw-today-right .mw-status-row:nth-child(2) .stud
  background:#fff0cf;color:#9a651c;
 }
 body[data-studio-view="today"] .mw-today-right .mw-status-row:nth-child(3) .studio-attention-label>span{
- background:#e8def9;color:#7145a2;
+ background:#e0eee7;color:#38775e;
 }
 
 /* Today job involvement roles: matching rounded pill treatment. */
@@ -7571,7 +7571,7 @@ body[data-studio-view="today"] .studio-role-dot{
  width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:currentColor;
 }
 body[data-studio-view="today"] .studio-role-pill[data-role="job-lead"]{
- background:#e8def9;border-color:#d0b8ef;color:#7140a2;
+ background:#e0eee7;border-color:#c2dccd;color:#36745d;
 }
 body[data-studio-view="today"] .studio-role-pill[data-role="assigned"]{
  background:#e1efff;border-color:#b0d0f3;color:#205e9a;
