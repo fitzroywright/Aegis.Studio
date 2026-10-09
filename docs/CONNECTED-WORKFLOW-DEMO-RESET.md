@@ -25,7 +25,7 @@ dotnet build --no-restore
 dotnet test --no-build
 ```
 
-On the demo site, sign in as Administrator. Run **Reset and Regenerate** and verify My Work, Jobs, Front Desk, WorkDay, Production, and Workspaces show the same Jobs. If the reset reports a protected dependency, do not remove the safeguard; inspect the live foreign-key graph and adjust the explicit ownership model.
+On the demo site, sign in as Administrator. Run **Reset and Regenerate** and verify Today, Jobs, Front Desk, WorkDay, Production, and Workspaces show the same Jobs. If the reset reports a protected dependency, do not remove the safeguard; inspect the live foreign-key graph and adjust the explicit ownership model.
 
 ## Limitations
 
