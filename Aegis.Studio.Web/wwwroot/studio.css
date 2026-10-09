@@ -7041,3 +7041,27 @@ body .shell>.studio-shell-footer{
 }
 body .shell>.studio-context-rail,
 body .shell>main{margin-bottom:0 !important}
+
+/* Studio frame: 56px masthead, full-width footer pinned to browser bottom. */
+body .shell{
+ height:calc(100dvh - 56px) !important;
+ grid-template-rows:minmax(0,1fr) 32px !important;
+}
+body .shell>.studio-shell-footer{
+ position:relative;z-index:10;
+ grid-column:1/-1;grid-row:2;
+ height:32px;min-height:32px;max-height:32px;
+ padding:0 12px;margin:0 !important;
+}
+body[data-studio-view="today"] .mw-today-page{
+ grid-template-rows:auto auto minmax(0,1fr) !important;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools{
+ display:flex;align-items:center;justify-content:flex-end;
+ flex-wrap:wrap;gap:8px;min-height:34px;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-calendar-view-switch,
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-day-nav{
+ flex:0 0 auto;
+}
+body[data-studio-view="today"] #studioPageTools{display:none !important}
