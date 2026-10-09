@@ -5873,7 +5873,7 @@ body[data-studio-view="workspaces"] .studio-shell-breadcrumb strong{
 
 
 /* Shell correction 2026-10-07: the persistent context rail was removed from the current HTML shell.
-   Non-My-Work pages must therefore let <main> own the full shell width instead of leaving it
+   Non-Today pages must therefore let <main> own the full shell width instead of leaving it
    auto-placed in the retired 220px rail column. */
 body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell{
   display:block;
