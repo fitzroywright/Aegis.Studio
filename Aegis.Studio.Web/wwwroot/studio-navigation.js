@@ -962,7 +962,6 @@
 
                     <section class="mw-list-panel jobs-center">
                         <div class="jobs-toolbar">
-                            <label class="jobs-search"><span>⌕</span><input type="search" data-jobs-search placeholder="Search jobs…"></label>
                             <select data-jobs-status><option value="">All statuses</option>${uniqueStatuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select>
                             <select data-jobs-light><option value="">All activity lights</option><option value="green">Normal</option><option value="amber">Attention</option><option value="red">Overdue</option><option value="neutral">Timing unavailable</option><option value="grey">Inactive</option></select><select data-jobs-person><option value="">All owners / photographers</option>${staff.map(x=>`<option value="${esc(String(x))}">${esc(typeof studioFirstName==='function'?studioFirstName(x):x)}</option>`).join('')}</select>
                             <select data-jobs-date><option value="all">All dates</option><option value="upcoming">Upcoming</option><option value="past">Past</option><option value="unscheduled">Not scheduled</option></select>
@@ -1016,7 +1015,7 @@
         const jobsHeading=genericView.querySelector('.jobs-page-heading');
         if(jobsHeading&&studioBreadcrumb)jobsHeading.appendChild(studioBreadcrumb);
         if(studioPageTools){
-            studioPageTools.innerHTML='<button type="button" class="primary jobs-new-button" data-job-action="new">＋ New Job</button>';
+            studioPageTools.innerHTML='';
         }
 
         const list=genericView.querySelector('[data-jobs-list]');
@@ -1061,10 +1060,10 @@
             genericView.querySelectorAll('[data-job-group]').forEach(x=>x.classList.toggle('active',x===button));
             apply();
         });
-        for(const [selector,value] of [['[data-jobs-search]',term],['[data-jobs-status]',statusFilter],['[data-jobs-person]',personFilter],['[data-jobs-date]',dateFilter],['[data-jobs-sort]',sort],['[data-jobs-light]',lightFilter]]){const control=genericView.querySelector(selector);if(control)control.value=value;}
+        for(const [selector,value] of [['[data-jobs-status]',statusFilter],['[data-jobs-person]',personFilter],['[data-jobs-date]',dateFilter],['[data-jobs-sort]',sort],['[data-jobs-light]',lightFilter]]){const control=genericView.querySelector(selector);if(control)control.value=value;}
         list.scrollTop=savedJobs.scroll||0;list.addEventListener('scroll',()=>{try{const state=JSON.parse(sessionStorage.getItem('studio-jobs-filters:'+workspaceFilter)||'{}');state.scroll=list.scrollTop;sessionStorage.setItem('studio-jobs-filters:'+workspaceFilter,JSON.stringify(state));}catch{}});
         genericView.querySelector('[data-jobs-light]').onchange=e=>{lightFilter=e.target.value;apply();};
-        genericView.querySelector('[data-jobs-search]').oninput=e=>{term=e.target.value.trim().toLowerCase();apply();};
+        // Search is intentionally absent from the Jobs toolbar.
         genericView.querySelector('[data-jobs-status]').onchange=e=>{statusFilter=e.target.value;apply();};
         genericView.querySelector('[data-jobs-person]').onchange=e=>{personFilter=e.target.value;apply();};
         genericView.querySelector('[data-jobs-date]').onchange=e=>{dateFilter=e.target.value;apply();};
