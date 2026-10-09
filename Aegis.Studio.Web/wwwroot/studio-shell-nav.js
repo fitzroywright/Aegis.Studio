@@ -32,6 +32,18 @@
         pageTools?.querySelector('[data-studio-persistent-tools]')?.remove();
     }
 
+    function ensureFooter() {
+        if (!shell) return;
+        let footer = document.getElementById('studioShellFooter');
+        if (!footer) {
+            footer = document.createElement('footer');
+            footer.id = 'studioShellFooter';
+            footer.className = 'studio-shell-footer';
+            footer.textContent = "Brian's Photo Studios · Studio";
+            shell.append(footer);
+        }
+    }
+
     function ensureLeftRail() {
         if (!shell) return;
         let rail = document.getElementById('studioContextRail');
@@ -148,6 +160,7 @@
         currentView = document.body.dataset.studioView || currentView;
         ensureTools();
         ensureLeftRail();
+        ensureFooter();
         ensureBreadcrumb();
         if (!window.history.state?.studioView) window.history.replaceState({ studioView: currentView }, '', window.location.href);
         window.addEventListener('popstate', event => {
