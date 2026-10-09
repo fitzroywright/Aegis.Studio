@@ -7,7 +7,7 @@ const {JSDOM}=require('jsdom');
 const code=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/studio-shell-nav.js'),'utf8');
 
 function setup(){
- const dom=new JSDOM('<body data-studio-view="mywork"><nav id="studioBreadcrumb"></nav><div id="studioPageTools"></div><div class="shell"><main></main></div><input id="studioSearch"></body>',{url:'https://studio.test/',runScripts:'outside-only'});
+ const dom=new JSDOM('<body data-studio-view="today"><nav id="studioBreadcrumb"></nav><div id="studioPageTools"></div><div class="shell"><main></main></div><input id="studioSearch"></body>',{url:'https://studio.test/',runScripts:'outside-only'});
  const w=dom.window;
  const calls=[];
  w.studioNavigate=async view=>{calls.push(view);w.document.body.dataset.studioView=view;};
@@ -16,21 +16,21 @@ function setup(){
  return {w,dom,calls};
 }
 
-test('Back stays inside Studio and My Work keeps its own left layout',async()=>{
+test('Back stays inside Studio and Today keeps its own left layout',async()=>{
  const {w,dom,calls}=setup();
  const tools=w.document.getElementById('studioPageTools');
  const rail=w.document.getElementById('studioContextRail');
  assert.ok(tools.querySelector('[data-studio-back]'));
  assert.ok(rail);
- assert.equal(w.document.body.dataset.studioView,'mywork');
- assert.ok(w.document.getElementById('studioBreadcrumb').textContent.includes('My Work'));
+ assert.equal(w.document.body.dataset.studioView,'today');
+ assert.ok(w.document.getElementById('studioBreadcrumb').textContent.includes('Today'));
 
  await w.studioNavigate('workspaces');
  assert.equal(w.document.body.dataset.studioView,'workspaces');
  assert.equal(rail.querySelectorAll('.studio-context-card').length,3);
  tools.querySelector('[data-studio-back]').click();
  await new Promise(resolve=>setTimeout(resolve,0));
- assert.deepEqual(calls,['workspaces','mywork']);
+ assert.deepEqual(calls,['workspaces','today']);
  assert.equal(w.location.href,'https://studio.test/');
  dom.window.close();
 });
@@ -57,7 +57,7 @@ test('Every non-My-Work page gets Status Actions and Quick Links cards',async()=
  assert.match(rail.textContent,/Status/);
  assert.match(rail.textContent,/Actions/);
  assert.match(rail.textContent,/Quick Links/);
- assert.match(w.document.getElementById('studioBreadcrumb').textContent,/My Work.*Production/);
+ assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*Production/);
 
  const tools=w.document.getElementById('studioPageTools');
  tools.innerHTML='<div class="page-specific">Page tool</div>';
