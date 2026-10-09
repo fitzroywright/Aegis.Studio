@@ -3,7 +3,7 @@
     const pageTools = document.getElementById('studioPageTools');
     const shell = document.querySelector('.shell');
     const quickLinks = [
-        ['mywork', 'My Work', '▤'],
+        ['mywork', 'Today', '▤'],
         ['workspaces', 'Workspaces', '▰'],
         ['jobs', 'Jobs', '▥'],
         ['pipeline', 'Pipeline', '⇥'],
