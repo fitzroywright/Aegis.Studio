@@ -7605,3 +7605,39 @@ body[data-studio-view="today"] .studio-role-pill[data-role="task-owner"]{
 body[data-studio-view="today"] .studio-role-pill[data-role="team"]{
  background:#fff0d9;border-color:#eed2a7;color:#92621f;
 }
+
+/* Today Jobs toolbar: calendar belongs in grid title row, directly before search. */
+body[data-studio-view="today"] .mw-today-job-toolbar{
+ display:flex;align-items:center;flex-wrap:wrap;gap:7px;
+}
+body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-view-tabs{
+ flex:0 1 auto;
+}
+body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{
+ position:static!important;top:auto!important;right:auto!important;
+ height:auto!important;min-height:30px!important;
+ display:flex;align-items:center;flex:0 0 auto;flex-wrap:nowrap;
+ gap:5px;margin-left:auto;padding:0;
+ background:transparent;box-shadow:none;border:0;
+ z-index:auto;
+}
+body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-search{
+ flex:0 1 220px;min-width:155px;margin:0;
+}
+body[data-studio-view="today"] .mw-today-job-columns{
+ font-size:.75rem!important;font-weight:850!important;
+ color:#213c5a!important;letter-spacing:.015em;
+ background:#e8eef5!important;
+ border-top:1px solid #cad8e7;border-bottom:1px solid #cad8e7;
+}
+body[data-studio-view="today"] .mw-today-job-columns>span{
+ font-weight:850!important;
+}
+body[data-studio-view="today"] .mw-today-job-date{
+ white-space:nowrap;font-variant-numeric:tabular-nums;
+}
+@media(max-width:1200px){
+ body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{
+ margin-left:0;
+ }
+}
