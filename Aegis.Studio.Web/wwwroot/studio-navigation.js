@@ -297,7 +297,7 @@
             ||'<div class="mw-empty">No accessible workspaces.</div>';
         const markup=`
             <section class="mw-page mw-today-page">
-                <header class="mw-today-heading"><div><h1>Today</h1><p>Your assignments, upcoming sessions, and what needs your attention.</p></div></header>
+                <header class="mw-today-heading"><div class="mw-today-heading-copy"><span class="mw-today-focus-icon" aria-hidden="true">✦</span><div><h1>Today <span class="mw-today-focus-label">Your focus</span></h1><p>What needs your attention, what’s coming up, and the work to move forward.</p></div></div></header>
                 <div class="mw-today-calendar-tools" aria-label="Calendar navigation"><time class="mw-today-calendar-date">${now.toLocaleDateString([],{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</time></div>
                 <div class="mw-today-layout">
                     <main class="mw-today-center">
