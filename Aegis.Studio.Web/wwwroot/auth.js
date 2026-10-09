@@ -45,6 +45,26 @@ async function loadSignedInUser() {
             : source.slice(0, 2).toUpperCase();
     }
 
+    const profilePhoto = document.getElementById('studioProfilePhoto');
+    const profilePlaceholder = document.getElementById('studioProfilePlaceholder');
+    if (profilePhoto && profilePlaceholder) {
+        const photoUrl = [user.photoUrl, user.profilePhotoUrl, user.avatarUrl, user.pictureUrl, user.photoUri]
+            .find(value => typeof value === 'string' && (/^https:\/\//i.test(value) || /^\/[^/]/.test(value)));
+        const showPlaceholder = () => {
+            profilePhoto.hidden = true;
+            profilePhoto.removeAttribute('src');
+            profilePlaceholder.hidden = false;
+        };
+        profilePhoto.onerror = showPlaceholder;
+        if (photoUrl) {
+            profilePhoto.onload = () => {
+                profilePhoto.hidden = false;
+                profilePlaceholder.hidden = true;
+            };
+            profilePhoto.src = photoUrl;
+        } else showPlaceholder();
+    }
+
     if (adminMenuButton) adminMenuButton.hidden = user.isAdministrator !== true;
 
     if (signOutButton) {
