@@ -202,7 +202,7 @@ dialog::backdrop {
   color:#a96300
 }
 
-/* Shell + My Work: approved horizontal reference */
+/* Shell + Today: approved horizontal reference */
 .topbar{height:72px;display:flex;align-items:center;gap:16px;padding:0 24px;background:#fff;border-bottom:1px solid #e5e7eb;white-space:nowrap}
 .shell-brand{padding:0;flex:0 0 auto}.shell-brand strong{font-size:17px;letter-spacing:.4px}.shell-brand strong>span{margin-left:8px}
 .studio-organization{font-size:12px;padding-left:14px;border-left:1px solid #d8dde5}
@@ -1819,8 +1819,8 @@ h3 {
 }
 
 
-/* My Work 2026-10-06 approved two-line reference */
-body[data-studio-view="mywork"] .generic{background:#f7f6f3}
+/* Today 2026-10-06 approved two-line reference */
+body[data-studio-view="today"] .generic{background:#f7f6f3}
 .mw-reference-page{padding:18px 36px 30px;gap:14px;min-height:100%;background:linear-gradient(180deg,#f8f7f4 0,#f5f4f1 100%)}
 .mw-reference-header{height:70px;display:flex;align-items:flex-start;justify-content:space-between}
 .mw-reference-header h1{font-size:38px;line-height:1;color:#2b160b;letter-spacing:-1.25px}
@@ -1910,68 +1910,68 @@ body[data-studio-view="mywork"] .generic{background:#f7f6f3}
 .mw-message-copy small{font-size:12px;line-height:15px}
 .mw-message-time{font-size:11px;color:#66717c}
 
-body[data-studio-view="mywork"] .topbar{height:64px;padding:0 36px;gap:14px;background:#fffdfa;border-bottom:1px solid #deddd8}
-body[data-studio-view="mywork"] .shell{height:calc(100dvh - 64px)}
-body[data-studio-view="mywork"] .shell-brand strong{font-size:0}
-body[data-studio-view="mywork"] .shell-brand strong:before{content:'◉  Studio';font-size:20px;font-weight:700;letter-spacing:0;color:#161616}
-body[data-studio-view="mywork"] .studio-organization{display:none}
-body[data-studio-view="mywork"] .rail{margin-left:14px}
-body[data-studio-view="mywork"] .brand-button{height:64px;padding:0 10px;font-size:13px;color:#171717;border-bottom:3px solid transparent}
-body[data-studio-view="mywork"] .brand-button.active{height:64px;border-radius:0;background:transparent;color:#3d1c0c;border-bottom-color:#6f3218;box-shadow:none}
-body[data-studio-view="mywork"] .nav-divider{display:none}
-body[data-studio-view="mywork"] .studio-global-search{width:310px;height:40px;margin-left:auto;position:relative}
-body[data-studio-view="mywork"] .studio-global-search:before{content:'⌕';position:absolute;left:12px;top:4px;z-index:1;font-size:24px;color:#66717c}
-body[data-studio-view="mywork"] .studio-global-search input{display:block;width:100%;height:40px;padding:8px 12px 8px 38px;border:1px solid #deddd8;border-radius:8px;background:#fff;color:#333}
-body[data-studio-view="mywork"] .studio-global-search input::placeholder{font-size:13px;color:#737b85}
-body[data-studio-view="mywork"] .shell-icon-button{width:38px}
-body[data-studio-view="mywork"] .avatar{width:40px;height:40px;background:#3b1d0e;color:#fff}
+body[data-studio-view="today"] .topbar{height:64px;padding:0 36px;gap:14px;background:#fffdfa;border-bottom:1px solid #deddd8}
+body[data-studio-view="today"] .shell{height:calc(100dvh - 64px)}
+body[data-studio-view="today"] .shell-brand strong{font-size:0}
+body[data-studio-view="today"] .shell-brand strong:before{content:'◉  Studio';font-size:20px;font-weight:700;letter-spacing:0;color:#161616}
+body[data-studio-view="today"] .studio-organization{display:none}
+body[data-studio-view="today"] .rail{margin-left:14px}
+body[data-studio-view="today"] .brand-button{height:64px;padding:0 10px;font-size:13px;color:#171717;border-bottom:3px solid transparent}
+body[data-studio-view="today"] .brand-button.active{height:64px;border-radius:0;background:transparent;color:#3d1c0c;border-bottom-color:#6f3218;box-shadow:none}
+body[data-studio-view="today"] .nav-divider{display:none}
+body[data-studio-view="today"] .studio-global-search{width:310px;height:40px;margin-left:auto;position:relative}
+body[data-studio-view="today"] .studio-global-search:before{content:'⌕';position:absolute;left:12px;top:4px;z-index:1;font-size:24px;color:#66717c}
+body[data-studio-view="today"] .studio-global-search input{display:block;width:100%;height:40px;padding:8px 12px 8px 38px;border:1px solid #deddd8;border-radius:8px;background:#fff;color:#333}
+body[data-studio-view="today"] .studio-global-search input::placeholder{font-size:13px;color:#737b85}
+body[data-studio-view="today"] .shell-icon-button{width:38px}
+body[data-studio-view="today"] .avatar{width:40px;height:40px;background:#3b1d0e;color:#fff}
 
 @media(max-width:1200px){
   .mw-reference-page{padding-left:22px;padding-right:22px}
   .mw-reference-grid{grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr)}
   .mw-session-row{grid-template-columns:7px 92px 44px minmax(150px,1fr) 95px 92px 24px}
   .mw-session-location{font-size:12px}
-  body[data-studio-view="mywork"] .studio-global-search{width:220px}
+  body[data-studio-view="today"] .studio-global-search{width:220px}
 }
 
 
-/* My Work visual-energy pass 2026-10-06 */
-body[data-studio-view="mywork"]{
+/* Today visual-energy pass 2026-10-06 */
+body[data-studio-view="today"]{
   background:#efece6
 }
-body[data-studio-view="mywork"] .generic{
+body[data-studio-view="today"] .generic{
   background:
     radial-gradient(circle at 14% 8%,rgba(180,112,58,.10),transparent 28%),
     radial-gradient(circle at 84% 14%,rgba(43,112,126,.07),transparent 24%),
     linear-gradient(180deg,#f7f4ef 0%,#f0ede7 100%)
 }
-body[data-studio-view="mywork"] .topbar{
+body[data-studio-view="today"] .topbar{
   background:rgba(255,253,249,.96);
   backdrop-filter:blur(14px);
   box-shadow:0 1px 0 #ddd7cf,0 5px 18px rgba(54,37,24,.04)
 }
-body[data-studio-view="mywork"] .shell-brand strong:before{
+body[data-studio-view="today"] .shell-brand strong:before{
   content:'◉  Studio';
   color:#2d160b;
   text-shadow:0 1px 0 #fff
 }
-body[data-studio-view="mywork"] .brand-button{
+body[data-studio-view="today"] .brand-button{
   transition:background .14s ease,color .14s ease,border-color .14s ease
 }
-body[data-studio-view="mywork"] .brand-button:hover{
+body[data-studio-view="today"] .brand-button:hover{
   background:#f3ece5;
   color:#5d2e17
 }
-body[data-studio-view="mywork"] .brand-button.active{
+body[data-studio-view="today"] .brand-button.active{
   color:#5d2b14;
   border-bottom-color:#8d4a25;
   background:linear-gradient(180deg,transparent 0%,rgba(139,72,35,.06) 100%)
 }
-body[data-studio-view="mywork"] .studio-global-search input{
+body[data-studio-view="today"] .studio-global-search input{
   box-shadow:0 1px 2px rgba(48,30,17,.04);
   background:#fffefd
 }
-body[data-studio-view="mywork"] .avatar{
+body[data-studio-view="today"] .avatar{
   box-shadow:0 0 0 3px #efe4d8
 }
 
@@ -2161,7 +2161,7 @@ body[data-studio-view="mywork"] .avatar{
 }
 
 
-/* My Work compact hero header 2026-10-06 */
+/* Today compact hero header 2026-10-06 */
 .mw-reference-header{
   height:104px;
   position:relative;
@@ -2785,7 +2785,7 @@ body[data-studio-view="workspaces"] .studio-global-search input{
 
 
 /* Studio-wide warm two-line design system 2026-10-06 */
-body:not([data-studio-view="mywork"]):not([data-studio-view="workspaces"]) .generic{
+body:not([data-studio-view="today"]):not([data-studio-view="workspaces"]) .generic{
   background:
     radial-gradient(circle at 8% 4%,rgba(161,92,48,.075),transparent 23%),
     radial-gradient(circle at 92% 12%,rgba(45,111,122,.055),transparent 22%),
@@ -3187,7 +3187,7 @@ body[data-studio-view="tasks"] .mw-page{
   body[data-studio-view] .topbar{padding-left:18px;padding-right:18px;gap:8px}
   body[data-studio-view] .brand-button{padding-left:6px;padding-right:6px;font-size:11px}
   body[data-studio-view] .studio-global-search{width:210px}
-  body:not([data-studio-view="mywork"]):not([data-studio-view="workspaces"]) .generic{padding-left:22px;padding-right:22px}
+  body:not([data-studio-view="today"]):not([data-studio-view="workspaces"]) .generic{padding-left:22px;padding-right:22px}
   .studio-page-heading,.job-detail-header,.admin-page-header{min-height:98px}
   .op-metrics,.cards,.management-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -3281,7 +3281,7 @@ body[data-studio-view] .shell-icon-button{
 
 /* Page surfaces: no decorative gradients. */
 body[data-studio-view] .generic,
-body:not([data-studio-view="mywork"]):not([data-studio-view="workspaces"]) .generic{
+body:not([data-studio-view="today"]):not([data-studio-view="workspaces"]) .generic{
   padding:16px 28px 24px;
   background:var(--studio-page)
 }
@@ -3435,7 +3435,7 @@ body[data-studio-view="reports"] .op-card{
   font-weight:750
 }
 
-/* My Work: tighter and cleaner while retaining two-line rows. */
+/* Today: tighter and cleaner while retaining two-line rows. */
 .mw-reference-page{
   padding:0;
   gap:12px;
@@ -3727,11 +3727,11 @@ body[data-studio-view="reports"] .op-card{
   body[data-studio-view] .brand-button{padding-left:6px;padding-right:6px;font-size:11px}
   body[data-studio-view] .studio-global-search{width:205px}
   body[data-studio-view] .generic,
-  body:not([data-studio-view="mywork"]):not([data-studio-view="workspaces"]) .generic{padding-left:18px;padding-right:18px}
+  body:not([data-studio-view="today"]):not([data-studio-view="workspaces"]) .generic{padding-left:18px;padding-right:18px}
 }
 
 
-/* My Work - compact Request Portal inspired list workspace */
+/* Today - compact Request Portal inspired list workspace */
 .mw-list-page{
   max-width:1180px;
   margin:0 auto;
@@ -3993,7 +3993,7 @@ body[data-studio-view="reports"] .op-card{
 }
 
 
-/* My Work right rail: compact status-style attention and messages */
+/* Today right rail: compact status-style attention and messages */
 .mw-list-layout{
   grid-template-columns:250px minmax(0,1fr) 280px;
 }
@@ -4065,7 +4065,7 @@ body[data-studio-view="reports"] .op-card{
 }
 
 
-/* My Work quick links */
+/* Today quick links */
 .mw-quick-links-panel{
   margin-top:0;
 }
@@ -4107,8 +4107,8 @@ body[data-studio-view="reports"] .op-card{
 }
 
 
-/* My Work fixed viewport layout */
-body[data-studio-view="mywork"] .generic{
+/* Today fixed viewport layout */
+body[data-studio-view="today"] .generic{
   overflow:hidden;
 }
 .mw-list-page{
@@ -4258,7 +4258,7 @@ body[data-studio-view="mywork"] .generic{
   }
 }
 @media(max-width:900px){
-  body[data-studio-view="mywork"] .generic{overflow:auto}
+  body[data-studio-view="today"] .generic{overflow:auto}
   .mw-list-page{
     height:auto;
     min-height:100%;
@@ -4281,7 +4281,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* My Work: use the available desktop width aggressively */
+/* Today: use the available desktop width aggressively */
 .mw-list-page{
   padding-left:10px;
   padding-right:10px;
@@ -4302,7 +4302,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* My Work card title icon colors */
+/* Today card title icon colors */
 .mw-title-icon{
   display:inline-grid;
   width:20px;
@@ -4344,7 +4344,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* My Work: single-column quick links and bullet task list */
+/* Today: single-column quick links and bullet task list */
 .mw-quick-link-list{
   grid-template-columns:1fr;
 }
@@ -4375,7 +4375,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* My Work compact one-row header + functional date navigator */
+/* Today compact one-row header + functional date navigator */
 .mw-list-header{
   flex:0 0 48px;
   min-height:48px;
@@ -4525,7 +4525,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* My Work tactile row hover ("speed bump") */
+/* Today tactile row hover ("speed bump") */
 .mw-list-page .mw-status-row,
 .mw-list-page .mw-action-list button,
 .mw-list-page .mw-quick-link-list button,
@@ -4568,7 +4568,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* My Work: give Recent Jobs more vertical room */
+/* Today: give Recent Jobs more vertical room */
 .mw-assigned-panel .mw-work-section[data-mw-region="schedule"]{
   flex:0 0 210px;
 }
@@ -4651,7 +4651,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* My Work breadcrumb title bar */
+/* Today breadcrumb title bar */
 .mw-header-line{
   display:flex;
   align-items:center;
@@ -4796,7 +4796,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* Unified single-line shell breadcrumb for My Work */
+/* Unified single-line shell breadcrumb for Today */
 .studio-shell-breadcrumb{
   display:flex;
   align-items:center;
@@ -4927,7 +4927,7 @@ body[data-studio-view="mywork"] .generic{
   font-size:8px;
 }
 
-/* My Work starts immediately below the single shell bar. */
+/* Today starts immediately below the single shell bar. */
 .mw-list-page{
   padding-top:8px;
 }
@@ -5037,7 +5037,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* My Work card families: header tint and border share the same semantic color */
+/* Today card families: header tint and border share the same semantic color */
 .mw-list-panel{
   --mw-card-color:#9aabba;
   --mw-card-soft:#f5f8fa;
@@ -5130,7 +5130,7 @@ body[data-studio-view="mywork"] .generic{
 }
 
 
-/* My Work communications feed: messages + announcements with type icons */
+/* Today communications feed: messages + announcements with type icons */
 .mw-messages-panel .mw-compact-messages{
   padding:0 10px 4px;
 }
@@ -5235,7 +5235,7 @@ body[data-studio-view] .user-menu .avatar{
   font-weight:800;
   letter-spacing:.02em;
 }
-body[data-studio-view="mywork"] .user-menu .avatar{
+body[data-studio-view="today"] .user-menu .avatar{
   box-shadow:0 0 0 1px #cdd9e3,0 2px 5px rgba(26,54,79,.16);
 }
 body[data-studio-view] .user-menu-caret{
@@ -5273,7 +5273,7 @@ body[data-studio-view] .user-menu-popover button:hover{
 }
 
 
-/* My Work date navigator: compact shell control + custom calendar */
+/* Today date navigator: compact shell control + custom calendar */
 .studio-shell-page-tools .mw-day-nav{
   display:flex;
   align-items:center;
@@ -5497,8 +5497,8 @@ body[data-studio-view] .user-menu-popover button:hover{
 }
 
 
-/* Shared Studio page frame. My Work keeps its existing pixel layout unchanged. */
-body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell{
+/* Shared Studio page frame. Today keeps its existing pixel layout unchanged. */
+body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell{
   display:grid;
   grid-template-columns:220px minmax(0,1fr);
   gap:14px;
@@ -5506,11 +5506,11 @@ body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell{
   box-sizing:border-box;
   background:#f8f9fa;
 }
-body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell>main{
+body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell>main{
   min-width:0;
   min-height:0;
 }
-body[data-studio-view="mywork"] .studio-context-rail,
+body[data-studio-view="today"] .studio-context-rail,
 body[data-studio-view="tasks"] .studio-context-rail{
   display:none;
 }
@@ -5538,15 +5538,15 @@ body[data-studio-view="tasks"] .studio-context-rail{
   opacity:.45;
   cursor:default;
 }
-body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .generic,
-body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .three-pane{
+body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .generic,
+body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .three-pane{
   border:1px solid #e1e4e8;
   border-radius:9px;
   background:#fff;
   overflow:auto;
 }
 @media(max-width:1050px){
-  body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell{
+  body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell{
     grid-template-columns:190px minmax(0,1fr);
     gap:10px;
     padding:10px;
@@ -5554,7 +5554,7 @@ body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .three-pan
 }
 
 
-/* Workspaces aligned to My Work three-column rails 2026-10-07 */
+/* Workspaces aligned to Today three-column rails 2026-10-07 */
 .workspace-list-page{
   min-height:100%;
   background:transparent;
@@ -5778,9 +5778,9 @@ body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .three-pan
 }
 
 
-/* Workspaces final My Work parity pass 2026-10-07 */
+/* Workspaces final Today parity pass 2026-10-07 */
 /* Workspaces owns its left and right rails; suppress the generic shell rail so
-   the screen remains exactly three columns like My Work. */
+   the screen remains exactly three columns like Today. */
 body[data-studio-view="workspaces"] .studio-context-rail{
   display:none;
 }
@@ -5791,7 +5791,7 @@ body[data-studio-view="workspaces"] .generic{
   padding:14px 22px 20px;
 }
 
-/* Match My Work proportions and card geometry. */
+/* Match Today proportions and card geometry. */
 .workspace-list-layout{
   grid-template-columns:250px minmax(0,1fr) 280px;
   gap:16px;
@@ -5875,11 +5875,11 @@ body[data-studio-view="workspaces"] .studio-shell-breadcrumb strong{
 /* Shell correction 2026-10-07: the persistent context rail was removed from the current HTML shell.
    Non-My-Work pages must therefore let <main> own the full shell width instead of leaving it
    auto-placed in the retired 220px rail column. */
-body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell{
+body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell{
   display:block;
   padding:0;
 }
-body:not([data-studio-view="mywork"]):not([data-studio-view="tasks"]) .shell>main{
+body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell>main{
   width:100%;
   height:100%;
 }
@@ -5889,7 +5889,7 @@ body[data-studio-view="jobs"] .generic{
   box-sizing:border-box;
 }
 
-/* Jobs page - real Studio data, My Work visual system 2026-10-07 */
+/* Jobs page - real Studio data, Today visual system 2026-10-07 */
 body[data-studio-view="jobs"] .studio-context-rail{
   display:none;
 }
@@ -6765,9 +6765,9 @@ body[data-studio-view="jobs"] .generic{
 }
 
 
-/* Shared Studio grid/list scrolling — My Work is the canonical interaction model. */
+/* Shared Studio grid/list scrolling — Today is the canonical interaction model. */
 @media(min-width:901px){
-  body[data-studio-view]:not([data-studio-view="mywork"]) .generic{
+  body[data-studio-view]:not([data-studio-view="today"]) .generic{
     min-height:0;
     overflow:hidden;
   }
@@ -6872,3 +6872,9 @@ body[data-studio-view="jobs"] .generic{
 .mw-today-right .mw-message-row{min-width:0}
 @media(max-width:1150px){.mw-today-layout{grid-template-columns:175px minmax(0,1fr)}.mw-today-right{grid-column:2;grid-template-columns:repeat(2,minmax(0,1fr))}.mw-today-right>section:last-child{grid-column:1/-1}.mw-today-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.mw-today-layout{display:flex;flex-direction:column}.mw-today-left,.mw-today-center,.mw-today-right{width:100%}.mw-today-left{grid-template-columns:repeat(2,minmax(0,1fr))}.mw-today-right{grid-template-columns:1fr}.mw-today-right>section:last-child{grid-column:auto}.mw-today-job-list{overflow-x:auto}.mw-today-job-columns,.mw-today-job-row{min-width:650px}.mw-today-heading time{display:none}}
+
+/* Today: navy page heading and understated earth-brown footer */
+body[data-studio-view="today"] .mw-today-heading{background:#172d4a;color:#fff;border-radius:12px;padding:18px 22px;align-items:center;box-shadow:0 3px 12px #0a1b3020}
+body[data-studio-view="today"] .mw-today-heading h1{color:#fff}
+body[data-studio-view="today"] .mw-today-heading p,body[data-studio-view="today"] .mw-today-heading time{color:#d9e3ef}
+body[data-studio-view="today"] .mw-today-footer{margin-top:14px;background:#76543d;color:#fff;border-radius:8px;padding:9px 16px;text-align:center;font-size:.75rem;letter-spacing:.02em}
