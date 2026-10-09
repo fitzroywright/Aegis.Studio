@@ -7513,3 +7513,11 @@ body[data-studio-view="today"] .mw-today-right .mw-compact-messages{
 @media(max-width:1050px){
  body[data-studio-view="today"] .mw-today-heading p{display:none}
 }
+
+/* Give the shared left-rail cards more horizontal room on desktop. */
+@media(min-width:1051px){
+ body .shell{grid-template-columns:260px minmax(0,1fr) !important}
+}
+@media(min-width:721px) and (max-width:1050px){
+ body .shell{grid-template-columns:230px minmax(0,1fr) !important}
+}
