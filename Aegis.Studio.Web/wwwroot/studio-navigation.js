@@ -9,7 +9,7 @@
             studioPageTools.parentElement.insertBefore(studioBreadcrumb,studioPageTools);
         }
         document.body.dataset.studioView=view;
-        if(view!=='today'){const count=document.getElementById('studioFooterRate');if(count)count.textContent='';}
+        if(view!=='today' && view!=='jobs'){const count=document.getElementById('studioFooterRate');if(count)count.textContent='';}
         document.querySelectorAll('[data-view]').forEach(button=>{
             button.classList.toggle('active',button.dataset.view===view);
         });
@@ -1017,6 +1017,8 @@
             studioPageTools.innerHTML='';
         }
 
+        const initialJobsCount=document.getElementById('studioFooterRate');
+        if(initialJobsCount)initialJobsCount.textContent=genericView.querySelectorAll('[data-job-row]').length+' jobs';
         const list=genericView.querySelector('[data-jobs-list]');
         const rows=()=>[...genericView.querySelectorAll('[data-job-row]')];
         const apply=()=>{
