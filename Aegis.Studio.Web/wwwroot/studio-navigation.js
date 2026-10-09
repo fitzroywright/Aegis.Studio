@@ -389,6 +389,8 @@
         const calendarHost=genericView.querySelector('.mw-today-calendar-tools');
         if(calendarHost && studioPageTools){
             calendarHost.replaceChildren(...Array.from(studioPageTools.children));
+            const searchForm=document.getElementById('studioSearchForm');
+            if(searchForm) calendarHost.prepend(searchForm);
         }
         const shellScope=calendarHost||genericView;
         shellScope.querySelectorAll('[data-mw-calendar-view]').forEach(button=>button.onclick=()=>state.setCalendarView(button.dataset.mwCalendarView));
