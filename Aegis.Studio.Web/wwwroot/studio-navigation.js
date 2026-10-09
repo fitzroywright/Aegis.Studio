@@ -15,16 +15,6 @@
     let navigationRevision=0;
     let jobsWorkspaceFilter=null;
 
-    function renderToday(){
-        const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
-        state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['today','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
-        todayLoad=controller;
-        conversationView.classList.add('hidden');genericView.classList.remove('hidden');
-        const started=performance.now(),run=globalThis.crypto?.randomUUID?.()||String(Date.now());
-        const diagnostics={run,startedAt:new Date().toISOString(),requests:[],shellMs:null,coreMs:null,completeMs:null};
-        window.studioTodayDiagnostics=diagnostics;
-        const now=new Date();
         const formatJobDate=value=>{
             if(!value)return '—';
             const raw=String(value);
@@ -35,6 +25,17 @@
             return Number.isNaN(date.getTime())?raw:date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'2-digit',year:'numeric'});
         };
 
+
+    function renderToday(){
+        const controller=new AbortController(),revision=navigationRevision;
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
+        state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['today','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
+        todayLoad=controller;
+        conversationView.classList.add('hidden');genericView.classList.remove('hidden');
+        const started=performance.now(),run=globalThis.crypto?.randomUUID?.()||String(Date.now());
+        const diagnostics={run,startedAt:new Date().toISOString(),requests:[],shellMs:null,coreMs:null,completeMs:null};
+        window.studioTodayDiagnostics=diagnostics;
+        const now=new Date();
         const dayRange=date=>{
             const from=new Date(date.getFullYear(),date.getMonth(),date.getDate());
             const to=new Date(date.getFullYear(),date.getMonth(),date.getDate()+1);
@@ -140,7 +141,7 @@
         state.resolveWorkspace();
         diagnostics.shellMs=Math.round(performance.now()-started);
         // Two reads at a time: operational essentials first, enrichment afterwards.
-        const pending=['tasks','schedule','jobs','auth','notifications','media'];
+        const pending=['jobs','tasks','schedule','auth','notifications','media'];
         async function worker(){
             while(pending.length&&state.active()){
                 await load(pending.shift());
