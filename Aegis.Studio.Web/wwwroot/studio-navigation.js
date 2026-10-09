@@ -387,7 +387,7 @@
                     <button type="button" class="mw-day-step" data-mw-day="1" aria-label="Next ${calendarView}">›</button>
                     <div class="mw-calendar-control">
                         <button type="button" class="mw-calendar-trigger" data-mw-calendar-toggle aria-label="Choose date" aria-expanded="false" title="Choose date">
-                            <span aria-hidden="true">▣</span>
+                            <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/></svg>
                         </button>
                         <div class="mw-calendar-popover" data-mw-calendar-popover hidden></div>
                     </div>
