@@ -7641,3 +7641,15 @@ body[data-studio-view="today"] .mw-today-job-date{
  margin-left:0;
  }
 }
+
+/* Job rows: recognizable open-details glyph instead of stray chevron. */
+body[data-studio-view="today"] .mw-today-open-job{
+ display:inline-grid;place-items:center;width:23px;height:23px;
+ border-radius:7px;background:#e6f0fa;color:#235d91;
+ font-size:14px;font-weight:800;line-height:1;
+ transition:background-color .15s,color .15s,transform .15s;
+}
+body[data-studio-view="today"] .mw-today-job-row:hover .mw-today-open-job,
+body[data-studio-view="today"] .mw-today-job-row:focus-visible .mw-today-open-job{
+ background:#255f94;color:#fff;transform:translate(1px,-1px);
+}
