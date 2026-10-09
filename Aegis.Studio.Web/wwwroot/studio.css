@@ -7911,3 +7911,22 @@ body[data-studio-view="jobs"] .shell>main>.studio-content-search{display:none!im
 body[data-studio-view="jobs"] .jobs-page-heading{margin-bottom:7px!important}
 body[data-studio-view="jobs"] .jobs-page-heading #studioBreadcrumb{margin-left:auto;justify-content:flex-end}
 body[data-studio-view="jobs"] .shell>main>#genericView{padding-top:0!important}
+
+/* Shared non-Today page frame. Today remains the untouched visual reference. */
+body:not([data-studio-view="today"]) .shell>main>.studio-content-search{display:none!important}
+body:not([data-studio-view="today"]) .shell>main{min-height:0;overflow:hidden}
+body:not([data-studio-view="today"]) .shell>main>#genericView{
+ min-height:0;overflow:auto;box-sizing:border-box;
+}
+body:not([data-studio-view="today"]) .shell>main>#genericView>.jobs-page{
+ height:100%;min-height:0;
+}
+body:not([data-studio-view="today"]) .shell>main>#genericView>.jobs-page>.jobs-layout{
+ min-height:0;align-items:stretch;
+}
+body:not([data-studio-view="today"]) .shell>main>#genericView>.jobs-page>.jobs-layout>.jobs-center{
+ min-height:0;overflow:hidden;
+}
+body:not([data-studio-view="today"]) .shell>main>#genericView>.jobs-page>.jobs-layout>.jobs-right-rail{
+ min-height:0;overflow-y:auto;
+}
