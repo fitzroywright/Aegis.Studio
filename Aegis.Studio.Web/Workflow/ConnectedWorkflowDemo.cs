@@ -169,7 +169,7 @@ internal static class ConnectedWorkflowDemo
         // In particular, a database transaction cannot roll back an object-store delete.
         var protectedTables=new HashSet<string>(StringComparer.Ordinal)
         {
-            "studio_workspaces","studio_user_profiles","studio_employees",
+            "studio_workspaces","studio_state","studio_user_profiles","studio_employees",
             "studio_workflow_thresholds","studio_workflow_audiences",
             "studio_workflow_migrations","studio_global_operational_roles",
             "studio_global_operational_role_members"
@@ -206,8 +206,12 @@ internal static class ConnectedWorkflowDemo
         // enforced by the protect_unassigned trigger.
         if(tables.Count>0)
         {
-            var names=string.Join(",",tables.Order(StringComparer.Ordinal)
-                .Select(name=>"public.\\\""+name.Replace("\\\"","\\\"\\\"")+"\\\""));
+            var names=string.Join(",",tables.Order(StringComparer.Ordinal).Select(name=>
+            {
+                if(!System.Text.RegularExpressions.Regex.IsMatch(name,@"^studio_[a-z0-9_]+$"))
+                    throw new InvalidOperationException("Unsafe database identifier: "+name);
+                return "public."+name;
+            }));
             Exec(c,tx,"truncate table "+names+" restart identity");
         }
         Exec(c,tx,@"delete from studio_workspaces
