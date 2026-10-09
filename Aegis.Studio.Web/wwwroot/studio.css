@@ -7670,6 +7670,18 @@ body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{
  position:static;top:auto;right:auto;z-index:auto;
 }
 
+/* Shared header branding and user profile: brand left, account right. */
+body .topbar .studio-bryans-brand{display:flex;align-items:center;gap:8px;min-width:116px;max-width:165px;flex:0 0 auto}
+body .topbar .studio-bryans-brand-image{display:block;width:30px;height:30px;object-fit:contain}
+body .topbar .studio-bryans-brand-image[hidden]{display:none}
+body .topbar .studio-bryans-brand-text{display:flex;flex-direction:column;color:#fff;font-size:15px;font-weight:850;line-height:1.03;letter-spacing:.035em;white-space:nowrap}
+body .topbar .studio-bryans-brand-text small{font-size:8px;font-weight:650;letter-spacing:.13em;margin-top:3px}
+body .topbar .user-menu-trigger{display:flex;align-items:center;gap:6px;cursor:pointer}
+body .topbar .studio-profile-avatar{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;overflow:hidden;border-radius:50%;background:#e7eef5;color:#3e5874;border:1px solid #c9d8e6}
+body .topbar .studio-profile-avatar img{width:100%;height:100%;object-fit:cover}
+body .topbar .studio-profile-avatar svg{width:21px;height:21px}
+body .topbar .studio-profile-avatar [hidden]{display:none}
+
 /* Compact Today controls and shared shell identity. */
 body[data-studio-view="today"] .mw-today-job-toolbar{padding:5px 9px;gap:5px;min-height:32px}
 body[data-studio-view="today"] .mw-today-view-tabs{gap:2px;flex:0 1 auto}
