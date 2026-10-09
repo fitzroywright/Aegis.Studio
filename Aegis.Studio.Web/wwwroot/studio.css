@@ -7745,8 +7745,47 @@ body[data-studio-view="today"] .mw-today-job-toolbar{padding:5px 9px;gap:5px;min
 body[data-studio-view="today"] .mw-today-view-tabs{gap:2px;flex:0 1 auto}
 body[data-studio-view="today"] .mw-today-view-tabs button{padding:4px 7px;min-height:25px;font-size:10px;border-radius:5px;white-space:nowrap}
 body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{gap:3px;min-height:25px!important}
-body[data-studio-view="today"] .mw-calendar-view-switch button,
-body[data-studio-view="today"] .mw-day-nav button{min-height:25px;height:25px;padding:2px 6px;font-size:10px;border-radius:5px}
+/* Today calendar navigator: cohesive, compact segmented control. */
+body[data-studio-view="today"] .mw-today-calendar-tools{
+ display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-calendar-view-switch{
+ display:inline-flex;align-items:center;gap:1px;
+ height:28px;margin:0;padding:2px;
+ background:#eaf1f7;border:1px solid #cddbe8;border-radius:7px;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-calendar-view-switch button{
+ min-width:37px;height:22px;min-height:22px;padding:2px 7px;
+ border:0;border-radius:5px;background:transparent;
+ color:#4c647d;font-size:10px;font-weight:700;cursor:pointer;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-calendar-view-switch button.active{
+ background:#234c73;color:#fff;box-shadow:0 1px 2px rgba(20,44,68,.18);
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-day-nav{
+ display:inline-flex;align-items:center;gap:2px;height:28px;
+ padding:2px;background:#fff;border:1px solid #cddbe8;border-radius:7px;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-day-nav button{
+ min-height:22px;height:22px;padding:2px 6px;border:0;border-radius:5px;
+ background:transparent;color:#294e70;font-size:11px;font-weight:700;cursor:pointer;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-day-nav .mw-day-step{
+ min-width:23px;font-size:17px;line-height:1;padding:0;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-day-nav .mw-day-current{
+ min-width:55px;padding:2px 6px;font-size:10px;color:#274968;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-day-nav button:hover,
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-calendar-view-switch button:not(.active):hover{
+ background:#dceaf5;color:#173c5d;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .mw-calendar-trigger{
+ display:grid;place-items:center;width:23px;height:22px;min-height:22px;padding:2px;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools button:focus-visible{
+ outline:2px solid #df8a32;outline-offset:1px;
+}
 body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-search{flex:0 1 160px;max-width:160px}
 body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-search input{min-height:26px;height:26px;font-size:11px;padding:3px 7px}
 body .topbar .studio-bryans-logo{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.05;font-weight:850;letter-spacing:.06em;font-size:13px;color:#fff;white-space:nowrap}
