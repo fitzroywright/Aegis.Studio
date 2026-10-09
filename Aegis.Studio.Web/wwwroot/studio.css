@@ -7930,3 +7930,28 @@ body:not([data-studio-view="today"]) .shell>main>#genericView>.jobs-page>.jobs-l
 body:not([data-studio-view="today"]) .shell>main>#genericView>.jobs-page>.jobs-layout>.jobs-right-rail{
  min-height:0;overflow-y:auto;
 }
+
+/* Shared page frame for every route except the untouched Today implementation. */
+body:not([data-studio-view="today"]) .shell{position:relative}
+body:not([data-studio-view="today"]) .shell::before{
+ content:"";position:absolute;left:0;right:0;top:55px;height:3px;
+ background:#df8a32;z-index:5;pointer-events:none;
+}
+body .studio-shared-page-heading[hidden]{display:none!important}
+body:not([data-studio-view="today"]) .shell>main>.studio-shared-page-heading{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;
+ flex:0 0 55px;min-height:55px;box-sizing:border-box;
+ margin:0;padding:5px 14px;background:linear-gradient(90deg,#e6f1fb,#f7fafc);
+}
+.studio-shared-heading-copy{display:flex;align-items:center;gap:8px;min-width:0}
+.studio-shared-heading-copy h1{font-size:20px;line-height:1.15;margin:0;color:#173653}
+.studio-shared-heading-copy p{font-size:11px;margin:2px 0 0;color:#59718a}
+.studio-shared-heading-trail{display:flex;align-items:center;justify-content:flex-end;margin-left:auto;min-width:0}
+.studio-shared-heading-trail #studioBreadcrumb{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin:0}
+body:not([data-studio-view="today"]) .shell>main>#genericView{padding-top:7px!important}
+body[data-studio-view="jobs"] .jobs-page-heading{display:none!important}
+body[data-studio-view="jobs"] .shell>main>#genericView{padding-top:7px!important}
+@media(max-width:800px){
+ body:not([data-studio-view="today"]) .studio-shared-heading-copy p{display:none}
+ body:not([data-studio-view="today"]) .shell>main>.studio-shared-page-heading{padding:5px 8px}
+}
