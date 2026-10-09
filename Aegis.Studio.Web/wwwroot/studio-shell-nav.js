@@ -48,49 +48,45 @@
     function renderLeftRail() {
         const rail = document.getElementById('studioContextRail');
         if (!rail) return;
-        const page = labelFor(currentView);
+        const workspaces = Array.isArray(window.workspaceCache) ? window.workspaceCache : [];
+        const workspaceItems = workspaces
+            .filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false)
+            .map(workspace => '<button type="button" data-studio-workspace-id="' + escText(workspace.id) + '"><span>▣</span><span>' + escText(workspace.name) + '</span></button>')
+            .join('');
         rail.innerHTML = `
-            <section class="mw-list-panel studio-context-card studio-context-status">
-                <header><h2><span class="mw-title-icon status">${iconFor(currentView)}</span> Status</h2></header>
-                <div class="mw-status-list">
-                    <button class="mw-status-row active" type="button" aria-current="page">
-                        <span class="mw-status-icon">${iconFor(currentView)}</span>
-                        <span>${escText(page)}</span>
-                        <strong>Current</strong>
-                    </button>
-                    <button class="mw-status-row" type="button" data-studio-side="today">
-                        <span class="mw-status-icon">▤</span><span>Today</span><strong>Home</strong>
-                    </button>
-                    <button class="mw-status-row" type="button" data-studio-side="workspaces">
-                        <span class="mw-status-icon">▰</span><span>Workspaces</span><strong>Open</strong>
-                    </button>
+            <section class="mw-list-panel studio-context-card">
+                <header><h2>My Workspaces</h2></header>
+                <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
+            </section>
+            <section class="mw-list-panel studio-context-card">
+                <header><h2>Actions</h2></header>
+                <div class="mw-today-rail-links">
+                    <button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>
+                    <button type="button" data-studio-side="jobs"><span>▣</span><span>Jobs</span></button>
+                    <button type="button" data-studio-side="tasks"><span>☑</span><span>Tasks</span></button>
+                    <button type="button" data-studio-side="messages"><span>✉</span><span>Send Message</span></button>
                 </div>
             </section>
-
-            <section class="mw-list-panel mw-action-panel studio-context-card">
-                <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
-                <div class="mw-action-list">
-                    <button type="button" data-studio-side="today"><span>▤</span><span>Go to Today</span><b>›</b></button>
-                    <button type="button" data-studio-focus-search><span>⌕</span><span>Search Studio</span><b>›</b></button>
-                </div>
-            </section>
-
-            <section class="mw-list-panel mw-quick-links-panel studio-context-card">
-                <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
-                <div class="mw-quick-link-list">
-                    ${quickLinks.filter(([key]) => !['today', currentView].includes(key)).slice(0,4).map(([key, label, icon]) =>
-                        '<button type="button" data-studio-side="' + key + '"><span>' + icon + '</span><span>' + escText(label) + '</span></button>'
-                    ).join('')}
+            <section class="mw-list-panel studio-context-card">
+                <header><h2>Quick Links</h2></header>
+                <div class="mw-today-rail-links">
+                    <button type="button" data-studio-side="schedule"><span>▦</span><span>Calendar</span></button>
+                    <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
+                    <button type="button" data-studio-side="reports"><span>▤</span><span>Reports</span></button>
                 </div>
             </section>`;
-
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
             button.onclick = () => window.studioNavigate?.(button.dataset.studioSide);
         });
-        rail.querySelector('[data-studio-focus-search]')?.addEventListener('click', () => {
-            const search = document.getElementById('studioSearch');
-            search?.focus();
+        rail.querySelectorAll('[data-studio-workspace-id]').forEach(button => {
+            button.onclick = () => {
+                const id = button.dataset.studioWorkspaceId;
+                const workspace = (window.workspaceCache || []).find(item => String(item.id) === id);
+                if (typeof window.selectWorkspace === 'function') window.selectWorkspace(id, workspace?.name || '');
+                else window.studioNavigate?.('workspaces');
+            };
         });
+
     }
 
     function ensureBreadcrumb() {
