@@ -29,6 +29,7 @@ internal static class StudioFactoryReset
         try
         {
             var removed = 0;
+            var previousBatch = new HashSet<string>(StringComparer.Ordinal);
             // Repeat listing from the beginning: providers have bounded listings
             // and keys already removed will disappear on the next enumeration.
             for (;;)
@@ -38,6 +39,9 @@ internal static class StudioFactoryReset
                     new StorageListRequest(MaximumResults: PageLimit), cancellationToken);
                 if (batch.Count == 0) break;
                 var keys = batch.Select(item => item.StorageKey).Distinct(StringComparer.Ordinal).ToArray();
+                if (keys.Length > 0 && previousBatch.SetEquals(keys))
+                    throw new InvalidOperationException("Storage purge made no progress; retry after investigating provider deletion behavior.");
+                previousBatch = keys.ToHashSet(StringComparer.Ordinal);
                 if (keys.Length == 0)
                     throw new InvalidOperationException("Storage enumeration returned no usable keys.");
                 foreach (var key in keys)
