@@ -7260,3 +7260,92 @@ body .shell>.studio-context-rail .mw-list-panel>header{min-height:46px}
  body .shell>.studio-context-rail{padding:86px 4px 8px}
  body:not([data-studio-view="today"]) .shell>main>.generic{padding:86px 8px 8px !important}
 }
+
+/* Today: balanced three-card rails with warm, purposeful color accents. */
+body[data-studio-view="today"] .shell>.studio-context-rail{
+ display:grid !important;
+ grid-template-rows:repeat(3,minmax(0,1fr));
+ align-content:stretch;gap:12px;overflow:hidden;
+}
+body[data-studio-view="today"] .shell>.studio-context-rail>.studio-context-card{
+ min-height:0;max-height:100%;height:100%;box-sizing:border-box;
+ display:flex;flex-direction:column;overflow:hidden;
+}
+body[data-studio-view="today"] .studio-context-card>.mw-today-rail-links{
+ flex:1;min-height:0;overflow-y:auto;align-content:start;
+}
+body[data-studio-view="today"] .mw-today-right{
+ height:100%;min-height:0;overflow:hidden;
+ display:grid;grid-template-rows:repeat(3,minmax(0,1fr));
+ align-content:stretch;gap:12px;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel{
+ height:100%;min-height:0;max-height:100%;
+ box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel>header{
+ flex:0 0 auto;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel>:not(header){
+ flex:1 1 auto;min-height:0;overflow-y:auto;
+}
+body[data-studio-view="today"] .studio-context-card:nth-child(1){
+ border-color:#a6c8e8;background:#f5faff;
+}
+body[data-studio-view="today"] .studio-context-card:nth-child(1)>header{
+ background:#e7f2ff;border-bottom-color:#c9def3;
+}
+body[data-studio-view="today"] .studio-context-card:nth-child(2){
+ border-color:#c6b6dc;background:#fcf9ff;
+}
+body[data-studio-view="today"] .studio-context-card:nth-child(2)>header{
+ background:#f0e9fa;border-bottom-color:#ded0ef;
+}
+body[data-studio-view="today"] .studio-context-card:nth-child(3){
+ border-color:#b6d7c1;background:#f7fcf8;
+}
+body[data-studio-view="today"] .studio-context-card:nth-child(3)>header{
+ background:#e8f5ec;border-bottom-color:#cce5d3;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(1){
+ border-color:#a6c8e8;background:#f7fbff;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(1)>header{
+ background:#e7f2ff;border-bottom-color:#c9def3;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(2){
+ border-color:#e6c29c;background:#fffaf4;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(2)>header{
+ background:#fff0de;border-bottom-color:#f0d4b4;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(3){
+ border-color:#d3b8d8;background:#fdf9fd;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(3)>header{
+ background:#f6eafa;border-bottom-color:#e7d2ed;
+}
+body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links button>span:first-child{
+ width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;
+ border-radius:7px;background:#e0ebf8;color:#205b91;
+ font-size:15px;font-weight:800;
+}
+body[data-studio-view="today"] .studio-context-card:nth-child(2) .mw-today-rail-links button>span:first-child{
+ background:#ece2fa;color:#7442a4;
+}
+body[data-studio-view="today"] .studio-context-card:nth-child(3) .mw-today-rail-links button>span:first-child{
+ background:#dff2e4;color:#247d4b;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel>header h2{
+ font-size:.85rem;font-weight:600;
+}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(1)>header h2{color:#235b8c}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(2)>header h2{color:#945b23}
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel:nth-child(3)>header h2{color:#804c8b}
+@media(max-width:1050px){
+ body[data-studio-view="today"] .mw-today-right{overflow-y:auto}
+}
+@media(max-height:650px){
+ body[data-studio-view="today"] .shell>.studio-context-rail{overflow-y:auto}
+ body[data-studio-view="today"] .mw-today-right{overflow-y:auto}
+}
