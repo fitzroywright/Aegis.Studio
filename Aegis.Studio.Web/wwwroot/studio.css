@@ -7004,3 +7004,27 @@ body[data-studio-view="today"] .mw-today-right{grid-column:2}
  body .shell>.studio-context-rail .mw-today-rail-links button{font-size:.75rem;padding:7px 5px}
  body[data-studio-view="today"] .mw-today-layout{display:flex;flex-direction:column}
 }
+
+/* Full-width Studio footer: one row spanning both the persistent rail and viewport. */
+body .shell{
+ grid-template-rows:minmax(0,1fr) auto !important;
+ align-items:stretch;
+}
+body .shell>.studio-context-rail{
+ grid-column:1;grid-row:1;
+}
+body .shell>main{
+ grid-column:2;grid-row:1;
+}
+body .shell>.studio-shell-footer{
+ display:flex;align-items:center;justify-content:center;
+ grid-column:1 / -1;grid-row:2;
+ width:100%;min-width:0;box-sizing:border-box;
+ min-height:30px;padding:6px 16px;
+ background:#76543d;color:#fff;
+ font-size:.75rem;font-weight:500;letter-spacing:.02em;
+ border-radius:0;margin:0;
+}
+body[data-studio-view="today"] .mw-today-page{
+ grid-template-rows:auto minmax(0,1fr) !important;
+}
