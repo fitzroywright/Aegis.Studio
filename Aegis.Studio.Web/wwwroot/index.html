@@ -31,7 +31,7 @@
     <nav class="studio-shell-breadcrumb" id="studioBreadcrumb" aria-label="Breadcrumb"></nav>
     <div class="studio-shell-page-tools" id="studioPageTools"></div>
     <div class="shell-context"><button type="button" class="context-chip" title="Operating location">⌖ Kingston Office</button><button type="button" class="context-chip" title="Connection context">⌾ Remote</button></div>
-    <form class="studio-global-search" id="studioSearchForm" role="search"><span class="studio-search-icon" aria-hidden="true">⌕</span><input id="studioSearch" type="search" placeholder="Search Studio" aria-label="Search Studio"><span class="studio-search-hint" aria-hidden="true">Jobs · clients · subjects</span></form>
+    
     <button id="notificationButton" class="action icon-action shell-icon-button" title="Notifications"><svg><use href="#i-bell"></use></svg></button>
     <details class="user-menu"><summary class="user-menu-trigger"><span id="userAvatar" class="avatar">--</span><span id="signedInUser" class="sr-only">Signed in</span><span class="user-menu-caret" aria-hidden="true">⌄</span></summary><div class="user-menu-popover"><button id="profileButton" type="button">Profile</button><button type="button" data-preferences>Preferences</button><button type="button" data-view="admin" id="adminMenuButton">Administration</button><button id="signOutButton" type="button">Sign Out</button></div></details>
     <button id="topNewButton" class="primary top-new-button" type="button" hidden>＋ New</button>
@@ -39,6 +39,7 @@
   <div class="shell">
     <aside id="studioContextRail" class="studio-context-rail" aria-label="Page navigation"></aside>
     <main>
+      <div class="studio-content-search" id="studioContentSearch"><form class="studio-global-search" id="studioSearchForm" role="search"><span class="studio-search-icon" aria-hidden="true">⌕</span><input id="studioSearch" type="search" placeholder="Search Studio" aria-label="Search Studio"><span class="studio-search-hint" aria-hidden="true">Jobs · clients · subjects</span></form></div>
       <section id="conversationView" class="three-pane">
         <div class="list-pane">
           <div class="pane-heading"><div><h2 id="workspaceTitle">Work</h2><p>Jobs, announcements and members</p></div></div>
