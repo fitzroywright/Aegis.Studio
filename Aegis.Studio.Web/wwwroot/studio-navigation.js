@@ -298,6 +298,7 @@
         const markup=`
             <section class="mw-page mw-today-page">
                 <header class="mw-today-heading"><div><h1>Today</h1><p>Your assignments, upcoming sessions, and what needs your attention.</p></div><time>${now.toLocaleDateString([],{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</time></header>
+                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div>
                 <div class="mw-today-layout">
                     <main class="mw-today-center">
                         <div class="mw-today-metrics">
@@ -384,7 +385,12 @@
                     </div>
                 </div>`;
         }
-        const shellScope=studioPageTools||genericView;
+        // Calendar navigation belongs to the Today content area, never the global masthead.
+        const calendarHost=genericView.querySelector('.mw-today-calendar-tools');
+        if(calendarHost && studioPageTools){
+            calendarHost.replaceChildren(...Array.from(studioPageTools.children));
+        }
+        const shellScope=calendarHost||genericView;
         shellScope.querySelectorAll('[data-mw-calendar-view]').forEach(button=>button.onclick=()=>state.setCalendarView(button.dataset.mwCalendarView));
         shellScope.querySelectorAll('[data-mw-day]').forEach(button=>button.onclick=()=>{
             if(button.dataset.mwDay==='today')state.selectDay(new Date());
