@@ -7028,3 +7028,16 @@ body .shell>.studio-shell-footer{
 body[data-studio-view="today"] .mw-today-page{
  grid-template-rows:auto minmax(0,1fr) !important;
 }
+
+/* Flush the shared footer with the viewport's bottom edge. */
+html,body{margin:0}
+body .shell{margin-bottom:0 !important;padding-bottom:0 !important;box-sizing:border-box}
+body .shell>.studio-shell-footer{
+ margin:0 !important;
+ padding-bottom:6px;
+ border-bottom:0;
+ border-radius:0;
+ align-self:end;
+}
+body .shell>.studio-context-rail,
+body .shell>main{margin-bottom:0 !important}
