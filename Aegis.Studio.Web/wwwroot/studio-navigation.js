@@ -364,6 +364,7 @@
         else if([...next.querySelectorAll('[data-mw-region]')].some(region=>!genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]'))){
             console.warn('[Studio Today] Missing grid region; rebuilding Today');
             genericView.replaceChildren(next.firstElementChild);
+            state.root=genericView.querySelector('.mw-page');
         }
         else next.querySelectorAll('[data-mw-region]').forEach(region=>{
             const existing=genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]');
