@@ -7,13 +7,13 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.Operations;
 
-public static class MyWorkEndpoints
+public static class TodayEndpoints
 {
-    public static void MapStudioMyWork(this WebApplication app)
+    public static void MapStudioToday(this WebApplication app)
     {
-        app.MapGet("/api/my-work/jobs", async (HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
+        app.MapGet("/api/today/jobs", async (HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
         {
-            ILogger logger = logs.CreateLogger("Studio.MyWork");
+            ILogger logger = logs.CreateLogger("Studio.Today");
             Guid[] allowed = Allowed(context, access, logger);
             Stopwatch timer = Stopwatch.StartNew();
             await using var connection = database.OpenConnection();
@@ -21,16 +21,16 @@ public static class MyWorkEndpoints
             command.Parameters.AddWithValue(allowed);
             command.Parameters.AddWithValue(Name(context.User));
             await using var reader = await command.ExecuteReaderAsync(context.RequestAborted);
-            List<MyWorkJobSummary> jobs = [];
+            List<TodayJobSummary> jobs = [];
             while (await reader.ReadAsync(context.RequestAborted))
                 jobs.Add(new(reader.GetGuid(0),reader.GetGuid(1),reader.GetGuid(2),reader.GetString(3),reader.GetString(4),reader.GetString(5),reader.IsDBNull(6)?null:DateOnly.FromDateTime(reader.GetDateTime(6)),reader.GetFieldValue<DateTimeOffset>(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.IsDBNull(9)?null:reader.GetGuid(9),reader.IsDBNull(10)?null:reader.GetString(10),reader.GetInt64(11),reader.GetInt64(12),reader.IsDBNull(13)?null:reader.GetString(13),reader.GetBoolean(14)));
             QueryComplete(context, logger, "job-list", timer, jobs.Count);
             return Results.Ok(jobs);
         }).RequireAuthorization();
 
-        app.MapGet("/api/my-work/tasks", (HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
+        app.MapGet("/api/today/tasks", (HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
         {
-            ILogger logger = logs.CreateLogger("Studio.MyWork");
+            ILogger logger = logs.CreateLogger("Studio.Today");
             HashSet<Guid> allowed = Allowed(context, access, logger).ToHashSet();
             Stopwatch timer = Stopwatch.StartNew();
             var tasks = new OperationalWorkStore(database).GetActivities(assignedTo: Name(context.User)).Where(t=>allowed.Contains(t.JobId)).ToList();
@@ -39,9 +39,9 @@ public static class MyWorkEndpoints
         }).RequireAuthorization();
 
 
-        app.MapGet("/api/my-work/schedule", async (DateTimeOffset? from, DateTimeOffset? to, HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
+        app.MapGet("/api/today/schedule", async (DateTimeOffset? from, DateTimeOffset? to, HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
         {
-            ILogger logger = logs.CreateLogger("Studio.MyWork");
+            ILogger logger = logs.CreateLogger("Studio.Today");
             Guid[] allowed = Allowed(context, access, logger);
             DateTimeOffset start=(from??DateTimeOffset.UtcNow.Date).ToUniversalTime();
             DateTimeOffset end=(to??start.AddDays(1)).ToUniversalTime();
@@ -70,9 +70,9 @@ public static class MyWorkEndpoints
             return Results.Ok(rows);
         }).RequireAuthorization();
 
-        app.MapGet("/api/my-work/media-summary", async (HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
+        app.MapGet("/api/today/media-summary", async (HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
         {
-            ILogger logger = logs.CreateLogger("Studio.MyWork");
+            ILogger logger = logs.CreateLogger("Studio.Today");
             Guid[] allowed = Allowed(context, access, logger, true);
             Stopwatch timer = Stopwatch.StartNew();
             await using var connection = database.OpenConnection();
@@ -94,7 +94,7 @@ public static class MyWorkEndpoints
                 """, connection);
             command.Parameters.AddWithValue(allowed);
             await using var reader = await command.ExecuteReaderAsync(context.RequestAborted);
-            List<MyWorkMediaSummary> rows = [];
+            List<TodayMediaSummary> rows = [];
             while (await reader.ReadAsync(context.RequestAborted)) rows.Add(new(reader.GetGuid(0),reader.GetInt64(1),reader.IsDBNull(2)?null:reader.GetGuid(2)));
             QueryComplete(context, logger, "media-summary", timer, rows.Count);
             return Results.Ok(rows);
@@ -110,8 +110,8 @@ public static class MyWorkEndpoints
     }
     private static string Name(ClaimsPrincipal user) => user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.Identity?.Name ?? throw new InvalidOperationException("Authenticated user has no login identifier.");
     private static void QueryComplete(HttpContext context, ILogger logger, string phase, Stopwatch timer, int count)
-        => logger.LogInformation("MyWork startup phase Run={Run} Trace={Trace} Phase={Phase} Rows={Rows} ElapsedMs={ElapsedMs}",context.Request.Headers["X-Studio-Startup"].ToString(),context.TraceIdentifier,phase,count,timer.Elapsed.TotalMilliseconds);
+        => logger.LogInformation("Today startup phase Run={Run} Trace={Trace} Phase={Phase} Rows={Rows} ElapsedMs={ElapsedMs}",context.Request.Headers["X-Studio-Startup"].ToString(),context.TraceIdentifier,phase,count,timer.Elapsed.TotalMilliseconds);
 }
-public sealed record MyWorkMediaSummary(Guid JobId, long AssetCount, Guid? ThumbnailVersionId);
+public sealed record TodayMediaSummary(Guid JobId, long AssetCount, Guid? ThumbnailVersionId);
 
-public sealed record MyWorkJobSummary(Guid Id,Guid WorkspaceId,Guid ConversationId,string Title,string ClientName,string Status,DateOnly? EventDate,DateTimeOffset CreatedAt,string? AssignedTo,Guid? ClientId,string? LinkedClientName,long TaskCount,long CompletedTaskCount,string? JobLead=null,bool IsCrewMember=false);
+public sealed record TodayJobSummary(Guid Id,Guid WorkspaceId,Guid ConversationId,string Title,string ClientName,string Status,DateOnly? EventDate,DateTimeOffset CreatedAt,string? AssignedTo,Guid? ClientId,string? LinkedClientName,long TaskCount,long CompletedTaskCount,string? JobLead=null,bool IsCrewMember=false);
