@@ -7700,14 +7700,30 @@ body .shell>.studio-shell-footer{justify-content:space-between;text-align:left;g
 body .shell>.studio-shell-footer #studioFooterRate{margin-left:auto}
 @media(max-width:1080px){body[data-studio-view="today"] .mw-today-job-toolbar{flex-wrap:wrap}body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{margin-left:0}}
 
-/* Today: single continuous orange divider directly above Jobs and the right rail. */
+/* Today: full-width divider belongs to the shared shell, including the left rail. */
+body[data-studio-view="today"] .shell{position:relative}
+body[data-studio-view="today"] .shell::before{
+ content:"";position:absolute;left:0;right:0;top:55px;
+ height:4px;background:#df8a32;z-index:4;pointer-events:none;
+}
 body[data-studio-view="today"] .mw-today-layout{
- border-top:4px solid #df8a32;
+ border-top:0;
  padding-top:7px;
  box-sizing:border-box;
- position:relative;
 }
-body[data-studio-view="today"] .mw-today-layout::before{
- content:"";position:absolute;top:-4px;left:-100vw;right:-100vw;
- height:4px;background:#df8a32;pointer-events:none;
+body[data-studio-view="today"] .mw-today-layout::before{content:none}
+body[data-studio-view="today"] .mw-today-heading{
+ display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+body[data-studio-view="today"] .mw-today-heading #studioBreadcrumb{
+ display:flex;align-items:center;justify-content:flex-end;gap:6px;
+ flex:0 0 auto;margin-left:auto;color:#274766!important;
+}
+body[data-studio-view="today"] .mw-today-heading #studioBreadcrumb strong,
+body[data-studio-view="today"] .mw-today-heading #studioBreadcrumb button{
+ color:#274766!important;font-size:12px;
+}
+@media(max-width:760px){
+ body[data-studio-view="today"] .mw-today-heading{flex-wrap:wrap}
+ body[data-studio-view="today"] .shell::before{top:55px}
 }
