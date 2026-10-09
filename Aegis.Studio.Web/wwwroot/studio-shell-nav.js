@@ -89,9 +89,11 @@
             <section class="mw-list-panel studio-context-card">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">↗</span> Quick Links</h2></header>
                 <div class="mw-today-rail-links">
-                    <button type="button" data-studio-side="schedule"><span>▦</span><span>Calendar</span></button>
+                    <button type="button" data-studio-side="workspaces"><span>▰</span><span>Workspaces</span></button>
+                    <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
-                    <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
+                    <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
+                    <button type="button" data-studio-side="pipeline"><span>⇥</span><span>Pipeline</span></button>
                 </div>
             </section>`;
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
