@@ -236,18 +236,21 @@ internal static class DemoFullStudioData
         }
     }
 
+    // Every rich Studio demo job must have at least 40 persisted photo assets.
+    // High-volume school, corporate and roster jobs retain their larger counts.
+    private const int MinimumDemoImagesPerJob = 40;
+
     private static int MediaCount(DemoJob job)
     {
-        return job.Number switch
+        int requested = job.Number switch
         {
             106 => 180, // employee ID job
-            201 => 2, // two distinct licensed wedding photographs
             303 => 100, // school portraits
             301 => 120, // executive headshots
-            401 => 241, // large roster: 241 distinct photographed subjects
-            501 => 1,   // one genuine product photograph
-            _ => IsPortraitCorpus(job)?8:PhysicalSourceCount(job)
+            401 => 241, // large roster
+            _ => MinimumDemoImagesPerJob
         };
+        return Math.Max(MinimumDemoImagesPerJob, requested);
     }
 
     internal static int RepairMedia(NpgsqlConnection c,NpgsqlTransaction tx,string login,IFileStorage storage,Action<DemoSeedProgress>? report)
