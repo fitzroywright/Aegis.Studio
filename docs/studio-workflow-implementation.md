@@ -2,7 +2,7 @@
 
 ## Product contract
 
-Navigation: My Work, Dashboard, Workspaces, Pipeline, Production, FrontDesk, WorkDay, Admin.
+Navigation: Today, Dashboard, Workspaces, Pipeline, Production, FrontDesk, WorkDay, Admin.
 
 Workspaces contain announcements and jobs. They are not general message queues. A job has its conversation above Gallery, Subjects, Tasks/Calendar, and Activity. Details is a small collapsible card. Subjects are the people being photographed, distinct from the purchasing customer; one subject renders as a card, multiple subjects as a roster. Tasks and Calendar are views of the same task records.
 
@@ -24,7 +24,7 @@ Finish shoot starts the upload timer. Submit for review stops it; first upload d
 - Job gallery lists latest asset versions, collections, history, source notes, uploader, timestamps and hashes. Conversation attachments remain accessible.
 - Existing version endpoints reused (registered by Production); version schema initialized before gallery queries, and per-asset upload serialization prevents duplicate version numbers.
 - Pipeline navigation has a read-only board of existing statuses and access to existing scheduling. This is a foundation, not the new scheduling workflow.
-- My Work filters existing tasks for the signed-in user; Dashboard reuses current operational insights.
+- Today filters existing tasks for the signed-in user; Dashboard reuses current operational insights.
 
 ## Iteration 2: Pipeline and execution
 
