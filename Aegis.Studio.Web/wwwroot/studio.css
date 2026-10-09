@@ -6970,7 +6970,6 @@ body[data-studio-view="today"] .mw-today-footer{
 
 /* Shared Studio three-card left rail: all views, including Today and Jobs. */
 body .shell{
- border-top:3px solid #df8a32;
  box-sizing:border-box;
  display:grid !important;
  grid-template-columns:210px minmax(0,1fr) !important;
@@ -7669,4 +7668,11 @@ body[data-studio-view="today"] .shell>main>.studio-content-search{
 }
 body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{
  position:static;top:auto;right:auto;z-index:auto;
+}
+
+/* Today: single continuous orange divider directly above Jobs and the right rail. */
+body[data-studio-view="today"] .mw-today-layout{
+ border-top:6px solid #df8a32;
+ padding-top:7px;
+ box-sizing:border-box;
 }
