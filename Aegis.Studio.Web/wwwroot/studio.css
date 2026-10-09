@@ -8009,3 +8009,20 @@ body[data-studio-view="workspaces"] .workspace-list-layout{
   body[data-studio-view="workspaces"] .workspace-list-layout{grid-template-columns:minmax(0,1fr)}
   body[data-studio-view="workspaces"] .workspace-right-rail{grid-column:1}
 }
+
+/* Navigation history label: gold emphasis with a compact breadcrumb divider. */
+body .topbar #studioBreadcrumb .breadcrumb-label{
+  color:#d8aa52!important;
+  font-weight:800;
+  display:inline-flex;
+  align-items:center;
+  white-space:nowrap;
+}
+body .topbar #studioBreadcrumb .breadcrumb-label::after{
+  content:"";
+  display:inline-block;
+  width:1px;
+  height:13px;
+  margin:0 10px;
+  background:rgba(216,170,82,.72);
+}
