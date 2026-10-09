@@ -84,7 +84,7 @@
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Calendar</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
-                    <button type="button" data-studio-side="reports"><span>▤</span><span>Reports</span></button>
+                    <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
                 </div>
             </section>`;
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
