@@ -18,14 +18,14 @@ async function showFrontDesk() {
     if (!frontDeskRole) await loadFrontDeskRole();
     const me = await json('/api/auth/me');
     if (!frontDeskRole?.frontDesk && !(me.user || me).isAdministrator) {
-        activateNavigation('frontdesk');
+        // Navigation state is owned by studioNavigate() in studio-navigation.js.
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
         genericView.innerHTML = '<h1>Front Desk</h1><p class="muted">You are not assigned to the Front Desk operational role.</p>';
         return;
     }
 
-    activateNavigation('frontdesk');
+    // Navigation state is owned by studioNavigate() in studio-navigation.js.
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
 
