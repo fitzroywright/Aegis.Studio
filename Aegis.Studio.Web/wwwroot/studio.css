@@ -3185,7 +3185,6 @@ body[data-studio-view="tasks"] .mw-page{
 /* Responsive preservation: density first, then wrap. */
 @media(max-width:1250px){
   body[data-studio-view] .topbar{padding-left:18px;padding-right:18px;gap:8px}
-  body[data-studio-view] .brand-button{padding-left:6px;padding-right:6px;font-size:11px}
   body[data-studio-view] .studio-global-search{width:210px}
   body:not([data-studio-view="today"]):not([data-studio-view="workspaces"]) .generic{padding-left:22px;padding-right:22px}
   .studio-page-heading,.job-detail-header,.admin-page-header{min-height:98px}
@@ -7003,7 +7002,7 @@ body[data-studio-view="today"] #genericView{
 }
 body[data-studio-view="today"] .mw-today-page{
  height:100%;min-height:0;max-height:100%;box-sizing:border-box;
- display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+ display:grid;
  gap:12px;padding:16px 18px 10px;overflow:hidden;
 }
 body[data-studio-view="today"] .mw-today-heading{min-height:0;margin:0}
@@ -7052,7 +7051,6 @@ body[data-studio-view="today"] .mw-today-right{grid-column:2}
  body[data-studio-view="today"] .mw-today-right{grid-column:1}
 }
 @media(max-width:720px){
- body .shell{grid-template-columns:145px minmax(0,1fr) !important}
  body .shell>.studio-context-rail{padding:8px 4px;gap:7px}
  body .shell>.studio-context-rail .mw-today-rail-links button{font-size:.75rem;padding:7px 5px}
  body[data-studio-view="today"] .mw-today-layout{display:flex;flex-direction:column}
@@ -7078,9 +7076,6 @@ body .shell>.studio-shell-footer{
  font-size:.75rem;font-weight:500;letter-spacing:.02em;
  border-radius:0;margin:0;
 }
-body[data-studio-view="today"] .mw-today-page{
- grid-template-rows:auto minmax(0,1fr) !important;
-}
 
 /* Flush the shared footer with the viewport's bottom edge. */
 html,body{margin:0}
@@ -7105,9 +7100,6 @@ body .shell>.studio-shell-footer{
  grid-column:1/-1;grid-row:2;
  height:32px;min-height:32px;max-height:32px;
  padding:0 12px;margin:0 !important;
-}
-body[data-studio-view="today"] .mw-today-page{
- grid-template-rows:minmax(0,1fr) !important;
 }
 body[data-studio-view="today"] .mw-today-calendar-tools{
  display:flex;align-items:center;justify-content:flex-end;
@@ -7181,7 +7173,6 @@ body[data-studio-view="today"] .shell>.studio-context-rail{
  padding-top:86px;
 }
 body[data-studio-view="today"] .mw-today-page{
- padding-top:86px;
  grid-template-rows:minmax(0,1fr)!important;
  gap:0;
 }
