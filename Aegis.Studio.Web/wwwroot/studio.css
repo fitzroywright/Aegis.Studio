@@ -7670,6 +7670,21 @@ body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{
  position:static;top:auto;right:auto;z-index:auto;
 }
 
+/* Compact Today controls and shared shell identity. */
+body[data-studio-view="today"] .mw-today-job-toolbar{padding:5px 9px;gap:5px;min-height:32px}
+body[data-studio-view="today"] .mw-today-view-tabs{gap:2px;flex:0 1 auto}
+body[data-studio-view="today"] .mw-today-view-tabs button{padding:4px 7px;min-height:25px;font-size:10px;border-radius:5px;white-space:nowrap}
+body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{gap:3px;min-height:25px!important}
+body[data-studio-view="today"] .mw-calendar-view-switch button,
+body[data-studio-view="today"] .mw-day-nav button{min-height:25px;height:25px;padding:2px 6px;font-size:10px;border-radius:5px}
+body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-search{flex:0 1 160px;max-width:160px}
+body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-search input{min-height:26px;height:26px;font-size:11px;padding:3px 7px}
+body .topbar .studio-bryans-logo{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.05;font-weight:850;letter-spacing:.06em;font-size:13px;color:#fff;white-space:nowrap}
+body .topbar .studio-bryans-logo small{font-size:8px;letter-spacing:.15em;font-weight:650}
+body .shell>.studio-shell-footer{justify-content:space-between;text-align:left;gap:12px}
+body .shell>.studio-shell-footer #studioFooterRate{margin-left:auto}
+@media(max-width:1080px){body[data-studio-view="today"] .mw-today-job-toolbar{flex-wrap:wrap}body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{margin-left:0}}
+
 /* Today: single continuous orange divider directly above Jobs and the right rail. */
 body[data-studio-view="today"] .mw-today-layout{
  border-top:6px solid #df8a32;
