@@ -348,19 +348,7 @@
             if(focused)existing.querySelector('[data-mw-filter="'+focused+'"]')?.focus();
         });
         state.root=genericView.querySelector('.mw-page');
-        if(studioBreadcrumb){
-            studioBreadcrumb.innerHTML=`
-                <details class="workspace-menu breadcrumb-workspace-menu" id="workspaceMenu">
-                    <summary class="workspace-breadcrumb-trigger"><span>Workspaces</span><span class="workspace-menu-caret">⌄</span></summary>
-                    <div class="workspace-menu-popover" id="workspaceMenuList" role="menu" aria-label="Workspaces"></div>
-                </details>
-                ${workspaceCrumb}
-                <span class="breadcrumb-separator" aria-hidden="true">›</span>
-                <button type="button" data-shell-nav="today">Today</button>
-                <span class="breadcrumb-separator" aria-hidden="true">›</span>
-                <strong>${esc(displayName)}</strong>
-                `;
-        }
+        window.studioSetBreadcrumb?.([{label:'Today',view:'today'}]);
         if(studioPageTools){
             const today=new Date();
             const isToday=selectedDate.getFullYear()===today.getFullYear()
@@ -759,13 +747,7 @@
                 </div>
             </section>`;
 
-        if(studioBreadcrumb){
-            studioBreadcrumb.innerHTML=`
-                <button type="button" data-shell-nav="today">Today</button>
-                <span class="breadcrumb-separator" aria-hidden="true">›</span>
-                <strong>Workspaces</strong>`;
-            studioBreadcrumb.querySelector('[data-shell-nav="today"]')?.addEventListener('click',()=>window.studioNavigate?.('today'));
-        }
+        window.studioSetBreadcrumb?.([{label:'Workspaces',view:'workspaces'}]);
         if(studioPageTools) studioPageTools.innerHTML='';
 
 
@@ -1322,16 +1304,7 @@
         setActive(view);
         if(view!=='today'){
             if(studioPageTools)studioPageTools.innerHTML='';
-            if(studioBreadcrumb){
-                const label=view==='workspaces'?'':view.replace(/(^|\s)\S/g,m=>m.toUpperCase());
-                studioBreadcrumb.innerHTML=`
-                    <details class="workspace-menu breadcrumb-workspace-menu" id="workspaceMenu">
-                        <summary class="workspace-breadcrumb-trigger"><span>Workspaces</span><span class="workspace-menu-caret">⌄</span></summary>
-                        <div class="workspace-menu-popover" id="workspaceMenuList" role="menu" aria-label="Workspaces"></div>
-                    </details>
-                    ${label?'<span class="breadcrumb-separator" aria-hidden="true">›</span><strong>'+esc(label)+'</strong>':''}`;
-                if(typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
-            }
+            window.studioSetBreadcrumb?.([{label:view==='workspaces'?'Workspaces':view.replace(/(^|\\s)\\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
             await route();
