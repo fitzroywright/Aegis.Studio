@@ -728,39 +728,6 @@
         genericView.innerHTML=`
             <section class="workspace-list-page mw-list-page">
                 <div class="mw-list-layout workspace-list-layout">
-                    <aside class="mw-list-summary workspace-left-rail">
-                        <section class="mw-list-panel">
-                            <header><h2><span class="mw-title-icon status">▥</span> Workspace Status</h2><small>${workspaceData.length} total</small></header>
-                            <div class="mw-status-list">
-                                <div class="workspace-summary-row"><span>▥</span><span>Active Jobs</span><strong>${totals.activeJobs}</strong></div>
-                                <div class="workspace-summary-row"><span>✓</span><span>Completed Jobs</span><strong>${totals.completedJobs}</strong></div>
-                                <div class="workspace-summary-row"><span>▣</span><span>Upcoming Shoots</span><strong>${totals.upcomingShoots}</strong></div>
-                                <div class="workspace-summary-row"><span>☑</span><span>Open Tasks</span><strong>${totals.openTasks}</strong></div>
-                                <div class="workspace-summary-row"><span>◷</span><span>Overdue Tasks</span><strong>${totals.overdueTasks}</strong></div>
-                                <div class="workspace-summary-row"><span>◆</span><span>Jobs Awaiting Production</span><strong>${totals.awaitingProduction}</strong></div>
-                            </div>
-                        </section>
-
-                        <section class="mw-list-panel mw-action-panel">
-                            <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
-                            <div class="mw-action-list">
-                                <button type="button" data-workspace-jobs><span>▥</span><span>View Jobs</span><b>›</b></button>
-                                <button type="button" data-nav-quick="pipeline"><span>⇥</span><span>Open Pipeline</span><b>›</b></button>
-                                <button type="button" data-nav-quick="frontdesk"><span>▣</span><span>Front Desk</span><b>›</b></button>
-                            </div>
-                        </section>
-
-                        <section class="mw-list-panel mw-quick-links-panel">
-                            <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
-                            <div class="mw-quick-link-list">
-                                <button type="button" data-nav-quick="today"><span>▤</span><span>Today</span></button>
-                                <button type="button" data-nav-quick="production"><span>◆</span><span>Production</span></button>
-                                <button type="button" data-nav-quick="finance"><span>▧</span><span>Finance</span></button>
-                                <button type="button" data-nav-quick="reports"><span>▥</span><span>Reports</span></button>
-                            </div>
-                        </section>
-                    </aside>
-
                     <section class="mw-list-panel workspace-center-panel">
                         <header class="workspace-center-header">
                             <div>
