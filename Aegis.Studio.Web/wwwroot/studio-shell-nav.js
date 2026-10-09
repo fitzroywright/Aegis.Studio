@@ -83,7 +83,6 @@
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>
-                    <button type="button" data-studio-side="jobs"><span>▣</span><span>Jobs</span></button>
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card">
