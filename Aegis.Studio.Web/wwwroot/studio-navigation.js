@@ -297,16 +297,10 @@
             ||'<div class="mw-empty">No accessible workspaces.</div>';
         const markup=`
             <section class="mw-page mw-today-page">
-                <header class="mw-today-heading"><div><h1>Today</h1><p>Your assignments, upcoming sessions, and what needs your attention.</p></div><time>${now.toLocaleDateString([],{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</time></header>
-                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div>
+                <header class="mw-today-heading"><div><h1>Today</h1><p>Your assignments, upcoming sessions, and what needs your attention.</p></div></header>
+                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"><time class="mw-today-calendar-date">${now.toLocaleDateString([],{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</time></div>
                 <div class="mw-today-layout">
                     <main class="mw-today-center">
-                        <div class="mw-today-metrics">
-                            <div class="mw-today-metric"><small>Jobs I'm Involved In</small><strong>${metric('jobs',jobs.filter(isInvolved).length)}</strong></div>
-                            <div class="mw-today-metric"><small>Jobs Led By Me</small><strong>${metric('jobs',jobs.filter(isLead).length)}</strong></div>
-                            <div class="mw-today-metric"><small>Today's Sessions</small><strong>${metric('schedule',todaySchedule.length)}</strong></div>
-                            <div class="mw-today-metric"><small>Needs Attention</small><strong>${metric('tasks',attentionTotal)}</strong></div>
-                        </div>
                         <section class="mw-list-panel mw-today-jobs" data-mw-region="jobs">
                             <div class="mw-today-job-toolbar">
                                 <div class="mw-today-view-tabs" role="group" aria-label="Job view">
@@ -314,7 +308,7 @@
                                 </div>
                                 <label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
                             </div>
-                            <div class="mw-today-jobs-heading"><h2>${jobViews[state.jobView]}</h2><span>${metric('jobs',sortedJobs.length)} jobs</span></div>
+                            <div class="mw-today-jobs-heading"><span>${metric('jobs',sortedJobs.length)} jobs</span></div>
                             <div class="mw-today-job-columns"><span>Job / Client</span><span>Status</span><span>Progress</span><span>Event Date</span><span>My Role</span><span></span></div>
                             <div class="mw-today-job-list">${phase('jobs',mainJobRows)}</div>
                         </section>
