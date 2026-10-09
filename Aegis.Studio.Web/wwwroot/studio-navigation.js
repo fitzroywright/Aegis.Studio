@@ -954,14 +954,13 @@
 
         genericView.innerHTML=`
             <section class="jobs-page mw-list-page">
+                <header class="mw-today-heading jobs-page-heading">
+                    <div class="mw-today-heading-copy"><span class="mw-today-focus-icon" aria-hidden="true">✦</span><div><h1>Jobs <span class="mw-today-focus-label">All jobs</span></h1><p>Manage jobs, schedules, production and progress across the studio.</p></div></div>
+                </header>
                 <div class="jobs-layout">
 
 
                     <section class="mw-list-panel jobs-center">
-                        <header class="jobs-center-header">
-                            <div><h2><span class="mw-title-icon assigned">▥</span> Jobs <span class="jobs-count">(${filteredBase().length})</span></h2><small>Open a job to work with its messages, media, subjects, tasks, sessions and activity.</small></div>
-                            
-                        </header>
                         <div class="jobs-toolbar">
                             <label class="jobs-search"><span>⌕</span><input type="search" data-jobs-search placeholder="Search jobs…"></label>
                             <select data-jobs-status><option value="">All statuses</option>${uniqueStatuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select>
@@ -972,7 +971,6 @@
                         </div>
                         <div class="jobs-table-head"><span></span><span>Job</span><span>Workspace / Type</span><span>Client</span><span>Shoot Date</span><span>Status</span><span>Progress</span><span></span></div>
                         <div class="jobs-list" data-jobs-list>${renderRows(filteredBase())}</div>
-                        <footer class="jobs-footer"><span data-jobs-showing>Showing ${filteredBase().length} jobs</span><span>Rows use live Studio job, schedule, task and media data.</span></footer>
                     </section>
 
                     <aside class="jobs-right-rail">
@@ -1015,6 +1013,8 @@
         if(workspaceForFilter)crumbItems.push({label:workspaceForFilter.name,view:'workspaces',workspaceId:workspaceForFilter.id});
         crumbItems.push({label:'Jobs',view:'jobs'});
         window.studioSetBreadcrumb?.(crumbItems);
+        const jobsHeading=genericView.querySelector('.jobs-page-heading');
+        if(jobsHeading&&studioBreadcrumb)jobsHeading.appendChild(studioBreadcrumb);
         if(studioPageTools){
             studioPageTools.innerHTML='<button type="button" class="primary jobs-new-button" data-job-action="new">＋ New Job</button>';
         }
@@ -1051,7 +1051,8 @@
             const shown=new Set(visible);
             rows().forEach(row=>row.hidden=!shown.has(row));
             visible.forEach(row=>list.appendChild(row));
-            genericView.querySelector('[data-jobs-showing]').textContent='Showing '+visible.length+' of '+rows().length+' jobs';
+            const footerCount=document.getElementById('studioFooterRate');
+            if(footerCount)footerCount.textContent=visible.length+' '+(visible.length===1?'job':'jobs');
             try{sessionStorage.setItem('studio-jobs-filters:'+workspaceFilter,JSON.stringify({groupFilter,statusFilter,personFilter,dateFilter,term,sort,lightFilter,scroll:list.scrollTop}));}catch{}
         };
 
