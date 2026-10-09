@@ -50,24 +50,50 @@ let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskC
 let frontDeskTab='today',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelectedClientId=null;
 function frontDeskRequestStage(item){return item.status==='Confirmed'?'Confirmed':item.status==='Cancelled'?'Cancelled':item.recordedDeposit>0?'Ready for confirmation':item.status==='AwaitingDeposit'?'Awaiting deposit':'Pending Job';}
 function renderFrontDesk(){
-    const today=new Date().toLocaleDateString(),sessions=frontDeskSchedule.filter(s=>new Date(s.startsAtUtc).toLocaleDateString()===today&&s.status!=='Cancelled').sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
-    const tabs=[['today','Walk-in / Today'],['requests','Bookings'],['jobs','Jobs'],['delivery','Pickup / Delivery'],['completed','Completed'],['enquiries','Inquiries']];
-    genericView.innerHTML=`<header class="studio-page-heading"><div><h1>Front Desk</h1><p>Welcome clients, manage bookings, sales and customer service.</p></div><div class="job-actions"><button class="primary" id="newBookingRequest">＋ New Booking</button><button onclick="showPos()">＋ New Sale</button></div></header>
-    <nav class="workspace-tabs" aria-label="Front Desk queues">${tabs.map(([key,label])=>`<button data-frontdesk-tab="${key}" class="${key===frontDeskTab?'active':''}">${label}</button>`).join('')}</nav>
-    <div class="op-grid frontdesk-board"><section class="op-card"><header><h2>Client Lookup</h2></header><div class="op-body"><input id="frontDeskClientSearch" type="search" placeholder="Search name, phone or email…" value="${esc(frontDeskClientTerm)}" aria-label="Find client"><div id="frontDeskClientResults" class="frontdesk-client-results"></div><button class="text-button" data-new-client>＋ New Client</button></div></section>
-    <section class="op-card"><header><h2>${frontDeskTab==='today'?"Today's Schedule":tabs.find(t=>t[0]===frontDeskTab)?.[1]||'Jobs'}</h2><button onclick="studioNavigate('pipeline')">View Calendar →</button></header><div class="op-body">${frontDeskTab==='today'?`<div class="frontdesk-today-list">${sessions.map(s=>`<article class="job-row"><button class="link-button" data-frontdesk-job="${s.jobId}"><strong>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))} · ${esc(s.title)}</strong><small>${esc(s.location||'')} · ${esc(s.status)}</small></button><button data-check-in="${s.jobId}">Check In</button></article>`).join('')||'<p>No sessions today.</p>'}</div>`:''}<input id="frontDeskSearch" type="search" placeholder="Search this queue…" aria-label="Find job, booking or customer" value="${esc(frontDeskTerm)}" ${frontDeskTab==='today'?'hidden':''}><div id="frontDeskJobList" ${frontDeskTab==='today'?'hidden':''}></div></div></section>
-    <section class="op-card"><header><h2>Quick Actions</h2></header><div class="op-body frontdesk-actions"><button data-new-client>＋ New Customer</button><button data-new-booking>New Booking</button><button data-take-payment>Take Payment</button><button onclick="showPos()">New Sale</button><button onclick="studioNavigate('pipeline')">Check Availability / Reschedule</button><button data-pickups>Pickup / Delivery</button><button onclick="studioNavigate('finance')">Invoices / Finance</button><h3>Walk-in Sales</h3><p class="muted">Use New Sale to select a client's job, add products and take payment.</p></div></section></div>`;
-    genericView.querySelector('#newBookingRequest').onclick=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
-    genericView.querySelector('[data-new-booking]').onclick=()=>genericView.querySelector('#newBookingRequest').click();
+    // Follow the Today page's full-width horizontal shell. No navigation sidebar
+    // or additional nested side rail; the secondary cards belong to the content grid.
+    const now=new Date(), today=now.toLocaleDateString();
+    const sessions=frontDeskSchedule.filter(s=>new Date(s.startsAtUtc).toLocaleDateString()===today&&s.status!=='Cancelled').sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
+    const pending=frontDeskRequests.filter(x=>!['Confirmed','Cancelled'].includes(x.status));
+    const unassigned=frontDeskJobs.filter(j=>!j.assignedTo&&j.status!=='Completed');
+    const enquiries=frontDeskEnquiries.filter(e=>!frontDeskRequests.some(r=>r.request?.conversationId===e.id));
+    const due=frontDeskRequests.filter(x=>x.status==='AwaitingDeposit'||(x.request?.requiredDeposit>0&&x.recordedDeposit<x.request.requiredDeposit&&!['Confirmed','Cancelled'].includes(x.status)));
+    const tabs=[['today','All'],['enquiries','New'],['requests','Bookings'],['jobs','Jobs'],['delivery','Pickup / Delivery'],['completed','Completed']];
+    const entries=[
+        ...enquiries.map(e=>({kind:'enquiry',id:e.id,created:e.createdAtUtc,name:e.contactName||'New inquiry',title:e.subject||'Inquiry',date:null,status:'New',source:e.channel||'Inquiry',conversationId:e.id})),
+        ...frontDeskRequests.map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Customer',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:'Booking',request:x}))
+    ].sort((a,b)=>new Date(b.created||0)-new Date(a.created||0));
+    const filtered=entries.filter(e=>(frontDeskTab==='today'||(frontDeskTab==='enquiries'&&e.kind==='enquiry')||(frontDeskTab==='requests'&&e.kind==='request'))&&[e.name,e.title,e.status,e.source].join(' ').toLowerCase().includes(frontDeskTerm.toLowerCase()));
+    const rows=filtered.map(e=>`<tr><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${esc(e.kind==='enquiry'?'Inquiry':'Booking')}</td><td>${esc(e.date||'—')}</td><td><span class="fd-status">${esc(e.status)}</span></td><td>${esc(e.source)}</td><td><button type="button" class="action" data-fd-open="${esc(e.id)}">Open</button></td></tr>`).join('');
+    const metric=(label,count,note)=>`<div class="fd-metric"><span>${esc(label)}</span><strong>${count}</strong><small>${esc(note)}</small></div>`;
+    genericView.innerHTML=`<div class="fd-page">
+      <header class="studio-page-heading fd-heading"><div><h1>Front Desk</h1><p>Manage new bookings, inquiries and customer requests.</p></div><button class="primary" id="newBookingRequest">＋ New Booking</button></header>
+      <div class="fd-layout"><div class="fd-main">
+        <div class="fd-metrics">${metric('New Inquiries',enquiries.length,'Awaiting response')}${metric('Pending Deposits',due.length,'Awaiting payment')}${metric('Needs Confirmation',pending.length,'Review and confirm')}${metric('Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
+        <section class="op-card fd-queue"><header><h2>Incoming Bookings &amp; Inquiries</h2><button class="primary" data-new-booking>＋ New Booking</button></header>
+          <div class="fd-filters"><div class="fd-tabs">${tabs.map(([key,label])=>`<button class="${frontDeskTab===key?'active':''}" data-frontdesk-tab="${key}">${label}</button>`).join('')}</div><input id="frontDeskSearch" type="search" placeholder="Search customers or bookings…" value="${esc(frontDeskTerm)}"></div>
+          <div class="fd-table-scroll" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<table class="fd-table"><thead><tr><th>Date</th><th>Customer / Request</th><th>Type</th><th>Event Date</th><th>Status</th><th>Source</th><th>Actions</th></tr></thead><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table>`:'<div id="frontDeskJobList"></div>'}</div>
+          <footer class="fd-footer"><span>${['today','requests','enquiries'].includes(frontDeskTab)?filtered.length+' records':'Jobs'}</span><span>Front Desk</span></footer></section>
+      </div><div class="fd-secondary">
+        <section class="op-card fd-actions"><header><h2>Quick Actions</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-new-client>＋ New Customer</button><button data-find-client>Find Customer</button><button data-take-payment>Take Payment</button><button data-new-sale>New Sale</button><button data-pickups>Pickup / Delivery</button></div></section>
+        <section class="op-card fd-schedule"><header><h2>Today's Schedule</h2><button data-calendar>View Calendar →</button></header><div class="fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="fd-session"><time>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</time><span><strong>${esc(s.title)}</strong><small>${esc(s.location||s.status||'')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
+        <section class="op-card fd-messages"><header><h2>Recent Inquiries</h2><button data-inquiries>View All →</button></header><div class="fd-message-list">${enquiries.slice(0,5).map(e=>`<button data-fd-enquiry="${esc(e.id)}"><strong>${esc(e.contactName||'Customer')}</strong><small>${esc(e.subject||'New inquiry')}</small></button>`).join('')||'<p class="muted">No new inquiries.</p>'}</div></section>
+      </div></div></div>`;
+    const newBooking=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
+    genericView.querySelectorAll('[data-new-booking],#newBookingRequest').forEach(b=>b.onclick=newBooking);
     genericView.querySelectorAll('[data-new-client]').forEach(b=>b.onclick=async()=>{await showFrontDeskClients();document.querySelector('dialog[open] [data-new]')?.click();});
+    genericView.querySelector('[data-find-client]').onclick=()=>showFrontDeskClients();
     genericView.querySelector('[data-take-payment]').onclick=()=>frontDeskSelectedClientId?takeFrontDeskClientPayment(frontDeskSelectedClientId):showPos();
+    genericView.querySelector('[data-new-sale]').onclick=()=>showPos();
     genericView.querySelector('[data-pickups]').onclick=()=>{frontDeskTab='delivery';renderFrontDesk();};
+    genericView.querySelector('[data-calendar]').onclick=()=>studioNavigate('pipeline');
+    genericView.querySelector('[data-inquiries]').onclick=()=>{frontDeskTab='enquiries';renderFrontDesk();};
     genericView.querySelectorAll('[data-frontdesk-tab]').forEach(b=>b.onclick=()=>{frontDeskTab=b.dataset.frontdeskTab;renderFrontDesk();});
-    genericView.querySelector('#frontDeskSearch').oninput=e=>{frontDeskTerm=e.target.value;renderFrontDeskRows();};
-    genericView.querySelector('#frontDeskClientSearch').oninput=e=>{frontDeskClientTerm=e.target.value;renderFrontDeskClientResults();};
-    genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.frontdeskJob));
-    genericView.querySelectorAll('[data-check-in]').forEach(b=>b.onclick=()=>checkInFrontDeskJob(b.dataset.checkIn));
-    renderFrontDeskClientResults();if(frontDeskTab!=='today')renderFrontDeskRows();
+    genericView.querySelector('#frontDeskSearch').oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();genericView.querySelector('#frontDeskSearch')?.focus();};
+    genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openWorkspaceJob(b.dataset.frontdeskJob));
+    genericView.querySelectorAll('[data-fd-open]').forEach(b=>b.onclick=()=>{const e=entries.find(x=>x.id===b.dataset.fdOpen);if(e?.jobId)openWorkspaceJob(e.jobId);else if(e?.conversationId)openPendingBookingForm(frontDeskEnquiries.find(x=>x.id===e.conversationId));});
+    genericView.querySelectorAll('[data-fd-enquiry]').forEach(b=>b.onclick=()=>openPendingBookingForm(frontDeskEnquiries.find(e=>e.id===b.dataset.fdEnquiry)));
+    if(!['today','requests','enquiries'].includes(frontDeskTab))renderFrontDeskRows();
 }
 function selectFrontDeskClient(clientId){
     frontDeskSelectedClientId=clientId;
