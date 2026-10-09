@@ -5,7 +5,7 @@ Date: 2026-09-19
 ## WORKDAY BUILD STATUS
 
 Architecture: PASS (source/static review)
-Home / My WorkDay: PASS (source/static review)
+Home / TodayDay: PASS (source/static review)
 Assignments: PASS (source/static review)
 Session Workflow: PASS (source/static review)
 Customer Details: PASS (source/static review)
@@ -41,7 +41,7 @@ Automated Tests: PASS (tests written; execution proof pending after final harden
 
 - login distinct from Work Sign In;
 - Work Sign In / Sign Out;
-- My WorkDay home;
+- TodayDay home;
 - Today / Upcoming / Needs Attention;
 - local authorized assignment search;
 - assignment/customer/instruction detail;
