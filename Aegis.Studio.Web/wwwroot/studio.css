@@ -7581,3 +7581,27 @@ body[data-studio-view="today"] .mw-today-right .mw-status-row:nth-child(2) .stud
 body[data-studio-view="today"] .mw-today-right .mw-status-row:nth-child(3) .studio-attention-label>span{
  background:#e8def9;color:#7145a2;
 }
+
+/* Today job involvement roles: matching rounded pill treatment. */
+body[data-studio-view="today"] .mw-today-job-role{min-width:0}
+body[data-studio-view="today"] .studio-role-pill{
+ display:inline-flex;align-items:center;gap:6px;max-width:100%;
+ padding:4px 10px;border-radius:999px;border:1px solid #cbd9e8;
+ background:#eaf2fa;color:#365a7c;font-size:.71rem;font-weight:700;
+ line-height:1.15;white-space:nowrap;
+}
+body[data-studio-view="today"] .studio-role-dot{
+ width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:currentColor;
+}
+body[data-studio-view="today"] .studio-role-pill[data-role="job-lead"]{
+ background:#e8def9;border-color:#d0b8ef;color:#7140a2;
+}
+body[data-studio-view="today"] .studio-role-pill[data-role="assigned"]{
+ background:#e1efff;border-color:#b0d0f3;color:#205e9a;
+}
+body[data-studio-view="today"] .studio-role-pill[data-role="task-owner"]{
+ background:#e1f4e9;border-color:#adddc0;color:#247649;
+}
+body[data-studio-view="today"] .studio-role-pill[data-role="team"]{
+ background:#fff0d9;border-color:#eed2a7;color:#92621f;
+}
