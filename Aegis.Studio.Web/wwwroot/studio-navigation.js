@@ -328,7 +328,6 @@
                         <section class="mw-list-panel" data-mw-region="messages"><header><h2>Messages & Announcements</h2><button data-nav="messages">View All →</button></header><div class="mw-compact-messages">${phase('notifications',messageRows)}</div></section>
                     </aside>
                 </div>
-                <footer class="mw-today-footer">Brian's Photo Studios · Today</footer>
             </section>`;
         const next=document.createElement('div');next.innerHTML=markup;
         if(!genericView.querySelector('.mw-page')){genericView.replaceChildren(next.firstElementChild);state.root=genericView.querySelector('.mw-page');}
