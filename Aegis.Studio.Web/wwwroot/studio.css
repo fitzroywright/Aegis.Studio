@@ -7453,3 +7453,63 @@ body[data-studio-view="today"] .mw-today-heading p{
  body[data-studio-view="today"] .mw-today-heading p{display:none}
  body[data-studio-view="today"] .mw-today-focus-icon{width:30px;height:30px;flex-basis:30px}
 }
+
+/* Dense Today workspace: retain balanced rails and the established color system. */
+body[data-studio-view="today"] .mw-today-heading{
+ top:58px;height:54px!important;padding:5px 10px!important;
+}
+body[data-studio-view="today"] .mw-today-heading-copy{gap:8px}
+body[data-studio-view="today"] .mw-today-focus-icon{
+ width:30px;height:30px;flex-basis:30px;font-size:17px;border-radius:8px;
+}
+body[data-studio-view="today"] .mw-today-heading h1{font-size:1.34rem;gap:7px}
+body[data-studio-view="today"] .mw-today-heading p{font-size:.69rem;margin:2px 0 0}
+body[data-studio-view="today"] .mw-today-focus-label{padding:2px 7px;font-size:.58rem}
+body[data-studio-view="today"] .mw-today-calendar-tools{
+ top:66px;height:34px;min-height:34px;gap:5px;
+}
+body[data-studio-view="today"] .shell>.studio-context-rail{
+ padding-top:62px;padding-bottom:6px;gap:7px;
+}
+body[data-studio-view="today"] .mw-today-page{
+ padding-top:62px!important;padding-bottom:6px!important;
+}
+body[data-studio-view="today"] .mw-today-layout{gap:7px}
+body[data-studio-view="today"] .mw-today-right{gap:7px}
+body[data-studio-view="today"] .studio-context-rail .studio-context-card>header,
+body[data-studio-view="today"] .mw-today-right>.mw-list-panel>header{
+ min-height:30px!important;padding:3px 8px!important;
+}
+body[data-studio-view="today"] .studio-card-icon{
+ width:19px;height:19px;flex-basis:19px;font-size:12px;border-radius:5px;
+}
+body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links{
+ padding:2px 5px;gap:0;
+}
+body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links button{
+ min-height:26px;padding:2px 5px;gap:6px;font-size:.76rem;
+}
+body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links button>span:first-child{
+ width:19px;height:19px;flex-basis:19px;font-size:11px;
+}
+body[data-studio-view="today"] .mw-today-right .mw-status-list{padding:2px 5px}
+body[data-studio-view="today"] .mw-today-right .mw-status-row{
+ min-height:28px;padding:3px 5px;gap:5px;
+}
+body[data-studio-view="today"] .studio-attention-label{gap:5px;font-size:.73rem}
+body[data-studio-view="today"] .studio-attention-label>span{
+ width:19px;height:19px;flex-basis:19px;font-size:11px;
+}
+body[data-studio-view="today"] .mw-today-job-toolbar{
+ padding-top:5px;padding-bottom:5px;gap:6px;
+}
+body[data-studio-view="today"] .mw-today-jobs-heading{
+ padding:0 9px 3px;
+}
+body[data-studio-view="today"] .mw-today-right .mw-section-rows,
+body[data-studio-view="today"] .mw-today-right .mw-compact-messages{
+ padding-top:1px;padding-bottom:1px;
+}
+@media(max-width:1050px){
+ body[data-studio-view="today"] .mw-today-heading p{display:none}
+}
