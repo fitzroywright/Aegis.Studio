@@ -955,17 +955,7 @@
         genericView.innerHTML=`
             <section class="jobs-page mw-list-page">
                 <div class="jobs-layout">
-                    <aside class="jobs-left-rail">
-                        ${workspaceForFilter?`<section class="mw-list-panel jobs-workspace-card">
-                            <header><h2><span class="mw-title-icon assigned">▰</span> Workspace</h2></header>
-                            <button type="button" class="jobs-workspace-summary" data-return-workspace>
-                                <span class="jobs-workspace-photo">▰</span>
-                                <span><strong>${esc(workspaceForFilter.name)}</strong><small>${filteredBase().length} accessible jobs</small></span>
-                                <b>›</b>
-                            </button>
-                        </section>`:''}
 
-                    </aside>
 
                     <section class="mw-list-panel jobs-center">
                         <header class="jobs-center-header">
@@ -986,6 +976,16 @@
                     </section>
 
                     <aside class="jobs-right-rail">
+                        ${workspaceForFilter?`<section class="mw-list-panel jobs-workspace-card">
+                            <header><h2><span class="mw-title-icon assigned">▰</span> Workspace</h2></header>
+                            <button type="button" class="jobs-workspace-summary" data-return-workspace>
+                                <span class="jobs-workspace-photo">▰</span>
+                                <span><strong>${esc(workspaceForFilter.name)}</strong><small>${filteredBase().length} accessible jobs</small></span>
+                                <b>›</b>
+                            </button>
+                        </section>`:''}
+
+
                         <section class="mw-list-panel">
                             <header><h2><span class="mw-title-icon status">▥</span> Job Status</h2><small>${filteredBase().length} jobs</small></header>
                             <div class="mw-status-list jobs-status-list">
