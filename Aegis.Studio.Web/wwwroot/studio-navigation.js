@@ -352,9 +352,12 @@
             </section>`;
         const next=document.createElement('div');next.innerHTML=markup;
         if(!genericView.querySelector('.mw-page')){genericView.replaceChildren(next.firstElementChild);state.root=genericView.querySelector('.mw-page');}
+        else if([...next.querySelectorAll('[data-mw-region]')].some(region=>!genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]'))){
+            console.warn('[Studio Today] Missing grid region; rebuilding Today');
+            genericView.replaceChildren(next.firstElementChild);
+        }
         else next.querySelectorAll('[data-mw-region]').forEach(region=>{
             const existing=genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]');
-            if(!existing){console.warn('[Studio Today] Missing region; rebuilding Today grid',region.dataset.mwRegion);genericView.replaceChildren(next.firstElementChild);return;}
             if(existing.innerHTML===region.innerHTML)return;
             const scroll=[...existing.querySelectorAll('div')].map(el=>el.scrollTop);
             const focused=document.activeElement?.dataset?.mwFilter;
