@@ -226,7 +226,7 @@ test('large galleries render one bounded page of previews and advance using a se
 });
 
 
-test('Workspaces keeps My Work breadcrumb and three-column rails',()=>{
+test('Workspaces keeps Today breadcrumb and three-column rails',()=>{
  const source=fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8');
  const workspaceSource=fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8');
  const css=fs.readFileSync(path.join(root,'studio.css'),'utf8');
@@ -234,9 +234,9 @@ test('Workspaces keeps My Work breadcrumb and three-column rails',()=>{
  assert.match(source,/workspace-left-rail/);
  assert.match(source,/workspace-center-panel/);
  assert.match(source,/workspace-right-rail/);
- assert.match(source,/data-shell-nav="mywork">My Work/);
+ assert.match(source,/data-shell-nav="today">Today/);
  assert.match(source,/breadcrumb-separator/);
- assert.match(workspaceSource,/\{label:'My Work',view:'mywork'\}/);
+ assert.match(workspaceSource,/\{label:'Today',view:'today'\}/);
  assert.match(workspaceSource,/\{label:'Workspaces',view:'workspaces'\}/);
  assert.match(css,/body\[data-studio-view="workspaces"\] \.studio-context-rail\{\s*display:none;/);
 });
@@ -255,7 +255,7 @@ test('Jobs page uses real Studio data and keeps the three-rail navigation path',
  assert.match(navigation,/jobs-left-rail/);
  assert.match(navigation,/jobs-center/);
  assert.match(navigation,/jobs-right-rail/);
- assert.match(navigation,/\{label:'My Work',view:'mywork'\}/);
+ assert.match(navigation,/\{label:'Today',view:'today'\}/);
  assert.match(navigation,/\{label:'Workspaces',view:'workspaces'\}/);
  assert.match(navigation,/\{label:'Jobs',view:'jobs'\}/);
  assert.doesNotMatch(navigation,/Workspace Links/);
