@@ -141,6 +141,18 @@ internal static class ConnectedWorkflowDemo
         return new {jobs=created,workspaces=WorkspaceNames.Length,stages=Stages.Length,message="Connected Workflow demo records generated. All contacts use example.invalid; no real client addresses."};
     }
 
+    // Verify the complete database reset in a rolled-back transaction BEFORE
+    // irreversible storage deletion. TRUNCATE/DELETE and trigger checks run
+    // against the real schema without committing any change.
+    internal static void ValidateReset(StudioDatabase db)
+    {
+        using var c=db.OpenConnection();
+        using var tx=c.BeginTransaction();
+        Lock(c,tx);
+        ResetData(c,tx);
+        tx.Rollback();
+    }
+
     internal static object Reset(StudioDatabase db)
     {
         using var c=db.OpenConnection();
