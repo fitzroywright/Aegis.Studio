@@ -11,19 +11,19 @@
         });
     }
 
-    let myWorkLoad=null;
+    let todayLoad=null;
     let navigationRevision=0;
     let jobsWorkspaceFilter=null;
 
-    function renderMyWork(){
+    function renderToday(){
         const controller=new AbortController(),revision=navigationRevision;
         const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
-        state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['mywork','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
-        myWorkLoad=controller;
+        state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['today','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
+        todayLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
         const started=performance.now(),run=globalThis.crypto?.randomUUID?.()||String(Date.now());
         const diagnostics={run,startedAt:new Date().toISOString(),requests:[],shellMs:null,coreMs:null,completeMs:null};
-        window.studioMyWorkDiagnostics=diagnostics;
+        window.studioTodayDiagnostics=diagnostics;
         const now=new Date();
         const dayRange=date=>{
             const from=new Date(date.getFullYear(),date.getMonth(),date.getDate());
@@ -47,14 +47,14 @@
         state.scheduleRange=scheduleRange;
         const scheduleUrl=(date,view=state.calendarView)=>{
             const {from,to}=scheduleRange(date,view);
-            return '/api/my-work/schedule?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
+            return '/api/today/schedule?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
         };
-        const urls={tasks:'/api/my-work/tasks',schedule:scheduleUrl(state.selectedDate,state.calendarView),jobs:'/api/my-work/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/my-work/media-summary'};
+        const urls={tasks:'/api/today/tasks',schedule:scheduleUrl(state.selectedDate,state.calendarView),jobs:'/api/today/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/today/media-summary'};
         let inFlight=0;const waiting=[];
         async function load(key){
             while(inFlight>=2)await new Promise(resolve=>waiting.push(resolve));
             if(!state.active())return;
-            inFlight++;state.status[key]='loading';delete state.errors[key];paintMyWork(state);
+            inFlight++;state.status[key]='loading';delete state.errors[key];paintToday(state);
             const begin=performance.now();let outcome='ok',trace=null;
             try{
                 const value=await json(urls[key],{signal:controller.signal,headers:{'X-Studio-Startup':run},onResponse:response=>{trace=response.headers?.get('X-Studio-Trace');}});
@@ -66,8 +66,8 @@
             }finally{
                 inFlight--;waiting.shift()?.();
                 diagnostics.requests.push({component:key,url:urls[key],outcome,elapsedMs:Math.round(performance.now()-begin),trace});
-                console.debug('[Studio My Work]',diagnostics.requests.at(-1));
-                if(state.active())paintMyWork(state);
+                console.debug('[Studio Today]',diagnostics.requests.at(-1));
+                if(state.active())paintToday(state);
             }
         }
         state.retry=key=>load(key);
@@ -86,12 +86,12 @@
                 }));
                 state.announcements=results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
                 state.status.announcements='ready';
-                if(state.active())paintMyWork(state);
+                if(state.active())paintToday(state);
             }catch{
                 state.workspaceName='';
                 state.announcements=[];
                 state.status.announcements='error';
-                if(state.active())paintMyWork(state);
+                if(state.active())paintToday(state);
             }
         };
         state.selectDay=date=>{
@@ -100,7 +100,7 @@
             urls.schedule=scheduleUrl(state.selectedDate,state.calendarView);
             state.schedule=[];
             state.status.schedule='loading';
-            paintMyWork(state);
+            paintToday(state);
             load('schedule');
         };
         state.setCalendarView=view=>{
@@ -110,7 +110,7 @@
             urls.schedule=scheduleUrl(state.selectedDate,state.calendarView);
             state.schedule=[];
             state.status.schedule='loading';
-            paintMyWork(state);
+            paintToday(state);
             load('schedule');
         };
         state.stepCalendar=direction=>{
@@ -126,7 +126,7 @@
             current.setDate(current.getDate()+direction*(state.calendarView==='week'?7:1));
             state.selectDay(current);
         };
-        paintMyWork(state);
+        paintToday(state);
         state.resolveWorkspace();
         diagnostics.shellMs=Math.round(performance.now()-started);
         // Two reads at a time: operational essentials first, enrichment afterwards.
@@ -137,15 +137,15 @@
                 if(diagnostics.coreMs===null&&['tasks','schedule'].every(k=>['ready','error'].includes(state.status[k])))diagnostics.coreMs=Math.round(performance.now()-started);
             }
         }
-        window.studioMyWorkReady=Promise.all([worker(),worker()]).then(()=>{
+        window.studioTodayReady=Promise.all([worker(),worker()]).then(()=>{
             diagnostics.completeMs=Math.round(performance.now()-started);
             diagnostics.cancelled=controller.signal.aborted;
-            console.info('[Studio My Work startup]',diagnostics);
+            console.info('[Studio Today startup]',diagnostics);
         });
         return Promise.resolve();
     }
 
-    function paintMyWork(state){
+    function paintToday(state){
         if(!state.active())return;
         const {auth,jobs,tasks,schedule,notifications}=state;
         const workspaceCrumb=state.workspaceName
@@ -300,7 +300,7 @@
                 <header class="mw-today-heading"><div><h1>Today</h1><p>Your assignments, upcoming sessions, and what needs your attention.</p></div><time>${now.toLocaleDateString([],{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</time></header>
                 <div class="mw-today-layout">
                     <aside class="mw-today-left" aria-label="Workspace and actions">
-                        <section class="mw-list-panel" data-mw-region="workspaces"><header><h2>My Workspaces</h2></header><div class="mw-today-rail-links">${workspaceRows}</div></section>
+                        <section class="mw-list-panel" data-mw-region="workspaces"><header><h2>Todayspaces</h2></header><div class="mw-today-rail-links">${workspaceRows}</div></section>
                         <section class="mw-list-panel"><header><h2>Actions</h2></header><div class="mw-today-rail-links">
                             ${isAdmin?'<button type="button" data-assign-job-lead>★ <span>Assign Job Lead</span></button>':''}
                             <button data-nav="frontdesk">＋ <span>New Booking</span></button>
@@ -343,6 +343,7 @@
                         <section class="mw-list-panel" data-mw-region="messages"><header><h2>Messages & Announcements</h2><button data-nav="messages">View All →</button></header><div class="mw-compact-messages">${phase('notifications',messageRows)}</div></section>
                     </aside>
                 </div>
+                <footer class="mw-today-footer">Brian's Photo Studios · Today</footer>
             </section>`;
         const next=document.createElement('div');next.innerHTML=markup;
         if(!genericView.querySelector('.mw-page')){genericView.replaceChildren(next.firstElementChild);state.root=genericView.querySelector('.mw-page');}
@@ -364,7 +365,7 @@
                 </details>
                 ${workspaceCrumb}
                 <span class="breadcrumb-separator" aria-hidden="true">›</span>
-                <button type="button" data-shell-nav="mywork">Today</button>
+                <button type="button" data-shell-nav="today">Today</button>
                 <span class="breadcrumb-separator" aria-hidden="true">›</span>
                 <strong>${esc(displayName)}</strong>
                 <span class="breadcrumb-date">· ${selectedDate.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>`;
@@ -387,7 +388,7 @@
                 <div class="mw-calendar-view-switch" role="group" aria-label="Calendar view">
                     ${['month','week','day'].map(view=>'<button type="button" data-mw-calendar-view="'+view+'" class="'+(calendarView===view?'active':'')+'" aria-pressed="'+String(calendarView===view)+'">'+view[0].toUpperCase()+view.slice(1)+'</button>').join('')}
                 </div>
-                <div class="mw-day-nav" aria-label="My Work ${viewLabel.toLowerCase()} navigator">
+                <div class="mw-day-nav" aria-label="Today ${viewLabel.toLowerCase()} navigator">
                     <button type="button" class="mw-day-step" data-mw-day="-1" aria-label="Previous ${calendarView}">‹</button>
                     <button type="button" class="mw-day-current" data-mw-day="today" title="${isToday?'Today':'Return to today'}">${selectedDateLabel}</button>
                     <button type="button" class="mw-day-step" data-mw-day="1" aria-label="Next ${calendarView}">›</button>
@@ -454,7 +455,7 @@
                 }
             };
         }
-        studioBreadcrumb?.querySelector('[data-shell-nav="mywork"]')?.addEventListener('click',()=>window.studioNavigate?.('mywork'));
+        studioBreadcrumb?.querySelector('[data-shell-nav="today"]')?.addEventListener('click',()=>window.studioNavigate?.('today'));
         studioBreadcrumb?.querySelector('[data-current-workspace]')?.addEventListener('click',()=>{
             if(typeof selectedWorkspace!=='undefined'&&selectedWorkspace){
                 const workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===String(selectedWorkspace));
@@ -465,12 +466,12 @@
         genericView.querySelectorAll('[data-mw-job-view]').forEach(button=>button.onclick=()=>{
             state.jobView=button.dataset.mwJobView;
             state.jobSearch='';
-            paintMyWork(state);
+            paintToday(state);
         });
         genericView.querySelector('[data-mw-job-search]')?.addEventListener('input',event=>{
             state.jobSearch=event.target.value;
             const position=event.target.selectionStart;
-            paintMyWork(state);
+            paintToday(state);
             const replacement=genericView.querySelector('[data-mw-job-search]');
             replacement?.focus();
             if(position!==null)replacement?.setSelectionRange(position,position);
@@ -521,11 +522,11 @@
                     const result=await json('/api/jobs/'+encodeURIComponent(jobId)+'/connected-workflow',{
                         method:'PUT',
                         headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({action:'owner',userName,reason:'My Work owner assignment',expectedRevision:wf.data.revision,operationId:crypto.randomUUID()})
+                        body:JSON.stringify({action:'owner',userName,reason:'Today owner assignment',expectedRevision:wf.data.revision,operationId:crypto.randomUUID()})
                     });
                     state.jobs=state.jobs.map(job=>String(job.id)===String(jobId)?{...job,jobLead:result.jobLead??userName}:job);
                     dialog.close();
-                    if(state.active())paintMyWork(state);
+                    if(state.active())paintToday(state);
                 }catch(errorValue){error.textContent=errorValue.message||String(errorValue);}
                 finally{submit.disabled=false;}
             };
@@ -570,7 +571,7 @@
     async function renderWorkspaces(){
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML='<div class="mywork-loading">Loading workspaces…</div>';
+        genericView.innerHTML='<div class="today-loading">Loading workspaces…</div>';
 
         const [workspaces,jobs,mediaSummary,allTasks,schedule]=await Promise.all([
             loadWorkspaces().then(()=>workspaceCache),
@@ -700,7 +701,7 @@
                         <section class="mw-list-panel mw-quick-links-panel">
                             <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
                             <div class="mw-quick-link-list">
-                                <button type="button" data-nav-quick="mywork"><span>▤</span><span>My Work</span></button>
+                                <button type="button" data-nav-quick="today"><span>▤</span><span>Today</span></button>
                                 <button type="button" data-nav-quick="production"><span>◆</span><span>Production</span></button>
                                 <button type="button" data-nav-quick="finance"><span>▧</span><span>Finance</span></button>
                                 <button type="button" data-nav-quick="reports"><span>▥</span><span>Reports</span></button>
@@ -754,7 +755,7 @@
                         <section class="mw-list-panel workspace-help-panel">
                             <header><h2><span class="mw-title-icon links">↗</span> Navigation</h2></header>
                             <div class="mw-action-list">
-                                <button type="button" data-nav-quick="mywork"><span>‹</span><span>Back to My Work</span><b>›</b></button>
+                                <button type="button" data-nav-quick="today"><span>‹</span><span>Back to Today</span><b>›</b></button>
                                 <button type="button" data-nav-quick="pipeline"><span>▥</span><span>View Pipeline</span><b>›</b></button>
                             </div>
                         </section>
@@ -764,10 +765,10 @@
 
         if(studioBreadcrumb){
             studioBreadcrumb.innerHTML=`
-                <button type="button" data-shell-nav="mywork">My Work</button>
+                <button type="button" data-shell-nav="today">Today</button>
                 <span class="breadcrumb-separator" aria-hidden="true">›</span>
                 <strong>Workspaces</strong>`;
-            studioBreadcrumb.querySelector('[data-shell-nav="mywork"]')?.addEventListener('click',()=>window.studioNavigate?.('mywork'));
+            studioBreadcrumb.querySelector('[data-shell-nav="today"]')?.addEventListener('click',()=>window.studioNavigate?.('today'));
         }
         if(studioPageTools) studioPageTools.innerHTML='';
 
@@ -819,7 +820,7 @@
     async function renderJobs(){
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML='<div class="mywork-loading">Loading jobs…</div>';
+        genericView.innerHTML='<div class="today-loading">Loading jobs…</div>';
 
         if(typeof loadWorkspaces==='function'&&(!Array.isArray(workspaceCache)||!workspaceCache.length))await loadWorkspaces();
         const now=new Date();
@@ -990,7 +991,7 @@
                             <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
                             <div class="mw-quick-link-list">
                                 <button type="button" data-job-nav="workspaces"><span>▰</span><span>Workspaces</span></button>
-                                <button type="button" data-job-nav="mywork"><span>▤</span><span>My Work</span></button>
+                                <button type="button" data-job-nav="today"><span>▤</span><span>Today</span></button>
                                 <button type="button" data-job-nav="production"><span>◆</span><span>Production</span></button>
                                 <button type="button" data-job-nav="frontdesk"><span>▣</span><span>Front Desk</span></button>
                             </div>
@@ -1033,7 +1034,7 @@
                 </div>
             </section>`;
 
-        const crumbItems=[{label:'My Work',view:'mywork'},{label:'Workspaces',view:'workspaces'}];
+        const crumbItems=[{label:'Today',view:'today'},{label:'Workspaces',view:'workspaces'}];
         if(workspaceForFilter)crumbItems.push({label:workspaceForFilter.name,view:'workspaces',workspaceId:workspaceForFilter.id});
         crumbItems.push({label:'Jobs',view:'jobs'});
         window.studioSetBreadcrumb?.(crumbItems);
@@ -1123,7 +1124,7 @@
     async function renderAdmin(){
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML='<div class="mywork-loading">Loading administration…</div>';
+        genericView.innerHTML='<div class="today-loading">Loading administration…</div>';
 
         const me=await json('/api/auth/me').catch(()=>null);
         const isAdministrator=me?.user?.isAdministrator===true||me?.isAdministrator===true;
@@ -1289,10 +1290,10 @@
     }
 
     const routes={
-        mywork:renderMyWork,
+        today:renderToday,
         messages:async()=>{conversationView.classList.remove('hidden');genericView.classList.add('hidden');await loadWorkspaces();await loadConversations();},
         schedule:()=>showPipeline(),
-        tasks:renderMyWork,
+        tasks:renderToday,
         workspaces:renderWorkspaces,
         jobs:renderJobs,
         pipeline:()=>showPipeline(),
@@ -1304,8 +1305,8 @@
         admin:renderAdmin
     };
 
-    let currentNavigationView=document.body.dataset.studioView||'mywork';
-    const navigationLabels={mywork:'My Work',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'My Work',schedule:'Pipeline'};
+    let currentNavigationView=document.body.dataset.studioView||'today';
+    const navigationLabels={today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
 
     function replaceNavigationHistory(view){
         const url='#studio='+encodeURIComponent(view);
@@ -1321,9 +1322,9 @@
         }
         currentNavigationView=view;
         const revision=++navigationRevision;
-        myWorkLoad?.abort();
+        todayLoad?.abort();
         setActive(view);
-        if(view!=='mywork'){
+        if(view!=='today'){
             if(studioPageTools)studioPageTools.innerHTML='';
             if(studioBreadcrumb){
                 const label=view==='workspaces'?'':view.replace(/(^|\s)\S/g,m=>m.toUpperCase());
@@ -1340,7 +1341,7 @@
             await route();
             if(revision===navigationRevision){
                 setActive(view);
-                if(view!=='mywork'&&typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
+                if(view!=='today'&&typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
             }
         }catch(error){
             if(revision!==navigationRevision)return;
@@ -1352,7 +1353,7 @@
     };
 
     window.addEventListener('popstate',event=>{
-        const view=event.state?.studioView||'mywork';
+        const view=event.state?.studioView||'today';
         if(view!==currentNavigationView)window.studioNavigate(view,{browserHistory:true,history:false}).catch(error=>console.error('Studio browser navigation failed.',error));
     });
 
@@ -1366,7 +1367,7 @@
 
     const startStudio=async()=>{
         const requested=new URLSearchParams(window.location.hash.replace(/^#/,'')).get('studio');
-        const initial=requested&&routes[requested]?requested:'mywork';
+        const initial=requested&&routes[requested]?requested:'today';
         currentNavigationView=initial;
         replaceNavigationHistory(initial);
         window.studioNavigate(initial,{history:false}).catch(error=>{
