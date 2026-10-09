@@ -7521,3 +7521,63 @@ body[data-studio-view="today"] .mw-today-right .mw-compact-messages{
 @media(min-width:721px) and (max-width:1050px){
  body .shell{grid-template-columns:230px minmax(0,1fr) !important}
 }
+
+/* Readable status pills and multicolored, purpose-specific Today icons. */
+body[data-studio-view="today"] .mw-today-job-stage{min-width:0}
+body[data-studio-view="today"] .studio-status-pill{
+ display:inline-flex;align-items:center;gap:6px;max-width:100%;
+ padding:4px 10px;border-radius:999px;border:1px solid #cbd9e8;
+ background:#eaf2fa;color:#365a7c;
+ font-size:.71rem;font-weight:700;line-height:1.15;
+ white-space:nowrap;
+}
+body[data-studio-view="today"] .studio-status-dot{
+ width:7px;height:7px;border-radius:50%;flex:0 0 7px;
+ background:currentColor;
+}
+body[data-studio-view="today"] .studio-status-pill[data-status*="complete"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="delivered"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="approved"]{
+ background:#e2f5e9;border-color:#a9ddbd;color:#197345;
+}
+body[data-studio-view="today"] .studio-status-pill[data-status*="progress"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="active"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="production"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="shoot"]{
+ background:#e2f0ff;border-color:#aacdf2;color:#195c9d;
+}
+body[data-studio-view="today"] .studio-status-pill[data-status*="pending"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="awaiting"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="needs"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="schedule"]{
+ background:#fff1d7;border-color:#f0d19a;color:#94601b;
+}
+body[data-studio-view="today"] .studio-status-pill[data-status*="cancel"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="blocked"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="overdue"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="reject"]{
+ background:#fde7e6;border-color:#f0b5b2;color:#aa3434;
+}
+body[data-studio-view="today"] .studio-status-pill[data-status*="review"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="upload"],
+body[data-studio-view="today"] .studio-status-pill[data-status*="editing"]{
+ background:#f1e7ff;border-color:#d7baf3;color:#7441a2;
+}
+body[data-studio-view="today"] .studio-context-card .mw-today-rail-links button:nth-child(3n+1)>span:first-child{
+ background:#dceafb;color:#2165a2;
+}
+body[data-studio-view="today"] .studio-context-card .mw-today-rail-links button:nth-child(3n+2)>span:first-child{
+ background:#ffe8cf;color:#a05c1c;
+}
+body[data-studio-view="today"] .studio-context-card .mw-today-rail-links button:nth-child(3n)>span:first-child{
+ background:#e8dff9;color:#7045a4;
+}
+body[data-studio-view="today"] .mw-today-right .mw-status-row:nth-child(1) .studio-attention-label>span{
+ background:#fce0df;color:#ad3535;
+}
+body[data-studio-view="today"] .mw-today-right .mw-status-row:nth-child(2) .studio-attention-label>span{
+ background:#fff0cf;color:#9a651c;
+}
+body[data-studio-view="today"] .mw-today-right .mw-status-row:nth-child(3) .studio-attention-label>span{
+ background:#e8def9;color:#7145a2;
+}
