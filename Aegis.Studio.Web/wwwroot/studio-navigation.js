@@ -1304,7 +1304,7 @@
         setActive(view);
         if(view!=='today'){
             if(studioPageTools)studioPageTools.innerHTML='';
-            window.studioSetBreadcrumb?.([{label:view==='workspaces'?'Workspaces':view.replace(/(^|\\s)\\S/g,m=>m.toUpperCase()),view}]);
+            window.studioSetBreadcrumb?.([{label:view==='workspaces'?'Workspaces':view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
             await route();
