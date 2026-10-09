@@ -7186,7 +7186,7 @@ body[data-studio-view="today"] .mw-today-page{
  gap:0;
 }
 body[data-studio-view="today"] .mw-today-layout{
- height:100%;min-height:0;
+ height:auto;min-height:0;max-height:100%;align-self:stretch;
 }
 body[data-studio-view="today"] .mw-today-center{
  display:flex;flex-direction:column;min-height:0;
