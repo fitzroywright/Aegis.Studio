@@ -164,49 +164,68 @@ internal static class ConnectedWorkflowDemo
 
     private static object ResetData(NpgsqlConnection c,NpgsqlTransaction tx)
     {
-        // Reset only business records, and every table that has a direct or
-        // indirect foreign key into them. PostgreSQL TRUNCATE checks the
-        // entire dependency set atomically. Protected configuration must never
-        // be silently added to the reset.
-        var roots=new[]{"studio_jobs","studio_clients","studio_conversations"};
-        var tables=new HashSet<string>(roots,StringComparer.Ordinal);
+        // This is the database phase only. The public factory-reset action MUST NOT
+        // call it until Studio-owned external storage has been emptied and verified.
+        // In particular, a database transaction cannot roll back an object-store delete.
         var protectedTables=new HashSet<string>(StringComparer.Ordinal)
         {
-            "studio_workspaces","studio_workspace_members","studio_user_profiles",
-            "studio_employees","studio_state","studio_demo_seed_runs",
+            "studio_workspaces","studio_user_profiles","studio_employees",
             "studio_workflow_thresholds","studio_workflow_audiences",
             "studio_workflow_migrations","studio_global_operational_roles",
             "studio_global_operational_role_members"
         };
-        bool changed;
-        do
+        var tables=new HashSet<string>(StringComparer.Ordinal);
+        using(var q=new NpgsqlCommand(@"select tablename from pg_tables
+            where schemaname='public' and tablename like 'studio_%'",c,tx))
+        using(var reader=q.ExecuteReader())
+            while(reader.Read())
+            {
+                var table=reader.GetString(0);
+                if(!protectedTables.Contains(table))tables.Add(table);
+            }
+
+        // PostgreSQL will reject TRUNCATE if any foreign-key child is omitted.
+        // Explicitly reject protected or non-Studio dependencies rather than CASCADE.
+        using(var q=new NpgsqlCommand(@"select child.relname,parent.relname
+            from pg_constraint fk join pg_class child on child.oid=fk.conrelid
+            join pg_class parent on parent.oid=fk.confrelid
+            join pg_namespace ns on ns.oid=child.relnamespace
+            where fk.contype='f' and ns.nspname='public'",c,tx))
+        using(var reader=q.ExecuteReader())
+            while(reader.Read())
+            {
+                var child=reader.GetString(0);
+                var parent=reader.GetString(1);
+                if(tables.Contains(parent)&&!tables.Contains(child))
+                    throw new InvalidOperationException(
+                        "Factory reset blocked by protected dependency: "+child+" -> "+parent);
+            }
+
+        // Workspace memberships and seed-run markers are business/demo records.
+        // Never truncate the system workspace itself: its immutable identity is
+        // enforced by the protect_unassigned trigger.
+        if(tables.Count>0)
         {
-            changed=false;
-            using var q=new NpgsqlCommand(@"select child.relname,parent.relname
-                from pg_constraint fk join pg_class child on child.oid=fk.conrelid
-                join pg_class parent on parent.oid=fk.confrelid
-                join pg_namespace ns on ns.oid=child.relnamespace
-                where fk.contype='f' and ns.nspname='public'",c,tx);
-            using var r=q.ExecuteReader();
-            var discovered=new List<string>();
-            while(r.Read())
-            {
-                string child=r.GetString(0),parent=r.GetString(1);
-                if(tables.Contains(parent)&&!tables.Contains(child))discovered.Add(child);
-            }
-            foreach(string child in discovered)
-            {
-                if(!child.StartsWith("studio_",StringComparison.Ordinal)||protectedTables.Contains(child))
-                    throw new InvalidOperationException("Reset blocked: protected dependent table "+child);
-                changed|=tables.Add(child);
-            }
-        }while(changed);
-        // Quote every name obtained from PostgreSQL's catalog; never concatenate
-        // user input into an identifier.
-        var tableList=string.Join(",",tables.Order(StringComparer.Ordinal)
-            .Select(name=>"public.\""+name.Replace("\"","\"\"")+"\""));
-        Exec(c,tx,"truncate table "+tableList+" restart identity");
-        return new {clearedTables=tables.Count,message="Studio business records and their database dependents cleared. Workspace/security configuration was preserved; external storage objects were not deleted."};
+            var names=string.Join(",",tables.Order(StringComparer.Ordinal)
+                .Select(name=>"public.\\\""+name.Replace("\\\"","\\\"\\\"")+"\\\""));
+            Exec(c,tx,"truncate table "+names+" restart identity");
+        }
+        Exec(c,tx,@"delete from studio_workspaces
+            where system_key is distinct from 'unassigned'");
+        using(var check=new NpgsqlCommand(@"select count(*) from studio_workspaces
+            where system_key='unassigned' and name='Unassigned' and is_enabled",c,tx))
+            if(Convert.ToInt64(check.ExecuteScalar())!=1)
+                throw new InvalidOperationException("Factory reset requires exactly one permanent Unassigned workspace.");
+        using(var check=new NpgsqlCommand("select count(*) from studio_workspaces",c,tx))
+            if(Convert.ToInt64(check.ExecuteScalar())!=1)
+                throw new InvalidOperationException("Factory reset left unexpected workspaces.");
+
+        // studio_state also holds persistent application configuration; clear
+        // only seed bookkeeping, never the whole table.
+        Exec(c,tx,@"delete from studio_state where key like 'demo-data-%'
+            or key like 'studio-demo-%'");
+        return new {clearedTables=tables.Count,workspacesRemaining=1,
+            message="Studio database business data cleared; only Unassigned remains. External storage must be independently purged and verified."};
     }
 
     private static void Lock(NpgsqlConnection c,NpgsqlTransaction tx)
