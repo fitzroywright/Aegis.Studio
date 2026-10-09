@@ -7082,3 +7082,50 @@ body[data-studio-view="today"] .mw-today-calendar-tools .studio-global-search in
   flex:1 1 100%;max-width:none;
  }
 }
+
+/* Studio-wide speedbump interaction: clickable grid rows, list rows and card rows.
+   Preserve established dimensions, colors and layout at rest. */
+:where(
+ .mw-today-job-row,.studio-speedbump-row,.jobs-row,.workspace-job-speedbump,
+ .mw-status-row,.mw-action-list button,.mw-quick-link-list button,
+ .mw-today-rail-links button,.mw-session-row,.mw-task-row,.mw-pipeline-row,
+ .mw-message-row,.mw-quick-link-row,.jobs-workspace-summary,
+ .studio-context-rail button,.jobs-page [role="row"][tabindex],
+ .mw-list-page [role="row"][tabindex],
+ .production-page [role="row"][tabindex],
+ .frontdesk-page [role="row"][tabindex]
+){
+ position:relative;
+ transition:background-color .16s ease,border-color .16s ease,
+  box-shadow .16s ease,transform .16s ease;
+ transform-origin:center center;
+}
+:where(
+ .mw-today-job-row,.studio-speedbump-row,.jobs-row,.workspace-job-speedbump,
+ .mw-status-row,.mw-action-list button,.mw-quick-link-list button,
+ .mw-today-rail-links button,.mw-session-row,.mw-task-row,.mw-pipeline-row,
+ .mw-message-row,.mw-quick-link-row,.jobs-workspace-summary,
+ .studio-context-rail button,.jobs-page [role="row"][tabindex],
+ .mw-list-page [role="row"][tabindex],
+ .production-page [role="row"][tabindex],
+ .frontdesk-page [role="row"][tabindex]
+):is(:hover,:focus-visible){
+ z-index:2;
+ background-color:#f1f7fd;
+ box-shadow:0 4px 12px rgba(31,64,96,.14);
+ transform:translateY(-1px) scale(1.003);
+}
+:where(
+ .mw-today-job-row,.studio-speedbump-row,.jobs-row,.workspace-job-speedbump,
+ .mw-status-row,.mw-action-list button,.mw-quick-link-list button,
+ .mw-today-rail-links button,.mw-session-row,.mw-task-row,.mw-pipeline-row,
+ .mw-message-row,.mw-quick-link-row,.jobs-workspace-summary,
+ .studio-context-rail button
+):active{transform:translateY(0) scale(.998);box-shadow:0 1px 3px rgba(31,64,96,.10)}
+@media(prefers-reduced-motion:reduce){
+ :where(.mw-today-job-row,.studio-speedbump-row,.jobs-row,.workspace-job-speedbump,
+ .mw-status-row,.mw-action-list button,.mw-quick-link-list button,
+ .mw-today-rail-links button,.mw-session-row,.mw-task-row,.mw-pipeline-row,
+ .mw-message-row,.mw-quick-link-row,.jobs-workspace-summary,
+ .studio-context-rail button){transition:none!important;transform:none!important}
+}
