@@ -13,7 +13,7 @@ public static class MediaProductionEndpoints
     public static void MapMediaProduction(this WebApplication app)
     {
         MediaProductionStore.Migrate(app.Services.GetRequiredService<StudioDatabase>());
-        app.MapGet("/api/my-work/media",(Guid? jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db)=>
+        app.MapGet("/api/today/media",(Guid? jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db)=>
         {
             var allowed=access.GetAccessibleJobIds(user,requireAttachments:true).Where(id=>!jobId.HasValue||id==jobId.Value).ToArray();
             using var c=db.OpenConnection();using var cmd=new NpgsqlCommand("select a.id,a.job_id,j.title,a.production_status,coalesce(v.file_name,a.asset_key),not exists(select 1 from studio_media_asset_subjects s where s.asset_id=a.id) and exists(select 1 from studio_job_subjects s where s.job_id=j.id) from studio_media_assets a join studio_jobs j on j.id=a.job_id left join lateral(select file_name from studio_asset_versions where job_id=a.job_id and asset_key=a.asset_key order by version_number desc limit 1)v on true where a.job_id=any($1) and lower(coalesce(a.assigned_to,''))=lower($2) and a.production_status not in ('Completed','Ready') order by j.created_at_utc,a.id limit 200",c);
