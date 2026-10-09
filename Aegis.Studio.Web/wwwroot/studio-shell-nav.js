@@ -166,13 +166,24 @@
         const footer = document.getElementById('studioFooterRate');
         const root = document.getElementById('genericView');
         if (!footer || !root || root.classList.contains('hidden')) return;
-        const selectors = ['[data-job-row]', '[data-workspace-row]', '[data-task-row]', '.mw-job-row', 'tbody tr'];
-        let rows = [];
-        for (const selector of selectors) {
-            rows = Array.from(root.querySelectorAll(selector)).filter(node => !node.hidden && getComputedStyle(node).display !== 'none');
-            if (rows.length) break;
+        const grids = [
+            { selector: '[data-job-row], .mw-job-row', noun: 'job' },
+            { selector: '[data-workspace-row]', noun: 'workspace' },
+            { selector: '[data-task-row]', noun: 'task' },
+            { selector: '[data-production-row]', noun: 'production item' },
+            { selector: '[data-booking-row]', noun: 'booking' },
+            { selector: '[data-message-row]', noun: 'message' },
+            { selector: 'tbody tr', noun: ({workspaces:'workspace',production:'production item',frontdesk:'booking',finance:'transaction',messages:'message',admin:'record',pipeline:'job',schedule:'session',tasks:'task'})[view] || 'item' }
+        ];
+        const visible = node => !node.hidden && !node.closest('[hidden]') && getComputedStyle(node).display !== 'none';
+        for (const grid of grids) {
+            const rows = Array.from(root.querySelectorAll(grid.selector)).filter(visible);
+            if (!rows.length) continue;
+            const noun = typeof grid.noun === 'function' ? grid.noun() : grid.noun;
+            footer.textContent = rows.length + ' ' + noun + (rows.length === 1 ? '' : 's');
+            return;
         }
-        footer.textContent = rows.length ? rows.length + ' ' + (rows.length === 1 ? 'item' : 'items') : '';
+        footer.textContent = '';
     }
 
     function syncPageFrame() {
