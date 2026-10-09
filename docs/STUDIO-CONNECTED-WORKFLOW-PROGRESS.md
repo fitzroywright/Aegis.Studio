@@ -54,7 +54,7 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 - Added required deliverable records, delivery/waiver commands, UI and read endpoint. Both the Delivered transition and Completed transition block outstanding requirements.
 - Last verified remote code commit at this checkpoint: `9bd116c23124eea60ab4cdf69501b2a1e3ece141`.
 - Not built or tested; no .NET SDK, application database, or Common sibling source available through GitHub-only execution. These changes are unverified.
-- Known next work: inspect transfer approval lifecycle (avoid superseding the approved request), validate SQL migration against actual schema, harden upload batch proofs and no-op commands, fix permission edge cases, integrate generic schedule writers, complete end-to-end tests and UI compatibility. Preserve My Work styling.
+- Known next work: inspect transfer approval lifecycle (avoid superseding the approved request), validate SQL migration against actual schema, harden upload batch proofs and no-op commands, fix permission edge cases, integrate generic schedule writers, complete end-to-end tests and UI compatibility. Preserve Today styling.
 
 ## Continuation checkpoint — saved October 8
 
