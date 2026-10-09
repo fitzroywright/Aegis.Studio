@@ -31,7 +31,7 @@
 
     function renderToday(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',jobStatusFilter:'',jobRoleFilter:'',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['today','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         todayLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -191,8 +191,12 @@
         const jobViews={led:'Jobs Led By Me',involved:"Jobs I'm Involved In",all:'All Jobs'};
         const viewJobs=state.jobView==='led'?jobs.filter(isLead):state.jobView==='all'?jobs:jobs.filter(isInvolved);
         const searchedJobs=viewJobs.filter(job=>[job.title,job.clientName,job.clientDisplayName,job.status,job.jobLead,job.id].some(value=>normalized(value).includes(normalized(state.jobSearch))));
-        const sortedJobs=[...searchedJobs].sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0));
-        const emptyJobText=state.jobSearch?'No jobs match your search':state.jobView==='led'?'You are not the Lead on any Jobs':state.jobView==='involved'?'You are not involved in any jobs':'No jobs found';
+        const roleForJob=job=>isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
+        const statusOptions=[...new Set(viewJobs.map(job=>String(job.status||'Unknown')))].sort((a,b)=>a.localeCompare(b));
+        const roleOptions=[...new Set(viewJobs.map(roleForJob))].sort((a,b)=>a.localeCompare(b));
+        const filteredJobs=searchedJobs.filter(job=>(!state.jobStatusFilter||String(job.status||'Unknown')===state.jobStatusFilter)&&(!state.jobRoleFilter||roleForJob(job)===state.jobRoleFilter));
+        const sortedJobs=[...filteredJobs].sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0));
+        const emptyJobText=(state.jobSearch||state.jobStatusFilter||state.jobRoleFilter)?'No jobs match your filters':state.jobView==='led'?'You are not the Lead on any Jobs':state.jobView==='involved'?'You are not involved in any jobs':'No jobs found';
         const mediaByJob=new Map(state.media.map(row=>[String(row.jobId),row]));
         const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assetCount:0}}));
         const totalPhotos=state.media.reduce((sum,row)=>sum+row.assetCount,0);
@@ -285,7 +289,7 @@
             const image=imageForJob(job.id);
             const total=Number(job.taskCount||0),completed=Number(job.completedTaskCount||0);
             const percent=total?Math.round(100*completed/total):0;
-            const role=isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
+            const role=roleForJob(job);
             return `<button class="mw-today-job-row" data-open-job="${esc(job.id)}">
                 <span class="mw-today-job-title">${image?'<img src="'+image+'" alt="" loading="lazy">':'<span class="mw-today-job-placeholder">▣</span>'}<span><strong>${esc(job.title||'Untitled Job')}</strong><small>${esc(job.clientName||job.clientDisplayName||'Client')}</small></span></span>
                 <span class="mw-today-job-stage"><span class="studio-status-pill" data-status="${esc(String(job.status||'Pending').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}"><span class="studio-status-dot" aria-hidden="true"></span>${esc(job.status||'Pending')}</span></span>
@@ -324,7 +328,7 @@
                                 <label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
                             </div>
                             <div class="mw-today-jobs-heading"><span>${metric('jobs',sortedJobs.length)} jobs</span></div>
-                            <div class="mw-today-job-columns"><span>Job / Client</span><span>Status</span><span>Progress</span><span>Event Date</span><span>My Role</span><span></span></div>
+                            <div class="mw-today-job-columns"><span>Job / Client</span><label class="mw-job-column-filter"><span>Status</span><select data-mw-job-status aria-label="Filter jobs by status"><option value="">All statuses</option>${statusOptions.map(value=>`<option value="${esc(value)}" ${state.jobStatusFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span>Progress</span><span>Event Date</span><label class="mw-job-column-filter"><span>My Role</span><select data-mw-job-role aria-label="Filter jobs by role"><option value="">All roles</option>${roleOptions.map(value=>`<option value="${esc(value)}" ${state.jobRoleFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span></span></div>
                             <div class="mw-today-job-list">${phase('jobs',mainJobRows)}</div>
                         </section>
                     </main>
@@ -459,6 +463,8 @@
             state.jobSearch='';
             paintToday(state);
         });
+        genericView.querySelector('[data-mw-job-status]')?.addEventListener('change',event=>{state.jobStatusFilter=event.target.value;paintToday(state);});
+        genericView.querySelector('[data-mw-job-role]')?.addEventListener('change',event=>{state.jobRoleFilter=event.target.value;paintToday(state);});
         genericView.querySelector('[data-mw-job-search]')?.addEventListener('input',event=>{
             state.jobSearch=event.target.value;
             const position=event.target.selectionStart;
