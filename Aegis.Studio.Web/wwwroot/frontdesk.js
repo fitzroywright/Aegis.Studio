@@ -29,21 +29,46 @@ async function showFrontDesk() {
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
 
-    genericView.innerHTML='<p>Loading FrontDesk…</p>';
-    try {
-        const dayStart=new Date();dayStart.setHours(0,0,0,0);const dayEnd=new Date(dayStart.getTime()+86400000);
-        const results=await Promise.all([
-            json('/api/jobs'),
-            json('/api/frontdesk/booking-requests'),
-            json('/api/frontdesk/enquiries'),
-            json('/api/frontdesk/workspaces'),
-            json('/api/frontdesk/clients'),
-            json('/api/schedule/entries?from='+encodeURIComponent(dayStart.toISOString())+'&to='+encodeURIComponent(new Date(dayStart.getTime()+90*86400000).toISOString())),
-            json('/api/accounts/invoices').catch(()=>[])
-        ]);
-        [frontDeskJobs,frontDeskRequests,frontDeskEnquiries,frontDeskWorkspaces,frontDeskClients,frontDeskSchedule,frontDeskInvoices]=results;
+    genericView.innerHTML='<p>Loading Front Desk…</p>';
+    const dayStart=new Date();dayStart.setHours(0,0,0,0);
+    const sources=[
+        ['/api/jobs','jobs'],
+        ['/api/frontdesk/booking-requests','bookings'],
+        ['/api/frontdesk/enquiries','inquiries'],
+        ['/api/frontdesk/workspaces','workspaces'],
+        ['/api/frontdesk/clients','clients'],
+        ['/api/schedule/entries?from='+encodeURIComponent(dayStart.toISOString())+'&to='+encodeURIComponent(new Date(dayStart.getTime()+90*86400000).toISOString()),'schedule'],
+        ['/api/accounts/invoices','invoices']
+    ];
+    const results=await Promise.allSettled(sources.map(([url])=>json(url)));
+    const errors=[];
+    const arrays=results.map((result,index)=>{
+        if(result.status==='rejected'){
+            errors.push(sources[index][1]+': '+(result.reason?.message||'Request failed'));
+            return [];
+        }
+        if(!Array.isArray(result.value)){
+            errors.push(sources[index][1]+': Unexpected API response');
+            return [];
+        }
+        return result.value;
+    });
+    [frontDeskJobs,frontDeskRequests,frontDeskEnquiries,frontDeskWorkspaces,frontDeskClients,frontDeskSchedule,frontDeskInvoices]=arrays;
+    try{
         renderFrontDesk();
-    } catch(error){genericView.innerHTML=`<h1>FrontDesk</h1><p role="alert">${esc(error.message)}</p><button class="action" onclick="showFrontDesk()">Retry</button>`;}
+        if(errors.length){
+            const notice=document.createElement('div');
+            notice.className='fd-load-warning';
+            notice.setAttribute('role','alert');
+            notice.innerHTML='<strong>Some Front Desk information could not be loaded.</strong> '+errors.map(esc).join(' · ')+' <button type="button" class="action">Retry</button>';
+            notice.querySelector('button').onclick=()=>showFrontDesk();
+            genericView.querySelector('.fd-page')?.prepend(notice);
+            console.warn('[Studio Front Desk] Partial API failures:',errors);
+        }
+    }catch(error){
+        console.error('[Studio Front Desk] Render failure:',error);
+        genericView.innerHTML=`<div class="fd-page"><h1>Front Desk</h1><p role="alert">Unable to render Front Desk: ${esc(error.message)}</p><button class="action" onclick="showFrontDesk()">Retry</button></div>`;
+    }
 }
 
 let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskClients=[],frontDeskSchedule=[],frontDeskInvoices=[];
@@ -54,14 +79,14 @@ function renderFrontDesk(){
     // or additional nested side rail; the secondary cards belong to the content grid.
     const now=new Date(), today=now.toLocaleDateString();
     const sessions=frontDeskSchedule.filter(s=>new Date(s.startsAtUtc).toLocaleDateString()===today&&s.status!=='Cancelled').sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
-    const pending=frontDeskRequests.filter(x=>!['Confirmed','Cancelled'].includes(x.status));
+    const pending=frontDeskRequests.filter(x=>x&&!['Confirmed','Cancelled'].includes(x.status));
     const unassigned=frontDeskJobs.filter(j=>!j.assignedTo&&j.status!=='Completed');
-    const enquiries=frontDeskEnquiries.filter(e=>!frontDeskRequests.some(r=>r.request?.conversationId===e.id));
-    const due=frontDeskRequests.filter(x=>x.status==='AwaitingDeposit'||(x.request?.requiredDeposit>0&&x.recordedDeposit<x.request.requiredDeposit&&!['Confirmed','Cancelled'].includes(x.status)));
+    const enquiries=frontDeskEnquiries.filter(e=>e&&!frontDeskRequests.some(r=>r?.request?.conversationId===e.id));
+    const due=frontDeskRequests.filter(x=>x&&(x.status==='AwaitingDeposit'||(x.request?.requiredDeposit>0&&x.recordedDeposit<x.request.requiredDeposit&&!['Confirmed','Cancelled'].includes(x.status))));
     const tabs=[['today','All'],['enquiries','New'],['requests','Bookings'],['jobs','Jobs'],['delivery','Pickup / Delivery'],['completed','Completed']];
     const entries=[
         ...enquiries.map(e=>({kind:'enquiry',id:e.id,created:e.createdAtUtc,name:e.contactName||'New inquiry',title:e.subject||'Inquiry',date:null,status:'New',source:e.channel||'Inquiry',conversationId:e.id})),
-        ...frontDeskRequests.map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Customer',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:'Booking',request:x}))
+        ...frontDeskRequests.filter(Boolean).map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Customer',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:'Booking',request:x}))
     ].sort((a,b)=>new Date(b.created||0)-new Date(a.created||0));
     const filtered=entries.filter(e=>(frontDeskTab==='today'||(frontDeskTab==='enquiries'&&e.kind==='enquiry')||(frontDeskTab==='requests'&&e.kind==='request'))&&[e.name,e.title,e.status,e.source].join(' ').toLowerCase().includes(frontDeskTerm.toLowerCase()));
     const rows=filtered.map(e=>`<tr><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${esc(e.kind==='enquiry'?'Inquiry':'Booking')}</td><td>${esc(e.date||'—')}</td><td><span class="fd-status">${esc(e.status)}</span></td><td>${esc(e.source)}</td><td><button type="button" class="action" data-fd-open="${esc(e.id)}">Open</button></td></tr>`).join('');
