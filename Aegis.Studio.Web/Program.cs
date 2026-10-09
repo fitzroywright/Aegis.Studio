@@ -240,7 +240,7 @@ app.Use(async(context,next)=>
     }
 });
 app.UseMiddleware<StorageFailureMiddleware>();
-app.UseMiddleware<MyWorkStartupTimingMiddleware>();
+app.UseMiddleware<TodayStartupTimingMiddleware>();
 app.UseAuthentication();
 app.UseMiddleware<WorkDayDeviceTokenMiddleware>();
 app.Use(async (context, next) => { bool document = context.Request.Path == "/" || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase); if (document && context.User.Identity?.IsAuthenticated != true) { context.Response.Redirect("/login"); return; } await next(); });
@@ -259,7 +259,7 @@ app.MapGet("/", (HttpContext context,IWebHostEnvironment e) => { context.Respons
 app.MapStudioAuthentication();
 app.MapStudioUserProfiles();
 app.MapStudioNotifications();
-app.MapStudioMyWork();
+app.MapStudioToday();
 app.MapStudioInAppMessaging();
 app.MapStudioMessageAttachments();
 app.MapStudioOperationsEnhancements();
