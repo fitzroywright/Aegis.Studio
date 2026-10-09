@@ -7065,3 +7065,20 @@ body[data-studio-view="today"] .mw-today-calendar-tools .mw-day-nav{
  flex:0 0 auto;
 }
 body[data-studio-view="today"] #studioPageTools{display:none !important}
+
+/* Today: global search sits beside calendar navigation in the content toolbar. */
+body[data-studio-view="today"] .mw-today-calendar-tools{
+ display:flex;align-items:center;justify-content:flex-end;gap:10px;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .studio-global-search{
+ display:flex;position:relative;margin-right:auto;flex:0 1 320px;
+ min-width:180px;max-width:340px;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools .studio-global-search input{
+ min-width:0;width:100%;
+}
+@media(max-width:850px){
+ body[data-studio-view="today"] .mw-today-calendar-tools .studio-global-search{
+  flex:1 1 100%;max-width:none;
+ }
+}
