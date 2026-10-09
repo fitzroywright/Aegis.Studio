@@ -1012,8 +1012,7 @@
         if(workspaceForFilter)crumbItems.push({label:workspaceForFilter.name,view:'workspaces',workspaceId:workspaceForFilter.id});
         crumbItems.push({label:'Jobs',view:'jobs'});
         window.studioSetBreadcrumb?.(crumbItems);
-        const jobsHeading=genericView.querySelector('.jobs-page-heading');
-        if(jobsHeading&&studioBreadcrumb)jobsHeading.appendChild(studioBreadcrumb);
+        // The shared shell owns the breadcrumb; do not move it into a hidden Jobs heading.
         if(studioPageTools){
             studioPageTools.innerHTML='';
         }
