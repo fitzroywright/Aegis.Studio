@@ -389,6 +389,16 @@
                 const bottom=railCards[railCards.length-1].getBoundingClientRect().bottom;
                 const height=Math.max(0,Math.round(bottom-top));
                 if(height>0)jobsCard.style.height=height+'px';
+                // Align the persistent left rail's three cards to the same
+                // top and bottom as the right rail, without changing their content.
+                const leftRail=document.getElementById('studioContextRail');
+                if(leftRail){
+                    const bounds=leftRail.getBoundingClientRect();
+                    const topPadding=Math.max(0,Math.round(top-bounds.top));
+                    const bottomPadding=Math.max(0,Math.round(bounds.bottom-bottom));
+                    leftRail.style.paddingTop=topPadding+'px';
+                    leftRail.style.paddingBottom=bottomPadding+'px';
+                }
             };
             if(state.jobsHeightRail!==rightRail){
                 state.jobsHeightObserver?.disconnect();
