@@ -85,6 +85,8 @@ public static class DemoDataEndpoints
             int restored=DemoDataExpansion.RepairMedia(connection,transaction,login,storage,report)
                 +DemoFullStudioData.RepairMedia(connection,transaction,login,storage,report);
             DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
+            int previewsQueued=QueueDemoPreviews(connection,transaction);
+            report?.Invoke(new(98,"Generating previews",0,0,$"Queued {previewsQueued} missing demo previews for background generation.");
             report?.Invoke(new(99,"Committing repairs",0,0,"Saving repaired demo photo references."));
             transaction.Commit();
             return $"Operational demo ready with {denseJobs} jobs covering {DemoDenseScheduleData.Days} days across all six workspaces. Full Studio demo verified; restored {restored} missing seeded photo versions and preserved existing edits.";
@@ -111,6 +113,8 @@ public static class DemoDataEndpoints
         bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
         bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage, report);
         DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
+        int previewsQueued=QueueDemoPreviews(connection,transaction);
+        report?.Invoke(new(98,"Generating previews",0,0,$"Queued {previewsQueued} demo previews for background generation.");
         report?.Invoke(new(99, "Committing rich demo", 0, 0, "Saving historical workflow and media data."));
         transaction.Commit();
 
@@ -121,6 +125,27 @@ public static class DemoDataEndpoints
                 : expanded
                     ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days. Legacy demo media also expanded."
                     : $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days; existing rich demo data is already up to date.";
+    }
+
+    // Explicitly queue preview derivatives for demo photographs. The normal version
+    // trigger handles new uploads; this also repairs older demo versions created
+    // before the trigger or left without usable thumbnail/preview references.
+    // Generation happens after commit in MediaDerivativeWorker, not in the HTTP request.
+    private static int QueueDemoPreviews(NpgsqlConnection connection,NpgsqlTransaction transaction)
+    {
+        using var cmd=new NpgsqlCommand("""
+            insert into studio_media_derivatives(version_id,status,attempts,next_attempt_at,updated_at)
+            select v.id,'Pending',0,now(),now()
+            from studio_asset_versions v
+            left join studio_media_derivatives d on d.version_id=v.id
+            where (v.asset_key like 'demo-full/%' or v.asset_key like 'demo-%')
+              and (d.version_id is null or d.status in ('Failed','WaitingForOriginal')
+                   or (d.status='Ready' and (d.thumbnail_key is null or d.preview_key is null)))
+            on conflict(version_id) do update set
+              status='Pending',attempts=0,next_attempt_at=now(),updated_at=now(),
+              thumbnail_key=null,preview_key=null,last_error=null
+            """,connection,transaction);
+        return cmd.ExecuteNonQuery();
     }
 
     private static void RepairDemoWorkspaces(NpgsqlConnection connection, NpgsqlTransaction transaction, string login)
