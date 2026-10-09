@@ -347,7 +347,7 @@
                 <button type="button" data-shell-nav="today">Today</button>
                 <span class="breadcrumb-separator" aria-hidden="true">›</span>
                 <strong>${esc(displayName)}</strong>
-                <span class="breadcrumb-date">· ${selectedDate.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>`;
+                `;
         }
         if(studioPageTools){
             const today=new Date();
