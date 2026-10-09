@@ -7206,7 +7206,12 @@ body .topbar .studio-shell-breadcrumb strong,
 body .topbar .studio-shell-breadcrumb .breadcrumb-separator{
  color:#fff !important;
 }
-body .topbar #notificationButton{margin-left:auto !important}
+body .topbar #notificationButton{
+ margin-left:auto !important;
+ width:28px;height:28px;min-width:28px;min-height:28px;
+ padding:4px;display:inline-flex;align-items:center;justify-content:center;
+}
+body .topbar #notificationButton svg{width:16px;height:16px;flex:0 0 16px}
 body .topbar .user-menu{margin-left:8px !important;margin-right:0 !important}
 body .topbar .breadcrumb-date{display:none !important}
 body .shell{
