@@ -18,7 +18,7 @@ Updated: 2026-09-19
 - COMPLETE — Revocable per-device WorkDay session token; raw token only in SecureStorage; hash stored server-side.
 
 ## Home / field workflow
-- COMPLETE — My WorkDay home.
+- COMPLETE — TodayDay home.
 - COMPLETE — Today / Upcoming.
 - COMPLETE — Needs Attention.
 - COMPLETE — Local authorized search.
