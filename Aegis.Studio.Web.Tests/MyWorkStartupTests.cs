@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Aegis.Studio.Web.Tests;
 
-public sealed class MyWorkStartupTests
+public sealed class TodayStartupTests
 {
     [Fact]
     public void RequestServicesCanBeConstructedWithoutDatabaseAccess()
@@ -26,10 +26,10 @@ public sealed class MyWorkStartupTests
     public async Task StartupFailuresKeepTheirTraceAndPropagateTheOriginalException()
     {
         var context = new DefaultHttpContext { TraceIdentifier = "startup-test-trace" };
-        context.Request.Path = "/api/my-work/jobs";
+        context.Request.Path = "/api/today/jobs";
         context.Request.Headers["X-Studio-Startup"] = "startup-test-run";
         var failure = new TimeoutException("Query timed out");
-        var middleware = new MyWorkStartupTimingMiddleware(_ => throw failure, NullLogger<MyWorkStartupTimingMiddleware>.Instance);
+        var middleware = new TodayStartupTimingMiddleware(_ => throw failure, NullLogger<TodayStartupTimingMiddleware>.Instance);
         Assert.Same(failure, await Assert.ThrowsAsync<TimeoutException>(() => middleware.InvokeAsync(context)));
         Assert.Equal("startup-test-trace", context.Response.Headers["X-Studio-Trace"].ToString());
     }
