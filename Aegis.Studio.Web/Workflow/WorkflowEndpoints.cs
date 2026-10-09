@@ -1,3 +1,4 @@
+using Common.Storage;
 using System.Security.Claims;
 using System.Text.Json;
 using Aegis.Studio.Web.Operations;
@@ -80,20 +81,36 @@ public static class WorkflowEndpoints
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
             return Results.Ok(ConnectedWorkflowDemo.Generate(db,WorkflowStore.Name(user)));
         }));
-        admin.MapPost("/demo-data/remove",(StudioDatabase db,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request)=>Run(()=>
+        admin.MapPost("/demo-data/remove",async (StudioDatabase db,IFileStorage storage,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request,CancellationToken cancellationToken)=>
         {
             if(!config.GetValue("DemoData:AllowDestructiveReset",false))return Results.NotFound();
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
             if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
-            return Results.Ok(ConnectedWorkflowDemo.Reset(db));
-        }));
-        admin.MapPost("/demo-data/reset-and-generate",(StudioDatabase db,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request)=>Run(()=>
+            try
+            {
+                return Results.Ok(await StudioFactoryReset.ExecuteAsync(db,storage,config,environment,null,cancellationToken));
+            }
+            catch(Exception e) when(e is InvalidOperationException or IOException or NpgsqlException)
+            {
+                return Results.Conflict(new{error=e.Message,complete=false,
+                    warning="Reset did not complete. Some storage objects may already have been purged. Correct the failure and retry."});
+            }
+        });
+        admin.MapPost("/demo-data/reset-and-generate",async (StudioDatabase db,IFileStorage storage,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request,CancellationToken cancellationToken)=>
         {
             if(!config.GetValue("DemoData:AllowDestructiveReset",false))return Results.NotFound();
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
             if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
-            return Results.Ok(ConnectedWorkflowDemo.ResetAndGenerate(db,WorkflowStore.Name(user)));
-        }));
+            try
+            {
+                return Results.Ok(await StudioFactoryReset.ExecuteAsync(db,storage,config,environment,WorkflowStore.Name(user),cancellationToken));
+            }
+            catch(Exception e) when(e is InvalidOperationException or IOException or NpgsqlException)
+            {
+                return Results.Conflict(new{error=e.Message,complete=false,
+                    warning="Reset/regeneration did not complete. Storage may already have been purged. Correct the failure and retry."});
+            }
+        });
         admin.MapPut("/thresholds",(WorkflowThreshold request,ClaimsPrincipal user,StudioDatabase db)=>Run(()=>
         {
             WorkflowRules.ValidateThreshold(request);using var c=db.OpenConnection();using var tx=c.BeginTransaction();
