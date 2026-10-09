@@ -3,7 +3,7 @@
     const pageTools = document.getElementById('studioPageTools');
     const shell = document.querySelector('.shell');
     const quickLinks = [
-        ['mywork', 'Today', '▤'],
+        ['today', 'Today', '▤'],
         ['workspaces', 'Workspaces', '▰'],
         ['jobs', 'Jobs', '▥'],
         ['pipeline', 'Pipeline', '⇥'],
@@ -12,7 +12,7 @@
         ['finance', 'Finance', '$'],
         ['messages', 'Messages', '✉']
     ];
-    let currentView = document.body.dataset.studioView || 'mywork';
+    let currentView = document.body.dataset.studioView || 'today';
     let renderingTools = false;
 
     const escText = value => String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -58,8 +58,8 @@
                         <span>${escText(page)}</span>
                         <strong>Current</strong>
                     </button>
-                    <button class="mw-status-row" type="button" data-studio-side="mywork">
-                        <span class="mw-status-icon">▤</span><span>My Work</span><strong>Home</strong>
+                    <button class="mw-status-row" type="button" data-studio-side="today">
+                        <span class="mw-status-icon">▤</span><span>Today</span><strong>Home</strong>
                     </button>
                     <button class="mw-status-row" type="button" data-studio-side="workspaces">
                         <span class="mw-status-icon">▰</span><span>Workspaces</span><strong>Open</strong>
@@ -70,7 +70,7 @@
             <section class="mw-list-panel mw-action-panel studio-context-card">
                 <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
                 <div class="mw-action-list">
-                    <button type="button" data-studio-side="mywork"><span>▤</span><span>Go to My Work</span><b>›</b></button>
+                    <button type="button" data-studio-side="today"><span>▤</span><span>Go to Today</span><b>›</b></button>
                     <button type="button" data-studio-focus-search><span>⌕</span><span>Search Studio</span><b>›</b></button>
                 </div>
             </section>
@@ -78,7 +78,7 @@
             <section class="mw-list-panel mw-quick-links-panel studio-context-card">
                 <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
                 <div class="mw-quick-link-list">
-                    ${quickLinks.filter(([key]) => !['mywork', currentView].includes(key)).slice(0,4).map(([key, label, icon]) =>
+                    ${quickLinks.filter(([key]) => !['today', currentView].includes(key)).slice(0,4).map(([key, label, icon]) =>
                         '<button type="button" data-studio-side="' + key + '"><span>' + icon + '</span><span>' + escText(label) + '</span></button>'
                     ).join('')}
                 </div>
@@ -101,9 +101,9 @@
     window.studioSetBreadcrumb = items => {
         if (!breadcrumb) return;
         const supplied = Array.isArray(items) ? items.filter(Boolean) : [];
-        const crumbs = supplied[0]?.view === 'mywork'
+        const crumbs = supplied[0]?.view === 'today'
             ? supplied
-            : [{ label: 'My Work', view: 'mywork' }, ...supplied];
+            : [{ label: 'Today', view: 'today' }, ...supplied];
         breadcrumb.innerHTML = crumbs.map((item, index) => {
             const separator = index ? '<span class="breadcrumb-separator" aria-hidden="true">›</span>' : '';
             const last = index === crumbs.length - 1;
@@ -135,9 +135,9 @@
             const result = await original(view);
             ensureTools();
             ensureLeftRail();
-            if (view !== 'mywork'
-                && !breadcrumb?.querySelector('[data-studio-crumb="mywork"]')
-                && !breadcrumb?.querySelector('[data-shell-nav="mywork"]')) {
+            if (view !== 'today'
+                && !breadcrumb?.querySelector('[data-studio-crumb="today"]')
+                && !breadcrumb?.querySelector('[data-shell-nav="today"]')) {
                 window.studioSetBreadcrumb([{ label: labelFor(view), view }]);
             }
             return result;
@@ -155,7 +155,7 @@
         ensureBreadcrumb();
         if (!window.history.state?.studioView) window.history.replaceState({ studioView: currentView }, '', window.location.href);
         window.addEventListener('popstate', event => {
-            const view = event.state?.studioView || 'mywork';
+            const view = event.state?.studioView || 'today';
             if (view !== currentView) window.studioNavigate?.(view, { browserHistory: true });
         });
 
