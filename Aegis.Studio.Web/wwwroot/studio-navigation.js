@@ -965,31 +965,6 @@
                             </button>
                         </section>`:''}
 
-                        <section class="mw-list-panel">
-                            <header><h2><span class="mw-title-icon status">▥</span> Job Status</h2><small>${filteredBase().length} jobs</small></header>
-                            <div class="mw-status-list jobs-status-list">
-                                ${groups.map(([key,label])=>`<button type="button" class="mw-status-row ${key==='all'?'active':''}" data-job-group="${key}"><span class="mw-status-icon">${key==='completed'?'✓':key==='cancelled'?'×':'○'}</span><span>${label}</span><strong>${key==='all'?filteredBase().length:filteredBase().filter(job=>stageGroup(job.status)===key).length}</strong></button>`).join('')}
-                            </div>
-                        </section>
-
-                        <section class="mw-list-panel mw-action-panel">
-                            <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
-                            <div class="mw-action-list">
-                                <button type="button" data-job-action="new"><span>＋</span><span>Create job</span><b>›</b></button>
-                                <button type="button" data-job-action="pipeline"><span>⇥</span><span>Open Pipeline</span><b>›</b></button>
-                                <button type="button" data-job-action="export"><span>⇩</span><span>Export list</span><b>›</b></button>
-                            </div>
-                        </section>
-
-                        <section class="mw-list-panel mw-quick-links-panel">
-                            <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
-                            <div class="mw-quick-link-list">
-                                <button type="button" data-job-nav="workspaces"><span>▰</span><span>Workspaces</span></button>
-                                <button type="button" data-job-nav="today"><span>▤</span><span>Today</span></button>
-                                <button type="button" data-job-nav="production"><span>◆</span><span>Production</span></button>
-                                <button type="button" data-job-nav="frontdesk"><span>▣</span><span>Front Desk</span></button>
-                            </div>
-                        </section>
                     </aside>
 
                     <section class="mw-list-panel jobs-center">
@@ -1011,6 +986,14 @@
                     </section>
 
                     <aside class="jobs-right-rail">
+                        <section class="mw-list-panel">
+                            <header><h2><span class="mw-title-icon status">▥</span> Job Status</h2><small>${filteredBase().length} jobs</small></header>
+                            <div class="mw-status-list jobs-status-list">
+                                ${groups.map(([key,label])=>`<button type="button" class="mw-status-row ${key==='all'?'active':''}" data-job-group="${key}"><span class="mw-status-icon">${key==='completed'?'✓':key==='cancelled'?'×':'○'}</span><span>${label}</span><strong>${key==='all'?filteredBase().length:filteredBase().filter(job=>stageGroup(job.status)===key).length}</strong></button>`).join('')}
+                            </div>
+                        </section>
+
+
                         <section class="mw-list-panel jobs-upcoming">
                             <header><h2><span class="mw-title-icon tasks">▣</span> Upcoming Shoots</h2><button type="button" data-job-action="pipeline">View calendar</button></header>
                             <div class="jobs-upcoming-list">
@@ -1019,7 +1002,7 @@
                         </section>
 
                         <section class="mw-list-panel jobs-activity">
-                            <header><h2><span class="mw-title-icon messages">◉</span> Recent Activity</h2><button type="button" data-job-action="notifications">View all</button></header>
+                            <header><h2><span class="mw-title-icon messages">◉</span> Recent Statuses</h2><button type="button" data-job-action="notifications">View all</button></header>
                             <div class="jobs-activity-list">
                                 ${activity.map(n=>{const job=jobById.get(String(n.referenceId));return `<button type="button" data-open-job="${job?.id||''}" class="jobs-activity-row"><span class="jobs-activity-icon">•</span><span><strong>${esc(n.subject||n.title||n.eventType||'Job activity')}</strong><small>${esc(job?.title||'Job')}${n.body?' · '+esc(n.body):''}</small></span><time>${n.createdAtUtc?new Date(n.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):''}</time></button>`;}).join('')||'<div class="mw-empty">No recent job activity.</div>'}
                             </div>
