@@ -29,6 +29,7 @@ internal static class StudioFactoryReset
         await Gate.WaitAsync(cancellationToken);
         try
         {
+            ConnectedWorkflowDemo.ValidateReset(database);
             long removed = 0;
             if (bucketReset is not null)
             {
