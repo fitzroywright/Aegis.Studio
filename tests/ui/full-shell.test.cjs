@@ -14,16 +14,16 @@ function api(u){const p=u.pathname;
  if(p==='/api/workspace-access')return workspaces.map(workspace=>({workspace,permissions:workspace.permissions}));
  if(p==='/api/auth/me')return {user:{userName:'demo.sam',displayName:'Samantha Lee',isAdministrator:true}};
  if(p==='/api/workspaces'||p==='/api/frontdesk/workspaces')return workspaces;
- if(p==='/api/jobs'||p==='/api/my-work/jobs')return jobs;
- if(p==='/api/my-work/tasks')return tasks;
- if(p==='/api/my-work/media-summary')return jobs.map(j=>({jobId:j.id,assetCount:20,thumbnailVersionId:'v'+j.id+'0'}));
+ if(p==='/api/jobs'||p==='/api/today/jobs')return jobs;
+ if(p==='/api/today/tasks')return tasks;
+ if(p==='/api/today/media-summary')return jobs.map(j=>({jobId:j.id,assetCount:20,thumbnailVersionId:'v'+j.id+'0'}));
  if(/^\/api\/jobs\/j\d$/.test(p))return jobs.find(j=>j.id===p.split('/').pop());
  if(p.endsWith('/access'))return {permissions};
  if(p.endsWith('/appearance'))return {color:'#b99750',icon:'folder'};
  if(p.endsWith('/media'))return media(p.split('/')[3]);
  if(p.endsWith('/subjects'))return media(p.split('/')[3]).subjects;
  if(p.includes('/activities'))return p.includes('/jobs/')?tasks.filter(t=>t.jobId===p.split('/')[3]):tasks;
- if(p==='/api/schedule/entries'||p==='/api/my-work/schedule')return sessions;
+ if(p==='/api/schedule/entries'||p==='/api/today/schedule')return sessions;
  if(p.includes('/shoots'))return [];
  if(p==='/api/photographers')return photographers;
  if(p==='/api/studio-employees')return photographers.map(x=>({userName:x.userName,displayName:x.displayName,isActive:true,isAssignable:true,roles:['Photographer']}));
@@ -42,8 +42,8 @@ function api(u){const p=u.pathname;
 test('the full shell loads every operational screen with a shared data graph',async()=>{const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc}),w=dom.window;
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));w.fetch=async url=>({ok:true,status:200,json:async()=>api(new URL(url,'http://studio.test')),text:async()=>JSON.stringify(api(new URL(url,'http://studio.test')))});
  for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
- await new Promise(r=>setTimeout(r,25));await w.studioMyWorkReady;
- for(const view of ['mywork','workspaces','pipeline','production','frontdesk','finance','management','admin']){try{await w.studioNavigate(view);assert.ok(w.document.querySelector('#genericView').textContent.trim().length>0,view);}catch(e){errors.push(view+': '+e.message)}}
+ await new Promise(r=>setTimeout(r,25));await w.studioTodayReady;
+ for(const view of ['today','workspaces','pipeline','production','frontdesk','finance','management','admin']){try{await w.studioNavigate(view);assert.ok(w.document.querySelector('#genericView').textContent.trim().length>0,view);}catch(e){errors.push(view+': '+e.message)}}
  const routeField=w.document.getElementById('workspaceRouteKey');assert.ok(routeField.closest('details'));assert.equal(routeField.closest('details').open,false);
  let finishDemo;const demoHeld=new Promise(resolve=>finishDemo=resolve);
  w.studioLoadDemoData=async report=>{report({percent:52,stage:'Studio photographs',message:'Carter Wedding — photo 17/320'});await demoHeld;report({percent:100,completed:true,message:'Full Studio demo loaded.'});return {message:'Full Studio demo loaded.'};};
@@ -61,7 +61,7 @@ test('cold workspace opening loads server permissions and keeps actual denial on
  w.fetch=async url=>{const u=new URL(url,'http://studio.test');requests.push(u.pathname);const body=u.pathname==='/api/workspace-access'?workspaces.map(workspace=>({workspace,permissions:{...permissions,view:!denied}})):api(u);return {ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body)};};
  try{
   for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
-  await new Promise(r=>setTimeout(r,25));await w.studioMyWorkReady;
+  await new Promise(r=>setTimeout(r,25));await w.studioTodayReady;
   assert.ok(w.eval('workspaceCache.length')>=0);
   await w.studioNavigate('workspaces');
   assert.ok(requests.includes('/api/workspace-access'));
