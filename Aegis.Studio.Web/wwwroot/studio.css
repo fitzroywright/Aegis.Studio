@@ -7194,3 +7194,69 @@ body[data-studio-view="today"] .mw-today-right .mw-list-panel>header button:hove
 .topbar .user-menu{margin-left:8px !important;margin-right:0 !important;flex:0 0 auto}
 .topbar #topNewButton[hidden]{display:none !important}
 .topbar .breadcrumb-date{display:none !important}
+
+/* Shared Studio application frame, all views. The content within each view remains its own. */
+html,body{height:100%;min-height:0;overflow:hidden}
+body .topbar{
+ height:56px !important;min-height:56px;max-height:56px;
+ background:#172d4a !important;color:#fff !important;
+ box-sizing:border-box;display:flex;align-items:center;
+ border-bottom:1px solid #102238 !important;
+}
+body .topbar .shell-brand,
+body .topbar .shell-brand strong,
+body .topbar .studio-shell-breadcrumb strong,
+body .topbar .studio-shell-breadcrumb .breadcrumb-separator{
+ color:#fff !important;
+}
+body .topbar #notificationButton{margin-left:auto !important}
+body .topbar .user-menu{margin-left:8px !important;margin-right:0 !important}
+body .topbar .breadcrumb-date{display:none !important}
+body .shell{
+ display:grid !important;
+ grid-template-columns:210px minmax(0,1fr) !important;
+ grid-template-rows:minmax(0,1fr) 32px !important;
+ height:calc(100dvh - 56px) !important;
+ min-height:0;overflow:hidden;padding:0 !important;margin:0 !important;
+}
+body .shell>.studio-context-rail{
+ display:flex !important;flex-direction:column;
+ grid-column:1;grid-row:1;
+ min-height:0;min-width:0;overflow-y:auto;
+ padding:86px 8px 12px 14px;box-sizing:border-box;
+ background:#f3f7fa;
+}
+body .shell>main{
+ grid-column:2;grid-row:1;
+ min-height:0;min-width:0;height:100%;
+ width:100% !important;overflow:hidden;
+}
+body .shell>main>.generic{
+ height:100%;min-height:0;box-sizing:border-box;
+ overflow:auto;
+}
+body .shell>.studio-shell-footer{
+ display:flex !important;grid-column:1/-1;grid-row:2;
+ align-items:center;justify-content:center;
+ height:32px;min-height:32px;max-height:32px;
+ margin:0 !important;padding:0 12px !important;
+ border:0;border-radius:0;background:#76543d;color:#fff;
+ box-sizing:border-box;z-index:10;
+}
+body:not([data-studio-view="today"]) .shell>main>.generic{
+ padding:86px 18px 12px !important;
+ background:#f3f7fa;
+}
+body:not([data-studio-view="today"]) .shell>main>.generic>.mw-page,
+body:not([data-studio-view="today"]) .shell>main>.generic>.jobs-page{
+ min-height:0;
+}
+body .shell>.studio-context-rail .mw-list-panel>header h2{
+ font-size:.85rem;font-weight:600;
+}
+body .shell>.studio-context-rail .mw-list-panel>header{min-height:46px}
+@media(max-width:720px){
+ body .shell{grid-template-columns:145px minmax(0,1fr) !important}
+ body .shell>.studio-context-rail{padding:86px 4px 8px}
+ body:not([data-studio-view="today"]) .shell>main>.generic{padding:86px 8px 8px !important}
+}
