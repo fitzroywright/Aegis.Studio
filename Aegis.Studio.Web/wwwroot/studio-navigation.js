@@ -17,7 +17,7 @@
 
     function renderMyWork(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['mywork','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         myWorkLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -167,6 +167,17 @@
         const todaySchedule=schedule.filter(entry=>entry.status!=='Cancelled'&&new Date(entry.startsAtUtc)>=startOfDay&&new Date(entry.startsAtUtc)<endOfDay).sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
         const leadJobs=jobs.filter(j=>!['Completed','Closed','Cancelled','Published'].includes(String(j.status||''))&&user&&String(j.jobLead||'').toLowerCase()===user);
         const recentJobs=[...leadJobs].sort((a,b)=>new Date(b.createdAtUtc||b.createdAt||0)-new Date(a.createdAtUtc||a.createdAt||0)).slice(0,4);
+        const normalized=value=>String(value||'').trim().toLowerCase();
+        const isLead=job=>Boolean(user)&&normalized(job.jobLead)===user;
+        const isInvolved=job=>isLead(job)
+            ||Boolean(user)&&[job.assignedTo,job.jobOwner,job.photographerUserName].some(value=>normalized(value)===user)
+            ||myTasks.some(task=>String(task.jobId)===String(job.id))
+            ||(Array.isArray(job.crew)&&job.crew.some(member=>normalized(member.userName||member)===user));
+        const jobViews={led:'Jobs Led By Me',involved:"Jobs I'm Involved In",all:'All Jobs'};
+        const viewJobs=state.jobView==='led'?jobs.filter(isLead):state.jobView==='all'?jobs:jobs.filter(isInvolved);
+        const searchedJobs=viewJobs.filter(job=>[job.title,job.clientName,job.clientDisplayName,job.status,job.jobLead,job.id].some(value=>normalized(value).includes(normalized(state.jobSearch))));
+        const sortedJobs=[...searchedJobs].sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0));
+        const emptyJobText=state.jobSearch?'No jobs match your search':state.jobView==='led'?'You are not the Lead on any Jobs':state.jobView==='involved'?'You are not involved in any jobs':'No jobs found';
         const mediaByJob=new Map(state.media.map(row=>[String(row.jobId),row]));
         const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assetCount:0}}));
         const totalPhotos=state.media.reduce((sum,row)=>sum+row.assetCount,0);
@@ -255,6 +266,20 @@
             </button>`;
         }).join('')||'<div class="mw-empty">No active jobs currently led by you.</div>';
 
+        const mainJobRows=sortedJobs.map(job=>{
+            const image=imageForJob(job.id);
+            const total=Number(job.activityTotal||job.totalActivities||0),completed=Number(job.activityCompleted||job.completedActivities||0);
+            const percent=total?Math.round(100*completed/total):0;
+            const role=isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
+            return `<button class="mw-today-job-row" data-open-job="${esc(job.id)}">
+                <span class="mw-today-job-title">${image?'<img src="'+image+'" alt="" loading="lazy">':'<span class="mw-today-job-placeholder">▣</span>'}<span><strong>${esc(job.title||'Untitled Job')}</strong><small>${esc(job.clientName||job.clientDisplayName||'Client')}</small></span></span>
+                <span class="mw-today-job-stage">${esc(job.status||'Pending')}</span>
+                <span class="mw-today-job-progress"><span class="mw-today-job-meter"><i style="width:${percent}%"></i></span>${percent}%</span>
+                <span class="mw-today-job-date">${job.eventDate?esc(String(job.eventDate)):'—'}</span>
+                <span class="mw-today-job-role">${esc(role)}</span>
+                <span class="mw-chevron">›</span>
+            </button>`;
+        }).join('')||'<div class="mw-today-jobs-empty" role="status">'+esc(emptyJobText)+'</div>';
         const overdueTasks=myTasks.filter(t=>t.dueAtUtc&&new Date(t.dueAtUtc)<now).length;
         const blockedTasks=myTasks.filter(t=>/blocked|rework|required|failed/i.test(String(t.status||''))).length;
         const schedulingJobs=leadJobs.filter(j=>/needs scheduling/i.test(String(j.status||''))).length;
@@ -265,80 +290,56 @@
         const attentionItems=[...productionTasks,...myTasks.filter(t=>!productionTasks.includes(t))].slice(0,5);
         const attentionTotal=overdueTasks+blockedTasks+attentionJobs;
 
+        const availableWorkspaces=(typeof workspaceCache!=='undefined'&&Array.isArray(workspaceCache)?workspaceCache:[])
+            .filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view);
+        const workspaceRows=availableWorkspaces.map(w=>`<button type="button" data-mw-workspace="${esc(w.id)}">▣ <span>${esc(w.name)}</span></button>`).join('')
+            ||'<div class="mw-empty">No accessible workspaces.</div>';
         const markup=`
-            <section class="mw-page mw-list-page">
-                <div class="mw-list-layout">
-                    <div class="mw-list-summary">
-                        <section class="mw-list-panel" data-mw-region="status">
-                            <header><h2><span class="mw-title-icon status">▥</span> Status</h2><small>Assigned to ${esc(displayName)}</small></header>
-                            <div class="mw-status-list">
-                                <button class="mw-status-row active" data-nav="mywork"><span class="mw-status-icon">▤</span><span>Jobs I lead</span><strong>${metric('jobs',leadJobs.length)}</strong></button>
-                                <button class="mw-status-row" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Scheduled sessions</span><strong>${metric('schedule',todaySchedule.length)}</strong></button>
-                                <button class="mw-status-row" data-nav="tasks"><span class="mw-status-icon">☑</span><span>Open tasks</span><strong>${metric('tasks',myTasks.length)}</strong></button>
-                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">▲</span><span>Needs attention</span><strong>${metric('tasks',attentionTotal)}</strong></button>
-                                <button class="mw-status-row" data-nav="messages"><span class="mw-status-icon">✉</span><span>Unread messages</span><strong>${metric('notifications',messageNotifications.filter(n=>!n.isRead).length)}</strong></button>
-                            </div>
-                        </section>
-
-                        <section class="mw-list-panel mw-action-panel" data-mw-region="actions">
-                            <header><h2><span class="mw-title-icon actions">◆</span> Actions</h2></header>
-                            <div class="mw-action-list">
-                                ${isAdmin?'<button type="button" data-assign-job-lead><span>★</span><span>Assign Job Lead</span><b>›</b></button>':''}
-                                <button data-nav="messages"><span>✉</span><span>Send Message</span><b>›</b></button>
-                                <button data-nav="schedule"><span>▣</span><span>Book a Schedule</span><b>›</b></button>
-                                <button data-nav="tasks"><span>＋</span><span>Create Task</span><b>›</b></button>
-                            </div>
-                        </section>
-
-                        <section class="mw-list-panel mw-quick-links-panel" data-mw-region="quick-links">
-                            <header><h2><span class="mw-title-icon links">↗</span> Quick Links</h2></header>
-                            <div class="mw-quick-link-list">
-                                <button data-nav="workspaces"><span>▰</span><span>Workspaces</span></button>
-                                <button data-nav="pipeline"><span>▥</span><span>Pipeline</span></button>
-                                <button data-nav="production"><span>◆</span><span>Production</span></button>
-                                <button data-nav="reports"><span>▤</span><span>Reports</span></button>
-                            </div>
-                        </section>
-                    </div>
-
-                    <section class="mw-list-panel mw-assigned-panel">
-                        <header class="mw-assigned-header">
-                            <div><h2><span class="mw-title-icon assigned">▣</span> Assigned</h2><small>Sessions, tasks and jobs currently belonging to ${esc(displayName)}</small></div>
-                        </header>
-
-                        <div class="mw-work-section" data-mw-region="schedule">
-                            <div class="mw-section-title"><h3>${state.calendarView==='month'?'Month Sessions':state.calendarView==='week'?'Week Sessions':((selectedDate.getFullYear()===now.getFullYear()&&selectedDate.getMonth()===now.getMonth()&&selectedDate.getDate()===now.getDate())?"Today's Sessions":'Day Sessions')}</h3><span>${metric('schedule',todaySchedule.length)}</span></div>
-                            <div class="mw-section-rows">${phase('schedule',sessionRows)}</div>
+            <section class="mw-page mw-today-page">
+                <header class="mw-today-heading"><div><h1>Today</h1><p>Your assignments, upcoming sessions, and what needs your attention.</p></div><time>${now.toLocaleDateString([],{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</time></header>
+                <div class="mw-today-layout">
+                    <aside class="mw-today-left" aria-label="Workspace and actions">
+                        <section class="mw-list-panel" data-mw-region="workspaces"><header><h2>My Workspaces</h2></header><div class="mw-today-rail-links">${workspaceRows}</div></section>
+                        <section class="mw-list-panel"><header><h2>Actions</h2></header><div class="mw-today-rail-links">
+                            ${isAdmin?'<button type="button" data-assign-job-lead>★ <span>Assign Job Lead</span></button>':''}
+                            <button data-nav="frontdesk">＋ <span>New Booking</span></button>
+                            <button data-nav="pipeline">▣ <span>Jobs</span></button>
+                            <button data-nav="tasks">☑ <span>Tasks</span></button>
+                            <button data-nav="messages">✉ <span>Send Message</span></button>
+                        </div></section>
+                        <section class="mw-list-panel"><header><h2>Quick Links</h2></header><div class="mw-today-rail-links">
+                            <button data-nav="schedule">▦ <span>Calendar</span></button>
+                            <button data-nav="production">◆ <span>Production</span></button>
+                            <button data-nav="reports">▤ <span>Reports</span></button>
+                        </div></section>
+                    </aside>
+                    <main class="mw-today-center">
+                        <div class="mw-today-metrics">
+                            <div class="mw-today-metric"><small>Jobs I'm Involved In</small><strong>${metric('jobs',jobs.filter(isInvolved).length)}</strong></div>
+                            <div class="mw-today-metric"><small>Jobs Led By Me</small><strong>${metric('jobs',jobs.filter(isLead).length)}</strong></div>
+                            <div class="mw-today-metric"><small>Today's Sessions</small><strong>${metric('schedule',todaySchedule.length)}</strong></div>
+                            <div class="mw-today-metric"><small>Needs Attention</small><strong>${metric('tasks',attentionTotal)}</strong></div>
                         </div>
-
-                        <div class="mw-work-section" data-mw-region="pipeline">
-                            <div class="mw-section-title"><h3>Jobs I Lead</h3><span>${state.status.media==='error'?'<button class="action" data-mw-retry="media">Retry photos</button>':''}<button data-nav="pipeline">View all →</button></span></div>
-                            <div class="mw-section-rows">${phase('jobs',recentRows)}</div>
-                        </div>
-
-                    </section>
-
-                    <aside class="mw-list-right">
-                        <section class="mw-list-panel" data-mw-region="attention">
-                            <header><h2><span class="mw-title-icon attention">▲</span> Needs Attention</h2><small>${metric('tasks',attentionTotal)} items</small></header>
-                            <div class="mw-status-list">
-                                <button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">◷</span><span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
-                                <button class="mw-status-row warning" data-nav="tasks"><span class="mw-status-icon">!</span><span>Blocked / rework</span><strong>${metric('tasks',blockedTasks)}</strong></button>
-                                <button class="mw-status-row warning" data-nav="schedule"><span class="mw-status-icon">▣</span><span>Needs scheduling</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
-                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">⇧</span><span>Awaiting upload</span><strong>${metric('jobs',uploadJobs)}</strong></button>
-                                <button class="mw-status-row warning" data-nav="production"><span class="mw-status-icon">◆</span><span>Production exceptions</span><strong>${metric('jobs',exceptionJobs)}</strong></button>
+                        <section class="mw-list-panel mw-today-jobs" data-mw-region="jobs">
+                            <div class="mw-today-job-toolbar">
+                                <div class="mw-today-view-tabs" role="group" aria-label="Job view">
+                                    ${Object.entries(jobViews).map(([key,label])=>`<button type="button" data-mw-job-view="${key}" class="${state.jobView===key?'active':''}" aria-pressed="${state.jobView===key}">${label}</button>`).join('')}
+                                </div>
+                                <label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
                             </div>
+                            <div class="mw-today-jobs-heading"><h2>${jobViews[state.jobView]}</h2><span>${metric('jobs',sortedJobs.length)} jobs</span></div>
+                            <div class="mw-today-job-columns"><span>Job / Client</span><span>Status</span><span>Progress</span><span>Event Date</span><span>My Role</span><span></span></div>
+                            <div class="mw-today-job-list">${phase('jobs',mainJobRows)}</div>
                         </section>
-
-                        <section class="mw-list-panel mw-right-tasks-panel" data-mw-region="tasks">
-                            <header><h2><span class="mw-title-icon tasks">☑</span> My Tasks</h2><small>${metric('tasks',myTasks.length)} open</small></header>
-                            <div class="mw-right-tasks">${phase('tasks',taskRows)}</div>
-                        </section>
-
-                        <section class="mw-list-panel mw-messages-panel" data-mw-region="messages">
-                            <header><h2><span class="mw-title-icon messages">✉</span> Messages</h2></header>
-                            <div class="mw-compact-messages">${phase('notifications',messageRows)}</div>
-                        </section>
+                    </main>
+                    <aside class="mw-today-right" aria-label="Daily activity">
+                        <section class="mw-list-panel" data-mw-region="schedule"><header><h2>Today's Sessions</h2><button data-nav="schedule">Calendar →</button></header><div class="mw-section-rows">${phase('schedule',sessionRows)}</div></section>
+                        <section class="mw-list-panel" data-mw-region="attention"><header><h2>Needs Attention</h2><button data-nav="tasks">View All →</button></header><div class="mw-status-list">
+                            <button class="mw-status-row warning" data-nav="tasks"><span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
+                            <button class="mw-status-row warning" data-nav="schedule"><span>Needs scheduling</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
+                            <button class="mw-status-row warning" data-nav="production"><span>Awaiting upload</span><strong>${metric('jobs',uploadJobs)}</strong></button>
+                        </div></section>
+                        <section class="mw-list-panel" data-mw-region="messages"><header><h2>Messages & Announcements</h2><button data-nav="messages">View All →</button></header><div class="mw-compact-messages">${phase('notifications',messageRows)}</div></section>
                     </aside>
                 </div>
             </section>`;
@@ -362,7 +363,7 @@
                 </details>
                 ${workspaceCrumb}
                 <span class="breadcrumb-separator" aria-hidden="true">›</span>
-                <button type="button" data-shell-nav="mywork">My Work</button>
+                <button type="button" data-shell-nav="mywork">Today</button>
                 <span class="breadcrumb-separator" aria-hidden="true">›</span>
                 <strong>${esc(displayName)}</strong>
                 <span class="breadcrumb-date">· ${selectedDate.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>`;
@@ -460,6 +461,30 @@
             }
         });
         if(typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
+        genericView.querySelectorAll('[data-mw-job-view]').forEach(button=>button.onclick=()=>{
+            state.jobView=button.dataset.mwJobView;
+            state.jobSearch='';
+            paintMyWork(state);
+        });
+        genericView.querySelector('[data-mw-job-search]')?.addEventListener('input',event=>{
+            state.jobSearch=event.target.value;
+            const focused=event.target;
+            const visible=(state.jobView==='led'?state.jobs.filter(j=>String(j.jobLead||'').toLowerCase()===String((state.auth.user||state.auth).userName||'').toLowerCase()):
+                state.jobView==='all'?state.jobs:state.jobs.filter(j=>String(j.jobLead||'').toLowerCase()===String((state.auth.user||state.auth).userName||'').toLowerCase()||state.tasks.some(t=>String(t.jobId)===String(j.id))));
+            const count=visible.filter(j=>[j.title,j.clientName,j.status,j.id].some(v=>String(v||'').toLowerCase().includes(state.jobSearch.toLowerCase()))).length;
+            const heading=genericView.querySelector('.mw-today-jobs-heading span');
+            if(heading)heading.textContent=count+' jobs';
+            // Repaint on search; restore input focus and caret afterwards.
+            const position=focused.selectionStart;
+            paintMyWork(state);
+            const replacement=genericView.querySelector('[data-mw-job-search]');
+            replacement?.focus();
+            if(position!==null)replacement?.setSelectionRange(position,position);
+        });
+        genericView.querySelectorAll('[data-mw-workspace]').forEach(button=>button.onclick=()=>{
+            const workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===button.dataset.mwWorkspace);
+            if(workspace)selectWorkspace(workspace.id,workspace.name);
+        });
         genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
         genericView.querySelector('[data-assign-job-lead]')?.addEventListener('click',async()=>{
             const activeJobs=jobs.filter(job=>!['Completed','Closed','Cancelled','Published'].includes(String(job.status||'')))
