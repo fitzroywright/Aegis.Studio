@@ -26,3 +26,10 @@ Delete **all** objects under exclusively Studio-owned storage roots, including u
 - `Aegis.Studio.Web/Storage/AttachmentStore.cs` uses `PrefixedFileStorage` for attachments, and `.delivery-cache` is a local derivative path. Other photo/version roots must be inventoried.
 
 **Do not merge this branch or run destructive commands until implementation and validation are complete.**
+
+
+## Implementation checkpoint (2026-10-09)
+
+Commits on this branch implement a fail-closed storage-first coordinator and wire the admin reset endpoints. The coordinator requires `Storage:FactoryResetExclusiveRoot=true` and both `IStorageQuery` and `IStorageLifecycle` on the configured `IFileStorage`. It purges enumerable keys, re-lists to verify emptiness, clears the local delivery cache, then runs the database reset and optionally regenerates Connected Workflow demo data.
+
+**Not production-ready:** Common.Storage currently implements irreversible `IStorageLifecycle` for local/network filesystem providers, but not S3, Azure Blob or SharePoint. Those providers intentionally reject reset before deletion. Current-key enumeration cannot independently prove there are no orphan historical versions without a provider-level audit. The database reset has not been integration-tested against a representative PostgreSQL schema; protected FK dependencies may correctly block it. No Kratos test or build has been performed. Do not enable the destructive flag on a shared root, and do not merge until these gaps are addressed.
