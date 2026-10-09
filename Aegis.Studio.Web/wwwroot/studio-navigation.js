@@ -299,21 +299,6 @@
             <section class="mw-page mw-today-page">
                 <header class="mw-today-heading"><div><h1>Today</h1><p>Your assignments, upcoming sessions, and what needs your attention.</p></div><time>${now.toLocaleDateString([],{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</time></header>
                 <div class="mw-today-layout">
-                    <aside class="mw-today-left" aria-label="Workspace and actions">
-                        <section class="mw-list-panel" data-mw-region="workspaces"><header><h2>Todayspaces</h2></header><div class="mw-today-rail-links">${workspaceRows}</div></section>
-                        <section class="mw-list-panel"><header><h2>Actions</h2></header><div class="mw-today-rail-links">
-                            ${isAdmin?'<button type="button" data-assign-job-lead>★ <span>Assign Job Lead</span></button>':''}
-                            <button data-nav="frontdesk">＋ <span>New Booking</span></button>
-                            <button data-nav="pipeline">▣ <span>Jobs</span></button>
-                            <button data-nav="tasks">☑ <span>Tasks</span></button>
-                            <button data-nav="messages">✉ <span>Send Message</span></button>
-                        </div></section>
-                        <section class="mw-list-panel"><header><h2>Quick Links</h2></header><div class="mw-today-rail-links">
-                            <button data-nav="schedule">▦ <span>Calendar</span></button>
-                            <button data-nav="production">◆ <span>Production</span></button>
-                            <button data-nav="reports">▤ <span>Reports</span></button>
-                        </div></section>
-                    </aside>
                     <main class="mw-today-center">
                         <div class="mw-today-metrics">
                             <div class="mw-today-metric"><small>Jobs I'm Involved In</small><strong>${metric('jobs',jobs.filter(isInvolved).length)}</strong></div>
