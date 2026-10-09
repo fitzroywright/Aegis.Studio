@@ -141,7 +141,10 @@
             current.setDate(current.getDate()+direction*(state.calendarView==='week'?7:1));
             state.selectDay(current);
         };
-        paintToday(state);
+        try{paintToday(state);}catch(error){
+            console.error('[Studio Today] Initial render failed',error);
+            genericView.innerHTML='<section class="mw-empty" role="alert">Today could not render. Check the browser console for the error and reload.</section>';
+        }
         state.resolveWorkspace();
         diagnostics.shellMs=Math.round(performance.now()-started);
         // Two reads at a time: operational essentials first, enrichment afterwards.
@@ -204,13 +207,15 @@
         const footerCount=document.getElementById('studioFooterRate');
         if(footerCount)footerCount.textContent=sortedJobs.length+' '+(sortedJobs.length===1?'job':'jobs');
         const emptyJobText=(state.jobSearch||state.jobStatusFilter||state.jobRoleFilter)?'No jobs match your filters':state.jobView==='led'?'You are not the Lead on any Jobs':state.jobView==='involved'?'You are not involved in any jobs':'No jobs found';
-        const mediaByJob=new Map(state.media.map(row=>[String(row.jobId),row]));
+        const media=Array.isArray(state.media)?state.media:[];
+        const announcements=Array.isArray(state.announcements)?state.announcements:[];
+        const mediaByJob=new Map(media.map(row=>[String(row.jobId),row]));
         const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assetCount:0}}));
-        const totalPhotos=state.media.reduce((sum,row)=>sum+row.assetCount,0);
+        const totalPhotos=media.reduce((sum,row)=>sum+Number(row.assetCount||0),0);
         const messageNotifications=notifications.filter(n=>/message|conversation|reply/i.test(String(n.eventType||n.title||n.type||'')));
         const combinedCommunicationFeed=[
             ...messageNotifications.map(n=>({kind:'message',at:n.createdAtUtc||n.createdAt||0,item:n})),
-            ...state.announcements.map(a=>({kind:'announcement',at:a.createdAtUtc||a.createdAt||0,item:a}))
+            ...announcements.map(a=>({kind:'announcement',at:a.createdAtUtc||a.createdAt||0,item:a}))
         ].sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6);
         const activityNotifications=notifications.slice(0,8);
 
