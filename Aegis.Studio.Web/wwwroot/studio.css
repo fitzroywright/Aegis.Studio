@@ -7066,23 +7066,6 @@ body[data-studio-view="today"] .mw-today-calendar-tools .mw-day-nav{
 }
 body[data-studio-view="today"] #studioPageTools{display:none !important}
 
-/* Today: global search sits beside calendar navigation in the content toolbar. */
-body[data-studio-view="today"] .mw-today-calendar-tools{
- display:flex;align-items:center;justify-content:flex-end;gap:10px;
-}
-body[data-studio-view="today"] .mw-today-calendar-tools .studio-global-search{
- display:flex;position:relative;margin-right:auto;flex:0 1 320px;
- min-width:180px;max-width:340px;
-}
-body[data-studio-view="today"] .mw-today-calendar-tools .studio-global-search input{
- min-width:0;width:100%;
-}
-@media(max-width:850px){
- body[data-studio-view="today"] .mw-today-calendar-tools .studio-global-search{
-  flex:1 1 100%;max-width:none;
- }
-}
-
 /* Studio-wide speedbump interaction: clickable grid rows, list rows and card rows.
    Preserve established dimensions, colors and layout at rest. */
 :where(
@@ -7157,11 +7140,6 @@ body[data-studio-view="today"] .mw-today-center{
 }
 body[data-studio-view="today"] .mw-today-jobs{
  flex:1 1 auto;min-height:0;
-}
-body[data-studio-view="today"] .mw-today-calendar-tools{
- position:fixed;top:78px;right:16px;
- height:38px;min-height:38px;z-index:4;
- display:flex;flex-wrap:nowrap;gap:8px;
 }
 body[data-studio-view="today"] .mw-today-calendar-date{
  font-size:.78rem;color:#60738b;white-space:nowrap;margin-right:8px;
@@ -7465,9 +7443,6 @@ body[data-studio-view="today"] .mw-today-focus-icon{
 body[data-studio-view="today"] .mw-today-heading h1{font-size:1.34rem;gap:7px}
 body[data-studio-view="today"] .mw-today-heading p{font-size:.69rem;margin:2px 0 0}
 body[data-studio-view="today"] .mw-today-focus-label{padding:2px 7px;font-size:.58rem}
-body[data-studio-view="today"] .mw-today-calendar-tools{
- top:66px;height:34px;min-height:34px;gap:5px;
-}
 body[data-studio-view="today"] .shell>.studio-context-rail{
  padding-top:62px;padding-bottom:6px;gap:7px;
 }
@@ -7652,4 +7627,44 @@ body[data-studio-view="today"] .mw-today-open-job{
 body[data-studio-view="today"] .mw-today-job-row:hover .mw-today-open-job,
 body[data-studio-view="today"] .mw-today-job-row:focus-visible .mw-today-open-job{
  background:#255f94;color:#fff;transform:translate(1px,-1px);
+}
+
+/* Global search is part of the content surface, never the navy masthead.
+   Today uses its dedicated Jobs search instead of duplicating the global field. */
+body .shell>main{
+ display:flex;flex-direction:column;
+}
+body .shell>main>.studio-content-search{
+ display:flex;align-items:center;justify-content:flex-end;
+ flex:0 0 43px;min-height:43px;box-sizing:border-box;
+ padding:5px 18px;background:#f3f7fa;
+}
+body .shell>main>.studio-content-search .studio-global-search{
+ display:flex;align-items:center;position:relative;
+ width:min(100%,320px);height:32px;min-width:0;
+ margin:0;background:#fff;border:1px solid #cad8e7;
+ border-radius:8px;box-sizing:border-box;
+}
+body .shell>main>.studio-content-search .studio-global-search:before{content:none}
+body .shell>main>.studio-content-search .studio-search-icon{
+ flex:0 0 25px;text-align:center;color:#496785;font-size:18px;
+}
+body .shell>main>.studio-content-search .studio-global-search input{
+ display:block;flex:1 1 auto;min-width:0;width:100%;height:30px;
+ padding:4px 8px;background:transparent;border:0;
+ color:#213c5a;font-size:12px;
+}
+body .shell>main>.studio-content-search .studio-global-search input::placeholder{
+ color:#718198;font-size:12px;
+}
+body .shell>main>.studio-content-search .studio-search-hint{display:none}
+body .shell>main>#conversationView,
+body .shell>main>#genericView{
+ flex:1 1 auto;min-height:0;height:auto!important;
+}
+body[data-studio-view="today"] .shell>main>.studio-content-search{
+ display:none!important;
+}
+body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-calendar-tools{
+ position:static;top:auto;right:auto;z-index:auto;
 }
