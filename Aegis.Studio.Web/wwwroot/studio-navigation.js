@@ -25,6 +25,16 @@
         const diagnostics={run,startedAt:new Date().toISOString(),requests:[],shellMs:null,coreMs:null,completeMs:null};
         window.studioTodayDiagnostics=diagnostics;
         const now=new Date();
+        const formatJobDate=value=>{
+            if(!value)return '—';
+            const raw=String(value);
+            const dateOnly=/^(\d{4})-(\d{2})-(\d{2})(?:$|T00:00:00(?:\.0+)?(?:Z)?)?/.exec(raw);
+            const date=dateOnly
+                ?new Date(Number(dateOnly[1]),Number(dateOnly[2])-1,Number(dateOnly[3]))
+                :new Date(raw);
+            return Number.isNaN(date.getTime())?raw:date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'2-digit',year:'numeric'});
+        };
+
         const dayRange=date=>{
             const from=new Date(date.getFullYear(),date.getMonth(),date.getDate());
             const to=new Date(date.getFullYear(),date.getMonth(),date.getDate()+1);
@@ -276,7 +286,7 @@
                 <span class="mw-today-job-title">${image?'<img src="'+image+'" alt="" loading="lazy">':'<span class="mw-today-job-placeholder">▣</span>'}<span><strong>${esc(job.title||'Untitled Job')}</strong><small>${esc(job.clientName||job.clientDisplayName||'Client')}</small></span></span>
                 <span class="mw-today-job-stage"><span class="studio-status-pill" data-status="${esc(String(job.status||'Pending').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}"><span class="studio-status-dot" aria-hidden="true"></span>${esc(job.status||'Pending')}</span></span>
                 <span class="mw-today-job-progress"><span class="mw-today-job-meter"><i style="width:${percent}%"></i></span>${percent}%</span>
-                <span class="mw-today-job-date">${job.eventDate?esc(String(job.eventDate)):'—'}</span>
+                <span class="mw-today-job-date">${esc(formatJobDate(job.eventDate))}</span>
                 <span class="mw-today-job-role"><span class="studio-role-pill" data-role="${esc(role.toLowerCase().replace(/[^a-z0-9]+/g,'-'))}"><span class="studio-role-dot" aria-hidden="true"></span>${esc(role)}</span></span>
                 <span class="mw-chevron">›</span>
             </button>`;
@@ -298,7 +308,7 @@
         const markup=`
             <section class="mw-page mw-today-page">
                 <header class="mw-today-heading"><div class="mw-today-heading-copy"><span class="mw-today-focus-icon" aria-hidden="true">✦</span><div><h1>Today <span class="mw-today-focus-label">Your focus</span></h1><p>What needs your attention, what’s coming up, and the work to move forward.</p></div></div></header>
-                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"><time class="mw-today-calendar-date">${now.toLocaleDateString([],{weekday:'long',month:'short',day:'numeric',year:'numeric'})}</time></div>
+                
                 <div class="mw-today-layout">
                     <main class="mw-today-center">
                         <section class="mw-list-panel mw-today-jobs" data-mw-region="jobs">
@@ -306,6 +316,7 @@
                                 <div class="mw-today-view-tabs" role="group" aria-label="Job view">
                                     ${Object.entries(jobViews).map(([key,label])=>`<button type="button" data-mw-job-view="${key}" class="${state.jobView===key?'active':''}" aria-pressed="${state.jobView===key}">${label}</button>`).join('')}
                                 </div>
+                                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div>
                                 <label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
                             </div>
                             <div class="mw-today-jobs-heading"><span>${metric('jobs',sortedJobs.length)} jobs</span></div>
@@ -383,8 +394,6 @@
         const calendarHost=genericView.querySelector('.mw-today-calendar-tools');
         if(calendarHost && studioPageTools){
             calendarHost.replaceChildren(...Array.from(studioPageTools.children));
-            const searchForm=document.getElementById('studioSearchForm');
-            if(searchForm) calendarHost.prepend(searchForm);
         }
         const shellScope=calendarHost||genericView;
         shellScope.querySelectorAll('[data-mw-calendar-view]').forEach(button=>button.onclick=()=>state.setCalendarView(button.dataset.mwCalendarView));
