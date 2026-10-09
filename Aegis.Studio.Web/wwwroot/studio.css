@@ -7955,3 +7955,15 @@ body[data-studio-view="jobs"] .shell>main>#genericView{padding-top:7px!important
  body:not([data-studio-view="today"]) .studio-shared-heading-copy p{display:none}
  body:not([data-studio-view="today"]) .shell>main>.studio-shared-page-heading{padding:5px 8px}
 }
+
+/* Jobs follows Today: full-width heading, no blank left header gutter. */
+body[data-studio-view="jobs"] .shell>main>.studio-shared-page-heading{
+ position:relative;z-index:2;
+}
+body[data-studio-view="jobs"] .shell>main>.studio-shared-page-heading:before{
+ content:"";position:absolute;right:100%;top:0;bottom:0;width:260px;
+ background:#e6f1fb;pointer-events:none;
+}
+body[data-studio-view="jobs"] .studio-shared-heading-trail{
+ margin-left:auto;justify-content:flex-end;
+}
