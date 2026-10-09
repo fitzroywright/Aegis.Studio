@@ -22,13 +22,22 @@ internal static class StudioFactoryReset
         if (!configuration.GetValue("Storage:FactoryResetExclusiveRoot", false))
             throw new InvalidOperationException(
                 "Factory reset requires Storage:FactoryResetExclusiveRoot=true after verifying the configured storage root is dedicated to Studio.");
-        if (storage is not IStorageQuery query || storage is not IStorageLifecycle lifecycle)
+        var bucketReset = storage as IStorageBucketReset;
+        if (bucketReset is null && (storage is not IStorageQuery || storage is not IStorageLifecycle))
             throw new InvalidOperationException(
-                "Factory reset requires provider-neutral enumeration AND irreversible version purge. This storage provider does not support both; no data was deleted.");
+                "Factory reset requires dedicated-bucket S3 purge or storage enumeration and irreversible lifecycle purge. No data was deleted.");
         await Gate.WaitAsync(cancellationToken);
         try
         {
-            var removed = 0;
+            long removed = 0;
+            if (bucketReset is not null)
+            {
+                removed = await bucketReset.PurgeBucketAsync(cancellationToken);
+            }
+            else
+            {
+                var query = (IStorageQuery)storage;
+                var lifecycle = (IStorageLifecycle)storage;
             var previousBatch = new HashSet<string>(StringComparer.Ordinal);
             // Repeat listing from the beginning: providers have bounded listings
             // and keys already removed will disappear on the next enumeration.
@@ -58,6 +67,7 @@ internal static class StudioFactoryReset
             var remaining = await query.ListAsync(new StorageListRequest(MaximumResults: 1), cancellationToken);
             if (remaining.Count != 0)
                 throw new InvalidOperationException("Storage verification failed: Studio files remain.");
+            }
 
             // Local delivery cache is derived from attachments, not user content.
             var cache = Path.Combine(environment.ContentRootPath, "Storage", ".delivery-cache");
