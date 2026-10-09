@@ -225,7 +225,7 @@
                 <span class="mw-session-location">⌖ &nbsp;${esc(entry.location||'Location not set')}</span>
                 <div class="mw-session-time"><strong>${formatTime(start)} – ${formatTime(end)}</strong></div>
                 <span class="mw-state-pill ${stateLabel==='In Progress'?'in-progress':''}">${stateLabel}</span>
-                <span class="mw-chevron">›</span>
+                <span class="mw-today-open-job" aria-hidden="true" title="Open job">↗</span>
             </button>`;
         }).join('')||'<div class="mw-empty">No sessions scheduled in this '+esc(state.calendarView||'day')+'.</div>';
 
