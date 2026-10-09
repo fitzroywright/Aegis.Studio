@@ -7129,3 +7129,61 @@ body[data-studio-view="today"] .mw-today-calendar-tools .studio-global-search in
  .mw-message-row,.mw-quick-link-row,.jobs-workspace-summary,
  .studio-context-rail button){transition:none!important;transform:none!important}
 }
+
+/* Today compact alignment: page heading spans above the rails; first cards line up. */
+body[data-studio-view="today"] .shell{position:relative}
+body[data-studio-view="today"] .mw-today-heading{
+ position:fixed;top:58px;left:14px;right:14px;
+ height:68px;box-sizing:border-box;
+ display:flex;align-items:center;justify-content:flex-start;
+ padding:6px 0;background:transparent!important;
+ z-index:3;pointer-events:none;
+}
+body[data-studio-view="today"] .mw-today-heading h1{margin:0;font-size:1.65rem}
+body[data-studio-view="today"] .mw-today-heading p{margin:2px 0 0}
+body[data-studio-view="today"] .shell>.studio-context-rail{
+ padding-top:86px;
+}
+body[data-studio-view="today"] .mw-today-page{
+ padding-top:86px;
+ grid-template-rows:minmax(0,1fr)!important;
+ gap:0;
+}
+body[data-studio-view="today"] .mw-today-layout{
+ height:100%;min-height:0;
+}
+body[data-studio-view="today"] .mw-today-center{
+ display:flex;flex-direction:column;min-height:0;
+}
+body[data-studio-view="today"] .mw-today-jobs{
+ flex:1 1 auto;min-height:0;
+}
+body[data-studio-view="today"] .mw-today-calendar-tools{
+ position:fixed;top:78px;right:16px;
+ height:38px;min-height:38px;z-index:4;
+ display:flex;flex-wrap:nowrap;gap:8px;
+}
+body[data-studio-view="today"] .mw-today-calendar-date{
+ font-size:.78rem;color:#60738b;white-space:nowrap;margin-right:8px;
+}
+body[data-studio-view="today"] .mw-today-jobs-heading{
+ justify-content:flex-end;padding:0 14px 6px;
+}
+body[data-studio-view="today"] .mw-today-jobs-heading h2{display:none}
+body[data-studio-view="today"] .mw-list-panel>header h2,
+body[data-studio-view="today"] .studio-context-card>header h2{
+ font-weight:600;font-size:.85rem;
+}
+body[data-studio-view="today"] .mw-today-right .mw-list-panel>header button{
+ background:transparent!important;border:0!important;
+ box-shadow:none!important;padding:3px 0!important;
+ font-weight:750;color:#244b71;text-decoration:none;
+}
+body[data-studio-view="today"] .mw-today-right .mw-list-panel>header button:hover{
+ text-decoration:underline;transform:none;
+}
+@media(max-width:1050px){
+ body[data-studio-view="today"] .mw-today-heading p{display:none}
+ body[data-studio-view="today"] .mw-today-calendar-date{display:none}
+ body[data-studio-view="today"] .mw-today-calendar-tools{gap:3px}
+}
