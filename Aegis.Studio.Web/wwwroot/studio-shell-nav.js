@@ -67,11 +67,11 @@
             .join('');
         rail.innerHTML = `
             <section class="mw-list-panel studio-context-card">
-                <header><h2>My Workspaces</h2></header>
+                <header><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2></header>
                 <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
             </section>
             <section class="mw-list-panel studio-context-card">
-                <header><h2>Actions</h2></header>
+                <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>
                     <button type="button" data-studio-side="jobs"><span>▣</span><span>Jobs</span></button>
@@ -80,7 +80,7 @@
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card">
-                <header><h2>Quick Links</h2></header>
+                <header><h2><span class="studio-card-icon" aria-hidden="true">↗</span> Quick Links</h2></header>
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Calendar</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
