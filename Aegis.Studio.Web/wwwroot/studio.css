@@ -6878,3 +6878,39 @@ body[data-studio-view="today"] .mw-today-heading{background:#172d4a;color:#fff;b
 body[data-studio-view="today"] .mw-today-heading h1{color:#fff}
 body[data-studio-view="today"] .mw-today-heading p,body[data-studio-view="today"] .mw-today-heading time{color:#d9e3ef}
 body[data-studio-view="today"] .mw-today-footer{margin-top:14px;background:#76543d;color:#fff;border-radius:8px;padding:9px 16px;text-align:center;font-size:.75rem;letter-spacing:.02em}
+
+/* Today: navy belongs to the global Studio masthead, not the page title card. */
+body[data-studio-view="today"] .topbar{
+    background:#172d4a !important;
+    color:#fff !important;
+    border-bottom:1px solid #102238 !important;
+}
+body[data-studio-view="today"] .topbar .shell-brand,
+body[data-studio-view="today"] .topbar .shell-brand strong,
+body[data-studio-view="today"] .topbar .brand-button,
+body[data-studio-view="today"] .topbar .studio-organization,
+body[data-studio-view="today"] .topbar .studio-breadcrumb,
+body[data-studio-view="today"] .topbar #studioBreadcrumb,
+body[data-studio-view="today"] .topbar #studioBreadcrumb strong,
+body[data-studio-view="today"] .topbar .breadcrumb-separator{
+    color:#fff !important;
+}
+body[data-studio-view="today"] .topbar .shell-brand strong:before{color:#fff !important}
+body[data-studio-view="today"] .topbar .brand-button.active{
+    color:#fff !important;
+    border-bottom-color:#b98b69 !important;
+}
+body[data-studio-view="today"] .topbar .brand-button:hover{
+    color:#fff !important;
+    background:#ffffff1a !important;
+}
+body[data-studio-view="today"] .mw-today-heading{
+    background:transparent !important;
+    color:inherit !important;
+    border-radius:0;
+    box-shadow:none !important;
+    padding:4px 0 8px;
+}
+body[data-studio-view="today"] .mw-today-heading h1{color:inherit !important}
+body[data-studio-view="today"] .mw-today-heading p,
+body[data-studio-view="today"] .mw-today-heading time{color:var(--muted,#64748b) !important}
