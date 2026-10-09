@@ -274,7 +274,7 @@
             const role=isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
             return `<button class="mw-today-job-row" data-open-job="${esc(job.id)}">
                 <span class="mw-today-job-title">${image?'<img src="'+image+'" alt="" loading="lazy">':'<span class="mw-today-job-placeholder">▣</span>'}<span><strong>${esc(job.title||'Untitled Job')}</strong><small>${esc(job.clientName||job.clientDisplayName||'Client')}</small></span></span>
-                <span class="mw-today-job-stage">${esc(job.status||'Pending')}</span>
+                <span class="mw-today-job-stage"><span class="studio-status-pill" data-status="${esc(String(job.status||'Pending').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}"><span class="studio-status-dot" aria-hidden="true"></span>${esc(job.status||'Pending')}</span></span>
                 <span class="mw-today-job-progress"><span class="mw-today-job-meter"><i style="width:${percent}%"></i></span>${percent}%</span>
                 <span class="mw-today-job-date">${job.eventDate?esc(String(job.eventDate)):'—'}</span>
                 <span class="mw-today-job-role">${esc(role)}</span>
