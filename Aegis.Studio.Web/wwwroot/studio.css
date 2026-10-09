@@ -7967,3 +7967,19 @@ body[data-studio-view="jobs"] .shell>main>.studio-shared-page-heading:before{
 body[data-studio-view="jobs"] .studio-shared-heading-trail{
  margin-left:auto;justify-content:flex-end;
 }
+
+/* Today Jobs: independent, always-visible vertical grid scrollbar. */
+body[data-studio-view="today"] .mw-today-jobs{
+ display:flex;flex-direction:column;min-height:0;overflow:hidden;
+}
+body[data-studio-view="today"] .mw-today-job-list{
+ flex:1 1 0;min-height:0;max-height:none;
+ overflow-y:scroll!important;overflow-x:hidden;
+ overscroll-behavior-y:contain;
+ scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7;
+}
+body[data-studio-view="today"] .mw-today-job-list::-webkit-scrollbar{width:10px}
+body[data-studio-view="today"] .mw-today-job-list::-webkit-scrollbar-track{background:#edf2f7}
+body[data-studio-view="today"] .mw-today-job-list::-webkit-scrollbar-thumb{
+ background:#8da0b4;border:2px solid #edf2f7;border-radius:8px;
+}
