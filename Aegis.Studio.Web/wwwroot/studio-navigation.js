@@ -376,6 +376,30 @@
             if(focused)existing.querySelector('[data-mw-filter="'+focused+'"]')?.focus();
         });
         state.root=genericView.querySelector('.mw-page');
+        // Match the Jobs card to the actual vertical span of the right rail cards.
+        // The rail is content-sized; a viewport or vh height cannot reliably align them.
+        const jobsCard=genericView.querySelector('.mw-today-jobs');
+        const rightRail=genericView.querySelector('.mw-today-right');
+        if(jobsCard&&rightRail){
+            const syncJobsHeight=()=>{
+                if(!state.active()||!jobsCard.isConnected||!rightRail.isConnected)return;
+                const railCards=[...rightRail.querySelectorAll(':scope > section')];
+                if(!railCards.length)return;
+                const top=railCards[0].getBoundingClientRect().top;
+                const bottom=railCards[railCards.length-1].getBoundingClientRect().bottom;
+                const height=Math.max(0,Math.round(bottom-top));
+                if(height>0)jobsCard.style.height=height+'px';
+            };
+            if(state.jobsHeightRail!==rightRail){
+                state.jobsHeightObserver?.disconnect();
+                state.jobsHeightRail=rightRail;
+                if(typeof ResizeObserver!=='undefined'){
+                    state.jobsHeightObserver=new ResizeObserver(syncJobsHeight);
+                    [...rightRail.querySelectorAll(':scope > section')].forEach(card=>state.jobsHeightObserver.observe(card));
+                }
+            }
+            requestAnimationFrame(syncJobsHeight);
+        }
         const todayHeading=genericView.querySelector('.mw-today-heading');
         if(todayHeading && studioBreadcrumb && studioBreadcrumb.parentElement!==todayHeading){
             todayHeading.appendChild(studioBreadcrumb);
