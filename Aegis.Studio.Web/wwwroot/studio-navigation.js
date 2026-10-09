@@ -69,7 +69,8 @@
         async function load(key){
             while(inFlight>=2)await new Promise(resolve=>waiting.push(resolve));
             if(!state.active())return;
-            inFlight++;state.status[key]='loading';delete state.errors[key];paintToday(state);
+            inFlight++;state.status[key]='loading';delete state.errors[key];
+            try{paintToday(state);}catch(renderError){console.error('[Studio Today] Render failed before '+key+' request',renderError);}
             const begin=performance.now();let outcome='ok',trace=null;
             try{
                 const value=await json(urls[key],{signal:controller.signal,headers:{'X-Studio-Startup':run},onResponse:response=>{trace=response.headers?.get('X-Studio-Trace');}});
@@ -82,7 +83,10 @@
                 inFlight--;waiting.shift()?.();
                 diagnostics.requests.push({component:key,url:urls[key],outcome,elapsedMs:Math.round(performance.now()-begin),trace});
                 console.debug('[Studio Today]',diagnostics.requests.at(-1));
-                if(state.active())paintToday(state);
+                if(state.active()){
+                    try{paintToday(state);}
+                    catch(renderError){console.error('[Studio Today] Render failed after '+key+' request',renderError);}
+                }
             }
         }
         state.retry=key=>load(key);
