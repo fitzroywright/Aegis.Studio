@@ -11,7 +11,7 @@ The expansion adds to the six original DEMO jobs:
 - 16 fictional subjects, showing both single-person cards and batch rosters.
 - Three workspace announcements, task audit entries and six internal conversation notes.
 
-Open a DEMO workspace and a job. **Gallery** shows the images and version history; **Subjects** shows people; **Tasks / Calendar** shows the same tasks as a list or monthly calendar; **Activity** shows the task audit. Appointments appear under **Pipeline → Open scheduling**. My Work shows the new tasks assigned to the loader.
+Open a DEMO workspace and a job. **Gallery** shows the images and version history; **Subjects** shows people; **Tasks / Calendar** shows the same tasks as a list or monthly calendar; **Activity** shows the task audit. Appointments appear under **Pipeline → Open scheduling**. Today shows the new tasks assigned to the loader.
 
 Images are generated locally and stored in the configured VersionStorePath, or the normal VersionStore folder. No network image service is required. These are explicitly synthetic illustrations, not client photographs. No galleries are published and no outbound notifications are sent.
 
