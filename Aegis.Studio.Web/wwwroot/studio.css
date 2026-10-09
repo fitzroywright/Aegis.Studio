@@ -7410,3 +7410,46 @@ body[data-studio-view="today"] .mw-today-right .mw-section-rows,
 body[data-studio-view="today"] .mw-today-right .mw-compact-messages{
  padding-top:3px;padding-bottom:3px;
 }
+
+/* Today heading: compact editorial focus, not another dashboard card. */
+body[data-studio-view="today"] .mw-today-heading{
+ border:0!important;border-left:4px solid #d6a04b!important;
+ border-radius:0!important;
+ background:linear-gradient(90deg,rgba(230,240,251,.96),rgba(248,250,252,.65) 62%,transparent)!important;
+ box-shadow:none!important;
+ padding:8px 14px!important;
+ height:68px;
+ pointer-events:none;
+}
+body[data-studio-view="today"] .mw-today-heading-copy{
+ display:flex;align-items:center;gap:12px;min-width:0;
+}
+body[data-studio-view="today"] .mw-today-focus-icon{
+ display:grid;place-items:center;flex:0 0 38px;
+ width:38px;height:38px;border-radius:11px;
+ background:#dce9f7;color:#214d7b;font-size:22px;
+ box-shadow:inset 0 0 0 1px #c5d8eb;
+}
+body[data-studio-view="today"] .mw-today-heading h1{
+ display:flex;align-items:center;gap:10px;
+ font-size:1.55rem;line-height:1.1;letter-spacing:-.035em;
+ font-weight:800;color:#172d4a!important;
+}
+body[data-studio-view="today"] .mw-today-focus-label{
+ display:inline-flex;align-items:center;
+ font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;
+ font-weight:750;color:#8a5928;
+ background:#fff0dc;border:1px solid #efd4b2;
+ border-radius:999px;padding:4px 9px;
+}
+body[data-studio-view="today"] .mw-today-heading p{
+ color:#51647a!important;font-size:.76rem;font-weight:500;
+ margin:4px 0 0;letter-spacing:0;
+}
+@media(max-width:1050px){
+ body[data-studio-view="today"] .mw-today-heading p{display:block;font-size:.68rem}
+}
+@media(max-width:780px){
+ body[data-studio-view="today"] .mw-today-heading p{display:none}
+ body[data-studio-view="today"] .mw-today-focus-icon{width:30px;height:30px;flex-basis:30px}
+}
