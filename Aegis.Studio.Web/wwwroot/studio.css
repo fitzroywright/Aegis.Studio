@@ -7415,7 +7415,7 @@ body[data-studio-view="today"] .mw-today-right .mw-compact-messages{
 
 /* Today heading: compact editorial focus, not another dashboard card. */
 body[data-studio-view="today"] .mw-today-heading{
- border:0!important;border-left:4px solid #d6a04b!important;
+ border:0!important;border-left:0!important;
  border-radius:0!important;
  background:linear-gradient(90deg,rgba(230,240,251,.96),rgba(248,250,252,.65) 62%,transparent)!important;
  box-shadow:none!important;
@@ -7472,6 +7472,7 @@ body[data-studio-view="today"] .shell>.studio-context-rail{
 }
 body[data-studio-view="today"] .mw-today-page{
  padding-top:62px!important;padding-bottom:6px!important;
+ padding-left:5px!important;padding-right:12px!important;
 }
 body[data-studio-view="today"] .mw-today-layout{gap:7px}
 body[data-studio-view="today"] .mw-today-right{gap:7px}
