@@ -73,6 +73,6 @@ Important files changed/new locally:
 5. Update progress markdown and make a local checkpoint commit only after successful remote save. No merge/deploy.
 6. Finish known gaps: serialize reservations across generic ScheduleStore writers; explicit upload-batch expected/completed/failed file proof; notification retry/reconciliation and permissions revalidation; no-op assignment policies; claim release/reassignment; correct legacy automation adapters/status mappings; richer request redirection/session selection; live Jobs clock refresh; acceptance/report and route mapping.
 7. Run native C# build/tests with correct Common dependencies and STUDIO_TEST_POSTGRES. Investigate baseline UI failures without broad visual redesign. Verify actual administrator mock login, HTTP permissions, and calendar/WorkDay session behavior.
-8. Record A–T acceptance results separately as passed, unexecuted, incomplete or deferred. Business-hours/holiday/pause clocks and advanced deposits remain deferred. Preserve My Work styling.
+8. Record A–T acceptance results separately as passed, unexecuted, incomplete or deferred. Business-hours/holiday/pause clocks and advanced deposits remain deferred. Preserve Today styling.
 
 User authorized implementation and routine choices. User required an isolated branch and regular saves. Main has not been merged, deployed or changed by this work.
