@@ -147,6 +147,7 @@
             ensureTools();
             ensureLeftRail();
             syncPageFrame();
+            syncGridFooterCount();
             if (view !== 'today'
                 && !breadcrumb?.querySelector('[data-studio-crumb="today"]')
                 && !breadcrumb?.querySelector('[data-shell-nav="today"]')) {
@@ -157,6 +158,21 @@
         wrapped.__studioShellWrapped = true;
         window.studioNavigate = wrapped;
         return true;
+    }
+
+    function syncGridFooterCount() {
+        const view = document.body.dataset.studioView || currentView;
+        if (view === 'today' || view === 'jobs') return;
+        const footer = document.getElementById('studioFooterRate');
+        const root = document.getElementById('genericView');
+        if (!footer || !root || root.classList.contains('hidden')) return;
+        const selectors = ['[data-job-row]', '[data-workspace-row]', '[data-task-row]', '.mw-job-row', 'tbody tr'];
+        let rows = [];
+        for (const selector of selectors) {
+            rows = Array.from(root.querySelectorAll(selector)).filter(node => !node.hidden && getComputedStyle(node).display !== 'none');
+            if (rows.length) break;
+        }
+        footer.textContent = rows.length ? rows.length + ' ' + (rows.length === 1 ? 'item' : 'items') : '';
     }
 
     function syncPageFrame() {
@@ -194,6 +210,7 @@
         if (identityNode) new MutationObserver(syncFooterIdentity).observe(identityNode, {childList:true,characterData:true,subtree:true});
         ensureBreadcrumb();
         syncPageFrame();
+        syncGridFooterCount();
         if (!window.history.state?.studioView) window.history.replaceState({ studioView: currentView }, '', window.location.href);
         window.addEventListener('popstate', event => {
             const view = event.state?.studioView || 'today';
