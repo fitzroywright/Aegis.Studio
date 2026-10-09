@@ -9,6 +9,7 @@
             studioPageTools.parentElement.insertBefore(studioBreadcrumb,studioPageTools);
         }
         document.body.dataset.studioView=view;
+        if(view!=='today'){const count=document.getElementById('studioFooterRate');if(count)count.textContent='';}
         document.querySelectorAll('[data-view]').forEach(button=>{
             button.classList.toggle('active',button.dataset.view===view);
         });
@@ -196,6 +197,8 @@
         const roleOptions=[...new Set(viewJobs.map(roleForJob))].sort((a,b)=>a.localeCompare(b));
         const filteredJobs=searchedJobs.filter(job=>(!state.jobStatusFilter||String(job.status||'Unknown')===state.jobStatusFilter)&&(!state.jobRoleFilter||roleForJob(job)===state.jobRoleFilter));
         const sortedJobs=[...filteredJobs].sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0));
+        const footerCount=document.getElementById('studioFooterRate');
+        if(footerCount)footerCount.textContent=sortedJobs.length+' '+(sortedJobs.length===1?'job':'jobs');
         const emptyJobText=(state.jobSearch||state.jobStatusFilter||state.jobRoleFilter)?'No jobs match your filters':state.jobView==='led'?'You are not the Lead on any Jobs':state.jobView==='involved'?'You are not involved in any jobs':'No jobs found';
         const mediaByJob=new Map(state.media.map(row=>[String(row.jobId),row]));
         const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assetCount:0}}));
@@ -327,7 +330,7 @@
                                 <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div>
                                 <label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
                             </div>
-                            <div class="mw-today-jobs-heading"><span>${metric('jobs',sortedJobs.length)} jobs</span></div>
+                            
                             <div class="mw-today-job-columns"><span>Job / Client</span><label class="mw-job-column-filter"><span>Status</span><select data-mw-job-status aria-label="Filter jobs by status"><option value="">All statuses</option>${statusOptions.map(value=>`<option value="${esc(value)}" ${state.jobStatusFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span>Progress</span><span>Event Date</span><label class="mw-job-column-filter"><span>My Role</span><select data-mw-job-role aria-label="Filter jobs by role"><option value="">All roles</option>${roleOptions.map(value=>`<option value="${esc(value)}" ${state.jobRoleFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span></span></div>
                             <div class="mw-today-job-list">${phase('jobs',mainJobRows)}</div>
                         </section>
