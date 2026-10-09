@@ -145,6 +145,7 @@
             const result = await original(view, options);
             ensureTools();
             ensureLeftRail();
+            syncPageFrame();
             if (view !== 'today'
                 && !breadcrumb?.querySelector('[data-studio-crumb="today"]')
                 && !breadcrumb?.querySelector('[data-shell-nav="today"]')) {
@@ -157,6 +158,30 @@
         return true;
     }
 
+    function syncPageFrame() {
+        const view = document.body.dataset.studioView || currentView;
+        const main = shell?.querySelector('main');
+        if (!main) return;
+        let heading = document.getElementById('studioSharedPageHeading');
+        if (!heading) {
+            heading = document.createElement('header');
+            heading.id = 'studioSharedPageHeading';
+            heading.className = 'studio-shared-page-heading';
+            main.insertBefore(heading, main.firstChild);
+        }
+        heading.hidden = view === 'today';
+        if (heading.hidden) return;
+        const label = labelFor(view);
+        let title = heading.querySelector('h1');
+        if (!title) {
+            heading.innerHTML = '<div class="studio-shared-heading-copy"><span class="mw-today-focus-icon" aria-hidden="true">✦</span><div><h1></h1><p>Studio workspace</p></div></div><div class="studio-shared-heading-trail"></div>';
+            title = heading.querySelector('h1');
+        }
+        title.textContent = label;
+        const trail = heading.querySelector('.studio-shared-heading-trail');
+        if (breadcrumb && breadcrumb.parentElement !== trail) trail.appendChild(breadcrumb);
+    }
+
     function initialize() {
         installNavigationWrapper();
         currentView = document.body.dataset.studioView || currentView;
@@ -167,6 +192,7 @@
         const identityNode = document.getElementById('signedInUser');
         if (identityNode) new MutationObserver(syncFooterIdentity).observe(identityNode, {childList:true,characterData:true,subtree:true});
         ensureBreadcrumb();
+        syncPageFrame();
         if (!window.history.state?.studioView) window.history.replaceState({ studioView: currentView }, '', window.location.href);
         window.addEventListener('popstate', event => {
             const view = event.state?.studioView || 'today';
@@ -186,6 +212,7 @@
             if (next !== currentView) {
                 currentView = next;
                 renderLeftRail();
+                syncPageFrame();
             }
         }).observe(document.body, { attributes: true, attributeFilter: ['data-studio-view'] });
     }
