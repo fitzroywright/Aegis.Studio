@@ -75,7 +75,7 @@
             .map(workspace => '<button type="button" data-studio-workspace-id="' + escText(workspace.id) + '"><span>▣</span><span>' + escText(workspace.name) + '</span></button>')
             .join('');
         rail.innerHTML = `
-            ${currentView === "today" ? "" : `<section class="mw-list-panel studio-context-card studio-primary-navigation"><header><h2><span class="studio-card-icon" aria-hidden="true">▥</span> Jobs</h2></header><div class="mw-today-rail-links"><button type="button" data-studio-side="jobs"><span>▥</span><span>All Jobs</span></button></div></section>`}
+
             <section class="mw-list-panel studio-context-card">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2></header>
                 <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
