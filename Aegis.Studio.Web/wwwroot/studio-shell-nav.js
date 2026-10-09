@@ -120,7 +120,7 @@
         const crumbs = supplied[0]?.view === 'today'
             ? supplied
             : [{ label: 'Today', view: 'today' }, ...supplied];
-        breadcrumb.innerHTML = crumbs.map((item, index) => {
+        breadcrumb.innerHTML = '<span class="breadcrumb-label">Navigation History</span>' + crumbs.map((item, index) => {
             const separator = index ? '<span class="breadcrumb-separator" aria-hidden="true">›</span>' : '';
             const last = index === crumbs.length - 1;
             if (last) return separator + '<strong>' + escText(item.label) + '</strong>';
