@@ -10,7 +10,7 @@
 | Import | Existing immutable local version storage | CSV roster upsert by job-scoped Subject ID; custom columns retained; file/folder picker and drag/drop dialog |
 | External editing | Existing immutable version history | Bulk ZIP exports, retained manifests, JPEG XMP export identity, duplicate-return protection, stale/unrecognized return queue and explicit matching |
 | Tasks and Activity | OperationalWorkStore and audit endpoints | Compact Tasks card, existing task/calendar editor in dialog, header Activity flyout grouped by day |
-| My Work | Existing assignments and tasks | Assigned media and subject attention queues with focused job/media navigation |
+| Today | Existing assignments and tasks | Assigned media and subject attention queues with focused job/media navigation |
 | Clients | Domain.Contact | Persistent clients independent of workspace, nullable job link, FrontDesk client search/edit/history |
 | Quotes | Existing invoice line contracts, pending booking requests, notification delivery queue | Draft estimates, queue email, visible delivery status, acceptance reference, idempotent conversion to pending booking |
 | Invoices | StudioAccountsStore | Same-client multi-job invoices, invoice-job associations, serialized invoice number allocation |
@@ -30,7 +30,7 @@ Startup applies additive, idempotent PostgreSQL schema changes. Existing connect
 
 ## Authorization
 
-New routes require authentication. Media reads use ViewAttachments; production mutations and exports use ManageProduction. Workspace appearance uses workspace access/edit permissions. Existing member permission attenuation and role authorization remain in force. FrontDesk client, quote and combined-invoice operations require Administrator or the existing ViewAllJobs + Billing combination. My Work filters job access and assignment. Returned identity lookup is scoped to the target job; cross-job tokens enter the unmatched queue.
+New routes require authentication. Media reads use ViewAttachments; production mutations and exports use ManageProduction. Workspace appearance uses workspace access/edit permissions. Existing member permission attenuation and role authorization remain in force. FrontDesk client, quote and combined-invoice operations require Administrator or the existing ViewAllJobs + Billing combination. Today filters job access and assignment. Returned identity lookup is scoped to the target job; cross-job tokens enter the unmatched queue.
 
 ## Validation
 
