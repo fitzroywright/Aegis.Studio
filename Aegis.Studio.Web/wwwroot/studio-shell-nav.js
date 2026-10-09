@@ -84,7 +84,6 @@
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>
                     <button type="button" data-studio-side="jobs"><span>▣</span><span>Jobs</span></button>
-                    <button type="button" data-studio-side="messages"><span>✉</span><span>Send Message</span></button>
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card">
