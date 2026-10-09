@@ -171,6 +171,7 @@
         const isLead=job=>Boolean(user)&&normalized(job.jobLead)===user;
         const isInvolved=job=>isLead(job)
             ||Boolean(user)&&[job.assignedTo,job.jobOwner,job.photographerUserName].some(value=>normalized(value)===user)
+            ||job.isCrewMember===true
             ||myTasks.some(task=>String(task.jobId)===String(job.id))
             ||(Array.isArray(job.crew)&&job.crew.some(member=>normalized(member.userName||member)===user));
         const jobViews={led:'Jobs Led By Me',involved:"Jobs I'm Involved In",all:'All Jobs'};
@@ -268,7 +269,7 @@
 
         const mainJobRows=sortedJobs.map(job=>{
             const image=imageForJob(job.id);
-            const total=Number(job.activityTotal||job.totalActivities||0),completed=Number(job.activityCompleted||job.completedActivities||0);
+            const total=Number(job.taskCount||0),completed=Number(job.completedTaskCount||0);
             const percent=total?Math.round(100*completed/total):0;
             const role=isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
             return `<button class="mw-today-job-row" data-open-job="${esc(job.id)}">
@@ -468,14 +469,7 @@
         });
         genericView.querySelector('[data-mw-job-search]')?.addEventListener('input',event=>{
             state.jobSearch=event.target.value;
-            const focused=event.target;
-            const visible=(state.jobView==='led'?state.jobs.filter(j=>String(j.jobLead||'').toLowerCase()===String((state.auth.user||state.auth).userName||'').toLowerCase()):
-                state.jobView==='all'?state.jobs:state.jobs.filter(j=>String(j.jobLead||'').toLowerCase()===String((state.auth.user||state.auth).userName||'').toLowerCase()||state.tasks.some(t=>String(t.jobId)===String(j.id))));
-            const count=visible.filter(j=>[j.title,j.clientName,j.status,j.id].some(v=>String(v||'').toLowerCase().includes(state.jobSearch.toLowerCase()))).length;
-            const heading=genericView.querySelector('.mw-today-jobs-heading span');
-            if(heading)heading.textContent=count+' jobs';
-            // Repaint on search; restore input focus and caret afterwards.
-            const position=focused.selectionStart;
+            const position=event.target.selectionStart;
             paintMyWork(state);
             const replacement=genericView.querySelector('[data-mw-job-search]');
             replacement?.focus();
