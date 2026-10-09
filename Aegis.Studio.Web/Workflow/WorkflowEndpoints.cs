@@ -85,14 +85,14 @@ public static class WorkflowEndpoints
             if(!config.GetValue("DemoData:AllowDestructiveReset",false))return Results.NotFound();
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
             if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
-            return Results.Ok(ConnectedWorkflowDemo.Reset(db));
+            return Results.Conflict(new { error = "Factory reset is unavailable until all Studio storage roots can be enumerated, purged and verified. No data was deleted." });
         }));
         admin.MapPost("/demo-data/reset-and-generate",(StudioDatabase db,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request)=>Run(()=>
         {
             if(!config.GetValue("DemoData:AllowDestructiveReset",false))return Results.NotFound();
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
             if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
-            return Results.Ok(ConnectedWorkflowDemo.ResetAndGenerate(db,WorkflowStore.Name(user)));
+            return Results.Conflict(new { error = "Reset and regenerate is unavailable until all Studio storage roots can be enumerated, purged and verified. No data was deleted." });
         }));
         admin.MapPut("/thresholds",(WorkflowThreshold request,ClaimsPrincipal user,StudioDatabase db)=>Run(()=>
         {
