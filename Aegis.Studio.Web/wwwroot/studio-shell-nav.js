@@ -134,12 +134,8 @@
         if (typeof window.studioNavigate !== 'function' || window.studioNavigate.__studioShellWrapped) return false;
         const original = window.studioNavigate;
         const wrapped = async (view, options = {}) => {
-            const previous = currentView;
-            if (!options.browserHistory && previous !== view) {
-                window.history.pushState({ studioView: view }, '', '#studio=' + encodeURIComponent(view));
-            }
             currentView = view;
-            const result = await original(view);
+            const result = await original(view, options);
             ensureTools();
             ensureLeftRail();
             if (view !== 'today'
