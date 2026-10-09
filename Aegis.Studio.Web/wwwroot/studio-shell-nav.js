@@ -44,6 +44,15 @@
         }
     }
 
+    function syncFooterIdentity() {
+        const target = document.getElementById('studioFooterUser');
+        if (!target) return;
+        const label = document.getElementById('signedInUser')?.textContent?.trim();
+        const avatar = document.getElementById('userAvatar')?.textContent?.trim();
+        const identity = label && !/^signed in$/i.test(label) ? label : (avatar && avatar !== '--' ? avatar : 'Studio Administrator - Admin');
+        target.textContent = 'Logged in User: ' + identity;
+    }
+
     function ensureLeftRail() {
         if (!shell) return;
         let rail = document.getElementById('studioContextRail');
@@ -156,6 +165,9 @@
         ensureTools();
         ensureLeftRail();
         ensureFooter();
+        syncFooterIdentity();
+        const identityNode = document.getElementById('signedInUser');
+        if (identityNode) new MutationObserver(syncFooterIdentity).observe(identityNode, {childList:true,characterData:true,subtree:true});
         ensureBreadcrumb();
         if (!window.history.state?.studioView) window.history.replaceState({ studioView: currentView }, '', window.location.href);
         window.addEventListener('popstate', event => {
