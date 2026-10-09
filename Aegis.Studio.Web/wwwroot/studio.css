@@ -7687,7 +7687,12 @@ body .shell>.studio-shell-footer #studioFooterRate{margin-left:auto}
 
 /* Today: single continuous orange divider directly above Jobs and the right rail. */
 body[data-studio-view="today"] .mw-today-layout{
- border-top:6px solid #df8a32;
+ border-top:4px solid #df8a32;
  padding-top:7px;
  box-sizing:border-box;
+ position:relative;
+}
+body[data-studio-view="today"] .mw-today-layout::before{
+ content:"";position:absolute;top:-4px;left:-100vw;right:-100vw;
+ height:4px;background:#df8a32;pointer-events:none;
 }
