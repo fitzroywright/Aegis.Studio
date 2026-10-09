@@ -7107,7 +7107,7 @@ body .shell>.studio-shell-footer{
  padding:0 12px;margin:0 !important;
 }
 body[data-studio-view="today"] .mw-today-page{
- grid-template-rows:auto auto minmax(0,1fr) !important;
+ grid-template-rows:minmax(0,1fr) !important;
 }
 body[data-studio-view="today"] .mw-today-calendar-tools{
  display:flex;align-items:center;justify-content:flex-end;
@@ -7973,7 +7973,7 @@ body[data-studio-view="today"] .mw-today-jobs{
  display:flex;flex-direction:column;min-height:0;overflow:hidden;
 }
 body[data-studio-view="today"] .mw-today-job-list{
- flex:1 1 auto;min-height:180px;max-height:none;
+ flex:1 1 auto;min-height:0;max-height:none;
  overflow-y:auto;overflow-x:hidden;
  overscroll-behavior-y:contain;
  scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7;
