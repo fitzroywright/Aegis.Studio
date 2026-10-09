@@ -16,14 +16,14 @@
 
 Aegis Studio must operate as one integrated business management system.
 
-**My Work is the visual design reference for the entire application.**
+**Today is the visual design reference for the entire application.**
 
 Preserve its existing appearance pixel-for-pixel wherever practical.
 
 Requirements:
 
 1. Maintain the existing Studio visual design, typography, spacing, rounded corners, and compact layouts.
-2. Apply the established My Work grid and scrolling behavior consistently to other operational pages.
+2. Apply the established Today grid and scrolling behavior consistently to other operational pages.
 3. Preserve existing functionality.
 4. Avoid duplicate business logic, workflow states, and data.
 5. Use the existing authentication, messaging, storage, and notification infrastructure.
@@ -33,7 +33,7 @@ Requirements:
 9. Implement role-based permissions for managerial actions.
 10. Preserve existing working integrations with Common libraries.
 
-Do not redesign My Work, Workspaces, Production, or Jobs unnecessarily.
+Do not redesign Today, Workspaces, Production, or Jobs unnecessarily.
 
 **The objective is functional integration, not visual reinvention.**
 
@@ -50,7 +50,7 @@ AEGIS STUDIO
 │
 ├── Dashboard
 │
-├── My Work
+├── Today
 │   ├── Needs Attention
 │   ├── My Jobs
 │   ├── My Tasks
@@ -115,7 +115,7 @@ Do not introduce unnecessary top-level navigation entries.
 
 Every operational screen must provide:
 
-- A reliable route back to My Work.
+- A reliable route back to Today.
 - A route to the associated Job.
 - A route to the parent Workspace.
 - Contextual navigation to related tasks.
@@ -127,7 +127,7 @@ Every operational screen must provide:
 For example:
 
 ```text
-My Work
+Today
    ↓
 Assigned Job
    ↓
@@ -137,7 +137,7 @@ Job Schedule
    ↓
 Back to Job
    ↓
-Back to My Work
+Back to Today
 ```
 
 Use the existing Studio navigation framework. Preserve existing Clients, Messaging, POS/Billing, gallery, Subjects, and administration routes. The structure above is an operational map, not permission to remove destinations. Publish a route-to-destination mapping as part of the implementation report.
@@ -374,7 +374,7 @@ Required actions:
 - Reassign Task
 - View Assignment History
 
-### My Work integration
+### Today integration
 
 Managers see the relevant assignment actions.
 
@@ -424,7 +424,7 @@ Do not create a separate scheduling system that will later conflict with WorkDay
 
 # 9. Photography execution and upload
 
-Assigned photographers access their jobs through My Work.
+Assigned photographers access their jobs through Today.
 
 The Job page provides:
 
@@ -480,7 +480,7 @@ Production Reviews Material
                ↓
          Task Assignment
                ↓
-             My Work
+             Today
                ↓
          Production Execution
                ↓
@@ -499,7 +499,7 @@ Production must be able to:
 - Record completion.
 - Move work toward approval.
 
-Assigned tasks must appear in My Work.
+Assigned tasks must appear in Today.
 
 Replace the current operational approval flow with the process in this brief. Source-media acceptance starts Active Production; finished-work approval is a separate stage after production execution. Reuse existing permission configuration, quality checks, approved asset versions, publishing adapters, and customer delivery capabilities. Do not add mandatory customer sign-off, payment clearance, or a new approval hierarchy. Section 21.5 defines the complete process.
 
@@ -664,9 +664,9 @@ The system must distinguish operational workflow state from payment state, assig
 
 ---
 
-# 13. My Work integration
+# 13. Today integration
 
-My Work remains the personal execution dashboard.
+Today remains the personal execution dashboard.
 
 Do not turn it into a second management system.
 
@@ -688,11 +688,11 @@ Do not turn it into a second management system.
 
 ### Navigation
 
-My Work actions must open the appropriate Job, Task, or Schedule interface.
+Today actions must open the appropriate Job, Task, or Schedule interface.
 
-Do not duplicate the full assignment editor inside My Work.
+Do not duplicate the full assignment editor inside Today.
 
-**Preserve the current My Work appearance.**
+**Preserve the current Today appearance.**
 
 ---
 
@@ -712,7 +712,7 @@ A workspace must show:
 
 Use the same job records and workflow state as the Jobs page.
 
-A job must not have one status in Workspaces and another in My Work.
+A job must not have one status in Workspaces and another in Today.
 
 The Workspaces page should provide clear navigation to the Job page and its assignment actions.
 
@@ -760,7 +760,7 @@ Recommended principles:
 - Consistent notifications.
 - Shared state across all Studio screens.
 
-Do not maintain independent copies of job workflow status in FrontDesk, Workspaces, My Work, and Production.
+Do not maintain independent copies of job workflow status in FrontDesk, Workspaces, Today, and Production.
 
 Those screens should be different views of the same underlying records.
 
@@ -782,7 +782,7 @@ Implement in the following order.
 
 - Inspect existing models, pages, routes, and services.
 - Identify already implemented functionality.
-- Preserve My Work styling.
+- Preserve Today styling.
 - Repair broken navigation.
 - Establish the shared workflow contract.
 
@@ -820,7 +820,7 @@ Implement in the following order.
 - Automatic Production notification.
 - Production review.
 - Production task assignment.
-- My Work integration.
+- Today integration.
 
 ### Phase 6 — Workflow visibility
 
@@ -887,7 +887,7 @@ The implementation is not complete until the following scenarios pass.
 4. Schedules all three using that session and their individual attendance windows where needed.
 5. Saves assignments.
 
-**Expected:** All three assignments appear correctly in the Job, schedule, and relevant My Work views.
+**Expected:** All three assignments appear correctly in the Job, schedule, and relevant Today views.
 
 ### Scenario E — Scheduling conflict
 
@@ -924,7 +924,7 @@ The implementation is not complete until the following scenarios pass.
 Navigate:
 
 ```text
-My Work
+Today
  → Job
  → Photographer Assignment
  → Schedule
@@ -932,7 +932,7 @@ My Work
  → Workspace
  → Job
  → Production
- → My Work
+ → Today
 ```
 
 **Expected:** No broken links, dead ends, or lost job context.
@@ -955,7 +955,7 @@ Verify that:
 - Existing media storage still works.
 - Existing authentication still works.
 - Existing Production functionality remains intact.
-- Existing My Work styling is preserved.
+- Existing Today styling is preserved.
 
 ---
 
@@ -1083,7 +1083,7 @@ Migrate unambiguous legacy statuses (for example Needs Scheduling, Awaiting Uplo
 - Treat back-to-back attendance windows as non-overlapping. Cancelled reservations do not create conflicts. Availability and reservation conflict checks must serialize competing saves so simultaneous managers cannot double-book silently.
 - Resolve conflicts by changing staff/time or, where the existing permission model allows it, an explicit manager override with the conflict list and a reason. Add a specific conflict-override permission if necessary; the default is denied. A boolean supplied by the client is never sufficient authorization. An override retains both reservations and never overwrites another Job's assignment.
 - Migrate primary photographer to Lead and assistant to Additional on the same session. Preserve historical attendance, image counts, backup, reshoot, handoff, and WorkDay references. Resolve any other explicitly linked staff without duplicating them; ambiguous generic resources require reconciliation.
-- Update Studio, calendars, My Work, and WorkDay to read the same session/crew model. Preserve compatible old clients through an adapter where needed. Existing WorkDay acceptance must not block Studio schedules.
+- Update Studio, calendars, Today, and WorkDay to read the same session/crew model. Preserve compatible old clients through an adapter where needed. Existing WorkDay acceptance must not block Studio schedules.
 
 ## 21.4. Responsibility and permission rules
 
@@ -1111,7 +1111,7 @@ Mock-auth Studio administrator accounts must expose and execute ordinary Job Own
 
 1. Photography submissions become an explicit Source Review submission.
 2. Production accepts source material or requests named corrections. Acceptance enters Active Production and creates/reuses the existing production work without duplicating tasks.
-3. Production creates and assigns required tasks; those tasks appear in My Work.
+3. Production creates and assigns required tasks; those tasks appear in Today.
 4. Finished work can enter Awaiting Approval only after required production tasks are Completed or explicitly Cancelled/waived by an authorized lead and current output versions satisfy existing quality checks. Unrelated administrative tasks do not automatically block production submission.
 5. An existing authorized approver approves the exact submitted finished-output versions or requests corrections. Do not invent a requirement for a different approver unless current policy already requires it.
 6. Final approval enters Ready for Delivery. Publishing uses approved versions and the existing provider-neutral adapter; customer delivery records method, timestamp, actor, and a reference/receipt where available. A successful publication alone does not falsely attest to other physical deliverables.
@@ -1174,7 +1174,7 @@ Do not implement minimum deposit calculation, provider verification, partial-pay
 - Reshoot: add a required linked session with a reason. Before Production submission, aggregate readiness reflects the new required session. After submission, explicitly withdraw/reopen the affected review under authorized correction controls before changing downstream readiness.
 - Removing a lead or cancelling a required session before execution forces a crew/schedule readiness recheck. Do not allow a finalized session with no lead. Replace a required session or waive that requirement with a reason; cancellation alone is not proof the photography obligation was fulfilled.
 - Job cancellation: FrontDesk may cancel Pending Jobs; Workspace Manager or Operations Manager may cancel confirmed active Jobs. Audit the reason, release unstarted reservations, cancel/suspend relevant open tasks, remove the Job from active queues, notify affected employees, and retain all historical media, payments and completed work. Do not erase or silently unpublish an existing customer gallery; flag its existing unpublish action for the authorized operator.
-- Blocked work: record a reason and responsible party; show the flag in Jobs and My Work. The regular clock keeps running. Avoid a separate timer-pausing On Hold stage in this phase.
+- Blocked work: record a reason and responsible party; show the flag in Jobs and Today. The regular clock keeps running. Avoid a separate timer-pausing On Hold stage in this phase.
 - Workspace transfer: FrontDesk routes Pending Jobs; confirmed Jobs require Operations Manager authority or both source and destination managers' recorded approval. Lock/version-check the Job, record transfer, and notify both sides. The destination manager becomes accountable. Retain explicit Job Owner and crew assignments and Job-specific grants unless deliberately reassigned; inherited workspace access follows the destination. Recheck readiness, request routing and permissions. Transfer changes the stage only if prerequisites genuinely become unmet.
 - Reopening: only Workspace Manager or Operations Manager may reopen a closed Job, with a reason and an applicable valid stage. Start a new stage occurrence without deleting prior closure, delivery, payment, approval, or publication history.
 
@@ -1182,8 +1182,8 @@ Do not implement minimum deposit calculation, provider verification, partial-pay
 
 Navigation:
 - Reuse the existing Pipeline destination for Jobs/Workflow Monitoring or provide a compatible route alias. Do not add a second competing board with separate Job state.
-- Publish a logical destination → concrete route/tab/action mapping. Each assignment, schedule, review, task, gallery and delivery screen must retain Job/Workspace context and a reliable route to My Work.
-- Link crew editing from Job → Assignments → Assign Photographers. My Work and Workspace actions deep-link there. Keep existing Subjects/collections, gallery, clients, messages, billing and WorkDay screens accessible.
+- Publish a logical destination → concrete route/tab/action mapping. Each assignment, schedule, review, task, gallery and delivery screen must retain Job/Workspace context and a reliable route to Today.
+- Link crew editing from Job → Assignments → Assign Photographers. Today and Workspace actions deep-link there. Keep existing Subjects/collections, gallery, clients, messages, billing and WorkDay screens accessible.
 - Preserve list filters, selected workspace, sort, pagination and scroll on return. Refresh changed rows without losing list context. Unauthorized deep links show a clear access message and working navigation.
 
 Concurrency:
@@ -1210,7 +1210,7 @@ Create fixtures containing an old pending booking without a Job, a linked confir
 Two authorized managers load the same Job revision and submit different ownership or crew changes. One succeeds; the other receives a conflict and cannot overwrite it. Repeat with two different Jobs reserving the same photographer at overlapping times: conflict checks must remain effective under concurrent saves. Verify no partial audit, crew, schedule, or notification changes survive a rejected transaction. Repeat with the stage unchanged to prove revision checks do not rely only on status strings.
 
 ### M — Three-person crew across two sessions
-Create one Job, one Job Owner, and two shoot sessions with a Lead plus two Additional photographers on each. Assign crew before scheduling, then schedule both sessions. Confirm roles, individual attendance windows, My Work entries, Job permissions and WorkDay/calendar reservations for all three. Finish session one: the Job does not enter Awaiting Upload while session two remains required and unfinished. Finish session two: the Job advances once. Attempt duplicate crew membership and a second Lead on one session; both are rejected.
+Create one Job, one Job Owner, and two shoot sessions with a Lead plus two Additional photographers on each. Assign crew before scheduling, then schedule both sessions. Confirm roles, individual attendance windows, Today entries, Job permissions and WorkDay/calendar reservations for all three. Finish session one: the Job does not enter Awaiting Upload while session two remains required and unfinished. Finish session two: the Job advances once. Attempt duplicate crew membership and a second Lead on one session; both are rejected.
 
 ### N — Partial uploads, corrections and resubmission
 Upload one photographer's first batch while others remain incomplete. The Job must not enter Production Review or send the handoff notification. Complete required contributions, submit explicitly, and verify one immutable submission/notification set. Request source corrections; resubmit a new revision and preserve the earlier manifest. Test production corrections separately through Active Production and Awaiting Approval. New uploads never inherit prior approval silently.
@@ -1227,7 +1227,7 @@ Business-hours timing is intentionally deferred: test that the current configura
 Verify FrontDesk routing of Pending Jobs, denial of ordinary-employee transfer/cancellation, and the required cross-workspace transfer authority. Confirm destination-manager accountability, changed inherited access, retained deliberate Job grants, rerouted assignment requests and notifications. Reassign owner/crew and verify assignment-derived access is removed only where no independent grant remains. Cancel a confirmed Job and verify released future reservations, preserved payments/media/history, and correct task/queue handling. Reopen with authorization and reason; retain prior stage occurrences.
 
 ### R — Studio administrator mock account
-Sign in through the existing Studio administrator mock-auth account(s). From My Work or a Workspace, open the Job and use Assign Job Owner, Assign Photographers, Create/Assign/Reassign Task and Schedule. Assign a three-person crew and verify saved data appears in Job, My Work and calendar. Verify actions are visible, server-authorized, and do not depend on the literal login name. Repeat with an ordinary mock employee to verify denied managerial actions and usable assignment-request flow. Verify deposit override requires its explicit capability.
+Sign in through the existing Studio administrator mock-auth account(s). From Today or a Workspace, open the Job and use Assign Job Owner, Assign Photographers, Create/Assign/Reassign Task and Schedule. Assign a three-person crew and verify saved data appears in Job, Today and calendar. Verify actions are visible, server-authorized, and do not depend on the literal login name. Repeat with an ordinary mock employee to verify denied managerial actions and usable assignment-request flow. Verify deposit override requires its explicit capability.
 
 ### S — Revised approvals and delivery
 Accept source media and verify Active Production, not finished-work approval. Finish required production tasks and quality checks, submit exact output versions for approval, request corrections, resubmit, approve, publish through the existing adapter, and record required delivery. Verify Ready for Delivery, Delivered and Completed transitions and unchanged approved historical versions. Publishing retries must preserve correlation and not create duplicate delivery attestations.
@@ -1241,4 +1241,4 @@ The final implementation report must include the original Section 19 items plus 
 
 Deferred improvements: business-hours/holiday calendars; pause-adjusted service clocks; advanced deposit verification and minimum amounts; customer credit/pay-later privileges; new refund/chargeback or override-revocation policy; expanded WorkDay acceptance; partial Job production handoffs. Do not expand this phase to implement them. Preserve current working capabilities where they already exist.
 
-Implement the complete revised workflow in logical commits on an implementation branch. Preserve My Work styling and existing Common integrations. Prioritize Job assignment, multiple session crews, shared workflow history, connected navigation and Jobs status lights. This document authorizes the routine decisions specified here; it does not authorize claiming unexecuted tests passed or merging incomplete work.
+Implement the complete revised workflow in logical commits on an implementation branch. Preserve Today styling and existing Common integrations. Prioritize Job assignment, multiple session crews, shared workflow history, connected navigation and Jobs status lights. This document authorizes the routine decisions specified here; it does not authorize claiming unexecuted tests passed or merging incomplete work.
