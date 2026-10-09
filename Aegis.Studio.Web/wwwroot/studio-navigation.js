@@ -162,7 +162,11 @@
 
     function paintToday(state){
         if(!state.active())return;
-        const {auth,jobs,tasks,schedule,notifications}=state;
+        const {auth}=state;
+        const jobs=Array.isArray(state.jobs)?state.jobs:[];
+        const tasks=Array.isArray(state.tasks)?state.tasks:[];
+        const schedule=Array.isArray(state.schedule)?state.schedule:[];
+        const notifications=Array.isArray(state.notifications)?state.notifications:[];
         const workspaceCrumb=state.workspaceName
             ? '<span aria-hidden="true">›</span><button type="button" class="workspace-current" data-current-workspace>'+esc(state.workspaceName)+'</button>'
             : '';
@@ -350,6 +354,7 @@
         if(!genericView.querySelector('.mw-page')){genericView.replaceChildren(next.firstElementChild);state.root=genericView.querySelector('.mw-page');}
         else next.querySelectorAll('[data-mw-region]').forEach(region=>{
             const existing=genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]');
+            if(!existing){console.warn('[Studio Today] Missing region; rebuilding Today grid',region.dataset.mwRegion);genericView.replaceChildren(next.firstElementChild);return;}
             if(existing.innerHTML===region.innerHTML)return;
             const scroll=[...existing.querySelectorAll('div')].map(el=>el.scrollTop);
             const focused=document.activeElement?.dataset?.mwFilter;
