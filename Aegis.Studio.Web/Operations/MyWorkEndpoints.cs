@@ -17,12 +17,13 @@ public static class MyWorkEndpoints
             Guid[] allowed = Allowed(context, access, logger);
             Stopwatch timer = Stopwatch.StartNew();
             await using var connection = database.OpenConnection();
-            await using var command = new NpgsqlCommand("select j.id,j.workspace_id,j.conversation_id,j.title,j.client_name,j.status,j.event_date,j.created_at_utc,j.assigned_to,j.client_id,c.display_name,coalesce(t.total,0),coalesce(t.completed,0),j.job_lead from studio_jobs j left join studio_clients c on c.id=j.client_id left join lateral (select count(*) total,count(*) filter(where status='Completed') completed from studio_job_activities where job_id=j.id) t on true where j.id=any($1) order by j.created_at_utc desc", connection);
+            await using var command = new NpgsqlCommand("select j.id,j.workspace_id,j.conversation_id,j.title,j.client_name,j.status,j.event_date,j.created_at_utc,j.assigned_to,j.client_id,c.display_name,coalesce(t.total,0),coalesce(t.completed,0),j.job_lead,exists(select 1 from studio_workflow_sessions ws join studio_workflow_crew wc on wc.session_id=ws.id where ws.job_id=j.id and lower(wc.user_name)=lower($2)) as is_crew_member from studio_jobs j left join studio_clients c on c.id=j.client_id left join lateral (select count(*) total,count(*) filter(where status='Completed') completed from studio_job_activities where job_id=j.id) t on true where j.id=any($1) order by j.created_at_utc desc", connection);
             command.Parameters.AddWithValue(allowed);
+            command.Parameters.AddWithValue(Name(context.User));
             await using var reader = await command.ExecuteReaderAsync(context.RequestAborted);
             List<MyWorkJobSummary> jobs = [];
             while (await reader.ReadAsync(context.RequestAborted))
-                jobs.Add(new(reader.GetGuid(0),reader.GetGuid(1),reader.GetGuid(2),reader.GetString(3),reader.GetString(4),reader.GetString(5),reader.IsDBNull(6)?null:DateOnly.FromDateTime(reader.GetDateTime(6)),reader.GetFieldValue<DateTimeOffset>(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.IsDBNull(9)?null:reader.GetGuid(9),reader.IsDBNull(10)?null:reader.GetString(10),reader.GetInt64(11),reader.GetInt64(12),reader.IsDBNull(13)?null:reader.GetString(13)));
+                jobs.Add(new(reader.GetGuid(0),reader.GetGuid(1),reader.GetGuid(2),reader.GetString(3),reader.GetString(4),reader.GetString(5),reader.IsDBNull(6)?null:DateOnly.FromDateTime(reader.GetDateTime(6)),reader.GetFieldValue<DateTimeOffset>(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.IsDBNull(9)?null:reader.GetGuid(9),reader.IsDBNull(10)?null:reader.GetString(10),reader.GetInt64(11),reader.GetInt64(12),reader.IsDBNull(13)?null:reader.GetString(13),reader.GetBoolean(14)));
             QueryComplete(context, logger, "job-list", timer, jobs.Count);
             return Results.Ok(jobs);
         }).RequireAuthorization();
@@ -113,4 +114,4 @@ public static class MyWorkEndpoints
 }
 public sealed record MyWorkMediaSummary(Guid JobId, long AssetCount, Guid? ThumbnailVersionId);
 
-public sealed record MyWorkJobSummary(Guid Id,Guid WorkspaceId,Guid ConversationId,string Title,string ClientName,string Status,DateOnly? EventDate,DateTimeOffset CreatedAt,string? AssignedTo,Guid? ClientId,string? LinkedClientName,long TaskCount,long CompletedTaskCount,string? JobLead=null);
+public sealed record MyWorkJobSummary(Guid Id,Guid WorkspaceId,Guid ConversationId,string Title,string ClientName,string Status,DateOnly? EventDate,DateTimeOffset CreatedAt,string? AssignedTo,Guid? ClientId,string? LinkedClientName,long TaskCount,long CompletedTaskCount,string? JobLead=null,bool IsCrewMember=false);
