@@ -277,7 +277,7 @@
                 <span class="mw-today-job-stage"><span class="studio-status-pill" data-status="${esc(String(job.status||'Pending').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}"><span class="studio-status-dot" aria-hidden="true"></span>${esc(job.status||'Pending')}</span></span>
                 <span class="mw-today-job-progress"><span class="mw-today-job-meter"><i style="width:${percent}%"></i></span>${percent}%</span>
                 <span class="mw-today-job-date">${job.eventDate?esc(String(job.eventDate)):'—'}</span>
-                <span class="mw-today-job-role">${esc(role)}</span>
+                <span class="mw-today-job-role"><span class="studio-role-pill" data-role="${esc(role.toLowerCase().replace(/[^a-z0-9]+/g,'-'))}"><span class="studio-role-dot" aria-hidden="true"></span>${esc(role)}</span></span>
                 <span class="mw-chevron">›</span>
             </button>`;
         }).join('')||'<div class="mw-today-jobs-empty" role="status">'+esc(emptyJobText)+'</div>';
