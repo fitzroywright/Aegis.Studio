@@ -7973,8 +7973,8 @@ body[data-studio-view="today"] .mw-today-jobs{
  display:flex;flex-direction:column;min-height:0;overflow:hidden;
 }
 body[data-studio-view="today"] .mw-today-job-list{
- flex:1 1 0;min-height:0;max-height:none;
- overflow-y:scroll!important;overflow-x:hidden;
+ flex:1 1 auto;min-height:180px;max-height:min(63vh,740px);
+ overflow-y:auto;overflow-x:hidden;
  overscroll-behavior-y:contain;
  scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7;
 }
