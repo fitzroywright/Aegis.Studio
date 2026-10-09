@@ -93,7 +93,6 @@
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
-                    <button type="button" data-studio-side="pipeline"><span>⇥</span><span>Pipeline</span></button>
                 </div>
             </section>`;
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
