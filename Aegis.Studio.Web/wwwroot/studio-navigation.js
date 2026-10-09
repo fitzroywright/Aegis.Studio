@@ -332,7 +332,7 @@
                             <button class="mw-status-row warning" data-nav="schedule"><span class="studio-attention-label"><span aria-hidden="true">▦</span>Needs scheduling</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
                             <button class="mw-status-row warning" data-nav="production"><span class="studio-attention-label"><span aria-hidden="true">⇧</span>Awaiting upload</span><strong>${metric('jobs',uploadJobs)}</strong></button>
                         </div></section>
-                        <section class="mw-list-panel" data-mw-region="messages"><header><h2><span class="studio-card-icon" aria-hidden="true">✉</span> Messages & Announcements</h2><button data-nav="messages">View All →</button></header><div class="mw-compact-messages">${phase('notifications',messageRows)}</div></section>
+                        <section class="mw-list-panel" data-mw-region="messages"><header><h2><span class="studio-card-icon" aria-hidden="true">✉</span> Messages & Announcements</h2><button data-nav="messages">View All →</button></header><div class="mw-compact-messages">${phase('notifications',messageRows)}</div><footer class="mw-messages-card-footer"><button type="button" data-nav="messages" class="mw-send-message-link"><span aria-hidden="true">✉</span> Send Message <span aria-hidden="true">→</span></button></footer></section>
                     </aside>
                 </div>
             </section>`;
