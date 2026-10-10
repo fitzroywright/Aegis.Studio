@@ -1,0 +1,86 @@
+// Jobs has one renderer and one scoped stylesheet. The shell owns navigation cards.
+(function () {
+ 'use strict';
+ let active;
+ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const array=value=>Array.isArray(value)?value:[];
+ const tone=status=>/cancel|changes/i.test(status)?'rose':/completed|delivered|ready for delivery/i.test(status)?'green':/approval|review/i.test(status)?'purple':/production|upload/i.test(status)?'blue':/scheduled/i.test(status)&&!/awaiting/i.test(status)?'teal':'amber';
+ const date=value=>{if(!value)return null;const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(value)?value+'T12:00:00':value);return Number.isFinite(+d)?d:null;};
+ const dateLabel=value=>date(value)?.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'2-digit',year:'numeric'}).replaceAll(',','')||'Not scheduled';
+ async function render(host,options) {
+  active?.dispose();
+  let disposed=false;
+  const controller={dispose(){disposed=true;host.onclick=null;host.onkeydown=null;}};active=controller;
+  const current=()=>!disposed&&options.isCurrent();
+  host.innerHTML='<div class="sj-loading" role="status">Loading jobs…</div>';
+  try {
+   const [jobData,workflowResult,notificationResult,peopleResult]=await Promise.all([
+    options.json('/api/jobs'),
+    options.json('/api/workflow/jobs').then(value=>({value:array(value)}),()=>({error:true,value:[]})),
+    options.json('/api/notifications?count=100').then(value=>({value:array(value)}),()=>({error:true,value:[]})),
+    options.json('/api/studio-employees?assignable=true').catch(()=>[])
+   ]);
+   if(!current())return controller;
+   const jobs=array(jobData),workspaces=array(options.workspaces).filter(w=>w.permissions?.accessWorkspace!==false&&w.permissions?.view!==false),workspacesById=new Map(workspaces.map(w=>[String(w.id),w]));
+   const flows=new Map(workflowResult.value.map(w=>[String(w.jobId),w]));
+   const people=new Map(array(peopleResult).map(p=>[String(p.userName).toLowerCase(),p.displayName||p.fullName||p.userName]));
+   const belongs=(job,id)=>!id||String(job.workspaceId)===id||array(job.participatingWorkspaceIds).map(String).includes(id);
+   const status=job=>flows.get(String(job.id))?.stage||job.status||'Status unavailable';
+   const owner=job=>flows.get(String(job.id))?.owner||job.jobLead||job.assignedTo||'';
+   const ownerLabel=job=>people.get(String(owner(job)).toLowerCase())||owner(job)||'Unassigned';
+   let saved={};try{saved=JSON.parse(sessionStorage.getItem('studio-jobs-view')||'{}');}catch{}
+   let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',attention='',page=1;
+   const stages=[...new Set(jobs.map(status))].sort();if(!stages.includes(stage))stage='';
+   const card=(title,body,cls='')=>`<section class="sj-card ${cls}"><header><h2>${title}</h2></header>${body}</section>`;
+   host.innerHTML=`<section class="sj-page" aria-label="Jobs"><section class="sj-board">
+    <div class="sj-toolbar"><h2>Jobs</h2><input type="search" data-sj-search aria-label="Search jobs, clients or references" placeholder="Search jobs, clients or references…"><select data-sj-workspace aria-label="Workspace"><option value="">All workspaces</option>${workspaces.map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select><select data-sj-status aria-label="Status"><option value="">All statuses</option>${stages.map(s=>`<option>${esc(s)}</option>`).join('')}</select><select data-sj-sort aria-label="Sort jobs"><option value="date-desc">Event date ↓</option><option value="date-asc">Event date ↑</option></select></div>
+    <div class="sj-summary"><span data-sj-count></span><button type="button" data-sj-clear>Clear filters</button></div>
+    <div class="sj-error" role="alert" data-sj-error hidden></div>
+    <div class="sj-table-scroll"><table class="sj-table"><thead><tr><th>Job / Client</th><th>Workspace</th><th>Event date</th><th>Job Owner</th><th>Status</th><th>Next Action</th></tr></thead><tbody></tbody></table></div>
+    <footer class="sj-pagination"><span data-sj-range></span><div><button type="button" data-sj-prev aria-label="Previous page">‹</button><span data-sj-page></span><button type="button" data-sj-next aria-label="Next page">›</button></div></footer>
+   </section><aside class="sj-right" aria-label="Job information">${card('Job Status','<div class="sj-card-body" data-sj-statuses></div>')}${card('Needs Attention','<div class="sj-card-body" data-sj-attention></div>','sj-attention-card')}${card('Messages & Announcements','<div class="sj-card-body" data-sj-messages><p>Loading messages…</p></div><footer><button type="button" data-sj-message>✉ Send Message →</button></footer>','sj-messages')}</aside></section>`;
+   const find=s=>host.querySelector(s);
+   find('[data-sj-search]').value=term;find('[data-sj-workspace]').value=workspace;find('[data-sj-status]').value=stage;find('[data-sj-sort]').value=sort;
+   host.studioJobsWorkspaceCounts=Object.fromEntries(workspaces.map(w=>[String(w.id),jobs.filter(j=>belongs(j,String(w.id))).length]));
+   window.dispatchEvent(new CustomEvent('studio-jobs-view-changed'));
+   async function open(id){if(!current())return;const error=find('[data-sj-error]');error.hidden=true;try{await options.openJob(id);}catch(e){if(current()){error.hidden=false;error.textContent='Unable to open job: '+e.message;}}}
+   const need=(job,key)=>key==='owner'?!owner(job)&&!/completed|delivered|cancelled/i.test(status(job)):key==='changes'?/changes requested/i.test(status(job)):/needs photographer assignment/i.test(status(job));
+   function apply(reset=true){
+    if(!current())return;if(reset)page=1;
+    const base=jobs.filter(j=>belongs(j,workspace));
+    const filtered=base.filter(j=>(!stage||status(j)===stage)&&(!attention||need(j,attention))&&[j.title,j.clientName,j.reference,j.jobNumber,workspacesById.get(String(j.workspaceId))?.name,ownerLabel(j)].join(' ').toLowerCase().includes(term.toLowerCase().trim()));
+    filtered.sort((a,b)=>{const ad=date(a.eventDate),bd=date(b.eventDate);return !ad&&!bd?String(a.id).localeCompare(String(b.id)):!ad?1:!bd?-1:(+ad-+bd)*(sort==='date-asc'?1:-1)||String(a.id).localeCompare(String(b.id));});
+    const pages=Math.max(1,Math.ceil(filtered.length/13));page=Math.min(page,pages);
+    const visible=filtered.slice((page-1)*13,page*13);
+    find('tbody').innerHTML=visible.map(j=>{const name=ownerLabel(j),initials=owner(j)?name.split(/[\s.]+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase():'–';return `<tr tabindex="0" data-sj-job="${esc(j.id)}" aria-label="Open ${esc(j.title||j.reference||'job')}"><td><strong>${esc(j.title||j.reference||'Untitled job')}</strong><small>${esc([j.clientName,j.reference||j.jobNumber].filter(Boolean).join(' · ')||'Client not linked')}</small></td><td>${esc(workspacesById.get(String(j.workspaceId))?.name||'Workspace unavailable')}</td><td>${esc(dateLabel(j.eventDate))}</td><td><span class="sj-owner"><span class="sj-initials" aria-hidden="true">${esc(initials)}</span>${esc(name)}</span></td><td><span class="sj-pill sj-${tone(status(j))}">${esc(status(j))}</span></td><td>${esc(flows.get(String(j.id))?.nextAction||'Workflow unavailable')}</td></tr>`;}).join('')||'<tr><td colspan="6" class="sj-empty">No jobs match these filters.</td></tr>';
+    find('[data-sj-count]').textContent=filtered.length+' jobs · Sorted by event date'+(attention?' · '+({owner:'Owner needed',changes:'Changes requested',photographers:'Photographers needed'}[attention]):'');
+    find('[data-sj-range]').textContent=filtered.length?`Showing ${(page-1)*13+1}–${Math.min(page*13,filtered.length)} of ${filtered.length} jobs`:'0 jobs';
+    find('[data-sj-page]').innerHTML=Array.from({length:Math.min(3,pages)},(_,i)=>Math.min(Math.max(1,page-1),Math.max(1,pages-2))+i).map(n=>`<button type="button" data-sj-page-number="${n}" aria-label="Page ${n}" ${n===page?'aria-current="page"':''}>${n}</button>`).join('');find('[data-sj-prev]').disabled=page===1;find('[data-sj-next]').disabled=page===pages;
+    const footer=document.getElementById('studioFooterRate');if(footer)footer.textContent=filtered.length+' jobs';
+    const counts=[...new Set(base.map(status))].map(s=>[s,base.filter(j=>status(j)===s).length]);
+    const changes=notificationResult.value.filter(n=>/status|workflow/i.test(n.eventType||n.type||n.title||'')&&base.some(j=>String(j.id)===String(n.referenceId))).sort((a,b)=>+(date(b.createdAtUtc||b.createdAt)||0)-+(date(a.createdAtUtc||a.createdAt)||0)).slice(0,3);
+    find('[data-sj-statuses]').innerHTML=(workflowResult.error?'<p>Workflow unavailable. Showing recorded job statuses.</p>':'')+counts.map(([s,n])=>`<button type="button" class="sj-status-count sj-${tone(s)}" data-sj-stage="${esc(s)}" aria-pressed="${stage===s}"><span>${esc(s)}</span><b>${n}</b><meter min="0" max="${Math.max(1,base.length)}" value="${n}" aria-label="${esc(s)} jobs">${n}</meter></button>`).join('')+'<h3>Recent Status Changes</h3>'+(changes.map(n=>`<button type="button" class="sj-note" data-sj-job="${esc(n.referenceId)}"><strong>${esc(n.title||n.subject||n.eventType)}</strong><small>${esc(n.body||'')} · ${esc(dateLabel(n.createdAtUtc||n.createdAt))}</small></button>`).join('')||'<p>No recent status changes.</p>');
+    find('[data-sj-attention]').innerHTML=[['owner','Owner needed'],['changes','Changes requested'],['photographers','Photographers needed']].map(([key,label])=>`<button type="button" class="sj-attention" data-sj-need="${key}" aria-pressed="${attention===key}"><span>${label}</span><b>${base.filter(j=>need(j,key)).length}</b></button>`).join('')+'<button type="button" class="sj-gold" data-sj-view-all>View all →</button>';
+    try{sessionStorage.setItem('studio-jobs-view',JSON.stringify({term,stage,sort}));}catch{}
+   }
+   find('[data-sj-search]').oninput=e=>{term=e.target.value;apply();};
+   find('[data-sj-workspace]').onchange=e=>{workspace=e.target.value;options.setWorkspaceFilter(workspace);apply();};
+   find('[data-sj-status]').onchange=e=>{stage=e.target.value;apply();};
+   find('[data-sj-sort]').onchange=e=>{sort=e.target.value;apply();};
+   find('[data-sj-clear]').onclick=()=>{term='';stage='';workspace='';attention='';options.setWorkspaceFilter('');find('[data-sj-search]').value='';find('[data-sj-status]').value='';find('[data-sj-workspace]').value='';apply();};
+   find('[data-sj-prev]').onclick=()=>{page--;apply(false);find('.sj-table-scroll').scrollTop=0;};find('[data-sj-next]').onclick=()=>{page++;apply(false);find('.sj-table-scroll').scrollTop=0;};
+   host.onclick=e=>{if(!current())return;const number=e.target.closest('[data-sj-page-number]');if(number){page=Number(number.dataset.sjPageNumber);apply(false);find('.sj-table-scroll').scrollTop=0;return;}const row=e.target.closest('[data-sj-job]');if(row){void open(row.dataset.sjJob);return;}const s=e.target.closest('[data-sj-stage]');if(s){stage=stage===s.dataset.sjStage?'':s.dataset.sjStage;find('[data-sj-status]').value=stage;apply();}const n=e.target.closest('[data-sj-need]');if(n){attention=attention===n.dataset.sjNeed?'':n.dataset.sjNeed;apply();}if(e.target.closest('[data-sj-view-all]')){attention='';stage='';term='';find('[data-sj-status]').value='';find('[data-sj-search]').value='';apply();}};
+   host.onkeydown=e=>{const row=e.target.closest('tr[data-sj-job]');if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void open(row.dataset.sjJob);}};
+   find('[data-sj-message]').onclick=()=>options.sendMessage?options.sendMessage():options.navigate('messages');apply();
+   const announcements=await Promise.allSettled(workspaces.map(async w=>array(await options.json('/api/workspaces/'+encodeURIComponent(w.id)+'/announcements')).map(a=>({...a,workspaceId:w.id,workspaceName:w.name}))));
+   if(!current())return controller;
+   const messages=notificationResult.value.filter(n=>/message|conversation|reply/i.test(n.eventType||n.title||n.type||'')).map(n=>({at:n.createdAtUtc||n.createdAt,item:n}));
+   messages.push(...announcements.flatMap(r=>r.status==='fulfilled'?r.value.map(a=>({at:a.createdAtUtc||a.createdAt,item:a,announcement:true})):[]));messages.sort((a,b)=>+(date(b.at)||0)-+(date(a.at)||0));
+   find('[data-sj-messages]').innerHTML=(notificationResult.error||announcements.some(r=>r.status==='rejected')?'<p>Some messages could not load. <button type="button" data-sj-retry>Retry</button></p>':'')+(messages.slice(0,8).map(({item:n,announcement})=>`<button type="button" class="sj-note" data-sj-communication="${esc(announcement?n.workspaceId:n.referenceType==='Job'?n.referenceId||'':'')}" data-sj-kind="${announcement?'workspace':'message'}"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.workspaceName||'Studio message')}</small></button>`).join('')||'<p>No messages or announcements.</p>');
+   find('[data-sj-retry]')?.addEventListener('click',()=>options.retry());
+   host.querySelectorAll('[data-sj-communication]').forEach(b=>b.onclick=()=>{if(b.dataset.sjKind==='workspace')options.openWorkspace(b.dataset.sjCommunication);else if(b.dataset.sjCommunication)void open(b.dataset.sjCommunication);else options.navigate('messages');});
+  } catch(error){if(current()){host.innerHTML='<div class="sj-loading" role="alert">Unable to load jobs: '+esc(error.message)+' <button type="button">Retry</button></div>';host.querySelector('button').onclick=()=>options.retry();}}
+  return controller;
+ }
+ window.StudioJobsPage={render,dispose(){active?.dispose();active=null;}};
+})();

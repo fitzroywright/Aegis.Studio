@@ -76,6 +76,16 @@
             .filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false)
             .map(workspace => '<button type="button" data-studio-workspace-id="' + escText(workspace.id) + '"><span>▣</span><span>' + escText(workspace.name) + '</span></button>')
             .join('');
+        if(document.body.dataset.studioView==='jobs'){
+            const navigation=[['today','Today','⌂'],['frontdesk','Front Desk','▣'],['jobs','Jobs','▥'],['media','Media','▧'],['messages','Messages','✉']];
+            const card=(title,body)=>'<section class="sj-rail-card"><header><h2>'+title+'</h2></header><div class="sj-rail-links">'+body+'</div></section>';
+            const counts=document.getElementById('genericView')?.studioJobsWorkspaceCounts||{};
+            const items=workspaces.filter(w=>w.permissions?.accessWorkspace!==false&&w.permissions?.view!==false).map(w=>'<button type="button" data-jobs-workspace-id="'+escText(w.id)+'"><span>▣</span><span>'+escText(w.name)+'</span>'+(counts[String(w.id)]!==undefined?'<b>'+counts[String(w.id)]+'</b>':'')+'</button>').join('');
+            rail.innerHTML=card('Navigation',navigation.map(([view,title,icon])=>'<button type="button" data-studio-side="'+view+'"'+(view==='jobs'?' class="active" aria-current="page"':'')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''))+card('My Workspaces',items||'<p>No workspaces available.</p>')+card('Actions','<button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button><button type="button" data-studio-side="schedule"><span>▦</span><span>View Calendar</span></button>');
+            rail.querySelectorAll('[data-studio-side]').forEach(b=>b.onclick=()=>window.studioNavigate?.(b.dataset.studioSide));
+            rail.querySelectorAll('[data-jobs-workspace-id]').forEach(b=>b.onclick=()=>window.studioOpenJobs?.(b.dataset.jobsWorkspaceId));
+            return;
+        }
         const jobPage=document.querySelector('#conversationView.has-open-job .job-detail-page');
         if(jobPage){
             const navigation=[['today','Today','⌂'],['frontdesk','Front Desk','▣'],['jobs','Jobs','▥'],['media','Media','▧'],['messages','Messages','✉']];
@@ -242,9 +252,9 @@
             const jobOpen=view==='workspaces' && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
             title.querySelector('strong')?.replaceChildren(document.createTextNode(jobOpen?'Job Details':labelFor(view)));
             title.setAttribute('aria-label',jobOpen?'Job Details':labelFor(view));
-            const icon=title.querySelector('.mw-today-focus-icon');if(icon)icon.innerHTML=jobOpen?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="13" r="4"/></svg>':'✦';
+            const icon=title.querySelector('.mw-today-focus-icon');if(icon)icon.innerHTML=view==='jobs'?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16v14H4zM8 6V3h8v3M4 11h16M10 11v3h4v-3"/></svg>':jobOpen?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="13" r="4"/></svg>':'✦';
             const tagline = title.querySelector('small');
-            if (tagline) tagline.textContent = jobOpen?'Media, workflow and conversations':view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : 'Studio workspace';
+            if (tagline) tagline.textContent = jobOpen?'Media, workflow and conversations':view==='jobs'?'Every job, one clear view':view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : 'Studio workspace';
         }
         main.classList.add('studio-standard-main');
     }
@@ -261,6 +271,7 @@
         ensureBreadcrumb();
         syncPageFrame();
         syncGridFooterCount();
+        window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();});
         if (!window.history.state?.studioView) window.history.replaceState({ studioView: currentView }, '', window.location.href);
         window.addEventListener('popstate', event => {
