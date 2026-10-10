@@ -8325,3 +8325,22 @@ body[data-studio-view="frontdesk"] .fd-secondary .op-card>header .fd-card-link:h
 body[data-studio-view="frontdesk"] .fd-secondary .op-card>header .fd-card-link:focus-visible{
  outline:2px solid #9a641d;outline-offset:2px;border-radius:3px;
 }
+
+/* Front Desk bookings grid: same tactile speed-bump navigation as Today lists. */
+body[data-studio-view="frontdesk"] .fd-table tbody tr.fd-speedbump-row{
+ position:relative;cursor:pointer;
+ transition:background-color .14s ease,box-shadow .14s ease,transform .14s ease;
+}
+body[data-studio-view="frontdesk"] .fd-table tbody tr.fd-speedbump-row:hover,
+body[data-studio-view="frontdesk"] .fd-table tbody tr.fd-speedbump-row:focus-visible{
+ background:#f1f7fd;transform:translateY(-1px) scale(1.003);
+ box-shadow:0 4px 10px rgba(31,64,96,.12);z-index:2;outline-offset:-2px;
+}
+body[data-studio-view="frontdesk"] .fd-table tbody tr.fd-speedbump-row:active{
+ transform:translateY(0) scale(.998);box-shadow:0 1px 3px rgba(31,64,96,.10);
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-studio-view="frontdesk"] .fd-table tbody tr.fd-speedbump-row{
+ transition:none;transform:none!important;
+ }
+}
