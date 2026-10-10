@@ -2,6 +2,9 @@
     document.addEventListener('error', event => {
         const image=event.target;
         if(!(image instanceof HTMLImageElement)||!image.isConnected||!image.src.includes('/versions/by-id/'))return;
+        // A page with its own recovery handler owns the first error. Do not detach
+        // its image before that handler can reveal a placeholder or load a fallback.
+        if(image.dataset.previewOwner||typeof image.onerror==='function')return;
         const unavailable=document.createElement('span'),message=document.createElement('span'),retry=document.createElement('button');
         const height=getComputedStyle(image).height;
         if(height&&height!=='auto'&&height!=='0px')unavailable.style.height=height;
@@ -11,3 +14,4 @@
         unavailable.append(message,retry);image.replaceWith(unavailable);
     },true);
 })();
+

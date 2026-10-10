@@ -1,11 +1,3 @@
-const baseOpenConversation = openConversation;
-
-openConversation = async function(id) {
-    await baseOpenConversation(id);
-    await tightenConversationExperience(id);
-    await renderAttachments(id);
-};
-
 async function tightenConversationExperience(conversationId) {
     const conversation = await json('/api/conversations/' + conversationId);
     const workspace = workspaceCache.find(item => item.id === conversation.workspaceId);
