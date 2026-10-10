@@ -8745,3 +8745,45 @@ body[data-studio-view="frontdesk"] .fd-communications[data-mw-region="messages"]
 body[data-studio-view="frontdesk"] .fd-communications[data-mw-region="messages"] .mw-send-message-link:focus-visible{
  background:#ffe38b;text-decoration:underline;
 }
+
+/* Job Details — Today-aligned, media-first operational layout */
+.job-reading-view.studio-job-today-layout{background:#faf8f2;color:#352e25;overflow:auto}
+.studio-job-today-layout .detail-header.studio-job-header{background:#ffedac;border:1px solid #ead58e;border-radius:10px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.studio-job-today-layout .studio-job-copy{flex:1 1 260px;min-width:0}
+.studio-job-today-layout .studio-job-copy h1{font-size:1.35rem;line-height:1.2;margin:0 0 3px}
+.studio-job-today-layout .studio-job-copy p{font-size:11px;margin:0;display:flex;gap:10px;flex-wrap:wrap}
+.studio-job-today-layout .job-header-actions{flex:0 0 auto}
+.studio-job-today-layout .studio-job-flow-lights{order:3;flex:1 0 100%;min-width:0;overflow-x:auto;padding:4px 0 0;border-top:1px solid #e6cf80}
+.studio-job-today-layout .studio-job-flow-lights:empty{display:none}
+.studio-job-today-layout .job-meta-strip{padding:5px 9px;gap:6px;background:#fffdf7;border-radius:7px}
+.studio-job-today-layout .job-meta-item{padding:3px 7px}
+.studio-job-today-layout .job-meta-item small{font-size:10px}
+.studio-job-today-layout .job-meta-item strong{font-size:11px}
+.studio-job-today-layout .job-section-tabs{margin:5px 0 8px;background:#fffaf0;border-bottom:2px solid #e8d7b5}
+.studio-job-today-layout .job-section-tabs button{font-size:12px;padding:8px 12px}
+.studio-job-today-layout .job-section-tabs button.active{background:#fff0c2;color:#65471a}
+.studio-job-today-layout .job-detail-board{display:grid;grid-template-columns:minmax(0,1fr) minmax(270px,315px);gap:10px;align-items:start}
+.studio-job-today-layout .job-detail-media-column{display:flex;flex-direction:column;gap:8px;min-width:0}
+.studio-job-today-layout .job-detail-media-column .job-media-section{min-height:520px;height:auto;background:#fffdf8;border:1px solid #e5ddcd;border-radius:9px;overflow:hidden}
+.studio-job-today-layout .job-media-section .job-center-heading{padding:8px 12px}
+.studio-job-today-layout .job-media-section .job-center-heading h2{font-size:14px}
+.studio-job-today-layout .job-detail-collections{border:0;border-bottom:1px solid #e8dfcc;border-radius:0;background:#fffaf0}
+.studio-job-today-layout .job-detail-collections>header{padding:5px 10px;border-bottom:0}
+.studio-job-today-layout .job-collection-list{display:flex;flex-wrap:wrap;gap:4px;padding:5px 9px;max-height:72px;overflow:auto}
+.studio-job-today-layout .job-collection-list button{white-space:nowrap;font-size:11px;padding:4px 8px}
+.studio-job-today-layout .job-media-content{min-height:390px}
+.studio-job-today-layout .job-detail-right{display:flex;flex-direction:column;gap:9px;min-width:0}
+.studio-job-today-layout .job-detail-right>.job-subjects-section{min-height:0;max-height:200px;overflow:auto}
+.studio-job-today-layout .job-detail-right>.job-detail-quick{max-height:190px;overflow:auto}
+.studio-job-today-layout .job-detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,315px);gap:10px;margin-top:9px}
+.studio-job-today-layout .job-detail-message-card{background:#fff5c8!important;border:1px solid #dfc66e!important;border-radius:9px;box-shadow:0 2px 5px rgba(103,78,22,.10);color:#5e4a20;display:flex;flex-direction:column;min-height:310px;max-height:490px;overflow:hidden}
+.studio-job-today-layout .job-detail-message-card>.job-panel-heading{background:#ffed9c!important;border-bottom:1px solid #e6d17c;color:#614a18;min-height:32px;padding:5px 10px}
+.studio-job-today-layout .job-detail-message-card>.messages{background:#fff5c8!important;color:#5e4a20;flex:1;min-height:0;overflow:auto;padding:8px}
+.studio-job-today-layout .job-detail-message-card .message{margin-bottom:7px}
+.studio-job-today-layout .job-detail-message-card .message-content{background:transparent}
+.studio-job-today-layout .job-detail-message-card .composer{background:#ffed9c;border-top:1px solid #e6d17c;padding:6px 9px}
+.studio-job-today-layout .job-detail-message-card .composer textarea{min-height:38px;max-height:70px}
+.studio-job-today-layout .job-detail-message-card .composer label{font-size:11px}
+.studio-job-today-layout .job-detail-message-card .composer button{font-size:11px}
+@media(max-width:950px){.studio-job-today-layout .job-detail-board,.studio-job-today-layout .job-detail-bottom{grid-template-columns:minmax(0,1fr)}.studio-job-today-layout .job-detail-right{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.studio-job-today-layout .job-detail-message-card{grid-column:1/-1}}
+@media(max-width:580px){.studio-job-today-layout .job-detail-right{display:flex}.studio-job-today-layout .studio-job-flow-lights{overflow-x:auto}}
