@@ -8700,3 +8700,14 @@ body[data-studio-view="media"] .studio-media-page{gap:5px;padding:5px 7px 4px}
 .studio-media-page .studio-media-upload .studio-media-drop{flex:1 1 auto;min-height:130px}
 .studio-media-page .studio-media-upload .studio-media-drop.uploading{opacity:.75;pointer-events:none;border-style:solid}
 .studio-media-page .studio-media-upload-actions:not(:has(#studioMediaProgress:empty)){padding:5px 4px 0}
+
+/* Compact editable metadata within the Media details column */
+.studio-media-page .studio-media-detail-fields{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.studio-media-page .studio-media-detail-fields>label{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:600}
+.studio-media-page .studio-media-detail-fields input[type=text],.studio-media-page .studio-media-detail-fields select{box-sizing:border-box;width:100%;min-width:0;padding:5px 6px;border:1px solid var(--theme-border,#ccd5df);border-radius:5px;background:var(--theme-surface,#fff);color:inherit;font-size:11px}
+.studio-media-page .studio-media-detail-fields input[readonly]{opacity:.75}
+.studio-media-page .studio-media-detail-subjects{border:1px solid var(--theme-border,#ccd5df);border-radius:5px;padding:5px;min-width:0;max-height:105px;overflow:auto}
+.studio-media-page .studio-media-detail-subjects legend{font-size:11px;font-weight:600}
+.studio-media-page .studio-media-subject-option{display:flex;align-items:center;gap:5px;font-size:11px;padding:2px 0}
+.studio-media-page .studio-media-detail-fields button{font-size:11px;padding:6px}
+.studio-media-page .studio-media-detail-name{font-size:11px;overflow-wrap:anywhere}
