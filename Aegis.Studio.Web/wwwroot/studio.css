@@ -8916,3 +8916,10 @@ body:has(.has-open-job .studio-job-today-layout) #conversationView.has-open-job{
 .studio-inbox-message-recipient{white-space:nowrap;max-width:24%;overflow:hidden;text-overflow:ellipsis}
 .studio-inbox-loading{padding:15px;font-size:12px}
 @media(max-width:900px){.studio-outlook-inbox{grid-template-columns:145px minmax(0,1fr)!important}.studio-outlook-inbox>.studio-inbox-reading{display:flex!important}}
+
+/* Messages single-column vertical split; no separate Jobs Filter rail. */
+.studio-outlook-inbox{display:flex!important;flex-direction:column!important;grid-template-columns:none!important;grid-template-rows:none!important;min-height:0}
+.studio-outlook-inbox>.studio-inbox-center{grid-column:auto!important;grid-row:auto!important;flex:0 0 55%;height:55%;min-height:0;padding:0!important;overflow:hidden}
+.studio-outlook-inbox>.studio-inbox-reading{grid-column:auto!important;grid-row:auto!important;position:static!important;align-self:stretch!important;flex:1 1 45%;height:auto!important;min-height:0!important;display:flex!important;z-index:auto!important;overflow:hidden;border-top:2px solid #d8b16d;border-left:0}
+.studio-inbox-tools select{font-size:11px;padding:6px;border:1px solid #ded8cd;border-radius:5px;max-width:180px}
+.mw-list-panel[data-mw-region="messages"] header button[data-nav="messages"]{font-weight:800!important;border:0!important;background:transparent!important;box-shadow:none!important;text-decoration:underline;text-underline-offset:3px;color:#8a5a17!important;padding:2px 4px!important}
