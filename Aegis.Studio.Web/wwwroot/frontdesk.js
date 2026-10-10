@@ -86,7 +86,7 @@ function renderFrontDesk(){
     const unassigned=frontDeskJobs.filter(j=>!j.assignedTo&&j.status!=='Completed');
     const enquiries=frontDeskEnquiries.filter(e=>e&&!frontDeskRequests.some(r=>r?.request?.conversationId===e.id));
     const due=frontDeskRequests.filter(x=>x&&(x.status==='AwaitingDeposit'||(x.request?.requiredDeposit>0&&x.recordedDeposit<x.request.requiredDeposit&&!['Confirmed','Cancelled'].includes(x.status))));
-    const tabs=[['today','All'],['enquiries','New'],['requests','Bookings'],['jobs','Jobs'],['completed','Completed']];
+    const tabs=[['today','All'],['enquiries','New'],['requests','Bookings'],['jobs','Jobs']];
     const entries=[
         ...enquiries.map(e=>({kind:'enquiry',id:e.id,created:e.createdAtUtc,name:e.contactName||'New inquiry',title:e.subject||'Inquiry',date:null,status:'New',source:e.channel||'Inquiry',conversationId:e.id})),
         ...frontDeskRequests.filter(Boolean).map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Customer',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:'Booking',request:x}))
@@ -129,7 +129,7 @@ function renderFrontDesk(){
           </section>
         <div class="fd-metrics">${metric('New Inquiries',enquiries.length,'Awaiting response')}${metric('Pending Deposits',due.length,'Awaiting payment')}${metric('Needs Confirmation',pending.length,'Review and confirm')}${metric('Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
       </div><div class="fd-secondary">
-        <section class="op-card fd-actions"><header><h2>Front Desk Services</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-new-client>＋ New Customer</button><button data-find-client>Find Customer</button><button data-take-payment>Take Payment</button><button data-new-sale>New Sale</button><button data-pickups>Pickup / Delivery</button></div></section>
+        <section class="op-card fd-actions"><header><h2>Front Desk Services</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-new-client>＋ New Customer</button><button data-find-client>Find Customer</button><button data-take-payment>Take Payment</button><button data-new-sale>New Sale</button><button data-pickups>Pickup / Delivery</button><button type="button" data-completed>Completed</button></div></section>
         <section class="op-card fd-schedule"><header><h2>Today's Schedule</h2><button type="button" class="fd-card-link" data-calendar>View Calendar →</button></header><div class="fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="fd-session"><time>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</time><span><strong>${esc(s.title)}</strong><small>${esc(s.location||s.status||'')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
         <section class="op-card fd-messages"><header><h2>Recent Inquiries</h2><button type="button" class="fd-card-link" data-inquiries>View All →</button></header><div class="fd-message-list">${enquiries.slice(0,5).map(e=>`<button data-fd-enquiry="${esc(e.id)}"><strong>${esc(e.contactName||'Customer')}</strong><small>${esc(e.subject||'New inquiry')}</small></button>`).join('')||'<p class="muted">No new inquiries.</p>'}</div></section>
       </div></div></div>`;
@@ -151,6 +151,7 @@ function renderFrontDesk(){
     genericView.querySelector('[data-take-payment]').onclick=()=>frontDeskSelectedClientId?takeFrontDeskClientPayment(frontDeskSelectedClientId):showPos();
     genericView.querySelector('[data-new-sale]').onclick=()=>showPos();
     genericView.querySelector('[data-pickups]').onclick=()=>{frontDeskTab='delivery';renderFrontDesk();};
+    genericView.querySelector('[data-completed]').onclick=()=>{frontDeskTab='completed';renderFrontDesk();};
     genericView.querySelector('[data-calendar]').onclick=()=>studioNavigate('pipeline');
     genericView.querySelector('[data-inquiries]').onclick=()=>{frontDeskTab='enquiries';renderFrontDesk();};
     genericView.querySelectorAll('[data-frontdesk-tab]').forEach(b=>b.onclick=()=>{frontDeskTab=b.dataset.frontdeskTab;renderFrontDesk();});
