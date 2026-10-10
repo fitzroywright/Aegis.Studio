@@ -8156,3 +8156,56 @@ body .shell::before{
  z-index:4;pointer-events:none;
 }
 body .shell>main,body .shell>.studio-context-rail{min-height:0}
+
+/* Shared non-Today page structure, based on the approved Today shell.
+   Today selectors and its own layout remain untouched. */
+body:not([data-studio-view="today"]) .studio-today-brand-title{
+ display:flex;align-items:center;gap:9px;min-width:0;margin-left:12px;
+ padding-left:15px;border-left:1px solid #ffffff55;color:#fff;
+}
+body:not([data-studio-view="today"]) .topbar #studioBreadcrumb{
+ display:flex;align-items:center;justify-content:flex-end;gap:6px;
+ margin-left:auto;margin-right:8px;min-width:0;max-width:34vw;overflow:hidden;
+}
+body:not([data-studio-view="today"]) .topbar #studioBreadcrumb .breadcrumb-label{
+ color:#efc36b;font-weight:800;white-space:nowrap;
+}
+body:not([data-studio-view="today"]) .topbar #studioBreadcrumb .breadcrumb-label::after{
+ content:"›";display:inline-block;margin:0 8px;color:#efc36b;font-size:19px;
+}
+body:not([data-studio-view="today"]) .topbar #studioBreadcrumb button,
+body:not([data-studio-view="today"]) .topbar #studioBreadcrumb strong{color:#fff}
+body:not([data-studio-view="today"]) .shell>main{
+ display:flex;flex-direction:column;min-height:0;overflow:hidden;
+}
+body:not([data-studio-view="today"]) .shell>main>.studio-content-search{display:none!important}
+body:not([data-studio-view="today"]) .shell>main>#genericView{
+ flex:1 1 auto;min-height:0;height:100%;max-height:100%;
+ overflow:auto;box-sizing:border-box;padding:7px 12px 6px 5px!important;
+}
+body:not([data-studio-view="today"]) .shell>.studio-context-rail{
+ min-height:0;overflow-y:auto;padding-top:7px;padding-bottom:6px;
+}
+body:not([data-studio-view="today"]) .shell>.studio-shell-footer{
+ display:flex;align-items:center;justify-content:space-between;
+}
+body:not([data-studio-view="today"]) .shell>.studio-shell-footer #studioFooterRate{
+ margin-left:auto;text-align:right;white-space:nowrap;
+}
+/* Page-specific grids use the same minmax(0,1fr) and flex sizing contract. */
+body:not([data-studio-view="today"]) :is(.jobs-page,.mw-list-page,.production-page,.fd-page){
+ display:flex;flex-direction:column;min-height:0;max-width:100%;
+}
+body:not([data-studio-view="today"]) :is(.jobs-layout,.mw-list-layout,.fd-layout){
+ flex:1 1 auto;min-height:0;align-items:stretch;
+}
+body:not([data-studio-view="today"]) :is(.jobs-center,.mw-list-center,.fd-queue){
+ min-width:0;min-height:0;
+}
+body:not([data-studio-view="today"]) :is(.jobs-list,.fd-table-scroll,.mw-list-grid){
+ min-height:0;overflow-y:auto;
+}
+@media(max-width:1100px){
+ body:not([data-studio-view="today"]) :is(.jobs-layout,.mw-list-layout,.fd-layout){height:auto}
+ body:not([data-studio-view="today"]) .topbar #studioBreadcrumb{max-width:25vw}
+}
