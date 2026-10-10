@@ -8237,3 +8237,13 @@ body[data-studio-view="today"] .topbar #studioBreadcrumb{
 body[data-studio-view="today"] .topbar #notificationButton{
  margin-left:0!important;flex:0 0 auto!important;
 }
+
+/* Breadcrumb separator contract: one gold chevron, never a vertical rule. */
+body .topbar #studioBreadcrumb .breadcrumb-label::after{
+ content:"›"!important;display:inline-block!important;
+ width:auto!important;height:auto!important;
+ margin:0 8px!important;padding:0!important;
+ border:0!important;border-right:0!important;
+ background:none!important;box-shadow:none!important;
+ color:#efc36b!important;font-size:19px!important;line-height:1!important;
+}
