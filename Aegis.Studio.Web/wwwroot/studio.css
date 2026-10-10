@@ -8070,3 +8070,19 @@ body[data-studio-view="today"] #studioBreadcrumb .breadcrumb-label::after{
   background:linear-gradient(135deg,transparent 43%,#b78220 44%,#b78220 55%,transparent 56%) center/9px 14px no-repeat!important;
   border-right:1px solid #d6b575;
 }
+
+/* Today: brand-side title and notification-side breadcrumb, no duplicate title strip. */
+.studio-today-brand-title{display:none}
+body[data-studio-view="today"] .studio-today-brand-title{display:flex;align-items:center;gap:9px;min-width:0;margin-left:12px;padding-left:15px;border-left:1px solid #ffffff55;color:#fff}
+.studio-today-brand-title .mw-today-focus-icon{font-size:22px;flex:0 0 auto}
+.studio-today-brand-title>span:last-child{display:flex;flex-direction:column;min-width:0}
+.studio-today-brand-title strong{font-size:19px;line-height:1.15;color:#fff}
+.studio-today-brand-title em{font-style:normal;font-size:11px;font-weight:600;color:#f0c77b;margin-left:6px}
+.studio-today-brand-title small{font-size:10px;color:#e4ecf7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}
+body[data-studio-view="today"] .mw-today-heading{display:none!important}
+body[data-studio-view="today"] .topbar #studioBreadcrumb{margin-left:auto!important;margin-right:8px!important;display:flex!important;align-items:center;justify-content:flex-end;gap:6px;min-width:0;max-width:34vw;overflow:hidden}
+body[data-studio-view="today"] .topbar #studioBreadcrumb .breadcrumb-label{color:#efc36b!important;font-weight:800!important}
+body[data-studio-view="today"] .topbar #studioBreadcrumb .breadcrumb-label::after{content:"›"!important;background:none!important;border:0!important;width:auto!important;height:auto!important;font-size:19px!important;margin:0 8px!important;color:#efc36b!important}
+body[data-studio-view="today"] .topbar #studioBreadcrumb button,body[data-studio-view="today"] .topbar #studioBreadcrumb strong{color:#fff!important}
+@media(max-width:1200px){.studio-today-brand-title small{max-width:210px}body[data-studio-view="today"] .topbar #studioBreadcrumb{max-width:25vw}}
+@media(max-width:800px){.studio-today-brand-title small,.studio-today-brand-title em{display:none}body[data-studio-view="today"] .topbar #studioBreadcrumb{max-width:40vw}}
