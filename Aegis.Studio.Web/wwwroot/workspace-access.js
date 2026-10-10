@@ -1,38 +1,7 @@
 let currentWorkspacePermissions = null;
 
-loadWorkspaces = async function() {
-    const access = await json('/api/workspace-access');
-    workspaceCache = access.map(item => ({
-        id: item.workspace.id,
-        name: item.workspace.name,
-        address: item.workspace.emailAddress || '',
-        iconName: item.workspace.iconName || 'folder',
-        accentColor: item.workspace.accentColor || '#b99750',
-        openCount: 0,
-        permissions: item.permissions
-    }));
-    requestWorkspace.innerHTML = workspaceCache
-        .filter(x => x.permissions.accessWorkspace)
-        .map(workspace => `<option value="${workspace.id}">${esc(workspace.name)}</option>`)
-        .join('');
-    renderWorkspaceMenu();
-};
-
-const originalSelectWorkspaceForAccess = selectWorkspace;
-selectWorkspace = async function(id, name) {
-    const workspace = workspaceCache.find(x => x.id === id);
-    if (!workspace?.permissions?.accessWorkspace || !workspace?.permissions?.view) {
-        alert('You do not have permission to view this workspace.');
-        return;
-    }
-    currentWorkspacePermissions = workspace.permissions;
-    await originalSelectWorkspaceForAccess(id, name);
-    renderWorkspaceMenu();
-};
-
-const originalOpenConversationForAccess = openConversation;
-openConversation = async function(id) {
-    await originalOpenConversationForAccess(id);
+// Permission presentation is called by the conversation renderer, never by a wrapper.
+function applyConversationPermissions() {
     if (!selectedWorkspace) return;
     const permissions = workspaceCache.find(x => x.id === selectedWorkspace)?.permissions;
     if (!permissions) return;
@@ -54,26 +23,7 @@ openConversation = async function(id) {
         internalToggle.disabled = true;
         internalToggle.title = 'Internal notes require edit or production permissions.';
     }
-};
-
-const originalSendMessageForAccess = sendMessage;
-sendMessage = async function() {
-    if (selectedWorkspace && !currentWorkspacePermissions?.replyRequester) {
-        alert('You do not have permission to reply to the requester in this workspace.');
-        return;
-    }
-    await originalSendMessageForAccess();
-};
-
-const originalCreateJobForAccess = createJob;
-createJob = async function() {
-    if (selectedWorkspace && !currentWorkspacePermissions?.createJob) {
-        alert('You do not have permission to create jobs in this workspace.');
-        return;
-    }
-    await originalCreateJobForAccess();
-};
-
+}
 
 function workspaceMenuGlyph(iconName) {
     return ({
@@ -123,3 +73,4 @@ document.addEventListener('click',event=>{
     const details=document.getElementById('workspaceMenu');
     if(details?.open&&!details.contains(event.target))details.open=false;
 });
+

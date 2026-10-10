@@ -73,7 +73,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
     const display = () => { conversationView.classList.remove('hidden'); genericView.classList.add('hidden'); document.body.dataset.studioView='workspaces'; };
     const fail = error => empty('Unable to load', error.message || String(error));
     tabs.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { tab = button.dataset.tab; search.value=''; syncSearchField(); search.focus(); loadConversations().catch(fail); });
-    selectWorkspace = async function(id, name) {
+    async function selectWorkspaceView(id, name) {
         const workspace = workspaceCache.find(x => x.id === id);
         if (!workspace?.permissions?.accessWorkspace || !workspace.permissions.view) return alert('You do not have permission to view this workspace.');
         window.studioRememberView?.({view:'workspaces',workspaceId:id,jobId:null});
@@ -88,8 +88,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
         document.querySelectorAll('.workspace').forEach(button => button.classList.toggle('active', button.dataset.id === id));
         display();
         try { await loadConversations(); } catch (error) { fail(error); }
-    };
-    loadConversations = async function() {
+    }
+    async function loadWorkspaceConversations() {
         syncSearchField();
         const version = ++revision;
         const workspaceId = selectedWorkspace;
@@ -121,7 +121,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
         </button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
         conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(jobs.find(x => x.id === button.dataset.job)).catch(fail));
         filter();
-    };
+    }
+    window.StudioWorkspace={select:selectWorkspaceView,load:loadWorkspaceConversations};
     window.openWorkspaceJob = async function(id) {
         const version=beginJobLoading();
         try {

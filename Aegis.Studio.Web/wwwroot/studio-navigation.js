@@ -546,7 +546,9 @@
             };
         });
         genericView.querySelectorAll('.mw-session-thumb img[data-fallback-src]').forEach(img=>{
+            img.dataset.previewOwner='today';
             img.addEventListener('error',()=>{
+                delete img.dataset.previewOwner;
                 const fallback=img.dataset.fallbackSrc;
                 if(!fallback||img.dataset.fallbackTried==='1')return;
                 img.dataset.fallbackTried='1';
@@ -1034,6 +1036,7 @@
             if(revision===navigationRevision){
                 setActive(view);
                 if(view!=='today'&&typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
+                window.StudioShell?.sync(view);
             }
         }catch(error){
             if(revision!==navigationRevision)return;
@@ -1046,7 +1049,7 @@
 
     window.addEventListener('popstate',event=>{
         const view=event.state?.studioView||'today';
-        if(view!==currentNavigationView)window.studioNavigate(view,{browserHistory:true,history:false}).catch(error=>console.error('Studio browser navigation failed.',error));
+        if(view!==currentNavigationView||view!==document.body.dataset.studioView)window.studioNavigate(view,{browserHistory:true,history:false}).catch(error=>console.error('Studio browser navigation failed.',error));
     });
 
     document.querySelectorAll('[data-view]').forEach(button=>{

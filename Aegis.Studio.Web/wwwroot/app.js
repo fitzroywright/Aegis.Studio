@@ -26,37 +26,30 @@ async function json(url, options) {
 }
 
 async function loadWorkspaces() {
-    const data = await json('/api/workspaces');
-    workspaceCache = data;
-    requestWorkspace.innerHTML = data.map(workspace =>
-        `<option value="${workspace.id}">${esc(workspace.name)}</option>`).join('');
+    const access = await json('/api/workspace-access');
+    workspaceCache = access.map(item => ({
+        id: item.workspace.id,
+        name: item.workspace.name,
+        address: item.workspace.emailAddress || '',
+        iconName: item.workspace.iconName || 'folder',
+        accentColor: item.workspace.accentColor || '#b99750',
+        openCount: 0,
+        permissions: item.permissions
+    }));
+    requestWorkspace.innerHTML = workspaceCache
+        .filter(x => x.permissions.accessWorkspace)
+        .map(workspace => `<option value="${workspace.id}">${esc(workspace.name)}</option>`)
+        .join('');
+    renderWorkspaceMenu();
 }
 
+// Public workspace entry points delegate to the sole workspace controller.
 async function selectWorkspace(id, name) {
-    selectedWorkspace = id;
-    document.querySelectorAll('.workspace').forEach(button => {
-        button.classList.toggle('active', button.dataset.id === id);
-    });
-    workspaceTitle.textContent = name;
-    await loadConversations();
+    return window.StudioWorkspace.select(id, name);
 }
 
 async function loadConversations() {
-    const query = selectedWorkspace ? `?workspaceId=${selectedWorkspace}` : '';
-    const data = await json('/api/conversations' + query);
-    conversationList.innerHTML = data.map(conversation => {
-        const last = conversation.messages[conversation.messages.length - 1];
-        return `
-            <div class="conversation-card" data-id="${conversation.id}">
-                <h3>${esc(conversation.subject)}</h3>
-                <div class="meta">${esc(conversation.contactName)} · ${esc(conversation.channel)} ${conversation.jobId ? '· JOB' : ''}</div>
-                <div class="snippet">${esc(last?.body || '')}</div>
-            </div>`;
-    }).join('') || '<div class="empty-state" style="padding:50px 20px">No open conversations.</div>';
-
-    document.querySelectorAll('.conversation-card').forEach(card => {
-        card.onclick = () => openConversation(card.dataset.id);
-    });
+    return window.StudioWorkspace.load();
 }
 
 async function openConversation(id) {
@@ -120,9 +113,16 @@ async function openConversation(id) {
         identitySelect.addEventListener('change', syncIdentityState);
         syncIdentityState();
     }
+    applyConversationPermissions();
+    await tightenConversationExperience(id);
+    await renderAttachments(id);
 }
 
 async function sendMessage() {
+    if (selectedWorkspace && !currentWorkspacePermissions?.replyRequester) {
+        alert('You do not have permission to reply to the requester in this workspace.');
+        return;
+    }
     const body = document.getElementById('messageBody').value.trim();
     if (!body) {
         return;
@@ -144,6 +144,10 @@ async function sendMessage() {
 }
 
 async function createJob() {
+    if (selectedWorkspace && !currentWorkspacePermissions?.createJob) {
+        alert('You do not have permission to create jobs in this workspace.');
+        return;
+    }
     const conversation = await json('/api/conversations/' + selectedConversation);
     const title = prompt('Job title', conversation.subject);
     if (!title) {
@@ -161,7 +165,10 @@ async function createJob() {
     await openJob(job.id);
 }
 
-async function openJob(id){return openWorkspaceJob(id);}
+async function openJob(id) {
+    await openWorkspaceJob(id);
+    await window.renderJobAccess?.(id);
+}
 
 function money(value) {
     return new Intl.NumberFormat('en-JM', { style: 'currency', currency: 'JMD' }).format(value || 0);
@@ -206,5 +213,6 @@ newRequestForm.onsubmit = async event => {
     await loadConversations();
     await openConversation(created.id);
 };
+
 
 

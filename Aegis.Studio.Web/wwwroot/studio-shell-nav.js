@@ -170,27 +170,17 @@
         });
     };
 
-    function installNavigationWrapper() {
-        if (typeof window.studioNavigate !== 'function' || window.studioNavigate.__studioShellWrapped) return false;
-        const original = window.studioNavigate;
-        const wrapped = async (view, options = {}) => {
-            currentView = view;
-            const result = await original(view, options);
-            ensureTools();
-            ensureLeftRail();
-            syncPageFrame();
-            syncGridFooterCount();
-            if (view !== 'today'
-                && !breadcrumb?.querySelector('[data-studio-crumb="today"]')
-                && !breadcrumb?.querySelector('[data-shell-nav="today"]')) {
-                window.studioSetBreadcrumb([{ label: labelFor(view), view }]);
-            }
-            return result;
-        };
-        wrapped.__studioShellWrapped = true;
-        window.studioNavigate = wrapped;
-        return true;
-    }
+    // The router calls this after a completed navigation. The shell never replaces it.
+    window.StudioShell={sync(view=document.body.dataset.studioView||currentView){
+        currentView=view;
+        ensureTools();
+        ensureLeftRail();
+        syncPageFrame();
+        syncGridFooterCount();
+        if(view!=='today'&&!breadcrumb?.querySelector('[data-studio-crumb="today"]')&&!breadcrumb?.querySelector('[data-shell-nav="today"]')){
+            window.studioSetBreadcrumb([{label:labelFor(view),view}]);
+        }
+    }};
 
     function syncGridFooterCount() {
         const view = document.body.dataset.studioView || currentView;
@@ -260,7 +250,6 @@
     }
 
     function initialize() {
-        installNavigationWrapper();
         currentView = document.body.dataset.studioView || currentView;
         ensureTools();
         ensureLeftRail();
@@ -273,11 +262,7 @@
         syncGridFooterCount();
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();});
-        if (!window.history.state?.studioView) window.history.replaceState({ studioView: currentView }, '', window.location.href);
-        window.addEventListener('popstate', event => {
-            const view = event.state?.studioView || 'today';
-            if (view !== currentView) window.studioNavigate?.(view, { browserHistory: true });
-        });
+
 
         if (pageTools) {
             new MutationObserver(() => {

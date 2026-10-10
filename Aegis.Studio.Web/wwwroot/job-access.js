@@ -16,11 +16,8 @@
         return Object.fromEntries(permissionLabels.map(([key]) => [key,true]));
     }
 
-    const originalOpenJob = window.openJob;
-    if (typeof originalOpenJob !== 'function') return;
-
-    window.openJob = async function(id) {
-        await originalOpenJob(id);
+    // Optional access panel explicitly requested by app.js after opening a job.
+    window.renderJobAccess = async function(id) {
         try {
             const access = await json(`/api/jobs/${id}/access`);
             const p = access.permissions || {};
@@ -123,3 +120,4 @@
         alert(`Notification queued for ${displayName}. Their messaging preferences determine delivery channels.`);
     };
 })();
+
