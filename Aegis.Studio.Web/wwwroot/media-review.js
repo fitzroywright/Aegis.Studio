@@ -25,13 +25,13 @@
         </div>
         <div class="studio-media-targets" hidden><select id="studioMediaJob"><option value="">Select Job</option></select><select id="studioMediaCollection"><option value="Unclassified">Unclassified</option></select><select id="studioMediaSubject"><option value="">No Subject</option></select></div>
       </section>
-      <div class="studio-media-main"><div class="studio-media-tree-summary studio-media-announcement" role="status"><div class="studio-media-announcement-copy"><small>Selected destination</small><strong id="studioMediaPath">Select a destination</strong><p id="studioMediaDestinationNotice"></p></div><button type="button" class="action" id="studioMediaOpenJob" disabled>Open Job Details ↗</button></div><section class="studio-media-panel studio-media-upload"><h2>Upload Files</h2>
+      <div class="studio-media-main"><div class="studio-media-tree-summary studio-media-announcement" role="status"><div class="studio-media-announcement-copy"><small>Selected destination</small><strong id="studioMediaPath">Select a destination</strong><p id="studioMediaDestinationNotice"></p></div><button type="button" class="action" id="studioMediaOpenJob" disabled>Open Job Details ↗</button></div><section class="studio-media-panel studio-media-library"><header class="studio-media-gallery-header"><div><h2>Media Library</h2><span id="studioMediaCount"></span></div><div class="studio-media-gallery-tools"><input type="search" id="studioMediaFileSearch" placeholder="Search files…" aria-label="Search files"><select id="studioMediaStatus" aria-label="Filter by status"><option value="">All statuses</option><option value="Needs Sorting">Needs Sorting</option><option value="Needs Review">Needs Review</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><select id="studioMediaSort" aria-label="Sort media"><option value="new">Newest first</option><option value="name">File name</option></select><button type="button" class="action" id="studioMediaRefresh">Refresh</button></div></header><div class="studio-media-status-tabs"><button type="button" data-media-tab="" class="active">All Files</button><button type="button" data-media-tab="Needs Review">Awaiting Review</button><button type="button" data-media-tab="Approved">Approved</button><button type="button" data-media-tab="Rejected">Rejected</button></div>
+        <div class="studio-media-carousel-layout"><div class="studio-media-carousel-wrap"><button type="button" class="studio-media-carousel-arrow" id="studioMediaPrevious" aria-label="Previous images">‹</button><div class="studio-media-gallery" id="studioMediaGallery"><p class="muted">Select a Job to view its media.</p></div>
+      <button type="button" class="studio-media-carousel-arrow" id="studioMediaNext" aria-label="Next images">›</button></div><aside class="studio-media-detail" id="studioMediaDetail"><h3>File Details</h3><p class="muted">Select an image to see its details.</p></aside></div></section><section class="studio-media-panel studio-media-upload"><h2>Upload Files</h2>
         <div class="studio-media-drop" id="studioMediaDrop" tabindex="0"><span aria-hidden="true">⇧</span><strong>Drag files here to upload</strong><p>Or choose images and other media from your device</p><button type="button" class="primary" id="studioMediaChoose">Choose Files</button><input type="file" id="studioMediaFiles" multiple hidden></div>
         <div class="studio-media-upload-actions"><span id="studioMediaProgress" role="status">Select a Job and files to begin.</span><button class="primary" id="studioMediaUpload" type="button" disabled>Upload Selected Files</button></div>
       </section>
-      <section class="studio-media-panel"><header class="studio-media-gallery-header"><div><h2>Media Library</h2><span id="studioMediaCount"></span></div><div class="studio-media-gallery-tools"><input type="search" id="studioMediaFileSearch" placeholder="Search files…" aria-label="Search files"><select id="studioMediaStatus" aria-label="Filter by status"><option value="">All statuses</option><option value="Needs Sorting">Needs Sorting</option><option value="Needs Review">Needs Review</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select><select id="studioMediaSort" aria-label="Sort media"><option value="new">Newest first</option><option value="name">File name</option></select><button type="button" class="action" id="studioMediaRefresh">Refresh</button></div></header><div class="studio-media-status-tabs"><button type="button" data-media-tab="" class="active">All Files</button><button type="button" data-media-tab="Needs Review">Awaiting Review</button><button type="button" data-media-tab="Approved">Approved</button><button type="button" data-media-tab="Rejected">Rejected</button></div>
-        <div class="studio-media-gallery" id="studioMediaGallery"><p class="muted">Select a Job to view its media.</p></div>
-      </section><div class="studio-media-detail" id="studioMediaDetail" hidden></div></div></div></div>`;
+      </div></div></div>`;
     const root=genericView.querySelector('.studio-media-page'),job=root.querySelector('#studioMediaJob'),collection=root.querySelector('#studioMediaCollection'),subject=root.querySelector('#studioMediaSubject'),files=root.querySelector('#studioMediaFiles'),upload=root.querySelector('#studioMediaUpload'),progress=root.querySelector('#studioMediaProgress'),gallery=root.querySelector('#studioMediaGallery'),count=root.querySelector('#studioMediaCount'),notice=root.querySelector('#studioMediaDestinationNotice');
     const search=root.querySelector('#studioMediaJobSearch'),matches=root.querySelector('#studioMediaJobMatches'),tree=root.querySelector('#studioMediaTree'),path=root.querySelector('#studioMediaPath');
     const workspaceNames=new Map(workspaces.map(w=>[String(w.id),w.name||w.title||'Workspace']));
@@ -123,6 +123,7 @@
     }
     function renderGallery(){
       const shown=visibleAssets();count.textContent=shown.length+' of '+assets.length+' files';
+      if(!shown.some(a=>assetIdOf(a)===selectedAssetId))selectedAssetId=shown.length?assetIdOf(shown[0]):'';
       const jobId=job.value;
       gallery.innerHTML=shown.length?shown.map(a=>{
         const id=assetIdOf(a),version=a.versionId||a.latestVersionId||a.thumbnailVersionId;
@@ -131,12 +132,16 @@
         const fallback=image?'/api/jobs/'+encodeURIComponent(jobId)+'/versions/by-id/'+encodeURIComponent(version)+'/preview/fallback':'';
         return '<button type="button" class="studio-media-asset studio-media-asset-button'+(selectedAssetId===id?' selected':'')+'" data-media-asset="'+escMedia(id)+'">'+(image?'<img loading="lazy" src="'+preview+'" onerror="this.onerror=null;this.src=\''+fallback+'\'" alt="'+escMedia(nameOf(a))+'">':'<span class="studio-media-file-icon">▧</span>')+'<strong>'+escMedia(nameOf(a))+'</strong><small>'+escMedia(statusOf(a))+'</small></button>';
       }).join(''):'<p class="muted">No media in this location matching the filters.</p>';
-      gallery.querySelectorAll('[data-media-asset]').forEach(button=>button.onclick=()=>{
-        selectedAssetId=button.dataset.mediaAsset;const a=assets.find(x=>assetIdOf(x)===selectedAssetId);if(!a)return;
-        detail.hidden=false;detail.innerHTML='<h3>File Details</h3><strong>'+escMedia(nameOf(a))+'</strong><dl><dt>Status</dt><dd>'+escMedia(statusOf(a))+'</dd><dt>Collection</dt><dd>'+escMedia(a.collection||'Unclassified')+'</dd><dt>Subjects</dt><dd>'+escMedia((a.subjects||a.subjectIds||[]).map(x=>typeof x==='object'?x.name||x.id:x).join(', ')||'None')+'</dd><dt>Type</dt><dd>'+escMedia(a.contentType||a.mimeType||'Unknown')+'</dd></dl>';
-        renderGallery();
-      });
+      function showDetails(){
+        const a=shown.find(x=>assetIdOf(x)===selectedAssetId);
+        detail.innerHTML=a?'<h3>File Details</h3><strong>'+escMedia(nameOf(a))+'</strong><dl><dt>Status</dt><dd>'+escMedia(statusOf(a))+'</dd><dt>Collection</dt><dd>'+escMedia(a.collection||'Unclassified')+'</dd><dt>Subjects</dt><dd>'+escMedia((a.subjects||a.subjectIds||[]).map(x=>typeof x==='object'?x.name||x.id:x).join(', ')||'None')+'</dd><dt>Type</dt><dd>'+escMedia(a.contentType||a.mimeType||'Unknown')+'</dd></dl>':'<h3>File Details</h3><p class="muted">Select an image to see its details.</p>';
+        gallery.querySelectorAll('[data-media-asset]').forEach(button=>button.classList.toggle('selected',button.dataset.mediaAsset===selectedAssetId));
+      }
+      gallery.querySelectorAll('[data-media-asset]').forEach(button=>button.onclick=()=>{selectedAssetId=button.dataset.mediaAsset;showDetails();});
+      showDetails();
     }
+    root.querySelector('#studioMediaPrevious').onclick=()=>gallery.scrollBy({left:-Math.max(240,gallery.clientWidth*.8),behavior:'smooth'});
+    root.querySelector('#studioMediaNext').onclick=()=>gallery.scrollBy({left:Math.max(240,gallery.clientWidth*.8),behavior:'smooth'});
     fileSearch.oninput=renderGallery;statusFilter.onchange=()=>{activeTab='';root.querySelectorAll('[data-media-tab]').forEach(b=>b.classList.remove('active'));renderGallery();};
     sortControl.onchange=renderGallery;
     root.querySelectorAll('[data-media-tab]').forEach(b=>b.onclick=()=>{activeTab=b.dataset.mediaTab;statusFilter.value='';root.querySelectorAll('[data-media-tab]').forEach(x=>x.classList.toggle('active',x===b));renderGallery();});
