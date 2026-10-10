@@ -187,28 +187,28 @@
         footer.textContent = '';
     }
 
+    // All non-Today views use the same masthead and content frame as Today.
+    // The Today route is deliberately excluded from these structural changes.
     function syncPageFrame() {
         const view = document.body.dataset.studioView || currentView;
+        if (view === 'today') return;
         const main = shell?.querySelector('main');
-        if (!main) return;
-        let heading = document.getElementById('studioSharedPageHeading');
-        if (!heading) {
-            heading = document.createElement('header');
-            heading.id = 'studioSharedPageHeading';
-            heading.className = 'studio-shared-page-heading';
-            main.insertBefore(heading, main.firstChild);
+        const masthead = document.querySelector('.topbar');
+        const title = document.getElementById('studioTodayBrandTitle');
+        const bell = document.getElementById('notificationButton');
+        if (!main || !masthead || !bell) return;
+
+        // Retire the secondary page-heading row rather than hiding it with CSS.
+        document.getElementById('studioSharedPageHeading')?.remove();
+        if (breadcrumb && breadcrumb.nextElementSibling !== bell) {
+            masthead.insertBefore(breadcrumb, bell);
         }
-        heading.hidden = view === 'today';
-        if (heading.hidden) return;
-        const label = labelFor(view);
-        let title = heading.querySelector('h1');
-        if (!title) {
-            heading.innerHTML = '<div class="studio-shared-heading-copy"><span class="mw-today-focus-icon" aria-hidden="true">✦</span><div><h1></h1><p>Studio workspace</p></div></div><div class="studio-shared-heading-trail"></div>';
-            title = heading.querySelector('h1');
+        if (title) {
+            title.querySelector('strong')?.replaceChildren(document.createTextNode(labelFor(view)));
+            const tagline = title.querySelector('small');
+            if (tagline) tagline.textContent = 'Studio workspace';
         }
-        title.textContent = label;
-        const trail = heading.querySelector('.studio-shared-heading-trail');
-        if (breadcrumb && breadcrumb.parentElement !== trail) trail.appendChild(breadcrumb);
+        main.classList.add('studio-standard-main');
     }
 
     function initialize() {
