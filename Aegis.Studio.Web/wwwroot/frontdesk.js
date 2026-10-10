@@ -1,5 +1,8 @@
 let frontDeskJobs = [];
 let frontDeskRole = null;
+let frontDeskColumnFilters = {type:'',status:'',source:''};
+let frontDeskSort = {column:'',direction:1};
+
 
 async function loadFrontDeskRole() {
     try {
@@ -88,8 +91,33 @@ function renderFrontDesk(){
         ...enquiries.map(e=>({kind:'enquiry',id:e.id,created:e.createdAtUtc,name:e.contactName||'New inquiry',title:e.subject||'Inquiry',date:null,status:'New',source:e.channel||'Inquiry',conversationId:e.id})),
         ...frontDeskRequests.filter(Boolean).map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Customer',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:'Booking',request:x}))
     ].sort((a,b)=>new Date(b.created||0)-new Date(a.created||0));
-    const filtered=entries.filter(e=>(frontDeskTab==='today'||(frontDeskTab==='enquiries'&&e.kind==='enquiry')||(frontDeskTab==='requests'&&e.kind==='request'))&&[e.name,e.title,e.status,e.source].join(' ').toLowerCase().includes(frontDeskTerm.toLowerCase()));
-    const rows=filtered.map(e=>`<tr><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${esc(e.kind==='enquiry'?'Inquiry':'Booking')}</td><td>${esc(e.date||'—')}</td><td><span class="fd-status">${esc(e.status)}</span></td><td>${esc(e.source)}</td><td><button type="button" class="action" data-fd-open="${esc(e.id)}">Open</button></td></tr>`).join('');
+    const entryType=e=>e.kind==='enquiry'?'Inquiry':'Booking';
+    const valuesFor=key=>[...new Set(entries.map(e=>key==='type'?entryType(e):String(e[key]||'')))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+    const filtered=entries.filter(e=>
+        (frontDeskTab==='today'||(frontDeskTab==='enquiries'&&e.kind==='enquiry')||(frontDeskTab==='requests'&&e.kind==='request'))
+        &&[e.name,e.title,e.status,e.source].join(' ').toLowerCase().includes(frontDeskTerm.toLowerCase())
+        &&(!frontDeskColumnFilters.type||entryType(e)===frontDeskColumnFilters.type)
+        &&(!frontDeskColumnFilters.status||e.status===frontDeskColumnFilters.status)
+        &&(!frontDeskColumnFilters.source||e.source===frontDeskColumnFilters.source)
+    );
+    if(frontDeskSort.column){
+        const key=frontDeskSort.column;
+        filtered.sort((a,b)=>frontDeskSort.direction*String(key==='type'?entryType(a):a[key]||'').localeCompare(String(key==='type'?entryType(b):b[key]||''),undefined,{numeric:true}));
+    }
+    const pill=(value,category)=>{
+        const normalized=String(value||'').toLowerCase();
+        const tone=category==='status'
+            ?(/confirm|complete|approved|paid/.test(normalized)?'success':/pending|await|deposit/.test(normalized)?'warning':/cancel|reject|overdue/.test(normalized)?'danger':'info')
+            :category==='type'?(normalized==='booking'?'blue':'violet')
+            :(/web|online|website/.test(normalized)?'blue':/phone|call/.test(normalized)?'violet':/email/.test(normalized)?'teal':'neutral');
+        return '<span class="fd-data-pill fd-data-pill--'+tone+'">'+esc(value||'—')+'</span>';
+    };
+    const columnHead=(key,label)=>{
+        const options=valuesFor(key).map(value=>'<option value="'+esc(value)+'"'+(frontDeskColumnFilters[key]===value?' selected':'')+'>'+esc(value)+'</option>').join('');
+        const arrow=frontDeskSort.column===key?(frontDeskSort.direction===1?' ↑':' ↓'):' ↕';
+        return '<th class="fd-column-head"><div class="fd-column-controls"><button type="button" data-fd-sort="'+key+'" aria-label="Sort by '+label+'">'+label+arrow+'</button><select data-fd-filter="'+key+'" aria-label="Filter '+label+'"><option value="">All</option>'+options+'</select></div></th>';
+    };
+    const rows=filtered.map(e=>`<tr><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}</td><td>${pill(e.source,'source')}</td><td><button type="button" class="action" data-fd-open="${esc(e.id)}">Open</button></td></tr>`).join('');
     const metric=(label,count,note)=>`<div class="fd-metric"><span>${esc(label)}</span><strong>${count}</strong><small>${esc(note)}</small></div>`;
     genericView.innerHTML=`<div class="fd-page">
       
@@ -97,17 +125,25 @@ function renderFrontDesk(){
         
         <section class="op-card fd-queue"><header><h2>Incoming Bookings &amp; Inquiries</h2></header>
           <div class="fd-filters"><div class="fd-tabs">${tabs.map(([key,label])=>`<button class="${frontDeskTab===key?'active':''}" data-frontdesk-tab="${key}">${label}</button>`).join('')}</div><input id="frontDeskSearch" type="search" placeholder="Search customers or bookings…" value="${esc(frontDeskTerm)}"></div>
-          <div class="fd-table-scroll" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<table class="fd-table"><thead><tr><th>Date</th><th>Customer / Request</th><th>Type</th><th>Event Date</th><th>Status</th><th>Source</th><th>Actions</th></tr></thead><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table>`:'<div id="frontDeskJobList"></div>'}</div>
+          <div class="fd-table-scroll" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<table class="fd-table"><thead><tr><th>Date</th><th>Customer / Request</th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}<th>Actions</th></tr></thead><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table>`:'<div id="frontDeskJobList"></div>'}</div>
           </section>
         <div class="fd-metrics">${metric('New Inquiries',enquiries.length,'Awaiting response')}${metric('Pending Deposits',due.length,'Awaiting payment')}${metric('Needs Confirmation',pending.length,'Review and confirm')}${metric('Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
       </div><div class="fd-secondary">
-        <section class="op-card fd-actions"><header><h2>Quick Actions</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-new-client>＋ New Customer</button><button data-find-client>Find Customer</button><button data-take-payment>Take Payment</button><button data-new-sale>New Sale</button><button data-pickups>Pickup / Delivery</button></div></section>
+        <section class="op-card fd-actions"><header><h2>Front Desk Services</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-new-client>＋ New Customer</button><button data-find-client>Find Customer</button><button data-take-payment>Take Payment</button><button data-new-sale>New Sale</button><button data-pickups>Pickup / Delivery</button></div></section>
         <section class="op-card fd-schedule"><header><h2>Today's Schedule</h2><button data-calendar>View Calendar →</button></header><div class="fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="fd-session"><time>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</time><span><strong>${esc(s.title)}</strong><small>${esc(s.location||s.status||'')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
         <section class="op-card fd-messages"><header><h2>Recent Inquiries</h2><button data-inquiries>View All →</button></header><div class="fd-message-list">${enquiries.slice(0,5).map(e=>`<button data-fd-enquiry="${esc(e.id)}"><strong>${esc(e.contactName||'Customer')}</strong><small>${esc(e.subject||'New inquiry')}</small></button>`).join('')||'<p class="muted">No new inquiries.</p>'}</div></section>
       </div></div></div>`;
     // The shared shell footer owns the visible filtered row count.
     const shellCount=document.getElementById('studioFooterRate');
     if(shellCount) shellCount.textContent=filtered.length+' '+(filtered.length===1?'row':'rows');
+    genericView.querySelectorAll('[data-fd-filter]').forEach(select=>select.onchange=()=>{
+        frontDeskColumnFilters[select.dataset.fdFilter]=select.value;renderFrontDesk();
+    });
+    genericView.querySelectorAll('[data-fd-sort]').forEach(button=>button.onclick=()=>{
+        const column=button.dataset.fdSort;
+        frontDeskSort=frontDeskSort.column===column?{column,direction:-frontDeskSort.direction}:{column,direction:1};
+        renderFrontDesk();
+    });
     const newBooking=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
     genericView.querySelectorAll('[data-new-booking]').forEach(b=>b.onclick=newBooking);
     genericView.querySelectorAll('[data-new-client]').forEach(b=>b.onclick=async()=>{await showFrontDeskClients();document.querySelector('dialog[open] [data-new]')?.click();});
