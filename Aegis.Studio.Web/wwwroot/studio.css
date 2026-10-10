@@ -3143,7 +3143,7 @@ body[data-studio-view] .avatar{
 }
 
 /* Department-specific accent edges. */
-body[data-studio-view="frontdesk"] .op-card:first-child{box-shadow:inset 4px 0 0 #9b6238,0 8px 24px rgba(57,38,24,.035)}
+body[data-studio-view="frontdesk"] .op-card:first-child{box-shadow:0 8px 24px rgba(57,38,24,.035)}
 body[data-studio-view="frontdesk"] .op-card:nth-child(2){box-shadow:inset 4px 0 0 #2e8f8b,0 8px 24px rgba(57,38,24,.035)}
 body[data-studio-view="frontdesk"] .op-card:nth-child(3){box-shadow:inset 4px 0 0 #d59a47,0 8px 24px rgba(57,38,24,.035)}
 body[data-studio-view="production"] .production-queue-card{box-shadow:inset 4px 0 0 #6d58a8,0 8px 24px rgba(57,38,24,.035)}
