@@ -8247,3 +8247,30 @@ body .topbar #studioBreadcrumb .breadcrumb-label::after{
  background:none!important;box-shadow:none!important;
  color:#efc36b!important;font-size:19px!important;line-height:1!important;
 }
+
+/* Shared left-rail card structure: identical geometry on every Studio page.
+   The same three cards are rendered by studio-shell-nav.js for every route. */
+body .shell>.studio-context-rail{
+ display:grid!important;
+ grid-template-columns:minmax(0,1fr)!important;
+ grid-template-rows:repeat(3,minmax(0,1fr))!important;
+ align-content:stretch!important;align-items:stretch!important;
+ gap:7px!important;min-width:0;min-height:0;
+ overflow:hidden!important;padding:7px 0 6px!important;
+}
+body .shell>.studio-context-rail>.studio-context-card{
+ display:flex!important;flex-direction:column!important;
+ flex:initial!important;height:100%!important;min-height:0!important;
+ max-height:100%!important;min-width:0;
+ margin:0!important;overflow:hidden!important;box-sizing:border-box;
+}
+body .shell>.studio-context-rail>.studio-context-card>header{
+ flex:0 0 auto;min-height:30px!important;
+ padding:3px 8px!important;
+}
+body .shell>.studio-context-rail>.studio-context-card>.mw-today-rail-links{
+ flex:1 1 auto;min-height:0;overflow-y:auto;align-content:start;
+}
+@media(max-height:650px){
+ body .shell>.studio-context-rail{overflow-y:auto!important}
+}
