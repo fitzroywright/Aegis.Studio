@@ -8274,3 +8274,15 @@ body .shell>.studio-context-rail>.studio-context-card>.mw-today-rail-links{
 @media(max-height:650px){
  body .shell>.studio-context-rail{overflow-y:auto!important}
 }
+
+/* Front Desk: bookings grid first, compact metric cards beneath it. */
+body[data-studio-view="frontdesk"] .fd-main{display:flex;flex-direction:column;min-height:0}
+body[data-studio-view="frontdesk"] .fd-main>.fd-queue{
+ order:0;flex:1 1 auto;min-height:0;overflow:hidden;
+}
+body[data-studio-view="frontdesk"] .fd-main>.fd-metrics{
+ order:1;flex:0 0 auto;min-height:0;margin:0;
+}
+body[data-studio-view="frontdesk"] .fd-queue>.fd-table-scroll{
+ flex:1 1 auto;min-height:0;overflow-y:auto;
+}
