@@ -24,6 +24,7 @@
     let inboxFilter = '';
     let inboxQuery = '';
     let inboxSelection = null;
+    let inboxLastLoad = 0;
     const inboxDate = value => value ? new Date(value).toLocaleString() : '—';
     const inboxSubject = message => String(message.subject || message.title || String(message.body || '').split('\\n')[0] || '(No subject)').slice(0,110);
     const inboxJob = thread => thread.scopeType === 'Job' ? (thread.title || thread.scopeId || 'Job') : '—';
@@ -71,6 +72,7 @@
                 }
             });
             await Promise.all(workers);
+            inboxLastLoad=Date.now();
             inboxRows=results.filter(x=>x.message).sort((a,b)=>new Date(b.message.createdAtUtc||0)-new Date(a.message.createdAtUtc||0));
             renderInboxFilters();renderInbox();handleUnreadChanges(threads);
         }catch(error){body.innerHTML='<tr><td colspan="5">'+esc(error.message||'Unable to load messages.')+'</td></tr>';}
@@ -425,7 +427,7 @@
         try {
             const messagesButton = document.querySelector('[data-view="messages"]');
             if (messagesButton?.classList.contains('active')) {
-                if(document.getElementById('studioInboxRows'))await loadInbox(false);else await loadThreads();
+                if(document.getElementById('studioInboxRows')){if(Date.now()-inboxLastLoad>30000)await loadInbox(false);}else await loadThreads();
                 if (selectedThread) await refreshSelectedThread(false);
             } else {
                 const threads = await json('/api/messages/threads');
