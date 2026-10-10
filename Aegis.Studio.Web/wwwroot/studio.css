@@ -8432,3 +8432,21 @@ body[data-studio-view="frontdesk"] .fd-queue .fd-table .action[data-fd-open]{
 body[data-studio-view="frontdesk"] .fd-queue .fd-table .action[data-fd-open]:hover{
  color:var(--text,#243247);background:var(--surface-muted,#f5f6f8);
 }
+
+/* Selected Front Desk metric cards: warm halo and restrained gold trim. */
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active{
+ position:relative;
+ border:1px solid #b88a38;
+ background:linear-gradient(180deg,#fffdf7 0%,#fff8e9 100%);
+ box-shadow:0 0 0 2px rgba(196,151,62,.22),0 0 16px 3px rgba(211,166,76,.25),0 5px 14px rgba(93,64,23,.12);
+ transform:translateY(-1px);
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active:hover,
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active:focus-visible{
+ background:linear-gradient(180deg,#fffdf7 0%,#fff5df 100%);
+ box-shadow:0 0 0 2px rgba(196,151,62,.32),0 0 20px 4px rgba(211,166,76,.32),0 6px 16px rgba(93,64,23,.15);
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active strong{color:#875d18}
+@media(prefers-reduced-motion:reduce){
+ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active{transform:none}
+}
