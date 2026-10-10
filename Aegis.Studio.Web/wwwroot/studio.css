@@ -8079,7 +8079,6 @@ body[data-studio-view="today"] .studio-today-brand-title{display:flex;align-item
 .studio-today-brand-title strong{font-size:19px;line-height:1.15;color:#fff}
 .studio-today-brand-title em{font-style:normal;font-size:11px;font-weight:600;color:#f0c77b;margin-left:6px}
 .studio-today-brand-title small{font-size:10px;color:#e4ecf7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}
-body[data-studio-view="today"] .mw-today-heading{display:none!important}
 body[data-studio-view="today"] .topbar #studioBreadcrumb{margin-left:auto!important;margin-right:8px!important;display:flex!important;align-items:center;justify-content:flex-end;gap:6px;min-width:0;max-width:34vw;overflow:hidden}
 body[data-studio-view="today"] .topbar #studioBreadcrumb .breadcrumb-label{color:#efc36b!important;font-weight:800!important}
 body[data-studio-view="today"] .topbar #studioBreadcrumb .breadcrumb-label::after{content:"›"!important;background:none!important;border:0!important;width:auto!important;height:auto!important;font-size:19px!important;margin:0 8px!important;color:#efc36b!important}
