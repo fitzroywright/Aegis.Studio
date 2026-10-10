@@ -77,24 +77,24 @@
         rail.innerHTML = `
 
             <section class="mw-list-panel studio-context-card">
-                <header><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2></header>
-                <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
-            </section>
-            <section class="mw-list-panel studio-context-card">
-                <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
-                <div class="mw-today-rail-links">
-                    <button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>
-                </div>
-            </section>
-            <section class="mw-list-panel studio-context-card">
-                <header><h2><span class="studio-card-icon" aria-hidden="true">↗</span> Quick Links</h2></header>
+                <header><h2><span class="studio-card-icon" aria-hidden="true">↗</span> Navigation</h2></header>
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="workspaces"><span>▰</span><span>Workspaces</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
                 </div>
-            </section>`;
+            </section>            <section class="mw-list-panel studio-context-card">
+                <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
+                <div class="mw-today-rail-links">
+                    <button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>
+                </div>
+            </section>
+            <section class="mw-list-panel studio-context-card">
+                <header><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2></header>
+                <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
+            </section>
+`;
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
             button.onclick = () => window.studioNavigate?.(button.dataset.studioSide);
         });
