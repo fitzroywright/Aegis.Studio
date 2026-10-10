@@ -2,7 +2,7 @@
 const fs=require('fs');
 const path=require('path');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-const scripts=['job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','workspace-outlook.js','studio-shell-nav.js'];
+const scripts=['job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
 function setup(w){
  const jobs=[{id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Wedding selects review',clientName:'Williams & Clarke',status:'Awaiting Production Review',eventDate:'2026-10-11'},{id:'job2',workspaceId:'workspace',conversationId:'conversation2',title:'Graduation portraits',clientName:'School',status:'Awaiting Scheduling'}];
  const calls=[],alerts=[];
@@ -19,7 +19,7 @@ function setup(w){
   if(base==='/api/jobs/job'||base==='/api/jobs/job2')return jobs.find(j=>base.endsWith('/'+j.id));
   if(base.endsWith('/connected-workflow'))return workflow(jobs.find(j=>base.includes('/'+j.id+'/'))||jobs[0]);
   if(base.endsWith('/subjects')){if(fixture.delaySubjects)await fixture.delaySubjects;if(fixture.failSubjects)throw new Error('Subjects unavailable');return subjects;}
-  if(base.endsWith('/media')){const q=new URL(url,'https://studio.test').searchParams;const filtered=q.get('subjectId')?assets.filter(a=>a.subjects.includes(q.get('subjectId'))):assets;return {assets:filtered,subjects,unmatched:[],collections:['Selections'],gallery:{default_lens:'Auto'},totalAssets:filtered.length,totalSubjects:1};}
+  if(base.endsWith('/media')){const q=new URL(url,'https://studio.test').searchParams;const filtered=assets.filter(a=>(!q.get('subjectId')||a.subjects.includes(q.get('subjectId')))&&(!q.get('collection')||a.collection===q.get('collection'))).sort((a,b)=>a.id.localeCompare(b.id));const matching=filtered.filter(a=>!q.get('after')||a.id>q.get('after'));const limit=Number(q.get('limit')||100);return {assets:matching.slice(0,limit),subjects,unmatched:[],collections:['Selections'],collectionCounts:{Selections:40},gallery:{default_lens:'Auto'},totalAssets:filtered.length,totalSubjects:1,hasMore:matching.length>limit};}
   if(base.endsWith('/access'))return {permissions:{editJob:fixture.canEdit,manageProduction:fixture.canEdit}};
   if(url.includes('/threads/Job/'))return {id:'thread'};
   if(base==='/api/auth/me')return {user:{userName:'studio.admin',displayName:'Studio Admin'}};

@@ -61,14 +61,14 @@ test('workspace job keeps Media dominant with working replies and dedicated pane
  Object.assign(w,{showWorkspaces:async()=>{},workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
  for(const id of ['conversationList','detailPane','workspaceTitle'])w[id]=w.document.getElementById(id);
  w.fetch=async url=>({ok:true,json:async()=>url.endsWith('/sending-identities')?{identities:[{type:'Workspace'},{type:'Self',isDefault:true}]}:{channel:'Email',messages:[]}});
- w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.endsWith('/media')?{assets:[],subjects:[],unmatched:[],gallery:{default_lens:'Auto'}}:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
+ w.json=async url=>url==='/api/jobs'?[job]:url==='/api/jobs/job'?job:url.split('?')[0].endsWith('/media')?{assets:[],subjects:[],collections:[],unmatched:[],totalAssets:0,gallery:{default_lens:'Auto'}}:url.includes('/threads/Job/')?{id:'thread'}:url==='/api/auth/me'?{user:{userName:'staff',displayName:'Staff'}}:url.endsWith('/access')?{permissions:{}}:[];
  w.eval(fs.readFileSync(path.join(root,'auth.js'),'utf8'));
  w.money=n=>'JMD '+n;w.eval(fs.readFileSync(path.join(root,'management.js'),'utf8'));
- w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
+ w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'media-production.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'job-details.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8'));
  await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,10));
  assert.equal(w.document.querySelector('#jobInternalNote'),null);
  assert.equal(w.document.querySelector('#jobSendingIdentity').value,'Workspace');
- assert.equal(w.document.querySelector('#hierarchyCompose button').textContent,'Reply');
+ assert.equal(w.document.querySelector('#hierarchyCompose button').textContent,'Send Message');
  const requests=[];const originalJson=w.json;w.json=async(url,options)=>{if(options?.body)requests.push({url,body:JSON.parse(options.body)});return originalJson(url,options);};
  for(const mode of ['Workspace','Internal','Self']) {
    const form=w.document.querySelector('#hierarchyCompose');const sender=w.document.querySelector('#jobSendingIdentity');sender.value=mode;sender.onchange();form.querySelector('textarea').value='Test reply';
@@ -80,13 +80,13 @@ test('workspace job keeps Media dominant with working replies and dedicated pane
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
  assert.equal(w.messageFirstName('fwright',[],'Team member',true),'fwright');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'fwright');
- assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.dataset.jobScroll),['media','overview','subjects','tasks','messages','activity']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.dataset.jobScroll),['media','overview','subjects','tasks','activity']);
  assert.equal(w.document.querySelector('.detail-header .activity-button'),null);
  assert.equal(w.document.querySelector('[data-job-scroll=activity]')?.dataset.jobScroll,'activity');
  assert.ok(w.document.querySelector('.job-detail-board'));
- await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-detail-right .job-detail-message-card'));assert.ok(w.document.querySelector('[aria-label="Filter media by collection"]'));assert.ok(w.document.querySelector('.job-detail-actions'));assert.equal(w.document.querySelector('.job-context-sidebar'),null);assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
+ await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-detail-right .job-detail-message-card'));assert.ok(w.document.querySelector('[aria-label="Filter media by collection"]'));assert.ok(w.document.querySelector('.jd-attention'));assert.equal(w.document.querySelector('.job-context-sidebar'),null);assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
  assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
- assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Job Lead: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
+ assert.equal(w.document.querySelector('details.job-details-card'),null);assert.equal(w.document.querySelector('[data-job="job"]'),null);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
 test('current shell keeps obsolete left navigation removed',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');

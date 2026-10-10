@@ -8,7 +8,7 @@ test('Today job opens with working reply and Subjects controls in their final co
  assert.equal(fixture.alerts.length,0);assert.ok(w.document.querySelector('.job-detail-page'));
  assert.equal(typeof w.document.querySelector('#hierarchyCompose').onsubmit,'function');
  assert.match(w.document.querySelector('#studioTodayBrandTitle strong').textContent,/Job Details/);
- assert.equal(w.document.querySelector('#studioFooterRate').textContent,'1 Job');
+ assert.equal(w.document.querySelector('#studioFooterRate').textContent,'40 files · 1 subject');
  await button(w,'subjects').onclick();
  const subjects=w.document.querySelector('#jobDetail-subjects');assert.equal(subjects.hidden,false);assert.match(subjects.textContent,/Morgan/);
  const add=subjects.querySelector('[data-job-add-subject]');assert.equal(add.hidden,false);add.click();assert.equal(subjects.querySelector('form').hidden,false);
@@ -23,7 +23,7 @@ test('Details, Tasks and Activity render their own visible panels',async t=>{
   await button(w,name).onclick();const panel=w.document.getElementById('jobDetail-'+name);assert.equal(panel.hidden,false);assert.match(panel.textContent,new RegExp(text));
   assert.equal(w.document.querySelectorAll('.job-detail-center > section:not([hidden])').length,1);
  }
- await button(w,'messages').onclick();assert.equal(w.document.activeElement.id,'hierarchyBody');
+ w.document.querySelector('[data-message-more]').click();assert.equal(w.document.activeElement.id,'hierarchyBody');
 });
 test('Subjects load errors stay visible and Retry restores the panel',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');fixture.failSubjects=true;
@@ -43,7 +43,7 @@ test('stale Subjects response cannot overwrite a subsequently opened job',async 
 });
 test('compact workflow opens full assignment controls without clipping the page',async t=>{
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
- assert.match(w.document.querySelector('.job-detail-flow').textContent,/Job Owner: studio/);
+ assert.match(w.document.querySelector('[data-job-owner]').textContent,/Owner: studio/);
  await w.document.querySelector('[data-job-workflow]').onclick();
  const dialog=w.document.querySelector('.job-detail-workflow-dialog');assert.ok(dialog.open);assert.ok(dialog.querySelector('[data-wf-session]'));assert.ok(dialog.querySelector('[data-wf-owner]'));
  dialog.close();await settle();assert.equal(w.document.querySelector('.job-detail-workflow-dialog'),null);
@@ -98,4 +98,70 @@ test('leaving Job Details while loading does not replace the destination page',a
  const opening=w.openWorkspaceJob('job');w.document.body.dataset.studioView='today';w.document.getElementById('conversationView').classList.add('hidden');
  release();await opening;
  assert.equal(w.document.body.dataset.studioView,'today');assert.equal(w.document.querySelector('#hierarchyCompose'),null);
+});
+test('approved layout uses twelve photos, real collection counts and cursor paging',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
+ assert.equal(w.document.querySelectorAll('.jd-photo').length,12);
+ assert.match(w.document.querySelector('.jd-gallery-footer').textContent,/1–12 of 40/);
+ const first=w.document.querySelector('.jd-photo').dataset.jdAsset;
+ await w.document.querySelector('[data-next]').onclick();assert.match(w.document.querySelector('.jd-gallery-footer').textContent,/13–24 of 40/);
+ assert.notEqual(w.document.querySelector('.jd-photo').dataset.jdAsset,first);
+ await w.document.querySelector('[data-previous]').onclick();assert.equal(w.document.querySelector('.jd-photo').dataset.jdAsset,first);
+ assert.ok(fixture.calls.some(c=>c.url.includes('after=')));
+ await w.document.querySelector('[data-filter=Unclassified]').onclick();assert.equal(w.document.querySelectorAll('.jd-photo').length,0);
+ assert.match(w.document.querySelector('#studioFooterRate').textContent,/40 files/);
+});
+test('Selected File saves collection and subjects while preserving production metadata',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
+ const selected=w.document.querySelector('.jd-photo');selected.click();
+ const form=w.document.querySelector('.jd-file-form');form.elements.collection.value='Unclassified';
+ await form.onsubmit({preventDefault(){},currentTarget:form});
+ const write=fixture.calls.find(c=>c.url.includes('/media/assets/')&&c.options?.method==='PUT');assert.ok(write);
+ const body=JSON.parse(write.options.body);assert.equal(body.collection,'Unclassified');assert.deepEqual(body.subjects,['person']);assert.equal(body.status,'Ready');
+});
+test('Job Details left rail owns actions and respects media edit permissions',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
+ assert.deepEqual(Array.from(w.document.querySelectorAll('.jd-rail-card h2'),el=>el.textContent),['Navigation','My Workspaces','Actions']);
+ assert.equal(w.document.querySelector('[data-job-action=subject]').disabled,false);
+ w.document.querySelector('[data-job-action=subject]').click();await settle();
+ assert.equal(w.document.querySelector('#jobDetail-subjects').hidden,false);assert.equal(w.document.querySelector('#jobDetail-subjects form').hidden,false);
+ fixture.canEdit=false;await w.openWorkspaceJob('job2');await settle();
+ assert.equal(w.document.querySelector('[data-job-action=upload]').disabled,true);assert.equal(w.document.querySelector('.jd-file-form button'),null);
+});
+test('gallery search and list controls operate on the displayed page',async t=>{
+ const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
+ const search=w.document.querySelector('[data-media-search]');search.value='Photo 10';search.oninput({target:search});
+ assert.equal(w.document.querySelectorAll('.jd-photo').length,1);
+ w.document.querySelector('[data-list]').click();assert.equal(w.document.querySelector('.jd-contact-sheet').classList.contains('list'),true);
+ w.document.querySelector('[data-grid]').click();assert.equal(w.document.querySelector('.jd-contact-sheet').classList.contains('list'),false);
+});
+test('workflow ribbon reflects current stage, corrections and cancellation',async t=>{
+ const {w}=environment(t);const host=w.document.createElement('div');
+ for(const [stage,correctionKind,index] of [['Pending',null,0],['Active Production',null,3],['Awaiting Approval',null,4],['Changes Requested','Source',2],['Changes Requested','Production',3]]){
+  w.StudioJobDetails.workflow(host,{stage,correctionKind});assert.equal(Array.from(host.children).indexOf(host.querySelector('.current')),index);
+ }
+ w.StudioJobDetails.workflow(host,{stage:'Cancelled'});assert.equal(host.querySelectorAll('.complete,.current').length,0);
+ w.StudioJobDetails.workflow(host,{stage:'Completed'});assert.equal(host.querySelectorAll('.complete').length,6);
+});
+test('upload selection queues files immediately into the current collection',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
+ await w.document.querySelector('[data-filter=Selections]').onclick();
+ const input=w.document.querySelector('[data-files]');Object.defineProperty(input,'files',{value:[new w.File(['image'],'photo.jpg',{type:'image/jpeg'})]});
+ await input.onchange();const upload=fixture.calls.find(c=>c.url.endsWith('/media/uploads'));assert.ok(upload);assert.equal(upload.options.body.get('collection'),'Selections');
+ assert.match(w.document.querySelector('[data-media-result]').textContent,/1 files uploaded/);
+});
+test('late media responses cannot overwrite a newer job or file inspector',async t=>{
+ const {w}=environment(t);const original=w.json;let release;const delay=new Promise(r=>release=r);
+ w.json=async(url,options)=>{if(url.startsWith('/api/jobs/job/media?'))await delay;return original(url,options);};
+ await w.openWorkspaceJob('job');await w.openWorkspaceJob('job2');await settle();release();await settle();
+ assert.match(w.document.querySelector('.job-detail-title h1').textContent,/Graduation portraits/);
+ assert.match(w.document.querySelector('.jd-selected-preview img').src,/jobs\/job2\/versions/);
+});
+test('preview failures show a recovery state and use the preview retry API',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
+ const img=w.document.querySelector('.jd-selected-preview img');img.onerror();
+ assert.equal(img.hidden,true);assert.equal(img.nextElementSibling.hidden,false);
+ await w.document.querySelector('[data-retry-preview]').onclick();
+ assert.ok(fixture.calls.some(c=>c.url.endsWith('/preview/retry')&&c.options.method==='POST'));
+ assert.equal(w.document.querySelector('[data-retry-preview]').textContent,'Preview queued');
 });

@@ -125,7 +125,7 @@ async function renderJobSubjects(job, panel, current, refresh) {
     if(rosterButton)rosterButton.onclick=async()=>{
         if(panel.studioOpenMedia)await panel.studioOpenMedia();
         else document.querySelector('[data-job-tab="gallery"]')?.click();
-        document.querySelector('[data-roster]')?.click();
+        if(panel.studioImportRoster)await panel.studioImportRoster();else document.querySelector('[data-roster]')?.click();
     };
 
     form.onsubmit=async event=>{

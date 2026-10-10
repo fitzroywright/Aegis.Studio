@@ -542,7 +542,7 @@ dialog::backdrop {
   min-height:0;
   overflow:hidden
 }
-.job-center-panel>div:not(.gallery-tab-filter):not(.media-toolbar-host) {
+.job-center-panel>div {
   min-height:0;
   overflow:auto;
   padding:0 12px 10px
@@ -708,20 +708,6 @@ dialog::backdrop {
 }
 .media-focused {
   outline:2px solid #1677ff
-}
-.media-toolbar-host {
-  display:flex;
-  gap:5px
-}
-.media-toolbar-host button {
-  font-size:10px;
-  padding:5px
-}
-.gallery-tab-filter {
-  display:flex;
-  gap:5px;
-  padding:0 12px 8px;
-  font-size:11px
 }
 .media-controls {
   display:flex;
@@ -7809,6 +7795,7 @@ body .topbar #studioBreadcrumb .breadcrumb-label{
   color:#d8aa52!important;
   font-weight:800;
   display:inline-flex;
+  flex-shrink:0;
   align-items:center;
   white-space:nowrap;
 }
@@ -7968,7 +7955,7 @@ body:not([data-studio-view="today"]) .topbar #studioBreadcrumb .breadcrumb-label
  content:"›";display:inline-block;margin:0 8px;color:#efc36b;font-size:19px;
 }
 body:not([data-studio-view="today"]) .topbar #studioBreadcrumb button,
-body:not([data-studio-view="today"]) .topbar #studioBreadcrumb strong{color:#fff}
+body:not([data-studio-view="today"]) .topbar #studioBreadcrumb strong{color:#fff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body:not([data-studio-view="today"]) .shell>main{
  display:flex;flex-direction:column;min-height:0;overflow:hidden;
 }

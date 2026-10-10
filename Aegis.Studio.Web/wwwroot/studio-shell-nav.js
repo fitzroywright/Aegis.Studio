@@ -76,6 +76,22 @@
             .filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false)
             .map(workspace => '<button type="button" data-studio-workspace-id="' + escText(workspace.id) + '"><span>▣</span><span>' + escText(workspace.name) + '</span></button>')
             .join('');
+        const jobPage=document.querySelector('#conversationView.has-open-job .job-detail-page');
+        if(jobPage){
+            const navigation=[['today','Today','⌂'],['frontdesk','Front Desk','▣'],['jobs','Jobs','▥'],['media','Media','▧'],['messages','Messages','✉']];
+            const actions=[['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready']];
+            const card=(title,body)=>'<section class="jd-rail-card"><header><h2>'+title+'</h2></header><div class="jd-rail-links">'+body+'</div></section>';
+            rail.innerHTML=card('Navigation',navigation.map(([view,title,icon])=>'<button type="button" data-studio-side="'+view+'"><span>'+icon+'</span><span>'+title+'</span></button>').join(''))+
+                card('My Workspaces',workspaceItems||'<p class="mw-empty">No workspaces available.</p>')+
+                card('Actions',actions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''));
+            rail.querySelectorAll('[data-studio-side]').forEach(button=>button.onclick=()=>window.studioNavigate?.(button.dataset.studioSide));
+            rail.querySelectorAll('[data-job-action]').forEach(button=>button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
+            rail.querySelectorAll('[data-studio-workspace-id]').forEach(button=>{
+                button.classList.toggle('active',typeof selectedWorkspace!=='undefined'&&String(selectedWorkspace)===button.dataset.studioWorkspaceId);
+                button.onclick=()=>{const workspace=workspaces.find(item=>String(item.id)===button.dataset.studioWorkspaceId);return selectWorkspace(button.dataset.studioWorkspaceId,workspace?.name||'Workspace');};
+            });
+            return;
+        }
         rail.innerHTML = `
 
             <section class="mw-list-panel studio-context-card">
@@ -169,7 +185,7 @@
     function syncGridFooterCount() {
         const view = document.body.dataset.studioView || currentView;
         if (view === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page')) {
-            const count=document.getElementById('studioFooterRate');if(count)count.textContent='1 Job';return;
+            const count=document.getElementById('studioFooterRate'),page=document.querySelector('.job-detail-page');if(count)count.textContent=page.dataset.mediaCount!==undefined?page.dataset.mediaCount+' files · '+page.dataset.subjectCount+(page.dataset.subjectCount==='1'?' subject':' subjects'):'1 Job';return;
         }
         if (view === 'today' || view === 'jobs' || view === 'frontdesk') return;
         const footer = document.getElementById('studioFooterRate');
@@ -203,6 +219,7 @@
         if (view === 'today') {
             const title = document.getElementById('studioTodayBrandTitle');
             if (title) {
+                const icon=title.querySelector('.mw-today-focus-icon');if(icon)icon.textContent='✦';
                 const heading = title.querySelector('strong');
                 if (heading) heading.innerHTML = 'Today <em>Your focus</em>';
                 const tagline = title.querySelector('small');
@@ -225,8 +242,9 @@
             const jobOpen=view==='workspaces' && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
             title.querySelector('strong')?.replaceChildren(document.createTextNode(jobOpen?'Job Details':labelFor(view)));
             title.setAttribute('aria-label',jobOpen?'Job Details':labelFor(view));
+            const icon=title.querySelector('.mw-today-focus-icon');if(icon)icon.innerHTML=jobOpen?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="13" r="4"/></svg>':'✦';
             const tagline = title.querySelector('small');
-            if (tagline) tagline.textContent = view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : 'Studio workspace';
+            if (tagline) tagline.textContent = jobOpen?'Media, workflow and conversations':view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : 'Studio workspace';
         }
         main.classList.add('studio-standard-main');
     }
