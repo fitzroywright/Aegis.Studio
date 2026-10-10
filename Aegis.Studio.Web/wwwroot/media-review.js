@@ -33,12 +33,12 @@
             <button type="button" class="studio-media-carousel-arrow" id="studioMediaNext" aria-label="Next images">›</button>
           </div>
           <aside class="studio-media-detail" id="studioMediaDetail"><h3>File Details</h3><p class="muted">Select an image to see its details.</p></aside>
-        </div></section><section class="studio-media-panel studio-media-upload"><header class="studio-media-upload-heading"><h2>Upload Files</h2><button class="primary" id="studioMediaUpload" type="button" disabled>Upload Selected Files</button></header>
+        </div></section><section class="studio-media-panel studio-media-upload">
         <div class="studio-media-drop" id="studioMediaDrop" tabindex="0"><span aria-hidden="true">⇧</span><strong>Drag files here to upload</strong><p>Or choose images and other media from your device</p><button type="button" class="primary" id="studioMediaChoose">Choose Files</button><input type="file" id="studioMediaFiles" multiple hidden></div>
         <div class="studio-media-upload-actions"><span id="studioMediaProgress" role="status" aria-live="polite"></span></div>
       </section>
       </div></div></div>`;
-    const root=genericView.querySelector('.studio-media-page'),job=root.querySelector('#studioMediaJob'),collection=root.querySelector('#studioMediaCollection'),subject=root.querySelector('#studioMediaSubject'),files=root.querySelector('#studioMediaFiles'),upload=root.querySelector('#studioMediaUpload'),progress=root.querySelector('#studioMediaProgress'),gallery=root.querySelector('#studioMediaGallery'),count=root.querySelector('#studioMediaCount'),notice=root.querySelector('#studioMediaDestinationNotice');
+    const root=genericView.querySelector('.studio-media-page'),job=root.querySelector('#studioMediaJob'),collection=root.querySelector('#studioMediaCollection'),subject=root.querySelector('#studioMediaSubject'),files=root.querySelector('#studioMediaFiles'),progress=root.querySelector('#studioMediaProgress'),gallery=root.querySelector('#studioMediaGallery'),count=root.querySelector('#studioMediaCount'),notice=root.querySelector('#studioMediaDestinationNotice');
     const search=root.querySelector('#studioMediaJobSearch'),matches=root.querySelector('#studioMediaJobMatches'),tree=root.querySelector('#studioMediaTree'),path=root.querySelector('#studioMediaPath');
     const workspaceNames=new Map(workspaces.map(w=>[String(w.id),w.name||w.title||'Workspace']));
     const describe=j=>[j.jobNumber||j.reference||'',j.title||j.name||'Job',j.clientName||j.customerName||''].filter(Boolean).join(' · ');
@@ -103,15 +103,26 @@
     function sync(){
       const allowed=/^[jcs]:/.test(selection);
       notice.textContent=allowed?'Uploads will be tagged to the selected Job, Collection and optional Subject.':'Legacy and Scratch Space require server-side storage before uploads can be enabled.';
-      upload.disabled=!allowed||!job.value||!selectedFiles.length;
+      drop.setAttribute('aria-disabled',String(!allowed||!job.value));
       root.querySelector('#studioMediaOpenJob').disabled=!job.value;
     }
     root.querySelector('#studioMediaChoose').onclick=()=>files.click();
     const drop=root.querySelector('#studioMediaDrop');
-    drop.addEventListener('dragover',event=>{event.preventDefault();drop.classList.add('drag-over')});
+    let uploading=false;
+    async function acceptFiles(incoming){
+      if(uploading){progress.textContent='An upload is already in progress. Please wait.';return;}
+      if(!job.value||!/^[jcs]:/.test(selection)){
+        progress.textContent='Select a Job, Collection or Subject before uploading.';
+        files.value='';return;
+      }
+      selectedFiles=Array.from(incoming||[]);
+      if(!selectedFiles.length)return;
+      await uploadFiles();
+    }
+    drop.addEventListener('dragover',event=>{event.preventDefault();if(!uploading)drop.classList.add('drag-over')});
     drop.addEventListener('dragleave',()=>drop.classList.remove('drag-over'));
-    drop.addEventListener('drop',event=>{event.preventDefault();drop.classList.remove('drag-over');selectedFiles=Array.from(event.dataTransfer.files);progress.textContent=selectedFiles.length+' files ready to upload.';sync()});
-    files.onchange=()=>{selectedFiles=Array.from(files.files);progress.textContent=selectedFiles.length+' files ready to upload.';sync()};
+    drop.addEventListener('drop',event=>{event.preventDefault();drop.classList.remove('drag-over');void acceptFiles(event.dataTransfer?.files)});
+    files.onchange=()=>{void acceptFiles(files.files)};
     const fileSearch=root.querySelector('#studioMediaFileSearch'),statusFilter=root.querySelector('#studioMediaStatus'),sortControl=root.querySelector('#studioMediaSort'),detail=root.querySelector('#studioMediaDetail');
     const statusOf=a=>String(a.productionStatus||a.status||'Needs Review');
     const nameOf=a=>String(a.fileName||a.assetKey||'Media file');
@@ -171,22 +182,24 @@
     };
 
     subject.onchange=()=>{const selected=subject.selectedOptions[0];if(selected?.dataset.collection)collection.value=selected.dataset.collection};
-    upload.onclick=async()=>{
-      if(!job.value||!selectedFiles.length||upload.disabled)return;
-      upload.disabled=true;const jobId=job.value,chosenCollection=collection.value,chosenSubject=subject.value;
-      let succeeded=0;
+    async function uploadFiles(){
+      if(uploading||!job.value||!selectedFiles.length)return;
+      uploading=true;drop.classList.add('uploading');
+      const jobId=job.value,chosenCollection=collection.value,chosenSubject=subject.value;
+      const batch=selectedFiles.slice();let succeeded=0;
       try{
-        for(const file of selectedFiles){
-          progress.textContent='Uploading '+(succeeded+1)+' of '+selectedFiles.length+': '+file.name;
+        for(const file of batch){
+          progress.textContent='Uploading '+(succeeded+1)+' of '+batch.length+': '+file.name;
           const form=new FormData();form.append('file',file);form.append('returned','false');form.append('note','Media Review & Upload');form.append('collection',chosenCollection);
           const result=await json('/api/jobs/'+encodeURIComponent(jobId)+'/media/uploads',{method:'POST',body:form});
           if(chosenSubject&&result.assetId)await json('/api/jobs/'+encodeURIComponent(jobId)+'/media/assets/'+encodeURIComponent(result.assetId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'Needs Sorting',collection:chosenCollection,subjects:[chosenSubject],assignedTo:null})});
           succeeded++;
         }
-        progress.textContent=succeeded+' files uploaded successfully.';selectedFiles=[];files.value='';await refresh();renderTree();
+        progress.textContent=succeeded+' files uploaded successfully.';
+        await refresh();renderTree();
       }catch(error){progress.textContent=succeeded+' uploaded; '+(error.message||'Upload failed')+'. Remaining files were not uploaded.';}
-      finally{sync()}
-    };
+      finally{selectedFiles=[];files.value='';uploading=false;drop.classList.remove('uploading');sync();}
+    }
     sync();
   };
 })();
