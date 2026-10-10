@@ -1,0 +1,12 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const {JSDOM}=require('jsdom');
+const script=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/frontdesk-pos.js'),'utf8');
+function setup(){const dom=new JSDOM('<body data-studio-view="frontdesk"><main id="genericView"></main></body>',{url:'https://studio.test',runScripts:'outside-only'});const w=dom.window;let calls=[],windows=[];w.genericView=w.document.querySelector('main');w.json=async(url,options)=>{calls.push([url,options]);return{url:'/pos-window.html?launch=test'}};w.open=()=>{const target={closed:false,studioPosDirty:false,location:{},focus(){},close(){this.closed=true;}};windows.push(target);return target;};w.eval(script);return{dom,w,calls,windows};}
+test('Front Desk launches a specific operation with its Job context',async()=>{const {w,calls,windows}=setup();await w.launchFrontDeskPos('NewSale',{jobId:'job-123'});assert.deepEqual(JSON.parse(calls[0][1].body),{action:'NewSale',jobId:'job-123'});assert.equal(windows[0].location.href,'/pos-window.html?launch=test');w.close();});
+test('Clean windows can be reused, dirty windows are preserved',async()=>{const {w,windows}=setup();await w.launchFrontDeskPos('NewSale',{jobId:'one'});await w.launchFrontDeskPos('TakePayment',{jobId:'two'});assert.equal(windows.length,1);windows[0].studioPosDirty=true;await w.launchFrontDeskPos('NewSale',{jobId:'three'});assert.equal(windows.length,2);assert.equal(windows[0].closed,false);w.close();});
+test('Other views cannot launch a financial operation',async()=>{const {w,calls,windows}=setup();w.document.body.dataset.studioView='jobs';await assert.rejects(w.launchFrontDeskPos('NewSale',{jobId:'one'}),/Front Desk/);assert.equal(calls.length,0);assert.equal(windows.length,0);w.close();});
+test('A failed launch closes only the newly opened window',async()=>{const {w,windows}=setup();w.json=async()=>{throw Error('Denied')};await assert.rejects(w.launchFrontDeskPos('NewSale',{jobId:'one'}),/Denied/);assert.equal(windows[0].closed,true);w.close();});
+test('Unregistered completion messages cannot refresh Front Desk',async()=>{const {w,calls}=setup();w.dispatchEvent(new w.MessageEvent('message',{origin:'https://studio.test',data:{type:'studio-pos-completed'},source:{}}));await new Promise(resolve=>setImmediate(resolve));assert.equal(calls.length,0);w.close();});

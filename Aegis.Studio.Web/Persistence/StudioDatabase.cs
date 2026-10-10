@@ -39,6 +39,9 @@ public sealed class StudioDatabase
                 updated_at_utc timestamptz not null
             );
             alter table studio_workspaces add column if not exists default_job_lead text null;
+            -- Workspace readers run before the media migration during fresh startup.
+            alter table studio_workspaces add column if not exists icon_name text not null default 'folder';
+            alter table studio_workspaces add column if not exists accent_color text not null default '#b99750';
             create unique index if not exists ux_studio_workspaces_email on studio_workspaces(lower(email_address)) where email_address is not null;
             create unique index if not exists ux_studio_workspaces_route_key on studio_workspaces(lower(route_key)) where route_key is not null;
 

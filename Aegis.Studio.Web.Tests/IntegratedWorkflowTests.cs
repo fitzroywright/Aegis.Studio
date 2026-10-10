@@ -79,7 +79,7 @@ public sealed class IntegratedWorkflowTests
         using var pinned=versions.Open(job,v3.Id,out _);Assert.Equal(3,pinned.ReadByte());
         Guid asset;using(var image=new NpgsqlCommand("select id from studio_media_assets where job_id=$1 and asset_key='approved-portrait'",c)){image.Parameters.AddWithValue(job);asset=(Guid)image.ExecuteScalar()!;}
         var studio=new StudioStore(db,new WorkspaceStore(db));var pos=new StudioPosStore(db,new PosAuditStore(db));
-        var sale=pos.Create(job,new([new("PRINT-5X7","Print",1500,3,asset),new("PRINT-5X7","Second print line",1500,2,asset)],Guid.NewGuid()),studio,"Cashier");
+        var sale=pos.Create(job,new([new("PRINT-5X7","Print",1500,3,asset),new("PRINT-5X7","Second print line",1500,2,asset)],Guid.NewGuid()),studio,"Cashier",allowPriceOverride:true);
         pos.Complete(sale.Id,new([new(TenderKind.Cash,7500,"Test")],"Test terminal"),studio,"Cashier");
         var purchasedLines=sale.Lines.ToArray();Assert.Equal(2,purchasedLines.Length);
         using(var order=new NpgsqlCommand("select source_version_id from studio_production_items where source_sale_line_id=$1",c)){order.Parameters.AddWithValue(purchasedLines[0].Id);Assert.Equal(v3.Id,order.ExecuteScalar());}
@@ -163,7 +163,7 @@ public sealed class IntegratedWorkflowTests
 
     // Every scenario gets its own disposable schema and storage root; failures cannot
     // prevent unrelated workflow scenarios from running or use operational data.
-    private sealed class WorkflowContext : IDisposable
+    internal sealed class WorkflowContext : IDisposable
     {
         private readonly string schema="studio_workflow_"+Guid.NewGuid().ToString("N");
         private readonly NpgsqlConnection admin;
@@ -187,7 +187,7 @@ public sealed class IntegratedWorkflowTests
                 Database.InitializeAsync().GetAwaiter().GetResult();new StudioFeatureDatabase(source).InitializeAsync().GetAwaiter().GetResult();
                 new WorkspaceJobStore(Database).EnsureSchema();new StudioClientStore(Database).Migrate();new ScheduleStore(Database,new ConfigurationBuilder().Build()).EnsureOperationalSchema();
                 Versions=new StudioVersionStore(Database,new LocalFileStorage(Root));MediaProductionStore.Migrate(Database);
-                Sql(Connection,ProductionItems.Schema);Sql(Connection,ProductionOrderLinker.Schema);
+                Sql(Connection,ProductionItems.Schema);Sql(Connection,ProductionOrderLinker.Schema);Sql(Connection,CommercialSchema.Sql);
                 Guid conversation=Guid.NewGuid();
                 Sql(Connection,"insert into studio_workspaces(id,name,created_at_utc,updated_at_utc) values($1,'Workflow',now(),now())",Workspace);
                 Sql(Connection,"insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,created_at_utc) values($1,$2,'Workflow','Client','client@example.test','Email',now())",conversation,Workspace);

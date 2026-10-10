@@ -4,10 +4,11 @@ using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Npgsql;
 using Aegis.Studio.Web.Workflow;
+using Aegis.Studio.Web.Production;
 
 namespace Aegis.Studio.Web.FrontDesk;
 
-public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null,string? ExternalBookingId=null,DateTimeOffset? StartsAtUtc=null,DateTimeOffset? EndsAtUtc=null,string? Location=null,string? ClientPhone=null,string? Destination=null,string BookingSource="FrontDesk");
+public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null,string? ExternalBookingId=null,DateTimeOffset? StartsAtUtc=null,DateTimeOffset? EndsAtUtc=null,string? Location=null,string? ClientPhone=null,string? Destination=null,string BookingSource="FrontDesk",Guid? JobTemplateId=null);
 public sealed record VerifiedDepositRequest(decimal Amount,string Currency,string Provider,string Reference);
 public sealed record FrontDeskRequest(Guid Id,PendingBookingRequest Request,string Status,Guid? JobId,decimal RecordedDeposit,DateTimeOffset CreatedAtUtc);
 
@@ -176,6 +177,11 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         Execute(c,tx,"insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,client_id) values($1,$2,$3,$4,$5,'Pending',$6,now(),$7)",job,r.WorkspaceId,conversation,r.Title,r.ClientName,r.EventDate,client);
         Execute(c,tx,"update studio_conversations set job_id=$2 where id=$1",conversation,job);
         Execute(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'Internal','Booking received; Pending Job created for FrontDesk review.',now())",Guid.NewGuid(),conversation,user);
+        if(r.JobTemplateId is Guid templateId)
+        {
+            var template=CommercialTemplateStore.Get(c,tx,templateId)??throw new ArgumentException("Job Template was not found.");
+            CommercialTemplateStore.ApplyNewJob(c,tx,job,template,Guid.NewGuid(),user);
+        }
         return job;
     }
     private static FrontDeskRequest Read(NpgsqlDataReader r)=>new(r.GetGuid(0),JsonSerializer.Deserialize<PendingBookingRequest>(r.GetString(1),JsonOptions)!,r.GetString(2),r.IsDBNull(3)?null:r.GetGuid(3),r.GetDecimal(4),r.GetFieldValue<DateTimeOffset>(5));

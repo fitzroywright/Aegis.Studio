@@ -303,7 +303,7 @@ public sealed class ProductionAuditStore
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
-            create table if not exists studio_operational_audit
+            create table if not exists studio_http_request_audit
             (
                 id uuid primary key,
                 occurred_at_utc timestamptz not null,
@@ -316,8 +316,15 @@ public sealed class ProductionAuditStore
                 client_key text null,
                 failure_type text null
             );
-            create index if not exists ix_studio_operational_audit_occurred on studio_operational_audit(occurred_at_utc desc);
-            create index if not exists ix_studio_operational_audit_user on studio_operational_audit(user_name,occurred_at_utc desc);
+            -- HTTP access logs and operational Job history have different required fields.
+            -- Preserve any older HTTP records without changing the original audit table.
+            do $$ begin
+              if exists(select 1 from information_schema.columns where table_schema=current_schema() and table_name='studio_operational_audit' and column_name='correlation_id') then
+                execute 'insert into studio_http_request_audit select id,occurred_at_utc,correlation_id,user_name,method,path,status_code,duration_ms,client_key,failure_type from studio_operational_audit where correlation_id is not null on conflict(id) do nothing';
+              end if;
+            end $$;
+            create index if not exists ix_studio_http_request_audit_occurred on studio_http_request_audit(occurred_at_utc desc);
+            create index if not exists ix_studio_http_request_audit_user on studio_http_request_audit(user_name,occurred_at_utc desc);
             """;
         command.ExecuteNonQuery();
     }
@@ -332,7 +339,7 @@ public sealed class ProductionAuditStore
         string clientKey = string.IsNullOrWhiteSpace(client) ? string.Empty : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(client))).ToLowerInvariant();
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "insert into studio_operational_audit(id,occurred_at_utc,correlation_id,user_name,method,path,status_code,duration_ms,client_key,failure_type) values($1,now(),$2,$3,$4,$5,$6,$7,$8,$9)";
+        command.CommandText = "insert into studio_http_request_audit(id,occurred_at_utc,correlation_id,user_name,method,path,status_code,duration_ms,client_key,failure_type) values($1,now(),$2,$3,$4,$5,$6,$7,$8,$9)";
         command.Parameters.AddWithValue(Guid.NewGuid());
         command.Parameters.AddWithValue(context.TraceIdentifier);
         command.Parameters.AddWithValue(userName);
@@ -349,7 +356,7 @@ public sealed class ProductionAuditStore
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id,occurred_at_utc,correlation_id,user_name,method,path,status_code,duration_ms,failure_type from studio_operational_audit order by occurred_at_utc desc limit $1";
+        command.CommandText = "select id,occurred_at_utc,correlation_id,user_name,method,path,status_code,duration_ms,failure_type from studio_http_request_audit order by occurred_at_utc desc limit $1";
         command.Parameters.AddWithValue(count);
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<ProductionAuditEntry> values = [];

@@ -1256,7 +1256,11 @@
         workspaces:renderWorkspaces,
         jobs:renderJobs,
         pipeline:()=>showPipeline(),
-        production:()=>showProduction(),
+        production:()=>showCatalogProduction(),
+        'studio-management':()=>showStudioManagement(),
+        catalog:()=>showCommercialCatalog(),
+        'job-templates':()=>showCommercialTemplates('Job'),
+        'work-order-templates':()=>showCommercialTemplates('WorkOrder'),
         media:()=>showMediaReview(),
         frontdesk:()=>showFrontDesk(),
         finance:()=>showAccounts(),
@@ -1266,7 +1270,7 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
+    const navigationLabels={'studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
 
     function replaceNavigationHistory(view){
         const url='#studio='+encodeURIComponent(view);

@@ -1,27 +1,22 @@
-# Catalog and production implementation checkpoint
+# Resumable implementation checkpoint
 
-Source brief: 2026-10-10, Catalog, Job Templates, Work Order Templates, Production and POS Integration.
-Baseline: main 4a1584bd8a943b216c817f737ae208207ab03224.
+Brief: Catalog, Job Templates, Work Order Templates, Production and POS Integration (2026-10-10).
+Original main: `4a1584bd8a943b216c817f737ae208207ab03224`.
 
-## Audit completed
-- Reuse PosCatalogStore and studio_pos_catalog as the authoritative selling-price catalog.
-- Reuse StudioPosStore/Aegis.Pos.Core, receipts, register reconciliation and accounting. Sales already snapshot unit prices; completion and refunds call ProductionOrderLinker.
-- Reuse studio_job_activities and WorkflowStore's versioned task/assignment operations. ProductionStore currently exposes hard-coded job templates; it does not contain persisted editable Job Templates or Work Order Templates.
-- Reuse approved studio_media_assets and pinned studio_asset_versions, production item QC, existing Job Gallery uploads and message attachment imports. Existing galleries remain in place.
-- Reuse WorkDay scheduling endpoints and existing employee validation.
-- Missing: catalog metadata/options/bundles and template links, managed versioned Job/Work Order Templates, independent per-line work orders/dependencies, template-based production generation, and Front Desk-only contextual POS windows.
+## Saved steps
 
-## Progress and recovery
-Current phase: repository audit and baseline build verification. No application changes published.
-Local workspace: /workspace/scratch/24d145d84380/Aegis.Studio (main inspection snapshot), Common sibling.
-Local SDK: /workspace/scratch/77eb8ffe420b/tools/dotnet/dotnet, version 10.0.401.
-Restore uses -m:1 -p:RestoreUseStaticGraphEvaluation=true because the normal recursive restore fails without diagnostic errors in this environment.
+1. Audited the catalog, financial engine, hard-coded template definitions, task/production stores, WorkDay, galleries, media versions and message imports. Initial audit saved on main in `2d9d90a1e518a2bf728eb64bb027ca0d9375726d`.
+2. Added catalog metadata, immutable managed templates, per-line snapshots/work orders and existing-task dependency/QC guards. Local checkpoint `b281fda`.
+3. Added management screens, production queues and contextual Front Desk POS windows. Local checkpoint `a304646`.
+4. Added connected tests and launch authorization; remote code checkpoint `c8c11b72c19f52962b317848dc87189892228a8b`, branch `checkpoint/catalog-production-20261010`.
+5. Validated existing task assignment/completion, fixed agreement fulfillment and variation/refund handling, added bounded approved-source lookup and audited specification amendments. Fixed observed fresh-start audit/schema and activity-reader issues. Final changes are saved in the branch history and main.
 
-## Remaining implementation sequence
-1. Add additive schema, catalog extension and immutable template versions.
-2. Instantiate existing activities from Job Templates and Work Order Templates; link sale lines and approved media; guard dependencies and QC in backend.
-3. Add compact management screens, paginated production queues and Front Desk contextual POS windows.
-4. Add meaningful pricing, versioning, retry/dependency/QC and launch tests. Restore/build/test locally and record exact results.
-5. Verify the full acceptance scenario before publishing application code to main. Do not claim completion while steps remain.
+## Recovery and remaining validation
 
-Commit code checkpoints locally and update this document as implementation progresses. Publish only a validated coherent application change; no destructive gallery cleanup.
+The code, tests, actual-app acceptance harness and detailed results are committed. Continue from main; the checkpoint branch retains the implementation recovery point. Read `docs/CATALOG-PRODUCTION-VERIFICATION.md` before changing the implementation.
+
+Outstanding validation: native PostgreSQL concurrent-session/WorkDay regression, browser visual QA, and configured external Customer Gallery publishing. The full UI suite has 13 baseline failures documented in the verification report. Do not describe these validations as completed.
+
+Prior local workspace: `/workspace/scratch/24d145d84380/Aegis.Studio`, with Common sibling projects. SDK used: `/workspace/scratch/77eb8ffe420b/tools/dotnet/dotnet`, 10.0.401. Restore required `-m:1 -p:RestoreUseStaticGraphEvaluation=true`; normal recursive restore failed without useful diagnostics. Build used `--no-restore -m:1 -p:BuildInParallel=false`. A temporary PGlite socket provided disposable PostgreSQL-protocol checks. These runtime paths are session-specific; use the normal .NET/Common layout when resuming elsewhere.
+
+No external deployment, real financial transaction, destructive gallery cleanup or deletion of historical data was performed.

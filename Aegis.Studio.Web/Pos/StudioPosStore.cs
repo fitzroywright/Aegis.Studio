@@ -28,8 +28,9 @@ public sealed class StudioPosStore
         return snapshot is null ? null : Rehydrate(snapshot);
     }
 
-    public Sale Create(Guid jobId, CreateStudioSaleRequest request, StudioStore studio, string userId)
+    public Sale Create(Guid jobId, CreateStudioSaleRequest request, StudioStore studio, string userId, bool allowPriceOverride = false)
     {
+        using var creationLock=request.ClientRequestId is Guid requestId?new PosOperationLock(database,"POSCreate:"+jobId+":"+requestId):null;
         if (studio.GetJob(jobId) is null) throw new KeyNotFoundException("Job was not found.");
         if (request.Lines is null || request.Lines.Count == 0) throw new InvalidOperationException("At least one sale line is required.");
 
@@ -46,19 +47,40 @@ public sealed class StudioPosStore
 
         if(request.ApplyToJobBalance && (request.Lines.Any(l=>l.Code!="BALANCE"||l.Quantity!=1)||request.Lines.Count!=1))throw new InvalidOperationException("Balance payments require a single balance payment line.");
         Sale sale = new(Guid.NewGuid(), "StudioJob", jobId.ToString("D"), DateTimeOffset.UtcNow);
-        foreach (CreateStudioSaleLineRequest line in request.Lines) sale.AddLine(SaleLine.Create(line.Code ?? string.Empty, line.Description, line.UnitPrice, line.Quantity));
-        Save(sale, false, request.ClientRequestId,request.ApplyToJobBalance,request.Lines);
+        var snapshots=new List<(PosCatalogItem Item,decimal Net,CatalogProductionSnapshot[] Frozen)?>();
+        var catalog=new PosCatalogStore(database);
+        foreach (CreateStudioSaleLineRequest line in request.Lines)
+        {
+            PosCatalogItem? item=line.CatalogItemId is Guid catalogId?catalog.Get(catalogId):catalog.GetAll().FirstOrDefault(p=>p.Code.Equals(line.Code,StringComparison.OrdinalIgnoreCase));
+            if(item is null)
+            {
+                if(!request.ApplyToJobBalance&&!allowPriceOverride)throw new UnauthorizedAccessException("Manual charges require price-override permission.");
+                snapshots.Add(null);sale.AddLine(SaleLine.Create(line.Code??string.Empty,line.Description,line.UnitPrice,line.Quantity));continue;
+            }
+            if(!item.IsActive)throw new ArgumentException("Catalog item is inactive.");
+            decimal gross=decimal.Round(item.UnitPrice*(1+item.TaxRate/100),2,MidpointRounding.AwayFromZero);
+            using(var agreements=database.OpenConnection())using(var price=CommercialTemplateStore.Command(agreements,null,"select confirmed_unit_price from studio_job_catalog_agreements where job_id=$1 and catalog_item_id=$2 and confirmed_at is not null and sale_line_id is null order by id limit 1",jobId,item.Id))
+                if(price.ExecuteScalar() is decimal agreed)gross=agreed;
+            decimal charged=CommercialRules.Price(gross,line.UnitPrice,line.DiscountPercent,allowPriceOverride);
+            decimal net=decimal.Round(charged/(1+item.TaxRate/100),2,MidpointRounding.AwayFromZero);
+            snapshots.Add((item,net,CatalogWorkOrders.Freeze(item,database)));
+            sale.AddLine(SaleLine.Create(item.Code,item.Name,charged,line.Quantity));
+        }
+        Save(sale, false, request.ClientRequestId,request.ApplyToJobBalance,request.Lines,snapshots);
         audit.Record("SaleCreated", sale.Id, jobId, userId, sale.Total, $"{sale.Lines.Count} line(s)");
         return sale;
     }
 
     public Sale Complete(Guid saleId, CompleteStudioSaleRequest request, StudioStore studio, string cashierUserId)
     {
-        using var operationConnection=database.OpenConnection();using var operationLock=operationConnection.BeginTransaction();
-        using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",operationConnection,operationLock)){guard.Parameters.AddWithValue("POS:"+saleId.ToString("D"));guard.ExecuteNonQuery();}
+        using var operationLock=new PosOperationLock(database,"POS:"+saleId.ToString("D"));
         PersistedSale snapshot = GetSnapshot(saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
         Guid jobId = Guid.Parse(sale.ReferenceId);
+        using var jobLock=new PosOperationLock(database,"POSAgreement:"+jobId);
+        using(var agreementConnection=database.OpenConnection())
+        using(var agreementGuard=CommercialTemplateStore.Command(agreementConnection,null,"select exists(select 1 from studio_catalog_line_snapshots snap join studio_pos_sale_lines l on l.id=snap.sale_line_id join studio_job_catalog_agreements a on a.id=snap.agreement_id where l.sale_id=$1 and a.sale_line_id is not null and a.sale_line_id<>l.id)",sale.Id))
+            if((bool)agreementGuard.ExecuteScalar()!)throw new InvalidOperationException("This confirmed agreement was already sold. Refresh the order before taking payment.");
         if (sale.Status == SaleStatus.Completed) { EnsureFinancialEventPosted(sale, snapshot, studio); ProductionOrderLinker.SyncCompletedSale(database,sale.Id,cashierUserId); return sale; }
         if (sale.Status == SaleStatus.Voided) throw new InvalidOperationException("A voided sale cannot be completed.");
         if (request.Tenders is null || request.Tenders.Count == 0) throw new InvalidOperationException("At least one tender is required.");
@@ -74,8 +96,7 @@ public sealed class StudioPosStore
 
     public Sale Void(Guid saleId, string userId, string reason)
     {
-        using var operationConnection=database.OpenConnection();using var operationLock=operationConnection.BeginTransaction();
-        using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",operationConnection,operationLock)){guard.Parameters.AddWithValue("POS:"+saleId.ToString("D"));guard.ExecuteNonQuery();}
+        using var operationLock=new PosOperationLock(database,"POS:"+saleId.ToString("D"));
         PersistedSale snapshot = GetSnapshot(saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
         sale.Void(userId, DateTimeOffset.UtcNow, reason);
@@ -86,8 +107,7 @@ public sealed class StudioPosStore
 
     public Sale Refund(Guid saleId, RefundStudioSaleRequest request, StudioStore studio, string userId)
     {
-        using var operationConnection=database.OpenConnection();using var operationLock=operationConnection.BeginTransaction();
-        using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",operationConnection,operationLock)){guard.Parameters.AddWithValue("POS:"+saleId.ToString("D"));guard.ExecuteNonQuery();}
+        using var operationLock=new PosOperationLock(database,"POS:"+saleId.ToString("D"));
         PersistedSale snapshot = GetSnapshot(saleId) ?? throw new KeyNotFoundException("Sale was not found.");
         Sale sale = Rehydrate(snapshot);
         if(request.OperationId.HasValue&&sale.Refunds.Any(r=>r.Id==request.OperationId.Value)){EnsureRefundFinancialEvents(sale,snapshot,studio,userId);ProductionOrderLinker.SyncCompletedSale(database,saleId,userId);return sale;}
@@ -126,7 +146,7 @@ public sealed class StudioPosStore
         Save(sale, true, snapshot.ClientRequestId);
     }
 
-    private PersistedSale Save(Sale sale, bool financialEventPosted, Guid? clientRequestId,bool? applyToBalance=null,IReadOnlyList<CreateStudioSaleLineRequest>? sourceLines=null)
+    private PersistedSale Save(Sale sale, bool financialEventPosted, Guid? clientRequestId,bool? applyToBalance=null,IReadOnlyList<CreateStudioSaleLineRequest>? sourceLines=null,IReadOnlyList<(PosCatalogItem Item,decimal Net,CatalogProductionSnapshot[] Frozen)?>? catalogSnapshots=null)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
@@ -154,7 +174,17 @@ public sealed class StudioPosStore
             for(int i=0;i<sourceLines.Count;i++)
             {
                 var request=sourceLines[i];var line=sale.Lines.ElementAt(i);
-                if(!ProductionOrderLinker.RequiresOutput(line.Code)&&request.SourceAssetId is null)continue;
+                if(catalogSnapshots?[i] is {} frozen)
+                {
+                    CatalogWorkOrders.SnapshotLine(connection,transaction,line.Id,frozen.Item,frozen.Net,request.Specifications,frozen.Frozen);
+                    if(request.AgreementId is Guid agreement)
+                    {
+                        using var agreementCheck=CommercialTemplateStore.Command(connection,transaction,"select count(*)::int from studio_job_catalog_agreements where id=$1 and job_id=$2 and catalog_item_id=$3 and quantity=$4 and sale_line_id is null and specifications is not distinct from $5",agreement,Guid.Parse(sale.ReferenceId),frozen.Item.Id,line.Quantity,request.Specifications);
+                        if((int)agreementCheck.ExecuteScalar()! !=1)throw new ArgumentException("The agreed product changed or has already been sold. Refresh the order.");
+                        CommercialTemplateStore.Execute(connection,transaction,"update studio_catalog_line_snapshots set agreement_id=$2 where sale_line_id=$1",line.Id,agreement);
+                    }
+                }
+                if(!ProductionOrderLinker.RequiresOutput(line.Code)&&request.SourceAssetId is null&&!(catalogSnapshots?[i]?.Frozen.Any(p=>p.Product.RequiresProduction)??false))continue;
                 Guid? approved=null;
                 if(request.SourceAssetId is Guid asset)
                 {
@@ -217,7 +247,7 @@ public sealed class StudioPosStore
 public sealed record PersistedSale(Guid Id,string ReferenceType,string ReferenceId,DateTimeOffset CreatedAtUtc,DateTimeOffset? SubmittedAtUtc,DateTimeOffset? CompletedAtUtc,DateTimeOffset? VoidedAtUtc,string? VoidedBy,string? VoidReason,string? CashierUserId,string? TerminalId,SaleStatus Status,List<SaleLine> Lines,List<Tender> Tenders,List<PersistedRefund> Refunds,bool FinancialEventPosted,Guid? ClientRequestId=null,bool AppliesToBalance=false);
 public sealed record PersistedRefund(Guid Id,List<RefundLine> Lines,List<Tender> Tenders,string Reason,DateTimeOffset CreatedAtUtc);
 public sealed record CreateStudioSaleRequest(IReadOnlyList<CreateStudioSaleLineRequest> Lines,Guid? ClientRequestId=null,bool ApplyToJobBalance=false);
-public sealed record CreateStudioSaleLineRequest(string? Code,string Description,decimal UnitPrice,int Quantity,Guid? SourceAssetId=null);
+public sealed record CreateStudioSaleLineRequest(string? Code,string Description,decimal UnitPrice,int Quantity,Guid? SourceAssetId=null,Guid? CatalogItemId=null,string? Specifications=null,decimal DiscountPercent=0,Guid? AgreementId=null);
 public sealed record CompleteStudioSaleRequest(IReadOnlyList<StudioTenderRequest> Tenders,string? TerminalId);
 public sealed record StudioTenderRequest(TenderKind Kind,decimal Amount,string? Reference);
 public sealed record VoidStudioSaleRequest(string Reason,Guid? OperationId=null);

@@ -23,12 +23,13 @@ public static class ProductionOrderLinker
     }
     public static void Sync(NpgsqlConnection c,NpgsqlTransaction tx,Guid sale,string actor)
     {
+        CatalogWorkOrders.Sync(c,tx,sale,actor);
         MediaProductionStore.Execute(c,tx,"""
             insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,blocked_reason,created_by,created_at_utc,updated_at_utc)
             select s.id,s.reference_id::uuid,'Print','Produce order '||substring(s.id::text,1,8),
               'Use the exact approved source attached to each purchased output.','Blocked','Normal',$2,'Approved source required',$2,now(),now()
             from studio_pos_sales s where s.id=$1 and s.reference_type='StudioJob' and s.status=2
-              and exists(select 1 from studio_pos_sale_lines l join studio_pos_line_media m on m.sale_line_id=l.id where l.sale_id=s.id)
+              and exists(select 1 from studio_pos_sale_lines l join studio_pos_line_media m on m.sale_line_id=l.id where l.sale_id=s.id and not exists(select 1 from studio_catalog_line_snapshots snap where snap.sale_line_id=l.id and snap.requires_production))
             on conflict(id) do nothing
             """,sale,actor);
         MediaProductionStore.Execute(c,tx,"""
@@ -36,7 +37,7 @@ public static class ProductionOrderLinker
             select l.id,s.id,m.asset_id,m.source_version_id,l.code,
               l.quantity-coalesce((select sum(rl.quantity) from studio_pos_refund_lines rl where rl.sale_line_id=l.id),0),l.id
             from studio_pos_sales s join studio_pos_sale_lines l on l.sale_id=s.id join studio_pos_line_media m on m.sale_line_id=l.id
-            where s.id=$1 and s.status=2 and m.source_version_id is not null and m.asset_id is not null
+            where s.id=$1 and s.status=2 and not exists(select 1 from studio_catalog_line_snapshots snap where snap.sale_line_id=l.id and snap.requires_production) and m.source_version_id is not null and m.asset_id is not null
               and l.quantity>coalesce((select sum(rl.quantity) from studio_pos_refund_lines rl where rl.sale_line_id=l.id),0)
             on conflict(id) do nothing
             """,sale);

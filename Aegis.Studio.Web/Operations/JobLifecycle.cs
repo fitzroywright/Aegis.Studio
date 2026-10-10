@@ -32,6 +32,7 @@ public static class JobLifecycleEndpoints
         })).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/workflow",(Guid jobId,JobLifecycleRequest request,ClaimsPrincipal user,WorkflowStore workflow)=>WorkflowEndpoints.Run(()=>
         {
+            if(request.Action=="publish")return Results.BadRequest(new{error="Publish approved collections through Job Gallery."});
             if(request.ExpectedRevision is null)return Results.BadRequest(new{error="Refresh the Job for its current revision."});
             return Results.Ok(workflow.Execute(jobId,new(JobLifecycleRules.Canonical(request.Action),request.ExpectedRevision.Value,request.OperationId,Reason:request.Note),user));
         })).RequireAuthorization();

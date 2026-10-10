@@ -111,6 +111,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(!manage&&!review&&!string.Equals(assignee,actor,StringComparison.OrdinalIgnoreCase))throw new UnauthorizedAccessException();
                 if(request.Status is not ("NotStarted" or "Scheduled" or "InProgress" or "Blocked" or "Completed" or "Cancelled" or "WaitingOnCustomer" or "ReworkRequired" or "Partial" or "Failed" or "ReprintRequired" or "ReadyForDelivery" or "Archived"))throw new ArgumentException("Choose a supported task status.");
                 if(request.Status=="Blocked"&&string.IsNullOrWhiteSpace(request.BlockedReason))throw new ArgumentException("Record the blocked reason.");
+                CommercialTemplateStore.GuardTask(c,tx,progressTask,request.Status!);
                 if(request.Status=="Completed"&&Exists(c,tx,"select exists(select 1 from studio_production_items where activity_id=$1 and qc_state not in ('Passed','Cancelled'))",progressTask))throw new ArgumentException("Pass all required item QC checks first.");
                 Sql(c,tx,"update studio_job_activities set status=$3,blocked_reason=$4,started_at_utc=case when $3='InProgress' then coalesce(started_at_utc,now()) else started_at_utc end,completed_at_utc=case when $3='Completed' then now() else null end,updated_at_utc=now() where id=$1 and job_id=$2",progressTask,job,request.Status,request.Status=="Blocked"?request.BlockedReason:null);
                 Notify(c,tx,job,request.OperationId.ToString(),"Owner","Task updated: "+request.Status);break;
@@ -249,9 +250,10 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(request.TargetStage is not ("Needs Assignment" or "Needs Photographer Assignment" or "Awaiting Scheduling" or "Awaiting Upload"))throw new ArgumentException("Reopen at an assignment, scheduling or upload gate, then use normal review actions.");
                 SetStage(c,tx,job,request.TargetStage);if(request.TargetStage!="Awaiting Upload"){EnsureDraft(c,tx,job);Recalculate(c,tx,job);}break;
             case "confirm":
+                CatalogWorkOrders.ConfirmAgreements(c,tx,job);
                 if(!IsFrontDesk(user))throw new UnauthorizedAccessException();
                 if(workspace==WorkflowRules.UnassignedWorkspaceId)throw new ArgumentException("Route the booking to a business workspace before confirmation.");
-                bool deposit=Exists(c,tx,"select exists(select 1 from studio_financial_events where job_id=$1 and kind='Deposit' and amount>0)",job);
+                bool deposit=Exists(c,tx,"select coalesce(sum(amount),0)>0 from studio_financial_events where job_id=$1 and kind in ('Deposit','Payment','POS Sale','POS Refund','Refund','Reversal')",job);
                 if(!deposit)
                 {
                     if(!IsOperations(user))throw new UnauthorizedAccessException();RequireReason(request);
@@ -285,11 +287,13 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
             case "resume-production":
                 if(!review)throw new UnauthorizedAccessException();stateAction=true;break;
             case "publish":
+                CommercialTemplateStore.GuardPublication(c,tx,job);
                 if(!IsFrontDesk(user)&&!manage&&!review)throw new UnauthorizedAccessException();
                 if(stage!="Ready for Delivery")throw new ArgumentException("Finished work must be approved before publication.");
                 if(configuration["ClientGallery:Provider"]!="Manifest")throw new ArgumentException("Configure the existing gallery provider before publication.");
                 Publish(c,tx,job,request.OperationId,actor,publisher);break;
             case "deliver":
+                CommercialTemplateStore.GuardPublication(c,tx,job);
                 if(!IsFrontDesk(user)&&!manage)throw new UnauthorizedAccessException();
                 if(request.Method=="Gallery"&&!Exists(c,tx,"select exists(select 1 from studio_workflow_publications where job_id=$1)",job))throw new ArgumentException("Publish the approved gallery before recording Gallery delivery.");
                 if(string.IsNullOrWhiteSpace(request.Method)||string.IsNullOrWhiteSpace(request.Reference))throw new ArgumentException("Record delivery method and receipt reference.");
@@ -327,6 +331,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 Sql(c,tx,"update studio_workflow_delivery_requirements set waived=true,waiver_reason=$3,waived_by=$4 where id=$1 and job_id=$2 and delivered_at_utc is null and not waived",waiverId,job,request.Reason,actor);
                 break;
             case "cancel":
+                Sql(c,tx,"update studio_catalog_work_orders set exception_reason=$2 where job_id=$1",job,"Job cancelled; production records retained: "+request.Reason);
                 if(stage=="Pending"?!IsFrontDesk(user)&&!manager:!manager)throw new UnauthorizedAccessException();RequireReason(request);
                 Sql(c,tx,"update studio_schedule_entries set status='Cancelled' where job_id=$1 and id in(select schedule_entry_id from studio_shoot_sessions where job_id=$1 and checked_in_at_utc is null)",job);
                 Sql(c,tx,"update studio_shoot_sessions set status='Cancelled' where job_id=$1 and checked_in_at_utc is null",job);
@@ -416,10 +421,11 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
     private void RequireEmployee(string name){if(!new StudioEmployeeDirectoryStore(database).IsAssignable(name))throw new ArgumentException("Choose an active, assignable Studio employee.");}
     private static void RequireReason(WorkflowCommand request){if(string.IsNullOrWhiteSpace(request.Reason))throw new ArgumentException("A reason is required.");}
     private static bool IsCrew(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,Guid? session,string name,bool lead)=>Exists(c,tx,"select exists(select 1 from studio_workflow_crew c join studio_workflow_sessions s on s.id=c.session_id where s.job_id=$1 and s.id=$2 and lower(c.user_name)=lower($3) and (not $4 or c.role='Lead'))",job,session,name,lead);
-    private static void EnsureDraft(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)=>Sql(c,tx,"insert into studio_workflow_sessions(id,job_id,title) select $1,$2,'Photography' where not exists(select 1 from studio_workflow_sessions where job_id=$2 and required)",Guid.NewGuid(),job);
+    private static void EnsureDraft(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)=>Sql(c,tx,"insert into studio_workflow_sessions(id,job_id,title) select $1,$2,'Photography' where not exists(select 1 from studio_workflow_sessions where job_id=$2 and required) and not exists(select 1 from studio_job_template_instances where job_id=$2 and not coalesce((definition->>'schedulingRequired')::boolean,false))",Guid.NewGuid(),job);
     private static void Recalculate(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)=>Sql(c,tx,"""
         update studio_jobs set status=case
          when nullif(trim(job_lead),'') is null then 'Needs Assignment'
+         when exists(select 1 from studio_job_template_instances where job_id=$1 and not coalesce((definition->>'schedulingRequired')::boolean,false)) then 'Active Production'
          when not exists(select 1 from studio_workflow_sessions where job_id=$1 and required) or exists(select 1 from studio_workflow_sessions where job_id=$1 and required and not crew_finalized) then 'Needs Photographer Assignment'
          when exists(select 1 from studio_workflow_sessions ws left join studio_shoot_sessions s on s.id=ws.shoot_id where ws.job_id=$1 and ws.required and (s.id is null or s.status='Cancelled')) then 'Awaiting Scheduling'
          else 'Scheduled' end
@@ -450,6 +456,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
     }
     private static void ValidateFinished(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
     {
+        CommercialTemplateStore.GuardPublication(c,tx,job);
         if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and activity_type in ('Cull','Edit','Retouch','Proof','Print','QC') and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Resolve required production tasks first.");
         if(Exists(c,tx,"select exists(select 1 from studio_media_assets a where a.job_id=$1 and (a.approved_version_id is null or exists(select 1 from studio_production_items i where i.asset_id=a.id and i.source_version_id=a.approved_version_id and i.qc_state not in ('Passed','Cancelled'))))",job))throw new ArgumentException("Pass current output quality checks before submission.");
     }

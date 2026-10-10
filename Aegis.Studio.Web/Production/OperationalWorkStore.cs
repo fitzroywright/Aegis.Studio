@@ -49,6 +49,7 @@ public sealed class OperationalWorkStore
     {
         JobActivity current = GetActivity(id) ?? throw new KeyNotFoundException("Activity was not found.");
         string status = NormalizeStatus(request.Status);
+        using(var guard=database.OpenConnection())CommercialTemplateStore.GuardTask(guard,null,id,status);
         if(status=="Completed")
         {
             using var c=database.OpenConnection();using var cmd=new NpgsqlCommand("select exists(select 1 from studio_production_items where activity_id=$1 and qc_state not in ('Passed','Cancelled'))",c);cmd.Parameters.AddWithValue(id);
@@ -162,7 +163,7 @@ public sealed class OperationalWorkStore
     private JobActivity? GetActivity(Guid id)
     {
         using NpgsqlConnection connection=database.OpenConnection(); using NpgsqlCommand command=connection.CreateCommand();
-        command.CommandText="select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc,collection_name from studio_job_activities where id=$1";
+        command.CommandText="select id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc,collection_name,(select workflow_revision from studio_jobs where id=studio_job_activities.job_id) from studio_job_activities where id=$1";
         command.Parameters.AddWithValue(id); using NpgsqlDataReader reader=command.ExecuteReader(); return reader.Read()?ReadActivity(reader):null;
     }
 
