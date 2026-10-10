@@ -191,7 +191,16 @@
     // The Today route is deliberately excluded from these structural changes.
     function syncPageFrame() {
         const view = document.body.dataset.studioView || currentView;
-        if (view === 'today') return;
+        if (view === 'today') {
+            const title = document.getElementById('studioTodayBrandTitle');
+            if (title) {
+                const heading = title.querySelector('strong');
+                if (heading) heading.innerHTML = 'Today <em>Your focus</em>';
+                const tagline = title.querySelector('small');
+                if (tagline) tagline.textContent = 'What needs your attention, what’s coming up, and the work to move forward.';
+            }
+            return;
+        }
         const main = shell?.querySelector('main');
         const masthead = document.querySelector('.topbar');
         const title = document.getElementById('studioTodayBrandTitle');
