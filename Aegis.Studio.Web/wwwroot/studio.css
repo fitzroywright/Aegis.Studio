@@ -8392,7 +8392,7 @@ body[data-studio-view="frontdesk"] .fd-queue .fd-table{
  table-layout:auto;text-align:left;font-size:.8rem;color:inherit;
 }
 body[data-studio-view="frontdesk"] .fd-queue .fd-table thead th{
- position:sticky;top:0;z-index:3;padding:11px 14px;
+ position:static;top:auto;z-index:auto;padding:11px 14px;
  background:var(--surface-muted,#f5f6f8);
  color:var(--muted,#64748b);font-size:.72rem;font-weight:700;
  border:0;border-bottom:1px solid var(--border,#edf0f2);
