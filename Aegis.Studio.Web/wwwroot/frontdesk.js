@@ -385,12 +385,18 @@ async async function loadFrontDeskCommunications(){
     const host=document.getElementById('fdCommunicationFeed');
     if(!host)return;
     try{
-        const notifications=await json('/api/notifications?count=80');
+        const [notificationResult,...announcementResults]=await Promise.allSettled([
+            json('/api/notifications?count=80'),
+            ...frontDeskWorkspaces.filter(w=>w.id).map(w=>json('/api/workspaces/'+encodeURIComponent(w.id)+'/announcements').then(items=>({workspace:w,items})))
+        ]);
         if(!host.isConnected)return;
-        const rows=(Array.isArray(notifications)?notifications:[])
-            .filter(n=>/message|conversation|reply|announcement/i.test(String(n.eventType||n.title||n.type||'')))
-            .slice(0,6);
-        host.innerHTML=rows.map(n=>`<button type="button" class="mw-message-row message" data-fd-message-job="${esc(n.referenceType==='Job'?(n.referenceId||''):'')}"><span class="mw-comm-type message" aria-hidden="true">✉</span><span class="mw-message-copy"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.eventType||'Studio message')}</small></span><span class="mw-message-time">${esc(n.createdAtUtc?new Date(n.createdAtUtc).toLocaleDateString():'')}</span><span class="mw-chevron" aria-hidden="true">›</span></button>`).join('')||'<div class="mw-empty">No recent messages or announcements.</div>';
+        const notifications=notificationResult.status==='fulfilled'&&Array.isArray(notificationResult.value)?notificationResult.value:[];
+        const announcements=announcementResults.flatMap(result=>result.status==='fulfilled'&&Array.isArray(result.value.items)?result.value.items.map(a=>({...a,workspaceId:result.value.workspace.id,workspaceName:result.value.workspace.name})) :[]);
+        const rows=[
+            ...notifications.filter(n=>/message|conversation|reply/i.test(String(n.eventType||n.title||n.type||''))).map(item=>({kind:'message',item,at:item.createdAtUtc||item.createdAt||0})),
+            ...announcements.map(item=>({kind:'announcement',item,at:item.createdAtUtc||item.createdAt||0}))
+        ].sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6);
+        host.innerHTML=rows.map(({kind,item:n})=>`<button type="button" class="mw-message-row ${kind}" data-fd-message-job="${esc(kind==='message'&&n.referenceType==='Job'?(n.referenceId||''):'')}" data-fd-announcement-workspace="${esc(kind==='announcement'?(n.workspaceId||''):'')}"><span class="mw-comm-type ${kind}" aria-hidden="true">${kind==='announcement'?'📣':'✉'}</span><span class="mw-message-copy"><strong>${esc(n.subject||n.title||(kind==='announcement'?'Announcement':'Message'))}</strong><small>${esc((kind==='announcement'&&n.workspaceName?n.workspaceName+' · ':'')+(n.body||n.eventType||'Studio message'))}</small></span><span class="mw-message-time">${esc(n.createdAtUtc?new Date(n.createdAtUtc).toLocaleDateString():'')}</span><span class="mw-chevron" aria-hidden="true">›</span></button>`).join('')||'<div class="mw-empty">No recent messages or announcements.</div>';
         host.querySelectorAll('[data-fd-message-job]').forEach(button=>button.onclick=()=>{
             if(button.dataset.fdMessageJob)openWorkspaceJob(button.dataset.fdMessageJob);
             else studioNavigate('messages');
