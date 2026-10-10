@@ -138,7 +138,7 @@ function renderFrontDesk(){
           </section>
         <div class="fd-metrics">${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}${metric('confirmation','Needs Confirmation',pending.length,'Review and confirm')}${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
       </div><div class="fd-secondary">
-        <section class="op-card fd-actions"><header><h2>Front Desk Services</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-new-client>＋ New Customer</button><button data-find-client>Find Customer</button><button data-take-payment>Take Payment</button><button data-new-sale>New Sale</button><button data-pickups>Pickup / Delivery</button><button type="button" data-completed>Completed</button></div></section>
+        <section class="op-card fd-actions"><header><h2>Front Desk Services</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-new-client>＋ New Customer</button><button data-find-client>Find Customer</button><button data-take-payment>Take Payment</button><button data-new-sale>New Sale</button><button type="button" data-send-message>Send Message</button><button data-pickups>Pickup / Delivery</button><button type="button" data-completed>Completed</button></div></section>
         <section class="op-card fd-schedule"><header><h2>Today's Schedule</h2><button type="button" class="fd-card-link" data-calendar>View Calendar →</button></header><div class="fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="fd-session"><time>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</time><span><strong>${esc(s.title)}</strong><small>${esc(s.location||s.status||'')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
         <section class="op-card fd-messages"><header><h2>Recent Inquiries</h2><button type="button" class="fd-card-link" data-inquiries>View All →</button></header><div class="fd-message-list">${enquiries.slice(0,5).map(e=>`<button data-fd-enquiry="${esc(e.id)}"><strong>${esc(e.contactName||'Customer')}</strong><small>${esc(e.subject||'New inquiry')}</small></button>`).join('')||'<p class="muted">No new inquiries.</p>'}</div></section>
       </div></div></div>`;
@@ -173,6 +173,7 @@ function renderFrontDesk(){
     genericView.querySelector('[data-find-client]').onclick=()=>showFrontDeskClients();
     genericView.querySelector('[data-take-payment]').onclick=()=>frontDeskSelectedClientId?takeFrontDeskClientPayment(frontDeskSelectedClientId):showPos();
     genericView.querySelector('[data-new-sale]').onclick=()=>showPos();
+    genericView.querySelector('[data-send-message]').onclick=()=>openFrontDeskMessagePicker();
     genericView.querySelector('[data-pickups]').onclick=()=>{frontDeskTab='delivery';renderFrontDesk();};
     genericView.querySelector('[data-completed]').onclick=()=>{frontDeskTab='completed';renderFrontDesk();};
     genericView.querySelector('[data-calendar]').onclick=()=>studioNavigate('pipeline');
@@ -376,7 +377,22 @@ async function showFrontDeskFlow(jobId) {
     return dialog;
 }
 
-async function messageFrontDeskJob(jobId, mode) {
+async function openFrontDeskMessagePicker(){
+    const jobs=frontDeskJobs.filter(job=>job?.id).sort((a,b)=>String(a.clientName||a.title||'').localeCompare(String(b.clientName||b.title||'')));
+    const dialog=frontDeskDialog('Send Message',`<p>Select the Job conversation to message. Messages are retained with the Job.</p><label>Job / Customer<select name="jobId" required><option value="">Select a Job…</option>${jobs.map(job=>`<option value="${esc(job.id)}">${esc((job.clientName||'Client')+' — '+(job.title||'Untitled Job'))}</option>`).join('')}</select></label><p class="muted">The message composer will open in a popup after you select a Job.</p>`);
+    const form=dialog.querySelector('form');
+    form.querySelector('[type=submit]').textContent='Continue';
+    if(!jobs.length){form.querySelector('[role=alert]').textContent='No Jobs are available for messaging.';form.querySelector('[type=submit]').disabled=true;}
+    form.onsubmit=async event=>{
+        event.preventDefault();
+        const jobId=form.elements.jobId.value;
+        if(!jobs.some(job=>String(job.id)===jobId)){form.querySelector('[role=alert]').textContent='Select a Job.';return;}
+        dialog.close();
+        try{await messageFrontDeskJob(jobId,'workspace');}
+        catch(error){const errorDialog=frontDeskDialog('Unable To Open Message',`<p>${esc(error.message||'Messaging is unavailable.')}</p>`);errorDialog.querySelector('[type=submit]').style.display='none';}
+    };
+}
+function messageFrontDeskJob(jobId, mode) {
     const [job,thread]=await Promise.all([
         json('/api/jobs/'+jobId),
         json('/api/messages/threads/Job/'+jobId,{method:'POST'})
