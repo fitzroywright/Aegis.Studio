@@ -8344,3 +8344,23 @@ body[data-studio-view="frontdesk"] .fd-table tbody tr.fd-speedbump-row:active{
  transition:none;transform:none!important;
  }
 }
+
+/* Front Desk grid heading and search share one compact header row. */
+body[data-studio-view="frontdesk"] .fd-queue>.fd-queue-header{
+ display:flex;align-items:center;justify-content:space-between;
+ gap:12px;flex-wrap:wrap;
+}
+body[data-studio-view="frontdesk"] .fd-queue-header h2{margin:0;flex:0 1 auto}
+body[data-studio-view="frontdesk"] .fd-queue-header-tools{
+ display:flex;align-items:center;gap:8px;min-width:0;margin-left:auto;
+}
+body[data-studio-view="frontdesk"] .fd-queue-header-tools #frontDeskSearch{
+ width:220px;max-width:100%;min-width:140px;box-sizing:border-box;
+ padding:6px 9px;border:1px solid #ded6cb;border-radius:6px;
+ background:#fff;color:inherit;font:inherit;
+}
+body[data-studio-view="frontdesk"] .fd-queue-header-tools .fd-tabs{display:flex;gap:5px}
+@media(max-width:700px){
+ body[data-studio-view="frontdesk"] .fd-queue-header-tools{width:100%;margin-left:0}
+ body[data-studio-view="frontdesk"] .fd-queue-header-tools #frontDeskSearch{flex:1;width:auto}
+}
