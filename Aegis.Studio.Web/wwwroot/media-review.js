@@ -25,7 +25,7 @@
         </div>
         <div id="studioMediaDestinationNotice" class="studio-media-notice" hidden></div>
         <div class="studio-media-targets">
-          <label>Job — All Workspaces<input id="studioMediaJobSearch" type="search" placeholder="Search Job, customer, reference or workspace…" autocomplete="off"><select id="studioMediaJob"><option value="">Select a Job…</option></select><small id="studioMediaJobMatches" role="status"></small></label>
+          <label>Job — All Workspaces<input id="studioMediaJobSearch" type="search" placeholder="Search Job, customer, reference or workspace…" autocomplete="off"><select id="studioMediaJob"><option value="">Select a Job…</option></select><small id="studioMediaJobMatches" role="status"></small><button type="button" class="action" id="studioMediaOpenJob" disabled>Open Job Details ↗</button></label>
           <label>Collection<select id="studioMediaCollection"><option value="Unclassified">Unclassified</option></select></label>
           <label>Subject<select id="studioMediaSubject"><option value="">No Subject</option></select></label>
         </div>
@@ -79,7 +79,13 @@
         gallery.innerHTML=assets.length?assets.map(a=>'<article class="studio-media-asset">'+(a.versionId&&String(a.contentType||'').startsWith('image/')?'<img loading="lazy" src="/api/jobs/'+encodeURIComponent(job.value)+'/versions/by-id/'+encodeURIComponent(a.versionId)+'/content" alt="'+escMedia(a.fileName||'Image')+'">':'<div class="studio-media-file-icon">▧</div>')+'<strong>'+escMedia(a.fileName||a.assetKey||'Media file')+'</strong><small>'+escMedia(a.productionStatus||a.status||'Needs Review')+'</small></article>').join(''):'<p class="muted">No media uploaded for this Job.</p>';
       }catch(error){gallery.innerHTML='<p role="alert">'+escMedia(error.message||'Unable to load media.')+'</p>';}
     }
-    job.onchange=()=>{sync();refresh()};
+    const openJobButton=root.querySelector('#studioMediaOpenJob');
+    openJobButton.onclick=()=>{
+      if(!job.value)return;
+      if(typeof openWorkspaceJob!=='function'){progress.textContent='Job detail navigation is unavailable.';return;}
+      Promise.resolve(openWorkspaceJob(job.value)).catch(error=>{progress.textContent=error.message||'Unable to open Job details.';});
+    };
+    job.onchange=()=>{openJobButton.disabled=!job.value;sync();refresh()};
     subject.onchange=()=>{const selected=subject.selectedOptions[0];if(selected?.dataset.collection)collection.value=selected.dataset.collection};
     upload.onclick=async()=>{
       if(!job.value||!selectedFiles.length||destination()!=='job')return;
