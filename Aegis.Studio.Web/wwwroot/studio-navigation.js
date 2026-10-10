@@ -209,7 +209,7 @@
         const filteredJobs=searchedJobs.filter(job=>(!state.jobStatusFilter||String(job.status||'Unknown')===state.jobStatusFilter)&&(!state.jobRoleFilter||roleForJob(job)===state.jobRoleFilter));
         const sortedJobs=[...filteredJobs].sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0));
         const footerCount=document.getElementById('studioFooterRate');
-        if(footerCount)footerCount.textContent=sortedJobs.length+' '+(sortedJobs.length===1?'row':'rows');
+        if(footerCount)footerCount.textContent=sortedJobs.length+' Jobs';
         const emptyJobText=(state.jobSearch||state.jobStatusFilter||state.jobRoleFilter)?'No jobs match your filters':state.jobView==='led'?'You are not the Lead on any Jobs':state.jobView==='involved'?'You are not involved in any jobs':'No jobs found';
         const media=Array.isArray(state.media)?state.media:[];
         const announcements=Array.isArray(state.announcements)?state.announcements:[];
@@ -999,7 +999,7 @@
         }
 
         const initialJobsCount=document.getElementById('studioFooterRate');
-        if(initialJobsCount)initialJobsCount.textContent=genericView.querySelectorAll('[data-job-row]').length+' jobs';
+        if(initialJobsCount)initialJobsCount.textContent=genericView.querySelectorAll('[data-job-row]').length+' Jobs';
         const list=genericView.querySelector('[data-jobs-list]');
         const rows=()=>[...genericView.querySelectorAll('[data-job-row]')];
         const apply=()=>{
@@ -1033,7 +1033,7 @@
             rows().forEach(row=>row.hidden=!shown.has(row));
             visible.forEach(row=>list.appendChild(row));
             const footerCount=document.getElementById('studioFooterRate');
-            if(footerCount)footerCount.textContent=visible.length+' '+(visible.length===1?'job':'jobs');
+            if(footerCount)footerCount.textContent=visible.length+' Jobs';
             try{sessionStorage.setItem('studio-jobs-filters:'+workspaceFilter,JSON.stringify({groupFilter,statusFilter,personFilter,dateFilter,term,sort,lightFilter,scroll:list.scrollTop}));}catch{}
         };
 
