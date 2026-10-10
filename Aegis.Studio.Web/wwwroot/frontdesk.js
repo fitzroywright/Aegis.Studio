@@ -123,8 +123,7 @@ function renderFrontDesk(){
       
       <div class="fd-layout"><div class="fd-main">
         
-        <section class="op-card fd-queue"><header><h2>Incoming Bookings &amp; Inquiries</h2></header>
-          <div class="fd-filters"><div class="fd-tabs">${tabs.map(([key,label])=>`<button class="${frontDeskTab===key?'active':''}" data-frontdesk-tab="${key}">${label}</button>`).join('')}</div><input id="frontDeskSearch" type="search" placeholder="Search customers or bookings…" value="${esc(frontDeskTerm)}"></div>
+        <section class="op-card fd-queue"><header class="fd-queue-header"><h2>Incoming Bookings &amp; Inquiries</h2><div class="fd-queue-header-tools"><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search customers or bookings…" value="${esc(frontDeskTerm)}"><div class="fd-tabs">${tabs.map(([key,label])=>`<button class="${frontDeskTab===key?'active':''}" data-frontdesk-tab="${key}">${label}</button>`).join('')}</div></div></header>
           <div class="fd-table-scroll" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<table class="fd-table"><thead><tr><th>Date</th><th>Customer / Request</th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}<th>Actions</th></tr></thead><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table>`:'<div id="frontDeskJobList"></div>'}</div>
           </section>
         <div class="fd-metrics">${metric('New Inquiries',enquiries.length,'Awaiting response')}${metric('Pending Deposits',due.length,'Awaiting payment')}${metric('Needs Confirmation',pending.length,'Review and confirm')}${metric('Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
