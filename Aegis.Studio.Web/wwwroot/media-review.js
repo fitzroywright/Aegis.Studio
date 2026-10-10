@@ -21,11 +21,11 @@
       <div class="studio-media-workspace"><section class="studio-media-panel studio-media-browser"><h2>Media Destinations</h2>
         <div class="studio-media-tree-layout">
           <div><input id="studioMediaJobSearch" type="search" placeholder="Search Workspaces, Jobs, Collections, Subjects…" aria-label="Search media destinations"><div id="studioMediaTree" class="studio-media-tree" role="tree"></div><small id="studioMediaJobMatches"></small></div>
-          <div class="studio-media-tree-summary"><strong id="studioMediaPath">Select a destination</strong><p id="studioMediaDestinationNotice"></p><button type="button" class="action" id="studioMediaOpenJob" disabled>Open Job Details ↗</button></div>
+          
         </div>
         <div class="studio-media-targets" hidden><select id="studioMediaJob"><option value="">Select Job</option></select><select id="studioMediaCollection"><option value="Unclassified">Unclassified</option></select><select id="studioMediaSubject"><option value="">No Subject</option></select></div>
       </section>
-      <div class="studio-media-main"><section class="studio-media-panel studio-media-upload"><h2>Upload Files</h2>
+      <div class="studio-media-main"><div class="studio-media-tree-summary studio-media-announcement" role="status"><div class="studio-media-announcement-copy"><small>Selected destination</small><strong id="studioMediaPath">Select a destination</strong><p id="studioMediaDestinationNotice"></p></div><button type="button" class="action" id="studioMediaOpenJob" disabled>Open Job Details ↗</button></div><section class="studio-media-panel studio-media-upload"><h2>Upload Files</h2>
         <div class="studio-media-drop" id="studioMediaDrop" tabindex="0"><span aria-hidden="true">⇧</span><strong>Drag files here to upload</strong><p>Or choose images and other media from your device</p><button type="button" class="primary" id="studioMediaChoose">Choose Files</button><input type="file" id="studioMediaFiles" multiple hidden></div>
         <div class="studio-media-upload-actions"><span id="studioMediaProgress" role="status">Select a Job and files to begin.</span><button class="primary" id="studioMediaUpload" type="button" disabled>Upload Selected Files</button></div>
       </section>
