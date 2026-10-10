@@ -209,7 +209,7 @@
         const filteredJobs=searchedJobs.filter(job=>(!state.jobStatusFilter||String(job.status||'Unknown')===state.jobStatusFilter)&&(!state.jobRoleFilter||roleForJob(job)===state.jobRoleFilter));
         const sortedJobs=[...filteredJobs].sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0));
         const footerCount=document.getElementById('studioFooterRate');
-        if(footerCount)footerCount.textContent=sortedJobs.length+' '+(sortedJobs.length===1?'job':'jobs');
+        if(footerCount)footerCount.textContent=sortedJobs.length+' '+(sortedJobs.length===1?'row':'rows');
         const emptyJobText=(state.jobSearch||state.jobStatusFilter||state.jobRoleFilter)?'No jobs match your filters':state.jobView==='led'?'You are not the Lead on any Jobs':state.jobView==='involved'?'You are not involved in any jobs':'No jobs found';
         const media=Array.isArray(state.media)?state.media:[];
         const announcements=Array.isArray(state.announcements)?state.announcements:[];
@@ -330,11 +330,11 @@
         const workspaceRows=availableWorkspaces.map(w=>`<button type="button" data-mw-workspace="${esc(w.id)}">▣ <span>${esc(w.name)}</span></button>`).join('')
             ||'<div class="mw-empty">No accessible workspaces.</div>';
         const markup=`
-            <section class="mw-page mw-today-page">
+            <section class="mw-page mw-today-page studio-dashboard-template">
                 
                 
-                <div class="mw-today-layout">
-                    <main class="mw-today-center">
+                <div class="mw-today-layout studio-dashboard-template__columns">
+                    <main class="mw-today-center studio-dashboard-template__primary">
                         <section class="mw-list-panel mw-today-jobs" data-mw-region="jobs">
                             <div class="mw-today-job-toolbar">
                                 <div class="mw-today-view-tabs" role="group" aria-label="Job view">
@@ -348,7 +348,7 @@
                             <div class="mw-today-job-list">${phase('jobs',mainJobRows)}</div>
                         </section>
                     </main>
-                    <aside class="mw-today-right" aria-label="Daily activity">
+                    <aside class="mw-today-right studio-dashboard-template__aside" aria-label="Daily activity">
                         <section class="mw-list-panel" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button data-nav="schedule">Calendar →</button></header><div class="mw-section-rows">${phase('schedule',sessionRows)}</div></section>
                         <section class="mw-list-panel" data-mw-region="attention"><header><h2><span class="studio-card-icon" aria-hidden="true">⚑</span> Needs Attention</h2><button data-nav="tasks">View All →</button></header><div class="mw-status-list">
                             <button class="mw-status-row warning" data-nav="tasks"><span class="studio-attention-label"><span aria-hidden="true">◷</span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
@@ -376,44 +376,6 @@
             if(focused)existing.querySelector('[data-mw-filter="'+focused+'"]')?.focus();
         });
         state.root=genericView.querySelector('.mw-page');
-        // Match the Jobs card to the actual vertical span of the right rail cards.
-        // The rail is content-sized; a viewport or vh height cannot reliably align them.
-        const jobsCard=genericView.querySelector('.mw-today-jobs');
-        const rightRail=genericView.querySelector('.mw-today-right');
-        if(jobsCard&&rightRail){
-            const syncJobsHeight=()=>{
-                if(!state.active()||!jobsCard.isConnected||!rightRail.isConnected)return;
-                const railCards=[...rightRail.querySelectorAll(':scope > section')];
-                if(!railCards.length)return;
-                const top=railCards[0].getBoundingClientRect().top;
-                const bottom=railCards[railCards.length-1].getBoundingClientRect().bottom;
-                const height=Math.max(0,Math.round(bottom-top));
-                if(height>0)jobsCard.style.height=height+'px';
-                // Align the persistent left rail's three cards to the same
-                // top and bottom as the right rail, without changing their content.
-                const leftRail=document.getElementById('studioContextRail');
-                if(leftRail){
-                    const bounds=leftRail.getBoundingClientRect();
-                    const topPadding=Math.max(0,Math.round(top-bounds.top));
-                    const bottomPadding=Math.max(0,Math.round(bounds.bottom-bottom));
-                    leftRail.style.paddingTop=topPadding+'px';
-                    leftRail.style.paddingBottom=bottomPadding+'px';
-                }
-            };
-            if(state.jobsHeightRail!==rightRail){
-                state.jobsHeightObserver?.disconnect();
-                state.jobsHeightRail=rightRail;
-                if(typeof ResizeObserver!=='undefined'){
-                    state.jobsHeightObserver=new ResizeObserver(syncJobsHeight);
-                    [...rightRail.querySelectorAll(':scope > section')].forEach(card=>state.jobsHeightObserver.observe(card));
-                }
-            }
-            requestAnimationFrame(syncJobsHeight);
-        }
-        const todayHeading=genericView.querySelector('.mw-today-heading');
-        if(todayHeading && studioBreadcrumb && studioBreadcrumb.parentElement!==todayHeading){
-            todayHeading.appendChild(studioBreadcrumb);
-        }
         window.studioSetBreadcrumb?.([{label:'Today',view:'today'}]);
         if(studioPageTools){
             const today=new Date();
