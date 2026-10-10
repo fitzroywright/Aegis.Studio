@@ -127,14 +127,14 @@ function renderFrontDesk(){
         const arrow=frontDeskSort.column===key?(frontDeskSort.direction===1?' ↑':' ↓'):' ↕';
         return '<th class="fd-column-head"><div class="fd-column-controls"><button type="button" data-fd-sort="'+key+'" aria-label="Sort by '+label+'">'+label+arrow+'</button><select data-fd-filter="'+key+'" aria-label="Filter '+label+'"><option value="">All</option>'+options+'</select></div></th>';
     };
-    const rows=filtered.map(e=>`<tr class="fd-speedbump-row" tabindex="0" role="link" aria-label="Open ${esc(e.name)}" data-fd-row-open="${esc(e.id)}"><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}</td><td>${pill(e.source,'source')}</td><td><button type="button" class="action" data-fd-open="${esc(e.id)}" aria-label="Open ${esc(e.name)}">›</button></td></tr>`).join('');
+    const rows=filtered.map(e=>`<tr class="fd-speedbump-row" tabindex="0" role="link" aria-label="Open ${esc(e.name)}" data-fd-row-open="${esc(e.id)}"><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}</td><td>${pill(e.source,'source')}</td><td class="fd-row-chevron" aria-hidden="true">›</td></tr>`).join('');
     const metric=(key,label,count,note)=>`<button type="button" class="fd-metric fd-metric-link${frontDeskMetricView===key?' is-active':''}" data-fd-metric="${key}" aria-pressed="${frontDeskMetricView===key}"><span>${esc(label)}</span><strong>${count}</strong><small>${esc(note)}</small></button>`;
     genericView.innerHTML=`<div class="fd-page">
       
       <div class="fd-layout"><div class="fd-main">
         
         <section class="op-card fd-queue"><header class="fd-queue-header"><h2>Incoming Bookings &amp; Inquiries</h2><div class="fd-queue-header-tools"><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search customers or bookings…" value="${esc(frontDeskTerm)}"><div class="fd-tabs">${tabs.map(([key,label])=>`<button class="${frontDeskTab===key?'active':''}" data-frontdesk-tab="${key}">${label}</button>`).join('')}</div></div></header>
-          <div class="fd-table-scroll" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<table class="fd-table"><thead><tr><th>Date</th><th>Customer / Request</th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}<th>Actions</th></tr></thead><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table>`:'<div id="frontDeskJobList"></div>'}</div>
+          <div class="fd-table-scroll" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<table class="fd-table"><thead><tr><th>Date</th><th>Customer / Request</th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}<th aria-label="Open Record"></th></tr></thead><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table>`:'<div id="frontDeskJobList"></div>'}</div>
           </section>
         <div class="fd-metrics">${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}${metric('confirmation','Needs Confirmation',pending.length,'Review and confirm')}${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
       </div><div class="fd-secondary">
@@ -182,17 +182,21 @@ function renderFrontDesk(){
     genericView.querySelector('#frontDeskSearch').oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();genericView.querySelector('#frontDeskSearch')?.focus();};
     genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openWorkspaceJob(b.dataset.frontdeskJob));
     genericView.querySelectorAll('[data-fd-row-open]').forEach(row=>{
-        const open=()=>row.querySelector('[data-fd-open]')?.click();
+        const open=()=>{
+            const e=entries.find(item=>String(item.id)===row.dataset.fdRowOpen);
+            if(e?.jobId)openWorkspaceJob(e.jobId);
+            else if(e?.conversationId)openPendingBookingForm(frontDeskEnquiries.find(item=>item.id===e.conversationId));
+        };
         row.addEventListener('click',event=>{
             if(event.target.closest('button,a,input,select'))return;
             open();
         });
         row.addEventListener('keydown',event=>{
             if(event.target!==row||!['Enter',' '].includes(event.key))return;
-            event.preventDefault();open();
+            event.preventDefault();
+            open();
         });
     });
-    genericView.querySelectorAll('[data-fd-open]').forEach(b=>b.onclick=()=>{const e=entries.find(x=>x.id===b.dataset.fdOpen);if(e?.jobId)openWorkspaceJob(e.jobId);else if(e?.conversationId)openPendingBookingForm(frontDeskEnquiries.find(x=>x.id===e.conversationId));});
     genericView.querySelectorAll('[data-fd-enquiry]').forEach(b=>b.onclick=()=>openPendingBookingForm(frontDeskEnquiries.find(e=>e.id===b.dataset.fdEnquiry)));
     if(!['today','requests','enquiries'].includes(frontDeskTab))renderFrontDeskRows();
 }
