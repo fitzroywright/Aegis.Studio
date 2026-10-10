@@ -8,7 +8,7 @@
     genericView.innerHTML='<div class="today-loading">Loading Media Review & Upload…</div>';
     let jobs=[];
     try{
-      const result=await json('/api/today/jobs');
+      const result=await json('/api/jobs');
       jobs=Array.isArray(result)?result:Array.isArray(result?.jobs)?result.jobs:[];
     }catch(error){
       if(current!==revision)return;
@@ -25,7 +25,7 @@
         </div>
         <div id="studioMediaDestinationNotice" class="studio-media-notice" hidden></div>
         <div class="studio-media-targets">
-          <label>Job<select id="studioMediaJob"><option value="">Select a Job…</option>${jobs.map(j=>'<option value="'+escMedia(j.id)+'">'+escMedia(j.title||j.name||j.clientName||j.id)+'</option>').join('')}</select></label>
+          <label>Job — All Workspaces<input id="studioMediaJobSearch" type="search" placeholder="Search Job, customer, reference or workspace…" autocomplete="off"><select id="studioMediaJob"><option value="">Select a Job…</option></select><small id="studioMediaJobMatches" role="status"></small></label>
           <label>Collection<select id="studioMediaCollection"><option value="Unclassified">Unclassified</option></select></label>
           <label>Subject<select id="studioMediaSubject"><option value="">No Subject</option></select></label>
         </div>
@@ -38,6 +38,19 @@
         <div class="studio-media-gallery" id="studioMediaGallery"><p class="muted">Select a Job to view its media.</p></div>
       </section></div>`;
     const root=genericView.querySelector('.studio-media-page'),job=root.querySelector('#studioMediaJob'),collection=root.querySelector('#studioMediaCollection'),subject=root.querySelector('#studioMediaSubject'),files=root.querySelector('#studioMediaFiles'),upload=root.querySelector('#studioMediaUpload'),progress=root.querySelector('#studioMediaProgress'),gallery=root.querySelector('#studioMediaGallery'),count=root.querySelector('#studioMediaCount'),notice=root.querySelector('#studioMediaDestinationNotice');
+    const search=root.querySelector('#studioMediaJobSearch'),matches=root.querySelector('#studioMediaJobMatches');
+    const workspaceNames=new Map((typeof workspaceCache!=='undefined'&&Array.isArray(workspaceCache)?workspaceCache:[]).map(w=>[String(w.id),w.name||'']));
+    const describe=j=>[j.title||j.name||'Untitled Job',j.clientName||j.customerName||'',workspaceNames.get(String(j.workspaceId))||j.workspaceName||'',j.jobNumber||j.reference||''].filter(Boolean).join(' · ');
+    function filterJobs(){
+      const query=search.value.trim().toLocaleLowerCase();
+      const filtered=jobs.filter(j=>!query||[describe(j),j.id].join(' ').toLocaleLowerCase().includes(query)).slice(0,150);
+      const selected=job.value;
+      job.innerHTML='<option value="">Select a Job…</option>'+filtered.map(j=>'<option value="'+escMedia(j.id)+'">'+escMedia(describe(j))+'</option>').join('');
+      if(filtered.some(j=>String(j.id)===selected))job.value=selected;
+      matches.textContent=filtered.length+' matching Jobs'+(jobs.length>150?' (first 150 shown; refine search)':'');
+    }
+    search.addEventListener('input',filterJobs);
+    filterJobs();
     let selectedFiles=[],assets=[],media=null;
     const destination=()=>root.querySelector('input[name="mediaDestination"]:checked').value;
     function sync(){
