@@ -49,6 +49,7 @@ public sealed class OperationalWorkStore
     {
         JobActivity current = GetActivity(id) ?? throw new KeyNotFoundException("Activity was not found.");
         string status = NormalizeStatus(request.Status);
+        using(var guard=database.OpenConnection())CommercialTemplateStore.GuardTask(guard,null,id,status);
         if(status=="Completed")
         {
             using var c=database.OpenConnection();using var cmd=new NpgsqlCommand("select exists(select 1 from studio_production_items where activity_id=$1 and qc_state not in ('Passed','Cancelled'))",c);cmd.Parameters.AddWithValue(id);

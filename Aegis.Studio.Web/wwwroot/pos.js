@@ -7,109 +7,12 @@ let posClientRequestId = null;
 let posCatalog = [];
 let posDeviceAgentBaseUrl = null;
 
-async function showPos() {
-    conversationView.classList.add('hidden');
-    genericView.classList.remove('hidden');
+async function showPos(){return pickFrontDeskFinancialAction('NewSale');}
+async function openPos(jobId,applyToBalance=false){return launchFrontDeskPos(applyToBalance?'TakePayment':'NewSale',{jobId});}
 
-    const [jobs, catalog, diagnostics, me] = await Promise.all([
-        json('/api/jobs'),
-        json('/api/pos/catalog'),
-        json('/api/pos/diagnostics'),
-        json('/api/auth/me')
-    ]);
-    posCatalog = catalog;
-    const sales = diagnostics.sales;
+async function showPosCatalogManager(){return studioNavigate('catalog');}
 
-    genericView.innerHTML = `
-        <div class="job-detail-header">
-            <div>
-                <h1>P O S</h1>
-                <p>Job-linked sales, tenders, receipts, refunds and audit history.</p>
-            </div>
-            ${(me.user || me).isAdministrator ? '<button class="action" onclick="showPosCatalogManager()">Manage Catalog</button>' : ''}
-        </div>
-        <div class="cards">
-            <div class="metric">Completed sales<strong>${sales.completedSales}</strong></div>
-            <div class="metric">Gross completed<strong>${money(sales.grossCompleted)}</strong></div>
-            <div class="metric">Refunded<strong>${money(sales.refunded)}</strong></div>
-            <div class="metric">Active catalog items<strong>${catalog.length}</strong></div>
-        </div>
-        <h2>Select a job</h2>
-        ${jobs.map(job => `
-            <button class="job-row job-button" onclick="openPos('${job.id}')">
-                <div><b>${esc(job.title)}</b><div class="meta">${esc(job.clientName)}${job.eventDate ? ' · ' + esc(job.eventDate) : ''}</div></div>
-                <span class="status-pill">Open P O S</span>
-            </button>`).join('') || '<p class="muted">No jobs are available.</p>'}`;
-}
-
-async function showPosCatalogManager() {
-    const [items, me] = await Promise.all([
-        json('/api/admin/pos/catalog/'),
-        json('/api/auth/me')
-    ]);
-    if (!(me.user || me).isAdministrator) {
-        alert('Administrator access is required.');
-        return;
-    }
-
-    genericView.innerHTML = `
-        <div class="job-detail-header">
-            <div><button class="link-button" onclick="showPos()">← P O S</button><h1>P O S Catalog</h1><p>Maintain reusable Studio products and services.</p></div>
-        </div>
-        <section class="pos-panel">
-            <div class="pos-entry">
-                <label>Code<input id="catalogCode" placeholder="SESSION"></label>
-                <label>Name<input id="catalogName" placeholder="Portrait Session"></label>
-                <label>Category<input id="catalogCategory" placeholder="Sessions"></label>
-                <label>Price<input id="catalogPrice" type="number" min="0" step="0.01"></label>
-                <button class="primary" onclick="savePosCatalogItem()">Add Item</button>
-            </div>
-        </section>
-        <section class="pos-history">
-            <table class="pos-grid">
-                <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Price</th><th>Status</th><th></th></tr></thead>
-                <tbody>${items.map(item => `<tr>
-                    <td>${esc(item.code)}</td><td>${esc(item.name)}</td><td>${esc(item.category)}</td><td>${money(item.unitPrice)}</td>
-                    <td>${item.isActive ? 'Active' : 'Inactive'}</td>
-                    <td><button class="link-button" onclick='editPosCatalogItem(${JSON.stringify(JSON.stringify(item))})'>Edit</button></td>
-                </tr>`).join('') || '<tr><td colspan="6" class="muted">No catalog items yet.</td></tr>'}</tbody>
-            </table>
-        </section>`;
-}
-
-async function savePosCatalogItem(existingId = null) {
-    const request = {
-        code: document.getElementById('catalogCode').value.trim(),
-        name: document.getElementById('catalogName').value.trim(),
-        category: document.getElementById('catalogCategory').value.trim(),
-        unitPrice: Number(document.getElementById('catalogPrice').value),
-        isActive: true,
-        sortOrder: 0
-    };
-    if (!request.name || !Number.isFinite(request.unitPrice) || request.unitPrice < 0) {
-        alert('Name and a valid non-negative price are required.');
-        return;
-    }
-    await json(existingId ? `/api/admin/pos/catalog/${existingId}` : '/api/admin/pos/catalog/', {
-        method: existingId ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request)
-    });
-    await showPosCatalogManager();
-}
-
-function editPosCatalogItem(serialized) {
-    const item = JSON.parse(serialized);
-    document.getElementById('catalogCode').value = item.code || '';
-    document.getElementById('catalogName').value = item.name || '';
-    document.getElementById('catalogCategory').value = item.category || '';
-    document.getElementById('catalogPrice').value = item.unitPrice;
-    const button = genericView.querySelector('.pos-entry .primary');
-    button.textContent = 'Save Changes';
-    button.onclick = () => savePosCatalogItem(item.id);
-}
-
-async function openPos(jobId,applyToBalance=false) {
+async function openPosTransaction(jobId,applyToBalance=false) {
     posApplyToJobBalance=applyToBalance;
     conversationView.classList.add('hidden');
     genericView.classList.remove('hidden');
@@ -134,7 +37,7 @@ async function openPos(jobId,applyToBalance=false) {
                 <h1>P O S — ${esc(job.clientName)}</h1>
                 <p>${esc(job.title)} · ${job.eventDate ? esc(job.eventDate) + ' · ' : ''}${esc(job.status)}</p>
             </div>
-            <button class="action" onclick="openPos('${jobId}',true)">Take balance payment</button><button class="action" onclick="showPos()">All P O S Jobs</button>
+            
         </div>
         <div class="pos-layout">
             <section class="pos-panel">
@@ -175,6 +78,7 @@ async function openPos(jobId,applyToBalance=false) {
             <div id="posHistory">${renderPosHistory(sales)}</div>
         </section>`;
     renderPosCatalog();
+    const auth=await json('/api/auth/me');if(!(auth.user||auth).isAdministrator)document.querySelector('.pos-manual-charge')?.setAttribute('hidden','');
     if(applyToBalance){document.getElementById('posCatalogSearch').disabled=true;document.querySelector('.pos-manual-charge').hidden=true;const input=document.getElementById('posBalancePayment');input.onchange=()=>{const amount=Number(input.value);if(!Number.isFinite(amount)||amount<=0||amount>studioFinancials(job).balance){alert('Enter a positive amount within the outstanding balance.');return;}posDraftLines=[{code:'BALANCE',description:'Payment toward job balance',unitPrice:amount,quantity:1}];renderPosDraft();};}
     renderPosDraft();
     refreshDeviceStatus('posDeviceStatus');
@@ -188,20 +92,17 @@ function renderPosCatalog() {
     target.innerHTML = items.length ? items.map(item => `
         <button class="pos-catalog-item" onclick="addCatalogPosLine('${item.id}')">
             <span><b>${esc(item.name)}</b><small>${esc(item.category)}${item.code ? ' · ' + esc(item.code) : ''}</small></span>
-            <strong>${money(item.unitPrice)}</strong>
+            <strong>${money(item.unitPrice*(1+(item.taxRate||0)/100))}</strong>
         </button>`).join('') : '<p class="muted">No matching catalog items. Use Manual charge if needed.</p>';
 }
 
-function addCatalogPosLine(itemId) {
-    const item = posCatalog.find(value => value.id === itemId);
-    if (!item||posApplyToJobBalance) return;
-    const existing = posDraftLines.find(line => line.catalogItemId === itemId && line.unitPrice === item.unitPrice);
-    if (existing) {
-        existing.quantity += 1;
-    } else {
-        posDraftLines.push({ catalogItemId: itemId, code: item.code || '', description: item.name, unitPrice: item.unitPrice, quantity: 1 });
-    }
-    renderPosDraft();
+async function addCatalogPosLine(itemId) {
+    const item=posCatalog.find(p=>p.id===itemId);if(!item||posApplyToJobBalance)return;
+    const me=await json('/api/auth/me');const user=me.user||me;const authorized=user.isAdministrator||user.roles?.includes('Operations Manager');
+    let assets=[];if(item.requiresProduction)try{const media=await json(`/api/jobs/${posJobId}/media`);assets=(media.assets||[]).filter(a=>a.approvedVersionId);}catch{}
+    const standard=Math.round(item.unitPrice*(1+(item.taxRate||0)/100)*100)/100;
+    const d=studioDialog(item.name,`<form class="commercial-form"><label>Quantity<input name="quantity" type="number" min="1" value="1" required></label>${Object.entries(item.options||{}).map(([name,values])=>`<label>${esc(name)}<select data-option="${esc(name)}">${values.map(v=>`<option>${esc(v)}</option>`).join('')}</select></label>`).join('')}<label>Specifications<textarea name="specifications"></textarea></label><label>Unit price including tax<input name="price" type="number" min="0" step=".01" value="${standard}" ${authorized?'':'readonly'}></label>${authorized?'<label>Authorized discount %<input name="discount" type="number" min="0" max="100" step=".01" value="0"></label>':''}${item.requiresProduction?`<label>Approved image<select name="asset"><option value="">Choose during production</option>${assets.map(a=>`<option value="${a.id}">${esc(a.fileName||a.assetKey)}</option>`).join('')}</select></label>`:''}<button class="primary">Add to sale</button><p role="alert"></p></form>`);
+    d.querySelector('form').onsubmit=e=>{e.preventDefault();const f=e.target;const specs=[...f.querySelectorAll('[data-option]')].map(x=>`${x.dataset.option}: ${x.value}`);if(f.elements.specifications.value)specs.push(f.elements.specifications.value);posDraftLines.push({catalogItemId:item.id,code:item.code,description:item.name,unitPrice:Number(f.elements.price.value),discountPercent:Number(f.elements.discount?.value||0),quantity:Number(f.elements.quantity.value),specifications:specs.join(' · '),sourceAssetId:f.elements.asset?.value||null});d.close();renderPosDraft();};
 }
 
 function addPosLine() {
@@ -253,13 +154,14 @@ function removePosTender(index) {
 }
 
 function renderPosDraft() {
+    if(window.persistPosWindowDraft)persistPosWindowDraft();
     const cart = document.getElementById('posCart');
     const tenderList = document.getElementById('posTenderList');
     if (!cart || !tenderList) return;
 
     cart.innerHTML = posDraftLines.length ? `
         <table class="pos-grid"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th><th></th></tr></thead><tbody>
-        ${posDraftLines.map((line, index) => `<tr><td>${esc(line.description)}</td><td><button class="qty-button" onclick="changePosLineQuantity(${index},-1)">−</button> ${line.quantity} <button class="qty-button" onclick="changePosLineQuantity(${index},1)">+</button></td><td>${money(line.unitPrice)}</td><td>${money(line.unitPrice * line.quantity)}</td><td><button class="link-button" onclick="removePosLine(${index})">Remove</button></td></tr>`).join('')}
+        ${posDraftLines.map((line, index) => `<tr><td>${esc(line.description)}</td><td><button class="qty-button" onclick="changePosLineQuantity(${index},-1)">−</button> ${line.quantity} <button class="qty-button" onclick="changePosLineQuantity(${index},1)">+</button></td><td>${money(line.unitPrice)}</td><td>${money(line.unitPrice * (1-(line.discountPercent||0)/100) * line.quantity)}</td><td><button class="link-button" onclick="removePosLine(${index})">Remove</button></td></tr>`).join('')}
         </tbody></table>` : '<p class="muted">Cart is empty.</p>';
 
     tenderList.innerHTML = posDraftTenders.length ? `
@@ -267,7 +169,7 @@ function renderPosDraft() {
         ${posDraftTenders.map((tender, index) => `<tr><td>${esc(tender.kind)}</td><td>${money(tender.amount)}</td><td>${esc(tender.reference || '')}</td><td><button class="link-button" onclick="removePosTender(${index})">Remove</button></td></tr>`).join('')}
         </tbody></table>` : '<p class="muted">No tender entered yet.</p>';
 
-    const saleTotal = posDraftLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+    const saleTotal = posDraftLines.reduce((sum, line) => sum + Math.round(line.unitPrice*(1-(line.discountPercent||0)/100)*100)/100 * line.quantity, 0);
     const tenderTotal = posDraftTenders.reduce((sum, tender) => sum + tender.amount, 0);
     const balance = saleTotal - tenderTotal;
     document.getElementById('posTotal').textContent = money(saleTotal);
@@ -280,7 +182,7 @@ function renderPosDraft() {
 }
 
 async function completePosSale() {
-    const saleTotal = posDraftLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+    const saleTotal = posDraftLines.reduce((sum, line) => sum + Math.round(line.unitPrice*(1-(line.discountPercent||0)/100)*100)/100 * line.quantity, 0);
     const tenderTotal = posDraftTenders.reduce((sum, tender) => sum + tender.amount, 0);
     if (!posDraftLines.length) {
         alert('Add at least one sale line.');
@@ -310,8 +212,9 @@ async function completePosSale() {
         });
 
         sendSaleToDeviceAgent(posCreatedSale);
+        if(window.posCompleted)posCompleted();
         await showPosReceipt(posCreatedSale.id, true);
-        await openPos(posJobId);
+        await openPosTransaction(posJobId);
     } catch (error) {
         alert('Sale could not be completed: ' + error.message);
         if (button) {
@@ -364,7 +267,8 @@ async function showPosReceipt(saleId, justCompleted = false) {
 
 const posRefundAttempts=new Map();
 async function refundPosSale(saleId) {
-    if(posRefundAttempts.has(saleId)){await json(`/api/pos/sales/${saleId}/refunds`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(posRefundAttempts.get(saleId))});posRefundAttempts.delete(saleId);await openPos(posJobId);return;}
+    if(posRefundAttempts.has(saleId)){await json(`/api/pos/sales/${saleId}/refunds`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(posRefundAttempts.get(saleId))});posRefundAttempts.delete(saleId);if(window.posCompleted)posCompleted();
+        if(window.posLaunch?.action==='IssueRefund'){genericView.innerHTML='<h2>Refund recorded</h2>';return;}await openPosTransaction(posJobId);return;}
     const sale = await json('/api/pos/sales/' + saleId);
     const reason = prompt('Refund reason:');
     if (!reason || !reason.trim()) return;
@@ -380,7 +284,7 @@ async function refundPosSale(saleId) {
         unitPrice: line.unitPrice,
         quantity: Math.max(0, line.quantity - (refundedByLine.get(line.id) || 0))
     })).filter(line => line.quantity > 0);
-    const amount = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+    const amount = lines.reduce((sum, line) => sum + Math.round(line.unitPrice*(1-(line.discountPercent||0)/100)*100)/100 * line.quantity, 0);
     if (!lines.length || amount <= 0) {
         alert('This sale is already fully refunded.');
         return;
@@ -390,7 +294,9 @@ async function refundPosSale(saleId) {
     if (!confirm(`Refund ${money(amount)} using ${method}?`)) return;
     const request={operationId:crypto.randomUUID(),lines,tenders:[{kind:method,amount,reference:'Refund'}],reason:reason.trim()};posRefundAttempts.set(saleId,request);
     await json(`/api/pos/sales/${saleId}/refunds`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request)});posRefundAttempts.delete(saleId);
-    await openPos(posJobId);
+    if(window.posCompleted)posCompleted();
+    if(typeof posLaunch!=='undefined'&&posLaunch?.action==='IssueRefund'){genericView.innerHTML='<h2>Refund recorded</h2>';return;}
+    await openPosTransaction(posJobId);
 }
 
 async function voidPosSale(saleId) {
@@ -401,7 +307,9 @@ async function voidPosSale(saleId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: reason.trim() })
     });
-    await openPos(posJobId);
+    if(window.posCompleted)posCompleted();
+    if(typeof posLaunch!=='undefined'&&posLaunch?.action==='IssueRefund'){genericView.innerHTML='<h2>Refund recorded</h2>';return;}
+    await openPosTransaction(posJobId);
 }
 
 async function loadDeviceAgentBaseUrl() {

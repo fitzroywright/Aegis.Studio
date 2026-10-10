@@ -12,7 +12,7 @@ public static class WorkflowEndpoints
     {
         app.MapGet("/api/workflow/jobs",(ClaimsPrincipal user,WorkflowStore store)=>Results.Ok(store.Monitor(user))).RequireAuthorization();
         app.MapGet("/api/jobs/{job:guid}/connected-workflow",(Guid job,ClaimsPrincipal user,WorkflowStore store)=>Run(()=>Results.Ok(store.View(job,user)))).RequireAuthorization();
-        app.MapPost("/api/jobs/{job:guid}/connected-workflow",(Guid job,WorkflowCommand request,ClaimsPrincipal user,WorkflowStore store)=>Run(()=>Results.Ok(store.Execute(job,request,user)))).RequireAuthorization();
+        app.MapPost("/api/jobs/{job:guid}/connected-workflow",(Guid job,WorkflowCommand request,ClaimsPrincipal user,WorkflowStore store)=>Run(()=>request.Action=="publish"?Results.BadRequest(new{error="Publish approved collections through Job Gallery."}):Results.Ok(store.Execute(job,request,user)))).RequireAuthorization();
         app.MapGet("/api/workflow/workspaces",(ClaimsPrincipal user,WorkflowStore workflow,WorkspaceStore store)=>Results.Ok(store.GetAll().Where(w=>w.IsEnabled&&(workflow.IsFrontDesk(user)||workflow.Manager(user,w.Id))))).RequireAuthorization();
         app.MapGet("/api/workflow/assignment-requests",(ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>
         {

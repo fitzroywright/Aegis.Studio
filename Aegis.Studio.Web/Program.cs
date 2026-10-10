@@ -275,6 +275,8 @@ app.MapMediaProduction();
 app.MapMediaBulkSelection();
 app.MapProductionItems();
 app.MapProductionOrders();
+app.MapCommercialProduction();
+app.MapFrontDeskPosLaunch();
 app.MapJobLifecycle();
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
 Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(app.Services.GetRequiredService<StudioDatabase>());
@@ -599,7 +601,7 @@ app.MapPost("/api/jobs/{jobId:guid}/pos/sales", (Guid jobId, CreateStudioSaleReq
     if (studio.GetJob(jobId) is null) return Results.NotFound();
     if (!access.HasPermission(user, jobId, "UsePos")) return Results.Forbid();
     if (request.Lines is null || request.Lines.Count == 0 || request.Lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.UnitPrice < 0m || x.Quantity <= 0)) return Results.BadRequest(new { error = "At least one valid sale line is required." });
-    try { Sale sale = pos.Create(jobId, request, studio, context.User.Identity?.Name ?? "Studio"); return Results.Created($"/api/pos/sales/{sale.Id}", sale); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
+    try { Sale sale = pos.Create(jobId, request, studio, context.User.Identity?.Name ?? "Studio", context.User.IsInRole("Administrator") || context.User.IsInRole("Operations Manager")); return Results.Created($"/api/pos/sales/{sale.Id}", sale); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
 });
 app.MapGet("/api/pos/sales/{saleId:guid}", (Guid saleId, StudioPosStore pos) => pos.Get(saleId) is Sale sale ? Results.Ok(sale) : Results.NotFound());
 app.MapPost("/api/pos/sales/{saleId:guid}/complete", (Guid saleId, CompleteStudioSaleRequest request, HttpContext context, StudioStore studio, StudioPosStore pos) => { if (pos.Get(saleId) is null) return Results.NotFound(); string userId = context.User.Identity?.Name ?? "Studio"; try { return Results.Ok(pos.Complete(saleId, request, studio, userId)); } catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); } });
