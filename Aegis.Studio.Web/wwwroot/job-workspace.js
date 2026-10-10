@@ -103,8 +103,8 @@ async function renderJobSubjects(job, panel, current, refresh) {
 
     panel.querySelectorAll('[data-show-media]').forEach(button=>button.onclick=()=>{
         window.studioMediaFocus={jobId:job.id,subjectId:button.dataset.showMedia};
-        const mediaTab=document.querySelector('[data-job-tab="gallery"]');
-        mediaTab?.click();
+        if(panel.studioOpenMedia)panel.studioOpenMedia();
+        else document.querySelector('[data-job-tab="gallery"]')?.click();
     });
 
     if(!canEdit) return;
@@ -122,10 +122,10 @@ async function renderJobSubjects(job, panel, current, refresh) {
     form.querySelector('[data-cancel]').onclick=()=>form.hidden=true;
 
     const rosterButton=panel.querySelector('[data-import-roster]');
-    if(rosterButton)rosterButton.onclick=()=>{
-        const mediaTab=document.querySelector('[data-job-tab="gallery"]');
-        mediaTab?.click();
-        setTimeout(()=>document.querySelector('[data-roster]')?.click(),0);
+    if(rosterButton)rosterButton.onclick=async()=>{
+        if(panel.studioOpenMedia)await panel.studioOpenMedia();
+        else document.querySelector('[data-job-tab="gallery"]')?.click();
+        document.querySelector('[data-roster]')?.click();
     };
 
     form.onsubmit=async event=>{
@@ -216,5 +216,6 @@ async function renderAnnouncementAdministration(){
             finally{button.disabled=false;}
         };
 }
+
 
 

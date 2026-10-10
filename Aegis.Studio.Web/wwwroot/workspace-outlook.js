@@ -18,13 +18,15 @@ function mergeJobMessages(teamMessages, customerMessages) {
     const search = document.createElement('input');
     search.type = 'search';
     let revision = 0;
+    let disposeJobView = () => {};
     let selectedJob = null;
     let tab = 'jobs';
-    const baseConversation = openConversation;
     function empty(title, message) {
-        detailPane.classList.remove('job-reading-view'); document.getElementById('conversationView').classList.remove('has-open-job');
+        disposeJobView();disposeJobView=()=>{};
+        detailPane.classList.remove('job-reading-view','job-detail-page'); document.getElementById('conversationView').classList.remove('has-open-job');
         detailPane.classList.add('empty');
         detailPane.innerHTML = `<div class="empty-state"><h2>${esc(title)}</h2><p>${esc(message)}</p></div>`;
+        window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
     }
     function filter() {
         const term = search.value.trim().toLocaleLowerCase();
@@ -127,7 +129,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
     };
     async function showJobMessages(job) {
         window.studioRememberView?.({view:'workspaces',workspaceId:job.workspaceId,jobId:job.id});
-        const workspace=(window.workspaceCache||[]).find(item=>String(item.id)===String(job.workspaceId));
+        const workspace=workspaceCache.find(item=>String(item.id)===String(job.workspaceId));
         window.studioSetBreadcrumb?.([
             {label:'Workspaces',view:'workspaces'},
             {label:workspace?.name||'Workspace',view:'workspaces',workspaceId:job.workspaceId},
@@ -166,6 +168,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         }
         if (version !== revision) return;
         const combined = mergeJobMessages(messages, conversation?.messages || []);
+        disposeJobView();disposeJobView=()=>{};
         detailPane.classList.remove('empty');
         detailPane.innerHTML = `<div class="detail-header"><div><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><div class="reply-textbox-shell"><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? `<label class="reply-paperclip" title="Attach document" aria-label="Attach document"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8l9.2-9.2"/></svg><input type="file" data-message-file hidden></label>` : ``}</div><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
         const renderMessages = () => {
@@ -173,19 +176,6 @@ function mergeJobMessages(teamMessages, customerMessages) {
             document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}" data-message-id="${esc(m.sourceId||'')}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Customer" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><span class="message-kind">${m.customer ? 'CUSTOMER EXCHANGE' : 'INTERNAL'}</span> ${esc(messageFirstName(m.author, people, m.customer ? 'Customer' : 'Team member', m.loginOnly))} · ${esc(new Date(m.at).toLocaleString())}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
-        if(job){
-            const header=detailPane.querySelector('.detail-header');
-            header.classList.add('studio-job-header');
-            const copy=header.querySelector(':scope > div');
-            copy.classList.add('studio-job-copy');
-            copy.querySelector('p').innerHTML=[
-                '<span class="studio-job-client">'+esc(job.linkedClientName||job.clientName||'Client not linked')+'</span>',
-                '<span class="studio-job-date">'+esc(job.eventDate||'Needs scheduling')+'</span>',
-                '<span class="studio-job-location">Location not set</span>',
-                '<span class="studio-status-pill">'+esc(job.status)+'</span>'
-            ].join('');
-
-        }
         const sender = document.getElementById('jobSendingIdentity');
         const canSend = () => !job || sender?.value === 'Internal' || (!!conversation && (String(conversation.channel).toLowerCase() !== 'email' ? sender?.value === 'Workspace' : identities.some(i => i.type === sender?.value)));
         const syncSend = () => {
@@ -196,214 +186,134 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if(sender) { sender.value = 'Workspace'; sender.onchange = syncSend; }
         syncSend();
         if (scope === 'Job') {
-            detailPane.classList.add('job-reading-view');
-            document.getElementById('conversationView').classList.add('has-open-job');
-
-            const job = selectedJob;
-            const workspaceName=workspaceCache.find(w=>w.id===job.workspaceId)?.name||'Workspace';
-            const current=()=>version===revision;
-
-            const lower=document.createElement('section');
-            lower.className='job-detail-media-column';
-            lower.innerHTML=`
-                <section class="job-center-panel job-media-section">
-                    <header class="job-center-heading">
-                        <h2>▣&nbsp; All Media</h2>
-                        <div class="media-toolbar-host" aria-label="Media toolbar"></div>
-                    </header>
-                    <div class="gallery-tab-filter"></div>
-                    <div class="job-media-content"></div>
-                </section>
-                <section class="job-center-panel job-subjects-section">
-                    <header class="job-center-heading"><h2>♟&nbsp; Subjects</h2><button type="button" class="text-button" data-job-add-subject>＋ Add Subject</button></header>
-                    <div class="job-subjects-content"></div>
-                </section>
-                <section class="job-center-panel job-tasks-section">
-                    <header class="job-center-heading"><h2>Tasks</h2><button type="button" class="text-button" data-job-add-task>＋ Add Task</button></header>
-                    <div class="job-tasks-content"></div>
-                </section>`;
-            detailPane.appendChild(lower);
-            const workflowHost=document.createElement('section');workflowHost.className='studio-job-flow-lights';lower.prepend(workflowHost);
-            if(window.StudioWorkflow)window.StudioWorkflow.render(workflowHost,job.id,current).catch(error=>{workflowHost.textContent=error.message;});
-
-            const messagesPanel=document.getElementById('combinedJobMessages');
-            const composer=document.getElementById('hierarchyCompose');
-            const filesPanel=document.createElement('section');filesPanel.className='thread-shared-files';
-            const nextPanel=document.createElement('section');nextPanel.className='thread-next-tasks';
-            const refreshFiles=()=>renderConversationFiles(job,filesPanel,current,refreshFiles);
-            refreshFiles().catch(error=>{if(current())filesPanel.textContent=error.message;});
-
-            const messageColumn=document.createElement('section');
-            messageColumn.className='job-message-column';
-            const messageHeader=document.createElement('header');
-            messageHeader.className='job-panel-heading';
-            messageHeader.innerHTML='<div><strong>Messages</strong></div><div class="panel-heading-actions"><button type="button" class="icon-button" data-message-search aria-label="Search messages">⌕</button><button type="button" class="icon-button" data-message-more aria-label="Message options">⋮</button></div>';
-            messageColumn.append(messageHeader,messagesPanel,composer);
-
-            const board=document.createElement('div');
-            board.className='job-detail-board';
-            const collections=document.createElement('section');
-            collections.className='job-detail-collections';
-            collections.innerHTML='<header><strong>▰&nbsp; Collections</strong><button type="button" class="action" data-collection-new>＋ New Collection</button></header><div class="job-collection-list"><button class="active" data-collection="">All Media</button><button data-collection="Raw Uploads">Raw Uploads</button><button data-collection="Selections">Selections</button><button data-collection="Retouched">Retouched</button><button data-collection="Album – Main">Album – Main</button><button data-collection="Album – Family">Album – Family</button><button data-collection="Album – Friends">Album – Friends</button><button data-collection="Album – Ceremony">Album – Ceremony</button><button data-collection="Client Gallery">Client Gallery</button></div>';
-            const rightStack=document.createElement('div');rightStack.className='job-detail-right';
-            const quick=document.createElement('section');quick.className='job-detail-quick';quick.innerHTML='<header><strong>▣&nbsp; Quick Actions</strong></header><div><button class="action" data-quick-upload>⇧ Upload Photos</button><button class="action" data-quick-collection>▱ Add to Collection</button><button class="action" data-quick-gallery>◎ Create Client Gallery</button><button class="action" data-quick-task>☑ Add Task</button><button class="action" data-quick-production>⚙ Open in Production</button><button class="action" data-quick-edit>✎ Edit Details</button></div>';
-
+            detailPane.classList.add('job-reading-view','job-detail-page');
+            conversationView.classList.add('has-open-job');
+            let disposed=false,workflowDialog=null;
+            const current=()=>!disposed && version===revision && selectedJob?.id===job.id && detailPane.classList.contains('job-detail-page') && !conversationView.classList.contains('hidden');
             const header=detailPane.querySelector('.detail-header');
-            const existingThumb=header.querySelector('.studio-job-thumb');
-            if(existingThumb) existingThumb.remove();
-
-
-            const meta=document.createElement('section');
-            meta.className='job-meta-strip';
-            const metaItems=[
-                ['Client',job.linkedClientName||job.clientName||'Not linked'],
-                ['Type',job.jobType||job.type||'Photography'],
-                ['Photographer',job.assignedTo?studioFirstName(job.assignedTo):'Unassigned'],
-                ['Workspace',workspaceName],
-                ['Job Code',job.jobCode||job.code||String(job.id).slice(0,12)]
-            ];
-            meta.innerHTML=metaItems.map(([label,value],index)=>'<div class="job-meta-item"><span class="job-meta-icon">'+['♙','♙','●','▥','▧'][index]+'</span><span><small>'+esc(label)+'</small><strong>'+esc(String(value))+'</strong></span></div>').join('');
-
-            const actions=document.createElement('div');
-            actions.className='job-header-actions';
-            actions.innerHTML='<button class="job-status-button" type="button" data-status-action><span></span>'+esc(job.status||'Status')+'⌄</button><button class="job-complete-button" type="button" data-complete-action>✓&nbsp;&nbsp; Mark Complete</button><button class="action more-action" data-more-action aria-label="More job actions">⋮</button>';
-            actions.querySelector('[data-status-action]').onclick=()=>openJobDetailsEditor(job);
-            actions.querySelector('[data-complete-action]').onclick=async()=>{
-                const button=actions.querySelector('[data-complete-action]');
-                button.disabled=true;
-                try{
-                    await json('/api/jobs/'+job.id,{
-                        method:'PUT',
-                        headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({status:'Completed',assignedTo:job.assignedTo||null,eventDate:job.eventDate||null})
-                    });
-                    await openWorkspaceJob(job.id);
-                }catch(error){
-                    alert(error.message||String(error));
-                    button.disabled=false;
-                }
-            };
-            actions.querySelector('[data-more-action]').onclick=()=>{
-                const dialog=studioDialog('Job actions','<div class="job-actions"><button type="button" class="action" data-edit>Edit Details</button><button type="button" class="action" data-calendar>Calendar</button><button type="button" class="action" data-activity>Activity</button></div>');
-                dialog.querySelector('[data-edit]').onclick=()=>{dialog.close();openJobDetailsEditor(job);};
-                dialog.querySelector('[data-calendar]').onclick=async()=>{dialog.close();await renderJobTab('calendar',job,lower.querySelector('.job-tasks-content'),current,()=>{});};
-                dialog.querySelector('[data-activity]').onclick=async()=>{dialog.close();await renderJobTab('activity',job,lower.querySelector('.job-tasks-content'),current,()=>{});};
-            };
-            header.append(actions);
-            header.after(meta);
+            header.className='job-detail-heading';
+            header.innerHTML=`<div class="job-detail-title"><h1>${esc(job.title)}</h1><p>${esc(job.linkedClientName||job.clientName||'Client not linked')} · ${esc(job.eventDate||'Needs scheduling')}</p></div>
+                <button type="button" class="action" data-job-workflow>Assignments &amp; Workflow</button>
+                <div class="job-detail-flow" aria-live="polite"><span class="workflow-light neutral">${esc(job.status)}</span><span data-stage-age></span><span data-job-owner></span><span data-job-blocked></span></div>`;
 
             const nav=document.createElement('nav');
-            nav.className='job-section-tabs';
-            nav.setAttribute('aria-label','Job information');
-            nav.innerHTML='<button data-job-scroll="media" class="active">▣ Media</button><button data-job-scroll="subjects">♙ Subjects</button><button data-job-scroll="tasks">☑ Tasks</button><button data-job-scroll="messages">✉ Messages</button><button data-job-scroll="activity">◷ Activity</button><button data-job-scroll="overview">▧ Details</button>';
-            meta.after(nav,board);
-            detailPane.classList.add('studio-job-today-layout');
-            nav.innerHTML='<button data-job-scroll="media" class="active">▣ Media</button><button data-job-scroll="overview">▤ Details</button><button data-job-scroll="subjects">♙ Subjects</button><button data-job-scroll="tasks">☑ Tasks</button><button data-job-scroll="messages">✉ Messages</button><button data-job-scroll="activity">◷ Activity</button>';
+            nav.className='job-detail-navigation';nav.setAttribute('aria-label','Job information');
+            nav.innerHTML=[['media','▣ Media'],['overview','▤ Details'],['subjects','♙ Subjects'],['tasks','☑ Tasks'],['messages','✉ Messages'],['activity','◷ Activity']].map(([name,label])=>`<button type="button" data-job-scroll="${name}" aria-controls="${name==='messages'?'jobDetailMessages':'jobDetail-'+name}">${label}</button>`).join('');
+            const board=document.createElement('div');board.className='job-detail-board';
+            const center=document.createElement('div');center.className='job-detail-center';
+            const panels={},contents={};
+            for(const [name,title] of [['media','All Media'],['overview','Job Details'],['subjects','Subjects'],['tasks','Tasks'],['activity','Recent Activity']]){
+                const panel=document.createElement('section');panel.className='job-center-panel job-'+(name==='overview'?'details':name)+'-section';panel.id='jobDetail-'+name;panel.hidden=name!=='media';
+                panel.innerHTML=`<header class="job-center-heading"><h2>${title}</h2>${name==='media'?'<div class="media-toolbar-host" aria-label="Media toolbar"></div>':name==='subjects'?'<button type="button" class="text-button" data-job-add-subject hidden>＋ Add Subject</button>':''}</header>${name==='media'?'<div class="gallery-tab-filter"></div>':''}<div class="job-${name}-content"></div>`;
+                panels[name]=panel;contents[name]=panel.querySelector('.job-'+name+'-content');center.append(panel);
+            }
+            const right=document.createElement('aside');right.className='job-detail-right';right.setAttribute('aria-label','Job tools and messages');
+            const selectedFile=document.createElement('section');selectedFile.className='job-center-panel job-detail-selected-file';
+            selectedFile.innerHTML='<header class="job-center-heading"><h2>Selected File</h2></header><div class="job-detail-selected-content"><p class="muted">Select a photo in the gallery to inspect it.</p></div>';
+            const selectedContent=selectedFile.querySelector('.job-detail-selected-content');
+            const messagesPanel=document.getElementById('combinedJobMessages'),composer=document.getElementById('hierarchyCompose');
+            const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.id='jobDetailMessages';
+            const messageHeader=document.createElement('header');messageHeader.className='job-panel-heading';messageHeader.innerHTML='<strong>Messages</strong><div class="panel-heading-actions"><button type="button" class="icon-button" data-message-search aria-label="Search messages">⌕</button><button type="button" class="icon-button" data-message-more aria-label="Show all messages">⋮</button></div>';
+            messageCard.append(messageHeader,messagesPanel,composer);
+            const actions=document.createElement('section');actions.className='job-center-panel job-detail-actions';
+            actions.innerHTML='<header class="job-center-heading"><h2>Actions</h2></header><div><button type="button" class="text-button" data-quick-upload>⇧ Upload Photos</button><button type="button" class="text-button" data-quick-task>☑ View / Add Tasks</button><button type="button" class="text-button" data-quick-edit>✎ Edit Details</button><button type="button" class="text-button" data-quick-production>◆ Production</button></div>';
+            right.append(selectedFile,messageCard,actions);board.append(center,right);detailPane.append(nav,board);
 
-            board.append(lower,rightStack);
-            header.appendChild(workflowHost);
-            lower.querySelector('.job-media-section .job-center-heading').after(collections);
-            rightStack.append(lower.querySelector('.job-subjects-section'),quick);
-            const bottom=document.createElement('section');bottom.className='job-detail-bottom';
-            const activityCard=document.createElement('section');activityCard.className='job-center-panel job-detail-activity-card';activityCard.innerHTML='<header class="job-center-heading"><h2>Recent Activity</h2></header><div class="job-detail-activity-content"></div>';
-            const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.append(messageHeader,messagesPanel,composer);
-            const selectedFile=document.createElement('section');
-            selectedFile.className='job-center-panel studio-job-selected-file';
-            selectedFile.innerHTML='<header class="job-center-heading"><h2>Selected File</h2></header><div class="studio-job-selected-content"><p class="muted">Select a photo in the gallery to inspect it.</p></div>';
-            rightStack.prepend(selectedFile,messageCard);
-            const selectedContent=selectedFile.querySelector('.studio-job-selected-content');
-            const updateSelectedFile=tile=>{
-                if(!tile)return;
-                const img=tile.querySelector('img');
-                const label=tile.querySelector('strong')?.textContent||img?.alt||'Media file';
-                const detail=tile.querySelector('small')?.textContent||'';
-                selectedContent.innerHTML=(img?'<img alt="" src="'+esc(img.currentSrc||img.src)+'">':'<span class="job-file-document">▤</span>')+'<div><strong>'+esc(label)+'</strong><small>'+esc(detail)+'</small></div>';
-                lower.querySelectorAll('.job-file-tile,.media-item,[data-media-asset]').forEach(el=>el.classList.toggle('studio-job-file-selected',el===tile));
+            const loaded=new Set(),pending=new Map();
+            const renderDetails=async()=>{
+                const schedules=await json('/api/schedule/entries?jobId='+job.id+'&from='+encodeURIComponent(new Date(Date.now()-31536000000).toISOString())+'&to='+encodeURIComponent(new Date(Date.now()+94608000000).toISOString()));
+                if(!current())return;
+                const workspace=workspaceCache.find(w=>w.id===job.workspaceId);
+                const fields=[['Client',job.linkedClientName||job.clientName||'Not linked'],['Type',job.jobType||job.type||'Photography'],['Workspace',workspace?.name||'Workspace'],['Job Code',job.jobCode||job.code||job.id],['Event date',job.eventDate||'Needs scheduling'],['Location',schedules.find(s=>s.location)?.location||'Not scheduled'],['Photographer',job.assignedTo?studioFirstName(job.assignedTo):'Unassigned']];
+                contents.overview.innerHTML='<dl class="job-detail-facts">'+fields.map(([name,value])=>'<div><dt>'+esc(name)+'</dt><dd>'+esc(String(value))+'</dd></div>').join('')+'</dl><p>Use Assignments &amp; Workflow to review ownership, scheduling and the next workflow action.</p>';
             };
-            lower.querySelector('.job-media-section').addEventListener('click',event=>{
-                const tile=event.target.closest('.job-file-tile,.media-item,[data-media-asset]');
-                if(tile)updateSelectedFile(tile);
-            });
-            const photoObserver=new MutationObserver(()=>{
-                if(!selectedFile.isConnected){photoObserver.disconnect();return;}
-                if(selectedContent.querySelector('.muted')){
-                    const first=lower.querySelector('.job-file-tile,.media-item,[data-media-asset]');
-                    if(first)updateSelectedFile(first);
+            const loadPanel=(name,force=false)=>{
+                if(pending.has(name))return pending.get(name);
+                if(loaded.has(name)&&!force)return Promise.resolve(true);
+                const host=contents[name];host.innerHTML='<p role="status">Loading…</p>';
+                const request=(async()=>{
+                    try{
+                        if(name==='media')await renderJobTab('gallery',job,host,current,()=>loadPanel(name,true));
+                        else if(name==='overview')await renderDetails();
+                        else await renderJobTab(name,job,host,current,()=>loadPanel(name,true));
+                        if(!current())return false;
+                        loaded.add(name);
+                        if(name==='subjects')panels.subjects.querySelector('[data-job-add-subject]').hidden=!host.querySelector('#addJobSubject');
+                        return true;
+                    }catch(error){
+                        if(current()){
+                            host.innerHTML='<p role="alert"></p><button type="button" class="action">Retry</button>';
+                            host.querySelector('p').textContent=error.message||String(error);
+                            host.querySelector('button').onclick=()=>loadPanel(name,true);
+                        }
+                        return false;
+                    }finally{pending.delete(name);}
+                })();pending.set(name,request);return request;
+            };
+            const selectPanel=async name=>{
+                if(name==='messages'){
+                    messageCard.scrollIntoView({block:'nearest'});composer.querySelector('textarea').focus();return;
                 }
-            });
-            photoObserver.observe(lower.querySelector('.job-media-content'),{childList:true,subtree:true});
-            bottom.append(activityCard,nextPanel);detailPane.appendChild(bottom);
-            filesPanel.remove();
-            quick.querySelector('[data-quick-upload]')?.addEventListener('click',()=>lower.querySelector('[data-add]')?.click());
-            collections.querySelector('[data-collection-new]')?.addEventListener('click',()=>lower.querySelector('[data-new-collection]')?.click());
-            quick.querySelector('[data-quick-collection]')?.addEventListener('click',()=>lower.querySelector('[data-new-collection]')?.click());
-            quick.querySelector('[data-quick-gallery]')?.addEventListener('click',()=>window.studioNavigate?.('production'));
-            quick.querySelector('[data-quick-task]')?.addEventListener('click',()=>lower.querySelector('[data-job-add-task]')?.click());
-            quick.querySelector('[data-quick-production]')?.addEventListener('click',()=>window.studioNavigate?.('production'));
-            quick.querySelector('[data-quick-edit]')?.addEventListener('click',()=>openJobDetailsEditor(job));
-            collections.querySelectorAll('[data-collection]').forEach(button=>button.onclick=()=>{collections.querySelectorAll('[data-collection]').forEach(x=>x.classList.toggle('active',x===button));const select=lower.querySelector('.gallery-tab-filter select');if(select){select.value=button.dataset.collection||'';select.dispatchEvent(new Event('change',{bubbles:true}));}});
-            renderJobActivity(job,activityCard.querySelector('.job-detail-activity-content'),current).catch(()=>{});
-            messageHeader.querySelector('[data-message-search]')?.addEventListener('click',()=>{
-                const term=prompt('Search this conversation');if(term===null)return;
-                messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));
-            });
-            messageHeader.querySelector('[data-message-more]')?.addEventListener('click',()=>{
-                messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea')?.focus();
-            });
-
-            const mediaPanel=lower.querySelector('.job-media-content');
-            const subjectsPanel=lower.querySelector('.job-subjects-content');
-            const tasksPanel=lower.querySelector('.job-tasks-content');
-            const refreshSubjects=()=>renderJobTab('subjects',job,subjectsPanel,current,refreshSubjects);
-            const refreshTasks=()=>renderJobTab('tasks',job,tasksPanel,current,refreshTasks);
-
-            Promise.allSettled([
-                renderJobTab('gallery',job,mediaPanel,current,()=>{}),
-                refreshSubjects(),
-                refreshTasks(),
-                renderCompactTasks(job,nextPanel,current)
-            ]).then(()=>{});
-
-            lower.querySelector('[data-job-add-subject]').onclick=()=>{
-                const add=subjectsPanel.querySelector('#addJobSubject');
-                if(add)add.click();
+                for(const [key,panel] of Object.entries(panels))panel.hidden=key!==name;
+                nav.querySelectorAll('button').forEach(button=>{const active=button.dataset.jobScroll===name;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
+                await loadPanel(name);
             };
+            nav.querySelectorAll('[data-job-scroll]').forEach(button=>button.onclick=()=>selectPanel(button.dataset.jobScroll));
+            panels.media.dataset.jobTab='gallery';
+            // Subject photo/roster links use this page-owned callback, never a global DOM lookup.
+            contents.subjects.studioOpenMedia=async()=>{await selectPanel('media');return loadPanel('media',true);};
+            panels.subjects.querySelector('[data-job-add-subject]').onclick=()=>contents.subjects.querySelector('#addJobSubject')?.click();
+            actions.querySelector('[data-quick-upload]').onclick=async()=>{await selectPanel('media');panels.media.querySelector('[data-add]')?.click();};
+            actions.querySelector('[data-quick-task]').onclick=async()=>{await selectPanel('tasks');contents.tasks.querySelector('form input')?.focus();};
+            actions.querySelector('[data-quick-edit]').onclick=()=>openJobDetailsEditor(job).catch(error=>alert(error.message));
+            actions.querySelector('[data-quick-production]').onclick=()=>window.studioNavigate?.('production');
+            messageHeader.querySelector('[data-message-search]').onclick=()=>{const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
+            messageHeader.querySelector('[data-message-more]').onclick=()=>{messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
 
-            lower.querySelector('[data-job-add-task]').onclick=()=>{
-                const dialog=studioDialog('Job tasks','<div class="all-tasks"></div>');
-                const panel=dialog.querySelector('.all-tasks');
-                const refresh=()=>renderJobTasks(job,panel,()=>dialog.isConnected,refresh);
-                refresh().catch(error=>panel.textContent=error.message);
-            };
-
-            nav.querySelectorAll('[data-job-scroll]').forEach(button=>{
-                button.onclick=async()=>{
-                    nav.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===button));
-                    const name=button.dataset.jobScroll;
-                    if(name==='overview'){messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);await refreshTasks();return;}
-                    if(name==='sessions'){const dialog=studioDialog('Job Sessions','<div data-job-sessions></div>');const sessions=await json('/api/operations/shoots?jobId='+job.id);dialog.querySelector('[data-job-sessions]').innerHTML=sessions.map(s=>'<article class="task-card"><strong>'+esc(s.location||'Session')+'</strong><small>'+esc(new Date(s.callTimeUtc).toLocaleString())+' · '+esc(s.status)+' · '+esc(studioFirstName(s.photographerUserName))+'</small></article>').join('')||'<p>No sessions scheduled.</p>';return;}
-                    if(name==='messages')messageCard.scrollIntoView({block:'nearest'});
-                    else if(name==='media')lower.querySelector('.job-media-section').scrollIntoView({block:'nearest'});
-                    else if(name==='subjects')lower.querySelector('.job-subjects-section').scrollIntoView({block:'nearest'});
-                    else if(name==='tasks')lower.querySelector('.job-tasks-section').scrollIntoView({block:'nearest'});
-                    else if(name==='calendar')await renderJobTab('calendar',job,tasksPanel,current,refreshTasks);
-                    else if(name==='activity')await renderJobTab('activity',job,tasksPanel,current,refreshTasks);
-                };
+            contents.media.addEventListener('click',event=>{
+                const tile=event.target.closest('.job-file-tile,.media-item,[data-media-asset]');if(!tile)return;
+                const img=tile.querySelector('img'),label=tile.querySelector('strong')?.textContent||img?.alt||'Media file',detail=tile.querySelector('small')?.textContent||'';
+                selectedContent.innerHTML=(img?'<img alt="" src="'+esc(img.currentSrc||img.src)+'">':'<span class="job-file-document">▤</span>')+'<div><strong>'+esc(label)+'</strong><small>'+esc(detail)+'</small></div>';
+                contents.media.querySelectorAll('.job-file-tile,.media-item,[data-media-asset]').forEach(el=>el.classList.toggle('job-detail-file-selected',el===tile));
             });
 
-            Promise.resolve().then(async()=>{
+            let workflow=null;
+            const updateAge=()=>{
+                const start=Date.parse(workflow?.data?.enteredAt||'');
+                header.querySelector('[data-stage-age]').textContent=Number.isFinite(start)?'In stage: '+(window.StudioWorkflow?.elapsed?.(Math.max(0,(Date.now()-start)/3600000))||Math.floor(Math.max(0,Date.now()-start)/3600000)+' hours'):'Timing unavailable';
+            };
+            const refreshWorkflow=async()=>{
                 try{
-                    const schedules=await json('/api/schedule/entries?jobId='+job.id+'&from='+encodeURIComponent(new Date(Date.now()-31536000000).toISOString())+'&to='+encodeURIComponent(new Date(Date.now()+94608000000).toISOString()));
-                    if(version!==revision)return;
-                    const location=schedules.find(x=>x.location)?.location;
-                    if(location){
-                        detailPane.querySelectorAll('.job-details-location,.studio-job-location').forEach(node=>node.textContent=location);
+                    const view=await json('/api/jobs/'+job.id+'/connected-workflow');if(!current())return;
+                    workflow=view;const data=view.data;
+                    const light=header.querySelector('.workflow-light');light.textContent=data.stage;light.className='workflow-light '+(data.blockedReason?'red':['Completed','Delivered','Ready for Delivery'].includes(data.stage)?'green':'amber');
+                    header.querySelector('[data-job-owner]').textContent='Job Owner: '+(data.owner?studioFirstName(data.owner):'Unassigned');
+                    header.querySelector('[data-job-blocked]').textContent=data.blockedReason?'Blocked: '+data.blockedReason:'';updateAge();
+                }catch(error){if(current())header.querySelector('[data-stage-age]').textContent='Workflow unavailable — open Assignments & Workflow to retry.';}
+            };
+            header.querySelector('[data-job-workflow]').onclick=async()=>{
+                const dialog=studioDialog('Assignments & Workflow','<div class="job-detail-workflow-content"></div>');dialog.classList.add('job-detail-workflow-dialog');
+                workflowDialog=dialog;
+                const host=dialog.querySelector('.job-detail-workflow-content');
+                dialog.addEventListener('close',()=>{
+                    if(host.__studioWorkflowClock)clearInterval(host.__studioWorkflowClock);
+                    workflowDialog=null;
+                    if(current()){
+                        refreshWorkflow();
+                        for(const name of ['tasks','activity','overview']){loaded.delete(name);if(!panels[name].hidden)loadPanel(name,true);}
                     }
-                }catch{}
-            });
+                }, {once:true});
+                try{await window.StudioWorkflow.render(host,job.id,()=>current()&&dialog.isConnected);}catch(error){host.textContent=error.message||String(error);}
+            };
+            // No detached panel retains a running clock.
+            const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);
+            disposeJobView=()=>{disposed=true;clearInterval(timer);workflowDialog?.close();};
+            refreshWorkflow();selectPanel('media');
+            window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
         } else {
-            detailPane.classList.remove('job-reading-view','studio-job-today-layout');
-            document.getElementById('conversationView').classList.remove('has-open-job');
+            detailPane.classList.remove('job-reading-view','job-detail-page');
+            conversationView.classList.remove('has-open-job');
+            window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
         }
         let pendingSend=null,pendingAttachment=null;
         document.getElementById('hierarchyCompose').onsubmit = async event => {
@@ -435,43 +345,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
             finally { if (form.isConnected) { syncSend(); if(pendingSend) {button.textContent='Retry attachment';form.querySelector('textarea').required=false;} } }
         };
     }
-    async function renderConversationFiles(job,panel,current,refresh) {
-            const files = (await json(`/api/conversations/${job.conversationId}/files`)).filter(f=>f.messageId);
-            if (!current()) return;
-            panel.innerHTML = `<section class="conversation-attachments"><header class="conversation-files-title">Conversation Files</header><div class="conversation-file-actions"><button class="action" data-preview-file disabled>Preview</button><a class="action" data-download-file hidden>Download</a></div><div class="job-file-gallery">${files.map(file => {
-                const url = '/api/attachments/' + encodeURIComponent(file.id);
-                const image = /\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '');
-                return `<a class="job-file-tile" data-file-id="${esc(file.id)}" href="${url}" target="_blank" rel="noopener">${image ? `<img loading="lazy" src="${url}" alt="${esc(file.fileName)}">` : '<span class="job-file-document" aria-hidden="true">▤</span>'}<strong>${esc(file.fileName)}</strong><small>${esc(file.visibility)} · ${esc(formatBytes(file.size))}${file.messageId?' · linked to '+esc(file.messageKind||'message'):''}</small><span>${file.messageId?'<span class="conversation-file-source" data-source-message="'+esc(file.messageId)+'">View source message</span>':'Open file'}</span></a>`;
-            }).join('') || '<p>No files attached yet.</p>'}</div></section>`;
-            panel.querySelectorAll('[data-source-message]').forEach(source=>source.onclick=event=>{
-                event.preventDefault();event.stopPropagation();
-                const message=document.querySelector('[data-message-id="'+source.dataset.sourceMessage+'"]');
-                if(!message){alert('The source message is outside the currently loaded message history.');return;}
-                message.scrollIntoView({behavior:'smooth',block:'center'});
-                message.classList.add('source-message-highlight');setTimeout(()=>message.classList.remove('source-message-highlight'),1800);
-            });
-
-            panel.querySelectorAll('.job-file-tile').forEach(tile => tile.ondblclick = event => {
-                const file = files.find(f => f.id === tile.dataset.fileId);
-                if (!/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName || '')) return;
-                event.preventDefault();
-                const dialog = document.createElement('dialog'); dialog.className = 'job-preview-dialog';
-                const url = '/api/attachments/' + encodeURIComponent(file.id);
-                dialog.innerHTML = `<header><strong>${esc(file.fileName)}</strong><button type="button" aria-label="Close preview">Close</button></header><img src="${url}" alt="${esc(file.fileName)}"><a href="${url}" target="_blank" rel="noopener">Open original</a>`;
-                document.body.appendChild(dialog);
-                dialog.querySelector('button').onclick = () => dialog.close();
-                dialog.addEventListener('close', () => dialog.remove(), {once:true}); dialog.showModal();
-            });
-
-            panel.querySelectorAll('.job-file-tile').forEach(tile=>{
-                tile.onclick=event=>{event.preventDefault();panel.querySelectorAll('.job-file-tile').forEach(x=>x.classList.toggle('selected',x===tile));const preview=panel.querySelector('[data-preview-file]'),download=panel.querySelector('[data-download-file]');preview.disabled=false;preview.onclick=()=>{const file=files.find(x=>x.id===tile.dataset.fileId);if(/\.(jpe?g|png|gif|webp|avif)$/i.test(file.fileName||''))tile.ondblclick({preventDefault(){}});else window.open(tile.href,'_blank','noopener');};download.hidden=false;download.href=tile.href;download.download=files.find(x=>x.id===tile.dataset.fileId).fileName;};
-                tile.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();tile.click();panel.querySelector('[data-preview-file]').click();}};
-            });
-    }
     async function renderJobTab(name, job, panel, current, refresh) {
         if (name === 'subjects') return renderJobSubjects(job,panel,current,refresh);
         if (name === 'tasks') return renderJobTasks(job,panel,current,refresh);
-        if (name === 'calendar') { await renderJobCalendar(job,panel,current); return; }
         if (name === 'activity') return renderJobActivity(job,panel,current);
         if (name === 'gallery') {
             panel.innerHTML='<div class="versioned-gallery"></div>';
@@ -482,5 +358,6 @@ function mergeJobMessages(teamMessages, customerMessages) {
     refreshButton.onclick = () => loadConversations().catch(fail);
     document.querySelector('.pane-heading p').textContent = 'Jobs, announcements and members';
 })();
+
 
 

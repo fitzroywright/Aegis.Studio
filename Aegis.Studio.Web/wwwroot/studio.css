@@ -443,112 +443,6 @@ dialog::backdrop {
   display:grid;
   place-items:center
 }
-.has-open-job {
-  display:block;
-  padding:17px 18px
-}
-.has-open-job>.list-pane {
-  display:none
-}
-.has-open-job>.detail-pane {
-  padding:0;
-  display:flex;
-  flex-direction:column;
-  height:100%;
-  overflow:hidden
-}
-.job-breadcrumb {
-  align-self:flex-start;
-  border:0;
-  background:transparent;
-  font-size:12px;
-  padding:0;
-  margin-bottom:7px
-}
-.studio-job-header {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:14px;
-  margin-bottom:14px;
-  flex-shrink:0
-}
-.studio-job-copy {
-  min-width:0
-}
-.studio-job-copy h1 {
-  font-size:29px
-}
-.studio-job-copy p {
-  display:flex;
-  gap:18px;
-  color:#69758b;
-  font-size:12px;
-  margin-top:8px
-}
-.job-header-actions {
-  display:flex;
-  gap:8px
-}
-.job-complete-button {
-  background:linear-gradient(#ad8254,#8c5617);
-  color:white;
-  min-width:180px
-}
-.job-status-button {
-  background:#e5efff;
-  color:#1677ff
-}
-.job-meta-strip {
-  display:grid;
-  grid-template-columns:repeat(5,minmax(0,1fr));
-  padding:13px 15px;
-  background:white;
-  border:1px solid #e4e8ee;
-  border-radius:8px;
-  margin-bottom:12px;
-  flex-shrink:0
-}
-.job-meta-item {
-  display:flex;
-  align-items:center;
-  gap:12px;
-  padding:0 15px;
-  border-right:1px solid #edf0f4
-}
-.job-meta-item:last-child {
-  border:0
-}
-.job-meta-item small,.job-meta-item strong {
-  display:block;
-  font-size:12px
-}
-.job-meta-icon {
-  color:#95612b;
-  font-size:24px
-}
-.job-section-tabs {
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:8px;
-  background:white;
-  border:1px solid #e4e8ee;
-  border-radius:8px;
-  margin-bottom:12px;
-  flex-shrink:0
-}
-.job-section-tabs button {
-  flex:1;
-  border:0;
-  background:transparent;
-  color:#68758b
-}
-.job-section-tabs button.active {
-  color:#92580f;
-  box-shadow:0 2px #1677ff
-}
-
 .job-message-column,.job-context-sidebar,
 .job-message-column {
   display:flex;
@@ -1510,12 +1404,6 @@ dialog::backdrop {
 
 
 
-.has-open-job>.detail-pane {
-  overflow:auto
-}
-.has-open-job {
-  height:calc(100dvh - 68px)
-}
 .frontdesk-board {
   height:auto;
   grid-template-columns:1fr 1.3fr
@@ -6444,108 +6332,6 @@ body[data-studio-view="jobs"] .generic{
 }
 .workspace-job-speedbump .job-status{white-space:nowrap}
 
-/* Job Detail: accepted mockup is the implementation, not an overlay. */
-.job-reading-view{overflow:auto}
-.job-detail-board{
-  display:grid;
-  grid-template-columns:260px minmax(0,1fr) 330px;
-  gap:12px;
-  align-items:stretch;
-}
-.job-detail-media-column{min-width:0}
-.job-detail-media-column>.job-subjects-section,
-.job-detail-media-column>.job-tasks-section{display:none}
-.job-detail-media-column .job-media-section{
-  min-height:490px;
-  height:100%;
-}
-.job-detail-collections,
-.job-detail-quick{
-  min-width:0;
-  overflow:hidden;
-  border:1px solid #dfe6ef;
-  border-radius:9px;
-  background:#fff;
-}
-.job-detail-collections>header,
-.job-detail-quick>header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  padding:10px 12px;
-  border-bottom:1px solid #e6dcfb;
-}
-.job-detail-collections>header{
-  background:#f5efff;
-  color:#53209b;
-}
-.job-collection-list{padding:5px 8px}
-.job-collection-list button{
-  display:block;
-  width:100%;
-  padding:10px 9px;
-  border:0;
-  border-bottom:1px solid #edf0f4;
-  border-radius:6px;
-  background:#fff;
-  color:#17345c;
-  text-align:left;
-}
-.job-collection-list button.active{
-  outline:1px solid #93c5fd;
-  background:#eaf3ff;
-}
-.job-detail-right{
-  display:grid;
-  grid-template-rows:auto 1fr;
-  gap:12px;
-  min-width:0;
-}
-.job-detail-right>.job-subjects-section{
-  display:flex;
-  min-height:240px;
-}
-.job-detail-quick>header{
-  background:#eaf5ff;
-  color:#07559b;
-}
-.job-detail-quick>div{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-  padding:10px;
-}
-.job-detail-quick .action{
-  min-height:42px;
-  text-align:left;
-}
-.job-detail-bottom{
-  display:grid;
-  grid-template-columns:1fr 1.1fr 1fr;
-  gap:12px;
-  margin-top:12px;
-}
-.job-detail-bottom>.job-center-panel,
-.job-detail-bottom>.job-message-column,
-.job-detail-bottom>.thread-next-tasks{min-height:210px}
-.job-media-section .job-center-heading{
-  border-bottom:1px solid #e6ebf1;
-  background:#f7f9fc;
-}
-.job-subjects-section .job-center-heading{
-  border-bottom:1px solid #cdeed9;
-  background:#eafaf0;
-  color:#126137;
-}
-.job-detail-board .media-items{grid-template-columns:repeat(5,minmax(0,1fr))}
-.job-detail-board .job-file-tile>img{height:105px}
-.job-detail-board .media-drop-surface{
-  min-height:350px;
-  padding:10px;
-  border:1px dashed #d5dde8;
-  border-radius:8px;
-}
 .subject-drop-target{transition:border-color .15s,box-shadow .15s,background .15s}
 .subject-drop-target.drag-target,
 .media-drop-surface.drag-over{
@@ -6561,28 +6347,10 @@ body[data-studio-view="jobs"] .generic{
   font-size:11px;
 }
 .subject-drop-target.drag-target:after{display:block}
-.job-section-tabs{margin-bottom:12px}
-
-@media(max-width:1250px){
-  .job-detail-board{grid-template-columns:220px minmax(0,1fr)}
-  .job-detail-right{
-    grid-column:1 / -1;
-    grid-template-columns:1fr 1fr;
-    grid-template-rows:auto;
-  }
-  .job-detail-board .media-items{grid-template-columns:repeat(4,minmax(0,1fr))}
-}
 @media(max-width:850px){
-  .job-detail-board{grid-template-columns:1fr}
-  .job-detail-right{
-    grid-column:auto;
-    grid-template-columns:1fr;
-  }
-  .job-detail-bottom{grid-template-columns:1fr}
   .workspace-job-speedbump{grid-template-columns:1fr}
   .workspace-job-speedbump .job-row-meta{justify-content:flex-start;flex-wrap:wrap}
 }
-
 
 /* Operational workspace announcement banner */
 .workspace-announcement-banners{
@@ -8746,120 +8514,6 @@ body[data-studio-view="frontdesk"] .fd-communications[data-mw-region="messages"]
  background:#ffe38b;text-decoration:underline;
 }
 
-/* Job Details — Today-aligned, media-first operational layout */
-.job-reading-view.studio-job-today-layout{background:#faf8f2;color:#352e25;overflow:auto}
-.studio-job-today-layout .detail-header.studio-job-header{background:#ffedac;border:1px solid #ead58e;border-radius:10px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
-.studio-job-today-layout .studio-job-copy{flex:1 1 260px;min-width:0}
-.studio-job-today-layout .studio-job-copy h1{font-size:1.35rem;line-height:1.2;margin:0 0 3px}
-.studio-job-today-layout .studio-job-copy p{font-size:11px;margin:0;display:flex;gap:10px;flex-wrap:wrap}
-.studio-job-today-layout .job-header-actions{flex:0 0 auto}
-.studio-job-today-layout .studio-job-flow-lights{order:3;flex:1 0 100%;min-width:0;overflow-x:auto;padding:4px 0 0;border-top:1px solid #e6cf80}
-.studio-job-today-layout .studio-job-flow-lights:empty{display:none}
-.studio-job-today-layout .job-meta-strip{padding:5px 9px;gap:6px;background:#fffdf7;border-radius:7px}
-.studio-job-today-layout .job-meta-item{padding:3px 7px}
-.studio-job-today-layout .job-meta-item small{font-size:10px}
-.studio-job-today-layout .job-meta-item strong{font-size:11px}
-.studio-job-today-layout .job-section-tabs{margin:5px 0 8px;background:#fffaf0;border-bottom:2px solid #e8d7b5}
-.studio-job-today-layout .job-section-tabs button{font-size:12px;padding:8px 12px}
-.studio-job-today-layout .job-section-tabs button.active{background:#fff0c2;color:#65471a}
-.studio-job-today-layout .job-detail-board{display:grid;grid-template-columns:minmax(0,1fr) minmax(270px,315px);gap:10px;align-items:start}
-.studio-job-today-layout .job-detail-media-column{display:flex;flex-direction:column;gap:8px;min-width:0}
-.studio-job-today-layout .job-detail-media-column .job-media-section{min-height:520px;height:auto;background:#fffdf8;border:1px solid #e5ddcd;border-radius:9px;overflow:hidden}
-.studio-job-today-layout .job-media-section .job-center-heading{padding:8px 12px}
-.studio-job-today-layout .job-media-section .job-center-heading h2{font-size:14px}
-.studio-job-today-layout .job-detail-collections{border:0;border-bottom:1px solid #e8dfcc;border-radius:0;background:#fffaf0}
-.studio-job-today-layout .job-detail-collections>header{padding:5px 10px;border-bottom:0}
-.studio-job-today-layout .job-collection-list{display:flex;flex-wrap:wrap;gap:4px;padding:5px 9px;max-height:72px;overflow:auto}
-.studio-job-today-layout .job-collection-list button{white-space:nowrap;font-size:11px;padding:4px 8px}
-.studio-job-today-layout .job-media-content{min-height:390px}
-.studio-job-today-layout .job-detail-right{display:flex;flex-direction:column;gap:9px;min-width:0}
-.studio-job-today-layout .job-detail-right>.job-subjects-section{min-height:0;max-height:200px;overflow:auto}
-.studio-job-today-layout .job-detail-right>.job-detail-quick{max-height:190px;overflow:auto}
-.studio-job-today-layout .job-detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,315px);gap:10px;margin-top:9px}
-.studio-job-today-layout .job-detail-message-card{background:#fff5c8!important;border:1px solid #dfc66e!important;border-radius:9px;box-shadow:0 2px 5px rgba(103,78,22,.10);color:#5e4a20;display:flex;flex-direction:column;min-height:310px;max-height:490px;overflow:hidden}
-.studio-job-today-layout .job-detail-message-card>.job-panel-heading{background:#ffed9c!important;border-bottom:1px solid #e6d17c;color:#614a18;min-height:32px;padding:5px 10px}
-.studio-job-today-layout .job-detail-message-card>.messages{background:#fff5c8!important;color:#5e4a20;flex:1;min-height:0;overflow:auto;padding:8px}
-.studio-job-today-layout .job-detail-message-card .message{margin-bottom:7px}
-.studio-job-today-layout .job-detail-message-card .message-content{background:transparent}
-.studio-job-today-layout .job-detail-message-card .composer{background:#ffed9c;border-top:1px solid #e6d17c;padding:6px 9px}
-.studio-job-today-layout .job-detail-message-card .composer textarea{min-height:38px;max-height:70px}
-.studio-job-today-layout .job-detail-message-card .composer label{font-size:11px}
-.studio-job-today-layout .job-detail-message-card .composer button{font-size:11px}
-@media(max-width:950px){.studio-job-today-layout .job-detail-board,.studio-job-today-layout .job-detail-bottom{grid-template-columns:minmax(0,1fr)}.studio-job-today-layout .job-detail-right{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.studio-job-today-layout .job-detail-message-card{grid-column:1/-1}}
-@media(max-width:580px){.studio-job-today-layout .job-detail-right{display:flex}.studio-job-today-layout .studio-job-flow-lights{overflow-x:auto}}
-
-/* Job Details visual parity: fixed viewport, internally scrolling photo canvas.
-   The existing Messages card colors, composer and behavior are deliberately untouched. */
-body:has(.has-open-job .studio-job-today-layout) #conversationView.has-open-job{
- height:100%!important;min-height:0!important;max-height:100%!important;
- padding:5px 9px!important;overflow:hidden!important;box-sizing:border-box;
-}
-#conversationView.has-open-job:has(.studio-job-today-layout)>.detail-pane.studio-job-today-layout{
- height:100%!important;max-height:100%!important;min-height:0!important;
- overflow:hidden!important;display:flex!important;flex-direction:column!important;
- padding:0!important;gap:5px;
-}
-.studio-job-today-layout>.studio-job-header{flex:0 0 auto!important;margin:0!important;padding:7px 11px!important;gap:5px 12px!important;max-height:155px;overflow:hidden}
-.studio-job-today-layout .studio-job-copy h1{font-size:1.18rem!important}
-.studio-job-today-layout .studio-job-copy p{gap:7px!important;margin:0!important}
-.studio-job-today-layout .studio-job-flow-lights{order:3;flex:1 0 100%;max-height:75px;overflow-x:auto;overflow-y:hidden;padding:3px 0 0!important}
-.studio-job-today-layout>.job-meta-strip{flex:0 0 auto!important;margin:0!important;padding:3px 6px!important;min-height:0}
-.studio-job-today-layout>.job-section-tabs{flex:0 0 auto!important;margin:0!important;min-height:33px}
-.studio-job-today-layout>.job-section-tabs button{padding:6px 11px!important}
-.studio-job-today-layout>.job-detail-board{
- flex:1 1 auto!important;min-height:0!important;height:auto!important;overflow:hidden!important;
- display:grid!important;grid-template-columns:minmax(0,1fr) minmax(255px,305px)!important;
- align-items:stretch!important;gap:8px!important;margin:0!important;
-}
-.studio-job-today-layout .job-detail-board>.job-detail-media-column{
- min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;
-}
-.studio-job-today-layout .job-detail-media-column>.job-media-section{
- flex:1 1 auto!important;min-height:0!important;height:100%!important;overflow:hidden!important;
- display:flex!important;flex-direction:column!important;
-}
-.studio-job-today-layout .job-media-section>.job-center-heading{flex:0 0 auto;padding:5px 9px!important}
-.studio-job-today-layout .job-media-section>.job-detail-collections{flex:0 0 auto}
-.studio-job-today-layout .job-detail-collections>header{padding:3px 8px!important}
-.studio-job-today-layout .job-collection-list{max-height:36px!important;overflow-x:auto!important;overflow-y:hidden!important;flex-wrap:nowrap!important;padding:3px 8px!important}
-.studio-job-today-layout .job-media-section>.gallery-tab-filter{flex:0 0 auto}
-.studio-job-today-layout .job-media-section>.job-media-content{
- flex:1 1 auto!important;min-height:0!important;height:100%!important;overflow:auto!important;
- padding:5px!important;
-}
-.studio-job-today-layout .job-media-content .media-production-layout{min-height:0!important;height:100%!important}
-.studio-job-today-layout .job-media-content .media-drop-surface{min-height:0!important;overflow:auto!important}
-.studio-job-today-layout .job-media-content .media-items{grid-template-columns:repeat(auto-fill,minmax(125px,1fr))!important;gap:6px}
-.studio-job-today-layout .job-detail-board .job-file-tile>img{height:clamp(95px,16vh,180px)!important;object-fit:cover}
-.studio-job-today-layout .job-detail-board>.job-detail-right{
- min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;
- display:flex!important;flex-direction:column!important;gap:7px!important;
- grid-column:auto!important;
-}
-.studio-job-today-layout .studio-job-selected-file{flex:0 0 auto;min-height:0;border:1px solid #e5ddcd;border-radius:8px;background:#fffdf8}
-.studio-job-today-layout .studio-job-selected-file>.job-center-heading{padding:5px 9px!important}
-.studio-job-today-layout .studio-job-selected-file h2{font-size:12px!important}
-.studio-job-today-layout .studio-job-selected-content{display:flex;align-items:center;gap:8px;padding:7px;min-width:0}
-.studio-job-today-layout .studio-job-selected-content>img{width:84px;height:66px;object-fit:cover;border-radius:5px;flex-shrink:0}
-.studio-job-today-layout .studio-job-selected-content>div{min-width:0;overflow:hidden}
-.studio-job-today-layout .studio-job-selected-content strong,.studio-job-today-layout .studio-job-selected-content small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
-.studio-job-today-layout .studio-job-file-selected{outline:2px solid #b68a3b;outline-offset:-2px}
-.studio-job-today-layout .job-detail-right>.job-detail-message-card{flex:1 1 auto;min-height:180px;max-height:none!important}
-.studio-job-today-layout .job-detail-right>.job-subjects-section{flex:0 0 auto;max-height:110px!important;overflow:auto}
-.studio-job-today-layout .job-detail-right>.job-detail-quick{flex:0 0 auto;max-height:90px!important;overflow:auto}
-.studio-job-today-layout>.job-detail-bottom{
- flex:0 0 92px!important;min-height:0!important;max-height:92px!important;overflow:hidden!important;
- display:grid!important;grid-template-columns:minmax(0,1fr) minmax(255px,305px)!important;
- gap:8px!important;margin:0!important;
-}
-.studio-job-today-layout>.job-detail-bottom>*{min-height:0!important;height:100%!important;overflow:auto!important}
-.studio-job-today-layout>.job-detail-bottom .job-center-heading{padding:4px 9px!important}
-@media(max-width:760px){
- .studio-job-today-layout>.job-detail-board{grid-template-columns:minmax(0,1fr) 230px!important}
- .studio-job-today-layout>.job-detail-bottom{grid-template-columns:minmax(0,1fr) 230px!important}
- .studio-job-today-layout .job-meta-item:nth-child(n+4){display:none}
-}
-
 /* Outlook-inspired Studio inbox: independent job filters, message list and reading pane */
 .studio-outlook-inbox{display:grid!important;grid-template-columns:190px minmax(420px,1fr) minmax(260px,31%);height:100%;min-height:0;overflow:hidden;gap:0;background:#fff;border:1px solid #dedbd4;border-radius:8px}
 .studio-outlook-inbox>.studio-inbox-filters{display:flex;flex-direction:column;min-height:0;overflow:hidden;background:#f8f6f0;border-right:1px solid #e1ddd4;padding:9px}
@@ -8923,3 +8577,4 @@ body:has(.has-open-job .studio-job-today-layout) #conversationView.has-open-job{
 .studio-outlook-inbox>.studio-inbox-reading{grid-column:auto!important;grid-row:auto!important;position:static!important;align-self:stretch!important;flex:1 1 45%;height:auto!important;min-height:0!important;display:flex!important;z-index:auto!important;overflow:hidden;border-top:2px solid #d8b16d;border-left:0}
 .studio-inbox-tools select{font-size:11px;padding:6px;border:1px solid #ded8cd;border-radius:5px;max-width:180px}
 .mw-list-panel[data-mw-region="messages"] header button[data-nav="messages"]{font-weight:800!important;border:0!important;background:transparent!important;box-shadow:none!important;text-decoration:underline;text-underline-offset:3px;color:#8a5a17!important;padding:2px 4px!important}
+

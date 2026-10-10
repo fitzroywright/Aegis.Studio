@@ -1,0 +1,108 @@
+/* Job Details owns its viewport layout. Shared card/media/message components retain
+   their styles; obsolete Job Details layouts have been removed from studio.css. */
+#conversationView.has-open-job {
+  display:flex;
+  min-height:0;
+  padding:5px 9px;
+  overflow:hidden;
+  box-sizing:border-box;
+}
+#conversationView.has-open-job > .list-pane,
+#conversationView.has-open-job > .workspace-tabs,
+#conversationView.has-open-job > .workspace-announcement-banners { display:none; }
+#conversationView > .job-detail-page {
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr);
+  flex:1;
+  min-width:0;
+  min-height:0;
+  padding:0;
+  gap:6px;
+  overflow:hidden;
+  color:var(--theme-text,#352e25);
+  background:var(--theme-surface,#faf8f2);
+}
+.job-detail-heading {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:5px 12px;
+  padding:8px 11px;
+  border:1px solid var(--theme-border,#ead58e);
+  border-radius:8px;
+  background:var(--theme-surface-alt,#fff0ba);
+}
+.job-detail-title { min-width:0; }
+.job-detail-title h1 { margin:0 0 2px; font-size:18px; line-height:1.2; overflow-wrap:anywhere; }
+.job-detail-title p { margin:0; font-size:11px; color:var(--theme-muted,#69758b); }
+.job-detail-heading > button { align-self:start; font-size:11px; padding:6px 9px; }
+.job-detail-flow { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:5px 14px; align-items:center; font-size:11px; }
+.job-detail-flow [data-job-blocked] { color:#b42c35; overflow-wrap:anywhere; }
+.job-detail-navigation {
+  display:flex;
+  gap:4px;
+  flex-wrap:wrap;
+  padding:3px 5px;
+  border:1px solid var(--theme-border,#e4e8ee);
+  border-radius:8px;
+  background:var(--theme-surface,#fffaf0);
+}
+.job-detail-navigation button { flex:1; border:0; background:transparent; color:var(--theme-muted,#68758b); padding:6px 9px; font-size:12px; white-space:nowrap; }
+.job-detail-navigation button.active { background:var(--theme-surface-alt,#fff0c2); color:var(--theme-text,#65471a); box-shadow:0 2px #d28b37; }
+.job-detail-board { display:grid; grid-template-columns:minmax(0,1fr) minmax(255px,305px); gap:8px; min-width:0; min-height:0; overflow:hidden; }
+.job-detail-center { display:flex; min-width:0; min-height:0; overflow:hidden; }
+.job-detail-center > section { flex:1; min-width:0; min-height:0; }
+.job-detail-page [hidden] { display:none; }
+.job-detail-page .job-center-heading { padding:5px 9px; border-bottom:1px solid var(--theme-border,#e5ddcd); background:var(--theme-surface-alt,#f7f9fc); }
+.job-detail-page .job-center-heading h2 { font-size:12px; margin:0; }
+.job-detail-center > section > div:last-child { flex:1; min-height:0; overflow:auto; padding:8px; }
+.job-detail-page .gallery-tab-filter { padding:5px 8px; flex:none; overflow:visible; }
+.job-detail-page .media-toolbar-row { flex-wrap:wrap; }
+.job-detail-page .media-title-toolbar { display:flex; flex:1; align-items:center; flex-wrap:wrap; gap:4px; min-width:0; }
+.job-detail-page .media-title-toolbar button,.job-detail-page .media-title-toolbar select { font-size:10px; padding:4px 6px; }
+.job-detail-page .media-title-toolbar select { width:auto; min-width:120px; max-width:200px; }
+.job-detail-page .media-progress { font-size:10px; }
+.job-detail-page .media-split { position:relative; display:inline-flex; }
+.job-detail-page .media-split-main { border-radius:5px 0 0 5px; }
+.job-detail-page .media-split-arrow { border-radius:0 5px 5px 0; }
+.job-detail-page .media-split-menu { display:none; position:absolute; z-index:10; top:100%; left:0; min-width:145px; padding:4px; background:var(--theme-surface,#fff); border:1px solid var(--theme-border,#dce4ec); border-radius:5px; box-shadow:0 3px 8px #0002; }
+.job-detail-page .media-split.open .media-split-menu { display:grid; gap:3px; }
+.job-detail-page .media-production-layout { min-height:0; height:100%; }
+.job-detail-page .media-drop-surface { min-height:0; overflow:auto; }
+.job-detail-page .media-items { grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:6px; }
+.job-detail-page .job-file-tile > img { height:clamp(100px,16vh,180px); object-fit:cover; }
+.job-detail-page .job-detail-right { display:grid; grid-template-rows:auto minmax(150px,1fr) auto; gap:7px; min-width:0; min-height:0; overflow:auto; }
+.job-detail-page .job-detail-selected-content { display:flex; gap:8px; align-items:center; padding:7px; overflow:auto; max-height:110px; }
+.job-detail-selected-content > img { width:84px; height:66px; object-fit:cover; border-radius:5px; flex:none; }
+.job-detail-selected-content > div { min-width:0; }
+.job-detail-selected-content strong,.job-detail-selected-content small { display:block; font-size:11px; overflow-wrap:anywhere; }
+.job-detail-file-selected { outline:2px solid #b68a3b; outline-offset:-2px; }
+.job-detail-page .job-detail-actions > div { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:5px 7px; }
+.job-detail-actions button { text-align:left; font-size:11px; padding:4px; }
+.job-detail-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:0 0 12px; }
+.job-detail-facts dt { color:var(--theme-muted,#69758b); font-size:11px; }
+.job-detail-facts dd { margin:2px 0 0; font-weight:650; overflow-wrap:anywhere; }
+
+/* Preserve the established post-it Messages card and reply controls. */
+.job-detail-page .job-detail-message-card { background:#fff5c8; border:1px solid #dfc66e; border-radius:9px; box-shadow:0 2px 5px rgba(103,78,22,.10); color:#5e4a20; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+.job-detail-page .job-detail-message-card > .job-panel-heading { background:#ffed9c; border-bottom:1px solid #e6d17c; color:#614a18; min-height:32px; padding:5px 10px; flex:none; }
+.job-detail-page .job-detail-message-card > .messages { background:#fff5c8; color:#5e4a20; flex:1; min-height:0; overflow:auto; padding:8px; }
+.job-detail-message-card .message { margin-bottom:7px; }
+.job-detail-message-card .message-content { background:transparent; }
+.job-detail-message-card .composer { background:#ffed9c; border-top:1px solid #e6d17c; padding:6px 9px; flex:none; }
+.job-detail-message-card .composer textarea { min-height:38px; max-height:70px; }
+.job-detail-message-card .composer label,.job-detail-message-card .composer button { font-size:11px; }
+.job-detail-message-card .composer .muted:empty,.job-detail-message-card .composer [role=alert]:empty { display:none; }
+.job-detail-workflow-dialog { width:min(1000px,95vw); max-height:85vh; overflow:auto; }
+.job-detail-workflow-dialog .workflow-panel { margin:0; overflow:visible; }
+@media(max-width:850px) {
+  .job-detail-board { grid-template-columns:minmax(0,1fr) 250px; }
+  .job-detail-facts { grid-template-columns:1fr; }
+}
+@media(max-width:600px) {
+  .job-detail-board { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(230px,40%); }
+  .job-detail-page .job-detail-right { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(140px,1fr) auto; }
+  .job-detail-selected-file { display:none; }
+  .job-detail-heading { grid-template-columns:minmax(0,1fr); }
+  .job-detail-heading > button { justify-self:start; }
+  .job-detail-page .job-detail-actions > div { grid-template-columns:1fr 1fr; }
+}
