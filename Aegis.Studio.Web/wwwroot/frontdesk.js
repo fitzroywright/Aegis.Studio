@@ -117,7 +117,7 @@ function renderFrontDesk(){
         const arrow=frontDeskSort.column===key?(frontDeskSort.direction===1?' ↑':' ↓'):' ↕';
         return '<th class="fd-column-head"><div class="fd-column-controls"><button type="button" data-fd-sort="'+key+'" aria-label="Sort by '+label+'">'+label+arrow+'</button><select data-fd-filter="'+key+'" aria-label="Filter '+label+'"><option value="">All</option>'+options+'</select></div></th>';
     };
-    const rows=filtered.map(e=>`<tr><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}</td><td>${pill(e.source,'source')}</td><td><button type="button" class="action" data-fd-open="${esc(e.id)}">Open</button></td></tr>`).join('');
+    const rows=filtered.map(e=>`<tr class="fd-speedbump-row" tabindex="0" role="link" aria-label="Open ${esc(e.name)}" data-fd-row-open="${esc(e.id)}"><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}</td><td>${pill(e.source,'source')}</td><td><button type="button" class="action" data-fd-open="${esc(e.id)}">Open</button></td></tr>`).join('');
     const metric=(label,count,note)=>`<div class="fd-metric"><span>${esc(label)}</span><strong>${count}</strong><small>${esc(note)}</small></div>`;
     genericView.innerHTML=`<div class="fd-page">
       
@@ -156,6 +156,17 @@ function renderFrontDesk(){
     genericView.querySelectorAll('[data-frontdesk-tab]').forEach(b=>b.onclick=()=>{frontDeskTab=b.dataset.frontdeskTab;renderFrontDesk();});
     genericView.querySelector('#frontDeskSearch').oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();genericView.querySelector('#frontDeskSearch')?.focus();};
     genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openWorkspaceJob(b.dataset.frontdeskJob));
+    genericView.querySelectorAll('[data-fd-row-open]').forEach(row=>{
+        const open=()=>row.querySelector('[data-fd-open]')?.click();
+        row.addEventListener('click',event=>{
+            if(event.target.closest('button,a,input,select'))return;
+            open();
+        });
+        row.addEventListener('keydown',event=>{
+            if(event.target!==row||!['Enter',' '].includes(event.key))return;
+            event.preventDefault();open();
+        });
+    });
     genericView.querySelectorAll('[data-fd-open]').forEach(b=>b.onclick=()=>{const e=entries.find(x=>x.id===b.dataset.fdOpen);if(e?.jobId)openWorkspaceJob(e.jobId);else if(e?.conversationId)openPendingBookingForm(frontDeskEnquiries.find(x=>x.id===e.conversationId));});
     genericView.querySelectorAll('[data-fd-enquiry]').forEach(b=>b.onclick=()=>openPendingBookingForm(frontDeskEnquiries.find(e=>e.id===b.dataset.fdEnquiry)));
     if(!['today','requests','enquiries'].includes(frontDeskTab))renderFrontDeskRows();
