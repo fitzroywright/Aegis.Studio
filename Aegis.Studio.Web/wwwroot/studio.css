@@ -8591,3 +8591,23 @@ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active strong{
 .studio-media-page .studio-media-detail dt{color:var(--text-muted,#766b5e)}
 .studio-media-page .studio-media-detail dd{margin:0;overflow-wrap:anywhere}
 @media(max-width:850px){.studio-media-page .studio-media-workspace{grid-template-columns:1fr}.studio-media-page .studio-media-tree{max-height:260px}}
+
+/* Media workspace: fixed-height page, independent tree/gallery scrolling */
+.studio-media-page{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.studio-media-page .studio-media-heading{flex:0 0 auto}
+.studio-media-page .studio-media-workspace{flex:1 1 auto;min-height:0;overflow:hidden;align-items:stretch}
+.studio-media-page .studio-media-browser{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.studio-media-page .studio-media-tree-layout{flex:1;min-height:0;display:flex!important;flex-direction:column}
+.studio-media-page .studio-media-tree-layout>div:first-child{display:flex;flex-direction:column;min-height:0;flex:1}
+.studio-media-page .studio-media-tree{flex:1;min-height:0;max-height:none;overflow:auto}
+.studio-media-page .studio-media-main{height:100%;min-height:0;overflow:hidden}
+.studio-media-page .studio-media-announcement{flex:0 0 auto;margin:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-left:3px solid #aa751f;background:var(--theme-surface-muted,#fffaf0)}
+.studio-media-page .studio-media-announcement-copy{min-width:0;flex:1}
+.studio-media-page .studio-media-announcement-copy small{display:block;color:var(--theme-muted,#766b5e);margin-bottom:2px}
+.studio-media-page .studio-media-announcement-copy strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.studio-media-page .studio-media-announcement .studio-media-notice{padding:0;border:0;background:transparent;margin:3px 0 0;font-size:12px}
+.studio-media-page .studio-media-upload{flex:0 0 auto}
+.studio-media-page .studio-media-main>.studio-media-panel:last-of-type{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.studio-media-page .studio-media-gallery{flex:1 1 auto;min-height:0;overflow-y:auto;align-content:start}
+.studio-media-page .studio-media-detail:not([hidden]){flex:0 0 auto;max-height:125px;overflow:auto}
+@media(max-width:850px){.studio-media-page .studio-media-workspace{grid-template-columns:minmax(165px,215px) minmax(0,1fr)}.studio-media-page .studio-media-tree{max-height:none}}
