@@ -151,7 +151,35 @@
       }).join(''):'<p class="muted">No media in this location matching the filters.</p>';
       function showDetails(){
         const a=shown.find(x=>assetIdOf(x)===selectedAssetId);
-        detail.innerHTML=a?'<h3>File Details</h3><strong>'+escMedia(nameOf(a))+'</strong><dl><dt>Status</dt><dd>'+escMedia(statusOf(a))+'</dd><dt>Collection</dt><dd>'+escMedia(a.collection||'Unclassified')+'</dd><dt>Subjects</dt><dd>'+escMedia((a.subjects||a.subjectIds||[]).map(x=>typeof x==='object'?x.name||x.id:x).join(', ')||'None')+'</dd><dt>Type</dt><dd>'+escMedia(a.contentType||a.mimeType||'Unknown')+'</dd></dl>':'<h3>File Details</h3><p class="muted">Select an image to see its details.</p>';
+        if(!a){detail.innerHTML='<h3>File Details</h3><p class="muted">Select an image to see its details.</p>';return;}
+        const jobRecord=jobs.find(j=>String(j.id)===String(job.value));
+        const currentCollection=a.collection||'Unclassified';
+        const currentSubjects=(a.subjects||a.subjectIds||[]).map(x=>String(typeof x==='object'?x.id:x));
+        const collectionNames=['Unclassified',...new Set((media?.collections||[]).map(c=>typeof c==='string'?c:c.name).filter(x=>x&&x!=='Unclassified'))];
+        const collectionOptions=collectionNames.map(x=>'<option value="'+escMedia(x)+'"'+(x===currentCollection?' selected':'')+'>'+escMedia(x)+'</option>').join('');
+        const subjects=(media?.subjects||[]).filter(x=>!x.isSystem);
+        detail.innerHTML='<h3>File Details</h3><strong class="studio-media-detail-name">'+escMedia(nameOf(a))+'</strong><div class="studio-media-detail-fields"><label>Job<input type="text" value="'+escMedia(describe(jobRecord||{})||job.value)+'" readonly title="Changing the Job requires moving the asset between Jobs"></label><label>Collection<select id="studioMediaDetailCollection">'+collectionOptions+'</select></label><fieldset class="studio-media-detail-subjects"><legend>Subjects</legend><div id="studioMediaDetailSubjects"></div></fieldset><button type="button" class="primary" id="studioMediaSaveTags">Save Tags</button><small id="studioMediaTagFeedback" role="status" aria-live="polite"></small></div>';
+        const collectionInput=detail.querySelector('#studioMediaDetailCollection');
+        const subjectList=detail.querySelector('#studioMediaDetailSubjects');
+        function drawSubjects(){
+          const relevant=subjects.filter(x=>(x.collection||'Unclassified')===collectionInput.value);
+          subjectList.innerHTML=relevant.length?relevant.map(x=>'<label class="studio-media-subject-option"><input type="checkbox" value="'+escMedia(x.id)+'"'+(currentSubjects.includes(String(x.id))?' checked':'')+'> '+escMedia(x.name)+'</label>').join(''):'<small>No Subjects in this Collection.</small>';
+        }
+        collectionInput.onchange=drawSubjects;drawSubjects();
+        const save=detail.querySelector('#studioMediaSaveTags'),feedback=detail.querySelector('#studioMediaTagFeedback');
+        save.onclick=async()=>{
+          const chosenCollection=collectionInput.value,chosenSubjects=Array.from(subjectList.querySelectorAll('input:checked')).map(x=>x.value);
+          const assetId=a.id||a.assetId;
+          if(!assetId){feedback.textContent='This file has no editable asset identifier.';return;}
+          save.disabled=true;feedback.textContent='Saving tags…';
+          try{
+            await json('/api/jobs/'+encodeURIComponent(job.value)+'/media/assets/'+encodeURIComponent(assetId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:statusOf(a),collection:chosenCollection,subjects:chosenSubjects,assignedTo:a.assignedTo||null})});
+            feedback.textContent='Tags saved.';
+            a.collection=chosenCollection;a.subjects=chosenSubjects;
+            await refresh();renderTree();
+          }catch(error){feedback.textContent=error.message||'Unable to save tags.';}
+          finally{save.disabled=false;}
+        };
         gallery.querySelectorAll('[data-media-asset]').forEach(button=>button.classList.toggle('selected',button.dataset.mediaAsset===selectedAssetId));
       }
       gallery.querySelectorAll('[data-media-asset]').forEach(button=>button.onclick=()=>{selectedAssetId=button.dataset.mediaAsset;showDetails();});
