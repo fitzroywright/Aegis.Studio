@@ -6,9 +6,10 @@
     const current=++revision;
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
     genericView.innerHTML='<div class="today-loading">Loading Media Review & Upload…</div>';
-    let jobs=[];
+    let jobs=[],workspaces=[];
     try{
-      const result=await json('/api/jobs');
+      const [result,ws]=await Promise.all([json('/api/jobs'),json('/api/workspaces')]);
+      workspaces=Array.isArray(ws)?ws:ws?.workspaces||[];
       jobs=Array.isArray(result)?result:Array.isArray(result?.jobs)?result.jobs:[];
     }catch(error){
       if(current!==revision)return;
@@ -18,17 +19,11 @@
     genericView.innerHTML=`<div class="studio-media-page">
       <header class="studio-media-heading"><div><h1>Media Review &amp; Upload</h1><p>Upload, organise and review Job media and source files.</p></div></header>
       <section class="studio-media-panel"><h2>Upload Destination</h2>
-        <div class="studio-media-destinations">
-          <label><input type="radio" name="mediaDestination" value="job" checked><strong>Job</strong><small>Upload to a Job, Collection and Subject</small></label>
-          <label><input type="radio" name="mediaDestination" value="scratch"><strong>Scratch Area</strong><small>Temporary sorting and staging</small></label>
-          <label><input type="radio" name="mediaDestination" value="legacy"><strong>Legacy Area</strong><small>Historical archive</small></label>
+        <div class="studio-media-tree-layout">
+          <div><input id="studioMediaJobSearch" type="search" placeholder="Search Workspaces, Jobs, Collections, Subjects…" aria-label="Search media destinations"><div id="studioMediaTree" class="studio-media-tree" role="tree"></div><small id="studioMediaJobMatches"></small></div>
+          <div class="studio-media-tree-summary"><strong id="studioMediaPath">Select a destination</strong><p id="studioMediaDestinationNotice"></p><button type="button" class="action" id="studioMediaOpenJob" disabled>Open Job Details ↗</button></div>
         </div>
-        <div id="studioMediaDestinationNotice" class="studio-media-notice" hidden></div>
-        <div class="studio-media-targets">
-          <label>Job — All Workspaces<input id="studioMediaJobSearch" type="search" placeholder="Search Job, customer, reference or workspace…" autocomplete="off"><select id="studioMediaJob"><option value="">Select a Job…</option></select><small id="studioMediaJobMatches" role="status"></small><button type="button" class="action" id="studioMediaOpenJob" disabled>Open Job Details ↗</button></label>
-          <label>Collection<select id="studioMediaCollection"><option value="Unclassified">Unclassified</option></select></label>
-          <label>Subject<select id="studioMediaSubject"><option value="">No Subject</option></select></label>
-        </div>
+        <div class="studio-media-targets" hidden><select id="studioMediaJob"><option value="">Select Job</option></select><select id="studioMediaCollection"><option value="Unclassified">Unclassified</option></select><select id="studioMediaSubject"><option value="">No Subject</option></select></div>
       </section>
       <section class="studio-media-panel studio-media-upload"><h2>Upload Files</h2>
         <div class="studio-media-drop" id="studioMediaDrop" tabindex="0"><span aria-hidden="true">⇧</span><strong>Drag files here to upload</strong><p>Or choose images and other media from your device</p><button type="button" class="primary" id="studioMediaChoose">Choose Files</button><input type="file" id="studioMediaFiles" multiple hidden></div>
@@ -38,30 +33,72 @@
         <div class="studio-media-gallery" id="studioMediaGallery"><p class="muted">Select a Job to view its media.</p></div>
       </section></div>`;
     const root=genericView.querySelector('.studio-media-page'),job=root.querySelector('#studioMediaJob'),collection=root.querySelector('#studioMediaCollection'),subject=root.querySelector('#studioMediaSubject'),files=root.querySelector('#studioMediaFiles'),upload=root.querySelector('#studioMediaUpload'),progress=root.querySelector('#studioMediaProgress'),gallery=root.querySelector('#studioMediaGallery'),count=root.querySelector('#studioMediaCount'),notice=root.querySelector('#studioMediaDestinationNotice');
-    const search=root.querySelector('#studioMediaJobSearch'),matches=root.querySelector('#studioMediaJobMatches');
-    const workspaceNames=new Map((typeof workspaceCache!=='undefined'&&Array.isArray(workspaceCache)?workspaceCache:[]).map(w=>[String(w.id),w.name||'']));
-    const describe=j=>[j.title||j.name||'Untitled Job',j.clientName||j.customerName||'',workspaceNames.get(String(j.workspaceId))||j.workspaceName||'',j.jobNumber||j.reference||''].filter(Boolean).join(' · ');
-    function filterJobs(){
-      const query=search.value.trim().toLocaleLowerCase();
-      const filtered=jobs.filter(j=>!query||[describe(j),j.id].join(' ').toLocaleLowerCase().includes(query)).slice(0,150);
-      const selected=job.value;
-      job.innerHTML='<option value="">Select a Job…</option>'+filtered.map(j=>'<option value="'+escMedia(j.id)+'">'+escMedia(describe(j))+'</option>').join('');
-      if(filtered.some(j=>String(j.id)===selected))job.value=selected;
-      matches.textContent=filtered.length+' matching Jobs'+(jobs.length>150?' (first 150 shown; refine search)':'');
+    const search=root.querySelector('#studioMediaJobSearch'),matches=root.querySelector('#studioMediaJobMatches'),tree=root.querySelector('#studioMediaTree'),path=root.querySelector('#studioMediaPath');
+    const workspaceNames=new Map(workspaces.map(w=>[String(w.id),w.name||w.title||'Workspace']));
+    const describe=j=>[j.jobNumber||j.reference||'',j.title||j.name||'Job',j.clientName||j.customerName||''].filter(Boolean).join(' · ');
+    const expanded=new Set(['workspaces']),cache=new Map();
+    let selection='';
+    function renderTree(){
+      const q=search.value.trim().toLowerCase();
+      const matchesText=(...parts)=>!q||parts.join(' ').toLowerCase().includes(q);
+      const node=(id,name,depth,children,icon)=>'<button type="button" role="treeitem" data-tree-id="'+escMedia(id)+'" class="studio-media-tree-node'+(selection===id?' selected':'')+'" style="padding-left:'+(12+depth*20)+'px"><span>'+ (children?(expanded.has(id)||q?'⌄':'›'):'·') +'</span><span>'+icon+'</span><span>'+escMedia(name)+'</span></button>';
+      let html=node('workspaces','Workspaces',0,true,'▣');
+      if(expanded.has('workspaces')||q){
+        const groups=workspaces.map(w=>({id:String(w.id),name:w.name||w.title||'Workspace',jobs:jobs.filter(j=>String(j.workspaceId)===String(w.id))}));
+        const other=jobs.filter(j=>!workspaceNames.has(String(j.workspaceId)));
+        if(other.length)groups.push({id:'other',name:'Other Jobs',jobs:other});
+        for(const w of groups){
+          const matching=w.jobs.filter(j=>matchesText(w.name,describe(j)));
+          if(!matchesText(w.name)&&!matching.length)continue;
+          const wid='w:'+w.id;html+=node(wid,w.name,1,true,'▰');
+          if(expanded.has(wid)||q)for(const j of matching){
+            const jid='j:'+j.id;html+=node(jid,describe(j),2,true,'▧');
+            if(expanded.has(jid)||q){
+              const data=cache.get(String(j.id));
+              if(!data){html+=node('pending:'+j.id,'Select Job to load collections',3,false,'⋯');continue;}
+              const names=['Unclassified',...new Set((data.collections||[]).map(c=>typeof c==='string'?c:c.name).filter(x=>x&&x!=='Unclassified'))];
+              for(const name of names){
+                const subjects=(data.subjects||[]).filter(x=>!x.isSystem&&(x.collection||'Unclassified')===name);
+                if(!matchesText(name,describe(j))&&!subjects.some(x=>matchesText(x.name,describe(j))))continue;
+                const cid='c:'+j.id+':'+encodeURIComponent(name);html+=node(cid,name,3,subjects.length>0,'▱');
+                if(expanded.has(cid)||q)for(const sub of subjects)if(matchesText(sub.name,name,describe(j)))html+=node('s:'+j.id+':'+sub.id,sub.name,4,false,'♙');
+              }
+            }
+          }
+        }
+      }
+      html+=node('legacy','Legacy',0,true,'▤');
+      if(expanded.has('legacy')||q)html+=node('legacy:unclassified','Unclassified',1,false,'▱');
+      html+=node('scratch','Scratch Space',0,false,'▱');
+      tree.innerHTML=html;
+      matches.textContent=jobs.length+' accessible Jobs';
     }
-    search.addEventListener('input',filterJobs);
-    filterJobs();
+    search.oninput=renderTree;
+    tree.onclick=async e=>{
+      const button=e.target.closest('[data-tree-id]');if(!button)return;
+      const id=button.dataset.treeId,parts=id.split(':'),jobId=['j','c','s'].includes(parts[0])?parts[1]:'';
+      if(['workspaces','legacy'].includes(id)||parts[0]==='w'){expanded.has(id)?expanded.delete(id):expanded.add(id);renderTree();return;}
+      if(parts[0]==='pending')return;
+      if(parts[0]==='j'||parts[0]==='c'){expanded.has(id)?expanded.delete(id):expanded.add(id);}
+      selection=id;job.value=jobId;collection.value='Unclassified';subject.value='';
+      if(jobId){
+        if(!cache.has(jobId)){try{cache.set(jobId,await json('/api/jobs/'+encodeURIComponent(jobId)+'/media'));}catch(error){progress.textContent=error.message||'Unable to load media.';}}
+        await refresh();
+        if(parts[0]==='c')collection.value=decodeURIComponent(parts.slice(2).join(':'));
+        if(parts[0]==='s'){subject.value=parts[2];collection.value=subject.selectedOptions[0]?.dataset.collection||'Unclassified';}
+      }else{gallery.innerHTML='<p class="muted">Select a Job to view its media.</p>';count.textContent='';}
+      const j=jobs.find(x=>String(x.id)===jobId);
+      path.textContent=jobId?[workspaceNames.get(String(j?.workspaceId))||'Workspace',describe(j||{}),parts[0]==='c'||parts[0]==='s'?collection.value:'',parts[0]==='s'?subject.selectedOptions[0]?.textContent:''].filter(Boolean).join(' / '):id.startsWith('legacy')?'Legacy / Unclassified':'Scratch Space';
+      sync();renderTree();
+    };
+    renderTree();
     let selectedFiles=[],assets=[],media=null;
-    const destination=()=>root.querySelector('input[name="mediaDestination"]:checked').value;
     function sync(){
-      const isJob=destination()==='job';
-      root.querySelector('.studio-media-targets').hidden=!isJob;
-      root.querySelector('.studio-media-upload').hidden=!isJob;
-      notice.hidden=isJob;
-      if(!isJob)notice.textContent=(destination()==='scratch'?'Scratch Area':'Legacy Area')+' requires shared server-side storage and transfer auditing. Uploads are unavailable until that storage is commissioned; files will not be silently saved to this browser or misfiled under a Job.';
-      upload.disabled=!isJob||!job.value||!selectedFiles.length;
+      const allowed=/^[jcs]:/.test(selection);
+      notice.textContent=allowed?'Uploads will be tagged to the selected Job, Collection and optional Subject.':'Legacy and Scratch Space require server-side storage before uploads can be enabled.';
+      upload.disabled=!allowed||!job.value||!selectedFiles.length;
+      root.querySelector('#studioMediaOpenJob').disabled=!job.value;
     }
-    root.querySelectorAll('input[name="mediaDestination"]').forEach(input=>input.onchange=sync);
     root.querySelector('#studioMediaChoose').onclick=()=>files.click();
     const drop=root.querySelector('#studioMediaDrop');
     drop.addEventListener('dragover',event=>{event.preventDefault();drop.classList.add('drag-over')});
@@ -73,6 +110,7 @@
       gallery.innerHTML='<p class="muted">Loading media…</p>';
       try{
         media=await json('/api/jobs/'+encodeURIComponent(job.value)+'/media');
+        cache.set(String(job.value),media);
         collection.innerHTML='<option value="Unclassified">Unclassified</option>'+Array.from(new Set((media.collections||[]).map(c=>typeof c==='string'?c:c.name).filter(Boolean))).filter(c=>c!=='Unclassified').map(c=>'<option value="'+escMedia(c)+'">'+escMedia(c)+'</option>').join('');
         subject.innerHTML='<option value="">No Subject</option>'+(media.subjects||[]).filter(s=>!s.isSystem).map(s=>'<option value="'+escMedia(s.id)+'" data-collection="'+escMedia(s.collection||'Unclassified')+'">'+escMedia(s.name)+'</option>').join('');
         assets=media.assets||[];count.textContent=assets.length+' files';
@@ -85,10 +123,10 @@
       if(typeof openWorkspaceJob!=='function'){progress.textContent='Job detail navigation is unavailable.';return;}
       Promise.resolve(openWorkspaceJob(job.value)).catch(error=>{progress.textContent=error.message||'Unable to open Job details.';});
     };
-    job.onchange=()=>{openJobButton.disabled=!job.value;sync();refresh()};
+
     subject.onchange=()=>{const selected=subject.selectedOptions[0];if(selected?.dataset.collection)collection.value=selected.dataset.collection};
     upload.onclick=async()=>{
-      if(!job.value||!selectedFiles.length||destination()!=='job')return;
+      if(!job.value||!selectedFiles.length||upload.disabled)return;
       upload.disabled=true;const jobId=job.value,chosenCollection=collection.value,chosenSubject=subject.value;
       let succeeded=0;
       try{
@@ -99,7 +137,7 @@
           if(chosenSubject&&result.assetId)await json('/api/jobs/'+encodeURIComponent(jobId)+'/media/assets/'+encodeURIComponent(result.assetId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'Needs Sorting',collection:chosenCollection,subjects:[chosenSubject],assignedTo:null})});
           succeeded++;
         }
-        progress.textContent=succeeded+' files uploaded successfully.';selectedFiles=[];files.value='';await refresh();
+        progress.textContent=succeeded+' files uploaded successfully.';selectedFiles=[];files.value='';await refresh();renderTree();
       }catch(error){progress.textContent=succeeded+' uploaded; '+(error.message||'Upload failed')+'. Remaining files were not uploaded.';}
       finally{sync()}
     };
