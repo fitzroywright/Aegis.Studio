@@ -8611,3 +8611,7 @@ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active strong{
 .studio-media-page .studio-media-gallery{flex:1 1 auto;min-height:0;overflow-y:auto;align-content:start}
 .studio-media-page .studio-media-detail:not([hidden]){flex:0 0 auto;max-height:125px;overflow:auto}
 @media(max-width:850px){.studio-media-page .studio-media-workspace{grid-template-columns:minmax(165px,215px) minmax(0,1fr)}.studio-media-page .studio-media-tree{max-height:none}}
+
+body[data-studio-view="media"] .shell>main>#genericView{overflow:hidden!important;min-height:0;height:100%;padding-bottom:5px!important}
+body[data-studio-view="media"] .studio-media-page{box-sizing:border-box;padding:8px 10px 5px;gap:8px}
+body[data-studio-view="media"] .studio-media-workspace{min-height:0}
