@@ -8859,3 +8859,37 @@ body:has(.has-open-job .studio-job-today-layout) #conversationView.has-open-job{
  .studio-job-today-layout>.job-detail-bottom{grid-template-columns:minmax(0,1fr) 230px!important}
  .studio-job-today-layout .job-meta-item:nth-child(n+4){display:none}
 }
+
+/* Outlook-inspired Studio inbox: independent job filters, message list and reading pane */
+.studio-outlook-inbox{display:grid!important;grid-template-columns:190px minmax(420px,1fr) minmax(260px,31%);height:100%;min-height:0;overflow:hidden;gap:0;background:#fff;border:1px solid #dedbd4;border-radius:8px}
+.studio-outlook-inbox>.studio-inbox-filters{display:flex;flex-direction:column;min-height:0;overflow:hidden;background:#f8f6f0;border-right:1px solid #e1ddd4;padding:9px}
+.studio-inbox-filters header{margin-bottom:8px}
+.studio-inbox-filters h2{font-size:15px;margin:0}
+.studio-inbox-filters small{font-size:11px;color:#7b756d}
+.studio-inbox-filters>input{width:100%;box-sizing:border-box;font-size:12px;padding:7px;border:1px solid #ddd4c4;border-radius:5px;margin-bottom:8px}
+.studio-inbox-job-filters{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:3px}
+.studio-inbox-job-filters button{display:flex;align-items:center;justify-content:space-between;gap:5px;border:0;border-radius:5px;background:transparent;text-align:left;padding:8px 7px;font-size:12px;color:inherit;cursor:pointer}
+.studio-inbox-job-filters button.active,.studio-inbox-job-filters button:hover{background:#f8e9bb;color:#65471a}
+.studio-inbox-job-filters span{font-size:10px;color:#83745a}
+.studio-inbox-center{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.studio-inbox-toolbar{flex:0 0 auto;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #e6e0d5;background:#fffdf8}
+.studio-inbox-toolbar h1{font-size:17px;margin:0}
+.studio-inbox-toolbar small{font-size:11px;color:#7c766e}
+.studio-inbox-tools{display:flex;align-items:center;gap:5px}
+.studio-inbox-tools input{max-width:155px;min-width:80px;padding:6px;border:1px solid #ded8cd;border-radius:5px;font-size:11px}
+.studio-inbox-tools button{font-size:11px;padding:6px 8px}
+.studio-inbox-table-wrap{min-height:0;flex:1;overflow:auto}
+.studio-inbox-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px}
+.studio-inbox-table th{position:sticky;top:0;background:#f4f0e6;color:#5d5243;text-align:left;padding:8px 7px;z-index:1;border-bottom:1px solid #ddd4c6;font-size:11px}
+.studio-inbox-table th:nth-child(1){width:18%}.studio-inbox-table th:nth-child(2){width:34%}.studio-inbox-table th:nth-child(3){width:15%}.studio-inbox-table th:nth-child(4){width:15%}.studio-inbox-table th:nth-child(5){width:18%}
+.studio-inbox-table td{padding:8px 7px;border-bottom:1px solid #eeeae2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top}
+.studio-inbox-table td strong,.studio-inbox-table td small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-inbox-table td small{color:#857f76;margin-top:4px;font-size:10px}
+.studio-inbox-table tbody tr{cursor:pointer}
+.studio-inbox-table tbody tr:hover{background:#fff9e9}
+.studio-inbox-table tbody tr.selected{background:#fff0c5}
+.studio-outlook-inbox>.studio-inbox-reading{min-width:0;min-height:0;border-left:1px solid #dedbd4;display:flex;flex-direction:column;overflow:hidden;background:#fffdf9}
+.studio-outlook-inbox .studio-message-history{min-height:0;flex:1;overflow:auto}
+.studio-outlook-inbox .studio-message-composer{flex:0 0 auto}
+@media(max-width:1200px){.studio-outlook-inbox{grid-template-columns:155px minmax(320px,1fr) minmax(230px,30%)}}
+@media(max-width:900px){.studio-outlook-inbox{grid-template-columns:145px minmax(0,1fr)}.studio-outlook-inbox>.studio-inbox-reading{display:none}}
