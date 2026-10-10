@@ -307,7 +307,31 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const bottom=document.createElement('section');bottom.className='job-detail-bottom';
             const activityCard=document.createElement('section');activityCard.className='job-center-panel job-detail-activity-card';activityCard.innerHTML='<header class="job-center-heading"><h2>Recent Activity</h2></header><div class="job-detail-activity-content"></div>';
             const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.append(messageHeader,messagesPanel,composer);
-            rightStack.prepend(messageCard);
+            const selectedFile=document.createElement('section');
+            selectedFile.className='job-center-panel studio-job-selected-file';
+            selectedFile.innerHTML='<header class="job-center-heading"><h2>Selected File</h2></header><div class="studio-job-selected-content"><p class="muted">Select a photo in the gallery to inspect it.</p></div>';
+            rightStack.prepend(selectedFile,messageCard);
+            const selectedContent=selectedFile.querySelector('.studio-job-selected-content');
+            const updateSelectedFile=tile=>{
+                if(!tile)return;
+                const img=tile.querySelector('img');
+                const label=tile.querySelector('strong')?.textContent||img?.alt||'Media file';
+                const detail=tile.querySelector('small')?.textContent||'';
+                selectedContent.innerHTML=(img?'<img alt="" src="'+esc(img.currentSrc||img.src)+'">':'<span class="job-file-document">▤</span>')+'<div><strong>'+esc(label)+'</strong><small>'+esc(detail)+'</small></div>';
+                lower.querySelectorAll('.job-file-tile,.media-item,[data-media-asset]').forEach(el=>el.classList.toggle('studio-job-file-selected',el===tile));
+            };
+            lower.querySelector('.job-media-section').addEventListener('click',event=>{
+                const tile=event.target.closest('.job-file-tile,.media-item,[data-media-asset]');
+                if(tile)updateSelectedFile(tile);
+            });
+            const photoObserver=new MutationObserver(()=>{
+                if(!selectedFile.isConnected){photoObserver.disconnect();return;}
+                if(selectedContent.querySelector('.muted')){
+                    const first=lower.querySelector('.job-file-tile,.media-item,[data-media-asset]');
+                    if(first)updateSelectedFile(first);
+                }
+            });
+            photoObserver.observe(lower.querySelector('.job-media-content'),{childList:true,subtree:true});
             bottom.append(activityCard,nextPanel);detailPane.appendChild(bottom);
             filesPanel.remove();
             quick.querySelector('[data-quick-upload]')?.addEventListener('click',()=>lower.querySelector('[data-add]')?.click());
