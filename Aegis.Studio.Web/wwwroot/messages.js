@@ -41,7 +41,7 @@
                 </aside>
                 <section class="studio-inbox-center">
                     <header class="studio-inbox-toolbar"><div><h1>All Messages</h1><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="primary" id="newDirectMessage">New</button></div></header>
-                    <div class="studio-inbox-table-wrap"><table class="studio-inbox-table"><thead><tr><th>Job</th><th>Message title & contents</th><th>Sender</th><th>Recipient</th><th>Date</th></tr></thead><tbody id="studioInboxRows"><tr><td colspan="5">Loading messages…</td></tr></tbody></table></div>
+                    <div class="studio-inbox-table-wrap" id="studioInboxRows" role="list" aria-label="Messages"><div class="studio-inbox-loading">Loading messages…</div></div>
                 </section>
                 <section id="messageConversationPane" class="message-conversation-pane studio-inbox-reading"><div class="empty-state"><h2>Select a message</h2><p>Read the conversation and reply here.</p></div></section>
             </div>`;
@@ -55,7 +55,7 @@
     async function loadInbox(force) {
         const body=document.getElementById('studioInboxRows');
         if(!body)return;
-        if(force)body.innerHTML='<tr><td colspan="5">Loading messages…</td></tr>';
+        if(force)body.innerHTML='<div class="studio-inbox-loading">Loading messages…</div>';
         try {
             const threads=await json('/api/messages/threads');
             inboxThreads=threads;
@@ -75,7 +75,7 @@
             inboxLastLoad=Date.now();
             inboxRows=results.filter(x=>x.message).sort((a,b)=>new Date(b.message.createdAtUtc||0)-new Date(a.message.createdAtUtc||0));
             renderInboxFilters();renderInbox();handleUnreadChanges(threads);
-        }catch(error){body.innerHTML='<tr><td colspan="5">'+esc(error.message||'Unable to load messages.')+'</td></tr>';}
+        }catch(error){body.innerHTML='<div class="studio-inbox-loading">'+esc(error.message||'Unable to load messages.')+'</div>';}
     }
     function renderInboxFilters(){
         const host=document.getElementById('studioInboxJobFilters');if(!host)return;
@@ -96,7 +96,9 @@
             return [inboxJob(thread),inboxSubject(message),message.body,message.senderUserName,inboxRecipient(message,thread),message.createdAtUtc].some(v=>String(v||'').toLowerCase().includes(inboxQuery));
         });
         document.getElementById('studioInboxCount').textContent=rows.length+' messages'+(inboxFilter?' in selected job':'');
-        body.innerHTML=rows.map(({thread,message})=>'<tr tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="'+(inboxSelection===message.id?'selected':'')+'"><td>'+esc(inboxJob(thread))+'</td><td><strong>'+esc(inboxSubject(message))+'</strong><small>'+esc(String(message.body||'').replace(/\\s+/g,' ').slice(0,170))+'</small></td><td>'+esc(message.senderUserName||'Unknown')+'</td><td>'+esc(inboxRecipient(message,thread))+'</td><td>'+esc(inboxDate(message.createdAtUtc))+'</td></tr>').join('')||'<tr><td colspan="5">No messages match the selected filters.</td></tr>';
+        const groups=[{title:'Follow Up Flag',items:rows.filter(x=>x.message.isFlagged||x.message.flagged)},{title:'Unflagged',items:rows.filter(x=>!x.message.isFlagged&&!x.message.flagged)}];
+        body.innerHTML=groups.map(group=>'<section class="studio-inbox-group"><div class="studio-inbox-group-heading"><span>⌄</span> '+esc(group.title)+': '+group.items.length+' item(s)</div>'+group.items.map(({thread,message})=>'<div role="listitem" tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="studio-inbox-message-row '+(inboxSelection===message.id?'selected':'')+'"><div class="studio-inbox-message-top"><strong class="studio-inbox-message-sender">'+esc(message.senderUserName||'Unknown')+'</strong><strong class="studio-inbox-message-subject">'+esc(inboxSubject(message))+'</strong><time>'+esc(inboxDate(message.createdAtUtc))+'</time></div><div class="studio-inbox-message-bottom"><span class="studio-inbox-message-job">'+esc(inboxJob(thread))+'</span><span class="studio-inbox-message-preview">'+esc(String(message.body||'').replace(/\\s+/g,' ').slice(0,220))+'</span><span class="studio-inbox-message-recipient">To: '+esc(inboxRecipient(message,thread))+'</span></div></div>').join('')+'</section>').join('') || '<div class="studio-inbox-loading">No messages.</div>';
+        if(!rows.length)body.innerHTML='<div class="studio-inbox-loading">No messages match the selected filters.</div>';
         body.querySelectorAll('[data-inbox-message]').forEach(row=>{
             const open=async()=>{inboxSelection=row.dataset.inboxMessage;renderInbox();await openThread(row.dataset.inboxThread);const msg=document.querySelector('#studioMessageHistory .studio-chat-message[data-message-id="'+CSS.escape(inboxSelection)+'"]');msg?.scrollIntoView({block:'nearest'});};
             row.onclick=open;row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void open();}};
