@@ -215,7 +215,7 @@
         if (title) {
             title.querySelector('strong')?.replaceChildren(document.createTextNode(labelFor(view)));
             const tagline = title.querySelector('small');
-            if (tagline) tagline.textContent = 'Studio workspace';
+            if (tagline) tagline.textContent = view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : 'Studio workspace';
         }
         main.classList.add('studio-standard-main');
     }
