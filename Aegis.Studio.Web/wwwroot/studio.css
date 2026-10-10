@@ -8146,3 +8146,13 @@ body .shell > .studio-shell-footer .studio-grid-item-count{display:block!importa
 body .shell>.studio-shell-footer .studio-grid-item-count{
  margin-left:auto!important;text-align:right!important;white-space:nowrap;
 }
+
+/* Shared shell structure: the orange divider is the first edge directly below
+   the 56px blue masthead, not an offset within the page content. */
+body .shell{position:relative}
+body .shell::before{
+ content:"";position:absolute;top:0!important;left:0;right:0;
+ height:4px!important;background:#df8a32!important;
+ z-index:4;pointer-events:none;
+}
+body .shell>main,body .shell>.studio-context-rail{min-height:0}
