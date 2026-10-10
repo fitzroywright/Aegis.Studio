@@ -8683,3 +8683,14 @@ body[data-studio-view="media"] .studio-media-page{gap:5px;padding:5px 7px 4px}
 .studio-media-page .studio-media-upload .studio-media-drop>span{font-size:28px}
 .studio-media-page .studio-media-drop p{font-size:12px;margin:0 0 3px}
 .studio-media-page .studio-media-drop strong{font-size:13px}
+
+/* Media upload: header action and expanding drop surface */
+.studio-media-page .studio-media-main>.studio-media-upload{display:flex;flex-direction:column;flex:1 1 38%;min-height:145px;overflow:hidden}
+.studio-media-page .studio-media-main>.studio-media-library{flex:1 1 62%;min-height:140px}
+.studio-media-page .studio-media-upload-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:0 0 auto;margin-bottom:6px}
+.studio-media-page .studio-media-upload-heading h2{margin:0}
+.studio-media-page .studio-media-upload-heading button{font-size:11px;padding:5px 10px;white-space:nowrap}
+.studio-media-page .studio-media-upload .studio-media-drop{flex:1 1 auto;min-height:0;padding:12px;box-sizing:border-box}
+.studio-media-page .studio-media-upload-actions{flex:0 0 auto;margin-top:0}
+.studio-media-page #studioMediaProgress:empty{display:none}
+.studio-media-page .studio-media-upload-actions:has(#studioMediaProgress:empty){display:none}
