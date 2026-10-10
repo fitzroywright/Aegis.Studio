@@ -8545,3 +8545,18 @@ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active strong{
 .studio-media-asset small{color:var(--theme-muted,#728092)}
 .studio-media-notice{margin-top:12px;padding:12px;border:1px solid #d9c5a2;border-radius:7px;background:var(--theme-surface-muted,#fff9ed);font-size:.82rem}
 @media(max-width:850px){.studio-media-destinations,.studio-media-targets{grid-template-columns:1fr}}
+
+/* Media: searchable destination hierarchy */
+.studio-media-page .studio-media-tree-layout{display:grid;grid-template-columns:minmax(320px,1.35fr) minmax(220px,1fr);gap:14px;align-items:start}
+.studio-media-page .studio-media-tree-browser,.studio-media-page .studio-media-tree-summary{min-width:0}
+.studio-media-page #studioMediaJobSearch{width:100%;box-sizing:border-box;margin:6px 0 10px}
+.studio-media-page .studio-media-tree{border:1px solid var(--border-color,#d8d1c7);border-radius:8px;max-height:340px;overflow:auto;padding:5px;background:var(--surface,#fff)}
+.studio-media-page .studio-media-tree-node{width:100%;display:flex;gap:9px;align-items:center;text-align:left;min-height:34px;padding-top:5px;padding-bottom:5px;padding-right:8px;border:0;border-radius:5px;background:transparent;color:inherit;cursor:pointer;font:inherit}
+.studio-media-page .studio-media-tree-node:hover{background:rgba(174,116,38,.08)}
+.studio-media-page .studio-media-tree-node.selected{background:rgba(174,116,38,.15);font-weight:650;outline:1px solid rgba(174,116,38,.3)}
+.studio-media-page .studio-media-tree-node>span:first-child{width:13px;flex:none}
+.studio-media-page .studio-media-tree-summary{padding:13px;border:1px solid var(--border-color,#d8d1c7);border-radius:8px}
+.studio-media-page .studio-media-tree-summary strong{display:block;overflow-wrap:anywhere}
+.studio-media-page .studio-media-tree-summary .studio-media-notice{margin:10px 0;color:var(--text-muted,#766b5e)}
+.studio-media-page .studio-media-targets[hidden]{display:none!important}
+@media(max-width:850px){.studio-media-page .studio-media-tree-layout{grid-template-columns:1fr}}
