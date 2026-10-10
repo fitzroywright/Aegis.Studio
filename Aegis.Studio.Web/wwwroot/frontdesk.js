@@ -381,7 +381,7 @@ async function showFrontDeskFlow(jobId) {
     return dialog;
 }
 
-async async function loadFrontDeskCommunications(){
+async function loadFrontDeskCommunications(){
     const host=document.getElementById('fdCommunicationFeed');
     if(!host)return;
     try{
@@ -420,7 +420,7 @@ function openFrontDeskMessagePicker(){
         catch(error){const errorDialog=frontDeskDialog('Unable To Open Message',`<p>${esc(error.message||'Messaging is unavailable.')}</p>`);errorDialog.querySelector('[type=submit]').style.display='none';}
     };
 }
-function messageFrontDeskJob(jobId, mode) {
+async function messageFrontDeskJob(jobId, mode) {
     const [job,thread]=await Promise.all([
         json('/api/jobs/'+jobId),
         json('/api/messages/threads/Job/'+jobId,{method:'POST'})
