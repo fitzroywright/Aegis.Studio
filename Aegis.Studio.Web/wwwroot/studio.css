@@ -8364,3 +8364,24 @@ body[data-studio-view="frontdesk"] .fd-queue-header-tools .fd-tabs{display:flex;
  body[data-studio-view="frontdesk"] .fd-queue-header-tools{width:100%;margin-left:0}
  body[data-studio-view="frontdesk"] .fd-queue-header-tools #frontDeskSearch{flex:1;width:auto}
 }
+
+/* Front Desk summary cards are actionable queue filters. */
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link{
+ appearance:none;display:flex;flex-direction:column;align-items:stretch;
+ text-align:left;font:inherit;color:inherit;cursor:pointer;
+ transition:background-color .14s ease,box-shadow .14s ease,transform .14s ease,border-color .14s ease;
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link:hover,
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link:focus-visible{
+ background:#f1f7fd;transform:translateY(-1px) scale(1.003);
+ box-shadow:0 4px 10px rgba(31,64,96,.12);z-index:1;
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active{
+ border-color:#a47731;box-shadow:inset 0 0 0 1px #a47731;
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link:focus-visible{
+ outline:2px solid #a47731;outline-offset:2px;
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link{transition:none;transform:none!important}
+}
