@@ -83,7 +83,7 @@
                     <button type="button" data-studio-side="workspaces"><span>▰</span><span>Workspaces</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
-                    <button type="button" data-studio-side="media"><span>▧</span><span>Media Review &amp; Upload</span></button>
+                    <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
                 </div>
             </section>            <section class="mw-list-panel studio-context-card">
