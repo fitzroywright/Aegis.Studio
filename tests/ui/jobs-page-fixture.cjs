@@ -1,0 +1,9 @@
+// Deterministic APIs shared by Jobs interactions and browser viewport checks.
+function setup(w){
+ const jobs=Array.from({length:28},(_,i)=>({id:'job-'+i,title:'Portrait '+i,clientName:i===0?'Acme & Sons':'Client '+i,reference:'REF-'+i,workspaceId:i<20?'w1':'w2',status:i%2?'Scheduled':'Needs Assignment',eventDate:i===27?null:'2026-10-'+String(i+1).padStart(2,'0')}));
+ const fixture={jobs,opened:[],calls:[],failJobs:false,failWorkflow:false,delay:null,current:true};
+ const json=async url=>{fixture.calls.push(url);if(url==='/api/jobs'){if(fixture.delay)await fixture.delay;if(fixture.failJobs)throw new Error('Offline');return jobs;}if(url==='/api/workflow/jobs'){if(fixture.failWorkflow)throw new Error('Offline');return jobs.map(j=>({jobId:j.id,stage:j.status,owner:j.id==='job-0'?null:'a.person',nextAction:'Review booking'}));}if(url.startsWith('/api/studio-employees'))return [{userName:'a.person',displayName:'Alice Person'}];if(url.startsWith('/api/notifications'))return [{id:'n1',referenceType:'Job',referenceId:'job-0',eventType:'JobStatusChanged',title:'Booking confirmed',createdAtUtc:'2026-10-10T12:00:00Z'},{id:'n2',referenceType:'Job',referenceId:'job-1',eventType:'WorkspaceMessage',title:'Client reply',body:'Thanks'}];if(url.endsWith('/announcements'))return [{title:'Studio update',body:'Opening hours',id:'a1'}];return [];};
+ w.document.body.dataset.studioView='jobs';w.document.getElementById('conversationView')?.classList.add('hidden');w.document.getElementById('genericView').classList.remove('hidden');
+ fixture.options={json,workspaces:[{id:'w1',name:'Portraits'},{id:'w2',name:'Commercial'}],workspaceFilter:'',setWorkspaceFilter:v=>fixture.workspace=v,isCurrent:()=>fixture.current,openJob:async id=>fixture.opened.push(id),openWorkspace:id=>fixture.workspaceOpened=id,navigate:view=>fixture.navigation=view,retry:()=>w.StudioJobsPage.render(w.document.getElementById('genericView'),fixture.options)};return fixture;
+}
+module.exports={setup};
