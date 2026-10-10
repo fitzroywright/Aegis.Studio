@@ -8450,3 +8450,43 @@ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active strong{
 @media(prefers-reduced-motion:reduce){
  body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active{transform:none}
 }
+
+/* Front Desk summary tiles: refined gold-edged operational cards. */
+body[data-studio-view="frontdesk"] .fd-metrics{gap:12px;padding:4px 3px 8px}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link{
+ position:relative;isolation:isolate;overflow:visible;
+ min-height:104px;padding:15px 17px 14px 19px;
+ border:1px solid #d9c5a2;border-radius:11px;
+ background:linear-gradient(135deg,#fffefa 0%,#fff 62%,#faf5ea 100%);
+ box-shadow:0 2px 7px rgba(75,54,27,.07),inset 0 1px 0 rgba(255,255,255,.95);
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link::before{
+ content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;
+ background:linear-gradient(180deg,#e4c477,#a87524);border-radius:0 3px 3px 0;
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link span{
+ color:#725527;font-size:.73rem;font-weight:700;letter-spacing:.025em;
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link strong{
+ font-size:1.9rem;line-height:1.1;font-weight:750;color:#332719;margin:5px 0 3px;
+ font-variant-numeric:tabular-nums;
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link small{
+ color:#777069;font-size:.71rem;line-height:1.3;
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link:not(.is-active):hover,
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link:not(.is-active):focus-visible{
+ background:linear-gradient(135deg,#fffdf5,#fff9ed);
+ border-color:#c29a50;transform:translateY(-2px);
+ box-shadow:0 0 0 1px rgba(194,154,80,.2),0 7px 17px rgba(83,57,25,.13);
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active{
+ border:1px solid #b88a38;
+ background:linear-gradient(135deg,#fffdf6,#fff5df);
+ box-shadow:0 0 0 2px rgba(196,151,62,.22),0 0 16px 3px rgba(211,166,76,.25),0 5px 14px rgba(93,64,23,.12);
+}
+body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active strong{color:#875d18}
+@media(prefers-reduced-motion:reduce){
+ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link{transition:none}
+ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link:hover{transform:none}
+}
