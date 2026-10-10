@@ -181,7 +181,8 @@
             const rows = Array.from(root.querySelectorAll(grid.selector)).filter(visible);
             if (!rows.length) continue;
             const noun = typeof grid.noun === 'function' ? grid.noun() : grid.noun;
-            footer.textContent = rows.length + ' ' + noun + (rows.length === 1 ? '' : 's');
+            const label = (noun + (rows.length === 1 ? '' : 's')).replace(/\b\w/g, letter => letter.toUpperCase());
+            footer.textContent = rows.length + ' ' + label;
             return;
         }
         footer.textContent = '';
