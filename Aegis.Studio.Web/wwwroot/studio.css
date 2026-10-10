@@ -8085,3 +8085,8 @@ body[data-studio-view="today"] .topbar #studioBreadcrumb .breadcrumb-label::afte
 body[data-studio-view="today"] .topbar #studioBreadcrumb button,body[data-studio-view="today"] .topbar #studioBreadcrumb strong{color:#fff!important}
 @media(max-width:1200px){.studio-today-brand-title small{max-width:210px}body[data-studio-view="today"] .topbar #studioBreadcrumb{max-width:25vw}}
 @media(max-width:800px){.studio-today-brand-title small,.studio-today-brand-title em{display:none}body[data-studio-view="today"] .topbar #studioBreadcrumb{max-width:40vw}}
+
+/* Persistent footer: user at left, visible filtered grid item count at far right. */
+body .shell > .studio-shell-footer{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;width:100%!important}
+body .shell > .studio-shell-footer #studioFooterUser{flex:0 1 auto;min-width:0}
+body .shell > .studio-shell-footer .studio-grid-item-count{display:block!important;flex:0 0 auto;margin-left:auto!important;text-align:right!important;white-space:nowrap;color:#fff;font-weight:700;font-variant-numeric:tabular-nums}
