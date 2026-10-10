@@ -144,7 +144,13 @@ function renderFrontDesk(){
       </div></div></div>`;
     // The shared shell footer owns the visible filtered row count.
     const shellCount=document.getElementById('studioFooterRate');
-    if(shellCount){const count=frontDeskTab==='unassigned'?unassigned.length:filtered.length;shellCount.textContent=count+' '+(count===1?'row':'rows');}
+    if(shellCount){
+        const jobMatches=frontDeskJobs.filter(j=>JSON.stringify(j).toLowerCase().includes(frontDeskTerm.trim().toLowerCase()));
+        const visibleJobs=frontDeskTab==='unassigned'?jobMatches.filter(j=>!j.assignedTo&&j.status!=='Completed'):frontDeskTab==='completed'?jobMatches.filter(j=>j.status==='Completed'):frontDeskTab==='delivery'?jobMatches.filter(j=>['Ready for Client','Ready for Delivery','Published'].includes(j.status)):[];
+        const count=['unassigned','completed','delivery'].includes(frontDeskTab)?visibleJobs.length:filtered.length;
+        const label=frontDeskTab==='unassigned'?'Unassigned Jobs':frontDeskTab==='completed'?'Completed Jobs':frontDeskTab==='delivery'?'Pickup / Delivery Jobs':frontDeskMetricView==='enquiries'||frontDeskTab==='enquiries'?'New Inquiries':frontDeskMetricView==='deposits'?'Pending Deposits':frontDeskMetricView==='confirmation'?'Needs Confirmation':'Bookings & Inquiries';
+        shellCount.textContent=count+' '+label;
+    }
     genericView.querySelectorAll('[data-fd-metric]').forEach(button=>button.onclick=()=>{
         const key=button.dataset.fdMetric;
         frontDeskMetricView=frontDeskMetricView===key?'':key;
