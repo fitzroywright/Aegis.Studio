@@ -8694,3 +8694,9 @@ body[data-studio-view="media"] .studio-media-page{gap:5px;padding:5px 7px 4px}
 .studio-media-page .studio-media-upload-actions{flex:0 0 auto;margin-top:0}
 .studio-media-page #studioMediaProgress:empty{display:none}
 .studio-media-page .studio-media-upload-actions:has(#studioMediaProgress:empty){display:none}
+
+/* Auto-upload Media: full drop target, no upload header or manual action */
+.studio-media-page .studio-media-main>.studio-media-upload{padding:8px;min-height:0}
+.studio-media-page .studio-media-upload .studio-media-drop{flex:1 1 auto;min-height:130px}
+.studio-media-page .studio-media-upload .studio-media-drop.uploading{opacity:.75;pointer-events:none;border-style:solid}
+.studio-media-page .studio-media-upload-actions:not(:has(#studioMediaProgress:empty)){padding:5px 4px 0}
