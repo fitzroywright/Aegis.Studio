@@ -70,7 +70,8 @@
     function renderLeftRail() {
         const rail = document.getElementById('studioContextRail');
         if (!rail) return;
-        const workspaces = Array.isArray(window.workspaceCache) ? window.workspaceCache : [];
+        const cache=typeof workspaceCache!=='undefined'?workspaceCache:window.workspaceCache;
+        const workspaces = Array.isArray(cache) ? cache : [];
         const workspaceItems = workspaces
             .filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false)
             .map(workspace => '<button type="button" data-studio-workspace-id="' + escText(workspace.id) + '"><span>▣</span><span>' + escText(workspace.name) + '</span></button>')
@@ -104,7 +105,7 @@
         rail.querySelectorAll('[data-studio-workspace-id]').forEach(button => {
             button.onclick = () => {
                 const id = button.dataset.studioWorkspaceId;
-                const workspace = (window.workspaceCache || []).find(item => String(item.id) === id);
+                const workspace = workspaces.find(item => String(item.id) === id);
                 if (typeof window.selectWorkspace === 'function') window.selectWorkspace(id, workspace?.name || '');
                 else window.studioNavigate?.('workspaces');
             };
@@ -134,7 +135,8 @@
         breadcrumb.querySelectorAll('[data-studio-crumb]').forEach(button => {
             button.onclick = () => {
                 if (button.dataset.studioWorkspace && typeof selectWorkspace === 'function') {
-                    const workspace = (window.workspaceCache || []).find(item => String(item.id) === String(button.dataset.studioWorkspace));
+                    const cache=typeof workspaceCache!=='undefined'?workspaceCache:window.workspaceCache;
+                    const workspace = (cache || []).find(item => String(item.id) === String(button.dataset.studioWorkspace));
                     return selectWorkspace(button.dataset.studioWorkspace, workspace?.name || button.textContent);
                 }
                 if (button.dataset.studioCrumb) window.studioNavigate?.(button.dataset.studioCrumb);
@@ -166,6 +168,9 @@
 
     function syncGridFooterCount() {
         const view = document.body.dataset.studioView || currentView;
+        if (view === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page')) {
+            const count=document.getElementById('studioFooterRate');if(count)count.textContent='1 Job';return;
+        }
         if (view === 'today' || view === 'jobs' || view === 'frontdesk') return;
         const footer = document.getElementById('studioFooterRate');
         const root = document.getElementById('genericView');
@@ -217,7 +222,9 @@
             masthead.insertBefore(breadcrumb, bell);
         }
         if (title) {
-            title.querySelector('strong')?.replaceChildren(document.createTextNode(labelFor(view)));
+            const jobOpen=view==='workspaces' && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
+            title.querySelector('strong')?.replaceChildren(document.createTextNode(jobOpen?'Job Details':labelFor(view)));
+            title.setAttribute('aria-label',jobOpen?'Job Details':labelFor(view));
             const tagline = title.querySelector('small');
             if (tagline) tagline.textContent = view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : 'Studio workspace';
         }
@@ -236,6 +243,7 @@
         ensureBreadcrumb();
         syncPageFrame();
         syncGridFooterCount();
+        window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();});
         if (!window.history.state?.studioView) window.history.replaceState({ studioView: currentView }, '', window.location.href);
         window.addEventListener('popstate', event => {
             const view = event.state?.studioView || 'today';
@@ -263,3 +271,4 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })();
+

@@ -54,8 +54,9 @@ test('stale asynchronous subjects response does not overwrite the next tab',asyn
  const {w,panel}=environment();panel.textContent='Next tab';w.json=async url=>url.endsWith('/access')?{permissions:{}}:[];
  await w.renderJobSubjects({id:'job'},panel,()=>false,()=>{});assert.equal(panel.textContent,'Next tab');
 });
-test('workspace job keeps Media dominant with activity beside the handoff and workspace settings',async()=>{
+test('workspace job keeps Media dominant with working replies and dedicated panels',async t=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;
+ t.after(()=>w.close());
  const job={id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Portraits',clientName:'Client',status:'Scheduled'};
  Object.assign(w,{showWorkspaces:async()=>{},workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
  for(const id of ['conversationList','detailPane','workspaceTitle'])w[id]=w.document.getElementById(id);
@@ -79,11 +80,11 @@ test('workspace job keeps Media dominant with activity beside the handoff and wo
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'Fitzroy Wright'}],'Team member',true),'Fitzroy');
  assert.equal(w.messageFirstName('fwright',[],'Team member',true),'fwright');
  assert.equal(w.messageFirstName('fwright',[{userName:'fwright',displayName:'fwright'}],'Team member',true),'fwright');
- assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.dataset.jobScroll),['media','subjects','tasks','messages','activity','overview']);
+ assert.deepEqual(Array.from(w.document.querySelectorAll('[data-job-scroll]'),b=>b.dataset.jobScroll),['media','overview','subjects','tasks','messages','activity']);
  assert.equal(w.document.querySelector('.detail-header .activity-button'),null);
  assert.equal(w.document.querySelector('[data-job-scroll=activity]')?.dataset.jobScroll,'activity');
  assert.ok(w.document.querySelector('.job-detail-board'));
- await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-detail-right .thread-next-tasks'));assert.ok(w.document.querySelector('.job-detail-collections'));assert.ok(w.document.querySelector('.job-detail-quick'));assert.equal(w.document.querySelector('.job-context-sidebar'),null);assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
+ await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-detail-right .job-detail-message-card'));assert.ok(w.document.querySelector('[aria-label="Filter media by collection"]'));assert.ok(w.document.querySelector('.job-detail-actions'));assert.equal(w.document.querySelector('.job-context-sidebar'),null);assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
  assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
  assert.equal(w.document.querySelector('details.job-details-card'),null);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Job Lead: Unassigned/);assert.match(w.document.querySelector('[data-job="job"]').textContent,/Event: Not scheduled/);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
@@ -264,3 +265,4 @@ test('Jobs page uses real Studio data and keeps the three-rail navigation path',
  assert.match(shell,/\['pipeline', 'Pipeline'/);
  assert.match(css,/body\[data-studio-view="jobs"\] \.studio-context-rail\{\s*display:none;/);
 });
+
