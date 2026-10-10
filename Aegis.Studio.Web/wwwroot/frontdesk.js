@@ -178,7 +178,6 @@ function renderFrontDesk(){
     genericView.querySelector('[data-messages-all]').onclick=()=>studioNavigate('messages');
     genericView.querySelector('[data-message-compose]').onclick=()=>openFrontDeskMessagePicker();
     loadFrontDeskCommunications();
-    genericView.querySelector('[data-inquiries]').onclick=()=>{frontDeskTab='enquiries';renderFrontDesk();};
     genericView.querySelector('#frontDeskSearch').oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();genericView.querySelector('#frontDeskSearch')?.focus();};
     genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openWorkspaceJob(b.dataset.frontdeskJob));
     genericView.querySelectorAll('[data-fd-row-open]').forEach(row=>{
