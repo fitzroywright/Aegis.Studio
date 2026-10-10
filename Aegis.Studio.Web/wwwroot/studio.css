@@ -8385,3 +8385,50 @@ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link:focus-visible{
 @media(prefers-reduced-motion:reduce){
  body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link{transition:none;transform:none!important}
 }
+
+/* Front Desk bookings grid adopts Today's Jobs grid visual language. */
+body[data-studio-view="frontdesk"] .fd-queue .fd-table{
+ width:100%;border-collapse:separate;border-spacing:0;
+ table-layout:auto;text-align:left;font-size:.8rem;color:inherit;
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table thead th{
+ position:sticky;top:0;z-index:3;padding:11px 14px;
+ background:var(--surface-muted,#f5f6f8);
+ color:var(--muted,#64748b);font-size:.72rem;font-weight:700;
+ border:0;border-bottom:1px solid var(--border,#edf0f2);
+ white-space:nowrap;
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody td{
+ padding:11px 14px;border:0;border-top:1px solid var(--border,#edf0f2);
+ vertical-align:middle;background:transparent;
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody tr:first-child td{border-top:0}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody td strong{
+ display:block;font-size:.8rem;font-weight:700;line-height:1.35;
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody td small{
+ display:block;font-size:.73rem;color:var(--muted,#64748b);margin-top:3px;
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody tr.fd-speedbump-row:hover,
+body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody tr.fd-speedbump-row:focus-visible{
+ background:var(--surface-muted,#f6f7f9);
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody tr.fd-speedbump-row:hover td,
+body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody tr.fd-speedbump-row:focus-visible td{
+ background:transparent;
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls button{
+ color:inherit;font-size:.72rem;font-weight:700;
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls select{
+ background:var(--surface,#fff);color:inherit;
+ border-color:var(--border,#d6d9df);
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table .action[data-fd-open]{
+ border:0;background:transparent;box-shadow:none;
+ color:var(--muted,#64748b);font-size:20px;font-weight:700;
+ padding:2px 7px;min-width:28px;min-height:28px;cursor:pointer;
+}
+body[data-studio-view="frontdesk"] .fd-queue .fd-table .action[data-fd-open]:hover{
+ color:var(--text,#243247);background:var(--surface-muted,#f5f6f8);
+}
