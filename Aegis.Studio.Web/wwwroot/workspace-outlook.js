@@ -223,7 +223,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     <div class="job-tasks-content"></div>
                 </section>`;
             detailPane.appendChild(lower);
-            const workflowHost=document.createElement('section');lower.prepend(workflowHost);
+            const workflowHost=document.createElement('section');workflowHost.className='studio-job-flow-lights';lower.prepend(workflowHost);
             if(window.StudioWorkflow)window.StudioWorkflow.render(workflowHost,job.id,current).catch(error=>{workflowHost.textContent=error.message;});
 
             const messagesPanel=document.getElementById('combinedJobMessages');
@@ -297,13 +297,18 @@ function mergeJobMessages(teamMessages, customerMessages) {
             nav.setAttribute('aria-label','Job information');
             nav.innerHTML='<button data-job-scroll="media" class="active">▣ Media</button><button data-job-scroll="subjects">♙ Subjects</button><button data-job-scroll="tasks">☑ Tasks</button><button data-job-scroll="messages">✉ Messages</button><button data-job-scroll="activity">◷ Activity</button><button data-job-scroll="overview">▧ Details</button>';
             meta.after(nav,board);
+            detailPane.classList.add('studio-job-today-layout');
+            nav.innerHTML='<button data-job-scroll="media" class="active">▣ Media</button><button data-job-scroll="overview">▤ Details</button><button data-job-scroll="subjects">♙ Subjects</button><button data-job-scroll="tasks">☑ Tasks</button><button data-job-scroll="messages">✉ Messages</button><button data-job-scroll="activity">◷ Activity</button>';
 
-            board.append(collections,lower,rightStack);
+            board.append(lower,rightStack);
+            header.appendChild(workflowHost);
+            lower.querySelector('.job-media-section').prepend(collections);
             rightStack.append(lower.querySelector('.job-subjects-section'),quick);
             const bottom=document.createElement('section');bottom.className='job-detail-bottom';
             const activityCard=document.createElement('section');activityCard.className='job-center-panel job-detail-activity-card';activityCard.innerHTML='<header class="job-center-heading"><h2>Recent Activity</h2></header><div class="job-detail-activity-content"></div>';
             const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.append(messageHeader,messagesPanel,composer);
-            bottom.append(activityCard,messageCard,nextPanel);detailPane.appendChild(bottom);
+            rightStack.prepend(messageCard);
+            bottom.append(activityCard,nextPanel);detailPane.appendChild(bottom);
             filesPanel.remove();
             quick.querySelector('[data-quick-upload]')?.addEventListener('click',()=>lower.querySelector('[data-add]')?.click());
             collections.querySelector('[data-collection-new]')?.addEventListener('click',()=>lower.querySelector('[data-new-collection]')?.click());
@@ -353,7 +358,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     const name=button.dataset.jobScroll;
                     if(name==='overview'){messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);await refreshTasks();return;}
                     if(name==='sessions'){const dialog=studioDialog('Job Sessions','<div data-job-sessions></div>');const sessions=await json('/api/operations/shoots?jobId='+job.id);dialog.querySelector('[data-job-sessions]').innerHTML=sessions.map(s=>'<article class="task-card"><strong>'+esc(s.location||'Session')+'</strong><small>'+esc(new Date(s.callTimeUtc).toLocaleString())+' · '+esc(s.status)+' · '+esc(studioFirstName(s.photographerUserName))+'</small></article>').join('')||'<p>No sessions scheduled.</p>';return;}
-                    if(name==='messages')messageColumn.scrollIntoView({block:'nearest'});
+                    if(name==='messages')messageCard.scrollIntoView({block:'nearest'});
                     else if(name==='media')lower.querySelector('.job-media-section').scrollIntoView({block:'nearest'});
                     else if(name==='subjects')lower.querySelector('.job-subjects-section').scrollIntoView({block:'nearest'});
                     else if(name==='tasks')lower.querySelector('.job-tasks-section').scrollIntoView({block:'nearest'});
@@ -373,7 +378,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 }catch{}
             });
         } else {
-            detailPane.classList.remove('job-reading-view');
+            detailPane.classList.remove('job-reading-view','studio-job-today-layout');
             document.getElementById('conversationView').classList.remove('has-open-job');
         }
         let pendingSend=null,pendingAttachment=null;
