@@ -19,29 +19,86 @@
         // showMessages remains available to contextual actions and direct links.
     }
 
+    let inboxRows = [];
+    let inboxThreads = [];
+    let inboxFilter = '';
+    let inboxQuery = '';
+    let inboxSelection = null;
+    const inboxDate = value => value ? new Date(value).toLocaleString() : '—';
+    const inboxSubject = message => String(message.subject || message.title || String(message.body || '').split('\\n')[0] || '(No subject)').slice(0,110);
+    const inboxJob = thread => thread.scopeType === 'Job' ? (thread.title || thread.scopeId || 'Job') : '—';
+    const inboxRecipient = (message,thread) => message.recipientUserName || message.recipient || (thread.scopeType === 'Job' ? 'Job team' : thread.scopeType === 'Workspace' ? 'Workspace team' : thread.scopeType === 'Direct' ? thread.title : 'Conversation');
     async function showMessages() {
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
         genericView.innerHTML = `
-            <div class="studio-messaging">
-                <aside class="message-thread-pane">
-                    <div class="message-pane-heading">
-                        <div><h1>Messages</h1><p>Studio staff conversations</p></div>
-                        <button class="primary" id="newDirectMessage">New</button>
-                    </div>
-                    <div class="message-scope-actions">
-                        <button class="action" id="workspaceTeamMessage" ${selectedWorkspace ? '' : 'disabled'}>Workspace team</button>
-                    </div>
-                    <div id="messageThreadList" class="message-thread-list"></div>
+            <div class="studio-messaging studio-outlook-inbox">
+                <aside class="studio-inbox-filters">
+                    <header><h2>Messages</h2><small>Job filters</small></header>
+                    <input id="studioInboxJobSearch" type="search" placeholder="Find a job…" aria-label="Find a job">
+                    <div id="studioInboxJobFilters" class="studio-inbox-job-filters"></div>
                 </aside>
-                <section id="messageConversationPane" class="message-conversation-pane">
-                    <div class="empty-state"><h2>Select a message thread</h2><p>Direct, workspace-team and job-team conversations stay inside Studio.</p></div>
+                <section class="studio-inbox-center">
+                    <header class="studio-inbox-toolbar"><div><h1>All Messages</h1><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="primary" id="newDirectMessage">New</button></div></header>
+                    <div class="studio-inbox-table-wrap"><table class="studio-inbox-table"><thead><tr><th>Job</th><th>Message title & contents</th><th>Sender</th><th>Recipient</th><th>Date</th></tr></thead><tbody id="studioInboxRows"><tr><td colspan="5">Loading messages…</td></tr></tbody></table></div>
                 </section>
+                <section id="messageConversationPane" class="message-conversation-pane studio-inbox-reading"><div class="empty-state"><h2>Select a message</h2><p>Read the conversation and reply here.</p></div></section>
             </div>`;
         document.getElementById('newDirectMessage').onclick = startDirect;
-        document.getElementById('workspaceTeamMessage').onclick = openWorkspaceThread;
-        await loadThreads();
+        document.getElementById('studioInboxRefresh').onclick = () => loadInbox(true);
+        document.getElementById('studioInboxSearch').oninput = event => { inboxQuery = event.target.value.toLowerCase(); renderInbox(); };
+        document.getElementById('studioInboxJobSearch').oninput = () => renderInboxFilters();
+        await loadInbox(true);
         startRefresh();
+    }
+    async function loadInbox(force) {
+        const body=document.getElementById('studioInboxRows');
+        if(!body)return;
+        if(force)body.innerHTML='<tr><td colspan="5">Loading messages…</td></tr>';
+        try {
+            const threads=await json('/api/messages/threads');
+            inboxThreads=threads;
+            const results=[];
+            // Limit concurrent requests to avoid flooding the messaging service.
+            let next=0;
+            const workers=Array.from({length:Math.min(5,threads.length)},async()=>{
+                while(next<threads.length){
+                    const thread=threads[next++];
+                    try {
+                        const messages=await json('/api/messages/threads/'+encodeURIComponent(thread.id));
+                        for(const message of messages)results.push({thread,message});
+                    }catch { results.push({thread,error:true}); }
+                }
+            });
+            await Promise.all(workers);
+            inboxRows=results.filter(x=>x.message).sort((a,b)=>new Date(b.message.createdAtUtc||0)-new Date(a.message.createdAtUtc||0));
+            renderInboxFilters();renderInbox();handleUnreadChanges(threads);
+        }catch(error){body.innerHTML='<tr><td colspan="5">'+esc(error.message||'Unable to load messages.')+'</td></tr>';}
+    }
+    function renderInboxFilters(){
+        const host=document.getElementById('studioInboxJobFilters');if(!host)return;
+        const term=(document.getElementById('studioInboxJobSearch')?.value||'').toLowerCase();
+        const jobs=inboxThreads.filter(x=>x.scopeType==='Job');
+        const names=new Map(jobs.map(t=>[String(t.scopeId||t.id),inboxJob(t)]));
+        const counts=new Map();
+        for(const row of inboxRows)if(row.thread.scopeType==='Job'){const id=String(row.thread.scopeId||row.thread.id);counts.set(id,(counts.get(id)||0)+1);}
+        host.innerHTML='<button data-inbox-job="" class="'+(!inboxFilter?'active':'')+'">All messages <span>'+inboxRows.length+'</span></button>'+[...names].filter(([,name])=>name.toLowerCase().includes(term)).sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>'<button data-inbox-job="'+esc(id)+'" class="'+(inboxFilter===id?'active':'')+'">'+esc(name)+' <span>'+(counts.get(id)||0)+'</span></button>').join('');
+        host.querySelectorAll('[data-inbox-job]').forEach(button=>button.onclick=()=>{inboxFilter=button.dataset.inboxJob;renderInboxFilters();renderInbox();});
+    }
+    function renderInbox(){
+        const body=document.getElementById('studioInboxRows');if(!body)return;
+        const rows=inboxRows.filter(({thread,message})=>{
+            const jobId=String(thread.scopeId||thread.id);
+            if(inboxFilter&&jobId!==inboxFilter)return false;
+            if(!inboxQuery)return true;
+            return [inboxJob(thread),inboxSubject(message),message.body,message.senderUserName,inboxRecipient(message,thread),message.createdAtUtc].some(v=>String(v||'').toLowerCase().includes(inboxQuery));
+        });
+        document.getElementById('studioInboxCount').textContent=rows.length+' messages'+(inboxFilter?' in selected job':'');
+        body.innerHTML=rows.map(({thread,message})=>'<tr tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="'+(inboxSelection===message.id?'selected':'')+'"><td>'+esc(inboxJob(thread))+'</td><td><strong>'+esc(inboxSubject(message))+'</strong><small>'+esc(String(message.body||'').replace(/\\s+/g,' ').slice(0,170))+'</small></td><td>'+esc(message.senderUserName||'Unknown')+'</td><td>'+esc(inboxRecipient(message,thread))+'</td><td>'+esc(inboxDate(message.createdAtUtc))+'</td></tr>').join('')||'<tr><td colspan="5">No messages match the selected filters.</td></tr>';
+        body.querySelectorAll('[data-inbox-message]').forEach(row=>{
+            const open=async()=>{inboxSelection=row.dataset.inboxMessage;renderInbox();await openThread(row.dataset.inboxThread);const msg=document.querySelector('#studioMessageHistory .studio-chat-message[data-message-id="'+CSS.escape(inboxSelection)+'"]');msg?.scrollIntoView({block:'nearest'});};
+            row.onclick=open;row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void open();}};
+        });
     }
 
     window.showStudioMessages = showMessages;
@@ -139,14 +196,15 @@
         textarea.addEventListener('keydown', handleMentionKeys);
         await loadMentionUsers();
         await fetch(`/api/messages/threads/${id}/read`, { method: 'POST' });
-        await loadThreads();
+        if(document.getElementById('studioInboxRows')) await loadInbox(false);
+        else await loadThreads();
         const history = document.getElementById('studioMessageHistory');
         if (history) history.scrollTop = history.scrollHeight;
     }
 
     function renderMessage(message, attachments = []) {
         const files=(attachments||[]).filter(file=>file.messageId===message.id);
-        return `<article class="studio-chat-message">
+        return `<article class="studio-chat-message" data-message-id="${esc(message.id)}">
             <div class="studio-chat-meta"><strong>${esc(studioFirstName(message.senderUserName))}</strong><span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
             <div class="studio-chat-body">${renderMentions(message.body)}</div>
             ${files.length?`<div class="studio-message-files">${files.map(file=>`<a href="/api/message-attachments/${file.id}" target="_blank" rel="noopener"><strong>${esc(file.fileName)}</strong><small>${formatBytes(file.size)}</small></a>`).join('')}</div>`:''}
@@ -367,7 +425,7 @@
         try {
             const messagesButton = document.querySelector('[data-view="messages"]');
             if (messagesButton?.classList.contains('active')) {
-                await loadThreads();
+                if(document.getElementById('studioInboxRows'))await loadInbox(false);else await loadThreads();
                 if (selectedThread) await refreshSelectedThread(false);
             } else {
                 const threads = await json('/api/messages/threads');
