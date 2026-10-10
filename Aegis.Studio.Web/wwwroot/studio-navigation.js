@@ -1257,6 +1257,7 @@
         jobs:renderJobs,
         pipeline:()=>showPipeline(),
         production:()=>showProduction(),
+        media:()=>showMediaReview(),
         frontdesk:()=>showFrontDesk(),
         finance:()=>showAccounts(),
         reports:()=>showManagement(),
@@ -1265,7 +1266,7 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
+    const navigationLabels={today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
 
     function replaceNavigationHistory(view){
         const url='#studio='+encodeURIComponent(view);
