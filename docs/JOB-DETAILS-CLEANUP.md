@@ -1,5 +1,7 @@
 # Job Details cleanup — 10 October 2026
 
+This records the initial cleanup. The current approved layout and ownership rules are documented in [JOB-DETAILS-APPROVED-LAYOUT.md](JOB-DETAILS-APPROVED-LAYOUT.md).
+
 Base: main at 96a5ebc7734bc5178ee09fa8380f9857c7e92808.
 
 The previous layout moved Subjects into the right rail but subsequently searched
