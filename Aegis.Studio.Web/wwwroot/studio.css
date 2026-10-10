@@ -8787,3 +8787,75 @@ body[data-studio-view="frontdesk"] .fd-communications[data-mw-region="messages"]
 .studio-job-today-layout .job-detail-message-card .composer button{font-size:11px}
 @media(max-width:950px){.studio-job-today-layout .job-detail-board,.studio-job-today-layout .job-detail-bottom{grid-template-columns:minmax(0,1fr)}.studio-job-today-layout .job-detail-right{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.studio-job-today-layout .job-detail-message-card{grid-column:1/-1}}
 @media(max-width:580px){.studio-job-today-layout .job-detail-right{display:flex}.studio-job-today-layout .studio-job-flow-lights{overflow-x:auto}}
+
+/* Job Details visual parity: fixed viewport, internally scrolling photo canvas.
+   The existing Messages card colors, composer and behavior are deliberately untouched. */
+body:has(.has-open-job .studio-job-today-layout) #conversationView.has-open-job{
+ height:100%!important;min-height:0!important;max-height:100%!important;
+ padding:5px 9px!important;overflow:hidden!important;box-sizing:border-box;
+}
+#conversationView.has-open-job:has(.studio-job-today-layout)>.detail-pane.studio-job-today-layout{
+ height:100%!important;max-height:100%!important;min-height:0!important;
+ overflow:hidden!important;display:flex!important;flex-direction:column!important;
+ padding:0!important;gap:5px;
+}
+.studio-job-today-layout>.studio-job-header{flex:0 0 auto!important;margin:0!important;padding:7px 11px!important;gap:5px 12px!important;max-height:155px;overflow:hidden}
+.studio-job-today-layout .studio-job-copy h1{font-size:1.18rem!important}
+.studio-job-today-layout .studio-job-copy p{gap:7px!important;margin:0!important}
+.studio-job-today-layout .studio-job-flow-lights{order:3;flex:1 0 100%;max-height:75px;overflow-x:auto;overflow-y:hidden;padding:3px 0 0!important}
+.studio-job-today-layout>.job-meta-strip{flex:0 0 auto!important;margin:0!important;padding:3px 6px!important;min-height:0}
+.studio-job-today-layout>.job-section-tabs{flex:0 0 auto!important;margin:0!important;min-height:33px}
+.studio-job-today-layout>.job-section-tabs button{padding:6px 11px!important}
+.studio-job-today-layout>.job-detail-board{
+ flex:1 1 auto!important;min-height:0!important;height:auto!important;overflow:hidden!important;
+ display:grid!important;grid-template-columns:minmax(0,1fr) minmax(255px,305px)!important;
+ align-items:stretch!important;gap:8px!important;margin:0!important;
+}
+.studio-job-today-layout .job-detail-board>.job-detail-media-column{
+ min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;
+}
+.studio-job-today-layout .job-detail-media-column>.job-media-section{
+ flex:1 1 auto!important;min-height:0!important;height:100%!important;overflow:hidden!important;
+ display:flex!important;flex-direction:column!important;
+}
+.studio-job-today-layout .job-media-section>.job-center-heading{flex:0 0 auto;padding:5px 9px!important}
+.studio-job-today-layout .job-media-section>.job-detail-collections{flex:0 0 auto}
+.studio-job-today-layout .job-detail-collections>header{padding:3px 8px!important}
+.studio-job-today-layout .job-collection-list{max-height:36px!important;overflow-x:auto!important;overflow-y:hidden!important;flex-wrap:nowrap!important;padding:3px 8px!important}
+.studio-job-today-layout .job-media-section>.gallery-tab-filter{flex:0 0 auto}
+.studio-job-today-layout .job-media-section>.job-media-content{
+ flex:1 1 auto!important;min-height:0!important;height:100%!important;overflow:auto!important;
+ padding:5px!important;
+}
+.studio-job-today-layout .job-media-content .media-production-layout{min-height:0!important;height:100%!important}
+.studio-job-today-layout .job-media-content .media-drop-surface{min-height:0!important;overflow:auto!important}
+.studio-job-today-layout .job-media-content .media-items{grid-template-columns:repeat(auto-fill,minmax(125px,1fr))!important;gap:6px}
+.studio-job-today-layout .job-detail-board .job-file-tile>img{height:clamp(95px,16vh,180px)!important;object-fit:cover}
+.studio-job-today-layout .job-detail-board>.job-detail-right{
+ min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;
+ display:flex!important;flex-direction:column!important;gap:7px!important;
+ grid-column:auto!important;
+}
+.studio-job-today-layout .studio-job-selected-file{flex:0 0 auto;min-height:0;border:1px solid #e5ddcd;border-radius:8px;background:#fffdf8}
+.studio-job-today-layout .studio-job-selected-file>.job-center-heading{padding:5px 9px!important}
+.studio-job-today-layout .studio-job-selected-file h2{font-size:12px!important}
+.studio-job-today-layout .studio-job-selected-content{display:flex;align-items:center;gap:8px;padding:7px;min-width:0}
+.studio-job-today-layout .studio-job-selected-content>img{width:84px;height:66px;object-fit:cover;border-radius:5px;flex-shrink:0}
+.studio-job-today-layout .studio-job-selected-content>div{min-width:0;overflow:hidden}
+.studio-job-today-layout .studio-job-selected-content strong,.studio-job-today-layout .studio-job-selected-content small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.studio-job-today-layout .studio-job-file-selected{outline:2px solid #b68a3b;outline-offset:-2px}
+.studio-job-today-layout .job-detail-right>.job-detail-message-card{flex:1 1 auto;min-height:180px;max-height:none!important}
+.studio-job-today-layout .job-detail-right>.job-subjects-section{flex:0 0 auto;max-height:110px!important;overflow:auto}
+.studio-job-today-layout .job-detail-right>.job-detail-quick{flex:0 0 auto;max-height:90px!important;overflow:auto}
+.studio-job-today-layout>.job-detail-bottom{
+ flex:0 0 92px!important;min-height:0!important;max-height:92px!important;overflow:hidden!important;
+ display:grid!important;grid-template-columns:minmax(0,1fr) minmax(255px,305px)!important;
+ gap:8px!important;margin:0!important;
+}
+.studio-job-today-layout>.job-detail-bottom>*{min-height:0!important;height:100%!important;overflow:auto!important}
+.studio-job-today-layout>.job-detail-bottom .job-center-heading{padding:4px 9px!important}
+@media(max-width:760px){
+ .studio-job-today-layout>.job-detail-board{grid-template-columns:minmax(0,1fr) 230px!important}
+ .studio-job-today-layout>.job-detail-bottom{grid-template-columns:minmax(0,1fr) 230px!important}
+ .studio-job-today-layout .job-meta-item:nth-child(n+4){display:none}
+}
