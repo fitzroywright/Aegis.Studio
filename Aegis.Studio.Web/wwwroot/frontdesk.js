@@ -1,5 +1,6 @@
 let frontDeskJobs = [];
 let frontDeskRole = null;
+let frontDeskMetricView = '';
 let frontDeskColumnFilters = {type:'',status:'',source:''};
 let frontDeskSort = {column:'',direction:1};
 
@@ -93,7 +94,16 @@ function renderFrontDesk(){
     ].sort((a,b)=>new Date(b.created||0)-new Date(a.created||0));
     const entryType=e=>e.kind==='enquiry'?'Inquiry':'Booking';
     const valuesFor=key=>[...new Set(entries.map(e=>key==='type'?entryType(e):String(e[key]||'')))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-    const filtered=entries.filter(e=>
+    const metricMatch=e=>{
+        if(!frontDeskMetricView)return true;
+        if(frontDeskMetricView==='enquiries')return e.kind==='enquiry';
+        if(e.kind!=='request')return false;
+        const request=frontDeskRequests.find(x=>x?.id===e.id);
+        if(frontDeskMetricView==='deposits')return !!request&&(request.status==='AwaitingDeposit'||(request.request?.requiredDeposit>0&&request.recordedDeposit<request.request.requiredDeposit&&!['Confirmed','Cancelled'].includes(request.status)));
+        if(frontDeskMetricView==='confirmation')return !!request&&!['Confirmed','Cancelled'].includes(request.status);
+        return true;
+    };
+    const filtered=entries.filter(e=>metricMatch(e)&&
         (frontDeskTab==='today'||(frontDeskTab==='enquiries'&&e.kind==='enquiry')||(frontDeskTab==='requests'&&e.kind==='request'))
         &&[e.name,e.title,e.status,e.source].join(' ').toLowerCase().includes(frontDeskTerm.toLowerCase())
         &&(!frontDeskColumnFilters.type||entryType(e)===frontDeskColumnFilters.type)
@@ -118,7 +128,7 @@ function renderFrontDesk(){
         return '<th class="fd-column-head"><div class="fd-column-controls"><button type="button" data-fd-sort="'+key+'" aria-label="Sort by '+label+'">'+label+arrow+'</button><select data-fd-filter="'+key+'" aria-label="Filter '+label+'"><option value="">All</option>'+options+'</select></div></th>';
     };
     const rows=filtered.map(e=>`<tr class="fd-speedbump-row" tabindex="0" role="link" aria-label="Open ${esc(e.name)}" data-fd-row-open="${esc(e.id)}"><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}</td><td>${pill(e.source,'source')}</td><td><button type="button" class="action" data-fd-open="${esc(e.id)}">Open</button></td></tr>`).join('');
-    const metric=(label,count,note)=>`<div class="fd-metric"><span>${esc(label)}</span><strong>${count}</strong><small>${esc(note)}</small></div>`;
+    const metric=(key,label,count,note)=>`<button type="button" class="fd-metric fd-metric-link${frontDeskMetricView===key?' is-active':''}" data-fd-metric="${key}" aria-pressed="${frontDeskMetricView===key}"><span>${esc(label)}</span><strong>${count}</strong><small>${esc(note)}</small></button>`;
     genericView.innerHTML=`<div class="fd-page">
       
       <div class="fd-layout"><div class="fd-main">
@@ -126,7 +136,7 @@ function renderFrontDesk(){
         <section class="op-card fd-queue"><header class="fd-queue-header"><h2>Incoming Bookings &amp; Inquiries</h2><div class="fd-queue-header-tools"><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search customers or bookings…" value="${esc(frontDeskTerm)}"><div class="fd-tabs">${tabs.map(([key,label])=>`<button class="${frontDeskTab===key?'active':''}" data-frontdesk-tab="${key}">${label}</button>`).join('')}</div></div></header>
           <div class="fd-table-scroll" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<table class="fd-table"><thead><tr><th>Date</th><th>Customer / Request</th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}<th>Actions</th></tr></thead><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table>`:'<div id="frontDeskJobList"></div>'}</div>
           </section>
-        <div class="fd-metrics">${metric('New Inquiries',enquiries.length,'Awaiting response')}${metric('Pending Deposits',due.length,'Awaiting payment')}${metric('Needs Confirmation',pending.length,'Review and confirm')}${metric('Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
+        <div class="fd-metrics">${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}${metric('confirmation','Needs Confirmation',pending.length,'Review and confirm')}${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
       </div><div class="fd-secondary">
         <section class="op-card fd-actions"><header><h2>Front Desk Services</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-new-client>＋ New Customer</button><button data-find-client>Find Customer</button><button data-take-payment>Take Payment</button><button data-new-sale>New Sale</button><button data-pickups>Pickup / Delivery</button><button type="button" data-completed>Completed</button></div></section>
         <section class="op-card fd-schedule"><header><h2>Today's Schedule</h2><button type="button" class="fd-card-link" data-calendar>View Calendar →</button></header><div class="fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="fd-session"><time>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</time><span><strong>${esc(s.title)}</strong><small>${esc(s.location||s.status||'')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
@@ -134,7 +144,15 @@ function renderFrontDesk(){
       </div></div></div>`;
     // The shared shell footer owns the visible filtered row count.
     const shellCount=document.getElementById('studioFooterRate');
-    if(shellCount) shellCount.textContent=filtered.length+' '+(filtered.length===1?'row':'rows');
+    if(shellCount){const count=frontDeskTab==='unassigned'?unassigned.length:filtered.length;shellCount.textContent=count+' '+(count===1?'row':'rows');}
+    genericView.querySelectorAll('[data-fd-metric]').forEach(button=>button.onclick=()=>{
+        const key=button.dataset.fdMetric;
+        frontDeskMetricView=frontDeskMetricView===key?'':key;
+        frontDeskTab=frontDeskMetricView==='unassigned'?'unassigned':'today';
+        frontDeskTerm='';
+        frontDeskColumnFilters={type:'',status:'',source:''};
+        renderFrontDesk();
+    });
     genericView.querySelectorAll('[data-fd-filter]').forEach(select=>select.onchange=()=>{
         frontDeskColumnFilters[select.dataset.fdFilter]=select.value;renderFrontDesk();
     });
@@ -228,7 +246,7 @@ function renderFrontDeskRows(){
         const linked=new Set(frontDeskRequests.map(r=>r.request.conversationId).filter(Boolean));
         host.innerHTML=frontDeskEnquiries.filter(e=>!linked.has(e.id)&&matches(e)).map(e=>`<article class="front-desk-row"><div><strong>${esc(e.contactName)}</strong><div>${esc(e.subject)}</div><small>${esc(e.channel)} · ${esc(new Date(e.createdAtUtc).toLocaleString())}</small></div><button class="primary" data-convert-enquiry="${e.id}">Prepare booking request</button></article>`).join('')||'<p class="empty-state">No unassigned enquiries awaiting booking preparation.</p>';
     }else{
-        let jobs=frontDeskJobs.filter(matches);if(frontDeskTab==='delivery')jobs=jobs.filter(j=>['Ready for Client','Ready for Delivery','Published'].includes(j.status));else if(frontDeskTab==='completed')jobs=jobs.filter(j=>j.status==='Completed');else jobs=jobs.filter(j=>j.status!=='Completed');
+        let jobs=frontDeskJobs.filter(matches);if(frontDeskTab==='delivery')jobs=jobs.filter(j=>['Ready for Client','Ready for Delivery','Published'].includes(j.status));else if(frontDeskTab==='completed')jobs=jobs.filter(j=>j.status==='Completed');else if(frontDeskTab==='unassigned')jobs=jobs.filter(j=>!j.assignedTo&&j.status!=='Completed');else jobs=jobs.filter(j=>j.status!=='Completed');
         host.innerHTML=jobs.map(renderFrontDeskJob).join('')||'<p class="empty-state">No jobs in this queue.</p>';
     }
     host.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.frontdeskJob));
