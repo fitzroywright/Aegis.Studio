@@ -33,9 +33,9 @@
             <button type="button" class="studio-media-carousel-arrow" id="studioMediaNext" aria-label="Next images">›</button>
           </div>
           <aside class="studio-media-detail" id="studioMediaDetail"><h3>File Details</h3><p class="muted">Select an image to see its details.</p></aside>
-        </div></section><section class="studio-media-panel studio-media-upload"><h2>Upload Files</h2>
+        </div></section><section class="studio-media-panel studio-media-upload"><header class="studio-media-upload-heading"><h2>Upload Files</h2><button class="primary" id="studioMediaUpload" type="button" disabled>Upload Selected Files</button></header>
         <div class="studio-media-drop" id="studioMediaDrop" tabindex="0"><span aria-hidden="true">⇧</span><strong>Drag files here to upload</strong><p>Or choose images and other media from your device</p><button type="button" class="primary" id="studioMediaChoose">Choose Files</button><input type="file" id="studioMediaFiles" multiple hidden></div>
-        <div class="studio-media-upload-actions"><span id="studioMediaProgress" role="status">Select a Job and files to begin.</span><button class="primary" id="studioMediaUpload" type="button" disabled>Upload Selected Files</button></div>
+        <div class="studio-media-upload-actions"><span id="studioMediaProgress" role="status" aria-live="polite"></span></div>
       </section>
       </div></div></div>`;
     const root=genericView.querySelector('.studio-media-page'),job=root.querySelector('#studioMediaJob'),collection=root.querySelector('#studioMediaCollection'),subject=root.querySelector('#studioMediaSubject'),files=root.querySelector('#studioMediaFiles'),upload=root.querySelector('#studioMediaUpload'),progress=root.querySelector('#studioMediaProgress'),gallery=root.querySelector('#studioMediaGallery'),count=root.querySelector('#studioMediaCount'),notice=root.querySelector('#studioMediaDestinationNotice');
