@@ -33,7 +33,7 @@
    const stages=[...new Set(jobs.map(status))].sort();if(!stages.includes(stage))stage='';
    const card=(title,body,cls='')=>`<section class="sj-card ${cls}"><header><h2>${title}</h2></header>${body}</section>`;
    host.innerHTML=`<section class="sj-page" aria-label="Jobs"><section class="sj-board">
-    <div class="sj-toolbar"><h2>Jobs</h2><input type="search" data-sj-search aria-label="Search jobs, clients or references" placeholder="Search jobs, clients or references…"><select data-sj-workspace aria-label="Workspace"><option value="">All workspaces</option>${workspaces.map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select><select data-sj-status aria-label="Status"><option value="">All statuses</option>${stages.map(s=>`<option>${esc(s)}</option>`).join('')}</select><select data-sj-sort aria-label="Sort jobs"><option value="date-desc">Event date ↓</option><option value="date-asc">Event date ↑</option></select></div>
+    <div class="sj-toolbar"><h2>Jobs</h2><input type="search" data-sj-search aria-label="Search jobs, clients or references" placeholder="Search jobs, clients or references…"><select data-sj-workspace aria-label="Workspace"><option value="">All workspaces</option>${workspaces.map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select><select data-sj-status aria-label="Status"><option value="">All statuses</option>${stages.map(s=>`<option>${esc(s)}</option>`).join('')}</select><select data-sj-sort aria-label="Sort jobs"><option value="date-desc">Event date ↓</option><option value="date-asc">Event date ↑</option></select><button type="button" class="sj-gold" data-sj-settings hidden>Workspace settings</button></div>
     <div class="sj-summary"><span data-sj-count></span><button type="button" data-sj-clear>Clear filters</button></div>
     <div class="sj-error" role="alert" data-sj-error hidden></div>
     <div class="sj-table-scroll"><table class="sj-table"><thead><tr><th>Job / Client</th><th>Workspace</th><th>Event date</th><th>Job Owner</th><th>Status</th><th>Next Action</th></tr></thead><tbody></tbody></table></div>
@@ -56,6 +56,7 @@
     find('[data-sj-count]').textContent=filtered.length+' jobs · Sorted by event date'+(attention?' · '+({owner:'Owner needed',changes:'Changes requested',photographers:'Photographers needed'}[attention]):'');
     find('[data-sj-range]').textContent=filtered.length?`Showing ${(page-1)*13+1}–${Math.min(page*13,filtered.length)} of ${filtered.length} jobs`:'0 jobs';
     find('[data-sj-page]').innerHTML=Array.from({length:Math.min(3,pages)},(_,i)=>Math.min(Math.max(1,page-1),Math.max(1,pages-2))+i).map(n=>`<button type="button" data-sj-page-number="${n}" aria-label="Page ${n}" ${n===page?'aria-current="page"':''}>${n}</button>`).join('');find('[data-sj-prev]').disabled=page===1;find('[data-sj-next]').disabled=page===pages;
+    find('[data-sj-settings]').hidden=!workspace||!options.openWorkspaceSettings;
     const footer=document.getElementById('studioFooterRate');if(footer)footer.textContent=filtered.length+' jobs';
     const counts=[...new Set(base.map(status))].map(s=>[s,base.filter(j=>status(j)===s).length]);
     const changes=notificationResult.value.filter(n=>/status|workflow/i.test(n.eventType||n.type||n.title||'')&&base.some(j=>String(j.id)===String(n.referenceId))).sort((a,b)=>+(date(b.createdAtUtc||b.createdAt)||0)-+(date(a.createdAtUtc||a.createdAt)||0)).slice(0,3);
@@ -71,6 +72,7 @@
    find('[data-sj-prev]').onclick=()=>{page--;apply(false);find('.sj-table-scroll').scrollTop=0;};find('[data-sj-next]').onclick=()=>{page++;apply(false);find('.sj-table-scroll').scrollTop=0;};
    host.onclick=e=>{if(!current())return;const number=e.target.closest('[data-sj-page-number]');if(number){page=Number(number.dataset.sjPageNumber);apply(false);find('.sj-table-scroll').scrollTop=0;return;}const row=e.target.closest('[data-sj-job]');if(row){void open(row.dataset.sjJob);return;}const s=e.target.closest('[data-sj-stage]');if(s){stage=stage===s.dataset.sjStage?'':s.dataset.sjStage;find('[data-sj-status]').value=stage;apply();}const n=e.target.closest('[data-sj-need]');if(n){attention=attention===n.dataset.sjNeed?'':n.dataset.sjNeed;apply();}if(e.target.closest('[data-sj-view-all]')){attention='';stage='';term='';find('[data-sj-status]').value='';find('[data-sj-search]').value='';apply();}};
    host.onkeydown=e=>{const row=e.target.closest('tr[data-sj-job]');if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void open(row.dataset.sjJob);}};
+   find('[data-sj-settings]').onclick=async()=>{try{await options.openWorkspaceSettings(workspace);}catch(error){if(current()){find('[data-sj-error]').textContent=error.message||String(error);find('[data-sj-error]').hidden=false;}}};
    find('[data-sj-message]').onclick=()=>options.sendMessage?options.sendMessage():options.navigate('messages');apply();
    const announcements=await Promise.allSettled(workspaces.map(async w=>array(await options.json('/api/workspaces/'+encodeURIComponent(w.id)+'/announcements')).map(a=>({...a,workspaceId:w.id,workspaceName:w.name}))));
    if(!current())return controller;
@@ -84,3 +86,4 @@
  }
  window.StudioJobsPage={render,dispose(){active?.dispose();active=null;}};
 })();
+

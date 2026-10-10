@@ -13,114 +13,35 @@ function mergeJobMessages(teamMessages, customerMessages) {
 // Workspace -> job -> messages. Workspace discussions and membership stay in context.
 (() => {
     const conversationView = document.getElementById('conversationView');
-    const listPane = conversationView.querySelector('.list-pane');
-    const paneHeading = listPane.querySelector('.pane-heading');
-    const search = document.createElement('input');
-    search.type = 'search';
     let revision = 0;
     let disposeJobView = () => {};
     let selectedJob = null;
-    let tab = 'jobs';
-    function empty(title, message) {
-        disposeJobView();disposeJobView=()=>{};
-        detailPane.classList.remove('job-reading-view','job-detail-page'); document.getElementById('conversationView').classList.remove('has-open-job');
-        detailPane.classList.add('empty');
-        detailPane.removeAttribute('aria-busy');
-        delete detailPane.dataset.mediaCount;delete detailPane.dataset.subjectCount;delete detailPane.dataset.productionEnabled;delete detailPane.dataset.editEnabled;delete detailPane.dataset.readyEnabled;
-        detailPane.innerHTML = `<div class="empty-state"><h2>${esc(title)}</h2><p>${esc(message)}</p></div>`;
-        window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
-    }
-    function filter() {
-        const term = search.value.trim().toLocaleLowerCase();
-        const container=tab==='members'?detailPane:conversationList;
-        container.querySelectorAll('[data-search]').forEach(row => row.hidden = !row.textContent.toLocaleLowerCase().includes(term));
-        const noMatches=container.querySelector('[data-no-member-matches]');
-        if(noMatches)noMatches.hidden=!container.querySelector('[data-search]')||!!container.querySelector('[data-search]:not([hidden])');
-    }
-    search.oninput = filter;
-    const tabs = document.createElement('div');
-    tabs.className = 'workspace-tabs workspace-list-controls';
-    tabs.setAttribute('aria-label', 'Workspace views');
-    tabs.innerHTML = '<button data-tab="jobs">Jobs</button><span class="workspace-member-avatars" aria-label="Workspace members"></span><button class="workspace-settings-action" aria-label="Workspace settings" title="Workspace settings">⚙</button>';
-    paneHeading.after(tabs);
-    const searchBox=document.createElement('div');
-    searchBox.className='workspace-inline-search';
-    search.setAttribute('aria-label','Search jobs');
-    search.placeholder='Search jobs…';
-    const refreshButton=document.createElement('button');
-    refreshButton.type='button';
-    refreshButton.className='action workspace-refresh';
-    refreshButton.setAttribute('aria-label','Refresh jobs');
-    refreshButton.title='Refresh jobs';
-    refreshButton.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg>';
-    searchBox.append(search,refreshButton);
-    tabs.querySelector('.workspace-member-avatars').before(searchBox);
-    tabs.querySelector('.workspace-settings-action').onclick=()=>{if(selectedWorkspace)openWorkspaceSettings(selectedWorkspace).catch(fail);};
-    function syncSearchField(){
-        const active=tabs.querySelector('[data-tab="'+tab+'"]');
-        active.after(searchBox);
-        tabs.dataset.searchScope=tab;
-        search.placeholder=tab==='members'?'Search members…':'Search jobs…';
-        search.setAttribute('aria-label',tab==='members'?'Search workspace members':'Search jobs');
-        refreshButton.title=tab==='members'?'Refresh members':'Refresh jobs';
-        refreshButton.setAttribute('aria-label',refreshButton.title);
-    }
-    syncSearchField();
-    const banners = document.createElement('section');
-    banners.className = 'workspace-announcement-banners';
-    banners.hidden = true;
-    document.getElementById('conversationView').prepend(banners);
     const display = () => { conversationView.classList.remove('hidden'); genericView.classList.add('hidden'); document.body.dataset.studioView='workspaces'; };
-    const fail = error => empty('Unable to load', error.message || String(error));
-    tabs.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { tab = button.dataset.tab; search.value=''; syncSearchField(); search.focus(); loadConversations().catch(fail); });
     async function selectWorkspaceView(id, name) {
-        const workspace = workspaceCache.find(x => x.id === id);
+        const workspace = workspaceCache.find(x => String(x.id) === String(id));
         if (!workspace?.permissions?.accessWorkspace || !workspace.permissions.view) return alert('You do not have permission to view this workspace.');
-        window.studioRememberView?.({view:'workspaces',workspaceId:id,jobId:null});
-        selectedWorkspace = id; selectedJob = null; selectedConversation = null;
+        const version=++revision;
+        disposeJobView();disposeJobView=()=>{};
+        selectedWorkspace = workspace.id; selectedJob = null; selectedConversation = null;
         currentWorkspacePermissions = workspace.permissions;
+        workspaceTitle.textContent = name || workspace.name;
+        // Workspace selection uses the same Jobs renderer, scoped to this workspace.
+        // Do not render the old split-pane list before navigating.
+        await window.studioOpenJobs(workspace.id);
+        if(version!==revision || document.body.dataset.studioView!=='jobs')return;
+        window.studioRememberView?.({view:'jobs',workspaceId:workspace.id,jobId:null});
         window.studioSetBreadcrumb?.([
             {label:'Today',view:'today'},
             {label:'Workspaces',view:'workspaces'},
-            {label:name,view:'workspaces',workspaceId:id}
+            {label:name || workspace.name,view:'jobs',workspaceId:workspace.id}
         ]);
-        tab = 'jobs'; search.value = ''; workspaceTitle.textContent = name;
-        document.querySelectorAll('.workspace').forEach(button => button.classList.toggle('active', button.dataset.id === id));
-        display();
-        try { await loadConversations(); } catch (error) { fail(error); }
     }
     async function loadWorkspaceConversations() {
-        syncSearchField();
-        const version = ++revision;
-        const workspaceId = selectedWorkspace;
-        banners.hidden = true;
-        banners.innerHTML = '';
-        if (workspaceId) renderAnnouncementBanners(banners,workspaceId,()=>selectedWorkspace===workspaceId).catch(error=>{if(selectedWorkspace===workspaceId){banners.hidden=false;banners.textContent='Announcements could not be loaded. Use Refresh to retry.';}});
-        tabs.querySelectorAll('[data-tab]').forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
-        display();
-        conversationList.innerHTML = '';
-        if (!workspaceId) { empty('Select a workspace', 'Choose a workspace on the left to see its jobs, announcements and members.'); return; }
-        empty('Select a job', 'Jobs belong to this workspace. Open a job to read its messages.');
-        const [jobs, directory, profile] = await Promise.all([
-            json('/api/jobs'),
-            json(`/api/workspaces/${workspaceId}/directory`).catch(() => []),
-            json('/api/auth/me').catch(() => ({}))
-        ]);
-        const people = [...directory, profile.user || profile];
-        studioRememberPeople(people);
-        tabs.querySelector('.workspace-member-avatars').innerHTML=directory.slice(0,5).map(m=>`<span title="${esc(studioFirstName(m))}">${esc(studioFirstName(m).slice(0,1))}</span>`).join('');
-        if (version !== revision) return;
-        conversationList.innerHTML = jobs.filter(x => x.workspaceId === workspaceId||(x.participatingWorkspaceIds||[]).includes(workspaceId)).map(job => `<button class="studio-speedbump-row workspace-job-speedbump" data-search data-job="${job.id}">
-            <span class="job-row-heading"><strong>${esc(job.title)}</strong></span>
-            <span class="job-row-client">${esc(job.clientName || job.linkedClientName || 'Client not linked')}</span>
-            <span class="job-row-meta">
-                <span>Event: ${esc(job.eventDate || 'Not scheduled')}</span>
-                <span>Job Lead: ${esc(job.jobLead ? messageFirstName(job.jobLead, people, 'Team member', true) : 'Unassigned')}</span>
-                <span class="job-status">${esc(job.status)}</span>
-            </span>
-        </button>`).join('') || '<p class="empty-state">No jobs in this workspace yet.</p>';
-        conversationList.querySelectorAll('[data-job]').forEach(button => button.onclick = () => showJobMessages(jobs.find(x => x.id === button.dataset.job)).catch(fail));
-        filter();
+        if (selectedWorkspace) {
+            const workspace = workspaceCache.find(x => String(x.id) === String(selectedWorkspace));
+            return selectWorkspaceView(selectedWorkspace, workspace?.name);
+        }
+        return window.studioOpenJobs('');
     }
     window.StudioWorkspace={select:selectWorkspaceView,load:loadWorkspaceConversations};
     window.openWorkspaceJob = async function(id) {
@@ -142,7 +63,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         delete detailPane.dataset.mediaCount;delete detailPane.dataset.subjectCount;delete detailPane.dataset.productionEnabled;delete detailPane.dataset.editEnabled;delete detailPane.dataset.readyEnabled;
         disposeJobView();disposeJobView=()=>{};
         selectedJob=null;selectedConversation=null;
-        display();banners.hidden=true;
+        display();
         detailPane.classList.remove('empty');
         detailPane.classList.add('job-reading-view','job-detail-page');
         detailPane.setAttribute('aria-busy','true');
@@ -164,7 +85,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         selectedWorkspace=job.workspaceId;
         const workspace=workspaceCache.find(item=>String(item.id)===String(job.workspaceId));
         currentWorkspacePermissions=workspace?.permissions||{};
-        workspaceTitle.textContent=workspace?.name||'Workspace';tab='jobs';
+        workspaceTitle.textContent=workspace?.name||'Workspace';
         window.studioRememberView?.({view:'workspaces',workspaceId:job.workspaceId,jobId:job.id});
         window.studioSetBreadcrumb?.([
             {label:'Workspaces',view:'workspaces'},
@@ -400,9 +321,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if (name === 'activity') return renderJobActivity(job,panel,current);
 
     }
-    refreshButton.onclick = () => loadConversations().catch(fail);
-    document.querySelector('.pane-heading p').textContent = 'Jobs, announcements and members';
 })();
+
 
 
 

@@ -809,6 +809,7 @@
             isCurrent,openJob:id=>openWorkspaceJob(id),navigate:view=>window.studioNavigate(view),
             sendMessage:async()=>{await window.studioNavigate('messages');if(document.body.dataset.studioView==='messages')document.getElementById('newDirectMessage')?.click();},
             openWorkspace:id=>selectWorkspace(id,(workspaceCache||[]).find(w=>String(w.id)===String(id))?.name||'Workspace'),
+            openWorkspaceSettings:id=>openWorkspaceSettings(id),
             retry:()=>renderJobs()
         });
     }
@@ -1072,4 +1073,5 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 

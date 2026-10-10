@@ -85,7 +85,7 @@ test('workspace job keeps Media dominant with working replies and dedicated pane
  assert.equal(w.document.querySelector('[data-job-scroll=activity]')?.dataset.jobScroll,'activity');
  assert.ok(w.document.querySelector('.job-detail-board'));
  await new Promise(r=>setTimeout(r,10));assert.ok(w.document.querySelector('.job-detail-right .job-detail-message-card'));assert.ok(w.document.querySelector('[aria-label="Filter media by collection"]'));assert.ok(w.document.querySelector('.jd-attention'));assert.equal(w.document.querySelector('.job-context-sidebar'),null);assert.equal(w.document.querySelector('.media-tasks'),null);assert.equal(w.document.querySelector('.gallery-upload-card'),null);
- assert.ok(w.document.querySelector('.workspace-settings-action'));assert.equal(w.document.querySelector('[data-tab=members]'),null);
+ assert.equal(w.document.querySelector('.workspace-settings-action'),null);assert.equal(w.document.querySelector('[data-tab=members]'),null);
  assert.equal(w.document.querySelector('details.job-details-card'),null);assert.equal(w.document.querySelector('[data-job="job"]'),null);assert.equal(w.document.querySelector('[data-tab="enquiries"]'),null);assert.equal(w.document.querySelector('[data-tab="team"]'),null);assert.equal(w.document.querySelector('[data-tab="announcements"]'),null);
 });
 test('current shell keeps obsolete left navigation removed',()=>{
@@ -253,3 +253,4 @@ test('Jobs uses its dedicated renderer and shared shell rail',()=>{
  assert.match(shell,/sj-rail-card/);
  assert.match(shell,/studioOpenJobs/);
 });
+

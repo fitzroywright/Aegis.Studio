@@ -24,3 +24,16 @@ test('An older Jobs request cannot replace a newer render and opening errors sta
  const {w,fixture,host}=environment(t);let release;fixture.delay=new Promise(r=>release=r);const first=w.StudioJobsPage.render(host,fixture.options);fixture.delay=null;fixture.options.workspaceFilter='w2';fixture.options.openJob=async()=>{throw new Error('Access denied');};await w.StudioJobsPage.render(host,fixture.options);release();await first;
  assert.equal(w.document.getElementById('studioFooterRate').textContent,'8 jobs');host.querySelector('tr[data-sj-job]').click();await new Promise(r=>setTimeout(r,0));assert.match(host.querySelector('[data-sj-error]').textContent,/Access denied/);assert.equal(host.querySelector('[data-sj-error]').hidden,false);
 });
+
+
+test('workspace settings follows the active filter and keeps errors inline',async t=>{
+ const {w,fixture,host}=environment(t),opened=[];
+ fixture.options.openWorkspaceSettings=async id=>{opened.push(id);};
+ await w.StudioJobsPage.render(host,fixture.options);
+ const settings=host.querySelector('[data-sj-settings]');assert.equal(settings.hidden,true);
+ change(w,host.querySelector('[data-sj-workspace]'),'w2');assert.equal(settings.hidden,false);
+ settings.click();await new Promise(r=>setTimeout(r,0));assert.deepEqual(opened,['w2']);
+ fixture.options.openWorkspaceSettings=async()=>{throw Error('Settings unavailable');};
+ settings.click();await new Promise(r=>setTimeout(r,0));assert.match(host.querySelector('[data-sj-error]').textContent,/Settings unavailable/);
+ host.querySelector('[data-sj-clear]').click();assert.equal(settings.hidden,true);
+});

@@ -67,7 +67,9 @@ test('cold workspace opening loads server permissions and keeps actual denial on
   assert.ok(requests.includes('/api/workspace-access'));
   await w.document.querySelector('[data-open-workspace="w0"]').onclick();
   assert.equal(w.eval('selectedWorkspace'),'w0');assert.deepEqual(errors,[]);
-  assert.equal(w.document.getElementById('conversationView').classList.contains('hidden'),false);
+  assert.equal(w.document.getElementById('conversationView').classList.contains('hidden'),true);
+  assert.equal(w.document.body.dataset.studioView,'jobs');
+  assert.equal(w.document.querySelector('[data-sj-workspace]').value,'w0');
   denied=true;await w.studioNavigate('workspaces');
   await w.document.querySelector('[data-open-workspace="w1"]').onclick();
   assert.match(errors.at(-1),/do not have permission/);
@@ -75,3 +77,4 @@ test('cold workspace opening loads server permissions and keeps actual denial on
   assert.equal(w.document.getElementById('genericView').classList.contains('hidden'),false);
  }finally{dom.window.close();}
 });
+
