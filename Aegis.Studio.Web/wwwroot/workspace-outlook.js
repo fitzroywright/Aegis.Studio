@@ -302,7 +302,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
 
             board.append(lower,rightStack);
             header.appendChild(workflowHost);
-            lower.querySelector('.job-media-section').prepend(collections);
+            lower.querySelector('.job-media-section .job-center-heading').after(collections);
             rightStack.append(lower.querySelector('.job-subjects-section'),quick);
             const bottom=document.createElement('section');bottom.className='job-detail-bottom';
             const activityCard=document.createElement('section');activityCard.className='job-center-panel job-detail-activity-card';activityCard.innerHTML='<header class="job-center-heading"><h2>Recent Activity</h2></header><div class="job-detail-activity-content"></div>';
