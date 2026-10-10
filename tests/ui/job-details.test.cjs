@@ -61,3 +61,41 @@ test('job navigation resolves the application lexical workspace cache',async t=>
  assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Demo \| Commercial and Products/);
  assert.match(w.document.getElementById('studioContextRail').textContent,/Demo \| Commercial and Products/);
 });
+test('direct job opening shows Job Details immediately and skips the workspace list',async t=>{
+ const {w,fixture}=environment(t);await settle();const original=w.json;let release;
+ const delay=new Promise(r=>release=r);
+ w.json=async(url,options)=>{if(url==='/api/jobs/job')await delay;return original(url,options);};
+ w.document.getElementById('conversationView').classList.add('hidden');w.document.body.dataset.studioView='today';
+ const opening=w.openWorkspaceJob('job');
+ assert.equal(w.document.getElementById('conversationView').classList.contains('hidden'),false);
+ assert.match(w.document.querySelector('#studioTodayBrandTitle strong').textContent,/Job Details/);
+ assert.equal(w.detailPane.getAttribute('aria-busy'),'true');
+ assert.match(w.detailPane.textContent,/Loading job/);assert.doesNotMatch(w.detailPane.textContent,/Select a job/);
+ release();await opening;
+ assert.equal(w.detailPane.hasAttribute('aria-busy'),false);
+ assert.ok(w.document.querySelector('#hierarchyCompose'));
+ assert.equal(fixture.calls.some(c=>c.url==='/api/jobs'),false);
+});
+test('a slow earlier job lookup cannot replace the latest selection',async t=>{
+ const {w}=environment(t);const original=w.json;let release;const delay=new Promise(r=>release=r);
+ w.json=async(url,options)=>{if(url==='/api/jobs/job')await delay;return original(url,options);};
+ const first=w.openWorkspaceJob('job');await w.openWorkspaceJob('job2');release();await first;
+ assert.match(w.document.querySelector('.job-detail-title h1').textContent,/Graduation portraits/);
+});
+test('job loading failure keeps Job Details visible and supports Retry',async t=>{
+ const {w}=environment(t);const original=w.json;let fail=true;
+ w.json=async(url,options)=>{if(url==='/api/jobs/job'&&fail)throw new Error('Job unavailable');return original(url,options);};
+ await w.openWorkspaceJob('job');
+ assert.match(w.document.querySelector('#studioTodayBrandTitle strong').textContent,/Job Details/);
+ assert.match(w.detailPane.querySelector('[role=alert]').textContent,/Job unavailable/);
+ assert.equal(w.detailPane.hasAttribute('aria-busy'),false);
+ fail=false;await w.detailPane.querySelector('button').onclick();
+ assert.ok(w.document.querySelector('#hierarchyCompose'));
+});
+test('leaving Job Details while loading does not replace the destination page',async t=>{
+ const {w}=environment(t);const original=w.json;let release;const delay=new Promise(r=>release=r);
+ w.json=async(url,options)=>{if(url==='/api/jobs/job')await delay;return original(url,options);};
+ const opening=w.openWorkspaceJob('job');w.document.body.dataset.studioView='today';w.document.getElementById('conversationView').classList.add('hidden');
+ release();await opening;
+ assert.equal(w.document.body.dataset.studioView,'today');assert.equal(w.document.querySelector('#hierarchyCompose'),null);
+});

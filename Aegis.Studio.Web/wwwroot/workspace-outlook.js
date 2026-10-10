@@ -25,6 +25,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         disposeJobView();disposeJobView=()=>{};
         detailPane.classList.remove('job-reading-view','job-detail-page'); document.getElementById('conversationView').classList.remove('has-open-job');
         detailPane.classList.add('empty');
+        detailPane.removeAttribute('aria-busy');
         detailPane.innerHTML = `<div class="empty-state"><h2>${esc(title)}</h2><p>${esc(message)}</p></div>`;
         window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
     }
@@ -121,29 +122,64 @@ function mergeJobMessages(teamMessages, customerMessages) {
         filter();
     };
     window.openWorkspaceJob = async function(id) {
-        if(!workspaceCache.length)await loadWorkspaces();
-        const job=await json('/api/jobs/'+id);
-        const workspace=workspaceCache.find(w=>w.id===job.workspaceId);
-        selectedWorkspace=job.workspaceId;currentWorkspacePermissions=workspace?.permissions || {};workspaceTitle.textContent=workspace?.name || 'Workspace';
-        selectedJob=job;tab='jobs';await loadConversations();await showJobMessages(job);
+        const version=beginJobLoading();
+        try {
+            const [job]=await Promise.all([
+                json('/api/jobs/'+id),
+                workspaceCache.length?Promise.resolve():loadWorkspaces()
+            ]);
+            if(!currentJobOpening(version))return;
+            await showJobMessages(job,version);
+        } catch(error) { jobLoadFailed(error,version,()=>window.openWorkspaceJob(id)); }
     };
-    async function showJobMessages(job) {
-        window.studioRememberView?.({view:'workspaces',workspaceId:job.workspaceId,jobId:job.id});
+    function currentJobOpening(version) {
+        return version===revision && !conversationView.classList.contains('hidden') && document.body.dataset.studioView==='workspaces';
+    }
+    function beginJobLoading(job) {
+        const version=++revision;
+        disposeJobView();disposeJobView=()=>{};
+        selectedJob=null;selectedConversation=null;
+        display();banners.hidden=true;
+        detailPane.classList.remove('empty');
+        detailPane.classList.add('job-reading-view','job-detail-page');
+        detailPane.setAttribute('aria-busy','true');
+        conversationView.classList.add('has-open-job');
+        detailPane.innerHTML=`<header class="job-detail-heading"><div class="job-detail-title"><h1>${esc(job?.title||'Job Details')}</h1><p role="status">Loading job…</p></div></header><div></div><div class="job-detail-board"><div class="job-detail-center"><section class="job-center-panel"><p role="status">Loading job information and messages…</p></section></div></div>`;
+        window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
+        return version;
+    }
+    function jobLoadFailed(error,version,retry) {
+        if(!currentJobOpening(version))return;
+        detailPane.removeAttribute('aria-busy');
+        detailPane.querySelector('.job-detail-title p').textContent='Unable to load job';
+        const panel=detailPane.querySelector('.job-detail-center');
+        panel.innerHTML=`<section class="job-center-panel"><p role="alert">${esc(error.message||String(error))}</p><button type="button" class="action">Retry</button></section>`;
+        panel.querySelector('button').onclick=retry;
+    }
+    async function showJobMessages(job,version=beginJobLoading(job)) {
+        if(!currentJobOpening(version))return;
+        selectedWorkspace=job.workspaceId;
         const workspace=workspaceCache.find(item=>String(item.id)===String(job.workspaceId));
+        currentWorkspacePermissions=workspace?.permissions||{};
+        workspaceTitle.textContent=workspace?.name||'Workspace';tab='jobs';
+        window.studioRememberView?.({view:'workspaces',workspaceId:job.workspaceId,jobId:job.id});
         window.studioSetBreadcrumb?.([
             {label:'Workspaces',view:'workspaces'},
             {label:workspace?.name||'Workspace',view:'workspaces',workspaceId:job.workspaceId},
             {label:job.title||'Job'}
         ]);
         selectedJob = job;
-        const version = ++revision;
+        detailPane.querySelector('.job-detail-title h1').textContent=job.title||'Job Details';
         conversationList.querySelectorAll('[data-job]').forEach(row => row.classList.toggle('active', row.dataset.job === job.id));
-        await thread('Job', job.id, version);
+        try { await thread('Job', job.id, version); }
+        catch(error) { jobLoadFailed(error,version,()=>window.openWorkspaceJob(job.id)); }
     }
     async function thread(scope, scopeId, version) {
-        const value = await json(`/api/messages/threads/${scope}/${scopeId}`, { method:'POST' });
-        const messages = await json(`/api/messages/threads/${value.id}?count=500`);
         const job = scope === 'Job' ? selectedJob : null;
+        const value = await json(`/api/messages/threads/${scope}/${scopeId}`, { method:'POST' });
+        if (version !== revision || (job && !currentJobOpening(version))) return;
+        const messages = await json(`/api/messages/threads/${value.id}?count=500`);
+        if (version !== revision || (job && !currentJobOpening(version))) return;
         let conversation = null, identities = [], customerNotice = '';
         if (job) {
             const response = await fetch('/api/conversations/' + job.conversationId);
@@ -156,7 +192,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 }
             } else customerNotice = response.status === 403 ? 'Customer messages are restricted by your permissions.' : 'Customer messages could not be loaded. Refresh to retry.';
         }
-        if (version !== revision) return;
+        if (version !== revision || (job && !currentJobOpening(version))) return;
         const people = [];
         if (job) {
             const responses = await Promise.allSettled([
@@ -166,10 +202,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
             if (responses[1].status === 'fulfilled') people.push(responses[1].value.user || responses[1].value);
             studioRememberPeople(people);
         }
-        if (version !== revision) return;
+        if (version !== revision || (job && !currentJobOpening(version))) return;
         const combined = mergeJobMessages(messages, conversation?.messages || []);
         disposeJobView();disposeJobView=()=>{};
         detailPane.classList.remove('empty');
+        detailPane.removeAttribute('aria-busy');
         detailPane.innerHTML = `<div class="detail-header"><div><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and customer correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><div class="reply-textbox-shell"><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? `<label class="reply-paperclip" title="Attach document" aria-label="Attach document"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8l9.2-9.2"/></svg><input type="file" data-message-file hidden></label>` : ``}</div><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
         const renderMessages = () => {
             const visible = combined;
