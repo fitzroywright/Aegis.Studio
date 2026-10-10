@@ -34,13 +34,8 @@
         genericView.classList.remove('hidden');
         genericView.innerHTML = `
             <div class="studio-messaging studio-outlook-inbox">
-                <aside class="studio-inbox-filters">
-                    <header><h2>Messages</h2><small>Job filters</small></header>
-                    <input id="studioInboxJobSearch" type="search" placeholder="Find a job…" aria-label="Find a job">
-                    <div id="studioInboxJobFilters" class="studio-inbox-job-filters"></div>
-                </aside>
                 <section class="studio-inbox-center">
-                    <header class="studio-inbox-toolbar"><div><h1>All Messages</h1><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="primary" id="newDirectMessage">New</button></div></header>
+                    <header class="studio-inbox-toolbar"><div><h1>All Messages</h1><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="primary" id="newDirectMessage">New</button></div></header>
                     <div class="studio-inbox-table-wrap" id="studioInboxRows" role="list" aria-label="Messages"><div class="studio-inbox-loading">Loading messages…</div></div>
                 </section>
                 <section id="messageConversationPane" class="message-conversation-pane studio-inbox-reading"><div class="empty-state"><h2>Select a message</h2><p>Read the conversation and reply here.</p></div></section>
@@ -48,7 +43,7 @@
         document.getElementById('newDirectMessage').onclick = startDirect;
         document.getElementById('studioInboxRefresh').onclick = () => loadInbox(true);
         document.getElementById('studioInboxSearch').oninput = event => { inboxQuery = event.target.value.toLowerCase(); renderInbox(); };
-        document.getElementById('studioInboxJobSearch').oninput = () => renderInboxFilters();
+        document.getElementById('studioInboxJobSelect').onchange = event => { inboxFilter=event.target.value;renderInbox(); };
         await loadInbox(true);
         startRefresh();
     }
@@ -78,14 +73,10 @@
         }catch(error){body.innerHTML='<div class="studio-inbox-loading">'+esc(error.message||'Unable to load messages.')+'</div>';}
     }
     function renderInboxFilters(){
-        const host=document.getElementById('studioInboxJobFilters');if(!host)return;
-        const term=(document.getElementById('studioInboxJobSearch')?.value||'').toLowerCase();
-        const jobs=inboxThreads.filter(x=>x.scopeType==='Job');
-        const names=new Map(jobs.map(t=>[String(t.scopeId||t.id),inboxJob(t)]));
-        const counts=new Map();
-        for(const row of inboxRows)if(row.thread.scopeType==='Job'){const id=String(row.thread.scopeId||row.thread.id);counts.set(id,(counts.get(id)||0)+1);}
-        host.innerHTML='<button data-inbox-job="" class="'+(!inboxFilter?'active':'')+'">All messages <span>'+inboxRows.length+'</span></button>'+[...names].filter(([,name])=>name.toLowerCase().includes(term)).sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>'<button data-inbox-job="'+esc(id)+'" class="'+(inboxFilter===id?'active':'')+'">'+esc(name)+' <span>'+(counts.get(id)||0)+'</span></button>').join('');
-        host.querySelectorAll('[data-inbox-job]').forEach(button=>button.onclick=()=>{inboxFilter=button.dataset.inboxJob;renderInboxFilters();renderInbox();});
+        const select=document.getElementById('studioInboxJobSelect');if(!select)return;
+        const jobs=new Map(inboxThreads.filter(t=>t.scopeType==='Job').map(t=>[String(t.scopeId||t.id),inboxJob(t)]));
+        select.innerHTML='<option value="">All jobs</option>'+[...jobs].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>'<option value="'+esc(id)+'">'+esc(name)+'</option>').join('');
+        select.value=inboxFilter;
     }
     function renderInbox(){
         const body=document.getElementById('studioInboxRows');if(!body)return;
