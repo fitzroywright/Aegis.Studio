@@ -163,7 +163,7 @@
 
     function syncGridFooterCount() {
         const view = document.body.dataset.studioView || currentView;
-        if (view === 'today' || view === 'jobs') return;
+        if (view === 'today' || view === 'jobs' || view === 'frontdesk') return;
         const footer = document.getElementById('studioFooterRate');
         const root = document.getElementById('genericView');
         if (!footer || !root || root.classList.contains('hidden')) return;
