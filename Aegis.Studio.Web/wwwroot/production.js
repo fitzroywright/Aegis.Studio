@@ -96,11 +96,6 @@ async function recordShootResults(id) {
 
 async function handoffShoot(id) { const handoffTo=prompt('Hand off verified files to which user/team?'); if(!handoffTo)return; try{ await json('/api/operations/shoots/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'handoff',imageCount:null,backupConfirmed:null,reshootRequired:null,coverageNotes:null,equipmentNotes:null,handoffTo})}); await showProduction(); }catch(error){ alert(error.message||error); } }
 
-async function createPhotographerProfile() {
-    const userName=prompt('AD user name'); if(!userName)return; const displayName=prompt('Display name',userName)||userName; const employmentType=prompt('Employment type: Employee, PartTime, Contractor, Freelance','Employee')||'Employee'; const skills=(prompt('Skills, comma separated','Wedding, Portrait')||'').split(',').map(x=>x.trim()).filter(Boolean); const defaultEquipmentNotes=prompt('Default equipment notes','')||null;
-    try{ await json('/api/photographers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName,displayName,employmentType,isActive:true,skills,defaultEquipmentNotes,scheduleResourceId:null})}); await showProduction(); }catch(error){ alert(error.message||error); }
-}
-
 async function addPhotographerAvailability(userName) {
     const from=prompt('Unavailable from (YYYY-MM-DD HH:MM)'); if(!from)return; const to=prompt('Unavailable until (YYYY-MM-DD HH:MM)'); if(!to)return; const type=prompt('Type: Unavailable, Leave, Preferred, Available','Unavailable')||'Unavailable'; const note=prompt('Note','')||null;
     await json(`/api/photographers/${encodeURIComponent(userName)}/availability`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({startsAtUtc:new Date(from).toISOString(),endsAtUtc:new Date(to).toISOString(),availabilityType:type,note})}); alert('Availability saved.');

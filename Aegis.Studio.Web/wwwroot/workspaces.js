@@ -134,12 +134,18 @@ async function runMailboxImport(workspaceId) {
 }
 
 function renderEmployeeDirectorySection() {
-    return `<section class="job-section"><h2>Employees & Roles</h2><p class="muted">Studio's operational employee directory. Directory providers populate identity; Studio controls whether a person is active and assignable.</p><div id="studioEmployeeList"><p class="muted">Loading…</p></div><h3>Add or maintain employee</h3><div class="pos-entry"><label>User name<input id="employeeUserName"></label><label>Display name<input id="employeeDisplayName"></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><button class="primary" onclick="saveStudioEmployee()">Save employee</button></div></section>`;
+    return `<section class="job-section"><h2>Employees & Roles</h2><p class="muted">Studio's operational employee directory. Directory providers populate identity; Studio controls whether a person is active and assignable. Register an active, assignable employee as a photographer to make them available for crew assignment.</p><div id="studioEmployeeList"><p class="muted">Loading…</p></div><h3>Add or maintain employee</h3><div class="pos-entry"><label>User name<input id="employeeUserName"></label><label>Display name<input id="employeeDisplayName"></label><label>Email<input id="employeeEmail" type="email"></label><label>Assignable<select id="employeeAssignable"><option value="true">Yes</option><option value="false">No</option></select></label><button class="primary" onclick="saveStudioEmployee()">Save employee</button></div></section>`;
 }
 async function refreshStudioEmployees(){
     const holder=document.getElementById('studioEmployeeList');if(!holder)return;
-    const employees=await json('/api/admin/studio-employees/');
-    holder.innerHTML=employees.map(e=>`<div class="job-row"><div><b>${esc(e.displayName)}</b><div class="meta">${esc(e.userName)} · ${e.isActive?'Active':'Inactive'} · ${e.isAssignable?'Assignable':'Not assignable'}</div><div class="meta">${esc((e.roles||[]).join(', ')||e.source||'Studio')}</div></div><button class="action" data-edit-employee="${esc(e.userName)}">Edit</button></div>`).join('')||'<p class="muted">No employees yet.</p>';
+    const [employees,photographers]=await Promise.all([json('/api/admin/studio-employees/'),json('/api/photographers')]);
+    if(!holder.isConnected)return;
+    const registered=new Set(photographers.filter(p=>p.isActive).map(p=>String(p.userName).toLowerCase()));
+    holder.innerHTML=employees.map(e=>`<div class="job-row"><div><b>${esc(e.displayName)}</b><div class="meta">${esc(e.userName)} · ${e.isActive?'Active':'Inactive'} · ${e.isAssignable?'Assignable':'Not assignable'}</div><div class="meta">${esc((e.roles||[]).join(', ')||e.source||'Studio')}</div></div><div class="job-actions"><button class="action" data-edit-employee="${esc(e.userName)}">Edit</button>${registered.has(String(e.userName).toLowerCase())?'<span class="studio-status-pill">Photographer</span>':e.isActive&&e.isAssignable?`<button class="action" data-register-photographer="${esc(e.userName)}">Register photographer</button>`:''}</div></div>`).join('')||'<p class="muted">No employees yet.</p>';
+    holder.querySelectorAll('[data-register-photographer]').forEach(button=>button.onclick=()=>{
+        const employee=employees.find(e=>String(e.userName).toLowerCase()===String(button.dataset.registerPhotographer).toLowerCase());
+        if(employee)registerStudioPhotographer(employee);
+    });
     holder.querySelectorAll('[data-edit-employee]').forEach(button=>button.onclick=()=>{
         const employee=employees.find(e=>String(e.userName).toLowerCase()===String(button.dataset.editEmployee).toLowerCase());if(!employee)return;
         document.getElementById('employeeUserName').value=employee.userName||'';
@@ -147,6 +153,19 @@ async function refreshStudioEmployees(){
         document.getElementById('employeeEmail').value=employee.emailAddress||'';
         document.getElementById('employeeAssignable').value=String(employee.isAssignable!==false);
     });
+}
+function registerStudioPhotographer(employee){
+    if(!employee.isActive||!employee.isAssignable)return;
+    const d=studioDialog('Register photographer',`<form class="request-form"><p><strong>${esc(employee.displayName)}</strong> · ${esc(employee.userName)}</p><p class="muted">This uses the existing Studio employee identity for assignments and WorkDay.</p><label>Employment type<select name="employmentType"><option>Employee</option><option>PartTime</option><option>Contractor</option><option>Freelance</option></select></label><label>Skills (comma separated)<input name="skills" maxlength="1000" value="${esc((employee.skills||[]).join(', '))}"></label><label>Default equipment notes<textarea name="equipment" maxlength="4000"></textarea></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Register photographer</button></div></form>`);
+    d.querySelector('[data-cancel]').onclick=()=>d.close();
+    d.querySelector('form').onsubmit=async event=>{
+        event.preventDefault();const form=event.currentTarget,save=form.querySelector('[type=submit]');if(save.disabled)return;save.disabled=true;
+        try{
+            await json('/api/photographers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:employee.userName,displayName:employee.displayName,employmentType:form.elements.employmentType.value,isActive:true,skills:form.elements.skills.value.split(',').map(x=>x.trim()).filter(Boolean),defaultEquipmentNotes:form.elements.equipment.value.trim()||null,scheduleResourceId:null})});
+            d.close();await refreshStudioEmployees();
+        }catch(error){if(d.isConnected)form.querySelector('[role=alert]').textContent=error.message||String(error);else alert(error.message||error);}
+        finally{if(save.isConnected)save.disabled=false;}
+    };
 }
 async function saveStudioEmployee(){
     const userName=document.getElementById('employeeUserName').value.trim();if(!userName)return alert('User name is required.');
