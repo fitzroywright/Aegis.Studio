@@ -296,7 +296,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) select $2,(b.declaration->>'subjectId')::uuid from studio_media_upload_receipts r join studio_media_upload_batches b on b.id=r.batch_id where r.id=$1 and b.declaration->>'subjectId' is not null on conflict do nothing",id,assetId);
             Execute(c,tx,"delete from studio_media_asset_subjects x using studio_job_subjects s where x.subject_id=s.id and x.asset_id=$2 and s.is_system and lower(s.name)='unclassified' and exists(select 1 from studio_media_upload_receipts r join studio_media_upload_batches b on b.id=r.batch_id where r.id=$1 and b.declaration->>'subjectId' is not null and (b.declaration->>'subjectId')::uuid<>s.id)",id,assetId);
         }
-        Execute(c,tx,"update studio_media_upload_receipts set status=$2,version_id=$3,asset_id=$4,last_error=null,completed_at_utc=now() where id=$1",id,unmatched?"Unmatched":"Stored",version,asset);
+        Execute(c,tx,"update studio_media_upload_receipts set status=$2,version_id=$3,asset_id=$4,last_error=null,completed_at_utc=now() where id=$1",id,unmatched?"Unmatched":"Stored",version,(object?)asset??DBNull.Value);
     }
     public void Resolve(Guid job,Guid unmatched,Guid asset,string user)
     {
