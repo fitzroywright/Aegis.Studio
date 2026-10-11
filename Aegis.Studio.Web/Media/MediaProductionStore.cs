@@ -99,12 +99,15 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         foreach(var value in new object?[]{job,page.Collection,page.SubjectId,page.Status,page.After,page.Limit,page.SubjectSearch,page.AssetId})cmd.Parameters.AddWithValue(value??DBNull.Value);
         return JsonSerializer.Deserialize<JsonElement>((string)cmd.ExecuteScalar()!);
     }
-    public void UpdateAsset(Guid job,Guid id,MediaAssetUpdate request,string user)
+    public void UpdateAsset(Guid job,Guid id,MediaAssetUpdate request,string user,bool canDispatch=false)
     {
         MediaProductionRules.ValidateState(request.Status);
         if((request.Collection?.Length??0)>100||(request.AssignedTo?.Length??0)>200||(request.Subjects?.Length??0)>500)throw new ArgumentException("Asset details are too long.");
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        if(Scalar(c,tx,"select id from studio_jobs where id=$1 and status not in ('Completed','Cancelled') for update",job) is null)throw new ArgumentException("Reopen the Job before changing media.");
         string key=AssetKey(c,tx,job,id);
+        string? previousAssignee=Scalar(c,tx,"select assigned_to from studio_media_assets where id=$1 and job_id=$2 for update",id,job) as string;
+        if(!canDispatch&&!string.Equals(previousAssignee?.Trim(),request.AssignedTo?.Trim(),StringComparison.OrdinalIgnoreCase))throw new ArgumentException("Only a Production Manager may change the production assignment.");
         foreach(Guid subject in request.Subjects??[])
             if(Scalar(c,tx,"select id from studio_job_subjects where id=$1 and job_id=$2",subject,job) is null)throw new ArgumentException("Subject belongs to another job or no longer exists.");
         if((request.Subjects?.Length??0)>0 && string.IsNullOrWhiteSpace(request.Collection))throw new ArgumentException("Classified images must belong to a collection.");

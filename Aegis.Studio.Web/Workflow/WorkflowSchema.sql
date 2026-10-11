@@ -232,3 +232,12 @@ end $$;
 drop trigger if exists workflow_invalidate_upload_proof on studio_asset_versions;
 create trigger workflow_invalidate_upload_proof after insert on studio_asset_versions
 for each row execute function studio_workflow_invalidate_upload_proof();
+
+-- Finance authorizes release; it never manufactures a payment event.
+create table if not exists studio_finance_authorizations(
+ id uuid primary key,job_id uuid not null references studio_jobs(id),client_id uuid null,client_name text not null,
+ kind text not null check(kind in ('CreditTerms','DeliveryAuthorization')),authorized_amount numeric(18,2) not null check(authorized_amount>0),
+ currency text not null check(currency='JMD'),scope text not null check(scope='FinalDelivery'),terms text not null,payment_due_date date not null,
+ approved_by text not null,reason text not null,contract_reference text not null,approved_at_utc timestamptz not null default now(),
+ revoked_at_utc timestamptz null,revoked_by text null,revocation_reason text null);
+create index if not exists ix_finance_authorization_job on studio_finance_authorizations(job_id,approved_at_utc desc);

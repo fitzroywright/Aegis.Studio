@@ -63,3 +63,12 @@ Next: capture final test results; validate schema/transactional WorkDay replay, 
 ## Checkpoint 4 — verified recovery handoff
 
 Final native Web/Core suite: **216 passed, 13 database tests skipped, 0 failed**. Final UI controller suite: **94 passed, 0 failed**. Edited JavaScript syntax and whitespace checks pass. Remote implementation checkpoint `ba6ee51775c5f6652e042800d3d8426402e13b5e` verified by reading its branch ref. See `COMPLETE-WORKFLOW-20261011-ACCEPTANCE.md` for verified scope, missing environment/device evidence, incomplete requirements and recovery instructions. The full implementation remains incomplete and is not merged or deployed.
+
+## Resumed implementation — Finance and production boundaries
+
+- Added explicit Finance Manager and Production Manager operational roles (including directory-group resolution). Finance authorization is independent of Operations override and administrator-wide billing access.
+- Added auditable JMD final-release authorization with amount, customer snapshot, terms, due date, contract reference, approver and revocation. It preserves actual financial events and receivables, including operationally completed Jobs.
+- Delivery and Front Desk fulfillment now use the connected workflow and require actual settlement or sufficient Finance authorization. Front Desk records delivery; Job closure remains a separate workflow decision.
+- Production task dispatch/reassignment and final technical approval require Production Manager authority. Job Owner can report progress only on assigned production work. Existing media assignment changes also check the explicit role.
+- Legacy workspace gallery public endpoints now serve reduced, visibly watermarked proofs only. Those galleries lack a pinned Job approval/receivable identity; their originals cannot safely qualify for final release. Job-scoped V1 final delivery is the next implementation step.
+- Added finance/production boundary rules tests, proof rendering verification, and isolated PostgreSQL finance tests (environment gated). Native build/testing in progress at this checkpoint; UI suite currently 94 passed. No merge or deployment.

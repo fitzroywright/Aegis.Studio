@@ -127,7 +127,7 @@ public static class GalleryEndpoints
                     x.SortOrder,
                     thumbnailUrl = $"/public/galleries/{token}/items/{x.Id}/thumbnail",
                     previewUrl = $"/public/galleries/{token}/items/{x.Id}/preview",
-                    originalUrl = $"/public/galleries/{token}/items/{x.Id}/original"
+                    originalUrl = (string?)null
                 })
             });
         }).AllowAnonymous();
@@ -137,12 +137,15 @@ public static class GalleryEndpoints
             WorkspaceGallery? gallery = store.GetPublished(token);
             GalleryItem? item = gallery?.Items.FirstOrDefault(x => x.Id == itemId && x.IsVisible);
             if (gallery is null || item is null) return Results.NotFound();
+            // Workspace galleries have no pinned Job approval or receivable identity.
+            // Originals are only released through the Job-scoped V1 gallery contract.
+            if (!GalleryProofs.IsProofVariant(variant)) return Results.NotFound();
             GalleryFile? file = store.ResolveFile(gallery, item, variant);
             if (file is null) return Results.NotFound();
             try
             {
-                Stream content = await store.OpenFileAsync(file, cancellationToken);
-                return Results.Stream(content, file.ContentType, enableRangeProcessing: true);
+                await using Stream content = await store.OpenFileAsync(file, cancellationToken);
+                return Results.Bytes(GalleryProofs.Render(content, variant.Equals("thumbnail", StringComparison.OrdinalIgnoreCase)), "image/jpeg");
             }
             catch (StorageException exception) when (exception.Code == "STORAGE-MISSING-001")
             {

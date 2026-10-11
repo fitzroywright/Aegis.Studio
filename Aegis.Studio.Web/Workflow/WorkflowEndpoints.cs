@@ -10,7 +10,7 @@ public static class WorkflowEndpoints
 {
     public static void MapConnectedWorkflow(this WebApplication app)
     {
-        app.MapGet("/api/workflow/capabilities",(ClaimsPrincipal user,WorkflowStore store)=>Results.Ok(new{operations=store.IsOperations(user),frontDesk=store.IsFrontDesk(user)})).RequireAuthorization();
+        app.MapGet("/api/workflow/capabilities",(ClaimsPrincipal user,WorkflowStore store)=>Results.Ok(new{operations=store.IsOperations(user),frontDesk=store.IsFrontDesk(user),finance=store.IsFinance(user),production=store.IsProductionManager(user)})).RequireAuthorization();
         app.MapGet("/api/operations-management",(ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>Run(()=>
         {
             if(!store.IsOperations(user))throw new UnauthorizedAccessException();

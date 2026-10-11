@@ -156,6 +156,7 @@ public sealed class JobAccessService
         bool billing = globalRoles.HasPermission(user, "Billing");
         bool viewAttachments = globalRoles.HasPermission(user, "ViewClientAttachments");
         bool addAttachments = globalRoles.HasPermission(user, "AddClientAttachments");
+        bool productionManager = globalRoles.HasRole(user, StudioRoleNames.ProductionManager);
 
         if (!viewAllJobs && !reply && !notify && !billing && !viewAttachments && !addAttachments)
         {
@@ -173,7 +174,7 @@ public sealed class JobAccessService
             false,
             false,
             false,
-            false,
+            productionManager,
             billing,
             billing,
             billing,

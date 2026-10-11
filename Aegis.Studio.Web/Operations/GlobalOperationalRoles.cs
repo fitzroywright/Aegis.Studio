@@ -13,6 +13,8 @@ public static class StudioRoleNames
     public const string FrontDesk = "Front Desk";
     public const string OperationsManager = "Operations Manager";
     public const string Administrator = "Administrator";
+    public const string FinanceManager = "Finance Manager";
+    public const string ProductionManager = "Production Manager";
 }
 
 public static class StudioPermissions
@@ -33,6 +35,9 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
     private static readonly Guid FrontDeskRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc001");
     private static readonly Guid AdministratorRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc003");
     private static readonly Guid OperationsManagerRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc004");
+
+    private static readonly Guid FinanceManagerRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc005");
+    private static readonly Guid ProductionManagerRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc006");
 
     private readonly StudioDatabase database;
 
@@ -95,6 +100,17 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         EnsureRole(OperationsManagerRoleId, StudioRoleNames.OperationsManager, "Overall Studio operational escalation manager.");
         EnsureRole(AdministratorRoleId, StudioRoleNames.Administrator, "Application security and unrestricted administration.");
 
+        EnsureRole(FinanceManagerRoleId, StudioRoleNames.FinanceManager, "Contractual credit, final delivery authorization and outstanding receivables.");
+        EnsureRole(ProductionManagerRoleId, StudioRoleNames.ProductionManager, "Production dispatch and final technical approval.");
+        foreach (var role in new[] { FinanceManagerRoleId, ProductionManagerRoleId })
+        {
+            EnsurePermission(role, StudioPermissions.Access);
+            EnsurePermission(role, StudioPermissions.ViewAllJobs);
+            EnsurePermission(role, StudioPermissions.ViewClientAttachments);
+            EnsurePermission(role, StudioPermissions.NotifyJobMembers);
+        }
+        EnsurePermission(FinanceManagerRoleId, StudioPermissions.Billing);
+        EnsurePermission(ProductionManagerRoleId, StudioPermissions.AddClientAttachments);
         EnsurePermission(UserRoleId, StudioPermissions.Access);
         foreach (string permission in new[]
         {
@@ -144,6 +160,14 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
                 userName.Trim(),
                 string.IsNullOrWhiteSpace(displayName) ? userName.Trim() : displayName.Trim(),
                 true));
+    }
+
+    public bool HasRole(ClaimsPrincipal user, string role)
+    {
+        if (user.IsInRole(role)) return true;
+        return GetDirectRoleKeysAsync(GetUserName(user)).GetAwaiter().GetResult()
+            .Concat(GetRoleKeysForGroupsAsync(user.FindAll("directory_group").Select(c => c.Value).ToArray()).GetAwaiter().GetResult())
+            .Contains(role, StringComparer.OrdinalIgnoreCase);
     }
 
     public bool HasPermission(ClaimsPrincipal user, string permission)

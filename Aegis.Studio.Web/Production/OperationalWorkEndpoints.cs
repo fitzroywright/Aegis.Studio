@@ -55,7 +55,7 @@ public static class OperationalWorkEndpoints
 
         app.MapPost("/api/jobs/{jobId:guid}/operations/template/{templateName}", (Guid jobId,string templateName,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) =>
         {
-            if(!new WorkflowStore(database,access,new WorkspaceAccessService(database),app.Services.GetRequiredService<Aegis.Studio.Web.Galleries.IClientGalleryPublisher>(),app.Configuration).CanManage(user,jobId)) return Results.Forbid();
+            if(!new GlobalOperationalRoleStore(database).HasRole(user,StudioRoleNames.ProductionManager)) return Results.Forbid();
             OperationalWorkStore store=new(database); if(store.GetActivities(jobId).Count>0) return Results.Ok(store.GetActivities(jobId));
             (string Type,string Title)[] steps=templateName.Trim().ToLowerInvariant() switch
             {

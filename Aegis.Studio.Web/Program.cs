@@ -283,6 +283,7 @@ Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(app.Services.GetRequiredService<
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).MigratePendingJobs();
 app.MapFrontDeskBookingRequests();
 app.MapConnectedWorkflow();
+Aegis.Studio.Web.Finance.FinanceReleaseStore.MapStudioFinance(app);
 app.MapStudioClients();
 app.MapStudioFulfillment();
 app.MapStudioQuotes();

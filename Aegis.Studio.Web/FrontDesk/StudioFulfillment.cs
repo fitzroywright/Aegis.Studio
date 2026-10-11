@@ -15,34 +15,13 @@ public static class StudioFulfillment
               operation_id uuid primary key,job_id uuid not null unique references studio_jobs(id),
               method text not null,recipient text not null,recorded_by text not null,recorded_at timestamptz not null default now());
             """,c))cmd.ExecuteNonQuery();
-        app.MapPost("/api/frontdesk/jobs/{jobId:guid}/fulfillment",(Guid jobId,FulfillmentRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db)=>
+        app.MapPost("/api/frontdesk/jobs/{jobId:guid}/fulfillment",(Guid jobId,FulfillmentRequest request,ClaimsPrincipal user,Aegis.Studio.Web.Workflow.WorkflowStore workflow)=>Aegis.Studio.Web.Workflow.WorkflowEndpoints.Run(()=>
         {
-            if(!access.HasPermission(user,jobId,"ChangeStatus")&&!user.IsInRole("Administrator")&&!new GlobalOperationalRoleStore(db).HasPermission(user,"Billing"))return Results.Forbid();
-            try
-            {
-                Validate(request);string actor=user.FindFirstValue("login_name")??user.Identity?.Name??"Studio";
-                using var c=db.OpenConnection();using var tx=c.BeginTransaction();
-                using var job=new NpgsqlCommand("select status,conversation_id from studio_jobs where id=$1 for update",c,tx);job.Parameters.AddWithValue(jobId);
-                string status;Guid conversation;
-                using(var r=job.ExecuteReader()){if(!r.Read())return Results.NotFound();status=r.GetString(0);conversation=r.GetGuid(1);}
-                using(var prior=new NpgsqlCommand("select job_id from studio_job_fulfillment where operation_id=$1 or job_id=$2",c,tx))
-                {prior.Parameters.AddWithValue(request.OperationId);prior.Parameters.AddWithValue(jobId);if(prior.ExecuteScalar() is Guid existing){if(existing!=jobId)throw new ArgumentException("This operation belongs to another job.");return Results.Ok(new{status="Completed",alreadyApplied=true});}}
-                if(status is not ("Ready for Client" or "Ready for Delivery" or "Published"))throw new ArgumentException("Production must be ready for the customer before recording collection or delivery.");
-                using(var balance=new NpgsqlCommand("""
-                    select coalesce(sum(case when lower(kind) in ('charge','adjustment','discount') then amount
-                      when lower(kind) in ('payment','deposit','refund','reversal') then -amount else 0 end),0)
-                    from studio_financial_events where job_id=$1
-                    """,c,tx))
-                {balance.Parameters.AddWithValue(jobId);if(Convert.ToDecimal(balance.ExecuteScalar())>0)throw new ArgumentException("A balance remains. Take payment before recording collection or delivery.");}
-                MediaProductionStore.Execute(c,tx,"insert into studio_job_fulfillment(operation_id,job_id,method,recipient,recorded_by) values($1,$2,$3,$4,$5)",request.OperationId,jobId,request.Method,request.Recipient.Trim(),actor);
-                MediaProductionStore.Execute(c,tx,"update studio_jobs set status='Completed' where id=$1",jobId);
-                string detail=$"{request.Method} confirmed by {actor}; received by {request.Recipient.Trim()}.";
-                MediaProductionStore.Audit(c,tx,jobId,"CustomerFulfillment",actor,detail);
-                MediaProductionStore.Execute(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'Internal',$4,now())",Guid.NewGuid(),conversation,actor,detail);
-                tx.Commit();return Results.Ok(new{status="Completed"});
-            }
-            catch(ArgumentException error){return Results.BadRequest(new{error=error.Message});}
-        }).RequireAuthorization();
+            Validate(request);
+            if(request.ExpectedRevision is not long revision)throw new ArgumentException("Refresh the Job before recording delivery.");
+            var result=workflow.Execute(jobId,new("deliver",revision,request.OperationId,Method:request.Method,Reference:request.Recipient.Trim()),user);
+            return Results.Ok(new{status=result.GetProperty("stage").GetString(),data=result});
+        })).RequireAuthorization();
     }
     public static void Validate(FulfillmentRequest request)
     {
@@ -51,4 +30,4 @@ public static class StudioFulfillment
         if(string.IsNullOrWhiteSpace(request.Recipient)||request.Recipient.Trim().Length>200)throw new ArgumentException("Record who received the completed order.");
     }
 }
-public sealed record FulfillmentRequest(Guid OperationId,string Method,string Recipient);
+public sealed record FulfillmentRequest(Guid OperationId,string Method,string Recipient,long? ExpectedRevision=null);

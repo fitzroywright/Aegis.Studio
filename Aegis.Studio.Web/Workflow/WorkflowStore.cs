@@ -1,3 +1,4 @@
+using Aegis.Studio.Web.Finance;
 using Aegis.Studio.Web.Galleries;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -11,11 +12,13 @@ using Npgsql;
 namespace Aegis.Studio.Web.Workflow;
 
 public sealed record CrewChange(string UserName,string Role,string? Notes=null,DateTimeOffset? Start=null,DateTimeOffset? End=null);
-public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null,string? Status=null,string? Priority=null,DateTimeOffset? ScheduledAtUtc=null,DateTimeOffset? DueAtUtc=null,string? Description=null,string? BlockedReason=null,string? HandoffTo=null,int? ExpectedFiles=null,int? CompletedFiles=null,int? FailedFiles=null);
+public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null,string? Status=null,string? Priority=null,DateTimeOffset? ScheduledAtUtc=null,DateTimeOffset? DueAtUtc=null,string? Description=null,string? BlockedReason=null,string? HandoffTo=null,int? ExpectedFiles=null,int? CompletedFiles=null,int? FailedFiles=null,decimal? AuthorizedAmount=null,DateOnly? PaymentDueDate=null,string? CreditTerms=null);
 
 public sealed class WorkflowStore(StudioDatabase database,JobAccessService access,WorkspaceAccessService workspaces,IClientGalleryPublisher publisher,IConfiguration configuration)
 {
     public static string Name(ClaimsPrincipal user)=>user.FindFirstValue("login_name")??user.FindFirstValue(ClaimTypes.NameIdentifier)??user.Identity?.Name??throw new UnauthorizedAccessException();
+    public bool IsFinance(ClaimsPrincipal u)=>new GlobalOperationalRoleStore(database).HasRole(u,StudioRoleNames.FinanceManager);
+    public bool IsProductionManager(ClaimsPrincipal u)=>new GlobalOperationalRoleStore(database).HasRole(u,StudioRoleNames.ProductionManager);
     public bool IsOperations(ClaimsPrincipal u)=>u.IsInRole("Operations Manager")||u.HasClaim("permission","studio.deposit.override")||new GlobalOperationalRoleStore(database).GetDirectRoleKeysAsync(Name(u)).GetAwaiter().GetResult().Contains("Operations Manager");
     public bool IsFrontDesk(ClaimsPrincipal u)=>u.IsInRole("Administrator")||IsOperations(u)||u.IsInRole("Front Desk")||new GlobalOperationalRoleStore(database).GetDirectRoleKeysAsync(Name(u)).GetAwaiter().GetResult().Contains("Front Desk");
     public bool Manager(ClaimsPrincipal u,Guid workspace)=>u.IsInRole("Administrator")||IsOperations(u)||workspaces.HasPermission(u,workspace,"ManageMembers")||workspaces.HasPermission(u,workspace,"AdminWorkspace");
@@ -28,7 +31,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
     public object View(Guid job,ClaimsPrincipal u)
     {
         if(!access.HasPermission(u,job,"ViewJob"))throw new UnauthorizedAccessException();
-        using var c=database.OpenConnection();return new {data=Snapshot(c,null,job),canManage=CanManage(u,job),canReview=access.HasPermission(u,job,"ManageProduction")&&access.HasPermission(u,job,"ChangeStatus"),canFrontDesk=IsFrontDesk(u),canOverride=IsOperations(u),canReopen=IsOperations(u),canAssignOwner=Manager(u,((JsonElement)Snapshot(c,null,job)).GetProperty("workspaceId").GetGuid()),userName=Name(u)};
+        using var c=database.OpenConnection();return new {data=Snapshot(c,null,job),canManage=CanManage(u,job),canReview=IsProductionManager(u),canFinance=IsFinance(u),canFrontDesk=IsFrontDesk(u),canOverride=IsOperations(u),canReopen=IsOperations(u),canAssignOwner=Manager(u,((JsonElement)Snapshot(c,null,job)).GetProperty("workspaceId").GetGuid()),userName=Name(u)};
     }
     public IReadOnlyList<object> Monitor(ClaimsPrincipal u)
     {
@@ -60,7 +63,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         Guid workspace;string stage;string? owner,correction;
         using(var q=Command(c,tx,"select workspace_id,status,job_lead,workflow_revision,correction_kind from studio_jobs where id=$1 for update",job))using(var r=q.ExecuteReader())
         {if(!r.Read())throw new KeyNotFoundException();workspace=r.GetGuid(0);stage=r.GetString(1);owner=r.IsDBNull(2)?null:r.GetString(2);if(r.GetInt64(3)!=request.ExpectedRevision)throw new WorkflowConflictException();correction=r.IsDBNull(4)?null:r.GetString(4);}
-        bool manager=Manager(user,workspace),manage=manager||string.Equals(owner,actor,StringComparison.OrdinalIgnoreCase),review=access.HasPermission(user,job,"ManageProduction")&&access.HasPermission(user,job,"ChangeStatus");
+        bool manager=Manager(user,workspace),manage=manager||string.Equals(owner,actor,StringComparison.OrdinalIgnoreCase),review=IsProductionManager(user);
         // Destination managers may decide a pending transfer before acquiring Job access.
         bool destinationTransferReviewer=request.Action=="decide-transfer"&&
             Exists(c,tx,"select exists(select 1 from studio_workflow_transfer_requests r where r.id=$1 and r.job_id=$2 and r.status='Pending' and r.source_workspace_id=$3)",request.AssignmentRequestId,job,workspace)&&
@@ -72,6 +75,19 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         bool stateAction=false;
         switch(request.Action)
         {
+            case "authorize-finance":
+                if(!IsFinance(user))throw new UnauthorizedAccessException();
+                if(stage=="Cancelled")throw new ArgumentException("Cannot authorize delivery for a cancelled Job.");
+                if(request.AuthorizedAmount is not decimal authorizedAmount||request.PaymentDueDate is not DateOnly paymentDueDate)throw new ArgumentException("Amount and payment due date are required.");
+                FinanceReleaseStore.Authorize(c,tx,job,request.OperationId,actor,new(authorizedAmount,request.Kind??"",request.CreditTerms??"",paymentDueDate,request.Reference??"",request.Reason??""));
+                Notify(c,tx,job,request.OperationId.ToString(),"Owner","Finance authorized final delivery; receivable remains outstanding");
+                break;
+            case "revoke-finance":
+                if(!IsFinance(user))throw new UnauthorizedAccessException();RequireReason(request);
+                if(request.TaskId is not Guid authorizationId||!Exists(c,tx,"select exists(select 1 from studio_finance_authorizations where id=$1 and job_id=$2 and revoked_at_utc is null)",authorizationId,job))throw new ArgumentException("Choose an active Finance authorization for this Job.");
+                Sql(c,tx,"update studio_finance_authorizations set revoked_at_utc=now(),revoked_by=$3,revocation_reason=$4 where id=$1 and job_id=$2",authorizationId,job,actor,request.Reason);
+                Notify(c,tx,job,request.OperationId.ToString(),"Owner","Finance final delivery authorization revoked");
+                break;
             case "owner":
                 if(!manager)throw new UnauthorizedAccessException();EnsureMutable(stage);
                 if(!string.IsNullOrWhiteSpace(request.UserName))RequireEmployee(request.UserName);
@@ -105,10 +121,10 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
             case "task-progress":
                 EnsureMutable(stage);
                 if(request.TaskId is not Guid progressTask)throw new ArgumentException("Choose a task.");
-                string? assignee;
-                using(var q=Command(c,tx,"select assigned_to from studio_job_activities where id=$1 and job_id=$2 for update",progressTask,job))using(var reader=q.ExecuteReader())
-                {if(!reader.Read())throw new KeyNotFoundException();assignee=reader.IsDBNull(0)?null:reader.GetString(0);}
-                if(!manage&&!review&&!string.Equals(assignee,actor,StringComparison.OrdinalIgnoreCase))throw new UnauthorizedAccessException();
+                string? assignee;string taskKind;
+                using(var q=Command(c,tx,"select assigned_to,activity_type from studio_job_activities where id=$1 and job_id=$2 for update",progressTask,job))using(var reader=q.ExecuteReader())
+                {if(!reader.Read())throw new KeyNotFoundException();assignee=reader.IsDBNull(0)?null:reader.GetString(0);taskKind=reader.GetString(1);}
+                if(!ProductionAuthorityRules.CanReport(review,manage,string.Equals(assignee,actor,StringComparison.OrdinalIgnoreCase),taskKind))throw new UnauthorizedAccessException();
                 if(request.Status is not ("NotStarted" or "Scheduled" or "InProgress" or "Blocked" or "Completed" or "Cancelled" or "WaitingOnCustomer" or "ReworkRequired" or "Partial" or "Failed" or "ReprintRequired" or "ReadyForDelivery" or "Archived"))throw new ArgumentException("Choose a supported task status.");
                 if(request.Status=="Blocked"&&string.IsNullOrWhiteSpace(request.BlockedReason))throw new ArgumentException("Record the blocked reason.");
                 CommercialTemplateStore.GuardTask(c,tx,progressTask,request.Status!);
@@ -119,6 +135,8 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(!manage&&!review)throw new UnauthorizedAccessException();EnsureMutable(stage);
                 if(string.IsNullOrWhiteSpace(request.Title)||request.Title.Length>200)throw new ArgumentException("Task title is required (maximum 200 characters).");
                 if(!string.IsNullOrWhiteSpace(request.UserName))RequireEmployee(request.UserName);
+                string? existingTaskKind=request.TaskId.HasValue?Scalar(c,tx,"select activity_type from studio_job_activities where id=$1 and job_id=$2",request.TaskId,job) as string:null;
+                if(!ProductionAuthorityRules.CanDispatch(review,manage,existingTaskKind,request.Kind))throw new UnauthorizedAccessException("Production Manager authorization is required to dispatch production work.");
                 Guid task=request.TaskId??Guid.NewGuid();
                 if(request.TaskId.HasValue&&Exists(c,tx,"select exists(select 1 from studio_job_activities where id=$1 and job_id<>$2)",task,job))throw new ArgumentException("Task belongs to another Job.");
                 Sql(c,tx,"""
@@ -134,11 +152,13 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 Sql(c,tx,"insert into studio_workflow_assignment_requests(id,job_id,task_id,user_name,kind,note) values($1,$2,$3,$4,$5,$6) on conflict do nothing",request.OperationId,job,request.TaskId,actor,request.Kind,request.Reason);
                 Notify(c,tx,job,request.OperationId.ToString(),request.Kind=="Owner"||string.IsNullOrWhiteSpace(owner)?"Manager":"Owner","Assignment requested");break;
             case "decide-request":
-                if(!manage)throw new UnauthorizedAccessException();RequireReason(request);
+                if(!manage&&!review)throw new UnauthorizedAccessException();EnsureMutable(stage);RequireReason(request);
                 string requester,requestKind;Guid? requestedTask;
                 using(var q=Command(c,tx,"select user_name,kind,task_id from studio_workflow_assignment_requests where id=$1 and job_id=$2 and status='Pending' for update",request.AssignmentRequestId,job))using(var r=q.ExecuteReader())
                 {if(!r.Read())throw new ArgumentException("This request is no longer pending.");requester=r.GetString(0);requestKind=r.GetString(1);requestedTask=r.IsDBNull(2)?null:r.GetGuid(2);}
                 if(request.Method is not ("Approved" or "Rejected" or "Redirected"))throw new ArgumentException("Choose an assignment decision.");
+                if(requestKind=="Task"&&!ProductionAuthorityRules.CanDispatch(review,manage,Scalar(c,tx,"select activity_type from studio_job_activities where id=$1 and job_id=$2",requestedTask,job) as string,null))throw new UnauthorizedAccessException();
+                if(requestKind=="Photographer"&&!manage)throw new UnauthorizedAccessException();
                 if(requestKind=="Owner"&&!manager)throw new UnauthorizedAccessException();
                 if(request.Method=="Redirected")
                 {
@@ -313,6 +333,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(configuration["ClientGallery:Provider"]!="Manifest")throw new ArgumentException("Configure the existing gallery provider before publication.");
                 Publish(c,tx,job,request.OperationId,actor,publisher);break;
             case "deliver":
+                FinanceReleaseStore.Require(c,tx,job);
                 CommercialTemplateStore.GuardPublication(c,tx,job);
                 if(!IsFrontDesk(user)&&!manage)throw new UnauthorizedAccessException();
                 if(request.Method=="Gallery"&&!Exists(c,tx,"select exists(select 1 from studio_workflow_publications where job_id=$1)",job))throw new ArgumentException("Publish the approved gallery before recording Gallery delivery.");
@@ -331,6 +352,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 Sql(c,tx,"insert into studio_workflow_delivery_requirements(id,job_id,title,required,created_by) values($1,$2,$3,true,$4)",request.OperationId,job,request.Title.Trim(),actor);
                 break;
             case "complete-delivery":
+                FinanceReleaseStore.Require(c,tx,job);
                 if(!manage&&!IsFrontDesk(user))throw new UnauthorizedAccessException();
                 if(stage is not ("Ready for Delivery" or "Delivered"))throw new ArgumentException("Approve the finished work before delivery.");
                 if(request.TaskId is not Guid deliveryId)throw new ArgumentException("Choose a deliverable.");
