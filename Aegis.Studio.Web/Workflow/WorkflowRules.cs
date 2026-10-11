@@ -9,6 +9,7 @@ public static class WorkflowRules
     public static readonly string[] Stages=["Pending","Needs Assignment","Needs Photographer Assignment","Awaiting Scheduling","Scheduled","Photography In Progress","Awaiting Upload","Awaiting Production Review","Active Production","Awaiting Approval","Changes Requested","Ready for Delivery","Delivered","Completed","Cancelled"];
     public static bool Inactive(string stage)=>stage is "Completed" or "Cancelled";
     public static bool DepositEligible(decimal received)=>received>0;
+    public static bool DepositEligible(decimal received,decimal required)=>required>=0&&received>=required;
     public static void ValidateThreshold(WorkflowThreshold t)
     {
         if(!Stages.Contains(t.Stage)||t.Policy!="Elapsed"||!double.IsFinite(t.WarningHours)||!double.IsFinite(t.OverdueHours)||t.WarningHours<=0||t.OverdueHours<=t.WarningHours)

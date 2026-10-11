@@ -273,11 +273,17 @@ public sealed class WorkDayLocalStore
     }
     public async Task<List<LocalOperation>> PendingAsync()
     {
-        List<LocalOperation> values=await db.Table<LocalOperation>().Where(x=>x.State==nameof(LocalSyncState.Pending)||x.State==nameof(LocalSyncState.Failed)).OrderBy(x=>x.OccurredAtUtc).ToListAsync();
+        List<LocalOperation> values=await db.Table<LocalOperation>().Where(x=>x.State==nameof(LocalSyncState.Pending)||x.State==nameof(LocalSyncState.Failed)||x.State==nameof(LocalSyncState.Sending)).OrderBy(x=>x.OccurredAtUtc).ToListAsync();
         foreach(LocalOperation value in values) await UnprotectOperationAsync(value);
         return values;
     }
     public async Task<DateTimeOffset?> OldestPendingOperationAsync()=> (await PendingAsync()).FirstOrDefault()?.OccurredAtUtc;
+    public async Task<List<LocalOperation>> UnacknowledgedAsync()
+    {
+        List<LocalOperation> values=await db.Table<LocalOperation>().Where(x=>x.State!=nameof(LocalSyncState.Acknowledged)).OrderBy(x=>x.OccurredAtUtc).ToListAsync();
+        foreach(LocalOperation value in values)await UnprotectOperationAsync(value);
+        return values;
+    }
     public async Task SaveOperationAsync(LocalOperation operation)
     {
         await ProtectOperationAsync(operation);

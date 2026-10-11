@@ -13,11 +13,12 @@ public static class WorkDayEndpoints
     {
         RouteGroupBuilder group=app.MapGroup("/api/workday").RequireAuthorization();
 
-        group.MapPost("/device-session",(ClaimsPrincipal user,WorkDayDeviceSessionRequest request,WorkDayStore store,IConfiguration configuration)=>
+        group.MapPost("/device-session",(ClaimsPrincipal user,WorkDayDeviceSessionRequest request,WorkDayStore store,StudioDatabase db,IConfiguration configuration)=>
         {
             if(string.Equals(user.Identity?.AuthenticationType,"WorkDayDeviceToken",StringComparison.OrdinalIgnoreCase))
                 return Results.Forbid();
             if(string.IsNullOrWhiteSpace(request.DeviceId)) return Results.BadRequest(new{error="DeviceId is required."});
+            if(new PhotographerStore(db).Get(UserName(user)) is not { IsActive:true })return Results.Forbid();
             int days=Math.Clamp(configuration.GetValue<int?>("WorkDay:DeviceSessionDays")??30,1,90);
             var issued=store.IssueDeviceSession(UserName(user),request.DeviceId,TimeSpan.FromDays(days));
             return Results.Ok(new WorkDayDeviceSessionResponse(issued.SessionId,issued.Token,issued.ExpiresAtUtc));
@@ -80,6 +81,10 @@ public static class WorkDayEndpoints
         group.MapPost("/operations",(ClaimsPrincipal user,WorkDayOperationRequest request,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,StudioOperationsFlowPublisher flows,JobAccessService access,IConfiguration configuration)=>
         {
             string userName=UserName(user);
+            if(!WorkDaySemantics.IsPhotographerOperation(request.Kind)||request.AssignmentId is null)
+                return Results.BadRequest(new{error="WorkDay reports photographer assignments; a supported action and assignment are required."});
+            if(user.Identity?.AuthenticationType=="WorkDayDeviceToken"&&user.FindFirstValue("workday_device_id")!=request.DeviceId)
+                return Results.Forbid();
             bool locationEnabled=configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled") ?? false;
             if(!locationEnabled && request.Kind==WorkDayOperationKind.LocationObservation)
                 return Results.BadRequest(new{error="WorkDay location tracking is disabled."});
@@ -334,7 +339,7 @@ public static class WorkDayEndpoints
             {
                 WorkDayAssignment[] assignments=entries
                     .Where(x=>x.ResourceIds.Contains(profile.ScheduleResourceId))
-                    .Select(x=>MapAssignment(x,db,store))
+                    .Select(x=>MapAssignment(x,db,store,profile.UserName))
                     .ToArray();
                 latest.TryGetValue(profile.UserName,out WorkDayClientStatus? client);
                 capacity.TryGetValue(profile.ScheduleResourceId,out StaffCapacitySnapshot? cap);
@@ -442,7 +447,7 @@ public static class WorkDayEndpoints
         if(jobId is not Guid effectiveJobId) return null;
 
         if(!access.HasPermission(user,effectiveJobId,"ViewJob")) return null;
-        return MapAssignment(entry,db,store);
+        return MapAssignment(entry,db,store,profile.UserName);
     }
 
     private static Guid? ResolveAssignmentJobId(ScheduleEntry entry,StudioDatabase db)
@@ -458,18 +463,19 @@ public static class WorkDayEndpoints
 
     private static string RequiredJobPermission(WorkDayOperationKind kind)=>kind switch
     {
-        WorkDayOperationKind.AcceptAssignment=>"ManageProduction",
-        WorkDayOperationKind.Arrive=>"ManageProduction",
-        WorkDayOperationKind.StartSession=>"ManageProduction",
-        WorkDayOperationKind.CompleteSession=>"ManageProduction",
-        WorkDayOperationKind.AddNote=>"ManageProduction",
-        WorkDayOperationKind.RecordException=>"ManageProduction",
-        WorkDayOperationKind.SetExceptionStatus=>"ManageProduction",
-        WorkDayOperationKind.LocationObservation=>"ManageProduction",
+        WorkDayOperationKind.AcceptAssignment=>"ViewJob",
+        WorkDayOperationKind.DeclineAssignment=>"ViewJob",
+        WorkDayOperationKind.Arrive=>"ViewJob",
+        WorkDayOperationKind.StartSession=>"ViewJob",
+        WorkDayOperationKind.CompleteSession=>"ViewJob",
+        WorkDayOperationKind.AddNote=>"ViewJob",
+        WorkDayOperationKind.RecordException=>"ViewJob",
+        WorkDayOperationKind.SetExceptionStatus=>"ViewJob",
+        WorkDayOperationKind.LocationObservation=>"ViewJob",
         _=>"ViewJob"
     };
 
-    private static WorkDayAssignment MapAssignment(ScheduleEntry e,StudioDatabase db,WorkDayStore store)
+    private static WorkDayAssignment MapAssignment(ScheduleEntry e,StudioDatabase db,WorkDayStore store,string userName)
     {
         string? customer=null,email=null,phone=null;
         Guid? workspace=null,conversation=null;
@@ -505,10 +511,10 @@ public static class WorkDayEndpoints
         }
 
         Guid? effectiveJobId=ResolveAssignmentJobId(e,db);
-        var state=store.GetAssignmentState(e.Id);
+        var state=store.GetAssignmentState(e.Id,userName);
         return new(
             e.Id,effectiveJobId,e.BookingId,e.Title,e.StartsAtUtc,e.EndsAtUtc,e.Location,
-            state?.Status??e.Status,e.Notes,workspace,conversation,customer,email,phone,state?.Version??0);
+            state?.Status??WorkDaySemantics.InitialStatus(e.Status),e.Notes,workspace,conversation,customer,email,phone,state?.Version??0);
     }
 
     private static WorkDayLocationTrackingMode ParseTrackingMode(string? value)=>

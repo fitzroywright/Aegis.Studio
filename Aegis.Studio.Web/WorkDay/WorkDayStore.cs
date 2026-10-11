@@ -41,6 +41,17 @@ public sealed class WorkDayStore(StudioDatabase database)
           assignment_id uuid primary key, status text not null, version bigint not null default 1,
           changed_by text not null, changed_at_utc timestamptz not null, last_operation_id uuid not null);
 
+        create table if not exists studio_workday_photographer_state(
+          assignment_id uuid not null, user_name text not null, status text not null,
+          version bigint not null, changed_at_utc timestamptz not null, last_operation_id uuid not null,
+          primary key(assignment_id,user_name));
+        -- Attribute legacy evidence to its actual reporter, never every photographer.
+        insert into studio_workday_photographer_state
+          select assignment_id,lower(changed_by),status,version,changed_at_utc,last_operation_id
+          from studio_workday_assignment_state on conflict do nothing;
+        alter table studio_workday_operations add column if not exists fingerprint text;
+        alter table studio_workday_notes alter constraint studio_workday_notes_operation_id_fkey deferrable initially deferred;
+
         create table if not exists studio_workday_device_sessions(
           id uuid primary key, user_name text not null, device_id text not null,
           token_hash text not null unique, created_at_utc timestamptz not null,
@@ -101,11 +112,11 @@ public sealed class WorkDayStore(StudioDatabase database)
         q.Parameters.AddWithValue(userName);q.Parameters.AddWithValue(deviceId);q.ExecuteNonQuery();
     }
 
-    public (string Status, long Version)? GetAssignmentState(Guid assignmentId)
+    public (string Status, long Version)? GetAssignmentState(Guid assignmentId,string userName)
     {
         using NpgsqlConnection c=database.OpenConnection(); using NpgsqlCommand cmd=c.CreateCommand();
-        cmd.CommandText="select status,version from studio_workday_assignment_state where assignment_id=$1";
-        cmd.Parameters.AddWithValue(assignmentId);
+        cmd.CommandText="select status,version from studio_workday_photographer_state where assignment_id=$1 and user_name=lower($2)";
+        cmd.Parameters.AddWithValue(assignmentId);cmd.Parameters.AddWithValue(userName);
         using NpgsqlDataReader r=cmd.ExecuteReader();
         return r.Read() ? (r.GetString(0), r.GetInt64(1)) : null;
     }
@@ -381,123 +392,112 @@ public sealed class WorkDayStore(StudioDatabase database)
 
     public WorkDayOperationResult Apply(string userName, WorkDayOperationRequest request)
     {
-        if(request.OperationId==Guid.Empty) throw new InvalidOperationException("OperationId is required.");
-        if(string.IsNullOrWhiteSpace(request.DeviceId)) throw new InvalidOperationException("DeviceId is required.");
-        using NpgsqlConnection c=database.OpenConnection(); using NpgsqlTransaction tx=c.BeginTransaction();
-
-        WorkDayOperationResult? replay = null;
-        using(NpgsqlCommand existing=c.CreateCommand())
+        if(request.OperationId==Guid.Empty || string.IsNullOrWhiteSpace(request.DeviceId))
+            throw new InvalidOperationException("OperationId and DeviceId are required.");
+        if(!WorkDaySemantics.IsPhotographerOperation(request.Kind) || request.AssignmentId is not Guid assignmentId)
+            throw new InvalidOperationException("Choose a photographer assignment reporting operation.");
+        if(request.OccurredAtUtc==default || request.OccurredAtUtc>DateTimeOffset.UtcNow.AddMinutes(5))
+            throw new InvalidOperationException("A valid event timestamp is required.");
+        if((request.Text?.Length??0)>4000)throw new InvalidOperationException("Operational notes may contain at most 4000 characters.");
+        if(request.Kind is WorkDayOperationKind.DeclineAssignment or WorkDayOperationKind.SetExceptionStatus or WorkDayOperationKind.RecordException or WorkDayOperationKind.AddNote)
+            if(string.IsNullOrWhiteSpace(request.Text))throw new InvalidOperationException("A reason or note is required.");
+        string actor=userName.Trim().ToLowerInvariant();
+        string fingerprint=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(actor+System.Text.Json.JsonSerializer.Serialize(request))));
+        using NpgsqlConnection c=database.OpenConnection();using NpgsqlTransaction tx=c.BeginTransaction();
+        using(var opLock=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",c,tx))
+        {opLock.Parameters.AddWithValue("workday-operation:"+request.OperationId);opLock.ExecuteNonQuery();}
+        using(var existing=new NpgsqlCommand("select user_name,fingerprint,state,result_message,server_version,coalesce(acknowledged_at_utc,received_at_utc),kind,assignment_id,occurred_at_utc,device_id,text_value,category,expected_version from studio_workday_operations where operation_id=$1",c,tx))
         {
-            existing.Transaction=tx; existing.CommandText="select state,result_message,server_version,coalesce(acknowledged_at_utc,received_at_utc) from studio_workday_operations where operation_id=$1";
-            existing.Parameters.AddWithValue(request.OperationId);
-            using NpgsqlDataReader r=existing.ExecuteReader();
+            existing.Parameters.AddWithValue(request.OperationId);using var r=existing.ExecuteReader();
             if(r.Read())
             {
-                replay=new WorkDayOperationResult(
-                    request.OperationId,
-                    Enum.Parse<WorkDayOperationState>(r.GetString(0)),
-                    r.GetFieldValue<DateTimeOffset>(3),
-                    r.IsDBNull(1)?null:r.GetString(1),
-                    r.IsDBNull(2)?null:r.GetInt64(2));
+                bool same=r.GetString(0).Equals(actor,StringComparison.OrdinalIgnoreCase) &&
+                    (!r.IsDBNull(1)?r.GetString(1)==fingerprint:
+                        r.GetString(6)==request.Kind.ToString()&&!r.IsDBNull(7)&&r.GetGuid(7)==assignmentId&&
+                        r.GetFieldValue<DateTimeOffset>(8)==request.OccurredAtUtc&&r.GetString(9)==request.DeviceId&&
+                        (r.IsDBNull(10)?null:r.GetString(10))==request.Text&&
+                        (r.IsDBNull(11)?null:r.GetString(11))==request.Category&&
+                        (r.IsDBNull(12)?(long?)null:r.GetInt64(12))==request.ExpectedVersion&&request.Location is null);
+                if(!same)throw new InvalidOperationException("This operation ID was used for different facts or another photographer.");
+                return new(request.OperationId,Enum.Parse<WorkDayOperationState>(r.GetString(2)),r.GetFieldValue<DateTimeOffset>(5),r.IsDBNull(3)?null:r.GetString(3),r.IsDBNull(4)?null:r.GetInt64(4));
             }
         }
-        if(replay is not null)
+        Guid job;string stage;
+        // Serialize with Studio workflow commands before locking the schedule entry.
+        using(var jobLock=new NpgsqlCommand("select j.id,j.status from studio_jobs j join studio_schedule_entries e on e.job_id=j.id where e.id=$1 for update of j",c,tx))
         {
-            tx.Commit();
-            return replay;
+            jobLock.Parameters.AddWithValue(assignmentId);using var r=jobLock.ExecuteReader();
+            if(!r.Read())throw new InvalidOperationException("This assignment has no operational Job.");
+            job=r.GetGuid(0);stage=r.GetString(1);
         }
+        if(stage is "Completed" or "Cancelled")throw new InvalidOperationException("Closed Jobs require an authorized reopening before reporting changes.");
+        using(var assignmentLock=new NpgsqlCommand("select e.id from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id join studio_photographers p on p.schedule_resource_id=er.resource_id where e.id=$1 and p.is_active and lower(p.user_name)=$2 and e.status<>'Cancelled' for update of e",c,tx))
+        {
+            assignmentLock.Parameters.AddWithValue(assignmentId);assignmentLock.Parameters.AddWithValue(actor);
+            if(assignmentLock.ExecuteScalar() is null)throw new InvalidOperationException("You are no longer an active photographer on this assignment.");
+        }
+        using(var attribution=new NpgsqlCommand("select set_config('studio.actor',$1,true),set_config('studio.reason',$2,true)",c,tx))
+        {attribution.Parameters.AddWithValue(actor);attribution.Parameters.AddWithValue("WorkDay "+request.Kind+": "+(request.Text??""));attribution.ExecuteNonQuery();}
 
-        DateTimeOffset now=DateTimeOffset.UtcNow;
+        string? next=request.Kind switch
+        {
+            WorkDayOperationKind.AcceptAssignment=>"Accepted",WorkDayOperationKind.DeclineAssignment=>"Declined",
+            WorkDayOperationKind.Arrive=>"Arrived",WorkDayOperationKind.StartSession=>"InProgress",
+            WorkDayOperationKind.CompleteSession=>"Completed",
+            WorkDayOperationKind.SetExceptionStatus=>WorkDaySemantics.NormalizeExceptionStatus(request.Category),_=>null
+        };
+        if(request.Kind==WorkDayOperationKind.SetExceptionStatus&&next is null)
+            throw new InvalidOperationException("Choose a supported exception status.");
         long? version=null;
-        string message="Acknowledged";
-
-        if(request.Kind is WorkDayOperationKind.WorkSignIn)
+        if(next is not null)
         {
-            using(NpgsqlCommand userLock=c.CreateCommand())
-            {
-                userLock.Transaction=tx;
-                userLock.CommandText="select pg_advisory_xact_lock(hashtext(lower($1)))";
-                userLock.Parameters.AddWithValue(userName);
-                userLock.ExecuteNonQuery();
-            }
-            using NpgsqlCommand active=c.CreateCommand(); active.Transaction=tx;
-            active.CommandText="select id from studio_workday_work_sessions where lower(user_name)=lower($1) and ended_at_utc is null limit 1"; active.Parameters.AddWithValue(userName);
-            object? activeId=active.ExecuteScalar();
-            if(activeId is not null) message="Work session already active.";
-            else
-            {
-                Guid sessionId=Guid.NewGuid();
-                using NpgsqlCommand ins=c.CreateCommand(); ins.Transaction=tx;
-                ins.CommandText="insert into studio_workday_work_sessions(id,user_name,started_at_utc,device_id,started_offline,source,updated_at_utc) values($1,$2,$3,$4,$5,'mobile',now())";
-                ins.Parameters.AddWithValue(sessionId);ins.Parameters.AddWithValue(userName);ins.Parameters.AddWithValue(request.OccurredAtUtc);ins.Parameters.AddWithValue(request.DeviceId);ins.Parameters.AddWithValue(request.Text=="offline");ins.ExecuteNonQuery();
-                SaveLocation(c,tx,userName,sessionId,request,null);
-            }
+            long currentVersion=0;string? currentStatus=null;
+            using(var state=new NpgsqlCommand("select status,version from studio_workday_photographer_state where assignment_id=$1 and user_name=$2 for update",c,tx))
+            {state.Parameters.AddWithValue(assignmentId);state.Parameters.AddWithValue(actor);using var r=state.ExecuteReader();if(r.Read()){currentStatus=r.GetString(0);currentVersion=r.GetInt64(1);}}
+            if(request.ExpectedVersion is not long expected || expected!=currentVersion)
+                return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,$"Version conflict. Client {request.ExpectedVersion}; server {currentVersion}.",currentVersion);
+            if(!WorkDaySemantics.CanTransition(currentStatus,next))
+                throw new InvalidOperationException($"Invalid photographer transition from {WorkDaySemantics.InitialStatus(currentStatus)} to {next}.");
+            if(request.Kind is WorkDayOperationKind.Arrive or WorkDayOperationKind.StartSession or WorkDayOperationKind.CompleteSession)
+                if(stage is not ("Scheduled" or "Photography In Progress"))throw new InvalidOperationException("Photography reporting requires a scheduled active Job.");
+            version=currentVersion+1;
+            using(var up=new NpgsqlCommand("insert into studio_workday_photographer_state values($1,$2,$3,$4,$5,$6) on conflict(assignment_id,user_name) do update set status=excluded.status,version=excluded.version,changed_at_utc=excluded.changed_at_utc,last_operation_id=excluded.last_operation_id",c,tx))
+            {up.Parameters.AddWithValue(assignmentId);up.Parameters.AddWithValue(actor);up.Parameters.AddWithValue(next);up.Parameters.AddWithValue(version.Value);up.Parameters.AddWithValue(request.OccurredAtUtc);up.Parameters.AddWithValue(request.OperationId);up.ExecuteNonQuery();}
         }
-        else if(request.Kind is WorkDayOperationKind.WorkSignOut)
+        if(request.Kind is WorkDayOperationKind.AddNote or WorkDayOperationKind.RecordException or WorkDayOperationKind.DeclineAssignment or WorkDayOperationKind.SetExceptionStatus)
         {
-            Guid? sessionId=null;
-            using(NpgsqlCommand find=c.CreateCommand()){find.Transaction=tx;find.CommandText="select id from studio_workday_work_sessions where lower(user_name)=lower($1) and ended_at_utc is null order by started_at_utc desc limit 1";find.Parameters.AddWithValue(userName);object? v=find.ExecuteScalar();if(v is Guid g)sessionId=g;}
-            if(sessionId is null) message="No active work session.";
-            else
-            {
-                using NpgsqlCommand upd=c.CreateCommand();upd.Transaction=tx;upd.CommandText="update studio_workday_work_sessions set ended_at_utc=$2,ended_offline=$3,updated_at_utc=now() where id=$1";upd.Parameters.AddWithValue(sessionId.Value);upd.Parameters.AddWithValue(request.OccurredAtUtc);upd.Parameters.AddWithValue(request.Text=="offline");upd.ExecuteNonQuery();
-                SaveLocation(c,tx,userName,sessionId,request,null);
-            }
+            using var note=new NpgsqlCommand("insert into studio_workday_notes(id,operation_id,user_name,assignment_id,note_type,category,body,occurred_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8)",c,tx);
+            note.Parameters.AddWithValue(Guid.NewGuid());note.Parameters.AddWithValue(request.OperationId);note.Parameters.AddWithValue(actor);note.Parameters.AddWithValue(assignmentId);note.Parameters.AddWithValue(request.Kind.ToString());note.Parameters.AddWithValue((object?)request.Category??DBNull.Value);note.Parameters.AddWithValue(request.Text!);note.Parameters.AddWithValue(request.OccurredAtUtc);note.ExecuteNonQuery();
         }
-        else if(request.Kind is WorkDayOperationKind.LocationObservation)
+        if(request.Kind is WorkDayOperationKind.StartSession or WorkDayOperationKind.CompleteSession)
         {
-            Guid? sessionId=null; using(NpgsqlCommand find=c.CreateCommand()){find.Transaction=tx;find.CommandText="select id from studio_workday_work_sessions where lower(user_name)=lower($1) and ended_at_utc is null limit 1";find.Parameters.AddWithValue(userName);object? v=find.ExecuteScalar();if(v is Guid g)sessionId=g;}
-            SaveLocation(c,tx,userName,sessionId,request,request.AssignmentId);
+            // Completion is per photographer. Every currently assigned photographer must finish.
+            using var shoot=new NpgsqlCommand("""
+                update studio_shoot_sessions s set
+                  status=case when $2='StartSession' then 'InProgress' else 'ShootComplete' end,
+                  checked_in_at_utc=coalesce(checked_in_at_utc,$3),
+                  checked_out_at_utc=case when $2='CompleteSession' then coalesce(checked_out_at_utc,$3) else checked_out_at_utc end,
+                  updated_at_utc=now()
+                where s.schedule_entry_id=$1 and s.status<>'Cancelled' and s.checked_out_at_utc is null
+                  and ($2='StartSession' or not exists(
+                    select 1 from studio_schedule_entry_resources er join studio_photographers p on p.schedule_resource_id=er.resource_id
+                    where er.entry_id=$1 and not exists(select 1 from studio_workday_photographer_state ps
+                      where ps.assignment_id=$1 and ps.user_name=lower(p.user_name) and ps.status='Completed')))
+                """,c,tx);
+            shoot.Parameters.AddWithValue(assignmentId);shoot.Parameters.AddWithValue(request.Kind.ToString());shoot.Parameters.AddWithValue(request.OccurredAtUtc);shoot.ExecuteNonQuery();
+            Aegis.Studio.Web.Production.JobShootLifecycle.Advance(c,tx,job,actor);
         }
-        else if(request.AssignmentId is Guid assignmentId)
+        string body=$"{actor}: {request.Kind} at {request.OccurredAtUtc:O}. {request.Text}";
+        foreach(string audience in new[]{"Owner","Manager"})
         {
-            string? next=request.Kind switch
-            {
-                WorkDayOperationKind.AcceptAssignment=>"Accepted",
-                WorkDayOperationKind.Arrive=>"Arrived",
-                WorkDayOperationKind.StartSession=>"InProgress",
-                WorkDayOperationKind.CompleteSession=>"Completed",
-                WorkDayOperationKind.SetExceptionStatus=>WorkDaySemantics.NormalizeExceptionStatus(request.Category),
-                _=>null
-            };
-            if(request.Kind==WorkDayOperationKind.SetExceptionStatus && next is null)
-                throw new InvalidOperationException("Exception status must be Cancelled, NoShow, Delayed or UnableToComplete.");
-            if(next is not null)
-            {
-                long currentVersion=0; string? currentStatus=null;
-                using(NpgsqlCommand q=c.CreateCommand())
-                {
-                    q.Transaction=tx;q.CommandText="select status,version from studio_workday_assignment_state where assignment_id=$1";q.Parameters.AddWithValue(assignmentId);
-                    using NpgsqlDataReader r=q.ExecuteReader();if(r.Read()){currentStatus=r.GetString(0);currentVersion=r.GetInt64(1);}
-                }
-                if(request.ExpectedVersion is long expected && currentVersion>0 && expected!=currentVersion)
-                {
-                    tx.Rollback();return new(request.OperationId,WorkDayOperationState.Conflict,now,$"Version conflict. Client {expected}; server {currentVersion}.",currentVersion);
-                }
-                if(!WorkDaySemantics.CanTransition(currentStatus,next))
-                    throw new InvalidOperationException($"Invalid WorkDay status transition from {WorkDaySemantics.InitialStatus(currentStatus)} to {next}.");
-                version=currentVersion+1;
-                using NpgsqlCommand up=c.CreateCommand();up.Transaction=tx;
-                up.CommandText="insert into studio_workday_assignment_state(assignment_id,status,version,changed_by,changed_at_utc,last_operation_id) values($1,$2,$3,$4,$5,$6) on conflict(assignment_id) do update set status=excluded.status,version=excluded.version,changed_by=excluded.changed_by,changed_at_utc=excluded.changed_at_utc,last_operation_id=excluded.last_operation_id";
-                up.Parameters.AddWithValue(assignmentId);up.Parameters.AddWithValue(next);up.Parameters.AddWithValue(version.Value);up.Parameters.AddWithValue(userName);up.Parameters.AddWithValue(request.OccurredAtUtc);up.Parameters.AddWithValue(request.OperationId);up.ExecuteNonQuery();
-            }
-            if(request.Kind is WorkDayOperationKind.AddNote or WorkDayOperationKind.RecordException)
-            {
-                if(string.IsNullOrWhiteSpace(request.Text)) throw new InvalidOperationException("Text is required.");
-                using NpgsqlCommand note=c.CreateCommand();note.Transaction=tx;note.CommandText="insert into studio_workday_notes(id,operation_id,user_name,assignment_id,note_type,category,body,occurred_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8)";note.Parameters.AddWithValue(Guid.NewGuid());note.Parameters.AddWithValue(request.OperationId);note.Parameters.AddWithValue(userName);note.Parameters.AddWithValue(assignmentId);note.Parameters.AddWithValue(request.Kind==WorkDayOperationKind.AddNote?"InternalNote":"Exception");note.Parameters.AddWithValue((object?)request.Category??DBNull.Value);note.Parameters.AddWithValue(request.Text);note.Parameters.AddWithValue(request.OccurredAtUtc);note.ExecuteNonQuery();
-            }
-            if(request.Kind is WorkDayOperationKind.StartSession or WorkDayOperationKind.CompleteSession)
-            {
-                using var shoot=new NpgsqlCommand("update studio_shoot_sessions set status=$2,checked_in_at_utc=coalesce(checked_in_at_utc,$3),checked_out_at_utc=case when $2='ShootComplete' then coalesce(checked_out_at_utc,$3) else checked_out_at_utc end,updated_at_utc=now() where schedule_entry_id=$1 and status<>'Cancelled' returning job_id",c,tx);
-                shoot.Parameters.AddWithValue(assignmentId);shoot.Parameters.AddWithValue(request.Kind==WorkDayOperationKind.CompleteSession?"ShootComplete":"InProgress");shoot.Parameters.AddWithValue(request.OccurredAtUtc);
-                var jobs=new List<Guid>();using(var reader=shoot.ExecuteReader())while(reader.Read())jobs.Add(reader.GetGuid(0));
-                foreach(Guid job in jobs.Distinct())Aegis.Studio.Web.Production.JobShootLifecycle.Advance(c,tx,job,userName);
-            }
-            SaveLocation(c,tx,userName,GetActiveSessionId(c,tx,userName),request,assignmentId);
+            using var notify=new NpgsqlCommand("select studio_workflow_notify($1,$2,$3,$4,$5)",c,tx);
+            notify.Parameters.AddWithValue(job);notify.Parameters.AddWithValue($"workday:{request.OperationId}:{audience}");notify.Parameters.AddWithValue(audience);notify.Parameters.AddWithValue("Photographer update: "+request.Kind);notify.Parameters.AddWithValue(body);notify.ExecuteNonQuery();
         }
-
-        using(NpgsqlCommand op=c.CreateCommand()){op.Transaction=tx;op.CommandText="insert into studio_workday_operations(operation_id,user_name,kind,assignment_id,occurred_at_utc,device_id,text_value,category,expected_version,state,result_message,server_version,received_at_utc,acknowledged_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'Acknowledged',$10,$11,now(),now())";op.Parameters.AddWithValue(request.OperationId);op.Parameters.AddWithValue(userName);op.Parameters.AddWithValue(request.Kind.ToString());op.Parameters.AddWithValue((object?)request.AssignmentId??DBNull.Value);op.Parameters.AddWithValue(request.OccurredAtUtc);op.Parameters.AddWithValue(request.DeviceId);op.Parameters.AddWithValue((object?)request.Text??DBNull.Value);op.Parameters.AddWithValue((object?)request.Category??DBNull.Value);op.Parameters.AddWithValue((object?)request.ExpectedVersion??DBNull.Value);op.Parameters.AddWithValue(message);op.Parameters.AddWithValue((object?)version??DBNull.Value);op.ExecuteNonQuery();}
-        tx.Commit(); return new(request.OperationId,WorkDayOperationState.Acknowledged,now,message,version);
+        SaveLocation(c,tx,actor,null,request,assignmentId);
+        using(var op=new NpgsqlCommand("insert into studio_workday_operations(operation_id,user_name,kind,assignment_id,occurred_at_utc,device_id,text_value,category,expected_version,state,result_message,server_version,received_at_utc,acknowledged_at_utc,fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'Acknowledged','Acknowledged',$10,now(),now(),$11)",c,tx))
+        {op.Parameters.AddWithValue(request.OperationId);op.Parameters.AddWithValue(actor);op.Parameters.AddWithValue(request.Kind.ToString());op.Parameters.AddWithValue(assignmentId);op.Parameters.AddWithValue(request.OccurredAtUtc);op.Parameters.AddWithValue(request.DeviceId);op.Parameters.AddWithValue((object?)request.Text??DBNull.Value);op.Parameters.AddWithValue((object?)request.Category??DBNull.Value);op.Parameters.AddWithValue((object?)request.ExpectedVersion??DBNull.Value);op.Parameters.AddWithValue((object?)version??DBNull.Value);op.Parameters.AddWithValue(fingerprint);op.ExecuteNonQuery();}
+        tx.Commit();return new(request.OperationId,WorkDayOperationState.Acknowledged,DateTimeOffset.UtcNow,"Acknowledged",version);
     }
 
     private static Guid? GetActiveSessionId(NpgsqlConnection c,NpgsqlTransaction tx,string user){using NpgsqlCommand q=c.CreateCommand();q.Transaction=tx;q.CommandText="select id from studio_workday_work_sessions where lower(user_name)=lower($1) and ended_at_utc is null limit 1";q.Parameters.AddWithValue(user);return q.ExecuteScalar() is Guid g?g:null;}

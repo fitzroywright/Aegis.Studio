@@ -30,7 +30,7 @@ public static class FrontDeskRequestRules
         if(amount<=0 || amount>999999999 || decimal.Round(amount,2)!=amount) throw new ArgumentException("Amount must be positive, at most 999999999, and have at most two decimal places.");
         if(string.IsNullOrWhiteSpace(currency) || currency.Trim().Length!=3 || !currency.Trim().All(char.IsAsciiLetter)) throw new ArgumentException("A three-letter currency is required.");
     }
-    public static bool DepositSatisfied(decimal received,decimal required)=>WorkflowRules.DepositEligible(received);
+    public static bool DepositSatisfied(decimal received,decimal required)=>WorkflowRules.DepositEligible(received,required);
 }
 
 public sealed class FrontDeskBookingRequestStore(StudioDatabase database)

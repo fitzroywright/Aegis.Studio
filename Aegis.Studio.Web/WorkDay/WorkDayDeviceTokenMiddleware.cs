@@ -24,6 +24,13 @@ public sealed class WorkDayDeviceTokenMiddleware(RequestDelegate next)
                 context.User=new ClaimsPrincipal(claims);
             }
         }
+        if(context.User.Identity?.AuthenticationType=="WorkDayDeviceToken")
+        {
+            string path=context.Request.Path.Value??"";
+            string[] reportingPaths=["/api/workday/bootstrap","/api/workday/availability","/api/workday/operations","/api/workday/device-session/revoke","/api/workday/client-observation"];
+            if(!reportingPaths.Contains(path,StringComparer.OrdinalIgnoreCase))
+            {context.Response.StatusCode=StatusCodes.Status403Forbidden;return;}
+        }
         await next(context);
     }
 }

@@ -2,6 +2,13 @@ namespace Aegis.Studio.Web.WorkDay;
 
 public static class WorkDaySemantics
 {
+    public static bool IsPhotographerOperation(WorkDayOperationKind kind)=>kind is
+        WorkDayOperationKind.AcceptAssignment or WorkDayOperationKind.DeclineAssignment or
+        WorkDayOperationKind.Arrive or WorkDayOperationKind.StartSession or
+        WorkDayOperationKind.CompleteSession or WorkDayOperationKind.AddNote or
+        WorkDayOperationKind.RecordException or WorkDayOperationKind.SetExceptionStatus or
+        WorkDayOperationKind.LocationObservation;
+
     public static string InitialStatus(string? current)=>
         string.IsNullOrWhiteSpace(current)||current.Equals("Scheduled",StringComparison.OrdinalIgnoreCase)||current.Equals("Assigned",StringComparison.OrdinalIgnoreCase)
             ?"Assigned":current.Trim();
@@ -18,7 +25,8 @@ public static class WorkDaySemantics
         return (from,to) switch
         {
             ("Assigned","Accepted")=>true,
-            ("Assigned","Arrived")=>true,
+            ("Assigned","Declined")=>true,
+            ("Accepted","Declined")=>true,
             ("Accepted","Arrived")=>true,
             ("Confirmed","Arrived")=>true,
             ("Delayed","Arrived")=>true,

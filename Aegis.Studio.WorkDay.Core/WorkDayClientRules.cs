@@ -5,6 +5,27 @@ public enum LocalUploadState { Pending, Uploading, Uploaded, Failed, Retrying }
 
 public static class WorkDayClientRules
 {
+    public static bool IsAcknowledged(string? state)=>
+        string.Equals(state,"Acknowledged",StringComparison.Ordinal);
+
+    // Each dependent offline event uses the version produced by the preceding event.
+    public static long NextExpectedVersion(long cachedVersion,int queuedStatusChanges)=>
+        checked(cachedVersion+queuedStatusChanges);
+
+    public static long NextExpectedVersionAfterPending(long cachedVersion,IEnumerable<long> pendingVersions)=>
+        pendingVersions.Select(x=>checked(x+1)).Append(cachedVersion).Max();
+
+    public static bool ChangesAssignmentStatus(string kind)=>kind is
+        "AcceptAssignment" or "DeclineAssignment" or "Arrive" or "StartSession" or
+        "CompleteSession" or "SetExceptionStatus";
+
+    public static string AssignmentStatus(string kind,string? category,string current)=>kind switch
+    {
+        "AcceptAssignment"=>"Accepted", "DeclineAssignment"=>"Declined",
+        "Arrive"=>"Arrived", "StartSession"=>"InProgress", "CompleteSession"=>"Completed",
+        "SetExceptionStatus" when !string.IsNullOrWhiteSpace(category)=>category!, _=>current
+    };
+
     public static bool IsPending(LocalSyncState state) =>
         state is LocalSyncState.Pending or LocalSyncState.Failed;
 

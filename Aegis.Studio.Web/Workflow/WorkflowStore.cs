@@ -244,7 +244,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 EnsureMutable(stage);
                 if(!manage&&!review)throw new UnauthorizedAccessException();Sql(c,tx,"update studio_jobs set blocked_reason=$2 where id=$1",job,string.IsNullOrWhiteSpace(request.Reason)?null:request.Reason);break;
             case "reopen":
-                if(!manager||!WorkflowRules.Inactive(stage))throw new UnauthorizedAccessException();RequireReason(request);
+                if(!IsOperations(user)||!WorkflowRules.Inactive(stage))throw new UnauthorizedAccessException();RequireReason(request);
                 if(request.TargetStage is null||!WorkflowRules.Stages.Contains(request.TargetStage)||WorkflowRules.Inactive(request.TargetStage))throw new ArgumentException("Choose a valid active reopening stage.");
                 // Reopening starts at the assignment/readiness gate; later stages require their normal proofs.
                 if(request.TargetStage is not ("Needs Assignment" or "Needs Photographer Assignment" or "Awaiting Scheduling" or "Awaiting Upload"))throw new ArgumentException("Reopen at an assignment, scheduling or upload gate, then use normal review actions.");
@@ -253,7 +253,10 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 CatalogWorkOrders.ConfirmAgreements(c,tx,job);
                 if(!IsFrontDesk(user))throw new UnauthorizedAccessException();
                 if(workspace==WorkflowRules.UnassignedWorkspaceId)throw new ArgumentException("Route the booking to a business workspace before confirmation.");
-                bool deposit=Exists(c,tx,"select coalesce(sum(amount),0)>0 from studio_financial_events where job_id=$1 and kind in ('Deposit','Payment','POS Sale','POS Refund','Refund','Reversal')",job);
+                if(stage!="Pending")throw new ArgumentException("Only Pending Jobs may be confirmed.");
+                decimal requiredDeposit=Convert.ToDecimal(Scalar(c,tx,"select coalesce((select (payload->>'requiredDeposit')::numeric from studio_frontdesk_requests where job_id=$1 limit 1),0)",job));
+                decimal paidDeposit=Convert.ToDecimal(Scalar(c,tx,"select coalesce(sum(amount),0) from studio_financial_events where job_id=$1 and kind in ('Deposit','Payment','POS Sale','POS Refund','Refund','Reversal')",job));
+                bool deposit=WorkflowRules.DepositEligible(paidDeposit,requiredDeposit);
                 if(!deposit)
                 {
                     if(!IsOperations(user))throw new UnauthorizedAccessException();RequireReason(request);

@@ -50,8 +50,10 @@ public sealed class WorkDayApiClient
             ? new{observationId=op.LocationObservationId??op.OperationId,latitude=op.Latitude.Value,longitude=op.Longitude.Value,accuracyMetres=op.AccuracyMetres,observedAtUtc=op.LocationObservedAtUtc??op.OccurredAtUtc,source=op.LocationSource,mockLocation=(bool?)null}
             : null;
         using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/operations",new{operationId=op.OperationId,kind=op.Kind,assignmentId=op.AssignmentId,occurredAtUtc=op.OccurredAtUtc,deviceId=op.DeviceId,text=op.Text,category=op.Category,location,expectedVersion=op.ExpectedVersion},ct);
+        if(r.StatusCode!=System.Net.HttpStatusCode.Conflict)r.EnsureSuccessStatusCode();
         OperationResultDto? result=await r.Content.ReadFromJsonAsync<OperationResultDto>(cancellationToken:ct);
-        if(result is null) throw new InvalidOperationException("Studio did not return an operation acknowledgement.");
+        if(result is null||result.OperationId!=op.OperationId||result.State is not ("Acknowledged" or "Conflict"))
+            throw new InvalidOperationException("Studio did not return a valid acknowledgement for this operation.");
         return result;
     }
 
@@ -103,7 +105,7 @@ public sealed class WorkDayApiClient
     public async Task ReplyConversationAsync(Guid conversationId,string body,string identity,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"api/conversations/{conversationId:D}/messages",new{body,isInternal=false,sendingIdentity=identity},ct);r.EnsureSuccessStatusCode();}
 }
 
-public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient api,WorkDayUploadService uploads)
+public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient api)
 {
     private readonly SemaphoreSlim gate=new(1,1);
     public DateTimeOffset? LastAttemptUtc{get;private set;}
@@ -130,15 +132,18 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                 CustomerName=x.CustomerName,CustomerEmail=x.CustomerEmail,CustomerPhone=x.CustomerPhone,Version=x.Version,CachedAtUtc=DateTimeOffset.UtcNow
             }));
 
+            HashSet<Guid> blocked=(await store.UnacknowledgedAsync()).Where(x=>x.State==nameof(LocalSyncState.Conflict)&&x.AssignmentId.HasValue).Select(x=>x.AssignmentId!.Value).ToHashSet();
             foreach(LocalOperation op in await store.PendingAsync())
             {
+                if(op.AssignmentId is Guid blockedId&&blocked.Contains(blockedId))continue;
                 op.State=nameof(LocalSyncState.Sending);op.LastAttemptUtc=DateTimeOffset.UtcNow;op.AttemptCount++;await store.SaveOperationAsync(op);
                 try
                 {
                     OperationResultDto result=await api.SendAsync(op,ct);
-                    op.State=result.State=="Conflict"?nameof(LocalSyncState.Conflict):nameof(LocalSyncState.Acknowledged);
+                    op.State=WorkDayClientRules.IsAcknowledged(result.State)?nameof(LocalSyncState.Acknowledged):nameof(LocalSyncState.Conflict);
                     op.LastError=result.Message;
-                    if(op.AssignmentId is Guid id && result.ServerVersion is long version)
+                    if(op.State==nameof(LocalSyncState.Conflict)&&op.AssignmentId is Guid conflictId)blocked.Add(conflictId);
+                    if(op.State==nameof(LocalSyncState.Acknowledged)&&op.AssignmentId is Guid id && result.ServerVersion is long version)
                     {
                         LocalAssignment? assignment=await store.GetAssignmentAsync(id);
                         if(assignment is not null){assignment.Version=version;assignment.Status=OperationStatus(op.Kind,op.Category,assignment.Status);await store.ReplaceAssignmentsAsync([assignment]);}
@@ -150,22 +155,12 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                 }
                 await store.SaveOperationAsync(op);
             }
-
-            if(LocationTrackingEnabled)
-            foreach(LocalLocationObservation loc in await store.PendingLocationsAsync())
-            {
-                LocalOperation locationOperation=new(){OperationId=loc.ObservationId,Kind="LocationObservation",AssignmentId=loc.AssignmentId,OccurredAtUtc=loc.ObservedAtUtc,DeviceId="location",LocationObservationId=loc.ObservationId,Latitude=loc.Latitude,Longitude=loc.Longitude,AccuracyMetres=loc.AccuracyMetres,LocationObservedAtUtc=loc.ObservedAtUtc,LocationSource=loc.Source};
-                try{await api.SendAsync(locationOperation,ct);loc.State=nameof(LocalSyncState.Acknowledged);await store.UpdateLocationAsync(loc);}
-                catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException){loc.State=nameof(LocalSyncState.Failed);await store.UpdateLocationAsync(loc);State="Waiting";return;}
-            }
-
-            await uploads.ProcessAsync(ct);
-            LastSuccessUtc=DateTimeOffset.UtcNow;State="Healthy";
+            LastSuccessUtc=DateTimeOffset.UtcNow;State=blocked.Count>0?"Degraded":"Healthy";
         }
         finally{gate.Release();}
     }
 
-    private static string OperationStatus(string kind,string? category,string current)=>kind switch{"AcceptAssignment"=>"Accepted","Arrive"=>"Arrived","StartSession"=>"InProgress","CompleteSession"=>"Completed","SetExceptionStatus" when !string.IsNullOrWhiteSpace(category)=>category!,_=>current};
+    private static string OperationStatus(string kind,string? category,string current)=>WorkDayClientRules.AssignmentStatus(kind,category,current);
 }
 
 public sealed record WorkDayBootstrapDto(string UserName,string DisplayName,DateTimeOffset ServerTimeUtc,IReadOnlyList<AssignmentDto> Today,IReadOnlyList<AssignmentDto> Upcoming,WorkSessionDto? ActiveWorkSession,bool LocationTrackingEnabled,string LocationTrackingMode,DateTimeOffset GeneratedAtUtc);

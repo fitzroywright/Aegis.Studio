@@ -9,11 +9,12 @@ public sealed class FrontDeskBookingRequestTests
 {
     [Theory]
     [InlineData(0,100,false)]
-    [InlineData(99.99,100,true)]
+    [InlineData(99.99,100,false)]
     [InlineData(100,100,true)]
     [InlineData(125,100,true)]
-    [InlineData(0,0,false)]
-    public void ConfirmationAllowsAnyPositiveVerifiedDeposit(decimal paid,decimal required,bool expected)
+    [InlineData(0,0,true)]
+    [InlineData(-1,0,false)]
+    public void ConfirmationRequiresTheConfiguredDeposit(decimal paid,decimal required,bool expected)
         => Assert.Equal(expected,FrontDeskRequestRules.DepositSatisfied(paid,required));
 
     [Theory]

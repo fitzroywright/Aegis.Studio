@@ -8,7 +8,11 @@ public sealed class WorkDaySemanticsTests
 {
     [Theory]
     [InlineData("Assigned","Accepted",true)]
-    [InlineData("Assigned","Arrived",true)]
+    [InlineData("Assigned","Arrived",false)]
+    [InlineData("Assigned","Declined",true)]
+    [InlineData("Accepted","Declined",true)]
+    [InlineData("InProgress","Declined",false)]
+    [InlineData("Declined","Arrived",false)]
     [InlineData("Accepted","Arrived",true)]
     [InlineData("Arrived","InProgress",true)]
     [InlineData("InProgress","Completed",true)]
