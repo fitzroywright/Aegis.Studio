@@ -102,7 +102,7 @@ async function showPipeline() {
         json('/api/operations/activities'),
         json('/api/schedule/resources'),
         json('/api/auth/me'),
-        json('/api/messages/users').catch(() => []),
+        json('/api/studio-employees?assignable=true').catch(() => []),
         json('/api/workspaces')
     ]);
     if(!current())return;

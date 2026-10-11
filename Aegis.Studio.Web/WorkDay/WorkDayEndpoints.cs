@@ -49,6 +49,8 @@ public static class WorkDayEndpoints
                 .Select(x=>x!)
                 .ToArray();
 
+            using var rosterConnection=db.OpenConnection();
+            var fieldTargets=all.ToDictionary(x=>x.Id,x=>WorkDayFieldReports.Targets(rosterConnection,null,x.Id));
             return Results.Ok(new WorkDayBootstrap(
                 userName,
                 profile.DisplayName,
@@ -60,7 +62,7 @@ public static class WorkDayEndpoints
                 (configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled") ?? false)
                     ? ParseTrackingMode(configuration["WorkDay:LocationTrackingMode"])
                     : WorkDayLocationTrackingMode.Disabled,
-                now));
+                now,fieldTargets));
         });
 
         group.MapGet("/availability",(ClaimsPrincipal user,DateTimeOffset? from,DateTimeOffset? to,StudioDatabase db)=>

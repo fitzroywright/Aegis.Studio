@@ -7,7 +7,7 @@ public static class WorkDaySemantics
         WorkDayOperationKind.Arrive or WorkDayOperationKind.StartSession or
         WorkDayOperationKind.CompleteSession or WorkDayOperationKind.AddNote or
         WorkDayOperationKind.RecordException or WorkDayOperationKind.SetExceptionStatus or
-        WorkDayOperationKind.LocationObservation;
+        WorkDayOperationKind.LocationObservation or WorkDayOperationKind.RecordFieldStatus;
 
     public static string InitialStatus(string? current)=>
         string.IsNullOrWhiteSpace(current)||current.Equals("Scheduled",StringComparison.OrdinalIgnoreCase)||current.Equals("Assigned",StringComparison.OrdinalIgnoreCase)

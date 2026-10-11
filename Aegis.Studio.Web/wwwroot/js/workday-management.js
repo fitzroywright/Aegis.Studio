@@ -39,7 +39,7 @@
 
   async function loadSessions() {
     try {
-      const [rows, people] = await Promise.all([getJson("/api/workday/management/sessions?count=100"),getJson("/api/messages/users").catch(() => [])]);
+      const [rows, people] = await Promise.all([getJson("/api/workday/management/sessions?count=100"),getJson("/api/studio-employees?assignable=true").catch(() => [])]);
       studioRememberPeople(people);
       let html = "<table><thead><tr><th>User</th><th>Started</th><th>Ended</th><th>Source</th><th></th></tr></thead><tbody>";
 

@@ -79,6 +79,7 @@ public sealed class WorkDayStore(StudioDatabase database)
           reason text not null, corrected_by text not null, corrected_at_utc timestamptz not null);
         create index if not exists ix_workday_session_corrections_session on studio_workday_session_corrections(work_session_id,corrected_at_utc);
         """;
+        cmd.CommandText+=WorkDayFieldReports.Schema;
         cmd.ExecuteNonQuery();
     }
 
@@ -401,8 +402,9 @@ public sealed class WorkDayStore(StudioDatabase database)
         if(request.OccurredAtUtc==default || request.OccurredAtUtc>DateTimeOffset.UtcNow.AddMinutes(5))
             throw new InvalidOperationException("A valid event timestamp is required.");
         if((request.Text?.Length??0)>4000)throw new InvalidOperationException("Operational notes may contain at most 4000 characters.");
-        if(request.Kind is WorkDayOperationKind.DeclineAssignment or WorkDayOperationKind.SetExceptionStatus or WorkDayOperationKind.RecordException or WorkDayOperationKind.AddNote)
+        if(request.Kind is WorkDayOperationKind.DeclineAssignment or WorkDayOperationKind.SetExceptionStatus or WorkDayOperationKind.RecordException or WorkDayOperationKind.AddNote or WorkDayOperationKind.RecordFieldStatus)
             if(string.IsNullOrWhiteSpace(request.Text))throw new InvalidOperationException("A reason or note is required.");
+        var fieldReport=request.Kind==WorkDayOperationKind.RecordFieldStatus?WorkDayFieldReports.Parse(request.Category):null;
         string actor=userName.Trim().ToLowerInvariant();
         if(recordedBy is not null&&string.IsNullOrWhiteSpace(recordingReason))throw new InvalidOperationException("A manual recording reason is required.");
         if((recordingReason?.Length??0)>4000)throw new InvalidOperationException("Manual recording reasons may contain at most 4000 characters.");
@@ -425,6 +427,15 @@ public sealed class WorkDayStore(StudioDatabase database)
                         (r.IsDBNull(12)?(long?)null:r.GetInt64(12))==request.ExpectedVersion&&request.Location is null);
                 if(!same)throw new InvalidOperationException("This operation ID was used for different facts or another photographer.");
                 return new(request.OperationId,Enum.Parse<WorkDayOperationState>(r.GetString(2)),r.GetFieldValue<DateTimeOffset>(5),r.IsDBNull(3)?null:r.GetString(3),r.IsDBNull(4)?null:r.GetInt64(4));
+            }
+        }
+        using(var rejected=new NpgsqlCommand("select user_name,fingerprint,message from studio_workday_field_conflicts where operation_id=$1",c,tx))
+        {
+            rejected.Parameters.AddWithValue(request.OperationId);using var r=rejected.ExecuteReader();
+            if(r.Read())
+            {
+                if(r.GetString(0)!=actor||r.GetString(1)!=fingerprint)throw new InvalidOperationException("This operation ID belongs to different report facts.");
+                return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,r.GetString(2),null);
             }
         }
         Guid job;string stage;
@@ -459,6 +470,23 @@ public sealed class WorkDayStore(StudioDatabase database)
         // Notes and problems also belong to the reviewed assignment generation.
         if(request.ExpectedVersion is not long expected || expected!=currentVersion)
             return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,$"Version conflict. Client {request.ExpectedVersion}; server {currentVersion}.",currentVersion);
+        if(fieldReport is not null)
+        {
+            if(stage is not ("Scheduled" or "Photography In Progress" or "Awaiting Upload"))return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,"Studio has advanced this Job beyond photography. Review the retained field report with the Job Owner.",currentVersion);
+            if(currentStatus is not ("Accepted" or "Arrived" or "InProgress" or "Completed"))throw new InvalidOperationException("Accept the assignment before recording its roster or collection status.");
+            string? conflict=WorkDayFieldReports.Apply(c,tx,assignmentId,fieldReport,actor,request.OperationId,request.OccurredAtUtc);
+            if(conflict is not null)
+            {
+                using(var rejected=new NpgsqlCommand("insert into studio_workday_field_conflicts(operation_id,assignment_id,user_name,fingerprint,target_id,report,message) values($1,$2,$3,$4,$5,$6::jsonb,$7)",c,tx))
+                {rejected.Parameters.AddWithValue(request.OperationId);rejected.Parameters.AddWithValue(assignmentId);rejected.Parameters.AddWithValue(actor);rejected.Parameters.AddWithValue(fingerprint);rejected.Parameters.AddWithValue(fieldReport.TargetId);rejected.Parameters.AddWithValue(System.Text.Json.JsonSerializer.Serialize(fieldReport));rejected.Parameters.AddWithValue(conflict);rejected.ExecuteNonQuery();}
+                foreach(string audience in new[]{"Owner","Manager"})
+                {
+                    using var notify=new NpgsqlCommand("select studio_workflow_notify($1,$2,$3,$4,$5)",c,tx);
+                    notify.Parameters.AddWithValue(job);notify.Parameters.AddWithValue($"workday-conflict:{request.OperationId}:{audience}");notify.Parameters.AddWithValue(audience);notify.Parameters.AddWithValue("WorkDay roster conflict");notify.Parameters.AddWithValue(actor+": "+conflict);notify.ExecuteNonQuery();
+                }
+                tx.Commit();return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,conflict,currentVersion);
+            }
+        }
         long? version=currentVersion;
         if(next is not null)
         {
@@ -470,7 +498,7 @@ public sealed class WorkDayStore(StudioDatabase database)
             using(var up=new NpgsqlCommand("insert into studio_workday_photographer_state values($1,$2,$3,$4,$5,$6) on conflict(assignment_id,user_name) do update set status=excluded.status,version=excluded.version,changed_at_utc=excluded.changed_at_utc,last_operation_id=excluded.last_operation_id",c,tx))
             {up.Parameters.AddWithValue(assignmentId);up.Parameters.AddWithValue(actor);up.Parameters.AddWithValue(next);up.Parameters.AddWithValue(version.Value);up.Parameters.AddWithValue(request.OccurredAtUtc);up.Parameters.AddWithValue(request.OperationId);up.ExecuteNonQuery();}
         }
-        if(request.Kind is WorkDayOperationKind.AddNote or WorkDayOperationKind.RecordException or WorkDayOperationKind.DeclineAssignment or WorkDayOperationKind.SetExceptionStatus)
+        if(request.Kind is WorkDayOperationKind.AddNote or WorkDayOperationKind.RecordException or WorkDayOperationKind.DeclineAssignment or WorkDayOperationKind.SetExceptionStatus or WorkDayOperationKind.RecordFieldStatus)
         {
             using var note=new NpgsqlCommand("insert into studio_workday_notes(id,operation_id,user_name,assignment_id,note_type,category,body,occurred_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8)",c,tx);
             note.Parameters.AddWithValue(Guid.NewGuid());note.Parameters.AddWithValue(request.OperationId);note.Parameters.AddWithValue(actor);note.Parameters.AddWithValue(assignmentId);note.Parameters.AddWithValue(request.Kind.ToString());note.Parameters.AddWithValue((object?)request.Category??DBNull.Value);note.Parameters.AddWithValue(request.Text!);note.Parameters.AddWithValue(request.OccurredAtUtc);note.ExecuteNonQuery();

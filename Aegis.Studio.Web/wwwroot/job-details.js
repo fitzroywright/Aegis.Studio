@@ -9,14 +9,16 @@
   if(stage==='Changes Requested')return data.correctionKind==='Production'?3:2;
   return ({Pending:0,'Needs Assignment':1,'Needs Photographer Assignment':1,'Awaiting Scheduling':2,Scheduled:2,'Photography In Progress':2,'Awaiting Upload':2,'Awaiting Production Review':3,'Active Production':3,'Awaiting Approval':4,'Ready for Delivery':5,Delivered:5,Completed:6})[stage]??-1;
  }
- function workflow(host,data,job={}){
-  const active=phaseIndex(data);
+ function workflow(host,data,job={},view={},activate=null){
+  const active=phaseIndex(data),next=root.StudioWorkflow?.nextAction({...view,data});
   const noShoot=/print|edit/i.test(job.jobType||job.type||'')&&!(data.sessions||[]).length;
-  host.innerHTML=phases.map((label,index)=>`<div class="jd-stage ${index===2&&noShoot?'skipped':active<0?'':index<active?'complete':index===active?'current':''}"><span class="jd-stage-light" aria-hidden="true">${index===2&&noShoot?'–':active>=0&&index<active?'✓':''}</span><span>${index===2&&noShoot?'No shoot':label}</span></div>`).join('');
+  host.innerHTML=phases.map((label,index)=>`<button type="button" class="jd-stage ${index===2&&noShoot?'skipped':active<0?'':index<active?'complete':index===active?'current':''}"><span class="jd-stage-light" aria-hidden="true">${index===2&&noShoot?'–':active>=0&&index<active?'✓':''}</span><span>${index===2&&noShoot?'No shoot':label}</span></button>`).join('');
   host.setAttribute('aria-label','Job workflow: '+data.stage);
+  host.querySelectorAll('.jd-stage').forEach((b,i)=>{b.setAttribute('aria-label',i===active?(next?.label||data.stage):phases[i]+' workflow details');b.onclick=()=>activate?activate(i===active?next?.selector:null):root.StudioWorkflow?.open(job.id,i===active?next?.selector:null);});
  }
  async function media(job,host,selectedHost,isCurrent,onCounts){
   let disposed=false,request=0,selectedId='',data=null,canEdit=false,uploading=false,search='',list=false;
+  let pendingBatch=null;
   let collection='',subject='',assetId='',after='',page=1;const previous=[];
   const focus=root.studioMediaFocus?.jobId===job.id?root.studioMediaFocus:root.studioMediaPage?.[job.id];
   if(focus){subject=focus.subjectId||'';assetId=focus.assetId||'';root.studioMediaFocus=null;}
@@ -100,14 +102,34 @@
    finally{if(current()&&version===request)host.removeAttribute('aria-busy');}
   }
   async function upload(files,target=collection||data?.gallery?.default_collection||'Unclassified'){
-   if(!canEdit||uploading||!files.length)return;uploading=true;const failed=[];let completed=0;
+   if(!canEdit||uploading||!files.length)return;uploading=true;
    try{
-    for(const file of files){if(!current())break;announce(`Uploading ${completed+failed.length+1}/${files.length}: ${file.name}`);
-     try{const form=new FormData();form.append('file',file);form.append('collection',target);form.append('returned','false');const saved=await json(`/api/jobs/${job.id}/media/uploads`,{method:'POST',body:form});if(subject&&saved.assetId)await put(`/api/jobs/${job.id}/media/assets/${saved.assetId}`,{status:'Needs Sorting',collection:target,subjects:[subject],assignedTo:null});completed++;}
-     catch(error){failed.push({file,error:error.message});}
+    if(pendingBatch)throw Error('Retry the pending batch before adding more files.');
+    const view=await json(`/api/jobs/${job.id}/connected-workflow`),sessions=view.data.sessions||[];
+    let sessionId=sessions[0]?.id||null;
+    if(sessions.length>1){
+     sessionId=await new Promise(resolve=>{const d=studioDialog('Choose upload session',`<form><label>Session<select name="session">${sessions.map(s=>`<option value="${escape(s.id)}">${escape(s.title)}</option>`).join('')}</select></label><button type="submit" class="primary">Upload</button></form>`);d.addEventListener('close',()=>resolve(null),{once:true});d.querySelector('form').onsubmit=e=>{e.preventDefault();resolve(e.currentTarget.elements.session.value);d.close();};});
+     if(!sessionId)return;
     }
-    if(current()){await load();announce(`${completed} files uploaded.${failed.length?' Failed: '+failed.map(f=>f.file.name+' ('+f.error+')').join('; '):''}`);}
-   }finally{uploading=false;}
+    pendingBatch={declaration:{batchId:crypto.randomUUID(),sessionId,subjectId:subject||null,collection:target,files:files.map(file=>({uploadId:crypto.randomUUID(),fileName:file.name,sizeBytes:file.size}))},files};
+    await sendBatch();
+   }catch(error){announce(error.message);if(pendingBatch)retryButton();}finally{uploading=false;}
+  }
+  function retryButton(){
+   const output=host.querySelector('[data-media-result]');if(!output||output.querySelector('button'))return;
+   const b=document.createElement('button');b.type='button';b.className='jd-save';b.textContent='Retry original batch';output.append(b);
+   b.onclick=async()=>{if(uploading)return;uploading=true;b.disabled=true;try{await sendBatch();}catch(e){announce(e.message);retryButton();}finally{uploading=false;}};
+  }
+  async function sendBatch(){
+   const batch=pendingBatch;
+   await json(`/api/jobs/${job.id}/media/upload-batches`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(batch.declaration)});
+   let completed=0;const failed=[];
+   for(let i=0;i<batch.files.length;i++){
+    const file=batch.files[i];announce(`Uploading ${i+1}/${batch.files.length}: ${file.name}`);
+    try{const form=new FormData();form.append('file',file);form.append('uploadId',batch.declaration.files[i].uploadId);await json(`/api/jobs/${job.id}/media/uploads`,{method:'POST',body:form});completed++;}catch(e){failed.push(file.name+': '+e.message);}
+   }
+   if(!failed.length)pendingBatch=null;
+   if(current()){await load();announce(`${completed}/${batch.files.length} stored.`+(failed.length?' Failed: '+failed.join('; '):''));if(failed.length)retryButton();}
   }
   async function importRoster(){
    if(!canEdit)return;

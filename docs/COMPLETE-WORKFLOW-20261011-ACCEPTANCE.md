@@ -74,3 +74,12 @@ node --test examples/public-v1-site/server.test.mjs
 ```
 
 Configure `STUDIO_TEST_POSTGRES` with a disposable service before running transactional acceptance. Mobile/platform checks are separate requirements.
+
+
+## Additional WorkDay sync implementation — awaiting local validation
+
+Automatic reconnect/active retry/resume sync, assignment Sync Now, live progress/failure feedback and durable last-success metadata are implemented. Encrypted cached Job/collection/roster targets and field-status reports now use stable operation receipts, reviewed target versions/fingerprints and the existing Owner/Manager notification/history path. New test sources have not been executed. See WORKDAY-SYNC-LOCAL-ACCEPTANCE.md for device/network/replay/conflict scenarios. Earlier verification counts do not validate these changes.
+
+### Photographer field journey extension
+
+The latest source adds the photographer mobile roster/status cache, automatic/manual durable synchronization, cross-assignment target conflicts, Job Details roster counts, scoped remainder scheduling, interactive workflow actions in Job Details and Front Desk, local Studio person searches and declared drag/drop uploads. See `WORKDAY-SYNC-LOCAL-ACCEPTANCE.md` for contracts and J1–J9 cases. New PostgreSQL/UI tests are **unrun**. Device/offline restart/reconnect, configured storage and role-based browser acceptance remain required; these objectives are implemented in source but not field-verified.

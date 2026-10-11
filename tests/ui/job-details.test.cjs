@@ -165,3 +165,30 @@ test('preview failures show a recovery state and use the preview retry API',asyn
  assert.ok(fixture.calls.some(c=>c.url.endsWith('/preview/retry')&&c.options.method==='POST'));
  assert.equal(w.document.querySelector('[data-retry-preview]').textContent,'Preview queued');
 });
+
+test('workflow next action requires the current owner acceptance before scheduling',async t=>{
+ const {w}=environment(t),base={stage:'Needs Photographer Assignment',owner:'owner',ownerAssignment:{assigned_to:'owner',status:'Assigned'},sessions:[]};
+ assert.equal(w.StudioWorkflow.nextAction({data:base,userName:'owner',canManage:true}).label,'Accept ownership');
+ assert.equal(w.StudioWorkflow.nextAction({data:base,userName:'other',canManage:true}).selector,null);
+ const accepted={...base,ownerAssignment:{...base.ownerAssignment,status:'Accepted'}};
+ assert.equal(w.StudioWorkflow.nextAction({data:accepted,userName:'owner',canManage:true}).label,'Assign photographer');
+ assert.equal(w.StudioWorkflow.nextAction({data:{...accepted,stage:'Awaiting Scheduling'},userName:'owner',canManage:true}).label,'Schedule session');
+});
+test('workflow phases are keyboard buttons and activate the state aware next action',async t=>{
+ const {w}=environment(t),host=w.document.createElement('div');w.document.body.append(host);let activated;
+ const data={stage:'Needs Photographer Assignment',owner:'owner',ownerAssignment:{assigned_to:'owner',status:'Assigned'},sessions:[]};
+ w.StudioJobDetails.workflow(host,data,{id:'job'},{userName:'owner',canManage:true},selector=>activated=selector);
+ const current=host.querySelector('button.current');assert.ok(current);assert.equal(current.getAttribute('aria-label'),'Accept ownership');current.click();
+ assert.equal(activated,'[data-wf-owner-response="accept-owner"]');
+});
+test('Job Details dropped files declare receipts and retries preserve operation identities',async t=>{
+ const {w,fixture}=environment(t);const original=w.json;let fail=true;
+ w.json=async(url,options)=>{if(url.endsWith('/media/uploads')){fixture.calls.push({url,options});if(fail)throw Error('Response lost');return {assetId:'asset'};}return original(url,options);};
+ await w.openWorkspaceJob('job');await settle();const host=w.document.querySelector('#jobDetail-media .job-media-content')||w.document.querySelector('.jd-gallery-toolbar').parentElement;
+ const file=new w.File(['image'],'field.jpg',{type:'image/jpeg'});
+ w.studioDroppedPhotos=async()=>[file];await host.ondrop({preventDefault(){},dataTransfer:{files:[file]}});
+ const first=fixture.calls.find(c=>c.url.endsWith('/media/upload-batches'));assert.ok(first);const declaration=JSON.parse(first.options.body);assert.equal(declaration.files.length,1);
+ const retry=host.querySelector('[data-media-result] button');assert.ok(retry);fail=false;await retry.onclick();
+ const declarations=fixture.calls.filter(c=>c.url.endsWith('/media/upload-batches')).map(c=>JSON.parse(c.options.body));assert.deepEqual(declarations[0],declarations[1]);
+ const uploads=fixture.calls.filter(c=>c.url.endsWith('/media/uploads'));assert.equal(uploads[0].options.body.get('uploadId'),uploads[1].options.body.get('uploadId'));
+});

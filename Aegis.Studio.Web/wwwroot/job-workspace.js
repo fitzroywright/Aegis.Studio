@@ -25,14 +25,24 @@ async function renderJobSubjects(job, panel, current, refresh) {
     const canEdit=(permissions.permissions||permissions).editJob;
     const canUpload=(permissions.permissions||permissions).manageProduction;
     const realSubjects=subjects.filter(subject=>!subject.isSystem);
+    const pendingSubjectBatches=new Map();
     const uploadToSubject=async(subjectId,files)=>{
+        if(!files.length)return;
         const subject=realSubjects.find(item=>item.id===subjectId),collection=subject?.collection||'Unclassified';
-        for(const file of files){
-            const form=new FormData();form.append('file',file);form.append('returned','false');form.append('note','Dropped on subject');form.append('collection',collection);
-            const uploaded=await json('/api/jobs/'+job.id+'/media/uploads',{method:'POST',body:form});
-            if(uploaded.assetId)await json('/api/jobs/'+job.id+'/media/assets/'+uploaded.assetId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'Needs Sorting',collection,subjects:[subjectId],assignedTo:null})});
+        let batch=pendingSubjectBatches.get(subjectId);
+        if(!batch){
+            const view=await json(`/api/jobs/${job.id}/connected-workflow`),sessions=view.data.sessions||[];
+            if(sessions.length>1)throw Error('Use Media Upload to choose the session for these files.');
+            batch={batchId:crypto.randomUUID(),sessionId:sessions[0]?.id||null,subjectId,collection,files:files.map(file=>({uploadId:crypto.randomUUID(),fileName:file.name,sizeBytes:file.size}))};
+            pendingSubjectBatches.set(subjectId,batch);
         }
-        await refresh();
+        if(batch.files.length!==files.length||batch.files.some((x,i)=>x.fileName!==files[i].name||x.sizeBytes!==files[i].size))throw Error('Reselect the same files to retry this subject batch.');
+        await json(`/api/jobs/${job.id}/media/upload-batches`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(batch)});
+        for(let i=0;i<files.length;i++){
+            const form=new FormData();form.append('file',files[i]);form.append('uploadId',batch.files[i].uploadId);
+            await json(`/api/jobs/${job.id}/media/uploads`,{method:'POST',body:form});
+        }
+        pendingSubjectBatches.delete(subjectId);await refresh();
     };
 
     const representative=subject=>{

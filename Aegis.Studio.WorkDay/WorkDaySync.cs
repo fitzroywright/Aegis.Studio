@@ -127,6 +127,16 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
     public DateTimeOffset? LastAttemptUtc{get;private set;}
     public DateTimeOffset? LastSuccessUtc{get;private set;}
     public string State{get;private set;}="Unknown";
+    public event Action? Changed;
+    public int CompletedUpdates{get;private set;}
+    public int TotalUpdates{get;private set;}
+    public string? LastError{get;private set;}
+    private void Publish()=>Changed?.Invoke();
+    public async Task LoadStatusAsync()
+    {
+        var saved=await store.GetMetadataAsync("LastSuccessfulSyncUtc");
+        if(DateTimeOffset.TryParse(saved,out var stamp))LastSuccessUtc=stamp;
+    }
     public bool LocationTrackingEnabled{get;private set;}
     public string LocationTrackingMode{get;private set;}="Unknown";
 
@@ -135,7 +145,9 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
         if(!await gate.WaitAsync(0,ct))return;
         try
         {
-            LastAttemptUtc=DateTimeOffset.UtcNow;State="Sending";
+            await LoadStatusAsync();
+            LastAttemptUtc=DateTimeOffset.UtcNow;State="Sending";LastError=null;CompletedUpdates=0;
+            TotalUpdates=(await store.PendingAsync()).Count+(await store.GetAvailabilityAsync()).Count(x=>x.SyncState is "Pending" or "Failed" or "Sending");Publish();
             await RefreshAssignmentsCoreAsync(ct);
             foreach(var availability in (await store.GetAvailabilityAsync()).Where(x=>x.SyncState is "Pending" or "Failed" or "Sending"))
             {
@@ -149,8 +161,8 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                 catch(HttpRequestException ex) when(ex.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
                 {availability.SyncState="Conflict";availability.LastError=ex.Message;}
                 catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
-                {availability.SyncState="Failed";availability.LastError=ex.Message;await store.SaveAvailabilityAsync(availability);State="Waiting";return;}
-                await store.SaveAvailabilityAsync(availability);
+                {availability.SyncState="Failed";availability.LastError=ex.Message;await store.SaveAvailabilityAsync(availability);State="Waiting";LastError=ex.Message;Publish();return;}
+                await store.SaveAvailabilityAsync(availability);CompletedUpdates++;Publish();
             }
 
             HashSet<Guid> blocked=(await store.UnacknowledgedAsync()).Where(x=>x.State==nameof(LocalSyncState.Conflict)&&x.AssignmentId.HasValue).Select(x=>x.AssignmentId!.Value).ToHashSet();
@@ -172,12 +184,20 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                 }
                 catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or InvalidOperationException or System.Text.Json.JsonException)
                 {
-                    op.State=nameof(LocalSyncState.Failed);op.LastError=ex.Message;await store.SaveOperationAsync(op);State="Waiting";return;
+                    op.State=nameof(LocalSyncState.Failed);op.LastError=ex.Message;await store.SaveOperationAsync(op);State="Waiting";LastError=ex.Message;Publish();return;
                 }
-                await store.SaveOperationAsync(op);
+                await store.SaveOperationAsync(op);CompletedUpdates++;Publish();
             }
-            LastSuccessUtc=DateTimeOffset.UtcNow;State=blocked.Count>0||(await store.GetAvailabilityAsync()).Any(x=>x.SyncState=="Conflict")?"Degraded":"Healthy";
+            await RefreshAssignmentsCoreAsync(ct);
+            var remaining=await store.UnacknowledgedAsync();
+            bool outstanding=remaining.Count>0||(await store.GetAvailabilityAsync()).Any(x=>WorkDayClientRules.IsOutstanding(x.SyncState));
+            State=outstanding?"Degraded":"Healthy";
+            if(!outstanding){LastSuccessUtc=DateTimeOffset.UtcNow;await store.SetMetadataAsync("LastSuccessfulSyncUtc",LastSuccessUtc.Value.ToString("O"));}
+            else LastError="Some changes need review. Open Review reports / resolve conflict; original reports remain on this device.";
+            Publish();
         }
+        catch(Exception ex)
+        {State="Waiting";LastError=ex.Message;Publish();throw;}
         finally{gate.Release();}
     }
 
@@ -189,9 +209,13 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
         {
             Id=x.Id,JobId=x.JobId,BookingId=x.BookingId,WorkspaceId=x.WorkspaceId,ConversationId=x.ConversationId,
             Title=x.Title,StartsAtUtc=x.StartsAtUtc,EndsAtUtc=x.EndsAtUtc,Location=x.Location,Status=x.Status,Instructions=x.Instructions,
-            CustomerName=x.CustomerName,CustomerEmail=x.CustomerEmail,CustomerPhone=x.CustomerPhone,Version=x.Version,IsCurrent=true,CachedAtUtc=DateTimeOffset.UtcNow
+            CustomerName=x.CustomerName,CustomerEmail=x.CustomerEmail,CustomerPhone=x.CustomerPhone,Version=x.Version,
+            FieldTargetsJson=CachedFieldTargets(bootstrap,x.Id),IsCurrent=true,CachedAtUtc=DateTimeOffset.UtcNow
         }),authoritative:true);
     }
+
+    private static string? CachedFieldTargets(WorkDayBootstrapDto bootstrap,Guid assignment)=>
+        bootstrap.FieldTargets is { } map&&map.TryGetValue(assignment,out var targets)?System.Text.Json.JsonSerializer.Serialize(targets):null;
 
     public async Task ResolveAssignmentConflictAsync(Guid assignmentId,string reason,CancellationToken ct=default)
     {
@@ -208,7 +232,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
     private static string OperationStatus(string kind,string? category,string current)=>WorkDayClientRules.AssignmentStatus(kind,category,current);
 }
 
-public sealed record WorkDayBootstrapDto(string UserName,string DisplayName,DateTimeOffset ServerTimeUtc,IReadOnlyList<AssignmentDto> Today,IReadOnlyList<AssignmentDto> Upcoming,WorkSessionDto? ActiveWorkSession,bool LocationTrackingEnabled,string LocationTrackingMode,DateTimeOffset GeneratedAtUtc);
+public sealed record WorkDayBootstrapDto(string UserName,string DisplayName,DateTimeOffset ServerTimeUtc,IReadOnlyList<AssignmentDto> Today,IReadOnlyList<AssignmentDto> Upcoming,WorkSessionDto? ActiveWorkSession,bool LocationTrackingEnabled,string LocationTrackingMode,DateTimeOffset GeneratedAtUtc,IReadOnlyDictionary<Guid,IReadOnlyList<FieldTargetDto>>? FieldTargets=null);
 public sealed record AssignmentDto(Guid Id,Guid? JobId,Guid? BookingId,string Title,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? Location,string Status,string? Instructions,Guid? WorkspaceId,Guid? ConversationId,string? CustomerName,string? CustomerEmail,string? CustomerPhone,long Version);
 public sealed record WorkSessionDto(Guid Id,string UserName,DateTimeOffset StartedAtUtc,DateTimeOffset? EndedAtUtc,string DeviceId,bool StartedOffline,bool? EndedOffline,string Source,DateTimeOffset UpdatedAtUtc);
 public sealed record OperationResultDto(Guid OperationId,string State,DateTimeOffset AcknowledgedAtUtc,string? Message,long? ServerVersion);
@@ -229,3 +253,6 @@ public sealed record AssignmentGalleryStatusDto(Guid WorkspaceId,bool Exists,Gui
 
 public sealed record WorkDayTimeBreakdownDto(string UserName,DateOnly LocalDate,double TotalMinutes,double RegularMinutes,double OvertimeMinutes,double WeekendMinutes,double WeekendOvertimeMinutes);
 public sealed record WorkDayTimeSummaryDto(string UserName,DateTimeOffset FromUtc,DateTimeOffset ToUtc,double TotalMinutes,double RegularMinutes,double OvertimeMinutes,double WeekendMinutes,double WeekendOvertimeMinutes,IReadOnlyList<WorkDayTimeBreakdownDto> Days);
+
+public sealed record FieldTargetDto(string TargetId,string Scope,string Name,string SourceFingerprint,long Version,string? Status,string? Collection=null,string? Reference=null,string? Instructions=null);
+public sealed record FieldStatusDto(string TargetId,string Status,string SourceFingerprint,long ExpectedTargetVersion,string? Reason=null);

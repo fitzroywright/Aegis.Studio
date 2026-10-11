@@ -12,7 +12,7 @@ using Npgsql;
 namespace Aegis.Studio.Web.Workflow;
 
 public sealed record CrewChange(string UserName,string Role,string? Notes=null,DateTimeOffset? Start=null,DateTimeOffset? End=null);
-public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null,string? Status=null,string? Priority=null,DateTimeOffset? ScheduledAtUtc=null,DateTimeOffset? DueAtUtc=null,string? Description=null,string? BlockedReason=null,string? HandoffTo=null,int? ExpectedFiles=null,int? CompletedFiles=null,int? FailedFiles=null,decimal? AuthorizedAmount=null,DateOnly? PaymentDueDate=null,string? CreditTerms=null,Guid? UploadBatchId=null,IReadOnlyList<Guid>? ResourceIds=null);
+public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null,string? Status=null,string? Priority=null,DateTimeOffset? ScheduledAtUtc=null,DateTimeOffset? DueAtUtc=null,string? Description=null,string? BlockedReason=null,string? HandoffTo=null,int? ExpectedFiles=null,int? CompletedFiles=null,int? FailedFiles=null,decimal? AuthorizedAmount=null,DateOnly? PaymentDueDate=null,string? CreditTerms=null,Guid? UploadBatchId=null,IReadOnlyList<Guid>? ResourceIds=null,IReadOnlyList<Guid>? SubjectIds=null);
 
 public sealed class WorkflowStore(StudioDatabase database,JobAccessService access,WorkspaceAccessService workspaces,IClientGalleryPublisher publisher,IConfiguration configuration)
 {
@@ -113,6 +113,23 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 AssignOwner(c,tx,job,string.IsNullOrWhiteSpace(request.UserName)?null:request.UserName.Trim(),actor);
                 if(!string.IsNullOrWhiteSpace(request.UserName))Notify(c,tx,job,request.OperationId.ToString(),request.UserName,"Job Owner assigned");
                 EnsureDraft(c,tx,job);Recalculate(c,tx,job);break;
+            case "reschedule-remainder":
+                if(!manage)throw new UnauthorizedAccessException();EnsureMutable(stage);RequireReason(request);
+                if(stage is not ("Scheduled" or "Photography In Progress" or "Awaiting Upload"))throw new ArgumentException("Schedule remainder before source review.");
+                if(request.SessionId is not null||request.Start is null||request.End is null||!request.Required)throw new ArgumentException("Remainder needs a new required session with a start and end.");
+                if(!Exists(c,tx,"select exists(select 1 from studio_job_owner_assignments a join studio_jobs j on j.owner_assignment_id=a.id where j.id=$1 and a.status='Accepted')",job))throw new ArgumentException("Accepted Job ownership is required.");
+                var remainder=(request.SubjectIds??[]).Distinct().ToArray();
+                if(remainder.Length==0||remainder.Length>5000)throw new ArgumentException("Select outstanding roster subjects.");
+                // Job lock serializes this decision with WorkDay writes. Recheck every selected subject.
+                foreach(var subject in remainder)
+                    if(!Exists(c,tx,"select exists(select 1 from studio_workday_roster_progress where id=$1 and job_id=$2 and status in ('Not Photographed','NotStarted','InProgress','Deferred','Absent','NoShow','Needs Retake','Blocked'))",subject,job))throw new ArgumentException("Roster changed. Refresh outstanding work before rescheduling.");
+                Guid followup=Guid.NewGuid();
+                SaveSession(c,tx,job,request with{SessionId=followup},actor,user);
+                foreach(var subject in remainder)Sql(c,tx,"insert into studio_workday_session_subjects select s.schedule_entry_id,$2 from studio_workflow_sessions w join studio_shoot_sessions s on s.id=w.shoot_id where w.id=$1",followup,subject);
+                if(stage=="Awaiting Upload")SetStage(c,tx,job,"Scheduled");
+                Notify(c,tx,job,request.OperationId.ToString(),"Owner","Remainder scheduled");
+                Notify(c,tx,job,request.OperationId.ToString(),"Manager","Remainder scheduled");
+                break;
             case "session":
                 if(!manage)throw new UnauthorizedAccessException();EnsureMutable(stage);
                 if(stage is not ("Needs Assignment" or "Needs Photographer Assignment" or "Awaiting Scheduling" or "Scheduled"))throw new ArgumentException("Withdraw/reopen the review or resolve the started shoot before changing its crew.");
@@ -506,6 +523,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         """,job);
     private static void ValidateSourceReady(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
     {
+        if(Exists(c,tx,"select exists(select 1 from studio_workday_roster_progress where job_id=$1 and status in ('Not Photographed','NotStarted','InProgress','Deferred','Absent','NoShow','Needs Retake','Blocked'))",job))throw new ArgumentException("Photograph or explicitly cancel outstanding roster subjects; schedule a follow-up session for the remainder.");
         if(Exists(c,tx,"select exists(select 1 from studio_media_upload_receipts where job_id=$1 and status not in ('Stored','Cancelled'))",job))throw new ArgumentException("Resolve pending, failed and unmatched declared uploads before source submission.");
         if(!Exists(c,tx,"select exists(select 1 from studio_workflow_upload_batches where job_id=$1 and source_upload_batch_id is not null and invalidated_at_utc is null and backup_confirmed and expected_files=completed_files and failed_files=0)",job))throw new ArgumentException("Verify an actual stored upload batch and its backup before source submission.");
         if(!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions where job_id=$1)",job)||Exists(c,tx,"select exists(select 1 from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=$1 and w.required and (s.id is null or s.status='Cancelled' or s.checked_out_at_utc is null or exists(select 1 from studio_workflow_crew c where c.session_id=w.id and not c.ready and c.waiver_reason is null)))",job))throw new ArgumentException("Complete all required sessions and photographer contributions, or explicitly waive missing contributions.");
@@ -559,6 +577,9 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
              'sessions',coalesce((select jsonb_agg(to_jsonb(w)||jsonb_build_object('shoot',to_jsonb(s),'crew',coalesce((select jsonb_agg(to_jsonb(c) order by role desc,user_name) from studio_workflow_crew c where c.session_id=w.id),'[]'::jsonb)) order by w.created_at_utc) from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=j.id),'[]'::jsonb),
              'submissions',coalesce((select jsonb_agg(to_jsonb(r) order by submitted_at_utc) from studio_workflow_submissions r where r.job_id=j.id),'[]'::jsonb),
              'bookingOverrides',coalesce((select jsonb_agg(to_jsonb(r) order by created_at_utc) from studio_booking_override_requests r where r.job_id=j.id),'[]'::jsonb),
+             'rosterCounts',coalesce((select jsonb_object_agg(status,n) from (select status,count(*) as n from studio_workday_roster_progress where job_id=j.id group by status) x),'{}'::jsonb),
+             'outstandingRoster',coalesce((select jsonb_agg(jsonb_build_object('id',p.id,'name',s.name,'collection',p.collection_name,'status',p.status) order by s.name,p.id) from studio_workday_roster_progress p join studio_job_subjects s on s.id=p.id where p.job_id=j.id and p.status in ('Not Photographed','NotStarted','InProgress','Deferred','Absent','NoShow','Needs Retake','Blocked')),'[]'::jsonb),
+             'fieldConflicts',coalesce((select jsonb_agg(to_jsonb(f) order by f.received_at_utc desc) from (select x.operation_id,x.user_name,x.target_id,x.report,x.message,x.received_at_utc from studio_workday_field_conflicts x join studio_schedule_entries e on e.id=x.assignment_id where e.job_id=j.id order by x.received_at_utc desc limit 100) f),'[]'::jsonb),
              'photographerReports',coalesce((select jsonb_agg(to_jsonb(o) order by o.occurred_at_utc desc) from (select op.user_name,op.assignment_id,op.kind,op.occurred_at_utc,op.received_at_utc,op.state,op.text_value,op.category from studio_workday_operations op join studio_schedule_entries e on e.id=op.assignment_id where e.job_id=j.id order by op.occurred_at_utc desc limit 100) o),'[]'::jsonb),
              'deliveries',coalesce((select jsonb_agg(to_jsonb(d) order by created_at_utc) from studio_workflow_deliveries d where d.job_id=j.id),'[]'::jsonb))::text from studio_jobs j where j.id=$1
             """,job) as string??throw new KeyNotFoundException();return JsonSerializer.Deserialize<JsonElement>(value);

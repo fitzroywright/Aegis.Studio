@@ -40,13 +40,13 @@ public sealed class StudioEmployeeDirectoryStore
         cmd.CommandText="""
             insert into studio_employees(user_name,display_name,is_active,is_assignable,source,last_synced_at_utc)
               select user_name,max(display_name),bool_or(is_active),true,'Existing Studio identity',now() from studio_global_operational_role_members group by user_name
-              on conflict(user_name) do update set display_name=excluded.display_name,source=excluded.source,last_synced_at_utc=excluded.last_synced_at_utc,updated_at_utc=now();
+              on conflict(user_name) do nothing;
             insert into studio_employees(user_name,display_name,is_active,is_assignable,source,workday_user_name,last_synced_at_utc)
               select user_name,display_name,is_active,is_active,'Studio photographer',user_name,now() from studio_photographers
-              on conflict(user_name) do update set display_name=excluded.display_name,source=excluded.source,workday_user_name=excluded.workday_user_name,last_synced_at_utc=excluded.last_synced_at_utc,updated_at_utc=now();
+              on conflict(user_name) do nothing;
             insert into studio_employees(user_name,display_name,is_active,is_assignable,source,last_synced_at_utc)
               select user_name,max(display_name),bool_or(is_active),true,'Workspace member',now() from studio_workspace_members group by user_name
-              on conflict(user_name) do update set display_name=excluded.display_name,is_active=excluded.is_active,updated_at_utc=now();
+              on conflict(user_name) do nothing;
             """;
         cmd.ExecuteNonQuery();
     }
@@ -67,7 +67,19 @@ public sealed class StudioEmployeeDirectoryStore
         return rows;
     }
 
-    public bool IsAssignable(string userName)=>GetAll(true).Any(x=>string.Equals(x.UserName,userName,StringComparison.OrdinalIgnoreCase));
+    public bool IsAssignable(string userName)
+    {
+        RefreshFromStudioSources();using var c=database.OpenConnection();
+        using var q=new NpgsqlCommand("select exists(select 1 from studio_employees where lower(user_name)=lower($1) and is_active and is_assignable)",c);
+        q.Parameters.AddWithValue(userName);return (bool)q.ExecuteScalar()!;
+    }
+    public IReadOnlyList<StudioEmployee> Search(string? query,int limit=25,bool photographersOnly=false)
+    {
+        string term=query?.Trim()??"";
+        var candidates=GetAll(true).Where(x=>term.Length==0||x.DisplayName.Contains(term,StringComparison.OrdinalIgnoreCase)||x.UserName.Contains(term,StringComparison.OrdinalIgnoreCase));
+        if(photographersOnly){var names=new Aegis.Studio.Web.Production.PhotographerStore(database).GetAll().Select(x=>x.UserName).ToHashSet(StringComparer.OrdinalIgnoreCase);candidates=candidates.Where(x=>names.Contains(x.UserName));}
+        return candidates.Take(Math.Clamp(limit,1,50)).ToArray();
+    }
 
     public StudioEmployee Save(StudioEmployeeRequest request)
     {
@@ -95,7 +107,7 @@ public static class StudioEmployeeDirectoryEndpoints
     public static void MapStudioEmployeeDirectory(this WebApplication app)
     {
         StudioEmployeeDirectoryStore store=new(app.Services.GetRequiredService<StudioDatabase>());store.EnsureSchema();
-        app.MapGet("/api/studio-employees",(bool? assignable)=>Results.Ok(store.GetAll(assignable==true))).RequireAuthorization();
+        app.MapGet("/api/studio-employees",(bool? assignable,string? q,int? limit,bool? photographersOnly)=>Results.Ok(assignable==true?store.Search(q,limit??25,photographersOnly==true):store.GetAll())).RequireAuthorization();
         RouteGroupBuilder admin=app.MapGroup("/api/admin/studio-employees").RequireAuthorization(new AuthorizeAttribute{Roles=StudioRoleNames.Administrator});
         admin.MapGet("/",()=>Results.Ok(store.GetAll()));
         admin.MapPost("/",(StudioEmployeeRequest request)=>Results.Ok(store.Save(request)));

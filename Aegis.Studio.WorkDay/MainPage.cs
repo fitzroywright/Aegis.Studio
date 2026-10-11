@@ -19,6 +19,9 @@ public sealed class MainPage:ContentPage
     private readonly VerticalStackLayout todayList=new(){Spacing=8};
     private readonly VerticalStackLayout upcomingList=new(){Spacing=8};
     private bool refreshing;
+    private bool observing;
+    private readonly Label progress=new();
+    private readonly ActivityIndicator syncing=new();
 
     public MainPage(WorkDayLocalStore store,WorkDaySyncEngine sync,WorkDayDeviceIdentity device,
         WorkDaySessionContext session,WorkDayApiClient api,WorkDayCredentialStore credentials,IServiceProvider services)
@@ -32,7 +35,7 @@ public sealed class MainPage:ContentPage
         Content=new ScrollView{Content=new VerticalStackLayout{Padding=18,Spacing=12,Children={
             new Label{Text="PHOTOGRAPHER WORKDAY",FontSize=25,FontAttributes=FontAttributes.Bold},
             new Label{Text=session.DisplayName??session.UserName??"Photographer"},
-            connectivity,lastSync,pending,refresh,availability,search,
+            connectivity,lastSync,pending,progress,syncing,refresh,availability,search,
             new Label{Text="NEEDS ATTENTION",FontAttributes=FontAttributes.Bold},attention,
             new Label{Text="TODAY",FontSize=20,FontAttributes=FontAttributes.Bold},todayList,
             new Label{Text="UPCOMING",FontSize=20,FontAttributes=FontAttributes.Bold},upcomingList,logout
@@ -41,7 +44,7 @@ public sealed class MainPage:ContentPage
 
     protected override async void OnAppearing()
     {
-        base.OnAppearing();await store.InitializeAsync();await RefreshAsync();
+        base.OnAppearing();if(!observing){sync.Changed+=SyncChanged;observing=true;}await store.InitializeAsync();await sync.LoadStatusAsync();await RefreshAsync();
     }
 
     private async Task RefreshAsync()
@@ -50,15 +53,11 @@ public sealed class MainPage:ContentPage
         try
         {
             bool reached=false;
-            try{await sync.SynchronizeAsync();reached=true;connectivity.Text=sync.State=="Healthy"?"ONLINE":"CONNECTED — CHANGES NEED ATTENTION";}
+            try{await sync.SynchronizeAsync();reached=sync.State is "Healthy" or "Degraded";connectivity.Text=sync.State=="Healthy"?"ONLINE":"CONNECTED — CHANGES NEED ATTENTION";}
             catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
             {connectivity.Text="OFFLINE / SYNC UNAVAILABLE — LOCAL REPORTS RETAINED";}
-            lastSync.Text=sync.LastSuccessUtc is null?"Last synchronization: Never":$"Last synchronization: {sync.LastSuccessUtc.Value.ToLocalTime():g}";
+            await ShowSyncStatusAsync();
             List<LocalOperation> outstanding=await store.UnacknowledgedAsync();
-            int availabilityPending=(await store.GetAvailabilityAsync()).Count(x=>Aegis.Studio.WorkDay.Core.WorkDayClientRules.IsOutstanding(x.SyncState));
-            pending.Text=$"{outstanding.Count} report(s) and {availabilityPending} availability change(s) awaiting acknowledgement";
-            attention.Text=outstanding.Count==0?"No pending reports.":string.Join(Environment.NewLine,
-                outstanding.Take(8).Select(x=>$"{x.Kind}: {x.State}{(x.LastError is null?"":" — "+x.LastError)}"));
             RenderAssignments(await store.GetAssignmentsAsync());
             if(reached)try
             {
@@ -68,6 +67,25 @@ public sealed class MainPage:ContentPage
             catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException){}
         }
         finally{refreshing=false;}
+    }
+
+    protected override void OnDisappearing()
+    {if(observing){sync.Changed-=SyncChanged;observing=false;}base.OnDisappearing();}
+    private void SyncChanged()=>MainThread.BeginInvokeOnMainThread(async()=>
+    {try{await ShowSyncStatusAsync();RenderAssignments(await store.GetAssignmentsAsync());}catch(Exception ex){attention.Text="Local sync status unavailable: "+ex.Message;}});
+    private async Task ShowSyncStatusAsync()
+    {
+        syncing.IsRunning=sync.State=="Sending";
+        progress.Text=syncing.IsRunning?$"Synchronizing {sync.CompletedUpdates} / {sync.TotalUpdates} updates":"Synchronization: "+sync.State;
+        lastSync.Text=sync.LastSuccessUtc is null?"Last successful synchronization: Never":$"Last successful synchronization: {sync.LastSuccessUtc.Value.ToLocalTime():g}";
+        var reports=await store.UnacknowledgedAsync();
+        var availability=(await store.GetAvailabilityAsync()).Where(x=>Aegis.Studio.WorkDay.Core.WorkDayClientRules.IsOutstanding(x.SyncState)).ToList();
+        pending.Text=$"{reports.Count} report(s) and {availability.Count} availability change(s) awaiting acknowledgement";
+        attention.Text=string.Join(Environment.NewLine,reports.Take(8).Select(x=>$"{x.Kind}: {x.State} · {x.Text}{(x.LastError is null?"":" — "+x.LastError)}")
+            .Concat(availability.Take(8).Select(x=>$"Availability: {x.SyncState} — {x.LastError}"))
+            .Concat(sync.LastError is null?Array.Empty<string>():new[]{sync.LastError}));
+        if(attention.Text.Length==0)attention.Text="No pending reports.";
+        connectivity.Text=sync.State=="Healthy"?"ONLINE":sync.State=="Sending"?"SYNCHRONIZING":sync.State=="Degraded"?"CHANGES NEED REVIEW":"OFFLINE / WAITING — LOCAL REPORTS RETAINED";
     }
 
     private void RenderAssignments(IReadOnlyList<LocalAssignment> values)

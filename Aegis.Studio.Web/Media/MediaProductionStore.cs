@@ -49,6 +49,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             "insert into studio_media_migrations(version) values(1) on conflict do nothing"
         ];
         foreach (string sql in statements) Execute(c, tx, sql);
+        Execute(c,tx,Aegis.Studio.Web.WorkDay.WorkDayFieldReports.Schema);
         tx.Commit();
     }
     public void Sync(Guid job)
@@ -78,7 +79,8 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             page as (select * from matching where ($5::uuid is null or id>$5) order by id limit $6)
             select jsonb_build_object(
             'totalAssets',(select count(*) from matching),
-            'totalSubjects',(select count(*) from studio_job_subjects where job_id=$1),
+            'totalSubjects',(select count(*) from studio_job_subjects where job_id=$1 and not is_system),
+            'rosterCounts',coalesce((select jsonb_object_agg(status,n) from (select status,count(*) as n from studio_workday_roster_progress where job_id=$1 group by status) x),'{}'::jsonb),
             'collectionCounts',coalesce((select jsonb_object_agg(collection_name,asset_count) from
               (select coalesce(col.collection_name,'Unclassified') as collection_name,count(*) as asset_count from studio_media_assets a
                left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key
@@ -93,7 +95,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
               from page a join lateral(select * from studio_asset_versions where job_id=a.job_id and asset_key=a.asset_key order by version_number desc limit 1)v on true
               left join studio_media_derivatives d on d.version_id=v.id
               left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key),'[]'::jsonb),
-            'subjects',coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'reference',s.reference,'notes',s.notes,'collection',s.collection_name,'scheduledAtUtc',s.scheduled_at_utc,'scheduleLocation',s.schedule_location,'contactName',s.contact_name,'contactEmail',s.contact_email,'contactPhone',s.contact_phone,'photoNotes',s.photo_notes,'isSystem',s.is_system,'status',case when s.production_status='Not Photographed' and exists(select 1 from studio_media_asset_subjects where subject_id=s.id) then 'Photographed' else s.production_status end,'attributes',s.attributes,
+            'subjects',coalesce((select jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'reference',s.reference,'notes',s.notes,'collection',s.collection_name,'scheduledAtUtc',s.scheduled_at_utc,'scheduleLocation',s.schedule_location,'contactName',s.contact_name,'contactEmail',s.contact_email,'contactPhone',s.contact_phone,'photoNotes',s.photo_notes,'isSystem',s.is_system,'status',coalesce((select p.status from studio_workday_roster_progress p where p.id=s.id),case when s.production_status='Not Photographed' and exists(select 1 from studio_media_asset_subjects where subject_id=s.id) then 'Photographed' else s.production_status end),'attributes',s.attributes,
               'imageCount',(select count(*) from studio_media_asset_subjects where subject_id=s.id))) from (select * from studio_job_subjects where job_id=$1 and ($7::text is null or name ilike '%'||$7||'%' or reference ilike '%'||$7||'%') order by is_system desc,name,id limit 500) s),'[]'::jsonb),
             'unmatched',coalesce((select jsonb_agg(jsonb_build_object('id',u.id,'fileName',v.file_name,'versionId',v.id,'reason',u.reason)) from studio_media_unmatched u join studio_asset_versions v on v.id=u.version_id where u.job_id=$1 and u.resolved_asset_id is null),'[]'::jsonb))::text
             """,c);

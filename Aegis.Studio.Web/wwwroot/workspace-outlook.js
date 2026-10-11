@@ -253,15 +253,17 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 try{
                     const view=await json('/api/jobs/'+job.id+'/connected-workflow');if(!current())return;
                     workflow=view;const data=view.data;
-                    window.StudioJobDetails.workflow(header.querySelector('.jd-workflow-track'),data,job);
+                    window.StudioJobDetails.workflow(header.querySelector('.jd-workflow-track'),data,job,view,selector=>header.querySelector('[data-job-workflow]').onclick(selector));
                     header.querySelector('.jd-status-pill').textContent=data.stage;
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(data.owner?studioFirstName(data.owner):'Unassigned');
                     header.querySelector('[data-job-blocked]').textContent=data.blockedReason?'Blocked: '+data.blockedReason:'';
                     const next={'Pending':'Review and confirm booking','Needs Assignment':'Assign a job owner','Needs Photographer Assignment':'Assign photographers','Awaiting Scheduling':'Schedule required sessions','Scheduled':'Start photography','Photography In Progress':'Finish required sessions','Awaiting Upload':'Complete and submit source media','Awaiting Production Review':'Review source material','Active Production':'Complete production and submit finished work','Awaiting Approval':'Approve finished work','Changes Requested':'Resolve requested corrections','Ready for Delivery':'Publish gallery and record delivery','Delivered':'Complete job'}[data.stage];
-                    attention.querySelector('.jd-attention-items').innerHTML=(data.blockedReason?'<p class="jd-blocked">'+esc(data.blockedReason)+'</p>':'')+(next?'<p>'+esc(next)+'</p>':'<p>No outstanding workflow action.</p>');updateAge();
+                    attention.querySelector('.jd-attention-items').innerHTML=(data.blockedReason?'<p class="jd-blocked">'+esc(data.blockedReason)+'</p>':'')+(next?'<p>'+esc(next)+'</p>':'<p>No outstanding workflow action.</p>')+((data.fieldConflicts||[]).length?'<p>Sync conflicts recorded: '+data.fieldConflicts.length+' · Review conflict history</p>':'')+Object.entries(data.rosterCounts||{}).map(([state,n])=>'<p>'+esc(state)+': '+esc(n)+'</p>').join('')+((data.outstandingRoster||[]).length?'<p>Outstanding roster: '+data.outstandingRoster.length+'</p>':'');
+                    const decision=window.StudioWorkflow.nextAction(view),button=attention.querySelector('[data-view-workflow]');button.textContent=decision.label+' →';button.onclick=()=>header.querySelector('[data-job-workflow]').onclick(decision.selector);updateAge();
                 }catch(error){if(current()){header.querySelector('[data-stage-age]').textContent='Workflow unavailable';attention.querySelector('.jd-attention-items').textContent='Workflow could not be loaded. Open View workflow to retry.';}}
             };
-            header.querySelector('[data-job-workflow]').onclick=async()=>{
+            header.querySelector('[data-job-workflow]').onclick=async selector=>{
+                if(typeof selector!=='string')selector=null;
                 const dialog=studioDialog('Assignments & Workflow','<div class="job-detail-workflow-content"></div>');dialog.classList.add('job-detail-workflow-dialog');
                 workflowDialog=dialog;
                 const host=dialog.querySelector('.job-detail-workflow-content');
@@ -273,7 +275,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                         for(const name of ['tasks','activity','overview']){loaded.delete(name);if(!panels[name].hidden)loadPanel(name,true);}
                     }
                 }, {once:true});
-                try{await window.StudioWorkflow.render(host,job.id,()=>current()&&dialog.isConnected);}catch(error){host.textContent=error.message||String(error);}
+                try{await window.StudioWorkflow.render(host,job.id,()=>current()&&dialog.isConnected);if(selector)host.querySelector(selector)?.click();}catch(error){host.textContent=error.message||String(error);}
             };
             // No detached panel retains a running clock.
             const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);

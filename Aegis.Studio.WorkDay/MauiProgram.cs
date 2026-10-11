@@ -12,6 +12,7 @@ public static class MauiProgram
    b.Services.AddSingleton<WorkDayLocalStore>();
    b.Services.AddSingleton<WorkDayApiClient>();
    b.Services.AddSingleton<WorkDaySyncEngine>();
+   b.Services.AddSingleton<WorkDayAutoSync>();
    b.Services.AddSingleton<WorkDayLocationService>();
    b.Services.AddSingleton<WorkDayUploadService>();
    b.Services.AddTransient<StartupPage>();

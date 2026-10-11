@@ -20,6 +20,8 @@ public sealed class LocalAssignment
     public string? CustomerEmail { get; set; }
     public string? CustomerPhone { get; set; }
     public bool IsCurrent { get; set; }=true;
+    [Ignore] public string? FieldTargetsJson { get; set; }
+    public string? FieldTargetsCiphertext { get; set; }
     public long Version { get; set; }
     public DateTimeOffset CachedAtUtc { get; set; }
 }
@@ -33,7 +35,8 @@ public sealed class LocalOperation
     public string DeviceId { get; set; }="";
     [Ignore] public string? Text { get; set; }
     public string? TextCiphertext { get; set; }
-    public string? Category { get; set; }
+    [Ignore] public string? Category { get; set; }
+    public string? CategoryCiphertext { get; set; }
     public long? ExpectedVersion { get; set; }
     public Guid? LocationObservationId { get; set; }
     [Ignore] public double? Latitude { get; set; }
@@ -126,6 +129,8 @@ public sealed class LocalLocationObservation
 public sealed class WorkDayLocalStore
 {
     private readonly SQLiteAsyncConnection db;
+    private readonly SemaphoreSlim initialization=new(1,1);
+    private bool initialized;
     private readonly WorkDayDataProtector protector;
     public WorkDayLocalStore(WorkDayDataProtector protector)
     {
@@ -136,6 +141,11 @@ public sealed class WorkDayLocalStore
 
     public async Task InitializeAsync()
     {
+        if(initialized)return;
+        await initialization.WaitAsync();
+        try
+        {
+            if(initialized)return;
         await db.CreateTableAsync<LocalMetadata>();
         await db.CreateTableAsync<LocalAssignment>();
         await db.CreateTableAsync<LocalOperation>();
@@ -144,6 +154,9 @@ public sealed class WorkDayLocalStore
         await db.CreateTableAsync<LocalAvailability>();
         await db.CreateTableAsync<LocalLocationObservation>();
         await MigrateAsync();
+            initialized=true;
+        }
+        finally{initialization.Release();}
     }
 
     public async Task BindAccountAsync(Uri server,string userName)
@@ -163,6 +176,11 @@ public sealed class WorkDayLocalStore
         }
     }
 
+    public async Task<string?> GetMetadataAsync(string key)
+    {await InitializeAsync();return (await db.Table<LocalMetadata>().Where(x=>x.Key==key).FirstOrDefaultAsync())?.Value;}
+    public async Task SetMetadataAsync(string key,string value)
+    {await InitializeAsync();await db.InsertOrReplaceAsync(new LocalMetadata{Key=key,Value=value});}
+
     private async Task MigrateAsync()
     {
         LocalMetadata? row=await db.Table<LocalMetadata>().Where(x=>x.Key=="SchemaVersion").FirstOrDefaultAsync();
@@ -177,6 +195,19 @@ public sealed class WorkDayLocalStore
             await db.ExecuteAsync("update LocalAssignment set IsCurrent=1");
             await db.ExecuteAsync("update LocalAvailability set SyncState='Acknowledged' where SyncState is null");
             version=3;
+        }
+        if(version<4)
+        {
+            var columns=await db.GetTableInfoAsync(nameof(LocalOperation));
+            if(columns.Any(x=>x.Name.Equals("Category",StringComparison.OrdinalIgnoreCase)))
+            {
+                foreach(var old in await db.QueryAsync<LegacyCategory>("select OperationId,Category from LocalOperation where Category is not null"))
+                {
+                    var encrypted=await protector.ProtectAsync(old.Category);
+                    await db.ExecuteAsync("update LocalOperation set CategoryCiphertext=?,Category=null where OperationId=?",encrypted,old.OperationId);
+                }
+            }
+            version=4;
         }
         await db.InsertOrReplaceAsync(new LocalMetadata{Key="SchemaVersion",Value=version.ToString(System.Globalization.CultureInfo.InvariantCulture)});
     }
@@ -226,6 +257,8 @@ public sealed class WorkDayLocalStore
         }
     }
 
+    private sealed class LegacyCategory { public Guid OperationId {get;set;} public string? Category {get;set;} }
+
     private sealed class LegacyOperationSensitive
     {
         public Guid OperationId { get; set; }
@@ -255,7 +288,7 @@ public sealed class WorkDayLocalStore
                 Title=await protector.ProtectAsync(value.Title)??"",StartsAtUtc=value.StartsAtUtc,EndsAtUtc=value.EndsAtUtc,
                 Location=await protector.ProtectAsync(value.Location),Status=value.Status,Instructions=await protector.ProtectAsync(value.Instructions),
                 CustomerName=await protector.ProtectAsync(value.CustomerName),CustomerEmail=await protector.ProtectAsync(value.CustomerEmail),
-                CustomerPhone=await protector.ProtectAsync(value.CustomerPhone),IsCurrent=value.IsCurrent,Version=value.Version,CachedAtUtc=value.CachedAtUtc
+                FieldTargetsCiphertext=await protector.ProtectAsync(value.FieldTargetsJson),CustomerPhone=await protector.ProtectAsync(value.CustomerPhone),IsCurrent=value.IsCurrent,Version=value.Version,CachedAtUtc=value.CachedAtUtc
             };
             prepared.Add(v);
         }
@@ -408,6 +441,7 @@ public sealed class WorkDayLocalStore
 
     private async Task ProtectOperationAsync(LocalOperation value)
     {
+        value.CategoryCiphertext=await protector.ProtectAsync(value.Category);
         if(value.Text is not null) value.TextCiphertext=await protector.ProtectAsync(value.Text);
         if(value.Latitude.HasValue) value.LatitudeCiphertext=await protector.ProtectAsync(value.Latitude.Value.ToString("R",System.Globalization.CultureInfo.InvariantCulture));
         if(value.Longitude.HasValue) value.LongitudeCiphertext=await protector.ProtectAsync(value.Longitude.Value.ToString("R",System.Globalization.CultureInfo.InvariantCulture));
@@ -416,6 +450,7 @@ public sealed class WorkDayLocalStore
 
     private async Task UnprotectOperationAsync(LocalOperation value)
     {
+        value.Category=await protector.UnprotectAsync(value.CategoryCiphertext);
         value.Text=await protector.UnprotectAsync(value.TextCiphertext);
         value.Latitude=ParseDouble(await protector.UnprotectAsync(value.LatitudeCiphertext));
         value.Longitude=ParseDouble(await protector.UnprotectAsync(value.LongitudeCiphertext));
@@ -443,6 +478,7 @@ public sealed class WorkDayLocalStore
 
     private async Task UnprotectAsync(LocalAssignment v)
     {
+        v.FieldTargetsJson=await protector.UnprotectAsync(v.FieldTargetsCiphertext);
         v.Title=await protector.UnprotectAsync(v.Title)??"";
         v.Location=await protector.UnprotectAsync(v.Location);
         v.Instructions=await protector.UnprotectAsync(v.Instructions);
