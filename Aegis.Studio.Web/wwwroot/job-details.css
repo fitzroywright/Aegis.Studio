@@ -43,7 +43,7 @@ button.jd-stage { position:absolute; display:flex; align-items:center; gap:6px; 
 .jd-stage > span:last-child { background:var(--theme-surface,#fff); padding:2px 3px; border-radius:3px; }
 .jd-stage-light { flex:none; width:18px; height:18px; display:grid; place-items:center; border:1px solid #a5abba; border-radius:50%; background:#e8e9ec; color:#fff; font-size:11px; }
 .jd-stage.complete { color:var(--theme-text,#162b50); }
-.jd-stage.complete .jd-stage-light { background:#318348; border-color:#318348; }
+.jd-stage.complete .jd-stage-light,.jd-stage.current.complete .jd-stage-light { background:#318348; border-color:#318348; }
 .jd-stage.current { font-weight:750; color:var(--theme-text,#162b50); }
 .jd-stage.current .jd-stage-light { background:#fb851c; border-color:#fb851c; }
 .jd-stage.exception .jd-stage-light { background:#bd3040; border-color:#bd3040; }

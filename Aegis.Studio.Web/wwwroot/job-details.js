@@ -12,9 +12,19 @@
   const noShoot=/print|edit/i.test(job.jobType||job.type||'')&&!(data.sessions||[]).length;
   const crewAssigned=sessions.length>0&&sessions.every(s=>s.crew_finalized&&(s.crew||[]).length>0);
   const shootComplete=sessions.length>0&&sessions.every(s=>s.shoot?.checked_out_at_utc&&s.shoot.status!=='Cancelled');
-  const visited=new Set((data.history||[]).filter(h=>h.exited_at_utc).map(h=>h.new_stage));
   const reshoot=sessions.some(s=>s.shoot?.reshoot_required)||(data.outstandingRoster||[]).some(s=>s.status==='Needs Retake');
   const groups=[['Booking',['Pending']],['Assignment',['Needs Assignment','Needs Photographer Assignment','Photographer Assigned']],['Shoot',['Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete']],['Upload',['Awaiting Upload','Awaiting Production Review']],['Production',['Active Production','Awaiting Approval']],['Delivery',['Ready for Delivery','Delivered','Completed']]];
+  const main=groups.flatMap(([,labels])=>labels),history=data.history||[],passed=new Set();
+  // Leaving a stage for cancellation, corrections or an earlier gate is not a successful pass.
+  // Re-entering a stage replaces its earlier result until that stage passes again.
+  history.forEach((entry,index)=>{
+   const from=entry.new_stage,to=history[index+1]?.new_stage||data.stage;
+   passed.delete(from);
+   if(!entry.exited_at_utc)return;
+   const forward=main.includes(from)&&main.includes(to)&&main.indexOf(to)>main.indexOf(from);
+   const corrected=from==='Changes Requested'&&['Awaiting Production Review','Active Production'].includes(to);
+   if(forward||corrected)passed.add(from);
+  });
   const positions=new Map();groups.forEach(([,labels],column)=>labels.forEach((label,row)=>positions.set(label,{x:column*170+18,y:32+row*25})));
   [['Cancelled',1],['Reshoot Required',2],['Changes Requested',4],['Blocked',5]].forEach(([label,column])=>positions.set(label,{x:column*170+18,y:151}));
   if(!positions.has(data.stage))positions.set(data.stage,{x:18,y:151});
@@ -22,11 +32,11 @@
   const nodes=labels.map(label=>{
    const skipped=noShoot&&(photographyStages.has(label)||label==='Reshoot Required'),current=label===data.stage||(label==='Blocked'&&!!data.blockedReason)||(label==='Reshoot Required'&&reshoot);
    const milestone=label==='Photographer Assigned'||label==='Shoot Complete';
-   const complete=label==='Photographer Assigned'?crewAssigned:label==='Shoot Complete'?shootComplete:visited.has(label);
-   const state=skipped?'skipped':current?(label==='Cancelled'||label==='Changes Requested'||label==='Blocked'||label==='Reshoot Required'?'current exception':'current'):complete?'complete':'pending';
-   const description=skipped?'Not required':current?'Current':complete?(milestone?'Confirmed':'Previously completed'):'Not reached';
+   const complete=hostStageComplete(label),finished=label==='Completed'&&current;
+   const state=skipped?'skipped':finished?'current complete':current?(label==='Cancelled'||label==='Changes Requested'||label==='Blocked'||label==='Reshoot Required'?'current exception':'current'):complete?'complete':'pending';
+   const description=skipped?'Not required':finished?'Successfully completed':current?'Current':complete?(milestone?'Confirmed':'Successfully passed'):'Not yet passed';
    const point=positions.get(label);
-   return `<button type="button" style="left:${point.x-9}px;top:${point.y-9}px" class="jd-stage ${state}" data-flow-stage="${escape(label)}" title="${escape(label+' · '+description)}" ${label===data.stage?'aria-current="step"':''}><span class="jd-stage-light" aria-hidden="true">${skipped?'–':current&&state.includes('exception')?'!':complete&&!current?'✓':''}</span><span>${escape(label)}${skipped?' <small>Not required</small>':''}</span></button>`;
+   return `<button type="button" style="left:${point.x-9}px;top:${point.y-9}px" class="jd-stage ${state}" data-flow-stage="${escape(label)}" title="${escape(label+' · '+description)}" ${label===data.stage?'aria-current="step"':''}><span class="jd-stage-light" aria-hidden="true">${skipped?'–':current&&state.includes('exception')?'!':finished||complete&&!current?'✓':''}</span><span>${escape(label)}${skipped?' <small>Not required</small>':''}</span></button>`;
   }).join('');
   const edge=(from,to,kind='main',returning=false)=>{
    const a=positions.get(from),b=positions.get(to);if(!a||!b)return '';
@@ -37,8 +47,7 @@
    else {const lane=returning?(kind==='reshoot'?181:176):({correction:132,reshoot:137,cancel:142,block:147}[kind]||137);path=`M ${a.x} ${a.y} C ${a.x-14} ${a.y+14} ${a.x-14} ${lane} ${a.x} ${lane} L ${b.x} ${lane} C ${b.x+14} ${lane} ${b.x+14} ${b.y+14} ${b.x} ${b.y}`;}
    return `<path data-flow-edge="${escape(from+' → '+to)}" class="jd-flow-edge ${kind} ${highlight?'attention':recorded?'recorded':''}" d="${path}"/>`;
   };
-  function hostStageComplete(label){return label==='Photographer Assigned'?crewAssigned:label==='Shoot Complete'?shootComplete:visited.has(label);}
-  const main=groups.flatMap(([,labels])=>labels);
+  function hostStageComplete(label){return label==='Photographer Assigned'?crewAssigned:label==='Shoot Complete'?shootComplete:label==='Completed'?data.stage==='Completed':passed.has(label);}
   const mainEdges=main.slice(1).map((label,index)=>edge(main[index],label)).join('');
   const correctionEdges=(data.correctionKind? [data.correctionKind]:['Source','Production']).map(kind=>{const origin=kind==='Source'?'Awaiting Production Review':'Awaiting Approval',target=kind==='Source'?'Awaiting Production Review':'Active Production';return edge(origin,'Changes Requested','correction')+edge('Changes Requested',target,'correction',true);}).join('');
   const previous=(data.history||[]).filter(h=>positions.has(h.new_stage)&&!['Cancelled','Blocked','Reshoot Required','Changes Requested'].includes(h.new_stage)).at(-1)?.new_stage;
