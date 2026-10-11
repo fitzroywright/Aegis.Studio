@@ -15,14 +15,22 @@
 #conversationView.has-open-job > .workspace-announcement-banners { display:none; }
 #conversationView > .job-detail-page { display:grid; grid-template-columns:minmax(0,1fr) clamp(245px,20vw,300px); grid-template-rows:auto auto minmax(0,1fr); flex:1; min-width:0; min-height:0; padding:0; gap:8px; overflow:hidden; color:var(--theme-text,#162b50); background:var(--theme-surface,#faf9f6); }
 .job-detail-page [hidden] { display:none; }
-.job-detail-heading { grid-column:1; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; padding:11px 14px 8px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); }
+.job-detail-heading { grid-column:1; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:11px 14px 8px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); }
 .job-detail-title { min-width:0; }
 .job-detail-title h1 { margin:0 0 4px; font-size:20px; line-height:1.15; overflow-wrap:anywhere; }
 .job-detail-title p { margin:0; font-size:11px; color:var(--theme-muted,#6f7a8b); }
 .jd-job-status { display:flex; flex-direction:column; align-items:flex-end; gap:5px; font-size:10px; }
-.jd-status-pill { padding:4px 12px; border-radius:20px; background:#d2eedb; color:#204d34; font-weight:700; max-width:210px; text-align:center; }
+.jd-status-pill { display:inline-flex; align-items:center; gap:7px; border:0; box-shadow:none; cursor:pointer; font:inherit; font-size:11px; padding:4px 12px; border-radius:20px; background:#d2eedb; color:#204d34; font-weight:700; max-width:210px; text-align:center; }
+.jd-status-pill::after { content:"⌄"; transition:transform .24s ease; }
+.jd-status-pill[aria-expanded=true]::after { transform:rotate(180deg); }
+.jd-status-pill:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
+.jd-flow-drawer { grid-column:1/-1; display:grid; grid-template-rows:0fr; min-width:0; opacity:0; visibility:hidden; transition:grid-template-rows .24s ease,opacity .24s ease,visibility 0s .24s; }
+.jd-flow-drawer.is-open { grid-template-rows:1fr; opacity:1; visibility:visible; transition:grid-template-rows .24s ease,opacity .24s ease,visibility 0s; }
+.jd-flow-drawer-inner { min-height:0; min-width:0; overflow:hidden; }
+.jd-flow-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:8px; font-size:11px; }
+@media(prefers-reduced-motion:reduce) { .jd-flow-drawer,.jd-flow-drawer.is-open,.jd-status-pill::after { transition:none; } }
 .jd-job-status small { color:var(--theme-muted,#7c8493); }
-.jd-workflow-track { grid-column:1/-1; display:block; padding:5px 0 0; min-width:0; overflow:auto; max-height:195px; }
+.jd-workflow-track { display:block; padding:5px 0 0; min-width:0; overflow:auto; max-height:195px; }
 .jd-flow-canvas { position:relative; width:1020px; height:184px; }
 .jd-flow-lines { position:absolute; inset:0; width:1020px; height:184px; pointer-events:none; }
 .jd-flow-edge { fill:none; stroke:#c5cad3; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
@@ -35,14 +43,14 @@ button.jd-stage { position:absolute; display:flex; align-items:center; gap:6px; 
 .jd-stage > span:last-child { background:var(--theme-surface,#fff); padding:2px 3px; border-radius:3px; }
 .jd-stage-light { flex:none; width:18px; height:18px; display:grid; place-items:center; border:1px solid #a5abba; border-radius:50%; background:#e8e9ec; color:#fff; font-size:11px; }
 .jd-stage.complete { color:var(--theme-text,#162b50); }
-.jd-stage.complete .jd-stage-light { background:#318348; border-color:#318348; }
+.jd-stage.complete .jd-stage-light,.jd-stage.current.complete .jd-stage-light { background:#318348; border-color:#318348; }
 .jd-stage.current { font-weight:750; color:var(--theme-text,#162b50); }
 .jd-stage.current .jd-stage-light { background:#fb851c; border-color:#fb851c; }
 .jd-stage.exception .jd-stage-light { background:#bd3040; border-color:#bd3040; }
 .jd-stage.skipped .jd-stage-light { background:transparent; color:var(--theme-muted,#69758b); }
 .jd-stage small { display:block; font-size:9px; }
 button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
-.jd-workflow-caption { grid-column:1/-1; display:flex; align-items:center; flex-wrap:wrap; gap:5px 12px; font-size:10px; color:#b4510f; }
+.jd-workflow-caption { grid-column:1/-1; margin-top:8px; display:flex; align-items:center; flex-wrap:wrap; gap:5px 12px; font-size:10px; color:#b4510f; }
 .jd-workflow-caption [data-job-blocked] { color:#bd3040; }
 .jd-workflow-caption .jd-link { margin-left:auto; }
 .jd-link { border:0; background:transparent; color:#9c631c; padding:3px; font-size:11px; font-weight:750; cursor:pointer; }
@@ -134,4 +142,4 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .job-detail-workflow-dialog .workflow-panel { margin:0; overflow:visible; }
 @media(max-width:1200px) { .jd-drop-hint { display:none; } .jd-contact-sheet { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr) 230px; } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-job-status { max-width:110px; } .jd-workflow-track { padding:6px 0 0; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } .job-detail-facts { grid-template-columns:1fr; } }
-@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:4; grid-template-rows:minmax(0,1fr); } .job-detail-selected-file,.jd-attention { display:none; } .job-detail-heading { padding:7px; gap:5px; } .jd-job-status { display:none; } .jd-workflow-track { max-height:195px; } .job-detail-navigation button { padding:6px 2px; font-size:9px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
+@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:4; grid-template-rows:minmax(0,1fr); } .job-detail-selected-file,.jd-attention { display:none; } .job-detail-heading { padding:7px; gap:0 5px; } .jd-job-status { max-width:130px; } .jd-workflow-track { max-height:195px; } .job-detail-navigation button { padding:6px 2px; font-size:9px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }

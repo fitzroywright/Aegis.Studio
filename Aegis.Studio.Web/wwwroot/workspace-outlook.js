@@ -154,8 +154,25 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const header=detailPane.querySelector('.detail-header');
             header.className='job-detail-heading';
             header.innerHTML=`<div class="job-detail-title"><h1>${esc(job.title)}</h1><p>${esc(job.eventDate?new Date(job.eventDate.includes('T')?job.eventDate:job.eventDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'2-digit',year:'numeric'}).replaceAll(',',''):'Needs scheduling')} · <span data-job-owner>Owner: ${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</span></p></div>
-                <div class="jd-job-status"><span class="jd-status-pill">${esc(job.status)}</span><small>${esc(job.jobCode||job.code||'')}</small></div>
-                <div class="jd-workflow-track" aria-live="polite"></div><div class="jd-workflow-caption"><span data-stage-age></span><span data-job-blocked></span><button type="button" class="jd-link" data-job-workflow>Assignments &amp; Workflow →</button></div>`;
+                <div class="jd-job-status"><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show job flow">${esc(job.status)}</button><small>${esc(job.jobCode||job.code||'')}</small></div>
+                <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-flow-toolbar"><strong>Job Flow</strong><button type="button" class="jd-link" data-close-job-flow>Close ↑</button></div><div class="jd-workflow-track" aria-live="polite"></div></div></section>
+                <div class="jd-workflow-caption"><span data-stage-age></span><span data-job-blocked></span><button type="button" class="jd-link" data-job-workflow>Assignments &amp; Workflow →</button></div>`;
+            const flowToggle=header.querySelector('.jd-status-pill'),flowDrawer=header.querySelector('.jd-flow-drawer');
+            const setFlowOpen=(open,restoreFocus=false)=>{
+                flowToggle.setAttribute('aria-expanded',String(open));
+                flowToggle.title=open?'Hide job flow':'Show job flow';
+                flowDrawer.classList.toggle('is-open',open);
+                flowDrawer.setAttribute('aria-hidden',String(!open));
+                flowDrawer.toggleAttribute('inert',!open);
+                if(restoreFocus)flowToggle.focus();
+            };
+            flowToggle.onclick=()=>setFlowOpen(flowToggle.getAttribute('aria-expanded')!=='true');
+            header.querySelector('[data-close-job-flow]').onclick=()=>setFlowOpen(false,true);
+            header.addEventListener('keydown',event=>{
+                if(event.key==='Escape'&&flowToggle.getAttribute('aria-expanded')==='true'){
+                    event.preventDefault();event.stopPropagation();setFlowOpen(false,true);
+                }
+            });
             const nav=document.createElement('nav');
             nav.className='job-detail-navigation';nav.setAttribute('aria-label','Job information');
             nav.innerHTML=[['media','▣ Media'],['overview','▤ Details'],['subjects','♙ Subjects'],['tasks','☑ Tasks'],['activity','◷ Activity']].map(([name,label])=>`<button type="button" data-job-scroll="${name}" aria-controls="${name==='messages'?'jobDetailMessages':'jobDetail-'+name}">${label}</button>`).join('');
@@ -263,6 +280,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 }catch(error){if(current()){header.querySelector('[data-stage-age]').textContent='Workflow unavailable';attention.querySelector('.jd-attention-items').textContent='Workflow could not be loaded. Open View workflow to retry.';}}
             };
             header.querySelector('[data-job-workflow]').onclick=async selector=>{
+                setFlowOpen(false);
                 if(typeof selector!=='string')selector=null;
                 const dialog=studioDialog('Assignments & Workflow','<div class="job-detail-workflow-content"></div>');dialog.classList.add('job-detail-workflow-dialog');
                 workflowDialog=dialog;
