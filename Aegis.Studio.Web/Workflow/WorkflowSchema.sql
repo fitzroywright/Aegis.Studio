@@ -284,3 +284,36 @@ do $$ declare name text; begin
   end if;
  end loop;
 end $$;
+
+-- Reassignment/rescheduling invalidates old offline reports even for the same person.
+-- Original operation evidence is retained; versions never reset to zero.
+create or replace function studio_workday_assignment_generation() returns trigger language plpgsql as $$
+declare entry uuid; resource uuid; person text;
+begin
+ entry:=case when tg_op='DELETE' then old.entry_id else new.entry_id end;
+ resource:=case when tg_op='DELETE' then old.resource_id else new.resource_id end;
+ select lower(user_name) into person from studio_photographers where schedule_resource_id=resource;
+ if person is not null then
+  insert into studio_workday_photographer_state(assignment_id,user_name,status,version,changed_at_utc,last_operation_id)
+   values(entry,person,'Assigned',1,now(),gen_random_uuid()) on conflict(assignment_id,user_name) do update
+   set status='Assigned',version=studio_workday_photographer_state.version+1,changed_at_utc=now(),last_operation_id=excluded.last_operation_id;
+ end if;
+ if tg_op='DELETE' then return old; else return new; end if;
+end $$;
+drop trigger if exists workday_assignment_generation on studio_schedule_entry_resources;
+create trigger workday_assignment_generation after insert or delete on studio_schedule_entry_resources
+ for each row execute function studio_workday_assignment_generation();
+
+create table if not exists studio_job_owner_assignments(
+ id uuid primary key,job_id uuid not null references studio_jobs(id),assigned_to text not null,assigned_by text not null,
+ assigned_at_utc timestamptz not null default now(),status text not null check(status in ('Assigned','Accepted','Declined','Superseded')),
+ response_reason text,responded_at_utc timestamptz,superseded_at_utc timestamptz);
+create unique index if not exists ux_current_owner_assignment on studio_job_owner_assignments(job_id) where status in ('Assigned','Accepted');
+alter table studio_jobs add column if not exists owner_assignment_id uuid references studio_job_owner_assignments(id);
+insert into studio_job_owner_assignments(id,job_id,assigned_to,assigned_by,status)
+ select md5('legacy-owner:'||id)::uuid,id,job_lead,'System migration','Assigned' from studio_jobs
+ where nullif(trim(job_lead),'') is not null and owner_assignment_id is null and status not in ('Completed','Cancelled') on conflict do nothing;
+update studio_jobs set owner_assignment_id=md5('legacy-owner:'||id)::uuid
+ where owner_assignment_id is null and status not in ('Completed','Cancelled') and exists(select 1 from studio_job_owner_assignments a where a.id=md5('legacy-owner:'||studio_jobs.id)::uuid);
+drop trigger if exists closed_child_guard on studio_job_owner_assignments;
+create trigger closed_child_guard before insert or update or delete on studio_job_owner_assignments for each row execute function studio_closed_child_guard();

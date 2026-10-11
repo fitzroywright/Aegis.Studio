@@ -39,7 +39,8 @@ public sealed class JobAccessService
             select j.id,array[coalesce(w.access_workspace,false),coalesce(w.can_view,false),coalesce(w.can_view,false),coalesce(w.reply_requester,false),coalesce(w.view_attachments,false),coalesce(w.add_attachments,false),coalesce(w.edit_job,false),coalesce(w.edit_job,false),coalesce(w.edit_job,false),coalesce(w.manage_schedule,false),coalesce(w.manage_production,false),coalesce(w.edit_job,false),coalesce(w.edit_job,false),coalesce(w.edit_job,false),coalesce(w.can_view,false),coalesce(w.edit_job,false),coalesce(w.notify_members,false),coalesce(w.manage_members,false),coalesce(w.admin_workspace,false)],array[coalesce(m.access_job,false),coalesce(m.view_job,false),coalesce(m.view_conversation,false),coalesce(m.reply_requester,false),coalesce(m.view_attachments,false),coalesce(m.add_attachments,false),coalesce(m.edit_job,false),coalesce(m.change_status,false),coalesce(m.assign_staff,false),coalesce(m.manage_schedule,false),coalesce(m.manage_production,false),coalesce(m.view_financials,false),coalesce(m.record_financial_activity,false),coalesce(m.use_pos,false),coalesce(m.view_pos_transactions,false),coalesce(m.refund_void_pos,false),coalesce(m.notify_job_members,false),coalesce(m.manage_job_members,false),coalesce(m.admin_job,false)],
               m.job_id is not null,coalesce(m.inherit_workspace_permissions,true),coalesce(w.admin_workspace,false),lower(coalesce(j.job_lead,''))=lower($1),
               exists(select 1 from studio_workflow_crew wc join studio_workflow_sessions ws on ws.id=wc.session_id where ws.job_id=j.id and lower(wc.user_name)=lower($1) and ws.required),
-              exists(select 1 from studio_job_activities a where a.job_id=j.id and lower(a.assigned_to)=lower($1) and a.status<>'Cancelled')
+              exists(select 1 from studio_job_activities a where a.job_id=j.id and lower(a.assigned_to)=lower($1) and a.status<>'Cancelled'),
+              exists(select 1 from studio_job_owner_assignments a where a.id=j.owner_assignment_id and lower(a.assigned_to)=lower($1) and a.status='Declined' and j.job_lead is null)
             from studio_jobs j
             left join lateral(select bool_or(access_workspace) as access_workspace,bool_or(can_view) as can_view,bool_or(reply_requester) as reply_requester,bool_or(view_attachments) as view_attachments,bool_or(add_attachments) as add_attachments,bool_or(edit_job) as edit_job,bool_or(manage_schedule) as manage_schedule,bool_or(manage_production) as manage_production,bool_or(notify_members) as notify_members,bool_or(manage_members) as manage_members,bool_or(admin_workspace) as admin_workspace from studio_workspace_members wm
               where lower(wm.user_name)=lower($1) and wm.is_active and (wm.workspace_id=j.workspace_id or exists(
@@ -57,6 +58,7 @@ public sealed class JobAccessService
                 ?Union(reader.GetBoolean(4)?Union(global,inherited):global,direct):Union(global,inherited);
             if(reader.GetBoolean(6))permissions=Union(permissions,JobPermissionSet.WorkflowOwner);
             else if(reader.GetBoolean(7)||reader.GetBoolean(8))permissions=Union(permissions,JobPermissionSet.WorkflowContributor);
+            if(reader.GetBoolean(9))permissions=Union(permissions,JobPermissionSet.Viewer);
             if(permissions.AccessJob||permissions.ViewJob)result[reader.GetGuid(0)]=permissions;
         }
         return result;

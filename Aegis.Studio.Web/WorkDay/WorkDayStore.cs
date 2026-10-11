@@ -449,14 +449,15 @@ public sealed class WorkDayStore(StudioDatabase database)
         };
         if(request.Kind==WorkDayOperationKind.SetExceptionStatus&&next is null)
             throw new InvalidOperationException("Choose a supported exception status.");
-        long? version=null;
+        long currentVersion=0;string? currentStatus=null;
+        using(var state=new NpgsqlCommand("select status,version from studio_workday_photographer_state where assignment_id=$1 and user_name=$2 for update",c,tx))
+        {state.Parameters.AddWithValue(assignmentId);state.Parameters.AddWithValue(actor);using var r=state.ExecuteReader();if(r.Read()){currentStatus=r.GetString(0);currentVersion=r.GetInt64(1);}}
+        // Notes and problems also belong to the reviewed assignment generation.
+        if(request.ExpectedVersion is not long expected || expected!=currentVersion)
+            return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,$"Version conflict. Client {request.ExpectedVersion}; server {currentVersion}.",currentVersion);
+        long? version=currentVersion;
         if(next is not null)
         {
-            long currentVersion=0;string? currentStatus=null;
-            using(var state=new NpgsqlCommand("select status,version from studio_workday_photographer_state where assignment_id=$1 and user_name=$2 for update",c,tx))
-            {state.Parameters.AddWithValue(assignmentId);state.Parameters.AddWithValue(actor);using var r=state.ExecuteReader();if(r.Read()){currentStatus=r.GetString(0);currentVersion=r.GetInt64(1);}}
-            if(request.ExpectedVersion is not long expected || expected!=currentVersion)
-                return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,$"Version conflict. Client {request.ExpectedVersion}; server {currentVersion}.",currentVersion);
             if(!WorkDaySemantics.CanTransition(currentStatus,next))
                 throw new InvalidOperationException($"Invalid photographer transition from {WorkDaySemantics.InitialStatus(currentStatus)} to {next}.");
             if(request.Kind is WorkDayOperationKind.Arrive or WorkDayOperationKind.StartSession or WorkDayOperationKind.CompleteSession)

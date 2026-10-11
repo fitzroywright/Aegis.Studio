@@ -1,76 +1,70 @@
-# Complete workflow brief — partial implementation and acceptance report
+# Complete workflow brief — implementation and acceptance checkpoint
 
-This is a recovery/acceptance checkpoint, not a release or a statement that the complete brief is delivered.
+This branch remains incomplete and is not a release candidate. Compilation, rule tests and browser-controller tests do not establish PostgreSQL transaction safety, live messaging delivery, storage acceptance or mobile-device readiness.
 
-Branch: `feature/studio-complete-workflow-20261011`.
-Baseline: `d12121c99e53e69c227202a0faa2a42d62bd746a`.
-Implemented code checkpoints: `4e6119598bf12c1bc44fdf62d606ec3521ae3c84`, `ba6ee51775c5f6652e042800d3d8426402e13b5e`.
-Specification and audit checkpoint: `be10b95fa8ab2ef9b5f0d1b532c78f62f206c7cb`.
+Branch: `feature/studio-complete-workflow-20261011`. Baseline: `d12121c99e53e69c227202a0faa2a42d62bd746a`.
 
-## Implemented and verified within the limits below
+Remote recovery checkpoints: audit `be10b95fa8ab2ef9b5f0d1b532c78f62f206c7cb`; initial workflow `4e6119598bf12c1bc44fdf62d606ec3521ae3c84` and `ba6ee51775c5f6652e042800d3d8426402e13b5e`; Finance/production/proofs `831aa0ba257f9fb14cbdb49ad776e963a25915bb`; Public V1/webhooks/reference website `067c9ee76bff86bc6aabe560f8c0ee36b28cbb84`. Fetch the latest branch head to include subsequent ownership/reassignment work.
 
-- Studio Web native compilation succeeds with .NET SDK 10.0.401 and the existing Common dependencies, with zero warnings and errors.
-- Final native Web/Core suite: **216 passed, 13 skipped, 0 failed** (229 total).
-- Final existing/new UI controller suite: **94 passed, 0 failed**.
-- Edited JavaScript passes syntax checks; `git diff --check` is clean.
-- Configured deposit eligibility tests cover partial/exact/overpayment, no deposit required and negative receipts.
-- Photographer rules cover offline version chaining, lost-acknowledgement replay, explicit acknowledgement requirements, decline and excluded timekeeping/unknown actions.
-- Device boundary tests reject mobile-token use for private Studio, production, file-upload, timekeeping and device-session minting routes.
-- Booking decision tests prevent self-approval even if one person holds both roles; UI tests verify decision visibility, history and direct Job navigation.
+## Implemented and locally verified
 
-These tests verify compilation, pure business rules, middleware boundaries and DOM/controller behavior. They do not establish database transaction behavior, external message delivery or physical-device acceptance.
+.NET Web/Core compilation and automated tests run against SDK 10.0.401 and the existing Common projects. The current suite passed **248**, skipped **15**, failed **0**. Browser-controller tests passed **99**, including four ownership-response tests. Reference website tests passed **3** at the preceding checkpoint. JavaScript syntax and `git diff --check` pass.
 
-## Implemented but awaiting environment/platform/device testing
+- Pending Job intake, deposit threshold rules and independent Operations decision authority.
+- WorkDay reporter-only API boundaries, explicit acknowledgements, version chaining and response rules.
+- Finance authorization rules and production dispatch/reporting authority, including combined-role cases.
+- Reduced-resolution, visibly watermarked image rendering.
+- Public V1 request authentication, required fields, stable response shape and frozen OpenAPI compatibility baseline.
+- Reference HTTP proxy signing, restriction to V1 routes, server-only credentials and durable webhook duplicate suppression.
+- Operations decision navigation, Finance receivables navigation and existing application controller behavior.
 
-### WorkDay photographer client and Studio reporting
+These tests include pure rules, middleware, image pixels, DOM behavior and a local Node HTTP test with a stubbed upstream. They do not constitute an end-to-end deployed workflow demonstration.
 
-Active mobile home/detail UI provides assignments, details, accept/decline, required decline reason, arrival, start, completion and operational notes/problems. Availability/leave remains supported using the existing Studio interface. Active upload/gallery-management/general work timekeeping controls and background upload invocation are removed. Existing stored files and reusable services remain preserved.
+## Implemented, awaiting connected acceptance
 
-The outbox retains original operation IDs, payloads and expected versions, recovers interrupted Sending entries and requires a matching explicit acknowledgement. Conflicts block dependent reports. Locally queued state is displayed separately from Studio state. Device identity is bound to the token; invalid tokens cannot fall back to a lingering login cookie. Cached data is bound to the enrolled Studio account.
+| Area | Current implementation | Evidence still required |
+| --- | --- | --- |
+| Booking and deposit | Intake immediately creates a Pending Job. Manual receipts are auditable and do not automatically confirm. Deposit requests enqueue email through the existing provider worker, reuse the message ID and show queue/provider evidence. | PostgreSQL concurrency and outbox acceptance; configured test email; confirmation through real role accounts. Recipient delivery is not claimed without receipts. |
+| Operations | Separate Operations page, override request/approve/reject, self-approval rejection, history/direct links and authorized reopening. | Real-account navigation, concurrent decisions and overdue/escalation behavior. |
+| Ownership | Current assignment and acceptance/decline history; Manager reassignment supersedes previous assignment; decline returns unresolved ownership and notifies Manager, escalating a Manager's own decline to Operations. | PostgreSQL migration/replay; same-person Manager/Owner and overdue cases; all legacy owner writers. |
+| Scheduling and WorkDay | Per-photographer reports, current-assignment checks, safe operation replay, shared-session completion and Studio history. Removal/reassignment bumps the assignment version, including same-person re-addition, while preserving old reports. | Multiple sessions/photographers, resource conflicts and concurrent rescheduling/replay on PostgreSQL. |
+| Mobile | Photographer assignment UI, acceptance/decline/reason, arrival/start/finish, notes/problems, availability interface and offline outbox; account-bound cache and revoked-token boundaries. Excluded upload/timekeeping controls are removed from the active flow. | Android/iOS builds and actual devices; network loss/restart/revocation; explicit recovery from offline conflicts. |
+| Finance and delivery | Explicit Finance Manager role; audited customer/Job authorization, amount/scope/terms/due date/reference/approver/revocation. Ledger and invoice balances are checked at final release. Delivery uses connected workflow. Receivables survive operational closure. | Transactional payment/refund/credit tests; reconciliation of shared receipts across multiple invoices; all alternate final-delivery paths. Non-JMD invoices intentionally cannot be released through the current JMD gate. |
+| Production and approval | Explicit Production Manager dispatch and final technical approval; assigned staff can report progress. Review/publication identifies media versions. | Connected and legacy writer audit, task/revision/resubmission flow and exact stored-version acceptance. |
+| Galleries | Legacy public gallery access serves proofs only. V1 publishes approved Job versions with expiring/revocable customer access; selections/submission and final downloads use Job-scoped authorization. | Real stored media, publication changes, expired/revoked tokens, Finance changes during access and server-side denial with unpaid balances. |
+| Public V1 | Signed/scoped HTTPS booking/status, idempotency, published-gallery pagination, proofs, selections and gated final downloads; schemas, standardized errors, bounded JSON, rate limiting and version policy. | Actual HTTP requests with PostgreSQL and storage; full OpenAPI conformance and concurrency acceptance. |
+| Webhooks | Durable event/destination outbox, signed HTTPS payloads, leases/retries, stable event IDs, Finance-aware delivery availability and Operations delivery visibility. | Real worker transport against a test receiver; crash/retry/configuration-change cases; migrations/triggers on PostgreSQL. |
+| Reference website | Runnable booking/gallery BFF and signed durable webhook receiver; browser uses V1 exclusively. | Browser booking-through-gallery demonstration against a configured test Studio. See `PUBLIC-V1-INTEGRATION.md`. |
+| Closure | Database guards reject closed Job and operational child changes; reopening sets an Operations-authorized transaction flag. Financial activity and preserved histories remain available. | Full migration and direct legacy API bypass tests; closure and reopening with representative data. |
 
-Studio stores reports per photographer, serializes replay/mutations, checks current assignment inside the transaction, notifies Owner/Workspace Manager and displays reporting history in Job Details. Shared shoot completion waits for every currently assigned photographer before the existing Job lifecycle may advance to Awaiting Upload.
+## Incomplete work
 
-**Not demonstrated:** a full Android/iOS device-to-Studio sequence; transactional replay/concurrency; decline followed by reassignment; restart/network-loss synchronization; correct migration and multi-photographer aggregation on PostgreSQL. Same-person removal/reassignment generation and conflict resolution UX still require design/implementation verification before release.
+1. Full role/navigation/action and alternate-writer audit through booking, scheduling, media, production, delivery and closure.
+2. Storage-backed upload completion, provenance/version preservation, thumbnail/preview retries and explicit handoff acceptance.
+3. WorkDay conflict recovery UX and offline availability handling; Android/iOS compilation and physical-device acceptance.
+4. Configured WhatsApp deposit delivery where a provider is present.
+5. Representative complete workflow acceptance with real PostgreSQL, stored media, multiple roles, multiple photographers and the external reference website.
 
-### Front Desk deposit delivery and Operations decisions
-
-Deposit requests enqueue an email using the existing outbound queue/worker and retain the message ID. Repeated requests reuse that queue item. Sender identity, customer address, positive deposit and a configured email channel are required. Delivery status distinguishes Pending/Retry/provider acceptance/failure; recipient-delivery receipt is explicitly unavailable without provider evidence. No live deposit email was sent here.
-
-Front Desk requests an override from Pending Job Details. A separate Operations Management page presents decisions/history and unassigned/overdue/blocked work. An Operations Manager other than the requester may approve/reject with a reason. Approval records actor/time/amount requirement, does not record payment and does not automatically confirm. Confirmation accepts the required deposit or an approved override covering the current requirement. Reopening is Operations-authorized on both server and UI.
-
-**Not demonstrated:** actual email provider acceptance/delivery; database outbox atomicity/retries; concurrent approval/confirmation; role navigation in the deployed browser with real accounts.
-
-## Blockers and exact next actions
+## Environment blockers and next actions
 
 | Blocker | Evidence | Next action |
 | --- | --- | --- |
-| PostgreSQL transaction/migration acceptance | No disposable server connection was supplied. Bundled PostgreSQL requires a non-root account; this runtime rejects process user switching with OSError 22. Thirteen existing database tests skip without STUDIO_TEST_POSTGRES. | Supply/use a disposable local PostgreSQL service, run existing tests and add connected WorkDay/outbox/override transaction coverage before merge. Never point tests at customer/payment data. |
-| Android build | Build reaches NETSDK1147: missing maui-android workload. Project inherited desktop TargetFramework was corrected; MAUI Controls is explicitly referenced. | Use Android SDK/JDK plus .NET MAUI workload on the development machine; run scripts/Build-WorkDay.ps1 and fix any compile/runtime failures. |
-| iOS build/device acceptance | Linux environment has no Xcode/iOS workload or physical devices. | Build on the Mac, provision a device and execute full acceptance, including offline/restart and revoked-session cases. |
-| Messaging/provider acceptance | No configured test provider/customer transport was used. | Exercise test recipients in Kratos demo environment and inspect queue/provider evidence; do not claim recipient delivery without receipts. |
+| Disposable PostgreSQL | `STUDIO_TEST_POSTGRES` is absent. The bundled PostgreSQL binaries require a non-root account; this runtime rejects user switching with OSError 22. Fifteen database tests skip. | Provide a disposable PostgreSQL service, run the gated tests, add connected workflow transaction coverage and verify migrations. Never use production customer/payment data for tests. |
+| Android | Missing `maui-android` workload produces NETSDK1147. | Use Android SDK/JDK and MAUI on a supported development machine; run `scripts/Build-WorkDay.ps1`, then device acceptance. |
+| iOS | No Mac/Xcode/iOS workload/device in this Linux runtime. | Build and provision on Mac, then verify offline/restart and revoked-session behavior on device. |
+| Messaging/storage/test deployment | No configured test recipient/provider or connected storage-backed Studio deployment was exercised. | Use Kratos test infrastructure and representative demo data, inspect provider and storage evidence, and run the complete role workflow. |
 
-## Incomplete requirements from the full brief
+No merge to main, deployment, destructive database reset, production customer/payment mutation or live message sending was performed. Do not merge or deploy until the incomplete requirements and connected/device acceptance gates pass.
 
-1. Finance Manager-specific contractual credit/receivable decisions and server-enforced final-release gates across every download/delivery path.
-2. Final Production Manager dispatch/technical approval boundaries across connected and legacy writers, including users who also own a Job.
-3. Formal backward-compatible `/api/public/v1` booking/gallery contract: schemas/OpenAPI, standard errors, pagination, scoped authentication, idempotency and rate limiting.
-4. Signed, replay-protected durable webhook delivery/retry and the public-V1-only booking/gallery reference website.
-5. Full navigation/action/legacy-writer audit completion, owner acceptance/reassignment and escalation parity; closed-job bypass verification.
-6. Storage-backed upload receipt reconciliation, provenance/version/thumbnail retry acceptance, gallery proof protection and payment/Finance release enforcement.
-7. Representative booking-through-closure acceptance with multiple roles, photographers, production staff and real stored media; decline/reassignment/offline tests and deployed browser validation.
+## Resume
 
-Existing Finance/gallery release gaps are not resolved by this branch. The full brief is **incomplete**. No merge to main, Kratos deployment, database reset, production data mutation or live external message sending was performed.
-
-## Resume safely
-
-Fetch and checkout the implementation branch. Read this report, `COMPLETE-WORKFLOW-20261011-PROGRESS.md` and the authoritative brief. Compare current main before merging additional work. The local snapshot was materialized through the GitHub connection; remote checkpoint SHAs above are authoritative for resumption.
-
-Native verification command:
+Fetch the implementation branch and read this report, `COMPLETE-WORKFLOW-20261011-PROGRESS.md`, the authoritative brief and `PUBLIC-V1-INTEGRATION.md`. The local snapshot was materialized through the GitHub connection; remote branch history is authoritative.
 
 ```sh
 dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj --nologo -m:1 -nr:false -p:UseSharedCompilation=false -p:BuildInParallel=false
 npm ci --prefix tests/ui
 npm test --prefix tests/ui
+node --test examples/public-v1-site/server.test.mjs
 ```
 
-For transactional tests, configure `STUDIO_TEST_POSTGRES` for a disposable database first. MAUI and physical-device checks are separate acceptance gates. Merge only after the approved connected workflow and all applicable gates are verified.
+Configure `STUDIO_TEST_POSTGRES` with a disposable service before running transactional acceptance. Mobile/platform checks are separate requirements.

@@ -83,3 +83,12 @@ Final native Web/Core suite: **216 passed, 13 database tests skipped, 0 failed**
 - Added closed Job/operational child guards for alternate writers and controlled Operations reopening. This migration requires PostgreSQL acceptance before merge.
 - Current verification: native 243 passed / 15 environment-gated skipped; UI 95 passed; reference site 3 passed. All core database, webhook transport and actual-storage acceptance remain unverified here. Android/iOS acceptance remains blocked by the platform environment.
 - Integration configuration, API and exact reference-site run commands are in `docs/PUBLIC-V1-INTEGRATION.md`.
+
+## Ownership acceptance and WorkDay reassignment checkpoint
+
+- Added current Job Owner assignments with explicit acceptance/decline, response reasons, superseded history and Manager notifications. Manager/Owner decline escalates to Operations. Only the actual current owner may respond; a stale assignment pointer does not authorize a previous owner. Declined owners retain read visibility only while that assignment remains current and unresolved.
+- Added Job Details response controls and assignment history. Cancellation restores the action control. Tests cover the current owner, managers, reassignment, closed/superseded/declined assignments, acceptance audit/revision and decline reason.
+- Schedule resource removal/re-addition advances photographer report versions rather than resetting them, including same-person reassignment. Notes/problems also require the current expected version. Old reports remain preserved for audit; transaction and migration acceptance remain unverified.
+- Corrected previously stale PostgreSQL booking tests: intake must create a Pending Job before payment, receipt replay must not duplicate Jobs/payments and recording a deposit must not automatically confirm. These corrected tests remain environment-gated, not demonstrated.
+- Rewrote acceptance report to distinguish new Finance, production, gallery, V1, webhook and reference implementation from outstanding connected/mobile/storage verification and incomplete legacy/navigation/recovery work.
+- Verification: .NET **248 passed / 15 skipped / 0 failed** (263 total); UI **99 passed / 0 failed**; JavaScript syntax and whitespace clean. No merge, deployment or live external messaging.

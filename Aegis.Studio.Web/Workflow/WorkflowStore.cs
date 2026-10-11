@@ -88,13 +88,29 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 Sql(c,tx,"update studio_finance_authorizations set revoked_at_utc=now(),revoked_by=$3,revocation_reason=$4 where id=$1 and job_id=$2",authorizationId,job,actor,request.Reason);
                 Notify(c,tx,job,request.OperationId.ToString(),"Owner","Finance final delivery authorization revoked");
                 break;
+            case "accept-owner":case "decline-owner":
+                EnsureMutable(stage);
+                string assignedOwner,ownerStatus;Guid ownerAssignment;
+                using(var q=Command(c,tx,"select a.id,a.assigned_to,a.status from studio_job_owner_assignments a join studio_jobs j on j.owner_assignment_id=a.id where j.id=$1 for update of a",job))using(var r=q.ExecuteReader())
+                {if(!r.Read())throw new ArgumentException("No current ownership assignment exists.");ownerAssignment=r.GetGuid(0);assignedOwner=r.GetString(1);ownerStatus=r.GetString(2);}
+                if(!string.Equals(owner,assignedOwner,StringComparison.OrdinalIgnoreCase)||!OwnerAssignmentRules.CanRespond(actor,assignedOwner,ownerStatus))throw new UnauthorizedAccessException("Only the assigned Job Owner may respond to this assignment.");
+                if(request.Action=="decline-owner")RequireReason(request);
+                Sql(c,tx,"update studio_job_owner_assignments set status=$2,response_reason=$3,responded_at_utc=now() where id=$1",ownerAssignment,request.Action=="accept-owner"?"Accepted":"Declined",request.Reason);
+                if(request.Action=="decline-owner")
+                {
+                    Sql(c,tx,"update studio_jobs set job_lead=null,assigned_to=null where id=$1",job);Recalculate(c,tx,job);
+                    Notify(c,tx,job,request.OperationId.ToString(),"Manager","Job Owner declined; reassignment required");
+                    if(manager)Notify(c,tx,job,request.OperationId.ToString(),"Operations Manager","Workspace Manager declined their own Job ownership; intervention required");
+                }
+                else Notify(c,tx,job,request.OperationId.ToString(),"Manager","Job Owner accepted responsibility");
+                break;
             case "owner":
                 if(!manager)throw new UnauthorizedAccessException();EnsureMutable(stage);
                 if(!string.IsNullOrWhiteSpace(request.UserName))RequireEmployee(request.UserName);
                 else RequireReason(request);
                 if(string.Equals(owner?.Trim(),request.UserName?.Trim(),StringComparison.OrdinalIgnoreCase))
                     throw new ArgumentException("This employee is already the Job Owner; no assignment change is needed.");
-                Sql(c,tx,"update studio_jobs set job_lead=$2,assigned_to=$2 where id=$1",job,string.IsNullOrWhiteSpace(request.UserName)?null:request.UserName.Trim());
+                AssignOwner(c,tx,job,string.IsNullOrWhiteSpace(request.UserName)?null:request.UserName.Trim(),actor);
                 if(!string.IsNullOrWhiteSpace(request.UserName))Notify(c,tx,job,request.OperationId.ToString(),request.UserName,"Job Owner assigned");
                 EnsureDraft(c,tx,job);Recalculate(c,tx,job);break;
             case "session":
@@ -172,7 +188,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                     if(request.Method=="Approved")
                     {
                         RequireEmployee(requester);
-                        if(requestKind=="Owner"){Sql(c,tx,"update studio_jobs set job_lead=$2,assigned_to=$2 where id=$1",job,requester);EnsureDraft(c,tx,job);Recalculate(c,tx,job);}
+                        if(requestKind=="Owner"){AssignOwner(c,tx,job,requester,actor);EnsureDraft(c,tx,job);Recalculate(c,tx,job);}
                         else if(requestKind=="Task")Sql(c,tx,"update studio_job_activities set assigned_to=$2,updated_at_utc=now() where id=$1 and job_id=$3",requestedTask,requester,job);
                         else
                         {
@@ -389,6 +405,13 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         Sql(c,tx,"insert into studio_workflow_commands(operation_id,job_id,fingerprint,result_revision) select $1,id,$3,workflow_revision from studio_jobs where id=$2",request.OperationId,job,fingerprint);
         var result=Snapshot(c,tx,job);tx.Commit();return result;
     }
+    private static void AssignOwner(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,string? owner,string actor)
+    {
+        Sql(c,tx,"update studio_job_owner_assignments set status='Superseded',superseded_at_utc=now() where job_id=$1 and status in ('Assigned','Accepted')",job);
+        Guid? assignment=string.IsNullOrWhiteSpace(owner)?null:Guid.NewGuid();
+        if(assignment.HasValue)Sql(c,tx,"insert into studio_job_owner_assignments(id,job_id,assigned_to,assigned_by,status) values($1,$2,$3,$4,'Assigned')",assignment,job,owner,actor);
+        Sql(c,tx,"update studio_jobs set job_lead=$2,assigned_to=$2,owner_assignment_id=$3 where id=$1",job,owner,assignment);
+    }
     private bool CanReviewTransfer(NpgsqlConnection c,NpgsqlTransaction tx,ClaimsPrincipal user,Guid transferId,Guid job)
     {
         var destination=Scalar(c,tx,"select destination_workspace_id from studio_workflow_transfer_requests where id=$1 and job_id=$2 and status='Pending'",transferId,job);
@@ -536,6 +559,8 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
     {
         var value=Scalar(c,tx,"""
             select jsonb_build_object('jobId',j.id,'stage',j.status,'revision',j.workflow_revision,'owner',j.job_lead,'workspaceId',j.workspace_id,'enteredAt',j.stage_entered_at_utc,'blockedReason',j.blocked_reason,'correctionKind',j.correction_kind,'claim',j.frontdesk_claim,
+             'ownerAssignment',(select to_jsonb(a) from studio_job_owner_assignments a where a.id=j.owner_assignment_id),
+             'ownerAssignmentHistory',coalesce((select jsonb_agg(to_jsonb(a) order by assigned_at_utc) from studio_job_owner_assignments a where a.job_id=j.id),'[]'::jsonb),
              'history',coalesce((select jsonb_agg(to_jsonb(h) order by revision) from studio_workflow_history h where h.job_id=j.id),'[]'::jsonb),
              'sessions',coalesce((select jsonb_agg(to_jsonb(w)||jsonb_build_object('shoot',to_jsonb(s),'crew',coalesce((select jsonb_agg(to_jsonb(c) order by role desc,user_name) from studio_workflow_crew c where c.session_id=w.id),'[]'::jsonb)) order by w.created_at_utc) from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=j.id),'[]'::jsonb),
              'submissions',coalesce((select jsonb_agg(to_jsonb(r) order by submitted_at_utc) from studio_workflow_submissions r where r.job_id=j.id),'[]'::jsonb),
