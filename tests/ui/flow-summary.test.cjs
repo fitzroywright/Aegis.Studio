@@ -8,11 +8,11 @@ test('main flow stays outside the drawer with status in its original position an
  assert.equal(summary.children.length,6);assert.equal(drawer.contains(summary),false);
  assert.equal(status.closest('.jd-job-status').previousElementSibling.className,'job-detail-title');
  assert.equal(header.querySelector('[data-job-workflow]').closest('.jd-flow-overview').firstElementChild,summary);
- assert.equal(drawer.hasAttribute('inert'),true);
+ assert.equal(drawer.hasAttribute('inert'),true);assert.equal(drawer.querySelector('.jd-flow-toolbar'),null);assert.equal(drawer.querySelector('[data-flow-stage="Pending"]').style.top,'0px');
  details.click();assert.equal(status.getAttribute('aria-expanded'),'true');assert.equal(drawer.hasAttribute('inert'),false);
  const stage=drawer.querySelector('[aria-current="step"]');stage.focus();stage.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
  assert.equal(drawer.hasAttribute('inert'),true);assert.equal(w.document.activeElement,details);assert.equal(summary.children.length,6);
- status.click();drawer.querySelector('[data-close-job-flow]').click();assert.equal(w.document.activeElement,status);assert.equal(summary.children.length,6);
+ status.click();header.querySelector('[data-close-job-flow]').click();assert.equal(w.document.activeElement,status);assert.equal(summary.children.length,6);
 });
 test('skipped history gates and their parent phases are checked, but the active shoot is not',async t=>{
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();

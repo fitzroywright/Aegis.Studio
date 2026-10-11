@@ -30,9 +30,9 @@
   const lastNormal=history.filter(h=>main.includes(h.new_stage)).at(-1)?.new_stage||(data.stage==='Changes Requested'?(data.correctionKind==='Source'?'Awaiting Production Review':data.correctionKind==='Production'?'Awaiting Approval':null):null);
   const frontier=main.indexOf(main.includes(data.stage)?data.stage:lastNormal);
   main.forEach((label,index)=>{if(index<frontier)passed.add(label);else passed.delete(label);});
-  const positions=new Map();groups.forEach(([,labels],column)=>labels.forEach((label,row)=>positions.set(label,{x:column*170+18,y:32+row*25})));
-  [['Cancelled',1],['Reshoot Required',2],['Changes Requested',4],['Blocked',5]].forEach(([label,column])=>positions.set(label,{x:column*170+18,y:151}));
-  if(!positions.has(data.stage))positions.set(data.stage,{x:18,y:151});
+  const positions=new Map();groups.forEach(([,labels],column)=>labels.forEach((label,row)=>positions.set(label,{x:column*170+18,y:9+row*25})));
+  [['Cancelled',1],['Reshoot Required',2],['Changes Requested',4],['Blocked',5]].forEach(([label,column])=>positions.set(label,{x:column*170+18,y:128}));
+  if(!positions.has(data.stage))positions.set(data.stage,{x:18,y:128});
   const labels=[...positions.keys()];
   const nodes=labels.map(label=>{
    const skipped=noShoot&&(photographyStages.has(label)||label==='Reshoot Required'),current=label===data.stage||(label==='Blocked'&&!!data.blockedReason)||(label==='Reshoot Required'&&reshoot);
@@ -48,8 +48,8 @@
    const recorded=hostStageComplete(from)&&hostStageComplete(to),highlight=kind!=='main'&&(to===data.stage||(to==='Blocked'&&data.blockedReason)||(to==='Reshoot Required'&&reshoot));
    let path;
    if(kind==='main'&&a.x===b.x)path=`M ${a.x} ${a.y} L ${b.x} ${b.y}`;
-   else if(kind==='main')path=`M ${a.x} ${a.y} L ${a.x} 115 Q ${a.x} 124 ${a.x+9} 124 L ${b.x-32} 124 Q ${b.x-41} 124 ${b.x-41} 115 L ${b.x-41} ${b.y+9} Q ${b.x-41} ${b.y} ${b.x-32} ${b.y} L ${b.x} ${b.y}`;
-   else {const lane=returning?(kind==='reshoot'?181:176):({correction:132,reshoot:137,cancel:142,block:147}[kind]||137);path=`M ${a.x} ${a.y} C ${a.x-14} ${a.y+14} ${a.x-14} ${lane} ${a.x} ${lane} L ${b.x} ${lane} C ${b.x+14} ${lane} ${b.x+14} ${b.y+14} ${b.x} ${b.y}`;}
+   else if(kind==='main')path=`M ${a.x} ${a.y} L ${a.x} 92 Q ${a.x} 101 ${a.x+9} 101 L ${b.x-32} 101 Q ${b.x-41} 101 ${b.x-41} 92 L ${b.x-41} ${b.y+9} Q ${b.x-41} ${b.y} ${b.x-32} ${b.y} L ${b.x} ${b.y}`;
+   else {const lane=returning?(kind==='reshoot'?158:153):({correction:109,reshoot:114,cancel:119,block:124}[kind]||114);path=`M ${a.x} ${a.y} C ${a.x-14} ${a.y+14} ${a.x-14} ${lane} ${a.x} ${lane} L ${b.x} ${lane} C ${b.x+14} ${lane} ${b.x+14} ${b.y+14} ${b.x} ${b.y}`;}
    return `<path data-flow-edge="${escape(from+' → '+to)}" class="jd-flow-edge ${kind} ${highlight?'attention':recorded?'recorded':''}" d="${path}"/>`;
   };
   function hostStageComplete(label){return label==='Photographer Assigned'?crewAssigned:label==='Shoot Complete'?shootComplete:label==='Completed'?data.stage==='Completed':passed.has(label);}
@@ -58,7 +58,7 @@
   const previous=(data.history||[]).filter(h=>positions.has(h.new_stage)&&!['Cancelled','Blocked','Reshoot Required','Changes Requested'].includes(h.new_stage)).at(-1)?.new_stage;
   const branchOrigin=main.includes(data.stage)?data.stage:previous||'Pending';
   const branches=correctionEdges+edge('Shoot Complete','Reshoot Required','reshoot')+edge('Reshoot Required','Awaiting Scheduling','reshoot',true)+edge(branchOrigin,'Cancelled','cancel')+edge(branchOrigin,'Blocked','block');
-  host.innerHTML=`<div class="jd-flow-canvas"><svg class="jd-flow-lines" viewBox="0 0 1020 184" aria-hidden="true" focusable="false">${mainEdges}${branches}</svg>${nodes}</div>`;
+  host.innerHTML=`<div class="jd-flow-canvas"><svg class="jd-flow-lines" viewBox="0 0 1020 161" aria-hidden="true" focusable="false">${mainEdges}${branches}</svg>${nodes}</div>`;
   host.setAttribute('aria-label','Job workflow: '+data.stage+(data.blockedReason?' · Blocked: '+data.blockedReason:''));
   const focusPoint=positions.get(data.stage);if(focusPoint&&host.clientWidth)host.scrollLeft=Math.max(0,focusPoint.x-host.clientWidth/2);
   if(summaryHost){

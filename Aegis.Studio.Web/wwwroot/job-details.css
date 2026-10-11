@@ -27,12 +27,11 @@
 .jd-flow-drawer { grid-column:1/-1; display:grid; grid-template-rows:0fr; min-width:0; opacity:0; visibility:hidden; transition:grid-template-rows .24s ease,opacity .24s ease,visibility 0s .24s; }
 .jd-flow-drawer.is-open { grid-template-rows:1fr; opacity:1; visibility:visible; transition:grid-template-rows .24s ease,opacity .24s ease,visibility 0s; }
 .jd-flow-drawer-inner { min-height:0; min-width:0; overflow:hidden; }
-.jd-flow-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:8px; font-size:11px; }
 @media(prefers-reduced-motion:reduce) { .jd-flow-drawer,.jd-flow-drawer.is-open,.jd-status-pill::after { transition:none; } }
 .jd-job-status small { color:var(--theme-muted,#7c8493); }
-.jd-workflow-track { display:block; padding:5px 0 0; min-width:0; overflow:auto; max-height:195px; }
-.jd-flow-canvas { position:relative; width:1020px; height:184px; }
-.jd-flow-lines { position:absolute; inset:0; width:1020px; height:184px; pointer-events:none; }
+.jd-workflow-track { display:block; padding:0; min-width:0; overflow:auto; max-height:172px; }
+.jd-flow-canvas { position:relative; width:1020px; height:161px; }
+.jd-flow-lines { position:absolute; inset:0; width:1020px; height:161px; pointer-events:none; }
 .jd-flow-edge { fill:none; stroke:#c5cad3; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .jd-flow-edge.recorded { stroke:#318348; }
 .jd-flow-edge.correction,.jd-flow-edge.reshoot { stroke:#a299bd; stroke-dasharray:4 3; }
@@ -141,6 +140,6 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .job-detail-workflow-dialog { width:min(1000px,95vw); max-height:85vh; overflow:auto; }
 .job-detail-workflow-dialog .workflow-panel { margin:0; overflow:visible; }
 @media(max-width:1200px) { .jd-drop-hint { display:none; } .jd-contact-sheet { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-@media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr) 230px; } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-job-status { max-width:110px; } .jd-workflow-track { padding:6px 0 0; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } .job-detail-facts { grid-template-columns:1fr; } }
-@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:4;  display:flex;flex-direction:column;} .job-detail-selected-file,.jd-attention { display:none; } .job-detail-heading { padding:7px; gap:0 5px; } .jd-job-status { max-width:130px; } .jd-workflow-track { max-height:195px; } .job-detail-navigation button { padding:6px 2px; font-size:9px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
+@media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr) 230px; } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-job-status { max-width:110px; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } .job-detail-facts { grid-template-columns:1fr; } }
+@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:4;  display:flex;flex-direction:column;} .job-detail-selected-file,.jd-attention { display:none; } .job-detail-heading { padding:7px; gap:0 5px; } .jd-job-status { max-width:130px; } .job-detail-navigation button { padding:6px 2px; font-size:9px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
 
