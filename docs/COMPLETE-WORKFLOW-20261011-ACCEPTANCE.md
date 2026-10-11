@@ -6,9 +6,9 @@ Branch: `feature/studio-complete-workflow-20261011`. Baseline: `d12121c99e53e69c
 
 Remote recovery checkpoints: audit `be10b95fa8ab2ef9b5f0d1b532c78f62f206c7cb`; initial workflow `4e6119598bf12c1bc44fdf62d606ec3521ae3c84` and `ba6ee51775c5f6652e042800d3d8426402e13b5e`; Finance/production/proofs `831aa0ba257f9fb14cbdb49ad776e963a25915bb`; Public V1/webhooks/reference website `067c9ee76bff86bc6aabe560f8c0ee36b28cbb84`. Fetch the latest branch head to include subsequent ownership/reassignment work.
 
-## Implemented and locally verified
+## Earlier verification (before the resumed changes)
 
-.NET Web/Core compilation and automated tests run against SDK 10.0.401 and the existing Common projects. The current suite passed **248**, skipped **15**, failed **0**. Browser-controller tests passed **99**, including four ownership-response tests. Reference website tests passed **3** at the preceding checkpoint. JavaScript syntax and `git diff --check` pass.
+.NET Web/Core compilation and automated tests run against SDK 10.0.401 and the existing Common projects. The earlier suite passed **248**, skipped **15**, failed **0**. Browser-controller tests passed **99**, including four ownership-response tests. Reference website tests passed **3** at the preceding checkpoint. The resumed JavaScript files pass static parsing and `git diff --check`; builds and tests were not rerun following the user instruction to perform them locally.
 
 - Pending Job intake, deposit threshold rules and independent Operations decision authority.
 - WorkDay reporter-only API boundaries, explicit acknowledgements, version chaining and response rules.
@@ -37,13 +37,19 @@ These tests include pure rules, middleware, image pixels, DOM behavior and a loc
 | Reference website | Runnable booking/gallery BFF and signed durable webhook receiver; browser uses V1 exclusively. | Browser booking-through-gallery demonstration against a configured test Studio. See `PUBLIC-V1-INTEGRATION.md`. |
 | Closure | Database guards reject closed Job and operational child changes; reopening sets an Operations-authorized transaction flag. Financial activity and preserved histories remain available. | Full migration and direct legacy API bypass tests; closure and reopening with representative data. |
 
-## Incomplete work
+## Resumed implementation, awaiting local validation
 
-1. Full role/navigation/action and alternate-writer audit through booking, scheduling, media, production, delivery and closure.
-2. Storage-backed upload completion, provenance/version preservation, thumbnail/preview retries and explicit handoff acceptance.
-3. WorkDay conflict recovery UX and offline availability handling; Android/iOS compilation and physical-device acceptance.
-4. Configured WhatsApp deposit delivery where a provider is present.
-5. Representative complete workflow acceptance with real PostgreSQL, stored media, multiple roles, multiple photographers and the external reference website.
+The subsequent source changes cover WorkDay conflict/history recovery and offline availability, Finance shared receipt counting, named-role production controls, configured WhatsApp deposit requests, actual storage-backed upload receipts and resumable batches, manual per-photographer Studio reporting, resource/availability conflict enforcement, legacy automation boundaries and fenced preview retries. Read the progress log for the implementation details.
+
+New database test cases have been added but **have not been executed**. The earlier pass/skip counts above are not evidence for the current branch.
+
+Remaining acceptance gates:
+
+1. Build the current Web/Core and platform projects and run the automated suites locally with a disposable PostgreSQL service. Resolve any compilation, migration, transaction or test failures before proceeding.
+2. Demonstrate the complete connected workflow with real stored media, test messaging providers, multiple roles/photographers, network interruption and the reference website. Verify both the connected controls and direct legacy API denials.
+3. Build and exercise WorkDay on Android and iOS devices, including offline queueing, app/device restart, account/session changes and conflict recovery. Record results before release review.
+
+See `COMPLETE-WORKFLOW-20261011-LOCAL-HANDOFF.md` for commands, configuration and concrete scenarios. Source implementation does not establish these acceptance gates as passed.
 
 ## Environment blockers and next actions
 

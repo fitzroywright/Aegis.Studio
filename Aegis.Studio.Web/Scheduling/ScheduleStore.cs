@@ -90,7 +90,9 @@ public sealed class ScheduleStore
         Guid id = Guid.NewGuid();
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
+        LockJob(connection,transaction,request.JobId);
         LockScheduleResources(connection,transaction,request.ResourceIds);
+        CheckAvailability(connection,transaction,request.ResourceIds,request.StartsAtUtc,request.EndsAtUtc);
         IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, null);
         if (conflicts.Count > 0) throw new ScheduleConflictException(conflicts);
         using (NpgsqlCommand command = connection.CreateCommand())
@@ -112,8 +114,14 @@ public sealed class ScheduleStore
             return GetEntries(request.StartsAtUtc.AddMinutes(-1),request.EndsAtUtc.AddMinutes(1)).Single(e=>e.Id==id);
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
+        Guid? currentJob;
+        using(var current=new NpgsqlCommand("select job_id from studio_schedule_entries where id=$1",connection,transaction))
+        {current.Parameters.AddWithValue(id);var value=current.ExecuteScalar();if(value is null)throw new KeyNotFoundException("Schedule entry was not found.");currentJob=value is Guid j?j:null;}
+        if(request.JobId!=currentJob)throw new InvalidOperationException("A schedule entry retains its original Job. Create a new entry in the destination Job.");
+        LockJob(connection,transaction,currentJob);
         Guid[] existing=GetAssignedResources(connection,transaction,id);
         LockScheduleResources(connection,transaction,existing.Concat(request.ResourceIds??[]));
+        CheckAvailability(connection,transaction,request.ResourceIds,request.StartsAtUtc,request.EndsAtUtc);
         IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, id);
         if (conflicts.Count > 0) throw new ScheduleConflictException(conflicts);
         using (NpgsqlCommand command = connection.CreateCommand())
@@ -140,6 +148,21 @@ public sealed class ScheduleStore
             cmd.ExecuteNonQuery();
         }
     }
+    private static void LockJob(NpgsqlConnection c,NpgsqlTransaction tx,Guid? job)
+    {
+        if(job is not Guid id)return;
+        using var q=new NpgsqlCommand("select id from studio_jobs where id=$1 and status not in ('Completed','Cancelled') for update",c,tx);q.Parameters.AddWithValue(id);
+        if(q.ExecuteScalar() is null)throw new InvalidOperationException("Closed Jobs require Operations reopening before scheduling changes.");
+    }
+    private static void CheckAvailability(NpgsqlConnection c,NpgsqlTransaction tx,IReadOnlyList<Guid>? ids,DateTimeOffset start,DateTimeOffset end)
+    {
+        var resources=(ids??[]).Distinct().ToArray();if(resources.Length==0)return;
+        using(var active=new NpgsqlCommand("select count(*) from studio_schedule_resources where id=any($1) and is_active",c,tx))
+        {active.Parameters.AddWithValue(resources);if((long)active.ExecuteScalar()! !=resources.Length)throw new InvalidOperationException("Choose active schedule resources.");}
+        using var q=new NpgsqlCommand("select p.display_name from studio_photographers p join studio_photographer_availability a on lower(a.user_name)=lower(p.user_name) where p.schedule_resource_id=any($1) and a.availability_type in ('Unavailable','Leave') and a.starts_at_utc<$3 and a.ends_at_utc>$2 limit 1",c,tx);
+        q.Parameters.AddWithValue(resources);q.Parameters.AddWithValue(start.ToUniversalTime());q.Parameters.AddWithValue(end.ToUniversalTime());
+        if(q.ExecuteScalar() is string name)throw new InvalidOperationException(name+" is unavailable or on leave at that time.");
+    }
     private static Guid[] GetAssignedResources(NpgsqlConnection connection,NpgsqlTransaction tx,Guid entryId)
     {
         using var cmd=new NpgsqlCommand("select resource_id from studio_schedule_entry_resources where entry_id=$1",connection,tx);
@@ -161,7 +184,7 @@ public sealed class ScheduleStore
             join studio_schedule_entry_resources er on er.entry_id=e.id
             join studio_schedule_resources r on r.id=er.resource_id
             where er.resource_id = any($1)
-              and e.starts_at_utc < $3 and e.ends_at_utc > $2
+              and coalesce(er.attendance_start_utc,e.starts_at_utc) < $3 and coalesce(er.attendance_end_utc,e.ends_at_utc) > $2
               and ($4::uuid is null or e.id <> $4)
               and e.status <> 'Cancelled'
             order by e.starts_at_utc
@@ -229,8 +252,10 @@ public sealed class ScheduleStore
             return GetAssignmentHistory(entryId,1).Single();
         using NpgsqlConnection connection=database.OpenConnection();
         using NpgsqlTransaction tx=connection.BeginTransaction();
+        LockJob(connection,tx,current.JobId);
         Guid[] previous=GetAssignedResources(connection,tx,entryId);
         LockScheduleResources(connection,tx,previous.Concat(next));
+        CheckAvailability(connection,tx,next,current.StartsAtUtc,current.EndsAtUtc);
         IReadOnlyList<ScheduleConflict> conflicts=FindConflicts(current.StartsAtUtc,current.EndsAtUtc,next,entryId);
         if(conflicts.Count>0) throw new ScheduleConflictException(conflicts);
         using(NpgsqlCommand delete=connection.CreateCommand())

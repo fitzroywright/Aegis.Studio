@@ -50,6 +50,8 @@ public sealed class WorkDayStore(StudioDatabase database)
           select assignment_id,lower(changed_by),status,version,changed_at_utc,last_operation_id
           from studio_workday_assignment_state on conflict do nothing;
         alter table studio_workday_operations add column if not exists fingerprint text;
+        alter table studio_workday_operations add column if not exists recorded_by text;
+        alter table studio_workday_operations add column if not exists recording_reason text;
         alter table studio_workday_notes alter constraint studio_workday_notes_operation_id_fkey deferrable initially deferred;
 
         create table if not exists studio_workday_device_sessions(
@@ -390,7 +392,7 @@ public sealed class WorkDayStore(StudioDatabase database)
         return new(r.GetGuid(0),r.GetString(1),r.GetFieldValue<DateTimeOffset>(2),r.IsDBNull(3)?null:r.GetFieldValue<DateTimeOffset>(3),r.GetString(4),r.GetBoolean(5),r.IsDBNull(6)?null:r.GetBoolean(6),null,null,r.GetString(7),r.GetFieldValue<DateTimeOffset>(8));
     }
 
-    public WorkDayOperationResult Apply(string userName, WorkDayOperationRequest request)
+    public WorkDayOperationResult Apply(string userName, WorkDayOperationRequest request,string? recordedBy=null,string? recordingReason=null)
     {
         if(request.OperationId==Guid.Empty || string.IsNullOrWhiteSpace(request.DeviceId))
             throw new InvalidOperationException("OperationId and DeviceId are required.");
@@ -402,8 +404,10 @@ public sealed class WorkDayStore(StudioDatabase database)
         if(request.Kind is WorkDayOperationKind.DeclineAssignment or WorkDayOperationKind.SetExceptionStatus or WorkDayOperationKind.RecordException or WorkDayOperationKind.AddNote)
             if(string.IsNullOrWhiteSpace(request.Text))throw new InvalidOperationException("A reason or note is required.");
         string actor=userName.Trim().ToLowerInvariant();
+        if(recordedBy is not null&&string.IsNullOrWhiteSpace(recordingReason))throw new InvalidOperationException("A manual recording reason is required.");
+        if((recordingReason?.Length??0)>4000)throw new InvalidOperationException("Manual recording reasons may contain at most 4000 characters.");
         string fingerprint=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(actor+System.Text.Json.JsonSerializer.Serialize(request))));
+            System.Text.Encoding.UTF8.GetBytes(actor+System.Text.Json.JsonSerializer.Serialize(request)+(recordedBy is null?"":"|manual:"+recordedBy.ToLowerInvariant()+":"+recordingReason))));
         using NpgsqlConnection c=database.OpenConnection();using NpgsqlTransaction tx=c.BeginTransaction();
         using(var opLock=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",c,tx))
         {opLock.Parameters.AddWithValue("workday-operation:"+request.OperationId);opLock.ExecuteNonQuery();}
@@ -438,7 +442,7 @@ public sealed class WorkDayStore(StudioDatabase database)
             if(assignmentLock.ExecuteScalar() is null)return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,"You are no longer an active photographer on this assignment. Review the original report with the Job Owner.",null);
         }
         using(var attribution=new NpgsqlCommand("select set_config('studio.actor',$1,true),set_config('studio.reason',$2,true)",c,tx))
-        {attribution.Parameters.AddWithValue(actor);attribution.Parameters.AddWithValue("WorkDay "+request.Kind+": "+(request.Text??""));attribution.ExecuteNonQuery();}
+        {attribution.Parameters.AddWithValue(recordedBy??actor);attribution.Parameters.AddWithValue((recordedBy is null?"WorkDay ":"Studio manual report ")+request.Kind+": "+(recordingReason??request.Text??""));attribution.ExecuteNonQuery();}
 
         string? next=request.Kind switch
         {
@@ -489,7 +493,7 @@ public sealed class WorkDayStore(StudioDatabase database)
             shoot.Parameters.AddWithValue(assignmentId);shoot.Parameters.AddWithValue(request.Kind.ToString());shoot.Parameters.AddWithValue(request.OccurredAtUtc);shoot.ExecuteNonQuery();
             Aegis.Studio.Web.Production.JobShootLifecycle.Advance(c,tx,job,actor);
         }
-        string body=$"{actor}: {request.Kind} at {request.OccurredAtUtc:O}. {request.Text}";
+        string body=$"{actor}: {request.Kind} at {request.OccurredAtUtc:O}. {request.Text}"+(recordedBy is null?"":$" Recorded manually by {recordedBy}: {recordingReason}");
         foreach(string audience in new[]{"Owner","Manager"})
         {
             using var notify=new NpgsqlCommand("select studio_workflow_notify($1,$2,$3,$4,$5)",c,tx);
@@ -498,6 +502,10 @@ public sealed class WorkDayStore(StudioDatabase database)
         SaveLocation(c,tx,actor,null,request,assignmentId);
         using(var op=new NpgsqlCommand("insert into studio_workday_operations(operation_id,user_name,kind,assignment_id,occurred_at_utc,device_id,text_value,category,expected_version,state,result_message,server_version,received_at_utc,acknowledged_at_utc,fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'Acknowledged','Acknowledged',$10,now(),now(),$11)",c,tx))
         {op.Parameters.AddWithValue(request.OperationId);op.Parameters.AddWithValue(actor);op.Parameters.AddWithValue(request.Kind.ToString());op.Parameters.AddWithValue(assignmentId);op.Parameters.AddWithValue(request.OccurredAtUtc);op.Parameters.AddWithValue(request.DeviceId);op.Parameters.AddWithValue((object?)request.Text??DBNull.Value);op.Parameters.AddWithValue((object?)request.Category??DBNull.Value);op.Parameters.AddWithValue((object?)request.ExpectedVersion??DBNull.Value);op.Parameters.AddWithValue((object?)version??DBNull.Value);op.Parameters.AddWithValue(fingerprint);op.ExecuteNonQuery();}
+        using(var recorder=new NpgsqlCommand("update studio_workday_operations set recorded_by=$2,recording_reason=$3 where operation_id=$1",c,tx))
+        {recorder.Parameters.AddWithValue(request.OperationId);recorder.Parameters.AddWithValue(recordedBy??actor);recorder.Parameters.AddWithValue((object?)recordingReason??DBNull.Value);recorder.ExecuteNonQuery();}
+        using(var audit=new NpgsqlCommand("insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,$3,$4,$5,now())",c,tx))
+        {audit.Parameters.AddWithValue(Guid.NewGuid());audit.Parameters.AddWithValue(job);audit.Parameters.AddWithValue(recordedBy is null?"PhotographerReport":"ManualPhotographerReport");audit.Parameters.AddWithValue(recordedBy??actor);audit.Parameters.AddWithValue(body);audit.ExecuteNonQuery();}
         tx.Commit();return new(request.OperationId,WorkDayOperationState.Acknowledged,DateTimeOffset.UtcNow,"Acknowledged",version);
     }
 

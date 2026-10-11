@@ -106,11 +106,8 @@ public sealed class WorkflowAutomationEngine
     private static readonly HashSet<string> supportedActions = new(StringComparer.OrdinalIgnoreCase)
     {
         "CreateActivity",
-        "ChangeJobStatus",
-        "AssignUser",
         "NotifyJob",
         "NotifyRequester",
-        "CreateSchedule",
         "WaitMinutes"
     };
 
@@ -396,26 +393,15 @@ public sealed class WorkflowAutomationEngine
         {
             case "createactivity":
                 string activityType = Text(action, "activityType", "Other");
+                if(ProductionAuthorityRules.IsProductionTask(activityType))throw new InvalidOperationException("Production activities require explicit Production Manager dispatch through Job workflow.");
                 string title = Text(action, "title", activityType);
                 string? assigned = OptionalText(action, "assignedTo");
                 int? dueMinutes = OptionalInt(action, "dueMinutes");
                 new OperationalWorkStore(database).CreateActivity(jobId, new JobActivityRequest(activityType,title,assigned,"NotStarted",Text(action,"priority","Normal"),null,dueMinutes.HasValue?DateTimeOffset.UtcNow.AddMinutes(dueMinutes.Value):null,null,null,null,null), "WORKFLOW");
                 if (!string.IsNullOrWhiteSpace(assigned)) jobAccess.EnsureAssignedMember(jobId, assigned);
                 break;
-            case "changejobstatus":
-                StudioJob before = studio.GetJob(jobId) ?? throw new KeyNotFoundException("Job not found.");
-                string status = Text(action, "status", before.Status);
-                StudioJob after = studio.UpdateJob(jobId, new UpdateJobRequest(status, null, null));
-                PublishJob(jobId,"JobStatusChanged",$"Job status: {after.Title}",$"{before.Status} → {after.Status}");
-                break;
-            case "assignuser":
-                string userName = Text(action, "userName", string.Empty);
-                if (string.IsNullOrWhiteSpace(userName)) throw new InvalidOperationException("AssignUser requires userName.");
-                StudioJob current = studio.GetJob(jobId) ?? throw new KeyNotFoundException("Job not found.");
-                studio.UpdateJob(jobId, new UpdateJobRequest(null, userName, null));
-                jobAccess.EnsureAssignedMember(jobId, userName);
-                notifications.PublishToUser(userName,"JobAssigned",$"Job assigned: {current.Title}","You were assigned by workflow automation.","Job",jobId.ToString("D"));
-                break;
+            case "changejobstatus":case "assignuser":
+                throw new InvalidOperationException("Legacy automatic Job status/ownership actions require an authorized connected workflow decision.");
             case "notifyjob":
                 PublishJob(jobId,"WorkflowNotification",Text(action,"subject","Workflow notification"),Text(action,"body","Workflow automation generated this notification."));
                 break;
@@ -423,10 +409,7 @@ public sealed class WorkflowAutomationEngine
                 NotifyRequester(jobId,Text(action,"subject","Job update"),Text(action,"body","There is an update to your request."),Text(action,"preference","JobStatusChanged"));
                 break;
             case "createschedule":
-                DateTimeOffset start = DateTimeOffset.UtcNow.AddMinutes(OptionalInt(action,"startsInMinutes") ?? 0);
-                int duration = Math.Max(1, OptionalInt(action,"durationMinutes") ?? 60);
-                new ScheduleStore(database, configuration).Create(new ScheduleEntryRequest(jobId,null,Text(action,"title","Scheduled work"),start,start.AddMinutes(duration),OptionalText(action,"location"),"Scheduled",OptionalText(action,"notes"),[]));
-                break;
+                throw new InvalidOperationException("Scheduling requires an authorized Job workflow decision.");
             default:
                 throw new InvalidOperationException($"Unsupported workflow action '{type}'.");
         }
@@ -573,6 +556,7 @@ public sealed class WorkflowAutomationEngine
             if (!action.TryGetProperty("type", out JsonElement typeElement) || typeElement.ValueKind != JsonValueKind.String) throw new InvalidOperationException("Every workflow action requires a string type.");
             string type = typeElement.GetString() ?? string.Empty;
             if (!supportedActions.Contains(type)) throw new InvalidOperationException($"Unsupported workflow action '{type}'.");
+            if(type.Equals("CreateActivity",StringComparison.OrdinalIgnoreCase)&&ProductionAuthorityRules.IsProductionTask(OptionalText(action,"activityType")??"Other"))throw new InvalidOperationException("Production activities require explicit Production Manager dispatch through Job workflow.");
             if (type.Equals("AssignUser", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(OptionalText(action,"userName"))) throw new InvalidOperationException("AssignUser requires userName.");
             if (type.Equals("ChangeJobStatus", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(OptionalText(action,"status"))) throw new InvalidOperationException("ChangeJobStatus requires status.");
         }

@@ -39,7 +39,7 @@ public sealed class WorkDaySchedulingService : IWorkDaySchedulingService
 
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
-        using(var jobLock=new NpgsqlCommand("select id from studio_jobs where id=$1 and status not in ('Completed','Cancelled','Published') for update",connection,transaction))
+        using(var jobLock=new NpgsqlCommand("select id from studio_jobs where id=$1 and status in ('Needs Photographer Assignment','Awaiting Scheduling','Scheduled') and exists(select 1 from studio_job_owner_assignments a where a.id=studio_jobs.owner_assignment_id and a.status='Accepted') for update",connection,transaction))
         {jobLock.Parameters.AddWithValue(jobId);if(jobLock.ExecuteScalar() is null)throw new InvalidOperationException("The job is unavailable for scheduling.");}
         using(var duplicate=new NpgsqlCommand("select id from studio_shoot_sessions where job_id=$1 and lower(photographer_user_name)=lower($2) and call_time_utc=$3 and planned_end_utc=$4 and status<>'Cancelled'",connection,transaction))
         {
@@ -89,8 +89,8 @@ public sealed class WorkDaySchedulingService : IWorkDaySchedulingService
             audit.Transaction = transaction; audit.CommandText="insert into studio_operational_audit(id,job_id,activity_id,action,user_name,detail,created_at_utc) values($1,$2,null,'ShootScheduled',$3,$4,now())";
             audit.Parameters.AddWithValue(Guid.NewGuid()); audit.Parameters.AddWithValue(jobId); audit.Parameters.AddWithValue(userName); audit.Parameters.AddWithValue($"{photographer.DisplayName} at {request.CallTimeUtc:u}; schedule {scheduleId}"); audit.ExecuteNonQuery();
         }
-        using(var jobUpdate=new NpgsqlCommand("update studio_jobs set assigned_to=coalesce(nullif(assigned_to,''),$2),status=case when status in ('New','Needs Scheduling','Confirmed') then 'Scheduled' else status end where id=$1",connection,transaction))
-        {jobUpdate.Parameters.AddWithValue(jobId);jobUpdate.Parameters.AddWithValue(photographer.UserName);jobUpdate.ExecuteNonQuery();}
+        using(var jobUpdate=new NpgsqlCommand("update studio_jobs set status='Scheduled' where id=$1 and status in ('Needs Photographer Assignment','Awaiting Scheduling','Scheduled')",connection,transaction))
+        {jobUpdate.Parameters.AddWithValue(jobId);jobUpdate.ExecuteNonQuery();}
         transaction.Commit();
         return new OperationalWorkStore(database).GetShoots(jobId).Single(x => x.Id == shootId);
     }
@@ -108,7 +108,7 @@ public sealed class WorkDaySchedulingService : IWorkDaySchedulingService
             staff.Add(assistant);
         }
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
-        using(var job=new NpgsqlCommand("select id from studio_jobs where id=$1 and status not in ('Completed','Cancelled','Published') for update",c,tx))
+        using(var job=new NpgsqlCommand("select id from studio_jobs where id=$1 and status in ('Needs Photographer Assignment','Awaiting Scheduling','Scheduled') and exists(select 1 from studio_job_owner_assignments a where a.id=studio_jobs.owner_assignment_id and a.status='Accepted') for update",c,tx))
         {job.Parameters.AddWithValue(jobId);if(job.ExecuteScalar() is null)throw new InvalidOperationException("Job is closed for scheduling.");}
         Guid schedule;string oldPhotographer;
         using(var find=new NpgsqlCommand("select schedule_entry_id,photographer_user_name,status,checked_in_at_utc from studio_shoot_sessions where id=$1 and job_id=$2 for update",c,tx))
@@ -118,6 +118,8 @@ public sealed class WorkDaySchedulingService : IWorkDaySchedulingService
             if(r.IsDBNull(0)||r.GetString(2)=="Cancelled"||!r.IsDBNull(3))throw new InvalidOperationException("Only an unstarted scheduled shoot can be rescheduled.");
             schedule=r.GetGuid(0);oldPhotographer=r.GetString(1);
         }
+        using(var crew=new NpgsqlCommand("select count(*) from studio_workflow_crew where session_id in(select id from studio_workflow_sessions where shoot_id=$1)",c,tx))
+        {crew.Parameters.AddWithValue(shootId);if((long)crew.ExecuteScalar()!>2)throw new InvalidOperationException("Use Job Crew / Schedule to preserve every photographer in this multi-photographer session.");}
         var next=staff.Select(p=>p.ScheduleResourceId).Concat(request.ResourceIds??[]).Distinct().Order().ToArray();
         Guid[] previous;
         using(var resources=new NpgsqlCommand("select coalesce(array_agg(resource_id),'{}'::uuid[]) from studio_schedule_entry_resources where entry_id=$1",c,tx))
@@ -142,7 +144,7 @@ public sealed class WorkDaySchedulingService : IWorkDaySchedulingService
     public void Cancel(Guid jobId,Guid shootId,string actor)
     {
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
-        using(var guard=new NpgsqlCommand("select id from studio_jobs where id=$1 and status not in ('Completed','Cancelled','Published') for update",c,tx)){guard.Parameters.AddWithValue(jobId);if(guard.ExecuteScalar() is null)throw new InvalidOperationException("Job is closed for scheduling.");}
+        using(var guard=new NpgsqlCommand("select id from studio_jobs where id=$1 and status in ('Needs Photographer Assignment','Awaiting Scheduling','Scheduled') and exists(select 1 from studio_job_owner_assignments a where a.id=studio_jobs.owner_assignment_id and a.status='Accepted') for update",c,tx)){guard.Parameters.AddWithValue(jobId);if(guard.ExecuteScalar() is null)throw new InvalidOperationException("Job is closed for scheduling.");}
         Guid entry;using(var shoot=new NpgsqlCommand("select schedule_entry_id,status,checked_in_at_utc from studio_shoot_sessions where id=$1 and job_id=$2 for update",c,tx))
         {shoot.Parameters.AddWithValue(shootId);shoot.Parameters.AddWithValue(jobId);using var r=shoot.ExecuteReader();if(!r.Read())throw new KeyNotFoundException("Shoot not found.");if(r.GetString(1)=="Cancelled")return;if(!r.IsDBNull(2)||r.IsDBNull(0))throw new InvalidOperationException("Only an unstarted shoot can be cancelled.");entry=r.GetGuid(0);}
         using(var update=new NpgsqlCommand("update studio_schedule_entries set status='Cancelled' where id=$1",c,tx)){update.Parameters.AddWithValue(entry);update.ExecuteNonQuery();}
@@ -155,13 +157,15 @@ public sealed class WorkDaySchedulingService : IWorkDaySchedulingService
     private static void EnsureNoConflicts(NpgsqlConnection connection, NpgsqlTransaction transaction, IReadOnlyList<Guid> resources, DateTimeOffset startsAtUtc, DateTimeOffset endsAtUtc, Guid? excludingEntry=null)
     {
         if (resources.Count == 0) return;
+        using(var active=new NpgsqlCommand("select count(*) from studio_schedule_resources where id=any($1) and is_active",connection,transaction))
+        {active.Parameters.AddWithValue(resources.Distinct().ToArray());if((long)active.ExecuteScalar()! !=resources.Distinct().Count())throw new InvalidOperationException("Choose active schedule resources.");}
         using NpgsqlCommand command = connection.CreateCommand(); command.Transaction = transaction;
         command.CommandText = """
             select r.name,e.title,e.starts_at_utc,e.ends_at_utc
             from studio_schedule_entries e
             join studio_schedule_entry_resources er on er.entry_id=e.id
             join studio_schedule_resources r on r.id=er.resource_id
-            where er.resource_id=any($1) and e.starts_at_utc<$3 and e.ends_at_utc>$2 and e.status<>'Cancelled' and ($4::uuid is null or e.id<>$4)
+            where er.resource_id=any($1) and coalesce(er.attendance_start_utc,e.starts_at_utc)<$3 and coalesce(er.attendance_end_utc,e.ends_at_utc)>$2 and e.status<>'Cancelled' and ($4::uuid is null or e.id<>$4)
             limit 1
             """;
         command.Parameters.AddWithValue(resources.ToArray()); command.Parameters.AddWithValue(startsAtUtc.ToUniversalTime()); command.Parameters.AddWithValue(endsAtUtc.ToUniversalTime()); command.Parameters.AddWithValue((object?)excludingEntry??DBNull.Value);

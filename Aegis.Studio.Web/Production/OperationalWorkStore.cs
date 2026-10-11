@@ -107,6 +107,7 @@ public sealed class OperationalWorkStore
         {locked.Parameters.AddWithValue(id);if(locked.ExecuteScalar() is null)throw new KeyNotFoundException("Shoot session was not found.");}
         ShootSession current = GetShoot(id) ?? throw new KeyNotFoundException("Shoot session was not found.");
         string action = request.Action?.Trim().ToLowerInvariant() ?? "update";
+        if(action is "checkin" or "checkout")throw new InvalidOperationException("Record each photographer through Job photographer reports or WorkDay; shared shoot completion follows every assigned photographer.");
         if(action=="checkout" && current.CheckedOutAtUtc.HasValue)return current;
         if(action=="checkin" && current.CheckedInAtUtc.HasValue)return current;
         if(action=="handoff" && current.HandoffStatus=="HandedOff")return current;

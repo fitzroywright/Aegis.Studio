@@ -86,7 +86,7 @@ async function createShootSession(event) {
 
 async function setOperationalActivityStatus(id,status,blockedReason) { const item=operationalActivityCache.get(id); if(!item)return; await StudioWorkflow.command(item.jobId,{action:'task-progress',taskId:id,status,blockedReason:blockedReason||null},item); await showProduction(); }
 async function blockOperationalActivity(id) { const reason=prompt('Why is this activity blocked?'); if(reason) await setOperationalActivityStatus(id,'Blocked',reason); }
-async function updateShoot(id,action) { await json('/api/operations/shoots/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,imageCount:null,backupConfirmed:null,reshootRequired:null,coverageNotes:null,equipmentNotes:null,handoffTo:null})}); await showProduction(); }
+async function updateShoot(id,action) { const shoot=shootCache.get(id);if(shoot)await openPhotographerReport(shoot.jobId,shoot.scheduleEntryId); }
 
 async function recordShootResults(id) {
     const item=shootCache.get(id); if(!item)return;
@@ -178,3 +178,12 @@ function bindEmbeddedShootAvailability(){
  }catch(error){target.textContent=error.message;}finally{button.disabled=false;}};
 }
 
+
+async function openPhotographerReport(jobId,assignmentId=null){
+ const rows=(await json(`/api/jobs/${jobId}/photographer-reports`)).filter(x=>!assignmentId||x.assignmentId===assignmentId);
+ if(!rows.length)throw Error('No current photographer assignments are available for reporting.');
+ const d=studioDialog('Record photographer update',`<form class="subject-form"><label>Assignment / photographer<select name="person">${rows.map((x,i)=>`<option value="${i}">${esc(x.title)} · ${esc(x.displayName)} · ${esc(x.status)}</option>`).join('')}</select></label><label>Update<select name="kind"><option value="0">Accepted</option><option value="10">Declined</option><option value="1">Arrived</option><option value="2">Started</option><option value="3">Completed</option><option value="5">Note</option><option value="6">Problem</option></select></label><label>Actual event time<input name="occurred" type="datetime-local" required></label><label>Photographer note<textarea name="note" maxlength="4000"></textarea></label><label>Why this is recorded manually / source<textarea name="reason" maxlength="4000" required></textarea></label><button class="primary">Record update</button><p role="alert"></p></form>`);
+ const f=d.querySelector('form');const now=new Date();f.elements.occurred.value=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ let original=null;
+ f.onsubmit=async e=>{e.preventDefault();const button=f.querySelector('button.primary');button.disabled=true;try{if(!original){const row=rows[Number(f.elements.person.value)];original={photographer:row.userName,reason:f.elements.reason.value,operation:{operationId:crypto.randomUUID(),kind:Number(f.elements.kind.value),assignmentId:row.assignmentId,occurredAtUtc:new Date(f.elements.occurred.value).toISOString(),deviceId:'StudioManual',text:f.elements.note.value||null,category:null,location:null,expectedVersion:row.version}};f.querySelectorAll('input,textarea,select').forEach(x=>x.disabled=true);}await json(`/api/jobs/${jobId}/photographer-reports`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(original)});d.close();await openWorkspaceJob(jobId);}catch(error){f.querySelector('[role=alert]').textContent=error.message+' Refresh assignment facts before recording a new decision if this report conflicts.';button.disabled=false;button.textContent='Retry original report';}};
+}

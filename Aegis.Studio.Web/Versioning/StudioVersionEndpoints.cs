@@ -142,7 +142,7 @@ public static class StudioVersionEndpoints
             if(!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
             using var c=db.OpenConnection();using var cmd=new NpgsqlCommand("""
                 insert into studio_media_derivatives(version_id) select id from studio_asset_versions where job_id=$1 and id=$2
-                on conflict(version_id) do update set status='Pending',attempts=0,next_attempt_at=now(),last_error=null
+                on conflict(version_id) do update set status='Pending',attempts=0,next_attempt_at=now(),last_error=null,lease_id=null
                 where studio_media_derivatives.status<>'Processing' or studio_media_derivatives.next_attempt_at<now()
                 """,c);cmd.Parameters.AddWithValue(jobId);cmd.Parameters.AddWithValue(versionId);
             await cmd.ExecuteNonQueryAsync(token);return Results.Accepted();

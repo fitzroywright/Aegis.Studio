@@ -130,6 +130,7 @@ public sealed class IntegratedWorkflowTests
         using var context=new WorkflowContext();
         var db=context.Database;var job=context.Job;
         var photographers=new PhotographerStore(db);photographers.Save(new("a","Photographer A","Employee",true,[],null));photographers.Save(new("b","Photographer B","Employee",true,[],null));
+        Sql(context.Connection,"create table studio_job_owner_assignments(id uuid primary key,status text);alter table studio_jobs add column owner_assignment_id uuid;insert into studio_job_owner_assignments values($1,'Accepted');update studio_jobs set owner_assignment_id=$1,status='Scheduled' where id=$2",Guid.NewGuid(),job);
         var scheduler=new WorkDaySchedulingService(db,photographers);var starts=DateTimeOffset.UtcNow.AddDays(5);
         var shoot=scheduler.Create(job,new("a",null,starts,starts.AddHours(1),"Studio",null,null,[]),"Manager");
         var moved=scheduler.Reschedule(job,shoot.Id,new("b",null,starts.AddHours(2),starts.AddHours(3),"Studio",null,null,[]),"Manager");

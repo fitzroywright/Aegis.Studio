@@ -113,3 +113,16 @@ User direction: builds and test execution will occur locally. No builds or tests
 - Session upload verification derives counts from stored receipts instead of accepting typed counts. Source submission blocks unresolved declared uploads and requires actual batch backup verification. Photographer readiness checks that photographer's session receipts.
 - Scheduling conflicts can no longer be bypassed with the legacy AllowConflicts flag.
 - Added focused declaration/destination test source. Per user direction, no builds or tests were executed for this checkpoint. Local validation, remaining alternate-writer audit, and device acceptance remain outstanding.
+
+
+## Resumed checkpoint: alternate writers, manual reports and local handoff
+
+- Legacy whole-shoot check-in/out and connected start/finish writes no longer bypass individual photographer reporting. Studio exposes versioned manual per-photographer reporting through the same WorkDay transaction, preserving the photographer, actual time, authenticated recorder, reason, stable operation ID and notification/audit evidence. Shared completion waits for all current assigned photographers.
+- Crew scheduling requires accepted Job ownership, supports active additional non-photographer resources, locks old/new resource sets, rejects conflicts and honors individual attendance. Legacy scheduling retains Job ownership, rejects inactive resources and leave conflicts, and prevents a two-person form from discarding a larger crew. Schedule entries retain their original Job; both sides of attempted relinking are permission checked. Generic scheduling now takes Job locks before resource locks.
+- Commercial task dispatch/source selection/reconciliation controls follow Production Manager authority. Assigned staff retain progress controls; QC completion remains reserved. Commands retain their original identities and reviewed revisions on retries.
+- New legacy automation definitions cannot automatically change Job status/ownership, create schedule reservations or dispatch production activities. Existing definitions encounter explicit review errors for those actions rather than claiming success. Coordination reminders and notifications remain available.
+- Preview claims are fenced by lease IDs, write separate derivative paths per claim, retry at most eight times and allow explicit retry. Original versions remain unchanged.
+- Upload cancellation records a reason, keeps immutable stored versions and receipts, waits for active per-file writes, invalidates prior batch verification and requires a new complete declaration for replacement files. No file counts or successful receipts are fabricated.
+- Outbound claims count attempts before sending, retain channel in audits and reject stale lease acknowledgements. Expired exhausted claims retain an explicit uncertain-provider outcome.
+- Added PostgreSQL test source for stable receipt replay/changed-byte rejection, closed-Job receipt replay, delivery lease recovery/stale acknowledgement denial, and manual multi-photographer completion/recorder attribution. Updated the scheduling test setup for accepted ownership.
+- Static JavaScript parsing and whitespace checks were performed. Builds, automated test execution, PostgreSQL acceptance, live provider/storage acceptance and Android/iOS device checks remain for the user's local environment.

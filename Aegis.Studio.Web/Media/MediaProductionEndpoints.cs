@@ -72,6 +72,7 @@ public static class MediaProductionEndpoints
             return Results.Ok(new MediaUploadReceipts(db,Store(db,storage)).List(jobId));
         }).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/upload-batches",(Guid jobId,UploadBatchDeclaration declaration,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,WorkflowStore workflow)=>Write(jobId,user,access,()=>Results.Ok(new MediaUploadReceipts(db,Store(db,storage)).Create(jobId,declaration,Name(user),workflow.CanManage(user,jobId)||new GlobalOperationalRoleStore(db).HasRole(user,StudioRoleNames.ProductionManager))))).RequireAuthorization();
+        app.MapPost("/api/jobs/{jobId:guid}/media/upload-batches/{batchId:guid}/cancel",(Guid jobId,Guid batchId,CancelUploadBatch request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,WorkflowStore workflow)=>Write(jobId,user,access,()=>Results.Ok(new MediaUploadReceipts(db,Store(db,storage)).Cancel(jobId,batchId,Name(user),workflow.CanManage(user,jobId)||workflow.IsProductionManager(user),request.Reason)))).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/uploads",async(Guid jobId,HttpRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>
         {
             if(!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
@@ -108,3 +109,5 @@ public sealed record WorkspaceAppearance(string Icon,string Color);
 
 public sealed record MediaGallerySettings(string Name,string DefaultLens);
 public sealed record MediaCollectionRequest(string Name);
+
+public sealed record CancelUploadBatch(string Reason);

@@ -1,4 +1,5 @@
 using Common.Storage;
+using Aegis.Studio.Web.WorkDay;
 using System.Security.Claims;
 using System.Text.Json;
 using Aegis.Studio.Web.Operations;
@@ -10,6 +11,20 @@ public static class WorkflowEndpoints
 {
     public static void MapConnectedWorkflow(this WebApplication app)
     {
+        app.MapGet("/api/jobs/{job:guid}/photographer-reports",(Guid job,ClaimsPrincipal user,WorkflowStore workflow,JobAccessService access,StudioDatabase db)=>Run(()=>
+        {
+            if(!access.HasPermission(user,job,"ViewJob"))throw new UnauthorizedAccessException();
+            using var c=db.OpenConnection();using var q=WorkflowStore.Command(c,null,"select e.id,p.user_name,p.display_name,coalesce(s.status,'Assigned'),coalesce(s.version,0),e.title from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id join studio_photographers p on p.schedule_resource_id=er.resource_id left join studio_workday_photographer_state s on s.assignment_id=e.id and lower(s.user_name)=lower(p.user_name) where e.job_id=$1 and e.status<>'Cancelled' and p.is_active and ($2 or lower(p.user_name)=lower($3)) order by e.starts_at_utc,p.user_name",job,workflow.CanManage(user,job),WorkflowStore.Name(user));
+            using var r=q.ExecuteReader();var rows=new List<object>();while(r.Read())rows.Add(new{assignmentId=r.GetGuid(0),userName=r.GetString(1),displayName=r.GetString(2),status=r.GetString(3),version=r.GetInt64(4),title=r.GetString(5)});return Results.Ok(rows);
+        })).RequireAuthorization();
+        app.MapPost("/api/jobs/{job:guid}/photographer-reports",(Guid job,ManualPhotographerReport report,ClaimsPrincipal user,WorkflowStore workflow,JobAccessService access,StudioDatabase db,WorkDayStore workday)=>Run(()=>
+        {
+            string actor=WorkflowStore.Name(user);
+            if(!access.HasPermission(user,job,"ViewJob")||(!workflow.CanManage(user,job)&&!actor.Equals(report.Photographer,StringComparison.OrdinalIgnoreCase)))throw new UnauthorizedAccessException();
+            using var c=db.OpenConnection();if(!WorkflowStore.Exists(c,null,"select exists(select 1 from studio_schedule_entries where id=$1 and job_id=$2)",report.Operation.AssignmentId,job))throw new ArgumentException("Choose an assignment in this Job.");
+            var result=workday.Apply(report.Photographer,report.Operation,actor,report.Reason);
+            return result.State==WorkDayOperationState.Conflict?Results.Conflict(result):Results.Ok(result);
+        })).RequireAuthorization();
         app.MapGet("/api/workflow/capabilities",(ClaimsPrincipal user,WorkflowStore store)=>Results.Ok(new{operations=store.IsOperations(user),frontDesk=store.IsFrontDesk(user),finance=store.IsFinance(user),production=store.IsProductionManager(user)})).RequireAuthorization();
         app.MapGet("/api/operations-management",(ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>Run(()=>
         {
@@ -134,7 +149,7 @@ public static class WorkflowEndpoints
         }));
     }
     internal static IResult Run(Func<IResult> action)
-    {try{return action();}catch(WorkflowConflictException e){return Results.Conflict(new{error=e.Message});}catch(UnauthorizedAccessException){return Results.Forbid();}catch(KeyNotFoundException){return Results.NotFound();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}}
+    {try{return action();}catch(WorkflowConflictException e){return Results.Conflict(new{error=e.Message});}catch(UnauthorizedAccessException){return Results.Forbid();}catch(KeyNotFoundException){return Results.NotFound();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}}
 }
 public sealed record WorkflowAudience(string Audience,IReadOnlyList<string> Users);
 
@@ -179,3 +194,5 @@ public sealed class WorkflowMonitorWorker(IServiceScopeFactory scopes,ILogger<Wo
 }
 
 public sealed record DemoResetConfirmation(string Confirmation);
+
+public sealed record ManualPhotographerReport(string Photographer,WorkDayOperationRequest Operation,string Reason);

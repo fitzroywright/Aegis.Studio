@@ -16,10 +16,11 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
           status text not null default 'Pending', attempts integer not null default 0,
           next_attempt_at timestamptz not null default now(), thumbnail_key text null,
           preview_key text null, last_error text null, updated_at timestamptz not null default now());
+        alter table studio_media_derivatives add column if not exists lease_id uuid;
         create or replace function studio_enqueue_media_preview() returns trigger language plpgsql as $$
         begin
           insert into studio_media_derivatives(version_id) values(new.id) on conflict(version_id)
-            do update set status='Pending',attempts=0,next_attempt_at=now(),thumbnail_key=null,preview_key=null,last_error=null;
+            do update set status='Pending',attempts=0,next_attempt_at=now(),thumbnail_key=null,preview_key=null,last_error=null,lease_id=null;
           return new;
         end $$;
         drop trigger if exists studio_version_preview_queue on studio_asset_versions;
@@ -36,9 +37,9 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
         {
             try
             {
-                Guid? id = await Claim(stoppingToken);
-                if (id is null) { await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken); continue; }
-                await Generate(id.Value, stoppingToken);
+                var claim = await Claim(stoppingToken);
+                if (claim is null) { await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken); continue; }
+                await Generate(claim.Value.Id,claim.Value.Lease,stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error)
@@ -50,7 +51,7 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
     }
     private Guid? backfillAfter;
     private bool backfillComplete;
-    private async Task<Guid?> Claim(CancellationToken token)
+    private async Task<(Guid Id,Guid Lease)?> Claim(CancellationToken token)
     {
         await using var c = database.OpenConnection();
         // Backfill is incremental; it does not scan or decode images on a request.
@@ -64,17 +65,19 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
             backfill.Parameters.AddWithValue((object?)backfillAfter??DBNull.Value);
             if(await backfill.ExecuteScalarAsync(token) is Guid cursor)backfillAfter=cursor;else backfillComplete=true;
         }
+        Guid lease=Guid.NewGuid();
         await using var cmd = new NpgsqlCommand("""
-            update studio_media_derivatives d set status='Processing',attempts=attempts+1,
+            update studio_media_derivatives d set status='Processing',attempts=attempts+1,lease_id=$1,
               next_attempt_at=now()+interval '15 minutes',updated_at=now()
             where version_id=(select version_id from studio_media_derivatives
-              where status in ('Pending','Processing','Failed') and next_attempt_at<=now()
+              where status in ('Pending','Processing','Failed') and attempts<8 and next_attempt_at<=now()
               order by next_attempt_at,version_id for update skip locked limit 1)
             returning version_id
             """, c);
-        return await cmd.ExecuteScalarAsync(token) is Guid id ? id : null;
+        cmd.Parameters.AddWithValue(lease);
+        return await cmd.ExecuteScalarAsync(token) is Guid id ? (id,lease) : null;
     }
-    private async Task Generate(Guid id, CancellationToken token)
+    private async Task Generate(Guid id,Guid lease,CancellationToken token)
     {
         try
         {
@@ -92,25 +95,25 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
                     65536, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
                 await original.CopyToAsync(staged, token); staged.Position = 0;
                 using var image = StudioImageProcessor.DecodeOriented(staged);
-                string thumb = $"MediaDerivatives/{job:N}/{id:N}/thumbnail.jpg";
-                string preview = $"MediaDerivatives/{job:N}/{id:N}/preview.jpg";
+                string thumb = $"MediaDerivatives/{job:N}/{id:N}/{lease:N}/thumbnail.jpg";
+                string preview = $"MediaDerivatives/{job:N}/{id:N}/{lease:N}/preview.jpg";
                 await Write(image, 384, thumb, token);
                 await Write(image, 1600, preview, token);
-                await SetState(id, "Ready", thumb, preview, null, token);
+                await SetState(id,lease, "Ready", thumb, preview, null, token);
             }
             finally { if (File.Exists(temp)) File.Delete(temp); }
         }
-        catch (StudioUnsupportedImageException error) { await SetState(id,"Unsupported",null,null,error.Message,token); }
+        catch (StudioUnsupportedImageException error) { await SetState(id,lease,"Unsupported",null,null,error.Message,token); }
         catch (StorageException error) when (error.Code=="STORAGE-MISSING-001")
         {
             logger.LogInformation("Preview deferred for version {VersionId}; original storage object is not available yet",id);
-            await SetState(id,"WaitingForOriginal",null,null,"Original unavailable. Preview will be queued when storage is restored.",token);
+            await SetState(id,lease,"WaitingForOriginal",null,null,"Original unavailable. Preview will be queued when storage is restored.",token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception error)
         {
             logger.LogWarning(error, "Preview generation failed for version {VersionId}; original is retained", id);
-            await SetState(id, "Failed", null, null, "Preview unavailable. Retry generation or download the original.", token);
+            await SetState(id,lease, "Failed", null, null, "Preview unavailable. Retry generation or download the original.", token);
         }
     }
     private async Task Write(SKBitmap original, int edge, string key, CancellationToken token)
@@ -121,15 +124,15 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
         await using var verify=await storage.OpenReadAsync(key,token);
         if(verify.ReadByte()<0)throw new IOException("Preview storage verification failed.");
     }
-    private async Task SetState(Guid id,string state,string? thumb,string? preview,string? error,CancellationToken token)
+    private async Task SetState(Guid id,Guid lease,string state,string? thumb,string? preview,string? error,CancellationToken token)
     {
         await using var c=database.OpenConnection();
         await using var cmd=new NpgsqlCommand("""
             update studio_media_derivatives set status=$2,thumbnail_key=$3,preview_key=$4,last_error=$5,
-              next_attempt_at=now()+make_interval(secs=>least(3600,30*power(2,least(attempts,7)))::int),updated_at=now()
-            where version_id=$1
+              lease_id=null,next_attempt_at=now()+make_interval(secs=>least(3600,30*power(2,least(attempts,7)))::int),updated_at=now()
+            where version_id=$1 and lease_id=$6 and status='Processing'
             """,c);
-        foreach(var value in new object?[]{id,state,thumb,preview,error})cmd.Parameters.AddWithValue(value??DBNull.Value);
+        foreach(var value in new object?[]{id,state,thumb,preview,error,lease})cmd.Parameters.AddWithValue(value??DBNull.Value);
         await cmd.ExecuteNonQueryAsync(token);
     }
 }

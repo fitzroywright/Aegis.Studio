@@ -157,7 +157,10 @@ public static class ScheduleEndpoints
             StudioInAppMessageStore messages) =>
         {
             ScheduleEntry? current = store.GetEntries(DateTimeOffset.UtcNow.AddYears(-5), DateTimeOffset.UtcNow.AddYears(5)).FirstOrDefault(x => x.Id == id);
-            Guid? jobId = request.JobId ?? current?.JobId;
+            if(current is null)return Results.NotFound();
+            var previousJob=current.JobId??ResolveBookingJobId(current.BookingId,database);
+            if(previousJob is Guid previous&&!access.HasPermission(user,previous,"ManageSchedule"))return Results.Forbid();
+            Guid? jobId = request.JobId ?? current.JobId;
             if (!jobId.HasValue)
             {
                 if (!user.IsInRole("Administrator")) return Results.Forbid();

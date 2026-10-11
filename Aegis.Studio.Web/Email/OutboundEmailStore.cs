@@ -56,13 +56,14 @@ public sealed class OutboundEmailStore
     public OutboundEmail? ClaimNext(IReadOnlyCollection<string> channels,Guid leaseId)
     {
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        using(var exhausted=new NpgsqlCommand("update studio_outbound_email set status='Failed',last_error='ProviderOutcomeUncertainAfterRetryExhaustion',lease_id=null,lease_until_utc=null where status='Sending' and lease_until_utc<now() and attempts>=10",c,tx))exhausted.ExecuteNonQuery();
         using var q=new NpgsqlCommand("""
             with candidate as (select id from studio_outbound_email
               where delivery_channel=any($1) and attempts<10 and
                 ((status in ('Pending','Retry') and (next_attempt_at_utc is null or next_attempt_at_utc<=now()))
                   or (status='Sending' and lease_until_utc<now()))
               order by created_at_utc for update skip locked limit 1)
-            update studio_outbound_email e set status='Sending',lease_id=$2,lease_until_utc=now()+interval '2 minutes'
+            update studio_outbound_email e set status='Sending',attempts=attempts+1,lease_id=$2,lease_until_utc=now()+interval '2 minutes'
               from candidate p where e.id=p.id returning e.id
             """,c,tx);q.Parameters.AddWithValue(channels.ToArray());q.Parameters.AddWithValue(leaseId);
         object? result=q.ExecuteScalar();tx.Commit();return result is Guid id?Get(id):null;
@@ -78,7 +79,7 @@ public sealed class OutboundEmailStore
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             select e.id,e.conversation_id,e.from_address,e.to_address,e.status,e.created_at_utc,
-                   e.provider_message_id,e.kind,e.sent_by_user_name,e.sending_identity_type,c.workspace_id
+                   e.provider_message_id,e.kind,e.sent_by_user_name,e.sending_identity_type,c.workspace_id,e.delivery_channel
             from studio_outbound_email e
             join studio_conversations c on c.id=e.conversation_id
             where c.workspace_id = any($1)
@@ -102,7 +103,7 @@ public sealed class OutboundEmailStore
                 reader.GetString(7),
                 reader.IsDBNull(8) ? null : reader.GetString(8),
                 reader.GetString(9),
-                reader.GetGuid(10)));
+                reader.GetGuid(10),reader.GetString(11)));
         }
         return values;
     }
@@ -115,7 +116,7 @@ public sealed class OutboundEmailStore
             update studio_outbound_email
             set status='ProviderAccepted',
                 provider_message_id=$2,
-                attempts=attempts+1,
+                attempts=attempts+case when $3::uuid is null then 1 else 0 end,
                 last_error=null,
                 next_attempt_at_utc=null,
                 provider_accepted_at_utc=now(),lease_id=null,lease_until_utc=null
@@ -133,10 +134,10 @@ public sealed class OutboundEmailStore
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             update studio_outbound_email
-            set attempts=attempts+1,
-                status=case when attempts+1 >= 10 then 'Failed' else 'Retry' end,
+            set attempts=attempts+case when $4::uuid is null then 1 else 0 end,
+                status=case when attempts+case when $4::uuid is null then 1 else 0 end >= 10 then 'Failed' else 'Retry' end,
                 last_error=$2,
-                next_attempt_at_utc=case when attempts+1 >= 10 then null else $3 end,lease_id=null,lease_until_utc=null
+                next_attempt_at_utc=case when attempts+case when $4::uuid is null then 1 else 0 end >= 10 then null else $3 end,lease_id=null,lease_until_utc=null
             where id=$1 and ($4::uuid is null or lease_id=$4)
             """;
         command.Parameters.AddWithValue(id);
@@ -259,6 +260,6 @@ public sealed record OutboundEmailAuditRecord(
     string Kind,
     string? ActualUser,
     string SendingIdentityType,
-    Guid WorkspaceId);
+    Guid WorkspaceId,string DeliveryChannel="Email");
 
 public sealed record MarkOutboundSentRequest(string? ProviderMessageId);

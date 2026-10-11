@@ -12,7 +12,7 @@ using Npgsql;
 namespace Aegis.Studio.Web.Workflow;
 
 public sealed record CrewChange(string UserName,string Role,string? Notes=null,DateTimeOffset? Start=null,DateTimeOffset? End=null);
-public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null,string? Status=null,string? Priority=null,DateTimeOffset? ScheduledAtUtc=null,DateTimeOffset? DueAtUtc=null,string? Description=null,string? BlockedReason=null,string? HandoffTo=null,int? ExpectedFiles=null,int? CompletedFiles=null,int? FailedFiles=null,decimal? AuthorizedAmount=null,DateOnly? PaymentDueDate=null,string? CreditTerms=null,Guid? UploadBatchId=null);
+public sealed record WorkflowCommand(string Action,long ExpectedRevision,Guid OperationId,string? UserName=null,string? Reason=null,Guid? SessionId=null,string? Title=null,IReadOnlyList<CrewChange>? Crew=null,DateTimeOffset? Start=null,DateTimeOffset? End=null,string? Location=null,bool AllowConflicts=false,bool Required=true,Guid? WorkspaceId=null,Guid? TaskId=null,string? Kind=null,string? Method=null,string? Reference=null,bool BackupConfirmed=false,string? TargetStage=null,Guid? AssignmentRequestId=null,string? Status=null,string? Priority=null,DateTimeOffset? ScheduledAtUtc=null,DateTimeOffset? DueAtUtc=null,string? Description=null,string? BlockedReason=null,string? HandoffTo=null,int? ExpectedFiles=null,int? CompletedFiles=null,int? FailedFiles=null,decimal? AuthorizedAmount=null,DateOnly? PaymentDueDate=null,string? CreditTerms=null,Guid? UploadBatchId=null,IReadOnlyList<Guid>? ResourceIds=null);
 
 public sealed class WorkflowStore(StudioDatabase database,JobAccessService access,WorkspaceAccessService workspaces,IClientGalleryPublisher publisher,IConfiguration configuration)
 {
@@ -116,11 +116,10 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
             case "session":
                 if(!manage)throw new UnauthorizedAccessException();EnsureMutable(stage);
                 if(stage is not ("Needs Assignment" or "Needs Photographer Assignment" or "Awaiting Scheduling" or "Scheduled"))throw new ArgumentException("Withdraw/reopen the review or resolve the started shoot before changing its crew.");
+                if(!Exists(c,tx,"select exists(select 1 from studio_job_owner_assignments a join studio_jobs j on j.owner_assignment_id=a.id where j.id=$1 and a.status='Accepted')",job))throw new ArgumentException("The assigned Job Owner must accept responsibility before crew assignment and scheduling.");
                 SaveSession(c,tx,job,request,actor,user);Recalculate(c,tx,job);break;
             case "start-session":case "finish-session":
-                if(!manage&&!IsCrew(c,tx,job,request.SessionId,actor,true))throw new UnauthorizedAccessException();
-                if(stage is not ("Scheduled" or "Photography In Progress"))throw new ArgumentException("Photography can only start or finish at the scheduled photography stages.");
-                ExecuteSession(c,tx,job,request);break;
+                throw new ArgumentException("Record each assigned photographer through Job photographer reports or WorkDay. Session completion follows all current photographers.");
             case "contribution-ready":case "waive-contribution":
                 if(stage=="Changes Requested"&&correction!="Source")throw new ArgumentException("Production corrections do not reopen source contributions.");
                 string contributor=request.UserName??actor;
@@ -131,8 +130,8 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 else
                 {
                     if(!request.BackupConfirmed)throw new ArgumentException("Confirm the existing required backup checks before declaring readiness.");
-                    if(!Exists(c,tx,"select exists(select 1 from studio_media_upload_batches b where b.job_id=$1 and b.session_id=$2 and lower(b.created_by)=lower($3) and exists(select 1 from studio_media_upload_receipts r where r.batch_id=b.id) and not exists(select 1 from studio_media_upload_receipts r where r.batch_id=b.id and (r.status<>'Stored' or r.version_id is null)))",job,request.SessionId,contributor))throw new ArgumentException("Finish your declared session upload batch and resolve unmatched files first.");
-                    if(Exists(c,tx,"select exists(select 1 from studio_media_upload_batches b join studio_media_upload_receipts r on r.batch_id=b.id where b.job_id=$1 and b.session_id=$2 and lower(b.created_by)=lower($3) and r.status<>'Stored')",job,request.SessionId,contributor))throw new ArgumentException("Resolve every outstanding file in your declared session batches first.");
+                    if(!Exists(c,tx,"select exists(select 1 from studio_media_upload_batches b where b.job_id=$1 and b.session_id=$2 and b.cancelled_at_utc is null and lower(b.created_by)=lower($3) and exists(select 1 from studio_media_upload_receipts r where r.batch_id=b.id) and not exists(select 1 from studio_media_upload_receipts r where r.batch_id=b.id and (r.status<>'Stored' or r.version_id is null)))",job,request.SessionId,contributor))throw new ArgumentException("Finish your declared session upload batch and resolve unmatched files first.");
+                    if(Exists(c,tx,"select exists(select 1 from studio_media_upload_batches b join studio_media_upload_receipts r on r.batch_id=b.id where b.job_id=$1 and b.session_id=$2 and b.cancelled_at_utc is null and lower(b.created_by)=lower($3) and r.status not in ('Stored','Cancelled'))",job,request.SessionId,contributor))throw new ArgumentException("Resolve every outstanding file in your declared session batches first.");
                 }
                 Sql(c,tx,"update studio_workflow_crew set ready=$3,waiver_reason=$4 where session_id=$1 and lower(user_name)=lower($2)",request.SessionId,contributor,request.Action=="contribution-ready",request.Action=="waive-contribution"?request.Reason:null);break;
             case "task-progress":
@@ -326,7 +325,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(stage=="Changes Requested"&&correction!="Source")throw new ArgumentException("Only source corrections may record upload batches.");
                 if(request.SessionId is not Guid uploadSession||!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions where id=$1 and job_id=$2)",uploadSession,job))
                     throw new ArgumentException("Choose a session belonging to this Job.");
-                if(request.UploadBatchId is not Guid declaredBatch||!Exists(c,tx,"select exists(select 1 from studio_media_upload_batches where id=$1 and job_id=$2 and session_id=$3)",declaredBatch,job,uploadSession))throw new ArgumentException("Choose an actual upload batch for this session.");
+                if(request.UploadBatchId is not Guid declaredBatch||!Exists(c,tx,"select exists(select 1 from studio_media_upload_batches where id=$1 and job_id=$2 and session_id=$3 and cancelled_at_utc is null)",declaredBatch,job,uploadSession))throw new ArgumentException("Choose an actual upload batch for this session.");
                 long expected=(long)Scalar(c,tx,"select count(*) from studio_media_upload_receipts where batch_id=$1",declaredBatch)!;
                 long completed=(long)Scalar(c,tx,"select count(*) from studio_media_upload_receipts where batch_id=$1 and status='Stored' and version_id is not null",declaredBatch)!;
                 if(expected==0||completed!=expected)throw new ArgumentException("Every declared file must have a stored receipt, with unmatched returns resolved, before backup verification.");
@@ -455,8 +454,12 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(resource is not Guid id)throw new ArgumentException(person.UserName+" needs an active photographer profile.");resources.Add((person,id));
                 if(person.Start.HasValue!=person.End.HasValue||person.Start<req.Start||person.End>req.End||person.End<=person.Start)throw new ArgumentException("Individual attendance must be a valid range inside the session.");
             }
+            var extras=(req.ResourceIds??[]).Distinct().Where(id=>!resources.Any(r=>r.Resource==id)).ToArray();
+            if(extras.Length>100)throw new ArgumentException("Choose at most 100 additional resources.");
+            foreach(var resource in extras)
+                if(!Exists(c,tx,"select exists(select 1 from studio_schedule_resources r where r.id=$1 and r.is_active and not exists(select 1 from studio_photographers p where p.schedule_resource_id=r.id))",resource))throw new ArgumentException("Choose active non-photographer resources; assign photographers through the crew list.");
             var previousResources=shoot.HasValue?(Guid[])Scalar(c,tx,"select coalesce(array_agg(er.resource_id),'{}'::uuid[]) from studio_schedule_entry_resources er join studio_shoot_sessions s on s.schedule_entry_id=er.entry_id where s.id=$1",shoot.Value)!:[];
-            foreach(var resource in resources.Select(x=>x.Resource).Concat(previousResources).Distinct().Order())Sql(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))",resource.ToString());
+            foreach(var resource in resources.Select(x=>x.Resource).Concat(extras).Concat(previousResources).Distinct().Order())Sql(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))",resource.ToString());
             Guid schedule=shoot.HasValue?(Guid)Scalar(c,tx,"select schedule_entry_id from studio_shoot_sessions where id=$1",shoot.Value)!:Guid.NewGuid();
             var conflicts=new List<string>();
             foreach(var item in resources)
@@ -464,10 +467,13 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 var start=(item.Person.Start??req.Start!.Value).ToUniversalTime();var end=(item.Person.End??req.End!.Value).ToUniversalTime();
                 if(Exists(c,tx,"select exists(select 1 from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id where er.resource_id=$1 and e.status<>'Cancelled' and e.id<>$2 and coalesce(er.attendance_start_utc,e.starts_at_utc)<$4 and coalesce(er.attendance_end_utc,e.ends_at_utc)>$3)",item.Resource,schedule,start,end)||Exists(c,tx,"select exists(select 1 from studio_photographer_availability where lower(user_name)=lower($1) and availability_type in ('Unavailable','Leave') and starts_at_utc<$3 and ends_at_utc>$2)",item.Person.UserName,start,end))conflicts.Add(item.Person.UserName);
             }
+            foreach(var resource in extras)
+                if(Exists(c,tx,"select exists(select 1 from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id where er.resource_id=$1 and e.status<>'Cancelled' and e.id<>$2 and coalesce(er.attendance_start_utc,e.starts_at_utc)<$4 and coalesce(er.attendance_end_utc,e.ends_at_utc)>$3)",resource,schedule,req.Start.Value.ToUniversalTime(),req.End!.Value.ToUniversalTime()))conflicts.Add("resource "+resource);
             if(conflicts.Count>0)throw new ArgumentException("Schedule conflicts: "+string.Join(", ",conflicts)+". Choose available staff and time.");
             Sql(c,tx,"insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,$3,$4,$5,$6,'Scheduled',$7,now()) on conflict(id) do update set title=excluded.title,starts_at_utc=excluded.starts_at_utc,ends_at_utc=excluded.ends_at_utc,location=excluded.location,status='Scheduled',notes=excluded.notes",schedule,job,req.Title??"Photography",req.Start.Value.ToUniversalTime(),req.End!.Value.ToUniversalTime(),req.Location,req.Reason);
             Sql(c,tx,"delete from studio_schedule_entry_resources where entry_id=$1",schedule);
             foreach(var item in resources)Sql(c,tx,"insert into studio_schedule_entry_resources(entry_id,resource_id,attendance_start_utc,attendance_end_utc) values($1,$2,$3,$4)",schedule,item.Resource,(item.Person.Start??req.Start.Value).ToUniversalTime(),(item.Person.End??req.End!.Value).ToUniversalTime());
+            foreach(var resource in extras)Sql(c,tx,"insert into studio_schedule_entry_resources(entry_id,resource_id,attendance_start_utc,attendance_end_utc) values($1,$2,$3,$4)",schedule,resource,req.Start.Value.ToUniversalTime(),req.End!.Value.ToUniversalTime());
             var lead=crew.Single(x=>x.Role=="Lead").UserName;var additional=crew.FirstOrDefault(x=>x.Role=="Additional")?.UserName;Guid shootId=shoot??Guid.NewGuid();
             Sql(c,tx,"""
                 insert into studio_shoot_sessions(id,job_id,schedule_entry_id,photographer_user_name,assistant_user_name,call_time_utc,planned_end_utc,location,status,image_count,backup_confirmed,reshoot_required,handoff_status,created_at_utc,updated_at_utc)
@@ -498,24 +504,9 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
          else 'Scheduled' end
         where id=$1 and status in ('Needs Assignment','Needs Photographer Assignment','Awaiting Scheduling','Scheduled')
         """,job);
-    private static void ExecuteSession(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,WorkflowCommand req)
-    {
-        if(!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions w join studio_shoot_sessions s on s.id=w.shoot_id where w.id=$1 and w.job_id=$2 and s.status<>'Cancelled')",req.SessionId,job))throw new ArgumentException("Choose a scheduled active session.");
-        if(req.Action=="start-session")
-        {
-            Sql(c,tx,"update studio_shoot_sessions set status='InProgress',checked_in_at_utc=coalesce(checked_in_at_utc,now()),updated_at_utc=now() where id=(select shoot_id from studio_workflow_sessions where id=$1) and checked_out_at_utc is null",req.SessionId);
-            Sql(c,tx,"update studio_jobs set status='Photography In Progress' where id=$1 and status='Scheduled'",job);
-        }
-        else
-        {
-            if(!Exists(c,tx,"select exists(select 1 from studio_shoot_sessions where id=(select shoot_id from studio_workflow_sessions where id=$1) and checked_in_at_utc is not null)",req.SessionId))throw new ArgumentException("Start this session before completing it.");
-            Sql(c,tx,"update studio_shoot_sessions set status='ShootComplete',checked_out_at_utc=coalesce(checked_out_at_utc,now()),backup_confirmed=$2,updated_at_utc=now() where id=(select shoot_id from studio_workflow_sessions where id=$1)",req.SessionId,req.BackupConfirmed);
-            if(!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=$1 and w.required and (s.id is null or s.status='Cancelled' or s.checked_out_at_utc is null))",job))SetStage(c,tx,job,"Awaiting Upload");
-        }
-    }
     private static void ValidateSourceReady(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
     {
-        if(Exists(c,tx,"select exists(select 1 from studio_media_upload_receipts where job_id=$1 and status<>'Stored')",job))throw new ArgumentException("Resolve pending, failed and unmatched declared uploads before source submission.");
+        if(Exists(c,tx,"select exists(select 1 from studio_media_upload_receipts where job_id=$1 and status not in ('Stored','Cancelled'))",job))throw new ArgumentException("Resolve pending, failed and unmatched declared uploads before source submission.");
         if(!Exists(c,tx,"select exists(select 1 from studio_workflow_upload_batches where job_id=$1 and source_upload_batch_id is not null and invalidated_at_utc is null and backup_confirmed and expected_files=completed_files and failed_files=0)",job))throw new ArgumentException("Verify an actual stored upload batch and its backup before source submission.");
         if(!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions where job_id=$1)",job)||Exists(c,tx,"select exists(select 1 from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=$1 and w.required and (s.id is null or s.status='Cancelled' or s.checked_out_at_utc is null or exists(select 1 from studio_workflow_crew c where c.session_id=w.id and not c.ready and c.waiver_reason is null)))",job))throw new ArgumentException("Complete all required sessions and photographer contributions, or explicitly waive missing contributions.");
         if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and activity_type in ('FileIngest','Backup') and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Complete the required ingest and backup verification tasks before submission.");
