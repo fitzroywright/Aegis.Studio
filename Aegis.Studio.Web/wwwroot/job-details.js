@@ -58,7 +58,7 @@
   const previous=(data.history||[]).filter(h=>positions.has(h.new_stage)&&!['Cancelled','Blocked','Reshoot Required','Changes Requested'].includes(h.new_stage)).at(-1)?.new_stage;
   const branchOrigin=main.includes(data.stage)?data.stage:previous||'Pending';
   const branches=correctionEdges+edge('Shoot Complete','Reshoot Required','reshoot')+edge('Reshoot Required','Awaiting Scheduling','reshoot',true)+edge(branchOrigin,'Cancelled','cancel')+edge(branchOrigin,'Blocked','block');
-  host.innerHTML=`<div class="jd-flow-canvas"><svg class="jd-flow-lines" viewBox="0 0 1020 184" aria-hidden="true" focusable="false">${mainEdges}${branches}</svg>${groups.map(([title],index)=>`<strong class="jd-flow-heading" style="left:${index*170+9}px">${title}</strong>`).join('')}${nodes}</div>`;
+  host.innerHTML=`<div class="jd-flow-canvas"><svg class="jd-flow-lines" viewBox="0 0 1020 184" aria-hidden="true" focusable="false">${mainEdges}${branches}</svg>${nodes}</div>`;
   host.setAttribute('aria-label','Job workflow: '+data.stage+(data.blockedReason?' · Blocked: '+data.blockedReason:''));
   const focusPoint=positions.get(data.stage);if(focusPoint&&host.clientWidth)host.scrollLeft=Math.max(0,focusPoint.x-host.clientWidth/2);
   if(summaryHost){

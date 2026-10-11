@@ -38,7 +38,6 @@
 .jd-flow-edge.correction,.jd-flow-edge.reshoot { stroke:#a299bd; stroke-dasharray:4 3; }
 .jd-flow-edge.cancel,.jd-flow-edge.block { stroke:#d5a7aa; stroke-dasharray:3 4; }
 .jd-flow-edge.attention { stroke:#bd3040; stroke-dasharray:none; }
-.jd-flow-heading { position:absolute; top:0; font-size:10px; color:var(--theme-text,#162b50); }
 button.jd-stage { position:absolute; display:flex; align-items:center; gap:6px; width:145px; min-height:18px; padding:0; border:0; border-radius:3px; background:transparent; color:var(--theme-muted,#69758b); font-size:10px; line-height:1.05; text-align:left; cursor:pointer; box-shadow:none; }
 .jd-stage > span:last-child { background:var(--theme-surface,#fff); padding:2px 3px; border-radius:3px; }
 .jd-stage-light { flex:none; width:18px; height:18px; display:grid; place-items:center; border:1px solid #a5abba; border-radius:50%; background:#e8e9ec; color:#fff; font-size:11px; }
