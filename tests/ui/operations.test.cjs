@@ -70,3 +70,9 @@ test('Finance filters signed records by method and staff without changing their 
  await w.showAccounts();const method=w.document.querySelector('[data-finance-method]');method.value='Card';method.onchange();assert.match(w.document.querySelector('[data-finance-results]').textContent,/Refund/);assert.doesNotMatch(w.document.querySelector('[data-finance-results]').textContent,/Payment/);assert.match(w.document.querySelector('[data-reconcile]').textContent,/-10/);w.close();
 });
 
+test('Finance retains completed-job receivables and directs approval to Job Details',async()=>{
+ const w=setup();endpoints(w);w.studioWorkflowCapabilities={finance:true};const read=w.json;
+ w.json=async u=>u==='/api/finance/receivables'?[{jobId:'completed',title:'Delivered wedding',customer:'Carter',stage:'Completed',decision:{balance:750,authorized:true},authorizations:[{payment_due_date:'2020-01-01',revoked_at_utc:null}]}]:read(u);
+ await w.showAccounts();assert.match(w.genericView.textContent,/Delivered wedding/);assert.match(w.genericView.textContent,/Completed · Finance release authorized/);assert.match(w.genericView.textContent,/Overdue/);
+ let opened;w.openWorkspaceJob=async id=>opened=id;w.document.querySelector('[data-open-job="completed"]').click();assert.equal(opened,'completed');w.close();
+});

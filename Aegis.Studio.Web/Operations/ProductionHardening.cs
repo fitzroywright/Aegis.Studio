@@ -61,7 +61,8 @@ public static class StudioProductionHardening
                 {
                     context.Response.Headers["Retry-After"] = Math.Max(1, (int)Math.Ceiling((decision.ResetsAtUtc - DateTimeOffset.UtcNow).TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
                     context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-                    await context.Response.WriteAsJsonAsync(new { error = "Too many requests. Try again shortly.", correlationId });
+                    if(context.Request.Path.StartsWithSegments("/api/public/v1"))await context.Response.WriteAsJsonAsync(new Aegis.Studio.Web.PublicApi.PublicV1Error("rate_limited","Too many requests. Try again shortly.",correlationId));
+                    else await context.Response.WriteAsJsonAsync(new { error = "Too many requests. Try again shortly.", correlationId });
                     return;
                 }
             }
@@ -212,6 +213,7 @@ public static class ProductionRequestPolicy
     public static RateLimitPolicy? GetRateLimitPolicy(HttpRequest request)
     {
         string path = request.Path.Value ?? string.Empty;
+        if (path.StartsWith("/api/public/v1/", StringComparison.OrdinalIgnoreCase)) return new RateLimitPolicy("public-v1", request.Method=="GET"?300:30, TimeSpan.FromMinutes(1));
         if (path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)) return new RateLimitPolicy("auth-login", 10, TimeSpan.FromMinutes(1));
         if (request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase) && path.Equals("/api/bookings", StringComparison.OrdinalIgnoreCase)) return new RateLimitPolicy("public-booking", 20, TimeSpan.FromMinutes(1));
         if (request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase) && path.Contains("/payment-confirmations", StringComparison.OrdinalIgnoreCase)) return new RateLimitPolicy("payment-confirmation", 30, TimeSpan.FromMinutes(1));

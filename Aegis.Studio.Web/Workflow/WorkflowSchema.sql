@@ -241,3 +241,46 @@ create table if not exists studio_finance_authorizations(
  approved_by text not null,reason text not null,contract_reference text not null,approved_at_utc timestamptz not null default now(),
  revoked_at_utc timestamptz null,revoked_by text null,revocation_reason text null);
 create index if not exists ix_finance_authorization_job on studio_finance_authorizations(job_id,approved_at_utc desc);
+
+-- Alternate operational writers must not silently edit a closed Job.
+create or replace function studio_closed_job_guard() returns trigger language plpgsql as $$
+begin
+ if current_setting('studio.demo_seed',true)='true' then return new; end if;
+ if old.status in ('Completed','Cancelled') then
+  if new.status is distinct from old.status and current_setting('studio.authorized_reopen',true) is distinct from 'true' then
+   raise exception 'Operations Manager reopening is required' using errcode='55000';
+  end if;
+  if new.status=old.status and (to_jsonb(new)-'workflow_revision') is distinct from (to_jsonb(old)-'workflow_revision') then
+   raise exception 'Reopen the closed Job before editing its operational details' using errcode='55000';
+  end if;
+ end if;
+ return new;
+end $$;
+drop trigger if exists closed_job_guard on studio_jobs;
+create trigger closed_job_guard before update on studio_jobs for each row execute function studio_closed_job_guard();
+create or replace function studio_closed_child_guard() returns trigger language plpgsql as $$
+declare payload jsonb; target uuid; stage text;
+begin
+ if current_setting('studio.demo_seed',true)='true' then
+  if tg_op='DELETE' then return old; else return new; end if;
+ end if;
+ payload:=case when tg_op='DELETE' then to_jsonb(old) else to_jsonb(new) end;
+ target:=nullif(payload->>'job_id','')::uuid;
+ if target is null and payload ? 'activity_id' then select job_id into target from studio_job_activities where id=(payload->>'activity_id')::uuid; end if;
+ if target is null and payload ? 'session_id' then select job_id into target from studio_workflow_sessions where id=(payload->>'session_id')::uuid; end if;
+ if target is null and payload ? 'asset_id' then select job_id into target from studio_media_assets where id=(payload->>'asset_id')::uuid; end if;
+ if target is null and payload ? 'entry_id' then select job_id into target from studio_schedule_entries where id=(payload->>'entry_id')::uuid; end if;
+ if target is not null then
+  select status into stage from studio_jobs where id=target for update;
+  if stage in ('Completed','Cancelled') then raise exception 'Reopen the closed Job before changing operational records' using errcode='55000'; end if;
+ end if;
+ if tg_op='DELETE' then return old; else return new; end if;
+end $$;
+do $$ declare name text; begin
+ foreach name in array array['studio_job_activities','studio_asset_versions','studio_media_assets','studio_job_subjects','studio_media_asset_subjects','studio_job_asset_collections','studio_shoot_sessions','studio_schedule_entries','studio_schedule_entry_resources','studio_workflow_sessions','studio_workflow_crew','studio_production_items','studio_catalog_work_orders'] loop
+  if to_regclass(name) is not null then
+   execute format('drop trigger if exists closed_child_guard on %I',name);
+   execute format('create trigger closed_child_guard before insert or update or delete on %I for each row execute function studio_closed_child_guard()',name);
+  end if;
+ end loop;
+end $$;

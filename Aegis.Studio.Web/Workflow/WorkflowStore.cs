@@ -268,6 +268,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(request.TargetStage is null||!WorkflowRules.Stages.Contains(request.TargetStage)||WorkflowRules.Inactive(request.TargetStage))throw new ArgumentException("Choose a valid active reopening stage.");
                 // Reopening starts at the assignment/readiness gate; later stages require their normal proofs.
                 if(request.TargetStage is not ("Needs Assignment" or "Needs Photographer Assignment" or "Awaiting Scheduling" or "Awaiting Upload"))throw new ArgumentException("Reopen at an assignment, scheduling or upload gate, then use normal review actions.");
+                Sql(c,tx,"select set_config('studio.authorized_reopen','true',true)");
                 SetStage(c,tx,job,request.TargetStage);if(request.TargetStage!="Awaiting Upload"){EnsureDraft(c,tx,job);Recalculate(c,tx,job);}break;
             case "request-deposit-override":
                 if(!IsFrontDesk(user))throw new UnauthorizedAccessException();RequireReason(request);

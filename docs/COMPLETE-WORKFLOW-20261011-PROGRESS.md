@@ -72,3 +72,14 @@ Final native Web/Core suite: **216 passed, 13 database tests skipped, 0 failed**
 - Production task dispatch/reassignment and final technical approval require Production Manager authority. Job Owner can report progress only on assigned production work. Existing media assignment changes also check the explicit role.
 - Legacy workspace gallery public endpoints now serve reduced, visibly watermarked proofs only. Those galleries lack a pinned Job approval/receivable identity; their originals cannot safely qualify for final release. Job-scoped V1 final delivery is the next implementation step.
 - Added finance/production boundary rules tests, proof rendering verification, and isolated PostgreSQL finance tests (environment gated). Native build/testing in progress at this checkpoint; UI suite currently 94 passed. No merge or deployment.
+
+## Resumed implementation — Public V1, webhooks and reference website
+
+- Implemented signed/scoped V1 booking submission/status and idempotency on existing Pending Job intake.
+- Added Job-scoped published-version gallery pages, watermarked proofs, customer selections/submission and server-gated final attachments. Existing client access issues a reusable V1 customer capability; no private storage URL is exposed.
+- Added OpenAPI and frozen compatibility baseline; standardized V1 errors, bounded JSON, pagination and persisted public rate limits.
+- Added durable webhook event/delivery tables, transaction-time booking/publication events, Finance-aware availability scan, HTTPS HMAC delivery with leases and bounded retries. Operations can see endpoint acceptance/retry history.
+- Added reference website/BFF using only V1 and durable signed webhook receiver with duplicate suppression. Node tests verify proxy route restrictions, server-only secrets/signatures and duplicate receipt handling.
+- Added closed Job/operational child guards for alternate writers and controlled Operations reopening. This migration requires PostgreSQL acceptance before merge.
+- Current verification: native 243 passed / 15 environment-gated skipped; UI 95 passed; reference site 3 passed. All core database, webhook transport and actual-storage acceptance remain unverified here. Android/iOS acceptance remains blocked by the platform environment.
+- Integration configuration, API and exact reference-site run commands are in `docs/PUBLIC-V1-INTEGRATION.md`.

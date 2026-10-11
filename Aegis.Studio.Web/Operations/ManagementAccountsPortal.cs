@@ -75,7 +75,7 @@ public static class ManagementAccountsPortalEndpoints
             {
                 ClientPortalIssueResult result = portal.Issue(jobId, request.ExpiresInDays ?? 30, UserName(context.User));
                 string publicUrl = $"{context.Request.Scheme}://{context.Request.Host}/client/{result.Token}";
-                return Results.Ok(new { result.Access, publicUrl, token = result.Token });
+                return Results.Ok(new { result.Access, publicUrl, token = result.Token, publicV1 = new { galleryReference=jobId, apiPath="/api/public/v1/galleries/"+jobId, accessToken=result.Token } });
             }
             catch (KeyNotFoundException) { return Results.NotFound(); }
         }).RequireAuthorization();

@@ -200,6 +200,7 @@ builder.Services.AddHostedService<InboundEmailWorker>();
 builder.Services.AddHostedService<OutboundEmailWorker>();
 builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddSingleton<WorkflowStore>();
+builder.Services.AddHostedService<Aegis.Studio.Web.PublicApi.PublicWebhookWorker>();
 builder.Services.AddHostedService<WorkflowMonitorWorker>();
 builder.Services.AddHostedService<ConfigurationContractPublisher>();
 builder.Services.AddSingleton<IClientGalleryPublisher,ManifestClientGalleryPublisher>();
@@ -230,13 +231,20 @@ workDayStore.ApplyLocationRetention(TimeSpan.FromDays(workDayLocationRetentionDa
 
 app.Use(async(context,next)=>
 {
-    try{await next();}
+    try{
+        await next();
+        if(context.Request.Path.StartsWithSegments("/api/public/v1")&&context.Response.StatusCode==404&&!context.Response.HasStarted)
+            await context.Response.WriteAsJsonAsync(new Aegis.Studio.Web.PublicApi.PublicV1Error("not_found","Unknown V1 resource.",context.TraceIdentifier));
+    }
     catch(Exception error) when (!context.Response.HasStarted && !context.RequestAborted.IsCancellationRequested)
     {
         app.Logger.LogError(error,"Studio request failed: {Method} {Path}",context.Request.Method,context.Request.Path);
         context.Response.Clear();
         context.Response.StatusCode=error is ArgumentException?400:error is KeyNotFoundException?404:503;
-        await context.Response.WriteAsJsonAsync(new{error=error is ArgumentException?error.Message:"This action could not be completed. Your saved data is retained; refresh and retry."});
+        if(error is Npgsql.PostgresException {SqlState:"55000"}) context.Response.StatusCode=409;
+        if(context.Request.Path.StartsWithSegments("/api/public/v1"))
+            await context.Response.WriteAsJsonAsync(new Aegis.Studio.Web.PublicApi.PublicV1Error("temporarily_unavailable","The action could not be completed. Retry with the same idempotency key.",context.TraceIdentifier));
+        else await context.Response.WriteAsJsonAsync(new{error=error is ArgumentException?error.Message:error is Npgsql.PostgresException {SqlState:"55000"}?"This Job is closed. Obtain Operations Manager reopening before editing operational records.":"This action could not be completed. Your saved data is retained; refresh and retry."});
     }
 });
 app.UseMiddleware<StorageFailureMiddleware>();
@@ -310,6 +318,8 @@ app.MapAegisHealth(
 app.MapStudioEngineeringDiagnostics();
 app.MapStudioPosHardening();
 app.MapStudioGalleries();
+Aegis.Studio.Web.PublicApi.PublicV1Endpoints.MapPublicV1(app);
+Aegis.Studio.Web.PublicApi.PublicWebhookWorker.EnsureSchema(app.Services.GetRequiredService<StudioDatabase>());
 
 app.MapGet("/api/email/status", async (global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphMailboxClient client, global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphEmailOptions options, UnroutedEmailStore unrouted, CancellationToken cancellationToken) =>
 {

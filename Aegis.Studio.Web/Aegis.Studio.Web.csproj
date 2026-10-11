@@ -23,6 +23,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Demo/portrait-catalogue.json" />
     <EmbeddedResource Include="Workflow/WorkflowSchema.sql" />
+    <EmbeddedResource Include="PublicApi/public-v1.openapi.json" />
+    <Content Update="PublicApi/public-v1.openapi.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="10.0.3" />
