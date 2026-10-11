@@ -510,9 +510,15 @@ public static class WorkDayEndpoints
         }
 
         Guid? effectiveJobId=ResolveAssignmentJobId(e,db);
+        string title=e.Title;
+        if(effectiveJobId is Guid assignedJob)
+        {
+            using var c=db.OpenConnection();using var q=new Npgsql.NpgsqlCommand("select title from studio_jobs where id=$1",c);q.Parameters.AddWithValue(assignedJob);
+            if(q.ExecuteScalar() is string jobTitle&&!string.Equals(jobTitle,e.Title,StringComparison.Ordinal))title=jobTitle+" · "+e.Title;
+        }
         var state=store.GetAssignmentState(e.Id,userName);
         return new(
-            e.Id,effectiveJobId,e.BookingId,e.Title,e.StartsAtUtc,e.EndsAtUtc,e.Location,
+            e.Id,effectiveJobId,e.BookingId,title,e.StartsAtUtc,e.EndsAtUtc,e.Location,
             state?.Status??WorkDaySemantics.InitialStatus(e.Status),e.Notes,workspace,conversation,customer,email,phone,state?.Version??0);
     }
 
