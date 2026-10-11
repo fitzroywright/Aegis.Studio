@@ -38,7 +38,9 @@ public static class WorkDayEndpoints
             if(profile is null || !profile.IsActive) return Results.NotFound(new{error="No active Studio field profile is linked to this account."});
 
             DateTimeOffset now=DateTimeOffset.UtcNow;
-            DateTimeOffset todayStart=new(now.UtcDateTime.Date,TimeSpan.Zero);
+            TimeZoneInfo zone=TimeZoneInfo.FindSystemTimeZoneById(configuration["Studio:TimeZoneId"]??"America/Jamaica");
+            DateTime localDate=TimeZoneInfo.ConvertTime(now,zone).Date;
+            DateTimeOffset todayStart=new DateTimeOffset(localDate,zone.GetUtcOffset(localDate)).ToUniversalTime();
             DateTimeOffset todayEnd=todayStart.AddDays(1);
             WorkDayAssignment[] all=schedules.GetEntries(todayStart.AddDays(-1),todayEnd.AddDays(30))
                 .Where(x=>x.ResourceIds.Contains(profile.ScheduleResourceId))
@@ -123,8 +125,7 @@ public static class WorkDayEndpoints
                     if(stage is not null)
                     {
                         flows.TryEnqueueWorkDaySession(correlation,stage,businessId.ToString("D"));
-                        ScheduleEntry? flowEntry=schedules.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10))
-                            .FirstOrDefault(x=>x.Id==businessId);
+                        ScheduleEntry? flowEntry=schedules.GetEntries(entryId:businessId).SingleOrDefault();
                         Guid? flowJobId=flowEntry is null?null:ResolveAssignmentJobId(flowEntry,db);
                         if(flowJobId is Guid jobId)
                         {
@@ -422,8 +423,7 @@ public static class WorkDayEndpoints
         PhotographerProfile? profile=new PhotographerStore(db).Get(userName);
         if(profile is null || !profile.IsActive) return false;
 
-        ScheduleEntry? assignment=schedules.GetEntries(DateTimeOffset.UtcNow.AddYears(-10),DateTimeOffset.UtcNow.AddYears(10))
-            .FirstOrDefault(x=>x.Id==assignmentId);
+        ScheduleEntry? assignment=schedules.GetEntries(entryId:assignmentId).SingleOrDefault();
         if(assignment is null || !assignment.ResourceIds.Contains(profile.ScheduleResourceId)) return false;
 
         Guid? jobId=ResolveAssignmentJobId(assignment,db);

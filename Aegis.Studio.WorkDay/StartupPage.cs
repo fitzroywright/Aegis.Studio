@@ -25,8 +25,14 @@ public sealed class StartupPage:ContentPage
         session.UserName=user;session.DisplayName=display;session.Server=server;session.IsAuthenticated=true;
         try
         {
+            await services.GetRequiredService<WorkDayLocalStore>().BindAccountAsync(server,user);
             WorkDayBootstrapDto? remote=await api.BootstrapAsync();
             if(remote is not null){session.UserName=remote.UserName;session.DisplayName=remote.DisplayName;Preferences.Default.Set("WorkDay.UserName",remote.UserName);Preferences.Default.Set("WorkDay.DisplayName",remote.DisplayName);}
+        }
+        catch(HttpRequestException ex) when(ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            api.SetDeviceToken(null);session.IsAuthenticated=false;
+            Application.Current!.Windows[0].Page=new NavigationPage(services.GetRequiredService<LoginPage>());return;
         }
         catch(HttpRequestException){}
         catch(TaskCanceledException){}

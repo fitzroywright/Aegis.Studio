@@ -6,8 +6,7 @@ public sealed class WorkDayDeviceTokenMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context,WorkDayStore store)
     {
-        if(context.User.Identity?.IsAuthenticated!=true &&
-           context.Request.Headers.TryGetValue("X-Aegis-WorkDay-Token",out var supplied) &&
+        if(context.Request.Headers.TryGetValue("X-Aegis-WorkDay-Token",out var supplied) &&
            !string.IsNullOrWhiteSpace(supplied))
         {
             var validated=store.ValidateDeviceToken(supplied.ToString());
@@ -23,6 +22,7 @@ public sealed class WorkDayDeviceTokenMiddleware(RequestDelegate next)
                 "WorkDayDeviceToken");
                 context.User=new ClaimsPrincipal(claims);
             }
+            else{context.Response.StatusCode=StatusCodes.Status401Unauthorized;return;}
         }
         if(context.User.Identity?.AuthenticationType=="WorkDayDeviceToken")
         {

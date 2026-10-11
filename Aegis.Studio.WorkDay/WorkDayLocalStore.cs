@@ -138,6 +138,23 @@ public sealed class WorkDayLocalStore
         await MigrateAsync();
     }
 
+    public async Task BindAccountAsync(Uri server,string userName)
+    {
+        await InitializeAsync();
+        string scope=server.AbsoluteUri.TrimEnd('/')+"|"+userName.Trim().ToLowerInvariant();
+        LocalMetadata? current=await db.Table<LocalMetadata>().Where(x=>x.Key=="AccountScope").FirstOrDefaultAsync();
+        if(current is not null&&current.Value!=scope)
+            throw new InvalidOperationException("This device contains another Studio account's offline data. Recover that account's reports before changing device enrollment.");
+        if(current is null)
+        {
+            string previousUser=Preferences.Default.Get("WorkDay.UserName","");
+            string previousServer=Preferences.Default.Get("WorkDay.ServerUrl","").TrimEnd('/');
+            if(previousUser.Length>0&&(!previousUser.Equals(userName,StringComparison.OrdinalIgnoreCase)||previousServer!=server.AbsoluteUri.TrimEnd('/')))
+                throw new InvalidOperationException("Recover the previous account's cached reports before changing this device's Studio account.");
+            await db.InsertOrReplaceAsync(new LocalMetadata{Key="AccountScope",Value=scope});
+        }
+    }
+
     private async Task MigrateAsync()
     {
         LocalMetadata? row=await db.Table<LocalMetadata>().Where(x=>x.Key=="SchemaVersion").FirstOrDefaultAsync();

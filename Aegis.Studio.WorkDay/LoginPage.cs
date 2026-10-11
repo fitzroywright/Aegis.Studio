@@ -18,14 +18,16 @@ public sealed class LoginPage:ContentPage
     }
     private async void Login(object? sender,EventArgs e)
     {
+        if(sender is Button button)button.IsEnabled=false;
         try
         {
             status.Text="Authenticating…";
             if(!Uri.TryCreate(server.Text?.Trim().TrimEnd('/')+"/",UriKind.Absolute,out Uri? uri) || uri.Scheme!="https")
                 throw new InvalidOperationException("Enter the HTTPS Studio service URL.");
-            api.SetServer(uri); await api.LoginAsync(user.Text??"",password.Text??"");
+            api.SetDeviceToken(null);api.SetServer(uri); await api.LoginAsync(user.Text??"",password.Text??"");
             WorkDayBootstrapDto? bootstrap=await api.BootstrapAsync();
             if(bootstrap is null) throw new InvalidOperationException("Studio did not return a WorkDay profile.");
+            await services.GetRequiredService<WorkDayLocalStore>().BindAccountAsync(uri,bootstrap.UserName);
             string deviceId=await device.GetAsync();
             DeviceSessionDto issued=await api.IssueDeviceSessionAsync(deviceId);
             await credentials.SaveAsync(issued.Token,issued.ExpiresAtUtc);
@@ -39,5 +41,6 @@ public sealed class LoginPage:ContentPage
             Application.Current!.Windows[0].Page=new NavigationPage(main);
         }
         catch(Exception ex){status.Text="Login failed: "+ex.Message;}
+        finally{if(sender is Button finished)finished.IsEnabled=true;}
     }
 }

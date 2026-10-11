@@ -14,6 +14,23 @@ test('Finance reconciles signed refunds and discounts with the job balance',asyn
  let opened;w.openWorkspaceJob=async id=>opened=id;w.document.querySelector('[data-open-job]').click();assert.equal(opened,'job');
  const chart=w.studioRevenueChart([{kind:'Refund',amount:-100,createdAt:date}]);const fragment=new JSDOM(chart);assert.ok([...fragment.window.document.querySelectorAll('rect')].every(r=>Number(r.getAttribute('height'))>=0));
 });
+test('Operations decisions link directly to Jobs and exclude self-approval',async()=>{
+ const w=setup();let opened;w.openWorkspaceJob=async id=>opened=id;
+ w.document.body.dataset.studioView='operations-management';
+ w.json=async u=>u==='/api/operations-management'?{userName:'manager',overrideRequests:[
+  {id:'own',job_id:'job1',title:'Own booking',requested_by:'MANAGER',reason:'Deposit exception',status:'Pending'},
+  {id:'other',job_id:'job2',title:'Other booking',requested_by:'frontdesk',reason:'Deposit exception',status:'Pending'},
+  {id:'done',job_id:'job3',title:'Decided booking',requested_by:'frontdesk',reason:'Deposit exception',status:'Rejected',decision_reason:'Deposit required'}
+ ],jobs:[{jobId:'job2',stage:'Needs Assignment',owner:null,timing:{label:'Overdue',light:'red'}}]}:[];
+ await w.showOperationsManagement();
+ assert.match(w.genericView.textContent,/Operations Management/);
+ assert.equal(w.document.querySelectorAll('[data-override="own"]').length,0);
+ assert.equal(w.document.querySelectorAll('[data-override="other"]').length,2);
+ assert.equal(w.document.querySelectorAll('[data-override="done"]').length,0);
+ w.document.querySelector('[data-open-job="job2"]').click();assert.equal(opened,'job2');
+ assert.match(w.genericView.textContent,/Deposit required/);
+ w.close();
+});
 test('Management workload follows the same schedule resource IDs as Pipeline',async()=>{
  const w=setup();endpoints(w);w.pipelineStages=[['Production',['Production']]];await w.showManagement();assert.equal(w.document.querySelectorAll('.st-dashboard-grid>.op-card').length,8);assert.match(w.genericView.textContent,/0 open tasks · 1 sessions/);
  let route;w.studioNavigate=v=>route=v;w.document.querySelector('[data-stage]').click();assert.equal(route,'pipeline');assert.equal(w.pipelineSelectedStage,'Production');

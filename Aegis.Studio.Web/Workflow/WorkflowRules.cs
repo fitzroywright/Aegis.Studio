@@ -8,8 +8,9 @@ public static class WorkflowRules
     public static readonly Guid UnassignedWorkspaceId=Guid.Parse("7fe72808-a713-4d99-8b39-481c86061008");
     public static readonly string[] Stages=["Pending","Needs Assignment","Needs Photographer Assignment","Awaiting Scheduling","Scheduled","Photography In Progress","Awaiting Upload","Awaiting Production Review","Active Production","Awaiting Approval","Changes Requested","Ready for Delivery","Delivered","Completed","Cancelled"];
     public static bool Inactive(string stage)=>stage is "Completed" or "Cancelled";
-    public static bool DepositEligible(decimal received)=>received>0;
     public static bool DepositEligible(decimal received,decimal required)=>required>=0&&received>=required;
+    public static bool CanDecideBookingOverride(bool operationsManager,string requester,string actor)=>
+        operationsManager&&!string.Equals(requester.Trim(),actor.Trim(),StringComparison.OrdinalIgnoreCase);
     public static void ValidateThreshold(WorkflowThreshold t)
     {
         if(!Stages.Contains(t.Stage)||t.Policy!="Elapsed"||!double.IsFinite(t.WarningHours)||!double.IsFinite(t.OverdueHours)||t.WarningHours<=0||t.OverdueHours<=t.WarningHours)

@@ -28,7 +28,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
     public object View(Guid job,ClaimsPrincipal u)
     {
         if(!access.HasPermission(u,job,"ViewJob"))throw new UnauthorizedAccessException();
-        using var c=database.OpenConnection();return new {data=Snapshot(c,null,job),canManage=CanManage(u,job),canReview=access.HasPermission(u,job,"ManageProduction")&&access.HasPermission(u,job,"ChangeStatus"),canFrontDesk=IsFrontDesk(u),canOverride=IsOperations(u),canAssignOwner=Manager(u,((JsonElement)Snapshot(c,null,job)).GetProperty("workspaceId").GetGuid()),userName=Name(u)};
+        using var c=database.OpenConnection();return new {data=Snapshot(c,null,job),canManage=CanManage(u,job),canReview=access.HasPermission(u,job,"ManageProduction")&&access.HasPermission(u,job,"ChangeStatus"),canFrontDesk=IsFrontDesk(u),canOverride=IsOperations(u),canReopen=IsOperations(u),canAssignOwner=Manager(u,((JsonElement)Snapshot(c,null,job)).GetProperty("workspaceId").GetGuid()),userName=Name(u)};
     }
     public IReadOnlyList<object> Monitor(ClaimsPrincipal u)
     {
@@ -249,6 +249,23 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 // Reopening starts at the assignment/readiness gate; later stages require their normal proofs.
                 if(request.TargetStage is not ("Needs Assignment" or "Needs Photographer Assignment" or "Awaiting Scheduling" or "Awaiting Upload"))throw new ArgumentException("Reopen at an assignment, scheduling or upload gate, then use normal review actions.");
                 SetStage(c,tx,job,request.TargetStage);if(request.TargetStage!="Awaiting Upload"){EnsureDraft(c,tx,job);Recalculate(c,tx,job);}break;
+            case "request-deposit-override":
+                if(!IsFrontDesk(user))throw new UnauthorizedAccessException();RequireReason(request);
+                if(stage!="Pending")throw new ArgumentException("Only Pending bookings need a deposit override.");
+                if(Exists(c,tx,"select exists(select 1 from studio_booking_override_requests where job_id=$1 and status='Pending')",job))throw new ArgumentException("An override request is already awaiting an Operations Manager decision.");
+                Sql(c,tx,"insert into studio_booking_override_requests(id,job_id,requested_by,reason) values($1,$2,$3,$4)",request.OperationId,job,actor,request.Reason);
+                Notify(c,tx,job,request.OperationId.ToString(),"Operations Manager","Booking deposit override requested");break;
+            case "decide-deposit-override":
+                if(!IsOperations(user))throw new UnauthorizedAccessException();RequireReason(request);
+                if(stage!="Pending")throw new ArgumentException("Only Pending bookings may receive deposit override decisions.");
+                if(request.Method is not ("Approved" or "Rejected"))throw new ArgumentException("Choose Approved or Rejected.");
+                string overrideRequester;
+                using(var q=Command(c,tx,"select requested_by from studio_booking_override_requests where id=$1 and job_id=$2 and status='Pending' for update",request.AssignmentRequestId,job))
+                {overrideRequester=q.ExecuteScalar() as string??throw new ArgumentException("This override request is no longer pending.");}
+                if(!WorkflowRules.CanDecideBookingOverride(IsOperations(user),overrideRequester,actor))throw new UnauthorizedAccessException("The requester cannot approve or reject their own override.");
+                Sql(c,tx,"update studio_booking_override_requests set status=$2,decided_by=$3,decision_reason=$4,decided_at_utc=now() where id=$1",request.AssignmentRequestId,request.Method,actor,request.Reason);
+                if(request.Method=="Approved")Sql(c,tx,"insert into studio_workflow_overrides(id,job_id,kind,actor,reason,original_requirement) select $1,$2,'Deposit',$3,$4,coalesce((select (payload->>'requiredDeposit')::numeric from studio_frontdesk_requests where job_id=$2 limit 1),0)",request.AssignmentRequestId,job,actor,request.Reason);
+                Notify(c,tx,job,request.OperationId.ToString(),"Front Desk","Booking override "+request.Method);break;
             case "confirm":
                 CatalogWorkOrders.ConfirmAgreements(c,tx,job);
                 if(!IsFrontDesk(user))throw new UnauthorizedAccessException();
@@ -259,8 +276,8 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 bool deposit=WorkflowRules.DepositEligible(paidDeposit,requiredDeposit);
                 if(!deposit)
                 {
-                    if(!IsOperations(user))throw new UnauthorizedAccessException();RequireReason(request);
-                    Sql(c,tx,"insert into studio_workflow_overrides(id,job_id,kind,actor,reason,original_requirement) select $1,$2,'Deposit',$3,$4,coalesce((select (payload->>'requiredDeposit')::numeric from studio_frontdesk_requests where job_id=$2 limit 1),0)",request.OperationId,job,actor,request.Reason);
+                    if(!Exists(c,tx,"select exists(select 1 from studio_booking_override_requests r join studio_workflow_overrides o on o.id=r.id where r.job_id=$1 and r.status='Approved' and o.kind='Deposit' and o.original_requirement >= $2)",job,requiredDeposit))
+                        throw new ArgumentException("The required deposit is not satisfied. Request an Operations Manager override and obtain its approval before confirming.");
                 }
                 Sql(c,tx,"update studio_frontdesk_requests set status='Confirmed' where job_id=$1",job);EnsureDraft(c,tx,job);stateAction=true;break;
             case "record-upload-batch":
@@ -499,6 +516,8 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
              'history',coalesce((select jsonb_agg(to_jsonb(h) order by revision) from studio_workflow_history h where h.job_id=j.id),'[]'::jsonb),
              'sessions',coalesce((select jsonb_agg(to_jsonb(w)||jsonb_build_object('shoot',to_jsonb(s),'crew',coalesce((select jsonb_agg(to_jsonb(c) order by role desc,user_name) from studio_workflow_crew c where c.session_id=w.id),'[]'::jsonb)) order by w.created_at_utc) from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=j.id),'[]'::jsonb),
              'submissions',coalesce((select jsonb_agg(to_jsonb(r) order by submitted_at_utc) from studio_workflow_submissions r where r.job_id=j.id),'[]'::jsonb),
+             'bookingOverrides',coalesce((select jsonb_agg(to_jsonb(r) order by created_at_utc) from studio_booking_override_requests r where r.job_id=j.id),'[]'::jsonb),
+             'photographerReports',coalesce((select jsonb_agg(to_jsonb(o) order by o.occurred_at_utc desc) from (select op.user_name,op.assignment_id,op.kind,op.occurred_at_utc,op.received_at_utc,op.state,op.text_value,op.category from studio_workday_operations op join studio_schedule_entries e on e.id=op.assignment_id where e.job_id=j.id order by op.occurred_at_utc desc limit 100) o),'[]'::jsonb),
              'deliveries',coalesce((select jsonb_agg(to_jsonb(d) order by created_at_utc) from studio_workflow_deliveries d where d.job_id=j.id),'[]'::jsonb))::text from studio_jobs j where j.id=$1
             """,job) as string??throw new KeyNotFoundException();return JsonSerializer.Deserialize<JsonElement>(value);
     }

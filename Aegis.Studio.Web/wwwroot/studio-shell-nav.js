@@ -107,6 +107,7 @@
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="today"><span>⌂</span><span>Today</span></button><button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button><button type="button" data-studio-side="messages"><span>✉</span><span>Messages</span></button><button type="button" data-studio-side="workspaces"><span>▰</span><span>Workspaces</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
+                    ${window.studioWorkflowCapabilities?.operations?'<button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations Management</span></button>':''}
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
                     <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                     <button type="button" data-studio-side="studio-management"><span>⚙</span><span>Studio Management</span></button>
@@ -261,6 +262,7 @@
         syncPageFrame();
         syncGridFooterCount();
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
+        window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();});
 
 

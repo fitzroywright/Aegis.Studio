@@ -62,7 +62,7 @@ public sealed class ScheduleStore
         return value;
     }
 
-    public IReadOnlyList<ScheduleEntry> GetEntries(DateTimeOffset? from = null, DateTimeOffset? to = null, Guid? jobId = null)
+    public IReadOnlyList<ScheduleEntry> GetEntries(DateTimeOffset? from = null, DateTimeOffset? to = null, Guid? jobId = null,Guid? entryId=null)
     {
         DateTimeOffset start = from?.ToUniversalTime() ?? DateTimeOffset.UtcNow.AddDays(-30);
         DateTimeOffset end = to?.ToUniversalTime() ?? DateTimeOffset.UtcNow.AddDays(180);
@@ -73,11 +73,11 @@ public sealed class ScheduleStore
                    coalesce(array_agg(er.resource_id) filter (where er.resource_id is not null),'{}')
             from studio_schedule_entries e
             left join studio_schedule_entry_resources er on er.entry_id=e.id
-            where e.starts_at_utc < $2 and e.ends_at_utc > $1 and ($3::uuid is null or e.job_id=$3)
+            where ($4::uuid is not null or (e.starts_at_utc < $2 and e.ends_at_utc > $1)) and ($3::uuid is null or e.job_id=$3) and ($4::uuid is null or e.id=$4)
             group by e.id
             order by e.starts_at_utc
             """;
-        command.Parameters.AddWithValue(start); command.Parameters.AddWithValue(end); command.Parameters.AddWithValue((object?)jobId??DBNull.Value);
+        command.Parameters.AddWithValue(start); command.Parameters.AddWithValue(end); command.Parameters.AddWithValue((object?)jobId??DBNull.Value);command.Parameters.AddWithValue((object?)entryId??DBNull.Value);
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<ScheduleEntry> values = [];
         while (reader.Read()) values.Add(ReadEntry(reader));

@@ -26,6 +26,10 @@ async function loadSignedInUser() {
 
     const payload = await response.json();
     const user = payload.user || payload;
+    try{
+        const capabilities=await fetch('/api/workflow/capabilities');
+        if(capabilities.ok){window.studioWorkflowCapabilities=await capabilities.json();window.dispatchEvent(new Event('studio-workflow-capabilities'));}
+    }catch{/* Operational navigation remains permission-gated by the server. */}
     studioRememberPeople([user]);
     const signedInUser = document.getElementById('signedInUser');
     const userAvatar = document.getElementById('userAvatar');

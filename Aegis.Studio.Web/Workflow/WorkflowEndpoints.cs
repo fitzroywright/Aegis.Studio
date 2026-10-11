@@ -10,6 +10,14 @@ public static class WorkflowEndpoints
 {
     public static void MapConnectedWorkflow(this WebApplication app)
     {
+        app.MapGet("/api/workflow/capabilities",(ClaimsPrincipal user,WorkflowStore store)=>Results.Ok(new{operations=store.IsOperations(user),frontDesk=store.IsFrontDesk(user)})).RequireAuthorization();
+        app.MapGet("/api/operations-management",(ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>Run(()=>
+        {
+            if(!store.IsOperations(user))throw new UnauthorizedAccessException();
+            using var c=db.OpenConnection();
+            using var q=WorkflowStore.Command(c,null,"select coalesce(jsonb_agg(to_jsonb(r) order by created_at_utc desc),'[]'::jsonb)::text from (select r.*,j.title from studio_booking_override_requests r join studio_jobs j on j.id=r.job_id order by r.created_at_utc desc limit 250) r");
+            return Results.Ok(new{userName=WorkflowStore.Name(user),overrideRequests=JsonSerializer.Deserialize<JsonElement>((string)q.ExecuteScalar()!),jobs=store.Monitor(user)});
+        })).RequireAuthorization();
         app.MapGet("/api/workflow/jobs",(ClaimsPrincipal user,WorkflowStore store)=>Results.Ok(store.Monitor(user))).RequireAuthorization();
         app.MapGet("/api/jobs/{job:guid}/connected-workflow",(Guid job,ClaimsPrincipal user,WorkflowStore store)=>Run(()=>Results.Ok(store.View(job,user)))).RequireAuthorization();
         app.MapPost("/api/jobs/{job:guid}/connected-workflow",(Guid job,WorkflowCommand request,ClaimsPrincipal user,WorkflowStore store)=>Run(()=>request.Action=="publish"?Results.BadRequest(new{error="Publish approved collections through Job Gallery."}):Results.Ok(store.Execute(job,request,user)))).RequireAuthorization();
