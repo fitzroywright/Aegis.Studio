@@ -79,6 +79,9 @@ let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskC
 let frontDeskTab='today',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelectedClientId=null;
 function frontDeskRequestStage(item){return item.status==='Confirmed'?'Confirmed':item.status==='Cancelled'?'Cancelled':item.recordedDeposit>0?'Ready for confirmation':item.status==='AwaitingDeposit'?'Awaiting deposit':'Pending Job';}
 function renderFrontDesk(){
+    const searchNode=genericView.querySelector('#frontDeskSearch');
+    const searchFocused=searchNode===document.activeElement;
+    const searchSelection=searchNode?[searchNode.selectionStart,searchNode.selectionEnd]:null;
     // Follow the Today page's full-width horizontal shell. No navigation sidebar
     // or additional nested side rail; the secondary cards belong to the content grid.
     const now=new Date(), today=now.toLocaleDateString();
@@ -141,6 +144,7 @@ function renderFrontDesk(){
         <section class="op-card fd-schedule"><header><h2>Today's Schedule</h2><button type="button" class="fd-card-link" data-calendar>View Calendar →</button></header><div class="fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="fd-session"><time>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</time><span><strong>${esc(s.title)}</strong><small>${esc(s.location||s.status||'')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
         <section class="mw-list-panel fd-messages fd-communications" data-mw-region="messages" data-fd-communications><header><h2><span class="studio-card-icon" aria-hidden="true">✉</span> Messages &amp; Announcements</h2><button type="button" class="fd-card-link" data-messages-all>View All →</button></header><div class="mw-compact-messages" id="fdCommunicationFeed"><div class="mw-empty">Loading messages…</div></div><footer class="mw-messages-card-footer"><button type="button" class="mw-send-message-link" data-message-compose><span aria-hidden="true">✉</span> Send Message <span aria-hidden="true">→</span></button></footer></section>
       </div></div></div>`;
+    if(searchNode){genericView.querySelector('#frontDeskSearch').replaceWith(searchNode);searchNode.value=frontDeskTerm;if(searchFocused){searchNode.focus({preventScroll:true});searchNode.setSelectionRange(...searchSelection);}}
     // The shared shell footer owns the visible filtered row count.
     const shellCount=document.getElementById('studioFooterRate');
     if(shellCount){
@@ -451,3 +455,4 @@ function recordFrontDeskFulfillment(jobId){
  const dialog=frontDeskDialog('Confirm collection / delivery',`<p>${esc(job?.title||'Job')} · ${esc(job?.clientName||'')}</p><label>Method<select name="method"><option value="Collected">Customer collected</option><option value="Delivered">Delivered to customer</option></select></label><label>Received by<input name="recipient" required maxlength="200"></label>`);
  dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{await json(`/api/frontdesk/jobs/${jobId}/fulfillment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId,method:form.elements.method.value,recipient:form.elements.recipient.value})});dialog.close();await showFrontDesk();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
+

@@ -20,7 +20,7 @@ function api(u){const p=u.pathname;
  if(/^\/api\/jobs\/j\d$/.test(p))return jobs.find(j=>j.id===p.split('/').pop());
  if(p.endsWith('/access'))return {permissions};
  if(p.endsWith('/appearance'))return {color:'#b99750',icon:'folder'};
- if(p.endsWith('/media'))return media(p.split('/')[3]);
+ if(p.endsWith('/media')){const snapshot=media(p.split('/')[3]),limit=Number(u.searchParams.get('limit')||100);return {...snapshot,totalAssets:snapshot.assets.length,assets:snapshot.assets.slice(0,limit),hasMore:snapshot.assets.length>limit};}
  if(p.endsWith('/subjects'))return media(p.split('/')[3]).subjects;
  if(p.includes('/activities'))return p.includes('/jobs/')?tasks.filter(t=>t.jobId===p.split('/')[3]):tasks;
  if(p==='/api/schedule/entries'||p==='/api/today/schedule')return sessions;
@@ -39,19 +39,19 @@ function api(u){const p=u.pathname;
  return [];
 }
 
-test('the full shell loads every operational screen with a shared data graph',async()=>{const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc}),w=dom.window;
+test('the full shell loads every operational screen with a shared data graph',async t=>{const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://studio.test/',runScripts:'outside-only',virtualConsole:vc}),w=dom.window;t.after(()=>dom.window.close());
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.remove()};w.HTMLElement.prototype.scrollIntoView=function(){};w.alert=e=>errors.push(String(e));w.fetch=async url=>({ok:true,status:200,json:async()=>api(new URL(url,'http://studio.test')),text:async()=>JSON.stringify(api(new URL(url,'http://studio.test')))});
  for(const script of w.document.querySelectorAll('script[src]'))require('vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
  await new Promise(r=>setTimeout(r,25));await w.studioTodayReady;
  for(const view of ['today','workspaces','pipeline','production','frontdesk','finance','management','admin']){try{await w.studioNavigate(view);assert.ok(w.document.querySelector('#genericView').textContent.trim().length>0,view);}catch(e){errors.push(view+': '+e.message)}}
  const routeField=w.document.getElementById('workspaceRouteKey');assert.ok(routeField.closest('details'));assert.equal(routeField.closest('details').open,false);
- let finishDemo;const demoHeld=new Promise(resolve=>finishDemo=resolve);
- w.studioLoadDemoData=async report=>{report({percent:52,stage:'Studio photographs',message:'Carter Wedding — photo 17/320'});await demoHeld;report({percent:100,completed:true,message:'Full Studio demo loaded.'});return {message:'Full Studio demo loaded.'};};
+ const read=w.json;let finishDemo;const held=new Promise(r=>finishDemo=r),writes=[];
+ w.json=async(url,options)=>{if(url==='/api/admin/connected-workflow/demo-data/generate'){writes.push(options.method);await held;return {message:'Connected Workflow demo generated.'};}return read(url,options);};
  const demoButton=w.document.querySelector('[data-load-demo]'),loadingDemo=demoButton.onclick();
- assert.equal(demoButton.disabled,true);assert.equal(w.document.querySelector('[data-demo-progress]').value,52);assert.match(w.document.querySelector('[data-demo-status]').textContent,/photo 17\/320/);assert.equal(w.document.getElementById('studioDemoLoader').getAttribute('aria-busy'),'true');
- finishDemo();await loadingDemo;assert.equal(demoButton.disabled,false);assert.equal(w.document.querySelector('[data-demo-progress]').value,100);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Full Studio demo loaded/);
- w.studioLoadDemoData=async()=>{throw Error('Rolled back');};await demoButton.onclick();assert.equal(demoButton.disabled,false);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Rolled back/);
- try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-detail-board'));assert.equal(w.document.querySelectorAll('.job-file-tile').length,20)}catch(e){errors.push('job: '+e.message)}
+ assert.equal(demoButton.disabled,true);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Generating Connected Workflow/);
+ finishDemo();await loadingDemo;assert.equal(demoButton.disabled,false);assert.deepEqual(writes,['POST']);assert.match(w.document.querySelector('[data-demo-status]').textContent,/demo generated/);
+ w.json=async(url,options)=>{if(url==='/api/admin/connected-workflow/demo-data/generate')throw Error('Rolled back');return read(url,options);};await demoButton.onclick();assert.equal(demoButton.disabled,false);assert.match(w.document.querySelector('[data-demo-status]').textContent,/Rolled back/);w.json=read;
+ try{await w.openWorkspaceJob('j0');await new Promise(r=>setTimeout(r,25));assert.ok(w.document.querySelector('.job-detail-board'));assert.equal(w.document.querySelectorAll('.jd-photo').length,12)}catch(e){errors.push('job: '+e.message)}
  dom.window.close();assert.deepEqual(errors,[]);});
 
 test('cold workspace opening loads server permissions and keeps actual denial on the landing page',async()=>{

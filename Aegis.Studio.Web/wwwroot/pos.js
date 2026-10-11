@@ -31,14 +31,7 @@ async function openPosTransaction(jobId,applyToBalance=false) {
     if(applyToBalance){const balance=studioFinancials(job).balance;if(balance<=0)throw Error('This job has no remaining balance.');posDraftLines=[{code:'BALANCE',description:'Payment toward job balance',unitPrice:balance,quantity:1}];}
 
     genericView.innerHTML = `
-        <div class="job-detail-header">
-            <div>
-                <button class="link-button" onclick="showFrontDesk()">← Front Desk</button>
-                <h1>P O S — ${esc(job.clientName)}</h1>
-                <p>${esc(job.title)} · ${job.eventDate ? esc(job.eventDate) + ' · ' : ''}${esc(job.status)}</p>
-            </div>
-            
-        </div>
+        <header class="pos-page-title"><h1>${applyToBalance?'Take Payment':'New Sale'}</h1><span>${esc(job.clientName)} · ${esc(job.title)}</span></header>
         <div class="pos-layout">
             <section class="pos-panel">
                 <div class="pane-heading"><div><h2>Items</h2><p>Catalog or manual charge</p></div></div>
@@ -69,14 +62,13 @@ async function openPosTransaction(jobId,applyToBalance=false) {
                 <div class="pos-summary"><span>Tendered</span><span id="posTenderTotal">${money(0)}</span></div>
                 <div class="pos-summary pos-balance"><span>Balance</span><span id="posBalance">${money(0)}</span></div>
                 <button id="completePosButton" class="primary" style="width:100%" onclick="completePosSale()">Complete Sale</button>
-                <p class="pos-muted">Sales are persisted before completion, are idempotent per checkout attempt, and post once to the job financial history.</p>
+                <p class="pos-muted">Check the items, payment amount and reference before completing the sale.</p>
                 <details class="pos-hardware-detail"><summary>Local hardware</summary><div id="posDeviceStatus" class="device-status">Checking optional device agent...</div></details>
             </section>
-        </div>
         <section class="pos-history">
             <h2>Sales for this job</h2>
             <div id="posHistory">${renderPosHistory(sales)}</div>
-        </section>`;
+        </section></div>`;
     renderPosCatalog();
     const auth=await json('/api/auth/me');if(!(auth.user||auth).isAdministrator)document.querySelector('.pos-manual-charge')?.setAttribute('hidden','');
     if(applyToBalance){document.getElementById('posCatalogSearch').disabled=true;document.querySelector('.pos-manual-charge').hidden=true;const input=document.getElementById('posBalancePayment');input.onchange=()=>{const amount=Number(input.value);if(!Number.isFinite(amount)||amount<=0||amount>studioFinancials(job).balance){alert('Enter a positive amount within the outstanding balance.');return;}posDraftLines=[{code:'BALANCE',description:'Payment toward job balance',unitPrice:amount,quantity:1}];renderPosDraft();};}
@@ -351,4 +343,5 @@ async function sendSaleToDeviceAgent(sale) {
         // Hardware is optional and must never roll back a committed sale.
     }
 }
+
 

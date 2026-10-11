@@ -102,27 +102,25 @@
             });
             return;
         }
-        rail.innerHTML = `
-
-            <section class="mw-list-panel studio-context-card">
+        rail.innerHTML = `<section class="mw-list-panel studio-context-card">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">↗</span> Navigation</h2></header>
                 <div class="mw-today-rail-links">
-                    <button type="button" data-studio-side="workspaces"><span>▰</span><span>Workspaces</span></button>
+                    <button type="button" data-studio-side="today"><span>⌂</span><span>Today</span></button><button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button><button type="button" data-studio-side="messages"><span>✉</span><span>Messages</span></button><button type="button" data-studio-side="workspaces"><span>▰</span><span>Workspaces</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
                     <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                     <button type="button" data-studio-side="studio-management"><span>⚙</span><span>Studio Management</span></button>
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
                 </div>
+            </section>
+            <section class="mw-list-panel studio-context-card">
+                <header><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2></header>
+                <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
             </section>            <section class="mw-list-panel studio-context-card">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>
                 </div>
-            </section>
-            <section class="mw-list-panel studio-context-card">
-                <header><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2></header>
-                <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
             </section>
 `;
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
@@ -191,6 +189,8 @@
         const footer = document.getElementById('studioFooterRate');
         const root = document.getElementById('genericView');
         if (!footer || !root || root.classList.contains('hidden')) return;
+        const count=root.querySelector('.st-page')?.dataset.itemCount;
+        if(count!==undefined){footer.textContent=count;return;}
         const grids = [
             { selector: '[data-job-row], .mw-job-row', noun: 'job' },
             { selector: '[data-workspace-row]', noun: 'workspace' },
@@ -285,4 +285,5 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })();
+
 

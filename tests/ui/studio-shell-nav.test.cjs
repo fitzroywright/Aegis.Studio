@@ -16,53 +16,17 @@ function setup(){
  return {w,dom,calls};
 }
 
-test('Back stays inside Studio and Today keeps its own left layout',async()=>{
- const {w,dom,calls}=setup();
- const tools=w.document.getElementById('studioPageTools');
- const rail=w.document.getElementById('studioContextRail');
- assert.ok(tools.querySelector('[data-studio-back]'));
- assert.ok(rail);
- assert.equal(w.document.body.dataset.studioView,'today');
- assert.ok(w.document.getElementById('studioBreadcrumb').textContent.includes('Today'));
-
- await w.studioNavigate('workspaces');
- assert.equal(w.document.body.dataset.studioView,'workspaces');
- assert.equal(rail.querySelectorAll('.studio-context-card').length,3);
- tools.querySelector('[data-studio-back]').click();
- await new Promise(resolve=>setTimeout(resolve,0));
- assert.deepEqual(calls,['workspaces','today']);
- assert.equal(w.location.href,'https://studio.test/');
- dom.window.close();
+test('breadcrumbs return to Today without leaving Studio',async t=>{
+ const {w,dom,calls}=setup();t.after(()=>dom.window.close());
+ await w.studioNavigate('workspaces');w.StudioShell.sync('workspaces');
+ w.document.querySelector('[data-studio-crumb="today"]').click();
+ await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual(calls,['workspaces','today']);assert.equal(w.location.href,'https://studio.test/');
 });
-
-test('Back uses an in-app parent even when the page was opened without Studio history',async()=>{
- const {w,dom,calls}=setup();
- w.document.body.dataset.studioView='jobs';
- // Simulate a direct/deep-linked page where the in-memory Studio history is empty.
- w.eval(code);
- w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
- const back=w.document.querySelector('[data-studio-back]');
- back.click();
- await new Promise(resolve=>setTimeout(resolve,0));
- assert.equal(calls.at(-1),'workspaces');
- assert.equal(w.location.href,'https://studio.test/');
- dom.window.close();
-});
-
-test('Every non-My-Work page gets Status Actions and Quick Links cards',async()=>{
- const {w,dom}=setup();
- await w.studioNavigate('production');
+test('shared rail keeps Navigation, My Workspaces and Actions in order',async t=>{
+ const {w,dom}=setup();t.after(()=>dom.window.close());await w.studioNavigate('production');w.StudioShell.sync('production');
  const rail=w.document.getElementById('studioContextRail');
- assert.equal(rail.querySelectorAll('.studio-context-card').length,3);
- assert.match(rail.textContent,/Status/);
- assert.match(rail.textContent,/Actions/);
- assert.match(rail.textContent,/Quick Links/);
+ assert.deepEqual([...rail.querySelectorAll('h2')].map(e=>e.textContent.trim().replace(/^[^A-Za-z]+/,'')),['Navigation','My Workspaces','Actions']);
+ for(const view of ['today','jobs','messages'])assert.ok(rail.querySelector('[data-studio-side="'+view+'"]'));
  assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*Production/);
-
- const tools=w.document.getElementById('studioPageTools');
- tools.innerHTML='<div class="page-specific">Page tool</div>';
- await new Promise(resolve=>setTimeout(resolve,0));
- assert.ok(tools.querySelector('[data-studio-persistent-tools]'));
- assert.ok(tools.querySelector('.page-specific'));
- dom.window.close();
 });

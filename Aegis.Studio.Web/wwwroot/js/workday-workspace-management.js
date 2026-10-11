@@ -131,9 +131,9 @@
     byId("performance").innerHTML =
       '<h3>Photographers</h3><div class="grid">' +
       (photographerCards || '<p class="muted">No photographer metrics in this window.</p>') +
-      "</div><h3>Editors</h3><div class="grid">" +
+      '</div><h3>Editors</h3><div class="grid">' +
       (editorCards || '<p class="muted">No editor metrics in this window.</p>') +
-      "</div><h3>Other Production</h3><div class="grid">" +
+      '</div><h3>Other Production</h3><div class="grid">' +
       (productionCards || '<p class="muted">No production metrics in this window.</p>') +
       "</div>";
   }
@@ -146,3 +146,4 @@
     load().catch(() => {});
   }, 30000);
 })();
+

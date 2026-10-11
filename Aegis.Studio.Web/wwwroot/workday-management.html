@@ -4,10 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Studio WorkDay Management</title>
-  <link rel="stylesheet" href="/css/workday-management.css?v=20260929-namefix">
+  <link rel="stylesheet" href="/css/workday-management.css?v=20261011-today">
+  <link rel="stylesheet" href="/studio-rows.css?v=20261011-today">
 </head>
 <body>
-  <header>
+  <header class="wd-masthead"><a href="/#studio=today">Brian’s · Studio</a><span>WorkDay</span></header>
+  <div class="wd-shell"><nav class="wd-navigation" aria-label="Studio navigation"><h2>Navigation</h2><a href="/#studio=today">Today</a><a href="/#studio=jobs">Jobs</a><a href="/#studio=management">Management</a><a href="/#studio=messages">Messages</a></nav><div class="wd-board">
+  <header class="wd-title">
     <h1>Aegis Studio WorkDay</h1>
     <div class="muted">Authorized work-session and field-presence evidence</div>
   </header>
@@ -25,7 +28,8 @@
       <div id="timeline" class="muted">Select a work session.</div>
       <div id="map">Location status loading...</div>
     </section>
-  </main>
+  </main></div></div><footer class="wd-footer">Brian’s · Studio WorkDay</footer>
   <script src="/auth.js?v=20260929-namefix"></script><script src="/js/workday-management.js?v=20260929-namefix"></script>
 </body>
 </html>
+

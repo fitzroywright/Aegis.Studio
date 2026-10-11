@@ -340,7 +340,7 @@
                                 <div class="mw-today-view-tabs" role="group" aria-label="Job view">
                                     ${Object.entries(jobViews).map(([key,label])=>`<button type="button" data-mw-job-view="${key}" class="${state.jobView===key?'active':''}" aria-pressed="${state.jobView===key}">${label}</button>`).join('')}
                                 </div>
-                                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div>
+                                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div><div class="mw-today-toolbar-actions">${(auth.user||auth).isAdministrator?'<button type="button" data-assign-job-lead>Assign Job Lead</button>':''}${state.status.media==='error'?'<button type="button" data-mw-retry="media">Retry previews</button>':''}</div>
                                 <label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
                             </div>
                             
@@ -820,37 +820,28 @@
     };
 
     async function renderAdmin(){
+        const current=StudioPage.begin('admin');
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
         genericView.innerHTML='<div class="today-loading">Loading administration…</div>';
 
         const me=await json('/api/auth/me').catch(()=>null);
+        if(!current())return;
         const isAdministrator=me?.user?.isAdministrator===true||me?.isAdministrator===true;
         if(!isAdministrator){
-            genericView.innerHTML='<section class="admin-page"><header class="admin-page-header"><div><h1>Admin</h1><p>Studio configuration and access management.</p></div></header><section class="admin-card"><h2>Administrator access required</h2><p class="muted">Your account does not have permission to administer Studio.</p></section></section>';
+            genericView.innerHTML=StudioPage.html({title:'Administration',content:'<section class="admin-card"><h2>Administrator access required</h2><p>Your account does not have permission to administer Studio.</p></section>'});StudioPage.bind(genericView,current);
             return;
         }
 
         workspaceAccessCache=await json('/api/workspace-access').catch(()=>[]);
         studioRolesCache=await json('/api/security/roles').catch(()=>[]);
+        if(!current())return;
         const manageable=workspaceAccessCache.filter(item=>item.permissions?.editWorkspace||item.permissions?.manageMembers||item.permissions?.adminWorkspace);
 
-        genericView.innerHTML=`
-            <section class="admin-page">
-                <header class="admin-page-header">
-                    <div><h1>Admin</h1><p>Configure Studio, workspaces, access, roles and workflow automation.</p></div>
-                    <span class="admin-status-pill">Administrator</span>
-                </header>
-
-                <div class="admin-summary-grid">
-                    <article class="admin-summary-card"><strong>${manageable.length}</strong><span>Managed Workspaces</span><small>Membership and routing</small></article>
-                    <article class="admin-summary-card"><strong>${studioRolesCache.filter(x=>x.isActive).length}</strong><span>Active Roles</span><small>Reusable permission sets</small></article>
-                    <article class="admin-summary-card"><strong>Pending</strong><span>Demo Reset</span><small>Connected Workflow fixture tools</small></article>
-                </div>
-
-                <div class="admin-layout">
-                    <div class="admin-main-column">
-                        <section class="admin-card admin-demo-card" id="studioDemoLoader">
+        genericView.innerHTML=StudioPage.html({title:'Administration',scroll:true,
+            summary:StudioPage.metrics([['Managed workspaces',manageable.length],['Active roles',studioRolesCache.filter(x=>x.isActive).length]]),
+            attention:'<p>Workspace access is controlled by memberships and reusable roles.</p>',
+            content:`<div class="st-admin-grid">                        <section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
                                 <div><h2>Demo Data</h2><p>Generate workflow-native examples or remove the owned demo fixture.</p></div>
                                 <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Generate Demo Data</button><button class="primary" type="button" data-demo-reset>Reset and Regenerate</button></div>
@@ -876,10 +867,7 @@
                             ${renderSecurityRolesSection()}
                             ${renderWorkflowSection()}
                         </div>
-                    </div>
-
-                    <aside class="admin-side-column">
-                        <section class="admin-card">
+                                            <section class="admin-card">
                             <header class="admin-card-header"><div><h2>Create Workspace</h2><p>Add a new operational workspace and its manager.</p></div></header>
                             <div class="admin-form-stack">
                                 <label>Name<input id="workspaceName"></label>
@@ -897,9 +885,8 @@
                             <p>Workspace access remains membership-based. Use reusable roles where possible and one-off permissions only when required.</p>
                             <p>Every operational workspace requires a Workspace Manager. Integration routing is configured under Advanced / Integration Settings.</p>
                         </section>
-                    </aside>
-                </div>
-            </section>`;
+</div>`});
+        StudioPage.bind(genericView,current);
 
         const statusPanel=document.querySelector('[data-service-status]');
         if(statusPanel){
@@ -989,7 +976,7 @@
 
     const routes={
         today:renderToday,
-        messages:async()=>{conversationView.classList.remove('hidden');genericView.classList.add('hidden');await loadWorkspaces();await loadConversations();},
+        messages:()=>window.showStudioMessages(),
         schedule:()=>showPipeline(),
         tasks:renderToday,
         workspaces:renderWorkspaces,
@@ -1026,6 +1013,8 @@
         currentNavigationView=view;
         const revision=++navigationRevision;
         window.StudioJobsPage?.dispose();
+        window.StudioPage?.invalidate();
+        window.StudioMessages?.invalidate();
         todayLoad?.abort();
         setActive(view);
         if(view!=='today'){

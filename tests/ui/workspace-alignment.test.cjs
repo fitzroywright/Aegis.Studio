@@ -118,9 +118,9 @@ test('job handoff uses shoot completion, never first upload, and shows blocked w
 test('FrontDesk search preserves focus and separates enquiry and booking queues',()=>{
  const {w,panel}=environment();panel.id='genericView';
  Object.assign(w,{activateView(){},activateNavigation(){},conversationView:{classList:{add(){}}},genericView:panel,money:n=>'JMD '+n,openWorkspaceJob(){},openPos(){},json:async()=>({frontDesk:true,user:{isAdministrator:true}})});
- w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nfrontDeskJobs=[{id:'job',clientName:'Campbell',title:'Wedding',status:'Needs Scheduling'}];frontDeskRequests=[{id:'request',request:{clientName:'Campbell',title:'Wedding',eventDate:'2026-10-10',requiredDeposit:100,workspaceId:'workspace'},recordedDeposit:40,status:'AwaitingDeposit'}];frontDeskTab='requests';frontDeskWorkspaces=[{id:'workspace',name:'Weddings'}];renderFrontDesk();document.querySelector('[data-frontdesk-tab=\"requests\"]').click();");
+ w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"\nfrontDeskJobs=[{id:'job',clientName:'Campbell',title:'Wedding',status:'Needs Scheduling'}];frontDeskRequests=[{id:'request',request:{clientName:'Campbell',title:'Wedding',eventDate:'2026-10-10',requiredDeposit:100,workspaceId:'workspace'},recordedDeposit:40,status:'AwaitingDeposit'}];frontDeskTab='requests';frontDeskWorkspaces=[{id:'workspace',name:'Weddings'}];renderFrontDesk();");
  const input=panel.querySelector('#frontDeskSearch');input.focus();input.value='Campbell';input.oninput({target:input});assert.equal(panel.querySelector('#frontDeskSearch'),input);assert.equal(w.document.activeElement,input);
- assert.match(panel.textContent,/Partial deposit/);assert.match(panel.textContent,/Record verified deposit/);assert.equal(panel.querySelector('[data-frontdesk-job]'),null);
+ assert.ok(panel.querySelector('[data-fd-row-open="request"]'));assert.match(panel.textContent,/Ready for confirmation/);assert.equal(panel.querySelector('[data-frontdesk-job]'),null);
 });
 
 test('shared request helper accepts empty successes and dismissal removes the banner',async()=>{
@@ -202,7 +202,7 @@ test('Pipeline shows stage groups with schedule and task on timeline and calenda
  const today=new Date();const time=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,10).toISOString();const end=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,12).toISOString();
  const requests=[];
  w.json=async(url,options)=>{requests.push(url);if(options)return {id:'new'};if(url==='/api/jobs')return [{id:'job',title:'Wedding',status:'Needs Scheduling',clientName:'Brown'}];if(url.startsWith('/api/schedule/entries?'))return [{id:'shoot',jobId:'job',title:'Wedding shoot',startsAtUtc:time,endsAtUtc:end,resourceIds:['photographer'],status:'Scheduled'},{id:'general',jobId:null,title:'Studio booking',startsAtUtc:time,endsAtUtc:end,resourceIds:[],status:'Tentative'}];if(url==='/api/operations/activities')return [{id:'task',jobId:'job',title:'Confirm location',scheduledAtUtc:time,dueAtUtc:time,status:'NotStarted'}];if(url==='/api/schedule/resources')return [{id:'photographer',name:'Taberfa',resourceType:'Staff',isActive:true}];if(url==='/api/auth/me')return {user:{isAdministrator:true}};if(url==='/api/workspaces')return [{id:'workspace',name:'Weddings'}];throw Error(url);};
- w.eval(fs.readFileSync(path.join(root,'scheduling.js'),'utf8'));
+ w.eval(fs.readFileSync(path.join(root,'studio-page.js'),'utf8'));w.eval(fs.readFileSync(path.join(root,'scheduling.js'),'utf8'));
  await w.showPipeline();
  assert.match(w.genericView.textContent,/Needs scheduling/);assert.match(w.genericView.textContent,/Wedding shoot/);assert.match(w.genericView.textContent,/Confirm location/);assert.match(w.genericView.textContent,/Unlinked schedule/);
  assert.equal(w.genericView.querySelectorAll('.pipeline-stage-lane').length,2);
@@ -232,14 +232,14 @@ test('Workspaces keeps Today breadcrumb and three-column rails',()=>{
  const workspaceSource=fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8');
  const css=fs.readFileSync(path.join(root,'studio.css'),'utf8');
  assert.match(source,/workspace-list-layout/);
- assert.match(source,/workspace-left-rail/);
+ assert.doesNotMatch(source,/class="workspace-left-rail"/);
  assert.match(source,/workspace-center-panel/);
  assert.match(source,/workspace-right-rail/);
- assert.match(source,/data-shell-nav="today">Today/);
- assert.match(source,/breadcrumb-separator/);
+ assert.match(fs.readFileSync(path.join(root,'studio-shell-nav.js'),'utf8'),/label: 'Today', view: 'today'/);
+
  assert.match(workspaceSource,/\{label:'Today',view:'today'\}/);
  assert.match(workspaceSource,/\{label:'Workspaces',view:'workspaces'\}/);
- assert.match(css,/body\[data-studio-view="workspaces"\] \.studio-context-rail\{\s*display:none;/);
+ assert.match(css,/body \.shell>\.studio-context-rail/);
 });
 
 
