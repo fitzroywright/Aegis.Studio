@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Aegis.Studio.Web.WorkDay;
 using Aegis.Studio.Web.Scheduling;
+using Aegis.Studio.Web.Production;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Xunit;
