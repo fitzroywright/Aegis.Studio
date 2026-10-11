@@ -2,7 +2,7 @@
 (() => {
  'use strict';
  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- function html({id,title='Messages & Announcements',body='',footer='',actions='',open=false,attributes=''}){
+ function html({id,title='Messages & Announcements',body='',footer='',actions='',open=true,attributes=''}){
   const panelId=id+'-content';
   return `<section id="${escape(id)}" class="smc-card${open?' is-open':''}" ${attributes}><header class="smc-header"><button type="button" class="smc-toggle" aria-expanded="${open}" aria-controls="${escape(panelId)}"><span aria-hidden="true">✉</span><strong>${escape(title)}</strong><span class="smc-chevron" aria-hidden="true">⌄</span></button>${actions?`<div class="smc-actions">${actions}</div>`:''}</header><div id="${escape(panelId)}" class="smc-drawer" aria-hidden="${!open}" ${open?'':'inert'}><div class="smc-content"><div class="smc-feed">${body}</div>${footer?`<footer class="smc-footer">${footer}</footer>`:''}</div></div></section>`;
  }
