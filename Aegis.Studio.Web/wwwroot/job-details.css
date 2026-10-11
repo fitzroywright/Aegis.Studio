@@ -52,7 +52,18 @@ button.jd-stage { position:absolute; display:flex; align-items:center; gap:6px; 
 button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-workflow-caption { grid-column:1/-1; margin-top:8px; display:flex; align-items:center; flex-wrap:wrap; gap:5px 12px; font-size:10px; color:#b4510f; }
 .jd-workflow-caption [data-job-blocked] { color:#bd3040; }
-.jd-workflow-caption .jd-link { margin-left:auto; }
+ .jd-flow-overview { grid-column:1/-1; display:flex; align-items:center; gap:14px; min-width:0; margin-top:10px; }
+.jd-flow-summary { display:flex; flex:1; min-width:0; align-items:center; gap:0; list-style:none; margin:0; padding:0; overflow-x:auto; }
+.jd-flow-phase { position:relative; display:flex; flex:1; align-items:center; gap:5px; min-width:88px; font-size:10px; color:var(--theme-muted,#69758b); }
+.jd-flow-phase:not(:last-child)::after { content:""; flex:1; height:2px; min-width:8px; margin:0 6px; background:#c5cad3; }
+.jd-flow-phase.complete::after { background:#318348; }
+.jd-flow-phase.complete,.jd-flow-phase.current { color:var(--theme-text,#162b50); font-weight:750; }
+.jd-flow-phase.complete .jd-stage-light { background:#318348; border-color:#318348; }
+.jd-flow-phase.current .jd-stage-light { background:#fb851c; border-color:#fb851c; }
+.jd-flow-phase.exception .jd-stage-light { background:#bd3040; border-color:#bd3040; }
+.jd-flow-phase.skipped .jd-stage-light { background:transparent; color:var(--theme-muted,#69758b); }
+.jd-flow-actions { flex:none; display:flex; align-items:center; gap:8px; }
+@media(max-width:900px) { .jd-flow-overview { flex-wrap:wrap; } .jd-flow-summary { flex-basis:100%; } .jd-flow-actions { margin-left:auto; } }
 .jd-link { border:0; background:transparent; color:#9c631c; padding:3px; font-size:11px; font-weight:750; cursor:pointer; }
 .job-detail-navigation { grid-column:1; display:flex; min-width:0; gap:0; border:1px solid var(--theme-border,#e1ded8); border-radius:7px; background:var(--theme-surface,#fff); }
 .job-detail-navigation button { flex:1; border:0; border-radius:0; background:transparent; color:var(--theme-text,#162b50); padding:8px 6px; font-size:12px; white-space:nowrap; box-shadow:none; }

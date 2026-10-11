@@ -8,7 +8,7 @@ const {JSDOM}=require('jsdom');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
 test('names prefer given or display first name and fall back to login',async()=>{
  const dom=new JSDOM('<span id="signedInUser"></span><span id="userAvatar"></span>',{runScripts:'outside-only',url:'https://studio.test'});
- const w=dom.window;w.fetch=async()=>({ok:true,json:async()=>({user:{userName:'fwright',displayName:'Fitzroy Wright'}})});
+ const w=dom.window;w.eval(fs.readFileSync(path.join(root,'studio-message-card.js'),'utf8'));w.fetch=async()=>({ok:true,json:async()=>({user:{userName:'fwright',displayName:'Fitzroy Wright'}})});
  w.eval(fs.readFileSync(path.join(root,'auth.js'),'utf8'));
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(w.document.getElementById('signedInUser').textContent,'Fitzroy');
@@ -19,7 +19,7 @@ test('names prefer given or display first name and fall back to login',async()=>
 });
 function environment(){
  const dom=new JSDOM('<div id="panel"></div>',{runScripts:'outside-only',url:'https://studio.test'});
- const w=dom.window;w.showWorkspaces=async()=>{};
+ const w=dom.window;w.eval(fs.readFileSync(path.join(root,'studio-message-card.js'),'utf8'));w.showWorkspaces=async()=>{};
  w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  w.eval(fs.readFileSync(path.join(root,'job-workspace.js'),'utf8'));
  return {w,panel:w.document.getElementById('panel')};
@@ -55,7 +55,7 @@ test('stale asynchronous subjects response does not overwrite the next tab',asyn
  await w.renderJobSubjects({id:'job'},panel,()=>false,()=>{});assert.equal(panel.textContent,'Next tab');
 });
 test('workspace job keeps Media dominant with working replies and dedicated panels',async t=>{
- const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://studio.test'});const w=dom.window;w.eval(fs.readFileSync(path.join(root,'studio-message-card.js'),'utf8'));
  t.after(()=>w.close());
  const job={id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Portraits',clientName:'Client',status:'Scheduled'};
  Object.assign(w,{showWorkspaces:async()=>{},workspaceCache:[{id:'workspace',name:'Portraits',permissions:{accessWorkspace:true,view:true}}],selectedWorkspace:'workspace',currentWorkspacePermissions:{},selectedConversation:null,activateView(){},activateNavigation(){},openConversation:async()=>{},formatBytes:()=>'',openJob:async()=>{},esc:s=>String(s??''),alert(){}});
@@ -197,7 +197,7 @@ test('large Media jobs show a searchable subject list beside overflowing images'
 });
 test('Pipeline shows stage groups with schedule and task on timeline and calendar',async()=>{
  const dom=new JSDOM('<div id="generic"></div><div id="conversation"></div>',{runScripts:'outside-only',url:'https://studio.test'});
- const w=dom.window;w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.genericView=dom.window.document.getElementById('generic');w.conversationView=dom.window.document.getElementById('conversation');w.activateNavigation=()=>{};w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const w=dom.window;w.eval(fs.readFileSync(path.join(root,'studio-message-card.js'),'utf8'));w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.genericView=dom.window.document.getElementById('generic');w.conversationView=dom.window.document.getElementById('conversation');w.activateNavigation=()=>{};w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  w.studioRememberPeople=()=>{};w.studioFirstName=value=>value;
  const today=new Date();const time=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,10).toISOString();const end=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1,12).toISOString();
  const requests=[];
