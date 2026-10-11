@@ -97,33 +97,43 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         using var command=new NpgsqlCommand("select exists(select 1 from studio_frontdesk_requests where status<>'Cancelled' and payload->>'conversationId'=$1)",connection);
         command.Parameters.AddWithValue(conversationId.ToString("D"));return (bool)command.ExecuteScalar()!;
     }
-    public object MarkRequested(Guid id,string actor)
+    public object MarkRequested(Guid id,string actor,string channel="Email",IConfiguration? configuration=null)
     {
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
-        Guid conversation;Guid? prior;string? from;PendingBookingRequest request;string status;
-        using(var q=new NpgsqlCommand("select r.payload::text,r.status,j.conversation_id,w.email_address,r.deposit_message_id,j.status from studio_frontdesk_requests r join studio_jobs j on j.id=r.job_id join studio_workspaces w on w.id=j.workspace_id where r.id=$1 for update of r,j",c,tx))
+        if(channel is not ("Email" or "WhatsApp"))throw new ArgumentException("Choose Email or WhatsApp.");
+        Guid conversation;Guid? prior;string? from;PendingBookingRequest request;string status;string? phone;
+        using(var q=new NpgsqlCommand("select r.payload::text,r.status,j.conversation_id,w.email_address,r.deposit_message_id,j.status,coalesce(nullif(cli.phone,''),r.payload->>'clientPhone') from studio_frontdesk_requests r join studio_jobs j on j.id=r.job_id join studio_workspaces w on w.id=j.workspace_id left join studio_clients cli on cli.id=j.client_id where r.id=$1 for update of r,j",c,tx))
         {
             q.Parameters.AddWithValue(id);using var r=q.ExecuteReader();if(!r.Read())throw new KeyNotFoundException();
             request=JsonSerializer.Deserialize<PendingBookingRequest>(r.GetString(0),JsonOptions)!;
-            status=r.GetString(1);conversation=r.GetGuid(2);from=r.IsDBNull(3)?null:r.GetString(3);prior=r.IsDBNull(4)?null:r.GetGuid(4);
+            status=r.GetString(1);conversation=r.GetGuid(2);from=r.IsDBNull(3)?null:r.GetString(3);prior=r.IsDBNull(4)?null:r.GetGuid(4);phone=r.IsDBNull(6)?null:r.GetString(6);
             if(r.GetString(5)!="Pending")throw new ArgumentException("Deposit requests belong to Pending Jobs; use Billing for confirmed Jobs.");
         }
         if(status is "Confirmed" or "Cancelled")throw new ArgumentException("This booking is no longer pending.");
         if(prior is Guid previous)return new{messageId=previous,state="AlreadyQueued",deliveryReceiptAvailable=false};
-        if(string.IsNullOrWhiteSpace(from))throw new ArgumentException("Configure an outbound workspace email identity before requesting a deposit.");
-        if(string.IsNullOrWhiteSpace(request.ClientEmail))throw new ArgumentException("A customer email address is required for email deposit requests.");
+        if(channel=="Email"&&string.IsNullOrWhiteSpace(from))throw new ArgumentException("Configure an outbound workspace email identity before requesting a deposit.");
+        if(channel=="Email"&&string.IsNullOrWhiteSpace(request.ClientEmail))throw new ArgumentException("A customer email address is required for email deposit requests.");
         if(request.RequiredDeposit<=0)throw new ArgumentException("No deposit is required for this booking.");
+        string recipient=channel=="Email"?request.ClientEmail:DepositDeliveryRules.Mobile(phone);
         Guid message=Guid.NewGuid();
         string body=$"Hello {request.ClientName},\n\nPlease arrange the required deposit of {request.Currency} {request.RequiredDeposit:0.00} for {request.Title}. Contact Brian's to arrange payment and provide your receipt/reference.\n\nBooking reference: {id:D}\nThis is a deposit request, not confirmation of payment or booking.\n\nBrian's";
-        Execute(c,tx,"insert into studio_outbound_email(id,conversation_id,from_address,to_address,subject,body,status,created_at_utc,kind,sent_by_user_name,sending_identity_type) values($1,$2,$3,$4,$5,$6,'Pending',now(),'DepositRequest',$7,'Workspace')",message,conversation,from,request.ClientEmail,"Deposit request — "+request.Title,body,actor);
+        var metadata=new Dictionary<string,string>();
+        if(channel=="WhatsApp"&&!string.IsNullOrWhiteSpace(configuration?["Messaging:WhatsApp:DepositTemplateName"]))
+        {
+            metadata["WhatsAppTemplateName"]=configuration["Messaging:WhatsApp:DepositTemplateName"]!;
+            metadata["WhatsAppTemplateLanguage"]=configuration["Messaging:WhatsApp:DepositTemplateLanguage"]??"en_US";
+            metadata["WhatsAppTemplateParameters"]=(configuration["Messaging:WhatsApp:DepositTemplateParameters"]??"{customer}|{job}|{amount}|{reference}")
+                .Replace("{customer}",request.ClientName.Replace('|',' ')).Replace("{job}",request.Title.Replace('|',' ')).Replace("{amount}",$"{request.Currency} {request.RequiredDeposit:0.00}").Replace("{reference}",id.ToString("D"));
+        }
+        Execute(c,tx,"insert into studio_outbound_email(id,conversation_id,from_address,to_address,subject,body,status,created_at_utc,kind,sent_by_user_name,sending_identity_type,delivery_channel,delivery_metadata) values($1,$2,$3,$4,$5,$6,'Pending',now(),'DepositRequest',$7,$8,$9,$10::jsonb)",message,conversation,channel=="Email"?from!:"Configured WhatsApp provider",recipient,"Deposit request — "+request.Title,body,actor,channel=="Email"?"Workspace":"Provider",channel,JsonSerializer.Serialize(metadata));
         Execute(c,tx,"update studio_frontdesk_requests set status='AwaitingDeposit',deposit_requested_at_utc=now(),deposit_message_id=$2 where id=$1",id,message);
-        tx.Commit();return new{messageId=message,state="Queued",deliveryReceiptAvailable=false};
+        tx.Commit();return new{messageId=message,state="Queued",channel,deliveryReceiptAvailable=false};
     }
     public object DepositDelivery(Guid id)
     {
-        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select r.deposit_message_id,e.status,e.attempts,e.last_error,e.provider_accepted_at_utc,e.provider_message_id from studio_frontdesk_requests r left join studio_outbound_email e on e.id=r.deposit_message_id where r.id=$1",c);
+        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select r.deposit_message_id,e.status,e.attempts,e.last_error,e.provider_accepted_at_utc,e.provider_message_id,e.delivery_channel from studio_frontdesk_requests r left join studio_outbound_email e on e.id=r.deposit_message_id where r.id=$1",c);
         q.Parameters.AddWithValue(id);using var r=q.ExecuteReader();if(!r.Read())throw new KeyNotFoundException();
-        return new{messageId=r.IsDBNull(0)?(Guid?)null:r.GetGuid(0),state=r.IsDBNull(1)?"NotRequested":r.GetString(1),attempts=r.IsDBNull(2)?0:r.GetInt32(2),lastError=r.IsDBNull(3)?null:r.GetString(3),providerAcceptedAtUtc=r.IsDBNull(4)?(DateTimeOffset?)null:r.GetFieldValue<DateTimeOffset>(4),providerMessageId=r.IsDBNull(5)?null:r.GetString(5),deliveryReceiptAvailable=false};
+        return new{messageId=r.IsDBNull(0)?(Guid?)null:r.GetGuid(0),state=r.IsDBNull(1)?"NotRequested":r.GetString(1),attempts=r.IsDBNull(2)?0:r.GetInt32(2),lastError=r.IsDBNull(3)?null:r.GetString(3),providerAcceptedAtUtc=r.IsDBNull(4)?(DateTimeOffset?)null:r.GetFieldValue<DateTimeOffset>(4),providerMessageId=r.IsDBNull(5)?null:r.GetString(5),channel=r.IsDBNull(6)?null:r.GetString(6),deliveryReceiptAvailable=false};
     }
     public FrontDeskRequest RecordDeposit(Guid id,VerifiedDepositRequest payment,string user)
     {
@@ -230,11 +240,16 @@ public static class FrontDeskBookingRequestEndpoints
             using var connection=db.OpenConnection();using var command=new NpgsqlCommand("select id,workspace_id,subject,contact_name,contact_address,channel,created_at_utc from studio_conversations where job_id is null and not is_closed order by created_at_utc desc",connection);using var reader=command.ExecuteReader();var result=new List<object>();while(reader.Read())result.Add(new{id=reader.GetGuid(0),workspaceId=reader.GetGuid(1),subject=reader.GetString(2),contactName=reader.GetString(3),contactAddress=reader.GetString(4),channel=reader.GetString(5),createdAtUtc=reader.GetFieldValue<DateTimeOffset>(6)});return Results.Ok(result);
         });
         group.MapPost("/booking-requests",(PendingBookingRequest request,ClaimsPrincipal user,StudioDatabase db)=>Allowed(user,db)?Run(()=>Results.Ok(new FrontDeskBookingRequestStore(db).Create(request,Name(user)))):Results.Forbid());
-        group.MapPost("/booking-requests/{id:guid}/deposit-requested",(Guid id,ClaimsPrincipal user,StudioDatabase db,IEnumerable<Common.Messaging.IExternalMessageChannel> channels)=>
+        group.MapGet("/deposit-delivery-channels",(ClaimsPrincipal user,StudioDatabase db,IEnumerable<Common.Messaging.IExternalMessageChannel> channels)=>
+            Allowed(user,db)?Results.Ok(channels.Where(x=>x.Channel is Common.Messaging.MessageChannel.MsEmail or Common.Messaging.MessageChannel.WhatsApp).Select(x=>x.Channel==Common.Messaging.MessageChannel.MsEmail?"Email":"WhatsApp").Distinct().ToArray()):Results.Forbid());
+        group.MapPost("/booking-requests/{id:guid}/deposit-requested",(Guid id,string? channel,ClaimsPrincipal user,StudioDatabase db,IConfiguration configuration,IEnumerable<Common.Messaging.IExternalMessageChannel> channels)=>
         {
             if(!Allowed(user,db))return Results.Forbid();
-            if(!channels.Any(x=>x.Channel==Common.Messaging.MessageChannel.MsEmail))return Results.Json(new{error="Configure the email delivery provider before sending deposit requests."},statusCode:503);
-            return Run(()=>Results.Ok(new FrontDeskBookingRequestStore(db).MarkRequested(id,Name(user))));
+            string chosen=channel??"Email";
+            if(chosen is not ("Email" or "WhatsApp"))return Results.BadRequest(new{error="Choose Email or WhatsApp."});
+            var kind=chosen=="Email"?Common.Messaging.MessageChannel.MsEmail:Common.Messaging.MessageChannel.WhatsApp;
+            if(!channels.Any(x=>x.Channel==kind))return Results.Json(new{error=$"Configure the {chosen} delivery provider before sending deposit requests."},statusCode:503);
+            return Run(()=>Results.Ok(new FrontDeskBookingRequestStore(db).MarkRequested(id,Name(user),chosen,configuration)));
         });
         group.MapGet("/booking-requests/{id:guid}/deposit-delivery",(Guid id,ClaimsPrincipal user,StudioDatabase db)=>Allowed(user,db)?Run(()=>Results.Ok(new FrontDeskBookingRequestStore(db).DepositDelivery(id))):Results.Forbid());
         group.MapPost("/booking-requests/{id:guid}/deposits",(Guid id,VerifiedDepositRequest request,ClaimsPrincipal user,StudioDatabase db)=>Allowed(user,db)?Run(()=>Results.Ok(new FrontDeskBookingRequestStore(db).RecordDeposit(id,request,Name(user)))):Results.Forbid());

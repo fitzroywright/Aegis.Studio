@@ -92,7 +92,7 @@ public sealed class ScheduleStore
         using NpgsqlTransaction transaction = connection.BeginTransaction();
         LockScheduleResources(connection,transaction,request.ResourceIds);
         IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, null);
-        if (conflicts.Count > 0 && !request.AllowConflicts) throw new ScheduleConflictException(conflicts);
+        if (conflicts.Count > 0) throw new ScheduleConflictException(conflicts);
         using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
@@ -115,7 +115,7 @@ public sealed class ScheduleStore
         Guid[] existing=GetAssignedResources(connection,transaction,id);
         LockScheduleResources(connection,transaction,existing.Concat(request.ResourceIds??[]));
         IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, id);
-        if (conflicts.Count > 0 && !request.AllowConflicts) throw new ScheduleConflictException(conflicts);
+        if (conflicts.Count > 0) throw new ScheduleConflictException(conflicts);
         using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;

@@ -103,3 +103,13 @@ User direction: builds and test execution will occur locally. No builds or tests
 - Technical item QC decisions and approved production-source allocation require Production Manager authority. Assignees may record produced quantity while QC remains Pending. QC task completion is also protected. Existing task creation/progress buttons now use versioned connected commands rather than the old unversioned request payload.
 - Invoice release reconciles the connected invoice/Job set and counts each receipt once. Invoice status remains insufficient evidence of settlement. Until explicit invoice receipt allocation exists, an unpaid linked invoice set requires Finance authorization.
 - Added local test sources for conflict recovery, QC authority and shared invoice receipts. Mobile, SQL migrations, API/UI behavior and these tests await the user's local validation.
+
+
+## Resumed checkpoint: delivery channels and actual upload receipts
+
+- Added configured WhatsApp deposit requests through the existing messaging transport, explicit international destination validation, recorded delivery channel/template metadata, and durable leased delivery claims. Email uses the recorded workspace/person sender. Provider acceptance remains distinct from customer delivery confirmation.
+- Added upload declarations with stable batch/file IDs and per-file receipts committed with immutable version metadata. Retried identical bytes reuse the receipt; changed bytes cannot reuse an ID. Unmatched editing returns remain visible until resolved.
+- Add / Upload declares files before sending, retains original IDs for retries, and offers resume of interrupted batches by reselecting the original files. Upload classification no longer clears an existing production assignee.
+- Session upload verification derives counts from stored receipts instead of accepting typed counts. Source submission blocks unresolved declared uploads and requires actual batch backup verification. Photographer readiness checks that photographer's session receipts.
+- Scheduling conflicts can no longer be bypassed with the legacy AllowConflicts flag.
+- Added focused declaration/destination test source. Per user direction, no builds or tests were executed for this checkpoint. Local validation, remaining alternate-writer audit, and device acceptance remain outstanding.

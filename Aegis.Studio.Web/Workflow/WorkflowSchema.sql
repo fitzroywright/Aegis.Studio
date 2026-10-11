@@ -317,3 +317,6 @@ update studio_jobs set owner_assignment_id=md5('legacy-owner:'||id)::uuid
  where owner_assignment_id is null and status not in ('Completed','Cancelled') and exists(select 1 from studio_job_owner_assignments a where a.id=md5('legacy-owner:'||studio_jobs.id)::uuid);
 drop trigger if exists closed_child_guard on studio_job_owner_assignments;
 create trigger closed_child_guard before insert or update or delete on studio_job_owner_assignments for each row execute function studio_closed_child_guard();
+
+-- Recorded handoffs reference actual stored-file receipts instead of client-entered counters.
+alter table studio_workflow_upload_batches add column if not exists source_upload_batch_id uuid;

@@ -103,10 +103,11 @@
   });
   bind('[data-wf-block]',()=>{const reason=prompt('Blocked reason; leave blank to clear the block.');return reason===null?undefined:mutate({action:'blocked',reason});});
   bind('[data-wf-ready]',b=>confirm('Have all intended files finished uploading and passed the required backup checks?')?mutate({action:'contribution-ready',sessionId:b.dataset.wfReady,backupConfirmed:true}):undefined);
-  bind('[data-wf-upload]',b=>{
-   const d=dialog('Verify upload batch','<label>Expected files<input name="expected" type="number" min="1" step="1" required></label><label>Completed files<input name="completed" type="number" min="0" step="1" required></label><label>Failed files<input name="failed" type="number" min="0" step="1" required value="0"></label><label><input name="backup" type="checkbox" required> Required backup verification completed</label>');
+  bind('[data-wf-upload]',async b=>{
+   const batches=(await json(`/api/jobs/${jobId}/media/upload-batches`)).filter(x=>x.sessionId===b.dataset.wfUpload);
+   const d=dialog('Verify upload batch',`<label>Stored upload batch<select name="batch" required><option value="">Choose actual batch</option>${batches.map(x=>`<option value="${x.batchId}">${esc(x.createdBy)} · ${x.files.filter(f=>f.state==='Stored').length}/${x.files.length} stored · ${esc(new Date(x.createdAtUtc).toLocaleString())}</option>`).join('')}</select></label><label><input name="backup" type="checkbox" required> Required backup verification completed</label>`);
    const f=d.querySelector('form');
-   f.onsubmit=async e=>{e.preventDefault();try{await mutate({action:'record-upload-batch',sessionId:b.dataset.wfUpload,expectedFiles:Number(f.elements.expected.value),completedFiles:Number(f.elements.completed.value),failedFiles:Number(f.elements.failed.value),backupConfirmed:f.elements.backup.checked});d.close();}catch(err){f.querySelector('[role=alert]').textContent=err.message;}};
+   f.onsubmit=async e=>{e.preventDefault();try{await mutate({action:'record-upload-batch',sessionId:b.dataset.wfUpload,uploadBatchId:f.elements.batch.value,backupConfirmed:f.elements.backup.checked});d.close();}catch(err){f.querySelector('[role=alert]').textContent=err.message;}};
   });
   bind('[data-wf-waive]',b=>{const person=prompt('Photographer username whose contribution is waived:');if(!person)return;const reason=prompt('Reason for waiving this contribution:');return reason?mutate({action:'waive-contribution',sessionId:b.dataset.wfWaive,userName:person,reason}):undefined;});
   bind('[data-wf-execute]',b=>mutate({action:b.dataset.wfExecute,sessionId:b.dataset.session,backupConfirmed:false}));

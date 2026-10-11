@@ -170,6 +170,10 @@ public sealed class StudioFeatureDatabase
             alter table studio_outbound_email add column if not exists last_error text null;
             alter table studio_outbound_email add column if not exists next_attempt_at_utc timestamptz null;
             alter table studio_outbound_email add column if not exists provider_accepted_at_utc timestamptz null;
+            alter table studio_outbound_email add column if not exists delivery_channel text not null default 'Email';
+            alter table studio_outbound_email add column if not exists delivery_metadata jsonb not null default '{}'::jsonb;
+            alter table studio_outbound_email add column if not exists lease_id uuid;
+            alter table studio_outbound_email add column if not exists lease_until_utc timestamptz;
             """;
 
         await using NpgsqlCommand command = dataSource.CreateCommand(sql + Aegis.Studio.Web.Operations.JobWorkspaceParticipation.Schema);

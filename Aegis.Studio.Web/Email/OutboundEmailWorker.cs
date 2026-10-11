@@ -1,141 +1,76 @@
 using Common.Messaging;
+using Common.Messaging.Channels.MicrosoftGraph;
+using System.Text.Json;
 
 namespace Aegis.Studio.Web.Email;
 
+// Retain the existing queue/service identity while supporting its configured transports.
 public sealed class OutboundEmailWorker : BackgroundService
 {
-    private readonly IExternalMessageChannel? emailChannel;
+    private readonly Dictionary<string,IExternalMessageChannel> channels;
     private readonly OutboundEmailStore outbox;
-    private readonly StudioOperationsFlowPublisher operationsFlows;
+    private readonly StudioOperationsFlowPublisher flows;
     private readonly ILogger<OutboundEmailWorker> logger;
-    private readonly TimeSpan pollInterval;
-
-    public OutboundEmailWorker(
-        IEnumerable<IExternalMessageChannel> externalChannels,
-        IConfiguration configuration,
-        OutboundEmailStore outbox,
-        StudioOperationsFlowPublisher operationsFlows,
-        ILogger<OutboundEmailWorker> logger)
+    private readonly IConfiguration configuration;
+    private readonly IChannelSecretResolver secrets;
+    private readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(60)};
+    public OutboundEmailWorker(IEnumerable<IExternalMessageChannel> externalChannels,IConfiguration configuration,OutboundEmailStore outbox,StudioOperationsFlowPublisher flows,ILogger<OutboundEmailWorker> logger,IChannelSecretResolver secrets)
     {
-        emailChannel = externalChannels.FirstOrDefault(channel => channel.Channel == MessageChannel.MsEmail);
-        this.outbox = outbox;
-        this.operationsFlows = operationsFlows;
-        this.logger = logger;
-        pollInterval = TimeSpan.FromSeconds(Math.Max(
-            5,
-            configuration.GetValue<int?>("Messaging:DeliveryPollSeconds") ?? 30));
+        this.configuration=configuration;this.outbox=outbox;this.flows=flows;this.logger=logger;this.secrets=secrets;
+        channels=new(StringComparer.Ordinal);
+        foreach(var channel in externalChannels)
+            if(channel.Channel is MessageChannel.MsEmail or MessageChannel.WhatsApp)channels.TryAdd(channel.Channel==MessageChannel.MsEmail?"Email":"WhatsApp",channel);
     }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        bool configurationWarningLogged = false;
-        while (!stoppingToken.IsCancellationRequested)
+        TimeSpan interval=TimeSpan.FromSeconds(Math.Max(5,configuration.GetValue<int?>("Messaging:DeliveryPollSeconds")??30));
+        while(!stoppingToken.IsCancellationRequested)
         {
-            if (emailChannel is null)
-            {
-                if (!configurationWarningLogged)
-                {
-                    logger.LogWarning("Common.Messaging Microsoft 365 email is waiting for configuration. Pending messages will remain queued.");
-                    configurationWarningLogged = true;
-                }
-
-                try
-                {
-                    await Task.Delay(pollInterval, stoppingToken);
-                }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                {
-                    break;
-                }
-                continue;
-            }
-
-            configurationWarningLogged = false;
             try
             {
-                IReadOnlyList<OutboundEmail> pending = outbox.GetPending();
-                foreach (OutboundEmail message in pending)
+                for(int n=0;n<25&&!stoppingToken.IsCancellationRequested;n++)
                 {
+                    Guid lease=Guid.NewGuid();var message=outbox.ClaimNext(channels.Keys.ToArray(),lease);if(message is null)break;
                     try
                     {
-                        MessageRecipient recipient = new(
-                            message.ToAddress,
-                            message.ToAddress,
-                            message.ToAddress,
-                            PreferredChannels: MessageChannel.MsEmail);
-                        MessageRequest request = new()
+                        var transport=channels[message.DeliveryChannel];
+                        MessageChannel channel=message.DeliveryChannel=="Email"?MessageChannel.MsEmail:MessageChannel.WhatsApp;
+                        if(transport is MicrosoftGraphEmailMessageChannel)
                         {
-                            RecipientIds = [message.ToAddress],
-                            Title = message.Subject,
-                            Body = message.Body,
-                            Channels = MessageChannel.MsEmail,
-                            Source = "Aegis.Studio",
-                            CorrelationId = message.ConversationId.ToString("D")
-                        };
-
-                        await emailChannel.SendAsync(
-                            recipient,
-                            request,
-                            message.Id,
-                            stoppingToken);
-
-                        outbox.MarkProviderAccepted(message.Id, null);
-                        operationsFlows.TryEnqueueOutbound(
-                            message.ConversationId.ToString("D"),
-                            "Provider",
-                            businessId: message.Id.ToString("D"),
-                            detail: "ProviderAccepted");
-                        operationsFlows.TryEnqueueOutboundUnknown(
-                            message.ConversationId.ToString("D"),
-                            "Recipient",
-                            businessId: message.Id.ToString("D"),
-                            detail: "DeliveryReceiptUnavailable");
-                        logger.LogInformation(
-                            "Common.Messaging accepted outbound email {MessageId} to {ToAddress}.",
-                            message.Id,
-                            message.ToAddress);
+                            // Common's Graph channel owns its configured mailbox. Construct it
+                            // with the audited workspace/person sender rather than silently
+                            // sending all replies from the installation's default mailbox.
+                            transport=new MicrosoftGraphEmailMessageChannel(http,new MicrosoftGraphEmailOptions
+                            {
+                                TenantId=configuration["Messaging:MicrosoftGraph:TenantId"]??"",
+                                ClientId=configuration["Messaging:MicrosoftGraph:ClientId"]??"",
+                                ClientSecretName=configuration["Messaging:MicrosoftGraph:ClientSecretName"]??"messaging/msgraph/client-secret",
+                                SenderUpn=message.FromAddress,SkipSenderRecipient=false
+                            },secrets);
+                        }
+                        var recipient=new MessageRecipient(message.ToAddress,message.ToAddress,channel==MessageChannel.MsEmail?message.ToAddress:null,
+                            Mobile:channel==MessageChannel.WhatsApp?message.ToAddress:null,PreferredChannels:channel);
+                        var request=new MessageRequest{RecipientIds=[message.ToAddress],Title=message.Subject,Body=message.Body,BodyIsHtml=false,Channels=channel,Source="Aegis.Studio",CorrelationId=message.Id.ToString("D"),Metadata=JsonSerializer.Deserialize<Dictionary<string,string>>(message.DeliveryMetadata)};
+                        await transport.SendAsync(recipient,request,message.Id,stoppingToken);
+                        if(outbox.MarkProviderAccepted(message.Id,null,lease) is not null)
+                        {
+                            flows.TryEnqueueOutbound(message.ConversationId.ToString("D"),"Provider",businessId:message.Id.ToString("D"),detail:"ProviderAccepted");
+                            flows.TryEnqueueOutboundUnknown(message.ConversationId.ToString("D"),"Recipient",businessId:message.Id.ToString("D"),detail:"DeliveryReceiptUnavailable");
+                        }
                     }
-                    catch (Exception exception)
+                    catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){throw;}
+                    catch(Exception ex)
                     {
-                        double retrySeconds = Math.Min(300, 5 * Math.Pow(2, Math.Min(message.Attempts, 6)));
-                        OutboundEmail? updated = outbox.MarkFailure(
-                            message.Id,
-                            exception.GetType().Name,
-                            DateTimeOffset.UtcNow.AddSeconds(retrySeconds));
-
-                        operationsFlows.TryEnqueueOutbound(
-                            message.ConversationId.ToString("D"),
-                            "Provider",
-                            businessId: message.Id.ToString("D"),
-                            detail: updated?.Status == "Failed" ? "RetryExhausted" : exception.GetType().Name,
-                            failed: true);
-
-                        logger.LogError(
-                            exception,
-                            "Failed sending outbound email {MessageId} through Common.Messaging. Attempt={Attempt}; State={State}.",
-                            message.Id,
-                            (updated?.Attempts ?? message.Attempts + 1),
-                            updated?.Status ?? "Unknown");
+                        var updated=outbox.MarkFailure(message.Id,ex.GetType().Name,DateTimeOffset.UtcNow.AddSeconds(Math.Min(300,5*Math.Pow(2,Math.Min(message.Attempts,6)))),lease);
+                        flows.TryEnqueueOutbound(message.ConversationId.ToString("D"),"Provider",businessId:message.Id.ToString("D"),detail:updated?.Status=="Failed"?"RetryExhausted":ex.GetType().Name,failed:true);
+                        logger.LogError(ex,"Outbound {Channel} message {MessageId} failed; queued retry state {State}",message.DeliveryChannel,message.Id,updated?.Status);
                     }
                 }
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception exception)
-            {
-                logger.LogError(exception, "Outbound email processing cycle failed.");
-            }
-
-            try
-            {
-                await Task.Delay(pollInterval, stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
+            catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){break;}
+            catch(Exception ex){logger.LogError(ex,"Outbound message processing cycle failed");}
+            try{await Task.Delay(interval,stoppingToken);}catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){break;}
         }
     }
+    public override void Dispose(){http.Dispose();base.Dispose();}
 }

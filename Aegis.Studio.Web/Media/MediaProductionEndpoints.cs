@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Versioning;
+using Aegis.Studio.Web.Workflow;
 using Common.Storage;
 using Npgsql;
 
@@ -65,6 +66,12 @@ public static class MediaProductionEndpoints
         }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6_000_000)).DisableAntiforgery().RequireAuthorization();
         app.MapPut("/api/jobs/{jobId:guid}/media/subjects/{subjectId:guid}/status",(Guid jobId,Guid subjectId,SubjectStateRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).SubjectStatus(jobId,subjectId,request.Status,Name(user));return Results.NoContent();})).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/export",(Guid jobId,MediaExportRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>Results.File(Store(db,storage).ExportFile(jobId,request.Assets??[],Name(user)),"application/zip","studio-editing-batch.zip"))).RequireAuthorization();
+        app.MapGet("/api/jobs/{jobId:guid}/media/upload-batches",(Guid jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>
+        {
+            if(!access.HasPermission(user,jobId,"ViewAttachments"))return Results.Forbid();
+            return Results.Ok(new MediaUploadReceipts(db,Store(db,storage)).List(jobId));
+        }).RequireAuthorization();
+        app.MapPost("/api/jobs/{jobId:guid}/media/upload-batches",(Guid jobId,UploadBatchDeclaration declaration,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage,WorkflowStore workflow)=>Write(jobId,user,access,()=>Results.Ok(new MediaUploadReceipts(db,Store(db,storage)).Create(jobId,declaration,Name(user),workflow.CanManage(user,jobId)||new GlobalOperationalRoleStore(db).HasRole(user,StudioRoleNames.ProductionManager))))).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/uploads",async(Guid jobId,HttpRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>
         {
             if(!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
@@ -73,7 +80,8 @@ public static class MediaProductionEndpoints
             if(ingestion is null)return Results.Json(new{error="The upload queue is busy. Retry this photo."},statusCode:429);
             var form=await request.ReadFormAsync(request.HttpContext.RequestAborted);if(form.Files.Count!=1)return Results.BadRequest(new{error="Send one file per request; the client queues batch uploads."});
             Guid? asset=Guid.TryParse(form["assetId"],out var parsed)?parsed:null;
-            return Write(jobId,user,access,()=>Results.Ok(Store(db,storage).Ingest(jobId,form.Files[0],form["returned"]=="true",asset,Name(user),form["note"].ToString(),form["collection"].ToString())));
+            if(!Guid.TryParse(form["uploadId"],out var uploadId))return Results.BadRequest(new{error="Declare an upload batch and send its stable upload ID."});
+            return Write(jobId,user,access,()=>Results.Ok(new MediaUploadReceipts(db,Store(db,storage)).Receive(jobId,uploadId,form.Files[0],Name(user))));
         }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(101_000_000)).DisableAntiforgery().RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/unmatched/{id:guid}/match",(Guid jobId,Guid id,MatchUploadRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).Resolve(jobId,id,request.AssetId,Name(user));return Results.NoContent();})).RequireAuthorization();
         app.MapGet("/api/workspaces/{workspaceId:guid}/appearance",(Guid workspaceId,ClaimsPrincipal user,WorkspaceAccessService access,StudioDatabase db)=>
@@ -93,7 +101,7 @@ public static class MediaProductionEndpoints
     private static IResult Write(Guid job,ClaimsPrincipal user,JobAccessService access,Func<IResult> action)
     {
         if(!access.HasPermission(user,job,"ManageProduction"))return Results.Forbid();
-        try{return action();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}
+        try{return action();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}catch(UnauthorizedAccessException){return Results.Forbid();}catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
     }
 }
 public sealed record WorkspaceAppearance(string Icon,string Color);

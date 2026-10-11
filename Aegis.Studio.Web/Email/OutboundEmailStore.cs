@@ -53,6 +53,21 @@ public sealed class OutboundEmailStore
         return values;
     }
 
+    public OutboundEmail? ClaimNext(IReadOnlyCollection<string> channels,Guid leaseId)
+    {
+        using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        using var q=new NpgsqlCommand("""
+            with candidate as (select id from studio_outbound_email
+              where delivery_channel=any($1) and attempts<10 and
+                ((status in ('Pending','Retry') and (next_attempt_at_utc is null or next_attempt_at_utc<=now()))
+                  or (status='Sending' and lease_until_utc<now()))
+              order by created_at_utc for update skip locked limit 1)
+            update studio_outbound_email e set status='Sending',lease_id=$2,lease_until_utc=now()+interval '2 minutes'
+              from candidate p where e.id=p.id returning e.id
+            """,c,tx);q.Parameters.AddWithValue(channels.ToArray());q.Parameters.AddWithValue(leaseId);
+        object? result=q.ExecuteScalar();tx.Commit();return result is Guid id?Get(id):null;
+    }
+
     public IReadOnlyList<OutboundEmailAuditRecord> GetRecentAudit(
         IReadOnlyCollection<Guid> workspaceIds,
         int count = 200)
@@ -92,7 +107,7 @@ public sealed class OutboundEmailStore
         return values;
     }
 
-    public OutboundEmail? MarkProviderAccepted(Guid id, string? providerMessageId)
+    public OutboundEmail? MarkProviderAccepted(Guid id, string? providerMessageId,Guid? leaseId=null)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -103,15 +118,16 @@ public sealed class OutboundEmailStore
                 attempts=attempts+1,
                 last_error=null,
                 next_attempt_at_utc=null,
-                provider_accepted_at_utc=now()
-            where id=$1
+                provider_accepted_at_utc=now(),lease_id=null,lease_until_utc=null
+            where id=$1 and ($3::uuid is null or lease_id=$3)
             """;
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue((object?)providerMessageId?.Trim() ?? DBNull.Value);
+        command.Parameters.AddWithValue((object?)leaseId??DBNull.Value);
         return command.ExecuteNonQuery() == 0 ? null : Get(id);
     }
 
-    public OutboundEmail? MarkFailure(Guid id, string failureCode, DateTimeOffset nextAttemptAtUtc)
+    public OutboundEmail? MarkFailure(Guid id, string failureCode, DateTimeOffset nextAttemptAtUtc,Guid? leaseId=null)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -120,12 +136,13 @@ public sealed class OutboundEmailStore
             set attempts=attempts+1,
                 status=case when attempts+1 >= 10 then 'Failed' else 'Retry' end,
                 last_error=$2,
-                next_attempt_at_utc=case when attempts+1 >= 10 then null else $3 end
-            where id=$1
+                next_attempt_at_utc=case when attempts+1 >= 10 then null else $3 end,lease_id=null,lease_until_utc=null
+            where id=$1 and ($4::uuid is null or lease_id=$4)
             """;
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(string.IsNullOrWhiteSpace(failureCode) ? "ProviderFailure" : failureCode.Trim());
         command.Parameters.AddWithValue(nextAttemptAtUtc);
+        command.Parameters.AddWithValue((object?)leaseId??DBNull.Value);
         return command.ExecuteNonQuery() == 0 ? null : Get(id);
     }
 
@@ -207,10 +224,10 @@ public sealed class OutboundEmailStore
         r.GetInt32(13),
         r.IsDBNull(14) ? null : r.GetString(14),
         r.IsDBNull(15) ? null : r.GetFieldValue<DateTimeOffset>(15),
-        r.IsDBNull(16) ? null : r.GetFieldValue<DateTimeOffset>(16));
+        r.IsDBNull(16) ? null : r.GetFieldValue<DateTimeOffset>(16),r.GetString(17),r.GetString(18));
 
     private const string SelectSql =
-        "select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,attempts,last_error,next_attempt_at_utc,provider_accepted_at_utc from studio_outbound_email ";
+        "select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,attempts,last_error,next_attempt_at_utc,provider_accepted_at_utc,delivery_channel,delivery_metadata::text from studio_outbound_email ";
 }
 
 public sealed record OutboundEmail(
@@ -230,7 +247,7 @@ public sealed record OutboundEmail(
     int Attempts = 0,
     string? LastError = null,
     DateTimeOffset? NextAttemptAtUtc = null,
-    DateTimeOffset? ProviderAcceptedAtUtc = null);
+    DateTimeOffset? ProviderAcceptedAtUtc = null,string DeliveryChannel="Email",string DeliveryMetadata="{}");
 public sealed record OutboundEmailAuditRecord(
     Guid MessageId,
     Guid ConversationId,

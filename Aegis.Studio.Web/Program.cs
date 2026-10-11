@@ -170,6 +170,15 @@ if (graphEmailEnabled)
     global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions
         .AddMicrosoftGraphEmailMessagingChannel(builder.Services, graphOptions);
 }
+if(builder.Configuration.GetValue("Messaging:WhatsApp:Enabled",false))
+{
+    global::Common.Messaging.Hosting.ChannelServiceCollectionExtensions.AddWhatsAppMessagingChannel(builder.Services,new global::Common.Messaging.Channels.WhatsApp.WhatsAppMessageOptions
+    {
+        Enabled=true,GraphApiVersion=builder.Configuration["Messaging:WhatsApp:GraphApiVersion"]??"v23.0",
+        PhoneNumberId=builder.Configuration["Messaging:WhatsApp:PhoneNumberId"]??string.Empty,
+        AccessTokenSecretName=builder.Configuration["Messaging:WhatsApp:AccessTokenSecretName"]??"messaging/whatsapp/access-token"
+    });
+}
 global::Common.Messaging.Hosting.ServiceCollectionExtensions
     .AddCommonMessagingDiagnostics(builder.Services);
 builder.Services.AddSingleton<WorkspaceStore>();

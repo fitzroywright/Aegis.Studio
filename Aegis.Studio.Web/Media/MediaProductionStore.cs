@@ -14,6 +14,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
         string[] statements = [
             Aegis.Studio.Web.Operations.JobWorkspaceParticipation.Schema,
+            MediaUploadReceipts.Schema,
             "create table if not exists studio_media_migrations(version integer primary key,applied_at timestamptz not null default now())",
             "create table if not exists studio_media_galleries(id uuid primary key references studio_jobs(id) on delete cascade,name text not null default 'Media',default_lens text not null default 'Auto')",
             "alter table studio_media_galleries add column if not exists default_collection text null",
@@ -220,11 +221,18 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         Audit(c,tx,job,"EditingBatchExported",user,$"Exported {manifest.Count} images for editing.");tx.Commit();output.Position=0;return output;
         }catch{output.Dispose();throw;}
     }
-    public object Ingest(Guid job,IFormFile file,bool returned,Guid? explicitAsset,string user,string? note,string? collection=null)
+    public object Ingest(Guid job,IFormFile file,bool returned,Guid? explicitAsset,string user,string? note,string? collection=null,Guid? uploadId=null)
     {
         if(file.Length<=0||file.Length>100_000_000)throw new ArgumentException("Files must be between 1 byte and 100 MB.");
         if(!string.IsNullOrWhiteSpace(collection))ValidateCollection(collection);
-        Sync(job);using var memory=new MemoryStream();using(var source=file.OpenReadStream())source.CopyTo(memory);
+        Sync(job);
+        if(uploadId.HasValue)
+        {
+            using var existing=database.OpenConnection();
+            using var q=new NpgsqlCommand("select id from studio_media_unmatched where id=$1 and job_id=$2",existing);q.Parameters.AddWithValue(uploadId.Value);q.Parameters.AddWithValue(job);
+            if(q.ExecuteScalar() is Guid unmatchedId)return new{unmatched=true,id=unmatchedId,reused=true};
+        }
+        using var memory=new MemoryStream();using(var source=file.OpenReadStream())source.CopyTo(memory);
         byte[] bytes=memory.ToArray();string hash=Convert.ToHexString(SHA256.HashData(bytes));Guid? asset=explicitAsset;Guid? sourceVersion=null;
         using(var c=database.OpenConnection())
         {
@@ -235,10 +243,10 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         }
         if(returned&&asset is null)
         {
-            using var c=database.OpenConnection();using var tx=c.BeginTransaction();StudioVersionStore.LockJobForMediaChange(c,tx,job);Guid id=Guid.NewGuid();
-            string key="unmatched/"+Guid.NewGuid().ToString("N");memory.Position=0;var version=versions.Add(c,tx,job,key,file.FileName,file.ContentType,memory,user,note);
+            using var c=database.OpenConnection();using var tx=c.BeginTransaction();StudioVersionStore.LockJobForMediaChange(c,tx,job);Guid id=uploadId??Guid.NewGuid();
+            string key="unmatched/"+id.ToString("N");memory.Position=0;var version=versions.Add(c,tx,job,key,file.FileName,file.ContentType,memory,user,note);
             Execute(c,tx,"insert into studio_media_unmatched(id,job_id,staging_key,version_id,reason) values($1,$2,$3,$4,'No unique retained export identity. Select the original image.')",id,job,key,version.Id);
-            Audit(c,tx,job,"UnmatchedUpload",user,"Returned file requires manual matching.");tx.Commit();return new{unmatched=true,id};
+            CommitUploadReceipt(c,tx,uploadId,version.Id,null,true);Audit(c,tx,job,"UnmatchedUpload",user,"Returned file requires manual matching.");tx.Commit();return new{unmatched=true,id};
         }
         using(var c=database.OpenConnection())using(var tx=c.BeginTransaction())
         {
@@ -247,17 +255,17 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             {
                 using var duplicate=new NpgsqlCommand("select v.id,a.id from studio_asset_versions v join studio_media_assets a on a.job_id=v.job_id and a.asset_key=v.asset_key where v.job_id=$1 and lower(v.sha256)=lower($2) and lower(v.file_name)=lower($3) order by v.created_at_utc limit 1",c,tx);
                 duplicate.Parameters.AddWithValue(job);duplicate.Parameters.AddWithValue(hash);duplicate.Parameters.AddWithValue(Path.GetFileName(file.FileName));
-                using var reader=duplicate.ExecuteReader();if(reader.Read())return new{unmatched=false,id=reader.GetGuid(0),assetId=reader.GetGuid(1),reused=true};
+                using var reader=duplicate.ExecuteReader();if(reader.Read()){var priorVersion=reader.GetGuid(0);var priorAsset=reader.GetGuid(1);reader.Close();CommitUploadReceipt(c,tx,uploadId,priorVersion,priorAsset,false);tx.Commit();return new{unmatched=false,id=priorVersion,assetId=priorAsset,reused=true};}
             }
             string key=asset.HasValue?AssetKey(c,tx,job,asset.Value):Guid.NewGuid().ToString("D");
             Execute(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))",job.ToString("D")+":"+key);
-            if(asset.HasValue&&Scalar(c,tx,"select version_id from studio_media_returns where job_id=$1 and sha256=$2 and asset_id=$3",job,hash,asset.Value) is Guid prior)return new{unmatched=false,id=prior};
+            if(asset.HasValue&&Scalar(c,tx,"select version_id from studio_media_returns where job_id=$1 and sha256=$2 and asset_id=$3",job,hash,asset.Value) is Guid prior){CommitUploadReceipt(c,tx,uploadId,prior,asset,false);tx.Commit();return new{unmatched=false,id=prior,reused=true};}
             if(sourceVersion.HasValue && Scalar(c,tx,"select id from studio_asset_versions where job_id=$1 and asset_key=$2 order by version_number desc limit 1",job,key) is Guid latest && latest != sourceVersion.Value)
             {
-                Guid unmatched=Guid.NewGuid();string staging="unmatched/"+unmatched.ToString("N");memory.Position=0;
+                Guid unmatched=uploadId??Guid.NewGuid();string staging="unmatched/"+unmatched.ToString("N");memory.Position=0;
                 var staged=versions.Add(c,tx,job,staging,file.FileName,file.ContentType,memory,user,note,sourceVersion);
                 Execute(c,tx,"insert into studio_media_unmatched(id,job_id,staging_key,version_id,reason) values($1,$2,$3,$4,'The editing batch is older than the current version. Review and explicitly match to promote this return.')",unmatched,job,staging,staged.Id);
-                Audit(c,tx,job,"StaleEditingReturn",user,"Older editing batch requires explicit matching.");tx.Commit();return new{unmatched=true,id=unmatched};
+                CommitUploadReceipt(c,tx,uploadId,staged.Id,null,true);Audit(c,tx,job,"StaleEditingReturn",user,"Older editing batch requires explicit matching.");tx.Commit();return new{unmatched=true,id=unmatched};
             }
             // Existing immutable store serializes version counters; never overwrite its files.
             memory.Position=0;var version=versions.Add(c,tx,job,key,file.FileName,file.ContentType,memory,user,note,sourceVersion);
@@ -274,8 +282,19 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
                 }
             }
             if(asset.HasValue){Execute(c,tx,"insert into studio_media_returns values($1,$2,$3,$4)",job,hash,asset.Value,version.Id);Execute(c,tx,"update studio_media_assets set production_status='Needs Review' where id=$1",asset.Value);}
-            Audit(c,tx,job,asset.HasValue?"EditedVersionReturned":"MediaUploaded",user,Path.GetFileName(file.FileName));tx.Commit();return new{unmatched=false,id=version.Id,assetId=mediaId};
+            CommitUploadReceipt(c,tx,uploadId,version.Id,mediaId,false);Audit(c,tx,job,asset.HasValue?"EditedVersionReturned":"MediaUploaded",user,Path.GetFileName(file.FileName));tx.Commit();return new{unmatched=false,id=version.Id,assetId=mediaId};
         }
+    }
+    // Commit the receipt with immutable version metadata: a lost response can be replayed even after Job closure.
+    private static void CommitUploadReceipt(NpgsqlConnection c,NpgsqlTransaction tx,Guid? upload,Guid version,Guid? asset,bool unmatched)
+    {
+        if(upload is not Guid id)return;
+        if(asset is Guid assetId)
+        {
+            Execute(c,tx,"insert into studio_media_asset_subjects(asset_id,subject_id) select $2,(b.declaration->>'subjectId')::uuid from studio_media_upload_receipts r join studio_media_upload_batches b on b.id=r.batch_id where r.id=$1 and b.declaration->>'subjectId' is not null on conflict do nothing",id,assetId);
+            Execute(c,tx,"delete from studio_media_asset_subjects x using studio_job_subjects s where x.subject_id=s.id and x.asset_id=$2 and s.is_system and lower(s.name)='unclassified' and exists(select 1 from studio_media_upload_receipts r join studio_media_upload_batches b on b.id=r.batch_id where r.id=$1 and b.declaration->>'subjectId' is not null and (b.declaration->>'subjectId')::uuid<>s.id)",id,assetId);
+        }
+        Execute(c,tx,"update studio_media_upload_receipts set status=$2,version_id=$3,asset_id=$4,last_error=null,completed_at_utc=now() where id=$1",id,unmatched?"Unmatched":"Stored",version,asset);
     }
     public void Resolve(Guid job,Guid unmatched,Guid asset,string user)
     {
@@ -283,8 +302,9 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         string key=AssetKey(c,tx,job,asset);
         using var cmd=new NpgsqlCommand("select version_id from studio_media_unmatched where id=$1 and job_id=$2 and resolved_asset_id is null for update",c,tx);cmd.Parameters.AddWithValue(unmatched);cmd.Parameters.AddWithValue(job);
         if(cmd.ExecuteScalar() is not Guid versionId)throw new ArgumentException("Upload is already matched or missing.");
-        var original=versions.GetWithinTransaction(c,tx,job,versionId:versionId);using var stream=versions.OpenStored(original);versions.Add(c,tx,job,key,original.FileName,original.ContentType,stream,user,"Manually matched returned image",versionId);
+        var original=versions.GetWithinTransaction(c,tx,job,versionId:versionId);using var stream=versions.OpenStored(original);var promoted=versions.Add(c,tx,job,key,original.FileName,original.ContentType,stream,user,"Manually matched returned image",versionId);
         Execute(c,tx,"update studio_media_unmatched set resolved_asset_id=$2 where id=$1",unmatched,asset);Execute(c,tx,"update studio_media_assets set production_status='Needs Review' where id=$1",asset);
+        Execute(c,tx,"update studio_media_upload_receipts set status='Stored',asset_id=$2,resolved_version_id=$3 where version_id=$1",versionId,asset,promoted.Id);
         Audit(c,tx,job,"ReturnedImageMatched",user,"Unmatched upload associated with original asset.");tx.Commit();
     }
     private static string Cell(string[] row,int index)=>index<row.Length?row[index]:"";
