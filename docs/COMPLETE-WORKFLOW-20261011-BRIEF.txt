@@ -1,0 +1,655 @@
+# Aegis.Studio — Complete Workflow, Navigation, External Integration and WorkDay Implementation Brief
+
+**Repository:** `fitzroywright/Aegis.Studio`  
+**Target branch:** `main`  
+**Target completion:** Sunday, October 11, 2026  
+**Deployment environment:** Kratos (demonstration/test environment)  
+**Customer:** Brian's
+
+## 1. Primary Objective
+
+Complete Aegis.Studio as a coherent, end-to-end photography business management system, supporting the entire operational lifecycle:
+
+**Booking → Front Desk → Deposit or Override → Confirmation → Workspace Assignment → Job Ownership → Photographer Assignment → Scheduling → WorkDay → Photography → Media Upload → Production → Review → Approval → Client Gallery → Payment/Credit Authorization → Delivery → Closure.**
+
+Every stage must have:
+
+- An appropriate user interface.
+- Clearly defined responsibilities and permissions.
+- The actions necessary to complete the stage.
+- A visible status and next action.
+- Navigation to the next responsible person or department.
+- Notifications and escalation where appropriate.
+- An auditable record of significant decisions.
+
+Do not implement isolated functionality that cannot be reached through the normal application workflow.
+
+## 2. Mandatory Initial Repository Audit
+
+Before modifying code:
+
+1. Examine the existing implementation across the entire repository.
+2. Identify functionality that already exists and works.
+3. Identify incomplete, disconnected, duplicated or obsolete functionality.
+4. Compare every workflow requirement with existing pages, actions, APIs and permissions.
+5. Inspect the current WorkDay mobile application and Studio integration.
+6. Review existing workflow briefs and implementation progress documents, but treat the decisions in this brief as authoritative where they conflict.
+7. Preserve existing working functionality unless it contradicts the approved workflow.
+
+**Important:** Do not rebuild existing working components merely because they are imperfectly organized.
+
+Where earlier implementations contradict this brief, correct the implementation rather than preserving incompatible legacy behavior.
+
+## 3. Booking and Front Desk
+
+Bookings may originate from:
+
+- Brian's public website.
+- Front Desk manual entry.
+- Telephone enquiries recorded by staff.
+- Email enquiries.
+- Other authorized integration sources.
+
+Every accepted booking request must immediately create a **Pending Job**.
+
+The job must be associated with the appropriate workspace, using configured destination routing. Unmatched bookings must enter the permanent **Unassigned** workspace.
+
+The Front Desk must be able to:
+
+- View and search incoming bookings and enquiries.
+- Open the associated Pending Job.
+- Review and correct booking details.
+- Select the appropriate Work Order Template.
+- Identify the customer and requested services.
+- Review pricing and deposit requirements.
+- Send a deposit request to the customer.
+- See whether that request was sent, delivered or failed, where provider evidence is available.
+- Record and verify manually received deposits.
+- Request an Operations Manager override.
+- Confirm eligible bookings.
+- Escalate unresolved enquiries.
+- View confirmed, active, delivery and completed jobs.
+
+Sending a deposit request must actually initiate delivery through the configured messaging service. Merely changing a status to "Deposit Requested" is insufficient.
+
+Support email initially and WhatsApp where a configured provider is available.
+
+Do not pretend an external payment was verified automatically when staff recorded it manually.
+
+## 4. Booking Confirmation and Operations Manager Override
+
+A Pending Job may be confirmed only when:
+
+1. The required deposit condition is satisfied; or
+2. An authorized Operations Manager has approved an override.
+
+A Pending Job exists before either condition is satisfied.
+
+An Operations Manager override must:
+
+- Require explicit authorization.
+- Record the approving manager.
+- Record the reason.
+- Record the decision date and time.
+- Be visible in the job's history.
+- Permit the booking to proceed without falsely recording a payment.
+
+Front Desk may request an override but cannot approve its own request.
+
+### Operations Management Interface
+
+Implement or complete a dedicated **Operations Management** interface, separate from technical Studio Administration.
+
+It must include:
+
+- Pending booking override requests.
+- Operational escalations.
+- Unassigned jobs requiring intervention.
+- Overdue assignments.
+- Jobs with unresolved ownership.
+- Workflow exceptions requiring management decisions.
+- Approval and rejection actions with audit history.
+
+All relevant actions must navigate directly to the affected job or request.
+
+## 5. Workspace Assignment and Job Ownership
+
+After confirmation, the job enters **Needs Assignment**.
+
+The responsible Workspace Manager must automatically receive visibility and notification.
+
+The Workspace Manager may:
+
+- Assign a Job Owner.
+- Reassign a Job Owner.
+- Monitor progress.
+- Schedule sessions.
+- Assign photographers.
+- Intervene when the Job Owner fails to act.
+
+The Job Owner may:
+
+- Coordinate the job.
+- Assign photographers.
+- Schedule sessions.
+- Manage operational details.
+- Monitor deliverables and deadlines.
+- Communicate with relevant participants.
+
+The Workspace Manager and Job Owner may be the same person.
+
+Permissions must remain role-based rather than relying on different people occupying the roles.
+
+If both responsibilities belong to one person and required actions become overdue, escalation must proceed to the Operations Manager.
+
+Implement assignment acceptance, decline, reassignment and associated notifications where required by the workflow.
+
+## 6. Scheduling and Photographer Assignment
+
+Studio remains authoritative for scheduling.
+
+Support:
+
+- Multiple sessions per job.
+- Multiple photographers per session.
+- Lead and additional photographer roles.
+- Photographer availability and leave.
+- Resource and equipment reservations.
+- Schedule conflict prevention.
+- Rescheduling.
+- Assignment notifications.
+- Assignment acceptance or decline.
+- Manual recording of responses received by telephone or email.
+
+Both the Job Owner and Workspace Manager may perform scheduling and photographer assignment.
+
+Scheduling must not depend on the WorkDay mobile application being online.
+
+A declined assignment must return to the appropriate Job Owner and Workspace Manager for resolution.
+
+Do not allow incompatible resource or photographer reservations.
+
+## 7. WorkDay — Mandatory Sunday Delivery
+
+### Purpose
+
+WorkDay is a dedicated Android/iOS mobile application for **photographers only**.
+
+It is not a second Studio installation.
+
+Studio remains the authoritative system for jobs, schedules, assignments and workflow status.
+
+WorkDay communicates with Studio through authenticated APIs.
+
+### Required Mobile Functionality
+
+Photographers must be able to:
+
+1. Sign in securely.
+2. View their assignments.
+3. View today's and upcoming sessions.
+4. Open assignment details.
+5. See job, session, time, location, instructions and contact information permitted by their role.
+6. Accept or decline assignments.
+7. Provide a reason when declining.
+8. View and update availability and leave.
+9. Report arrival at an assignment.
+10. Report when a photography session starts.
+11. Report when a photography session finishes.
+12. Add operational notes or report a problem.
+13. Synchronize relevant changes with Studio.
+14. Continue essential assignment reporting while temporarily offline.
+
+Offline operations must be queued safely and synchronized when connectivity returns.
+
+Duplicate synchronization must not create duplicate workflow events.
+
+### Explicitly Excluded from WorkDay
+
+Do not implement the following as part of this delivery:
+
+- Photo or video uploads.
+- Production editing tasks.
+- Production approval.
+- Media gallery management.
+- General staff timekeeping or payroll clock-in/clock-out.
+
+Photographers will upload media using Studio.
+
+Production staff will perform their work using Studio.
+
+Existing code supporting excluded functions should be assessed before removal. Preserve reusable services and avoid destructive changes.
+
+### Required Studio Integration
+
+Studio must receive and display WorkDay updates, including:
+
+- Assignment acceptance and decline.
+- Availability changes.
+- Arrival.
+- Session start.
+- Session completion.
+- Problems or operational notes.
+- Synchronization status where relevant.
+
+The Job Owner and Workspace Manager must see the appropriate updates without manually reconstructing the photographer's activity.
+
+When all required photography sessions are completed, the workflow must transition appropriately toward **Awaiting Upload**.
+
+Do not confuse WorkDay attendance or general work sessions with actual photography session lifecycle events.
+
+### WorkDay Management Inside Studio
+
+Review and complete existing WorkDay management interfaces.
+
+They should provide:
+
+- Photographer enrollment and access management.
+- Device/session revocation.
+- Assignment and synchronization visibility.
+- Operational exceptions.
+- Photographer availability.
+- Relevant management diagnostics.
+
+Use the Today design system for Studio's management pages.
+
+### Sunday Acceptance Requirement
+
+Build and validate the mobile application and its Studio integration.
+
+At minimum, demonstrate:
+
+**Studio assigns photographer → WorkDay receives assignment → Photographer accepts → Photographer starts session → Photographer completes session → Studio records completion and advances the workflow correctly.**
+
+Also verify decline/reassignment and offline synchronization.
+
+Document any platform or physical-device verification that cannot be completed. Do not claim device acceptance based solely on successful compilation.
+
+## 8. Media Upload and Handoff
+
+All media uploads occur through Studio.
+
+Authorized photographers and production staff may upload media.
+
+Media may arrive:
+
+- From different photographers.
+- At different times.
+- From separate devices.
+- From production staff.
+- From external sources handled by authorized staff.
+
+Support immediate upload into the correct Workspace, Job, Collection and Subject structure.
+
+Maintain the **Unclassified** collection for material that has not yet been classified.
+
+Require:
+
+- Reliable upload completion reporting.
+- Media identity and provenance.
+- Version preservation.
+- Thumbnail and preview generation.
+- Retry and failure handling.
+- Clear upload progress.
+- No silent overwriting of originals.
+
+The Job Owner and Workspace Manager must be able to identify outstanding media and overdue submissions.
+
+Media must be explicitly submitted for the next review or production stage. Merely uploading files must not imply approval.
+
+## 9. Production Management
+
+Production work takes place entirely within Studio.
+
+The Production Manager controls production assignments and resource allocation.
+
+The Production Manager may also personally perform production work.
+
+The Job Owner retains visibility and may raise concerns or request escalation but cannot override production assignments without the appropriate production permissions.
+
+If the Job Owner and Production Manager are the same person, the system must support both roles without duplicating the job or requiring artificial handoffs.
+
+The Production interface must provide:
+
+- Work awaiting production intake.
+- Required deliverables.
+- Available media.
+- Assigned production tasks.
+- Staff assignments.
+- Deadlines and priorities.
+- Work in progress.
+- Blocked tasks.
+- Completed work awaiting review.
+- Revisions and rework.
+
+Production must operate on explicit work items, not merely informal chat messages.
+
+## 10. Review and Approval
+
+The Production Manager has final technical approval authority.
+
+The Job Owner may review results and raise concerns.
+
+Support:
+
+- Explicit review submissions.
+- Exact media/version identification.
+- Reviewer decisions.
+- Approval.
+- Rejection or requested changes.
+- Revision tasks.
+- Resubmission.
+- Approval history.
+- Audit records.
+
+Approval must apply to identifiable media versions and deliverables.
+
+Do not automatically approve material merely because files were uploaded or tasks were marked complete.
+
+Only approved deliverables may proceed to final publishing.
+
+## 11. Client Galleries and Selections
+
+Implement controlled publication of client galleries.
+
+Customers may view proofs and select photographs before final payment.
+
+Proofs must use reduced-resolution images with visible watermarks.
+
+Do not expose original-resolution files through proof endpoints.
+
+Support:
+
+- Gallery publication.
+- Customer access.
+- Photo selection.
+- Selection submission.
+- Relevant customer approval.
+- Controlled final delivery.
+- Expiring or revocable access where appropriate.
+
+Final download authorization must be enforced by the server, not merely by hiding buttons.
+
+## 12. Payment, Finance Override and Delivery
+
+Final deliverables may be released only when:
+
+1. The required balance has been settled; or
+2. Finance has approved contractual credit terms or a specific delivery authorization.
+
+The Finance Manager, not the Operations Manager, owns credit authorization.
+
+Finance authorization must record:
+
+- Customer and job.
+- Approved credit terms.
+- Authorized amount or scope.
+- Payment due date.
+- Approving person.
+- Reason or contractual reference.
+- Approval timestamp.
+- Audit history.
+
+A finance authorization does not mean the customer has paid.
+
+Outstanding receivables must remain visible to Finance after delivery.
+
+Operational job completion and financial settlement are separate states.
+
+A job may be operationally completed while an approved contractual receivable remains outstanding.
+
+## 13. Job Closure and Reopening
+
+A job may close when its required operational deliverables and approvals are complete.
+
+Closure must preserve:
+
+- Job history.
+- Assignment history.
+- Workflow transitions.
+- Production decisions.
+- Delivery evidence.
+- Financial status.
+- Audit records.
+
+An Operations Manager may authorize a controlled reopening with a recorded reason.
+
+Closed jobs must not be silently modified through legacy APIs or alternate screens.
+
+## 14. Public Website Integration
+
+Provide a stable, documented **REST API over HTTPS using JSON**, beginning with `/api/public/v1`.
+
+The public API must support two primary integration areas:
+
+### Booking Integration
+
+- Submit a booking or enquiry.
+- Return a stable reference.
+- Prevent accidental duplicate submission.
+- Track the booking's externally permitted status.
+- Receive appropriate booking updates.
+
+### Gallery Integration
+
+- Retrieve authorized published gallery information.
+- Display proof images.
+- Submit customer selections.
+- Retrieve permitted selection state.
+- Obtain authorized final delivery access.
+
+The public API must never expose Studio's internal management operations.
+
+### API Contract Stability
+
+Treat version 1 as a formal backward-compatible contract.
+
+Require:
+
+- OpenAPI documentation.
+- Defined request and response schemas.
+- Explicit authentication and authorization.
+- Stable identifiers.
+- Standardized error responses.
+- Pagination where needed.
+- Idempotency for sensitive operations.
+- Rate limiting.
+- Automated contract compatibility tests.
+- Deprecation and versioning policy.
+
+Internal Studio changes must not silently break external consumers.
+
+### Webhooks
+
+Support configurable webhooks for events such as:
+
+- Booking received.
+- Booking confirmed.
+- Gallery published.
+- Gallery updated.
+- Final delivery available.
+
+Use signed webhook payloads, delivery retries and replay protection.
+
+Webhook destinations and credentials must be configured per Studio installation.
+
+For now, implement for Brian's private installation.
+
+**Do not build a SaaS platform or unnecessary multi-tenant infrastructure as part of this brief.**
+
+## 15. Reference Website
+
+Provide a small working reference website demonstrating the public API.
+
+It must:
+
+- Submit a booking.
+- Show a booking confirmation/reference.
+- Open an authorized customer gallery.
+- Display watermarked proofs.
+- Allow customer selections.
+- Demonstrate authorized final downloads.
+
+The reference website must use the public V1 API exclusively.
+
+It must not call private Studio endpoints or access the Studio database directly.
+
+The reference implementation is intended to help Brian's website developers integrate without depending on Studio's internal UI or implementation.
+
+## 16. Navigation and Action Consistency
+
+This is a mandatory acceptance requirement.
+
+The application's navigation must reflect the approved business workflow.
+
+Audit and correct:
+
+- Today.
+- Front Desk.
+- Operations Management.
+- Workspaces.
+- Jobs.
+- Job Details.
+- Scheduling and Calendar.
+- WorkDay Management.
+- Media.
+- Production.
+- Messages.
+- Finance and Billing.
+- Galleries.
+- Delivery.
+- Studio Administration.
+
+Every action must:
+
+- Be visible to the appropriate authorized role.
+- Appear in the relevant operational context.
+- Lead to the correct destination.
+- Respect workflow state and permissions.
+- Provide appropriate success or failure feedback.
+- Update relevant views.
+- Avoid duplicate or conflicting action paths.
+
+The user's next required action should be discoverable without navigating through unrelated administration pages.
+
+Preserve Navigation History and direct links to the relevant job.
+
+Remove dead links, duplicate controls and obsolete navigation that contradict the workflow.
+
+## 17. Mandatory Today UI Standard
+
+All Studio web pages must respect the approved Today design language:
+
+- Dark blue header.
+- Orange horizontal divider.
+- Brown footer.
+- Compact information density.
+- Navigation History.
+- Consistent left and right rails where applicable.
+- Consistent grid behavior.
+- Appropriate status pills.
+- Speed-bump row highlighting.
+- Grid row counts in the footer.
+- No unnecessary page-level scrolling.
+- Internal scrolling within grids and cards.
+- No sidebars.
+- Standard, Light and Dark theme options.
+
+Preserve the existing approved visual appearance wherever possible.
+
+**Do not accumulate CSS or JavaScript overrides to disguise obsolete implementations.**
+
+Replace superseded rules and code at their original source.
+
+Avoid duplicate event handlers, duplicate initialization, competing CSS selectors and obsolete scripts.
+
+No fake controls, nonfunctional buttons or decorative actions that imply unsupported functionality.
+
+## 18. Testing and Verification
+
+Implement tests covering:
+
+- Booking intake and Pending Job creation.
+- Deposit requests and delivery reporting.
+- Deposit verification.
+- Operations Manager overrides.
+- Workspace assignment.
+- Job Owner acceptance and reassignment.
+- Multiple photographer scheduling.
+- Resource conflicts.
+- WorkDay assignment acceptance and decline.
+- WorkDay session reporting.
+- Offline synchronization.
+- Media upload and versioning.
+- Production dispatch.
+- Review and approval.
+- Gallery publication.
+- Client selection.
+- Payment and Finance authorization.
+- Final delivery restrictions.
+- Job closure and reopening.
+- Public API compatibility.
+- Webhook delivery.
+- Role-based navigation and action visibility.
+
+Test the complete workflow using representative demo data.
+
+Include tests where one person holds multiple roles.
+
+Verify that unauthorized users cannot bypass workflow rules through direct API calls.
+
+## 19. Implementation and Delivery Rules
+
+1. Use a dedicated implementation branch with regular checkpoint commits.
+2. Preserve existing working functionality.
+3. Do not perform destructive database resets.
+4. Do not modify production customer or payment records.
+5. Use the existing storage, security, messaging and deployment infrastructure.
+6. Prefer local restore, build, test and deployment verification.
+7. Do not use cloud build loops unnecessarily.
+8. Avoid broad rewrites where targeted changes are sufficient.
+9. Maintain accurate progress and recovery documentation.
+10. Verify functionality before merging into `main`.
+11. Do not merge known failing or incomplete changes.
+12. Do not deploy unverified changes into a production environment.
+13. Document any tests that were skipped or could not run.
+14. Preserve compatibility with the existing Kratos deployment process.
+
+Do not stop for routine commentary or approval between ordinary implementation steps. Stop when a decision is required to prevent data loss, security compromise, incompatible public API changes or significant regression.
+
+## 20. Final Deliverables
+
+The implementation must produce:
+
+1. A connected Studio workflow from booking through closure.
+2. Correct navigation and operational actions for every participating role.
+3. Functional Operations Manager and Finance approval paths.
+4. Functional photographer-only WorkDay mobile application.
+5. Verified Studio–WorkDay integration.
+6. Complete Studio-based media and production workflow.
+7. Stable Public REST API V1.
+8. Working booking and gallery reference website.
+9. Automated workflow, authorization and API contract tests.
+10. Updated technical and operational documentation.
+11. A final implementation and acceptance report.
+
+The report must distinguish:
+
+- Implemented and verified.
+- Implemented but awaiting device or environment testing.
+- Incomplete.
+- Blocked, with the reason and next action.
+
+## 21. Definition of Done
+
+The implementation is complete only when a representative booking can travel through the entire approved workflow without manual database intervention, hidden administrative shortcuts or disconnected interfaces.
+
+A photographer must be able to receive an assignment in WorkDay, respond, report session progress and have Studio reflect the result.
+
+Production must be able to complete its responsibilities entirely within Studio.
+
+The external reference website must be able to book jobs and interact with published customer galleries using only the stable V1 API.
+
+**WorkDay readiness is a mandatory Sunday objective, not a deferred enhancement.**
+
+The final goal is an integrated, testable Brian's operational system ready for supervised real-world acceptance testing, rather than a collection of individually functional pages.
