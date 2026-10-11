@@ -157,7 +157,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             header.className='job-detail-heading';
             header.innerHTML=`<div class="job-detail-title"><h1>${esc(job.title)}</h1><p>${esc(job.eventDate?new Date(job.eventDate.includes('T')?job.eventDate:job.eventDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'2-digit',year:'numeric'}).replaceAll(',',''):'Needs scheduling')} · <span data-job-owner>Owner: ${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</span></p></div>
                 <div class="jd-job-status"><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show flow details">${esc(job.status)}</button><small>${esc(job.jobCode||job.code||'')}</small></div>
-                <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol><div class="jd-flow-actions"><button type="button" class="jd-link" data-toggle-flow-details aria-expanded="false" aria-controls="jobFlowDrawer">Details ↓</button><button type="button" class="jd-link" data-job-workflow>Assignments &amp; Workflow →</button></div></div>
+                <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol><div class="jd-flow-actions"><button type="button" class="jd-link jd-flow-toggle" data-toggle-flow-details aria-expanded="false" aria-controls="jobFlowDrawer" aria-label="Expand flow details" title="Expand flow details"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button><button type="button" class="jd-link" data-job-workflow>Assignments &amp; Workflow →</button></div></div>
                 <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow details" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-flow-toolbar"><strong>Flow details</strong><button type="button" class="jd-link" data-close-job-flow>Close ↑</button></div><div class="jd-workflow-track" aria-live="polite"></div></div></section>
                 <div class="jd-workflow-caption"><span data-stage-age></span><span data-job-blocked></span></div>`;
             const flowToggle=header.querySelector('.jd-status-pill'),detailsToggle=header.querySelector('[data-toggle-flow-details]'),flowDrawer=header.querySelector('.jd-flow-drawer');
@@ -166,7 +166,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 flowToggle.setAttribute('aria-expanded',String(open));
                 flowToggle.title=open?'Hide flow details':'Show flow details';
                 detailsToggle.setAttribute('aria-expanded',String(open));
-                detailsToggle.textContent=open?'Details ↑':'Details ↓';
+                detailsToggle.setAttribute('aria-label',open?'Collapse flow details':'Expand flow details');
+                detailsToggle.title=open?'Collapse flow details':'Expand flow details';
                 flowDrawer.classList.toggle('is-open',open);
                 flowDrawer.setAttribute('aria-hidden',String(!open));
                 flowDrawer.toggleAttribute('inert',!open);
