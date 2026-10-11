@@ -3,18 +3,32 @@
  'use strict';
  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const put=(url,body)=>json(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- const phases=['Booking','Assigned','Shoot','Production','Review','Delivery'];
- function phaseIndex(data){
-  const stage=data.stage;
-  if(stage==='Changes Requested')return data.correctionKind==='Production'?3:2;
-  return ({Pending:0,'Needs Assignment':1,'Needs Photographer Assignment':1,'Awaiting Scheduling':2,Scheduled:2,'Photography In Progress':2,'Awaiting Upload':2,'Awaiting Production Review':3,'Active Production':3,'Awaiting Approval':4,'Ready for Delivery':5,Delivered:5,Completed:6})[stage]??-1;
- }
+ // Job stages stay aligned with WorkflowRules; milestones read existing session facts.
+ const phases=['Pending','Needs Assignment','Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload','Awaiting Production Review','Active Production','Awaiting Approval','Ready for Delivery','Delivered','Completed','Changes Requested','Cancelled','Blocked'];
+ const photographyStages=new Set(['Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload']);
+ function phaseIndex(data){return phases.indexOf(data.stage);}
  function workflow(host,data,job={},view={},activate=null){
-  const active=phaseIndex(data),next=root.StudioWorkflow?.nextAction({...view,data});
+  const next=root.StudioWorkflow?.nextAction({...view,data}),sessions=(data.sessions||[]).filter(s=>s.required!==false);
   const noShoot=/print|edit/i.test(job.jobType||job.type||'')&&!(data.sessions||[]).length;
-  host.innerHTML=phases.map((label,index)=>`<button type="button" class="jd-stage ${index===2&&noShoot?'skipped':active<0?'':index<active?'complete':index===active?'current':''}"><span class="jd-stage-light" aria-hidden="true">${index===2&&noShoot?'–':active>=0&&index<active?'✓':''}</span><span>${index===2&&noShoot?'No shoot':label}</span></button>`).join('');
-  host.setAttribute('aria-label','Job workflow: '+data.stage);
-  host.querySelectorAll('.jd-stage').forEach((b,i)=>{b.setAttribute('aria-label',i===active?(next?.label||data.stage):phases[i]+' workflow details');b.onclick=()=>activate?activate(i===active?next?.selector:null):root.StudioWorkflow?.open(job.id,i===active?next?.selector:null);});
+  const crewAssigned=sessions.length>0&&sessions.every(s=>s.crew_finalized&&(s.crew||[]).length>0);
+  const shootComplete=sessions.length>0&&sessions.every(s=>s.shoot?.checked_out_at_utc&&s.shoot.status!=='Cancelled');
+  const visited=new Set((data.history||[]).filter(h=>h.exited_at_utc).map(h=>h.new_stage));
+  const labels=phases.includes(data.stage)?phases:[...phases,data.stage];
+  host.innerHTML=labels.map(label=>{
+   const skipped=noShoot&&photographyStages.has(label),current=label===data.stage||(label==='Blocked'&&!!data.blockedReason);
+   const milestone=label==='Photographer Assigned'||label==='Shoot Complete';
+   const complete=label==='Photographer Assigned'?crewAssigned:label==='Shoot Complete'?shootComplete:visited.has(label);
+   const state=skipped?'skipped':current?(label==='Cancelled'||label==='Changes Requested'||label==='Blocked'?'current exception':'current'):complete?'complete':'pending';
+   const description=skipped?'Not required':current?'Current':complete?(milestone?'Confirmed':'Previously completed'):'Not reached';
+   return `<button type="button" class="jd-stage ${state}" data-flow-stage="${escape(label)}" title="${escape(label+' · '+description)}" ${label===data.stage?'aria-current="step"':''}><span class="jd-stage-light" aria-hidden="true">${skipped?'–':current&&state.includes('exception')?'!':complete&&!current?'✓':''}</span><span>${escape(label)}${skipped?' <small>Not required</small>':''}</span></button>`;
+  }).join('');
+  host.setAttribute('aria-label','Job workflow: '+data.stage+(data.blockedReason?' · Blocked: '+data.blockedReason:''));
+  host.querySelectorAll('.jd-stage').forEach(button=>{
+   const label=button.dataset.flowStage,current=label===data.stage;
+   const selector=current?next?.selector:label==='Blocked'&&data.blockedReason&&view.canManage?'[data-wf-block]':null;
+   button.setAttribute('aria-label',current?(next?.label||data.stage):button.title+' · View workflow details');
+   button.onclick=()=>activate?activate(selector):root.StudioWorkflow?.open(job.id,selector);
+  });
  }
  async function media(job,host,selectedHost,isCurrent,onCounts){
   let disposed=false,request=0,selectedId='',data=null,canEdit=false,uploading=false,search='',list=false;

@@ -22,15 +22,18 @@
 .jd-job-status { display:flex; flex-direction:column; align-items:flex-end; gap:5px; font-size:10px; }
 .jd-status-pill { padding:4px 12px; border-radius:20px; background:#d2eedb; color:#204d34; font-weight:700; max-width:210px; text-align:center; }
 .jd-job-status small { color:var(--theme-muted,#7c8493); }
-.jd-workflow-track { grid-column:1/-1; display:flex; padding:9px 10px 0; min-width:0; }
-.jd-stage { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; gap:5px; text-align:center; font-size:10px; line-height:1.2; min-width:0; }
-.jd-stage::before { content:''; position:absolute; left:-50%; right:50%; top:12px; height:3px; background:#d4d6db; }
-.jd-stage:first-child::before { display:none; }
-.jd-stage.complete::before,.jd-stage.current::before { background:#318348; }
-.jd-stage-light { z-index:1; flex:none; width:25px; height:25px; display:grid; place-items:center; border:1px solid #a5abba; border-radius:50%; background:#e8e9ec; color:#fff; font-size:15px; }
+.jd-workflow-track { grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fit,minmax(105px,1fr)); gap:5px 8px; padding:8px 0 0; min-width:0; }
+button.jd-stage { display:flex; align-items:center; gap:5px; min-width:0; min-height:32px; padding:4px 5px; border:1px solid var(--theme-border,#dedbd4); border-radius:4px; background:var(--theme-surface,#fff); color:var(--theme-muted,#69758b); font-size:10px; line-height:1.15; text-align:left; cursor:pointer; box-shadow:none; }
+.jd-stage-light { flex:none; width:18px; height:18px; display:grid; place-items:center; border:1px solid #a5abba; border-radius:50%; background:#e8e9ec; color:#fff; font-size:11px; }
+.jd-stage.complete { color:var(--theme-text,#162b50); }
 .jd-stage.complete .jd-stage-light { background:#318348; border-color:#318348; }
-.jd-stage.current .jd-stage-light { background:#fb851c; border-color:#fff; outline:1px solid #ed6810; }
-.jd-stage.current { font-weight:750; }
+.jd-stage.current { font-weight:750; border-color:#ed7010; color:var(--theme-text,#162b50); }
+.jd-stage.current .jd-stage-light { background:#fb851c; border-color:#fb851c; }
+.jd-stage.exception { border-color:#bd3040; }
+.jd-stage.exception .jd-stage-light { background:#bd3040; border-color:#bd3040; }
+.jd-stage.skipped .jd-stage-light { background:transparent; color:var(--theme-muted,#69758b); }
+.jd-stage small { display:block; font-size:9px; }
+button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-workflow-caption { grid-column:1/-1; display:flex; align-items:center; flex-wrap:wrap; gap:5px 12px; font-size:10px; color:#b4510f; }
 .jd-workflow-caption [data-job-blocked] { color:#bd3040; }
 .jd-workflow-caption .jd-link { margin-left:auto; }
@@ -123,8 +126,4 @@
 .job-detail-workflow-dialog .workflow-panel { margin:0; overflow:visible; }
 @media(max-width:1200px) { .jd-drop-hint { display:none; } .jd-contact-sheet { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr) 230px; } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-job-status { max-width:110px; } .jd-workflow-track { padding:6px 0 0; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } .job-detail-facts { grid-template-columns:1fr; } }
-@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:4; grid-template-rows:minmax(0,1fr); } .job-detail-selected-file,.jd-attention { display:none; } .job-detail-heading { padding:7px; gap:5px; } .jd-job-status { display:none; } .jd-stage { font-size:8px; } .jd-stage-light { width:20px; height:20px; font-size:12px; } .jd-stage::before { top:9px; } .job-detail-navigation button { padding:6px 2px; font-size:9px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
-
-/* Workflow actions retain the existing compact phase track. */
-button.jd-stage{background:transparent;border:0;font:inherit;color:inherit;cursor:pointer;text-align:inherit;padding:0;}
-button.jd-stage:focus-visible{outline:2px solid #d97827;outline-offset:3px;}
+@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:4; grid-template-rows:minmax(0,1fr); } .job-detail-selected-file,.jd-attention { display:none; } .job-detail-heading { padding:7px; gap:5px; } .jd-job-status { display:none; } .jd-workflow-track { grid-template-columns:repeat(3,minmax(0,1fr)); max-height:150px; overflow:auto; } .job-detail-navigation button { padding:6px 2px; font-size:9px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
