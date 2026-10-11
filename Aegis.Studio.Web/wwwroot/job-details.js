@@ -4,7 +4,7 @@
  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const put=(url,body)=>json(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
  // Job stages stay aligned with WorkflowRules; milestones read existing session facts.
- const phases=['Pending','Needs Assignment','Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload','Awaiting Production Review','Active Production','Awaiting Approval','Ready for Delivery','Delivered','Completed','Changes Requested','Cancelled','Blocked'];
+ const phases=['Pending','Needs Assignment','Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload','Awaiting Production Review','Active Production','Awaiting Approval','Ready for Delivery','Delivered','Completed','Changes Requested','Cancelled','Blocked','Reshoot Required'];
  const photographyStages=new Set(['Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload']);
  function phaseIndex(data){return phases.indexOf(data.stage);}
  function workflow(host,data,job={},view={},activate=null){
@@ -13,19 +13,43 @@
   const crewAssigned=sessions.length>0&&sessions.every(s=>s.crew_finalized&&(s.crew||[]).length>0);
   const shootComplete=sessions.length>0&&sessions.every(s=>s.shoot?.checked_out_at_utc&&s.shoot.status!=='Cancelled');
   const visited=new Set((data.history||[]).filter(h=>h.exited_at_utc).map(h=>h.new_stage));
-  const labels=phases.includes(data.stage)?phases:[...phases,data.stage];
-  host.innerHTML=labels.map(label=>{
-   const skipped=noShoot&&photographyStages.has(label),current=label===data.stage||(label==='Blocked'&&!!data.blockedReason);
+  const reshoot=sessions.some(s=>s.shoot?.reshoot_required)||(data.outstandingRoster||[]).some(s=>s.status==='Needs Retake');
+  const groups=[['Booking',['Pending']],['Assignment',['Needs Assignment','Needs Photographer Assignment','Photographer Assigned']],['Shoot',['Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete']],['Upload',['Awaiting Upload','Awaiting Production Review']],['Production',['Active Production','Awaiting Approval']],['Delivery',['Ready for Delivery','Delivered','Completed']]];
+  const positions=new Map();groups.forEach(([,labels],column)=>labels.forEach((label,row)=>positions.set(label,{x:column*170+18,y:32+row*25})));
+  [['Cancelled',1],['Reshoot Required',2],['Changes Requested',4],['Blocked',5]].forEach(([label,column])=>positions.set(label,{x:column*170+18,y:151}));
+  if(!positions.has(data.stage))positions.set(data.stage,{x:18,y:151});
+  const labels=[...positions.keys()];
+  const nodes=labels.map(label=>{
+   const skipped=noShoot&&(photographyStages.has(label)||label==='Reshoot Required'),current=label===data.stage||(label==='Blocked'&&!!data.blockedReason)||(label==='Reshoot Required'&&reshoot);
    const milestone=label==='Photographer Assigned'||label==='Shoot Complete';
    const complete=label==='Photographer Assigned'?crewAssigned:label==='Shoot Complete'?shootComplete:visited.has(label);
-   const state=skipped?'skipped':current?(label==='Cancelled'||label==='Changes Requested'||label==='Blocked'?'current exception':'current'):complete?'complete':'pending';
+   const state=skipped?'skipped':current?(label==='Cancelled'||label==='Changes Requested'||label==='Blocked'||label==='Reshoot Required'?'current exception':'current'):complete?'complete':'pending';
    const description=skipped?'Not required':current?'Current':complete?(milestone?'Confirmed':'Previously completed'):'Not reached';
-   return `<button type="button" class="jd-stage ${state}" data-flow-stage="${escape(label)}" title="${escape(label+' · '+description)}" ${label===data.stage?'aria-current="step"':''}><span class="jd-stage-light" aria-hidden="true">${skipped?'–':current&&state.includes('exception')?'!':complete&&!current?'✓':''}</span><span>${escape(label)}${skipped?' <small>Not required</small>':''}</span></button>`;
+   const point=positions.get(label);
+   return `<button type="button" style="left:${point.x-9}px;top:${point.y-9}px" class="jd-stage ${state}" data-flow-stage="${escape(label)}" title="${escape(label+' · '+description)}" ${label===data.stage?'aria-current="step"':''}><span class="jd-stage-light" aria-hidden="true">${skipped?'–':current&&state.includes('exception')?'!':complete&&!current?'✓':''}</span><span>${escape(label)}${skipped?' <small>Not required</small>':''}</span></button>`;
   }).join('');
+  const edge=(from,to,kind='main',returning=false)=>{
+   const a=positions.get(from),b=positions.get(to);if(!a||!b)return '';
+   const recorded=hostStageComplete(from)&&hostStageComplete(to),highlight=kind!=='main'&&(to===data.stage||(to==='Blocked'&&data.blockedReason)||(to==='Reshoot Required'&&reshoot));
+   let path;
+   if(kind==='main'&&a.x===b.x)path=`M ${a.x} ${a.y} L ${b.x} ${b.y}`;
+   else if(kind==='main')path=`M ${a.x} ${a.y} L ${a.x} 115 Q ${a.x} 124 ${a.x+9} 124 L ${b.x-32} 124 Q ${b.x-41} 124 ${b.x-41} 115 L ${b.x-41} ${b.y+9} Q ${b.x-41} ${b.y} ${b.x-32} ${b.y} L ${b.x} ${b.y}`;
+   else {const lane=returning?(kind==='reshoot'?181:176):({correction:132,reshoot:137,cancel:142,block:147}[kind]||137);path=`M ${a.x} ${a.y} C ${a.x-14} ${a.y+14} ${a.x-14} ${lane} ${a.x} ${lane} L ${b.x} ${lane} C ${b.x+14} ${lane} ${b.x+14} ${b.y+14} ${b.x} ${b.y}`;}
+   return `<path data-flow-edge="${escape(from+' → '+to)}" class="jd-flow-edge ${kind} ${highlight?'attention':recorded?'recorded':''}" d="${path}"/>`;
+  };
+  function hostStageComplete(label){return label==='Photographer Assigned'?crewAssigned:label==='Shoot Complete'?shootComplete:visited.has(label);}
+  const main=groups.flatMap(([,labels])=>labels);
+  const mainEdges=main.slice(1).map((label,index)=>edge(main[index],label)).join('');
+  const correctionEdges=(data.correctionKind? [data.correctionKind]:['Source','Production']).map(kind=>{const origin=kind==='Source'?'Awaiting Production Review':'Awaiting Approval',target=kind==='Source'?'Awaiting Production Review':'Active Production';return edge(origin,'Changes Requested','correction')+edge('Changes Requested',target,'correction',true);}).join('');
+  const previous=(data.history||[]).filter(h=>positions.has(h.new_stage)&&!['Cancelled','Blocked','Reshoot Required','Changes Requested'].includes(h.new_stage)).at(-1)?.new_stage;
+  const branchOrigin=main.includes(data.stage)?data.stage:previous||'Pending';
+  const branches=correctionEdges+edge('Shoot Complete','Reshoot Required','reshoot')+edge('Reshoot Required','Awaiting Scheduling','reshoot',true)+edge(branchOrigin,'Cancelled','cancel')+edge(branchOrigin,'Blocked','block');
+  host.innerHTML=`<div class="jd-flow-canvas"><svg class="jd-flow-lines" viewBox="0 0 1020 184" aria-hidden="true" focusable="false">${mainEdges}${branches}</svg>${groups.map(([title],index)=>`<strong class="jd-flow-heading" style="left:${index*170+9}px">${title}</strong>`).join('')}${nodes}</div>`;
   host.setAttribute('aria-label','Job workflow: '+data.stage+(data.blockedReason?' · Blocked: '+data.blockedReason:''));
+  const focusPoint=positions.get(data.stage);if(focusPoint&&host.clientWidth)host.scrollLeft=Math.max(0,focusPoint.x-host.clientWidth/2);
   host.querySelectorAll('.jd-stage').forEach(button=>{
    const label=button.dataset.flowStage,current=label===data.stage;
-   const selector=current?next?.selector:label==='Blocked'&&data.blockedReason&&view.canManage?'[data-wf-block]':null;
+   const selector=current?next?.selector:label==='Blocked'&&data.blockedReason&&view.canManage?'[data-wf-block]':label==='Reshoot Required'&&reshoot&&view.canManage&&data.ownerAssignment?.status==='Accepted'&&['Scheduled','Photography In Progress','Awaiting Upload'].includes(data.stage)&&(data.outstandingRoster||[]).length?'[data-wf-remainder]':null;
    button.setAttribute('aria-label',current?(next?.label||data.stage):button.title+' · View workflow details');
    button.onclick=()=>activate?activate(selector):root.StudioWorkflow?.open(job.id,selector);
   });
