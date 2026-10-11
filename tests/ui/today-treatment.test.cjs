@@ -14,7 +14,7 @@ async function setup(t){
 test('converted routes keep a single Today board, three information cards and real controls',async t=>{
  const {w,errors}=await setup(t);
  for(const view of ['messages','catalog','job-templates','work-order-templates','production','pipeline','schedule','finance','management','reports','studio-management','admin']){
-  await w.studioNavigate(view);assert.equal(w.document.body.dataset.studioView,view);assert.equal(w.document.querySelectorAll('#genericView .st-page').length,1,view);assert.equal(w.document.querySelectorAll('.st-right>.st-card').length,3,view);assert.equal(w.document.querySelector('.production-side'),null);
+  await w.studioNavigate(view);assert.equal(w.document.body.dataset.studioView,view);assert.equal(w.document.querySelectorAll('#genericView .st-page').length,1,view);assert.equal(w.document.querySelectorAll('.st-right>section').length,3,view);assert.equal(w.document.querySelector('.production-side'),null);
  }
  assert.ok(w.document.querySelector('#workspaceName'));assert.ok(w.document.querySelector('[data-load-demo]'));
  await w.studioNavigate('schedule');assert.ok(w.document.querySelector('#scheduleEntryForm'));assert.ok(w.document.querySelector('#pipelineJobFilter'));

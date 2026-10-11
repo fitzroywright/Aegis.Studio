@@ -3,7 +3,7 @@ const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
 function setup(scripts=['management.js']){
  const dom=new JSDOM('<main id="genericView"></main><div id="conversationView"></div>',{url:'https://studio.test',runScripts:'outside-only'}),w=dom.window;
  Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),activateNavigation(){},esc:s=>String(s??''),money:n=>'JMD '+Number(n).toLocaleString(),studioFirstName:s=>String(s),studioRememberPeople(){},alert(){}});
- ['studio-page.js',...scripts].forEach(s=>w.eval(fs.readFileSync(path.join(root,s),'utf8')));return w;
+ ['studio-message-card.js','studio-page.js',...scripts].forEach(s=>w.eval(fs.readFileSync(path.join(root,s),'utf8')));return w;
 }
 const date=new Date().toISOString();
 const jobs=[{id:'job',workspaceId:'workspace',clientId:'client',title:'Wedding',clientName:'Carter',status:'Production',financialEvents:[{kind:'Charge',amount:100,createdAt:date},{kind:'Deposit',amount:30,createdAt:date},{kind:'Payment',amount:50,createdAt:date},{kind:'Refund',amount:-10,createdAt:date},{kind:'Discount',amount:-5,createdAt:date}]}];
