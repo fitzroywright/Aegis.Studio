@@ -106,7 +106,7 @@ public static class StudioEmployeeDirectoryEndpoints
 {
     public static void MapStudioEmployeeDirectory(this WebApplication app)
     {
-        StudioEmployeeDirectoryStore store=new(app.Services.GetRequiredService<StudioDatabase>());store.EnsureSchema();
+        StudioEmployeeDirectoryStore store=app.Services.GetRequiredService<StudioEmployeeDirectoryStore>();store.EnsureSchema();
         app.MapGet("/api/studio-employees",(bool? assignable,string? q,int? limit,bool? photographersOnly)=>Results.Ok(assignable==true?store.Search(q,limit??25,photographersOnly==true):store.GetAll())).RequireAuthorization();
         RouteGroupBuilder admin=app.MapGroup("/api/admin/studio-employees").RequireAuthorization(new AuthorizeAttribute{Roles=StudioRoleNames.Administrator});
         admin.MapGet("/",()=>Results.Ok(store.GetAll()));

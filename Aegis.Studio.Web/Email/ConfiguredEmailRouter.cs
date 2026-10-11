@@ -18,7 +18,8 @@ public sealed class ConfiguredEmailRouter : IInboundEmailRouter
         if (email.InternetHeaders.TryGetValue(RouteHeaderName, out string? routeKey) && !string.IsNullOrWhiteSpace(routeKey))
         {
             StudioWorkspaceDefinition? headerMatch = workspaces.FindByRouteKey(routeKey);
-            if (headerMatch is not null)
+            if (headerMatch is not null && email.ToAddresses.Concat(email.CcAddresses)
+                .Any(address=>string.Equals(NormalizeAddress(address),NormalizeAddress(headerMatch.EmailAddress),StringComparison.OrdinalIgnoreCase)))
             {
                 return Routed(headerMatch);
             }

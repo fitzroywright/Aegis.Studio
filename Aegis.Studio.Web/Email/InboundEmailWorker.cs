@@ -11,6 +11,7 @@ namespace Aegis.Studio.Web.Email;
 public sealed class InboundEmailWorker : BackgroundService
 {
     private readonly MicrosoftGraphMailboxClient graphClient;
+    private readonly Aegis.Studio.Web.Messaging.StudioUnifiedInbound? unifiedInbound;
     private readonly IInboundEmailRouter router;
     private readonly StudioStore store;
     private readonly StudioDatabase database;
@@ -33,9 +34,10 @@ public sealed class InboundEmailWorker : BackgroundService
         NotificationService notifications,
         AttachmentStore attachments,
         StudioOperationsFlowPublisher operationsFlows,
-        ILogger<InboundEmailWorker> logger)
+        ILogger<InboundEmailWorker> logger, Aegis.Studio.Web.Messaging.StudioUnifiedInbound? unifiedInbound = null)
     {
         this.graphClient = graphClient;
+        this.unifiedInbound = unifiedInbound;
         this.router = router;
         this.store = store;
         this.database = database;
@@ -78,10 +80,21 @@ public sealed class InboundEmailWorker : BackgroundService
                         graphEmail.Subject,
                         graphEmail.Body,
                         graphEmail.ReceivedAtUtc,
-                        graphEmail.FileAttachments.Select(a => new InboundEmailAttachment(a.FileName, a.ContentType, a.Content, a.IsInline)).ToList());
+                        graphEmail.FileAttachments.Select(a => new InboundEmailAttachment(a.FileName, a.ContentType, a.Content, a.IsInline)).ToList(), graphEmail.ProviderMessageId);
                     string correlationId = email.MessageId;
                     operationsFlows.TryEnqueueInbound(correlationId, "Mailbox");
-                    EmailRouteResult route = router.Route(email);
+                    EmailRouteResult route;
+                    try
+                    {
+                        if (unifiedInbound is not null && await unifiedInbound.TryImportAsync(email, stoppingToken)) continue;
+                        route = unifiedInbound?.FindLegacyRoute(email) ?? router.Route(email);
+                    }
+                    catch(InvalidOperationException ex)
+                    {
+                        unroutedStore.Capture(email,ex.Message);
+                        logger.LogWarning("Inbound email {MessageId} is retained for controlled handling",email.MessageId);
+                        continue;
+                    }
                     if (!route.IsRouted)
                     {
                         UnroutedEmail captured = unroutedStore.Capture(email, route.FailureReason ?? "No route was resolved.");
@@ -112,7 +125,7 @@ public sealed class InboundEmailWorker : BackgroundService
                     {
                         attachmentIndex++;
                         string contentHash = Convert.ToHexString(SHA256.HashData(attachment.Content)).ToLowerInvariant();
-                        string sourceKey = $"graph:{email.MessageId}:{attachment.FileName}:{contentHash}";
+                        string sourceKey = $"graph:{email.ProviderMessageId ?? email.MessageId}:{attachment.FileName}:{contentHash}";
                         string attachmentCorrelation = $"{email.MessageId}:attachment:{attachmentIndex}";
 
                         operationsFlows.TryEnqueueAttachment(

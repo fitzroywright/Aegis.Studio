@@ -153,7 +153,7 @@ public sealed class UserProfileStore
 
     private static string? NormalizeClock(string? value) => string.IsNullOrWhiteSpace(value) ? null : TimeOnly.TryParse(value, out TimeOnly time) ? time.ToString("HH:mm") : null;
     private static string GetUserName(ClaimsPrincipal user) => user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("Authenticated user has no login identifier.");
-    private static Guid StableProfileId(string userName) { byte[] bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(userName.Trim().ToLowerInvariant())); return new Guid(bytes.AsSpan(0,16)); }
+    internal static Guid StableProfileId(string userName) { byte[] bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(userName.Trim().ToLowerInvariant())); return new Guid(bytes.AsSpan(0,16)); }
 
     private const string SelectSql = "select id,user_name,display_name,email,department,title,theme_name,email_enabled,in_app_enabled,slack_enabled,teams_enabled,whatsapp_enabled,whatsapp_mobile,new_workspace_message,job_assigned,booking_changed,payment_changed,job_status_changed,mentions_and_replies,delivery_mode,quiet_hours_start,quiet_hours_end,created_at_utc,updated_at_utc from studio_user_profiles";
 }

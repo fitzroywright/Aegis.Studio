@@ -11,7 +11,8 @@ public sealed record InboundEmail(
     string Subject,
     string Body,
     DateTimeOffset ReceivedAt,
-    IReadOnlyCollection<InboundEmailAttachment>? Attachments = null)
+    IReadOnlyCollection<InboundEmailAttachment>? Attachments = null,
+    string? ProviderMessageId = null)
 {
     public IReadOnlyCollection<InboundEmailAttachment> FileAttachments => Attachments ?? Array.Empty<InboundEmailAttachment>();
 }

@@ -124,7 +124,8 @@ public sealed class StudioStore
             throw new InvalidOperationException("An email must be routed before it can be ingested.");
         }
 
-        StudioConversation? duplicate = FindByExternalMessageId(email.MessageId);
+        StudioConversation? duplicate = FindByExternalMessageId(email.MessageId)
+            ?? (string.IsNullOrWhiteSpace(email.ProviderMessageId) ? null : FindByExternalMessageId(email.ProviderMessageId));
         if (duplicate is not null)
         {
             return new EmailIngestResult(duplicate, false, true);
@@ -327,6 +328,15 @@ public sealed class StudioStore
         string? threadId = NormaliseThreadId(email.ThreadId);
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
+        string[] references=Aegis.Studio.Web.Messaging.StudioUnifiedInbound.ReplyReferences(email.InternetHeaders);
+        if(references.Length>0)
+        {
+            command.CommandText="select distinct e.conversation_id from studio_outbound_email e join studio_conversations c on c.id=e.conversation_id where e.rfc_message_id=any($1) and lower(e.to_address)=lower($2) and c.workspace_id=$3";
+            command.Parameters.AddWithValue(references);command.Parameters.AddWithValue(email.FromAddress.Trim());command.Parameters.AddWithValue(workspaceId);
+            using var referenceReader=command.ExecuteReader();List<Guid> ids=[];while(referenceReader.Read())ids.Add(referenceReader.GetGuid(0));referenceReader.Close();command.Parameters.Clear();
+            if(ids.Count==1)return GetConversation(ids[0]);
+            if(ids.Count>1)throw new InvalidOperationException("Reply headers match multiple conversations.");
+        }
         if (threadId is not null)
         {
             command.CommandText = "select id from studio_conversations where workspace_id=$1 and external_thread_id=$2 order by created_at_utc desc limit 1";

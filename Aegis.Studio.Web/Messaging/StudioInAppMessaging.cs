@@ -81,12 +81,14 @@ public sealed class StudioInAppMessageStore
             left join studio_message_reads r on r.thread_id=t.id and lower(r.user_name)=lower($1)
             left join studio_inapp_messages m on m.thread_id=t.id
             where (t.scope_type='Direct' and tm.user_name is not null)
-               or (t.scope_type='Workspace' and exists(select 1 from studio_workspace_members wm where wm.workspace_id=t.scope_id and lower(wm.user_name)=lower($1) and wm.is_active))
-               or (t.scope_type='Job' and exists(select 1 from studio_job_members jm where jm.job_id=t.scope_id and lower(jm.user_name)=lower($1) and jm.is_active))
+               or (t.scope_type='Workspace' and t.scope_id=any($2))
+               or (t.scope_type='Job' and t.scope_id=any($3))
             group by t.id,t.scope_type,t.scope_id,t.title,t.created_by,t.created_at_utc,r.last_read_at_utc
             order by coalesce(max(m.created_at_utc),t.created_at_utc) desc
             """;
         command.Parameters.AddWithValue(userName);
+        command.Parameters.AddWithValue(workspaceAccess.GetAccessibleWorkspaceIds(user).Where(id=>workspaceAccess.HasPermission(user,id,"View")).ToArray());
+        command.Parameters.AddWithValue(jobAccess.GetPermissionMap(user).Where(p=>p.Value.ViewJob).Select(p=>p.Key).ToArray());
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<StudioMessageThreadSummary> values = [];
         while (reader.Read())
@@ -111,6 +113,7 @@ public sealed class StudioInAppMessageStore
         string key = string.Join('|', new[] { current.ToLowerInvariant(), other.ToLowerInvariant() }.OrderBy(x => x, StringComparer.Ordinal));
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
+        StudioUnifiedMessaging.LockRequest(connection,transaction,key);
         using NpgsqlCommand existing = connection.CreateCommand();
         existing.Transaction = transaction;
         existing.CommandText = "select id,title,created_by,created_at_utc from studio_message_threads where scope_type='Direct' and direct_key=$1";
@@ -159,9 +162,9 @@ public sealed class StudioInAppMessageStore
         Guid id = Guid.NewGuid();
         DateTimeOffset now = DateTimeOffset.UtcNow;
         using NpgsqlCommand insert = connection.CreateCommand();
-        insert.CommandText = "insert into studio_message_threads(id,scope_type,scope_id,direct_key,title,created_by,created_at_utc) values($1,$2,$3,null,$4,$5,$6) returning id";
+        insert.CommandText = "insert into studio_message_threads(id,scope_type,scope_id,direct_key,title,created_by,created_at_utc) values($1,$2,$3,null,$4,$5,$6) on conflict(scope_type,scope_id) where scope_id is not null do update set scope_type=excluded.scope_type returning id";
         insert.Parameters.AddWithValue(id); insert.Parameters.AddWithValue(normalized); insert.Parameters.AddWithValue(scopeId); insert.Parameters.AddWithValue(title); insert.Parameters.AddWithValue(current); insert.Parameters.AddWithValue(now);
-        insert.ExecuteScalar();
+        id=(Guid)insert.ExecuteScalar()!;
         return new StudioMessageThread(id, normalized, scopeId, title, current, now);
     }
 
@@ -170,11 +173,11 @@ public sealed class StudioInAppMessageStore
         AssertThreadAccess(threadId, user);
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "select id,thread_id,sender_user_name,body,created_at_utc from studio_inapp_messages where thread_id=$1 order by created_at_utc desc limit $2";
+        command.CommandText = "select id,thread_id,sender_user_name,body,created_at_utc,subject,recipient_addresses,internet_message_id from studio_inapp_messages where thread_id=$1 order by created_at_utc desc limit $2";
         command.Parameters.AddWithValue(threadId); command.Parameters.AddWithValue(Math.Clamp(count, 1, 500));
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<StudioInAppMessage> values = [];
-        while (reader.Read()) values.Add(new StudioInAppMessage(reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4)));
+        while (reader.Read()) values.Add(new StudioInAppMessage(reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4), reader.GetString(5), reader.GetFieldValue<string[]>(6), reader.IsDBNull(7) ? null : reader.GetString(7)));
         values.Reverse();
         return values;
     }
@@ -346,7 +349,7 @@ public static class StudioInAppMessagingEndpoints
                 IReadOnlyList<string> mentionedUsers = store.ResolveMentionedParticipants(threadId, message.SenderUserName, message.Body);
                 foreach (string mentionedUser in mentionedUsers)
                 {
-                    notifications.PublishToUser(
+                    notifications.PublishInternalToUser(
                         mentionedUser,
                         "Mention",
                         $"{message.SenderUserName} mentioned you",
@@ -387,7 +390,7 @@ public static class StudioInAppMessagingEndpoints
 
 public sealed record StudioMessageThread(Guid Id, string ScopeType, Guid? ScopeId, string Title, string CreatedBy, DateTimeOffset CreatedAtUtc);
 public sealed record StudioMessageThreadSummary(Guid Id, string ScopeType, Guid? ScopeId, string Title, string CreatedBy, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastMessageAtUtc, long UnreadCount);
-public sealed record StudioInAppMessage(Guid Id, Guid ThreadId, string SenderUserName, string Body, DateTimeOffset CreatedAtUtc);
+public sealed record StudioInAppMessage(Guid Id, Guid ThreadId, string SenderUserName, string Body, DateTimeOffset CreatedAtUtc, string Subject = "", string[]? RecipientAddresses = null, string? InternetMessageId = null);
 public sealed record StudioMessageUser(string UserName, string DisplayName);
 public sealed record StartDirectMessageRequest(string UserName);
 public sealed record SendStudioMessageRequest(string Body);

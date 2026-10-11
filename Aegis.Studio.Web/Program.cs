@@ -190,6 +190,14 @@ builder.Services.AddSingleton<BookingStore>();
 builder.Services.AddSingleton<BookingApiAuthenticator>();
 builder.Services.AddSingleton<UserProfileStore>();
 builder.Services.AddSingleton<StudioInAppMessageStore>();
+builder.Services.AddSingleton<StudioEmployeeDirectoryStore>();
+builder.Services.AddSingleton<StudioMessageAttachmentStore>();
+builder.Services.AddSingleton<StudioAddressBook>();
+builder.Services.AddSingleton<StudioDeliveryPlanner>();
+builder.Services.AddSingleton<StudioUnifiedMessaging>();
+builder.Services.AddSingleton<StudioUnifiedInbox>();
+builder.Services.AddSingleton<StudioUnifiedInbound>();
+builder.Services.AddHttpClient<global::Common.Messaging.IEmailRecipientDirectory,global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphRecipientDirectory>();
 builder.Services.AddSingleton<StudioRecipientResolver>();
 builder.Services.AddSingleton<NotificationService>();
 builder.Services.AddSingleton<WorkspaceTimelineService>();
@@ -302,6 +310,7 @@ app.MapFrontDeskBookingRequests();
 app.MapConnectedWorkflow();
 Aegis.Studio.Web.Finance.FinanceReleaseStore.MapStudioFinance(app);
 app.MapStudioClients();
+app.MapStudioUnifiedMessaging();
 app.MapStudioFulfillment();
 app.MapStudioQuotes();
 app.MapJobAccess();
@@ -383,11 +392,12 @@ app.MapPost("/api/interactions", (IncomingInteractionRequest request, ClaimsPrin
     try { StudioConversation conversation = store.ReceiveInteraction(request); notifications.PublishToAll("WorkspaceMessage", $"New request: {conversation.Subject}", $"{conversation.ContactName} sent a new {conversation.Channel} request.", "Conversation", conversation.Id.ToString("D")); return Results.Created("/api/conversations", conversation); }
     catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
 });
-app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter router, StudioStore store, UnroutedEmailStore unrouted, NotificationService notifications, StudioOperationsFlowPublisher operationsFlows) =>
+app.MapPost("/api/email/inbound", async (InboundEmail email, StudioUnifiedInbound unified, CancellationToken token, IInboundEmailRouter router, StudioStore store, UnroutedEmailStore unrouted, NotificationService notifications, StudioOperationsFlowPublisher operationsFlows) =>
 {
     bool evidence = email.ToAddresses.Count > 0 || email.CcAddresses.Count > 0 || email.InternetHeaders.ContainsKey("X-Aegis-Route");
     if (string.IsNullOrWhiteSpace(email.MessageId) || string.IsNullOrWhiteSpace(email.FromAddress) || !evidence || string.IsNullOrWhiteSpace(email.Subject) || string.IsNullOrWhiteSpace(email.Body)) return Results.BadRequest(new { error = "Message id, sender, routing evidence, subject and body are required." });
-    EmailRouteResult route = router.Route(email);
+    if(await unified.TryImportAsync(email,token))return Results.Ok(new{routed=true});
+    EmailRouteResult route = unified.FindLegacyRoute(email) ?? router.Route(email);
     string correlationId = email.MessageId;
     if (!route.IsRouted)
     {
@@ -405,9 +415,10 @@ app.MapPost("/api/email/inbound", (InboundEmail email, IInboundEmailRouter route
         operationsFlows.TryEnqueueInbound(correlationId, "Notification", businessId: result.Conversation.Id.ToString("D"));
     }
     return Results.Ok(new { routed = true, workspaceId = route.WorkspaceId, conversationId = result.Conversation.Id, result.CreatedConversation, result.WasDuplicate });
-});
-app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen()));
-app.MapGet("/api/email/outbox", (OutboundEmailStore store) => Results.Ok(store.GetPending()));
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
+app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen())).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
+app.MapGet("/api/email/outbox", (ClaimsPrincipal user, OutboundEmailStore outbox, StudioStore store, WorkspaceAccessService access) =>
+    Results.Ok(outbox.GetPending().Where(e => e.StudioMessageId is null && store.GetConversation(e.ConversationId) is { } c && access.HasPermission(user,c.WorkspaceId,"View"))));
 app.MapGet("/api/email/audit", (int? count, ClaimsPrincipal user, OutboundEmailStore store, WorkspaceAccessService access) =>
 {
     IReadOnlyList<Guid> workspaceIds = access.GetAccessibleWorkspaceIds(user);

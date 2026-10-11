@@ -64,6 +64,11 @@ public sealed class NotificationService
             profile.Messaging.WhatsAppMobile);
     }
 
+    public void PublishInternalToUser(string userName,string eventType,string subject,string body,string? referenceType=null,string? referenceId=null)
+    {
+        Insert(userName,"InApp",eventType,subject,body,referenceType,referenceId,"Delivered",null);
+    }
+
     public void PublishToUser(string userName, string eventType, string subject, string body, string? referenceType = null, string? referenceId = null)
     {
         StudioUserProfile? profile = profiles.GetAll().FirstOrDefault(x =>

@@ -24,31 +24,44 @@
     let inboxFilter = '';
     let inboxQuery = '';
     let inboxSelection = null;
+    let inboxOffset = 0;
+    let inboxTotal = 0;
+    let inboxSearchTimer = null;
+    let addressEntries = [];
+    let selectedRecipients = [];
+    let sendRequestId = null;
+    let selectedSubject = 'Studio message';
     let inboxLastLoad = 0;
     let inboxRevision = 0;
     let threadRevision = 0;
+    const modeLabel = value => ({InternalOnly:'Studio only',ExternalOnly:'Email only',Combined:'Studio + email'})[value]||value;
+    const deliveryLabel = value => ({ProviderAccepted:'Accepted by Microsoft 365',Attention:'Needs attention',Pending:'Queued',Retry:'Retry scheduled',Sending:'Sending',Delivered:'Delivered',Excluded:'Router copy excluded'})[value]||value;
     const inboxDate = value => value ? new Date(value).toLocaleString() : '—';
     const inboxSubject = message => String(message.subject || message.title || String(message.body || '').split('\n')[0] || '(No subject)').slice(0,110);
     const inboxJob = thread => thread.scopeType === 'Job' ? (thread.title || thread.scopeId || 'Job') : '—';
-    const inboxRecipient = (message,thread) => message.recipientUserName || message.recipient || (thread.scopeType === 'Job' ? 'Job team' : thread.scopeType === 'Workspace' ? 'Workspace team' : thread.scopeType === 'Direct' ? thread.title : 'Conversation');
+    const inboxRecipient = (message,thread) => (message.recipientAddresses?.length ? message.recipientAddresses.join(', ') : '') || message.recipientUserName || message.recipient || (thread.scopeType === 'Job' ? 'Job team' : thread.scopeType === 'Workspace' ? 'Workspace team' : thread.scopeType === 'Direct' ? thread.title : 'Conversation');
     async function showMessages() {
         const current=StudioPage.begin('messages');
-        ++inboxRevision;
+        ++inboxRevision;selectedThread=null;selectedRecipients=[];sendRequestId=null;
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML = StudioPage.html({title:'Messages',summary:'<p>All job, workspace and direct conversations.</p>',attention:'<p>Use Follow Up Flag to find messages requiring a reply.</p>',content:`
+        genericView.innerHTML = StudioPage.html({title:'Messages',summary:'<p>Private, workspace, job and client conversations. Internal messages stay in Studio.</p>',attention:'<p>External delivery outcomes appear in each conversation. Held deliveries need review before retrying.</p>',content:`
             <div class="st-inbox">
                 <section class="studio-inbox-center">
-                    <header class="studio-inbox-toolbar"><div><h1>All Messages</h1><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="primary" id="newDirectMessage">New</button></div></header>
+                    <header class="studio-inbox-toolbar"><div><h1>All Messages</h1><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New</button></div></header>
                     <div class="studio-inbox-table-wrap" id="studioInboxRows" role="list" aria-label="Messages"><div class="studio-inbox-loading">Loading messages…</div></div>
+                    <nav class="studio-inbox-pagination" aria-label="Message pages"><button id="studioInboxPrevious" class="action">Previous</button><span id="studioInboxPage"></span><button id="studioInboxNext" class="action">Next</button></nav>
                 </section>
                 <section id="messageConversationPane" class="message-conversation-pane studio-inbox-reading"><div class="empty-state"><h2>Select a message</h2><p>Read the conversation and reply here.</p></div></section>
             </div>`});
         StudioPage.bind(genericView,current);
         document.getElementById('newDirectMessage').onclick = startDirect;
+        document.getElementById('studioAddressBook').onclick = () => showAddressBook();
+        document.getElementById('studioInboxPrevious').onclick=()=>{inboxOffset=Math.max(0,inboxOffset-100);void loadInbox(true);};
+        document.getElementById('studioInboxNext').onclick=()=>{inboxOffset+=100;void loadInbox(true);};
         document.getElementById('studioInboxRefresh').onclick = () => loadInbox(true);
-        document.getElementById('studioInboxSearch').oninput = event => { inboxQuery = event.target.value.toLowerCase(); renderInbox(); };
-        document.getElementById('studioInboxJobSelect').onchange = event => { inboxFilter=event.target.value;renderInbox(); };
+        document.getElementById('studioInboxSearch').oninput = event => { inboxQuery = event.target.value;inboxOffset=0;clearTimeout(inboxSearchTimer);inboxSearchTimer=setTimeout(()=>loadInbox(true),250); };
+        document.getElementById('studioInboxJobSelect').onchange = event => { inboxFilter=event.target.value;inboxOffset=0;void loadInbox(true); };
         await loadInbox(true);
         if(current())startRefresh();
     }
@@ -58,49 +71,37 @@
         if(!body)return;
         if(force)body.innerHTML='<div class="studio-inbox-loading">Loading messages…</div>';
         try {
-            const threads=await json('/api/messages/threads');
+            const params=new URLSearchParams({offset:String(inboxOffset),limit:'100',query:inboxQuery});
+            if(inboxFilter)params.set('jobId',inboxFilter);
+            const page=await json('/api/messages/inbox?'+params);
             if(revision!==inboxRevision||document.getElementById('studioInboxRows')!==body)return;
-            inboxThreads=threads;
-            const results=[];
-            // Limit concurrent requests to avoid flooding the messaging service.
-            let next=0;
-            const workers=Array.from({length:Math.min(5,threads.length)},async()=>{
-                while(next<threads.length){
-                    const thread=threads[next++];
-                    try {
-                        const messages=await json('/api/messages/threads/'+encodeURIComponent(thread.id));
-                        for(const message of messages)results.push({thread,message});
-                    }catch { results.push({thread,error:true}); }
-                }
-            });
-            await Promise.all(workers);
+            inboxRows=page.items;inboxTotal=page.total;inboxLastLoad=Date.now();
+            if(!addressEntries.length)addressEntries=await json('/api/messages/address-book');
             if(revision!==inboxRevision||document.getElementById('studioInboxRows')!==body)return;
-            inboxLastLoad=Date.now();
-            inboxRows=results.filter(x=>x.message).sort((a,b)=>new Date(b.message.createdAtUtc||0)-new Date(a.message.createdAtUtc||0));
-            renderInboxFilters();renderInbox();handleUnreadChanges(threads);
+            renderInboxFilters();renderInbox();
         }catch(error){if(revision!==inboxRevision||document.getElementById('studioInboxRows')!==body)return;body.innerHTML='<div class="studio-inbox-loading">'+esc(error.message||'Unable to load messages.')+'</div>';}
     }
     function renderInboxFilters(){
         const select=document.getElementById('studioInboxJobSelect');if(!select)return;
-        const jobs=new Map(inboxThreads.filter(t=>t.scopeType==='Job').map(t=>[String(t.scopeId||t.id),inboxJob(t)]));
+        const jobs=new Map(addressEntries.filter(t=>t.contactType==='Job').map(t=>[String(t.scopeId||t.id),t.displayName]));
         select.innerHTML='<option value="">All jobs</option>'+[...jobs].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>'<option value="'+esc(id)+'">'+esc(name)+'</option>').join('');
         select.value=inboxFilter;
     }
     function renderInbox(){
         const body=document.getElementById('studioInboxRows');if(!body)return;
-        const rows=inboxRows.filter(({thread,message})=>{
-            const jobId=String(thread.scopeId||thread.id);
-            if(inboxFilter&&jobId!==inboxFilter)return false;
-            if(!inboxQuery)return true;
-            return [inboxJob(thread),inboxSubject(message),message.body,message.senderUserName,inboxRecipient(message,thread),message.createdAtUtc].some(v=>String(v||'').toLowerCase().includes(inboxQuery));
-        });
+        const rows=inboxRows;
         StudioPage.setCount(rows.length+' messages');
-        document.getElementById('studioInboxCount').textContent=rows.length+' messages'+(inboxFilter?' in selected job':'');
-        const groups=[{title:'Follow Up Flag',items:rows.filter(x=>x.message.isFlagged||x.message.flagged)},{title:'Unflagged',items:rows.filter(x=>!x.message.isFlagged&&!x.message.flagged)}];
+        document.getElementById('studioInboxCount').textContent=inboxTotal+' messages'+(inboxFilter?' in selected job':'');
+        document.getElementById('studioInboxPage').textContent=rows.length?(inboxOffset+1)+'–'+(inboxOffset+rows.length)+' of '+inboxTotal:'No messages';
+        document.getElementById('studioInboxPrevious').disabled=inboxOffset===0;
+        document.getElementById('studioInboxNext').disabled=inboxOffset+rows.length>=inboxTotal;
+        const groups=[{title:'Messages',items:rows}];
         body.innerHTML=groups.map(group=>'<section class="studio-inbox-group"><div class="studio-inbox-group-heading"><span>⌄</span> '+esc(group.title)+': '+group.items.length+' item(s)</div>'+group.items.map(({thread,message})=>'<div role="listitem" tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="studio-inbox-message-row '+(inboxSelection===message.id?'selected':'')+'"><div class="studio-inbox-message-top"><strong class="studio-inbox-message-sender">'+esc(message.senderUserName||'Unknown')+'</strong><strong class="studio-inbox-message-subject">'+esc(inboxSubject(message))+'</strong><time>'+esc(inboxDate(message.createdAtUtc))+'</time></div><div class="studio-inbox-message-bottom"><span class="studio-inbox-message-job">'+esc(inboxJob(thread))+'</span><span class="studio-inbox-message-preview">'+esc(String(message.body||'').replace(/\s+/g,' ').slice(0,220))+'</span><span class="studio-inbox-message-recipient">To: '+esc(inboxRecipient(message,thread))+'</span></div></div>').join('')+'</section>').join('') || '<div class="studio-inbox-loading">No messages.</div>';
         if(!rows.length)body.innerHTML='<div class="studio-inbox-loading">No messages match the selected filters.</div>';
         body.querySelectorAll('[data-inbox-message]').forEach(row=>{
-            const open=async()=>{inboxSelection=row.dataset.inboxMessage;renderInbox();await openThread(row.dataset.inboxThread);const msg=document.querySelector('#studioMessageHistory .studio-chat-message[data-message-id="'+CSS.escape(inboxSelection)+'"]');msg?.scrollIntoView({block:'nearest'});};
+            const open=async()=>{inboxSelection=row.dataset.inboxMessage;renderInbox();const selected=inboxRows.find(item=>item.message.id===inboxSelection);
+                if(selected?.thread.kind==='Conversation')await openLegacyConversation(selected.thread.id);
+                else await openThread(row.dataset.inboxThread);const msg=document.querySelector('#studioMessageHistory .studio-chat-message[data-message-id="'+CSS.escape(inboxSelection)+'"]');msg?.scrollIntoView({block:'nearest'});};
             row.onclick=open;row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void open();}};
         });
     }
@@ -124,45 +125,87 @@
     }
 
     async function startDirect() {
-        const users = await loadMentionUsers();
-        if (!users.length) {
-            alert('No other Studio users are available for direct messaging yet.');
-            return;
-        }
-        let dialog = document.getElementById('directMessageDialog');
-        if (!dialog) {
-            dialog = document.createElement('dialog');
-            dialog.id = 'directMessageDialog';
-            dialog.className = 'direct-message-dialog';
-            document.body.appendChild(dialog);
-        }
-        dialog.innerHTML = `
-            <form method="dialog" class="direct-message-form">
-                <div class="message-dialog-heading"><div><h2>New message</h2><p>Start a private Studio conversation.</p></div><button type="button" class="message-dialog-close" aria-label="Close">×</button></div>
-                <label>Studio user
-                    <select id="directMessageUser" required>
-                        ${users.map(user => `<option value="${esc(user.userName)}">${esc(studioFirstName(user))}</option>`).join('')}
-                    </select>
-                </label>
-                <div class="dialog-actions"><button type="button" class="direct-message-cancel">Cancel</button><button type="submit" class="primary">Open conversation</button></div>
-            </form>`;
-        const close = () => dialog.close();
-        dialog.querySelector('.message-dialog-close').onclick = close;
-        dialog.querySelector('.direct-message-cancel').onclick = close;
-        dialog.querySelector('form').onsubmit = async event => {
-            event.preventDefault();
-            const userName = document.getElementById('directMessageUser').value;
-            if (!userName) return;
-            const thread = await json('/api/messages/threads/direct', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userName })
-            });
-            dialog.close();
-            await loadThreads();
-            await openThread(thread.id);
+        addressEntries=await json('/api/messages/address-book');
+        let dialog=document.getElementById('directMessageDialog');
+        if(!dialog){dialog=document.createElement('dialog');dialog.id='directMessageDialog';dialog.className='direct-message-dialog';document.body.appendChild(dialog);}
+        dialog.innerHTML=`<form class="direct-message-form"><div class="message-dialog-heading"><h2>New message</h2><button class="message-dialog-close" type="button" aria-label="Close">×</button></div>
+            <label>Recipients<select id="unifiedRecipients" multiple required>${addressEntries.filter(e=>e.status==='Active').map(e=>`<option value="${esc(e.id)}">${esc(e.displayName)} · ${esc(e.contactType)} · ${esc(modeLabel(e.deliveryMode))}</option>`).join('')}</select></label>
+            <label>Subject<input id="unifiedSubject" maxlength="200" required></label><label>Message<textarea id="unifiedBody" maxlength="10000" required></textarea></label>
+            <label>Attachments<input id="unifiedFiles" type="file" multiple></label><p id="unifiedSendFeedback" role="status"></p><div class="dialog-actions"><button type="button" class="action" id="unifiedCancel">Cancel</button><button class="primary" type="submit">Send</button></div></form>`;
+        const close=()=>dialog.close();dialog.querySelector('.message-dialog-close').onclick=close;dialog.querySelector('#unifiedCancel').onclick=close;
+        const requestId=crypto.randomUUID();
+        dialog.querySelector('form').onsubmit=async event=>{
+            event.preventDefault();const button=dialog.querySelector('[type=submit]');button.disabled=true;
+            try{
+                const destinationIds=[...dialog.querySelector('#unifiedRecipients').selectedOptions].map(o=>o.value);
+                const request={requestId,threadId:null,destinationIds,subject:dialog.querySelector('#unifiedSubject').value,body:dialog.querySelector('#unifiedBody').value};
+                const result=await sendUnified(request,dialog.querySelector('#unifiedFiles').files);
+                dialog.close();await loadInbox(true);await openThread(result.threadId);
+            }catch(error){dialog.querySelector('#unifiedSendFeedback').textContent=error.message;}finally{button.disabled=false;}
         };
         dialog.showModal();
+    }
+
+    async function sendUnified(request,files=[]) {
+        const data=new FormData();data.append('message',JSON.stringify(request));
+        for(const file of files)data.append('files',file);
+        const response=await fetch('/api/messages/send',{method:'POST',body:data});
+        const result=await response.json().catch(()=>({error:'Message could not be sent.'}));
+        if(!response.ok)throw new Error(result.error||'Message could not be sent.');
+        return result;
+    }
+
+    async function showAddressBook() {
+        const entries=await json('/api/messages/address-book');
+        const admin=await fetch('/api/admin/messaging/address-book');const canConfigure=admin.ok;
+        let dialog=document.getElementById('studioAddressDialog');
+        if(!dialog){dialog=document.createElement('dialog');dialog.id='studioAddressDialog';dialog.className='direct-message-dialog';document.body.appendChild(dialog);}
+        dialog.innerHTML=`<div class="direct-message-form"><div class="message-dialog-heading"><h2>Address Book</h2><button type="button" class="message-dialog-close" aria-label="Close">×</button></div><div class="studio-address-list">${entries.map(e=>`<article><strong>${esc(e.displayName)}</strong><small>${esc(e.emailAddress||e.studioInboxId||'No email configured')} · ${esc(e.contactType)} · ${esc(modeLabel(e.deliveryMode))} · ${esc(e.status)}</small>${canConfigure?`<button class="st-link" data-address-config="${esc(e.id)}">Routing settings</button>`:''}</article>`).join('')}</div><form id="studioContactForm"><label>Contact name<input name="displayName" required maxlength="200"></label><label>Email<input name="emailAddress" type="email" required></label><button class="primary" type="submit">Add external contact</button><p role="status" id="studioContactFeedback"></p></form></div>`;
+        dialog.querySelector('.message-dialog-close').onclick=()=>dialog.close();
+        dialog.querySelectorAll('[data-address-config]').forEach(button=>button.onclick=()=>editAddressRoute(entries.find(e=>e.id===button.dataset.addressConfig),dialog));
+        dialog.querySelector('form').onsubmit=async event=>{
+            event.preventDefault();const form=event.target;
+            try{await json('/api/messages/contacts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName:form.elements.displayName.value,emailAddress:form.elements.emailAddress.value})});dialog.close();addressEntries=[];await showAddressBook();}
+            catch(error){document.getElementById('studioContactFeedback').textContent=error.message;}
+        };dialog.showModal();
+    }
+
+    async function editAddressRoute(entry,dialog) {
+        // The server checks Administrator permission; no provider credentials or membership editing is exposed here.
+        const adminResponse=await fetch('/api/admin/messaging/address-book');
+        if(!adminResponse.ok){alert('Routing settings require a Studio administrator.');return;}
+        entry=(await adminResponse.json()).find(e=>e.id===entry.id);
+        const fields=[['inboxType','Inbox type',['Internal','Microsoft365','External']],['deliveryMode','Delivery mode',['InternalOnly','ExternalOnly','Combined']],['combinedMailboxPolicy','Combined mailbox policy',['ExternalCopy','InternalOnly','Hold']],['status','Status',['Active','Inactive','Attention']]];
+        dialog.innerHTML=`<form class="direct-message-form"><div class="message-dialog-heading"><h2>${esc(entry.displayName)}</h2><button type="button" class="message-dialog-close">×</button></div>
+            <label>Professional or destination email<input name="emailAddress" value="${esc(entry.emailAddress)}"></label>
+            ${fields.map(([name,label,options])=>`<label>${esc(label)}<select name="${name}">${options.map(value=>`<option value="${esc(value)}" ${entry[name]===value?'selected':''}>${esc(modeLabel(value))}</option>`).join('')}</select></label>`).join('')}
+            <label>Provider group object ID<input name="providerReference" value="${esc(entry.providerReference||'')}"></label><label>Authorized sending mailbox<input name="senderMailbox" value="${esc(entry.senderMailbox||'')}"></label>
+            ${['studioManagedGroup','groupVerified','senderVerified'].map(name=>`<label><input type="checkbox" name="${name}" ${entry[name]?'checked':''}>${esc(({studioManagedGroup:'Use Studio-managed group routing',groupVerified:'Group fan-out verified in Microsoft 365',senderVerified:'Professional sender verified in Microsoft 365'})[name])}</label>`).join('')}
+            <label>Tenant validation evidence<textarea name="verificationEvidence">${esc(entry.verificationEvidence||'')}</textarea></label><p role="status" id="routeFeedback"></p><button class="primary" type="submit">Save routing</button></form>`;
+        dialog.querySelector('.message-dialog-close').onclick=()=>dialog.close();
+        dialog.querySelector('form').onsubmit=async event=>{
+            event.preventDefault();const form=event.target;const updated={...entry};
+            for(const name of ['emailAddress','inboxType','deliveryMode','combinedMailboxPolicy','status','providerReference','senderMailbox','verificationEvidence'])updated[name]=form.elements[name].value||null;
+            for(const name of ['studioManagedGroup','groupVerified','senderVerified'])updated[name]=form.elements[name].checked;
+            updated.studioInboxId=updated.deliveryMode==='ExternalOnly'?null:(entry.userName||entry.scopeId||null);
+            try{await json('/api/admin/messaging/address-book/'+entry.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(updated)});addressEntries=[];dialog.close();await showAddressBook();}
+            catch(error){document.getElementById('routeFeedback').textContent=error.message;}
+        };
+    }
+
+    async function openLegacyConversation(id) {
+        const revision=++threadRevision;selectedThread=null;
+        const target=document.getElementById('messageConversationPane');
+        const [conversation,identities,files]=await Promise.all([json('/api/conversations/'+id),json('/api/conversations/'+id+'/sending-identities').catch(()=>null),json('/api/conversations/'+id+'/attachments').catch(()=>[])]);
+        const pane=document.getElementById('messageConversationPane');if(!pane||pane!==target||revision!==threadRevision)return;
+        pane.innerHTML=`<div class="message-conversation-header"><div><h2>${esc(conversation.subject)}</h2><p>${esc(conversation.contactName)} · ${esc(conversation.contactAddress)}</p></div><button class="st-link" id="openConversationWorkspace">Open conversation</button></div><div class="studio-message-history">${conversation.messages.map(m=>renderMessage({id:m.id,senderUserName:m.author,body:m.body,createdAtUtc:m.createdAt},[])).join('')}${files.length?`<div class="studio-message-files">${files.map(f=>`<a href="/api/attachments/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.fileName)}</a>`).join('')}</div>`:''}</div>
+            <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><select name="sendingIdentity" aria-label="Sender identity">${(identities?.identities||[{type:'Workspace',label:'Workspace'}]).map(i=>`<option value="${esc(i.type)}">${esc(i.label)}</option>`).join('')}</select><label><input name="internal" type="checkbox">Internal note</label><button class="primary" type="submit">Send</button></div></form>`;
+        document.getElementById('openConversationWorkspace').onclick=async()=>{await selectWorkspace(conversation.workspaceId);await openConversation(id);};
+        document.getElementById('legacyMessageComposer').onsubmit=async event=>{
+            event.preventDefault();const form=event.target,button=form.querySelector('[type=submit]');button.disabled=true;
+            try{await json('/api/conversations/'+id+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:form.elements.body.value,isInternal:form.elements.internal.checked,sendingIdentity:form.elements.sendingIdentity.value})});await openLegacyConversation(id);await loadInbox(false);}
+            catch(error){document.getElementById('legacySendFeedback').textContent=error.message;}finally{button.disabled=false;}
+        };
     }
 
     async function openWorkspaceThread() {
@@ -180,24 +223,28 @@
         await joinRealtimeThread(id, previousThread);
         const threads = await json('/api/messages/threads');
         const thread = threads.find(item => item.id === id);
-        const [messages,threadAttachments] = await Promise.all([json(`/api/messages/threads/${id}`),json(`/api/messages/threads/${id}/attachments`).catch(()=>[])]);
+        const [messages,threadAttachments,recipients,deliveries,identity] = await Promise.all([json(`/api/messages/threads/${id}`),json(`/api/messages/threads/${id}/attachments`).catch(()=>[]),json(`/api/messages/threads/${id}/recipients`),json(`/api/messages/threads/${id}/deliveries`),json('/api/messages/identity')]);
         const pane = document.getElementById('messageConversationPane');
         if (!pane || pane!==targetPane || revision!==threadRevision) return;
+        selectedRecipients=recipients;sendRequestId=null;
+        selectedSubject=[...messages].reverse().find(m=>m.subject)?.subject||thread?.title||'Studio message';
         pane.innerHTML = `
-            <div class="message-conversation-header"><div><h2>${esc(thread?.title || 'Messages')}</h2><p>${esc(thread?.scopeType || '')}</p></div></div>
+            <div class="message-conversation-header"><div><h2>${esc(thread?.title || 'Messages')}</h2><p>${esc(thread?.scopeType || '')} · From: ${esc(identity?.emailAddress||identity?.displayName||'Studio')} · To: ${esc(recipients.map(r=>r.displayName).join(', ')||'Internal team')}</p></div></div>
             <div id="studioMessageHistory" class="studio-message-history">
-                ${messages.map(message=>renderMessage(message,threadAttachments)).join('') || '<div class="empty-state compact"><p>No messages yet. Start the conversation.</p></div>'}
+                ${messages.map(message=>renderMessage(message,threadAttachments,deliveries)).join('') || '<div class="empty-state compact"><p>No messages yet. Start the conversation.</p></div>'}
             </div>
             <form id="studioMessageComposer" class="studio-message-composer">
                 <div class="message-composer-input-wrap">
                     <textarea id="studioMessageBody" maxlength="10000" placeholder="Write a message… Use @ to mention a Studio user." required></textarea>
-                    <div id="mentionSuggestions" class="mention-suggestions" hidden></div>
+                    <div id="mentionSuggestions" class="mention-suggestions" hidden></div><span id="studioSendFeedback" role="status"></span>
                 </div>
-                <label class="action message-attachment-control">Attach document<input id="studioMessageFile" type="file" hidden></label>
-                <button class="action" id="studioWhatsAppSend" type="button" title="Send this message to the photographer via WhatsApp">WhatsApp</button><button class="primary" type="submit">Send</button>
+                <div class="studio-compose-actions"><label class="action message-attachment-control">Attach document<input id="studioMessageFile" type="file" multiple hidden></label>
+                <button class="action" id="studioWhatsAppSend" type="button" title="Send this message to the photographer via WhatsApp">WhatsApp</button><button class="primary" type="submit">Send</button></div>
             </form>`;
         document.getElementById('studioMessageComposer').onsubmit = sendMessage;
         document.getElementById('studioWhatsAppSend').onclick = sendWhatsApp;
+        pane.querySelectorAll('[data-retry-routing]').forEach(button=>button.onclick=()=>retryRouting(button.dataset.retryRouting));
+        pane.querySelectorAll('[data-retry-delivery]').forEach(button=>button.onclick=()=>retryDelivery(button.dataset.retryDelivery,button.dataset.uncertain==='true'));
         const textarea = document.getElementById('studioMessageBody');
         textarea.addEventListener('input', () => updateMentionSuggestions(textarea));
         textarea.addEventListener('keydown', handleMentionKeys);
@@ -209,13 +256,22 @@
         if (history) history.scrollTop = history.scrollHeight;
     }
 
-    function renderMessage(message, attachments = []) {
+    function renderMessage(message, attachments = [], deliveries = []) {
         const files=(attachments||[]).filter(file=>file.messageId===message.id);
         return `<article class="studio-chat-message" data-message-id="${esc(message.id)}">
-            <div class="studio-chat-meta"><strong>${esc(studioFirstName(message.senderUserName))}</strong><span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
+            <div class="studio-chat-meta"><strong>${esc(message.senderUserName)}</strong><span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
+            ${message.subject?`<strong>${esc(message.subject)}</strong>`:''}
             <div class="studio-chat-body">${renderMentions(message.body)}</div>
             ${files.length?`<div class="studio-message-files">${files.map(file=>`<a href="/api/message-attachments/${file.id}" target="_blank" rel="noopener"><strong>${esc(file.fileName)}</strong><small>${formatBytes(file.size)}</small></a>`).join('')}</div>`:''}
+            ${deliveries.filter(d=>d.messageId===message.id).length?`<details class="studio-delivery-details"><summary>Delivery · ${esc([...new Set(deliveries.filter(d=>d.messageId===message.id).map(d=>deliveryLabel(d.status)))].join(', '))}</summary>${deliveries.filter(d=>d.messageId===message.id).map(d=>`<div><span>${esc(d.transport)} · ${esc(d.recipient)} · ${esc(deliveryLabel(d.status))} ${esc(d.detail||'')}</span>${d.transport==='Routing'&&d.status==='Attention'&&d.recipient!=='Attachments'?`<button class="st-link" data-retry-routing="${esc(message.id)}">Resolve again</button>`:''}${d.deliveryId&&['Failed','Attention'].includes(d.status)?`<button class="st-link" data-retry-delivery="${esc(d.deliveryId)}" data-uncertain="${String(d.status==='Attention'&&String(d.detail).startsWith('ProviderOutcomeUncertain'))}">Retry</button>`:''}</div>`).join('')}</details>`:''}
         </article>`;
+    }
+
+    async function retryRouting(messageId){try{await json('/api/messages/'+messageId+'/retry-routing',{method:'POST'});await openThread(selectedThread);}catch(error){alert(error.message);}}
+    async function retryDelivery(deliveryId,uncertain){
+        const reconciledNotSent=uncertain&&confirm('Check Microsoft 365 sent items or message trace first. Confirm this delivery was NOT sent?');
+        if(uncertain&&!reconciledNotSent)return;
+        try{await json('/api/messages/deliveries/'+deliveryId+'/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reconciledNotSent})});await openThread(selectedThread);}catch(error){alert(error.message);}
     }
 
     function renderMentions(body) {
@@ -293,33 +349,13 @@
     }
 
     async function sendMessage(event) {
-        event.preventDefault();
-        const body = document.getElementById('studioMessageBody').value.trim();
-        if (!body || !selectedThread) return;
-        const threads=await json('/api/messages/threads');
-        const thread=threads.find(item=>item.id===selectedThread);
-        const sent=await json(`/api/messages/threads/${selectedThread}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body })
-        });
-        const file=document.getElementById('studioMessageFile')?.files?.[0];
-        if(file){
-            if(thread?.scopeType==='Job'&&thread.scopeId){
-                const job=await json('/api/jobs/'+thread.scopeId);
-                if(!job.conversationId)throw new Error('This job has no linked conversation for Conversation Files.');
-                const data=new FormData();data.append('file',file);
-                const upload=await fetch('/api/conversations/'+job.conversationId+'/attachments?visibility=Internal',{method:'POST',body:data});
-                if(!upload.ok)throw new Error(await upload.text());
-                const attachment=await upload.json();
-                const link=await fetch('/api/attachments/'+attachment.id+'/message-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:sent.id,messageKind:'JobMessage',jobId:thread.scopeId})});
-                if(!link.ok)throw new Error(await link.text());
-            }else{
-                const data=new FormData();data.append('file',file);
-                const upload=await fetch('/api/messages/'+sent.id+'/attachments',{method:'POST',body:data});
-                if(!upload.ok)throw new Error(await upload.text());
-            }
-        }
-        document.getElementById('studioMessageBody').value = '';
-        await openThread(selectedThread);
+        event.preventDefault();const threadId=selectedThread;const body=document.getElementById('studioMessageBody').value.trim();
+        if(!body||!threadId)return;const button=event.target.querySelector('[type=submit]');button.disabled=true;
+        sendRequestId ||= crypto.randomUUID();
+        try{
+            const result=await sendUnified({requestId:sendRequestId,threadId,subject:selectedSubject,body,destinationIds:selectedRecipients.map(r=>r.id)},document.getElementById('studioMessageFile').files);
+            sendRequestId=null;document.getElementById('studioMessageBody').value='';await openThread(result.threadId);
+        }catch(error){document.getElementById('studioSendFeedback').textContent=error.message;}finally{button.disabled=false;}
     }
 
     function updateUnreadBadge(count) {
@@ -444,10 +480,12 @@
     async function refreshSelectedThread(markRead) {
         if (!selectedThread) return;
         const currentThread=selectedThread,revision=threadRevision,targetHistory=document.getElementById('studioMessageHistory');
-        const [messages,threadAttachments] = await Promise.all([json(`/api/messages/threads/${selectedThread}`),json(`/api/messages/threads/${selectedThread}/attachments`).catch(()=>[])]);
+        const [messages,threadAttachments,deliveries] = await Promise.all([json(`/api/messages/threads/${selectedThread}`),json(`/api/messages/threads/${selectedThread}/attachments`).catch(()=>[]),json(`/api/messages/threads/${selectedThread}/deliveries`)]);
         const history = document.getElementById('studioMessageHistory');
         if (history && history===targetHistory && currentThread===selectedThread && revision===threadRevision) {
-            history.innerHTML = messages.map(message=>renderMessage(message,threadAttachments)).join('');
+            history.innerHTML = messages.map(message=>renderMessage(message,threadAttachments,deliveries)).join('');
+            history.querySelectorAll('[data-retry-routing]').forEach(button=>button.onclick=()=>retryRouting(button.dataset.retryRouting));
+            history.querySelectorAll('[data-retry-delivery]').forEach(button=>button.onclick=()=>retryDelivery(button.dataset.retryDelivery,button.dataset.uncertain==='true'));
             history.scrollTop = history.scrollHeight;
         }
         if (markRead) {
