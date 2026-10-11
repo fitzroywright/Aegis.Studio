@@ -12,7 +12,7 @@ async function environment(t,full=false){
  return {ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body),headers:{get:()=>null}};
  };
  if(!full)w.studioOpenJobs=async()=>{};
- const scripts=full?[...w.document.querySelectorAll('script[src]')].map(el=>new URL(el.src).pathname.slice(1)):['app.js','workspace-access.js','attachments.js','auth.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js'];
+ const scripts=full?[...w.document.querySelectorAll('script[src]')].map(el=>new URL(el.src).pathname.slice(1)):['studio-message-card.js','app.js','workspace-access.js','attachments.js','auth.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js'];
  for(const script of scripts)require('vm').runInContext(fs.readFileSync(path.join(root,script),'utf8'),dom.getInternalVMContext());
  await new Promise(r=>setTimeout(r,0));if(full)await w.studioTodayReady;await w.loadWorkspaces();return {w,calls,alerts,spaces};
 }

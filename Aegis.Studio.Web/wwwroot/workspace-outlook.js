@@ -127,6 +127,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
             studioRememberPeople(people);
         }
         if (version !== revision || (job && !currentJobOpening(version))) return;
+        const previousMessageCard=detailPane.querySelector('#jobDetailMessages');
+        const messagesOpen=previousMessageCard?.dataset.messageJobId===job?.id&&StudioMessageCard.isOpen(previousMessageCard);
         const combined = mergeJobMessages(messages, conversation?.messages || []);
         disposeJobView();disposeJobView=()=>{};
         detailPane.classList.remove('empty');
@@ -154,19 +156,23 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const header=detailPane.querySelector('.detail-header');
             header.className='job-detail-heading';
             header.innerHTML=`<div class="job-detail-title"><h1>${esc(job.title)}</h1><p>${esc(job.eventDate?new Date(job.eventDate.includes('T')?job.eventDate:job.eventDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'2-digit',year:'numeric'}).replaceAll(',',''):'Needs scheduling')} · <span data-job-owner>Owner: ${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</span></p></div>
-                <div class="jd-job-status"><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show job flow">${esc(job.status)}</button><small>${esc(job.jobCode||job.code||'')}</small></div>
-                <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-flow-toolbar"><strong>Job Flow</strong><button type="button" class="jd-link" data-close-job-flow>Close ↑</button></div><div class="jd-workflow-track" aria-live="polite"></div></div></section>
-                <div class="jd-workflow-caption"><span data-stage-age></span><span data-job-blocked></span><button type="button" class="jd-link" data-job-workflow>Assignments &amp; Workflow →</button></div>`;
-            const flowToggle=header.querySelector('.jd-status-pill'),flowDrawer=header.querySelector('.jd-flow-drawer');
+                <div class="jd-job-status"><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show flow details">${esc(job.status)}</button><small>${esc(job.jobCode||job.code||'')}</small></div>
+                <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol><div class="jd-flow-actions"><button type="button" class="jd-link" data-toggle-flow-details aria-expanded="false" aria-controls="jobFlowDrawer">Details ↓</button><button type="button" class="jd-link" data-job-workflow>Assignments &amp; Workflow →</button></div></div>
+                <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow details" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-flow-toolbar"><strong>Flow details</strong><button type="button" class="jd-link" data-close-job-flow>Close ↑</button></div><div class="jd-workflow-track" aria-live="polite"></div></div></section>
+                <div class="jd-workflow-caption"><span data-stage-age></span><span data-job-blocked></span></div>`;
+            const flowToggle=header.querySelector('.jd-status-pill'),detailsToggle=header.querySelector('[data-toggle-flow-details]'),flowDrawer=header.querySelector('.jd-flow-drawer');
+            let flowTrigger=flowToggle;
             const setFlowOpen=(open,restoreFocus=false)=>{
                 flowToggle.setAttribute('aria-expanded',String(open));
-                flowToggle.title=open?'Hide job flow':'Show job flow';
+                flowToggle.title=open?'Hide flow details':'Show flow details';
+                detailsToggle.setAttribute('aria-expanded',String(open));
+                detailsToggle.textContent=open?'Details ↑':'Details ↓';
                 flowDrawer.classList.toggle('is-open',open);
                 flowDrawer.setAttribute('aria-hidden',String(!open));
                 flowDrawer.toggleAttribute('inert',!open);
-                if(restoreFocus)flowToggle.focus();
+                if(restoreFocus)flowTrigger.focus();
             };
-            flowToggle.onclick=()=>setFlowOpen(flowToggle.getAttribute('aria-expanded')!=='true');
+            flowToggle.onclick=detailsToggle.onclick=event=>{flowTrigger=event.currentTarget;setFlowOpen(flowToggle.getAttribute('aria-expanded')!=='true');};
             header.querySelector('[data-close-job-flow]').onclick=()=>setFlowOpen(false,true);
             header.addEventListener('keydown',event=>{
                 if(event.key==='Escape'&&flowToggle.getAttribute('aria-expanded')==='true'){
@@ -189,12 +195,14 @@ function mergeJobMessages(teamMessages, customerMessages) {
             selectedFile.innerHTML='<header class="jd-card-heading"><h2>Selected File</h2></header><div class="job-detail-selected-content"><p class="muted">Select a photo in the gallery to inspect it.</p></div>';
             const selectedContent=selectedFile.querySelector('.job-detail-selected-content');
             const messagesPanel=document.getElementById('combinedJobMessages'),composer=document.getElementById('hierarchyCompose');
-            const messageCard=document.createElement('section');messageCard.className='job-message-column job-detail-message-card';messageCard.id='jobDetailMessages';
-            const messageHeader=document.createElement('header');messageHeader.className='job-panel-heading';messageHeader.innerHTML='<strong>Messages</strong><div class="panel-heading-actions"><button type="button" class="icon-button" data-message-search aria-label="Search messages">⌕</button><button type="button" class="icon-button" data-message-more aria-label="Show all messages">⋮</button></div>';
-            messageCard.append(messageHeader,messagesPanel,composer);
+            const messageCard=StudioMessageCard.create({id:'jobDetailMessages',title:'Messages',open:!!messagesOpen,attributes:'data-message-job-id="'+esc(job.id)+'"',actions:'<button type="button" data-message-search aria-label="Search messages">⌕</button><button type="button" data-message-more aria-label="Show all messages">⋮</button>'});
+            const messageHeader=messageCard.querySelector('.smc-header');
+            messageCard.querySelector('.smc-feed').append(messagesPanel);
+            messageCard.querySelector('.smc-content').append(composer);
+            StudioMessageCard.bind(messageCard);
             const attention=document.createElement('section');attention.className='jd-panel jd-attention';
             attention.innerHTML='<header class="jd-card-heading"><h2>⚠ Needs Attention</h2></header><div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
-            right.append(selectedFile,attention,messageCard);board.append(center,right);detailPane.append(nav,board);
+            right.append(selectedFile,messageCard,attention);board.append(center,right);detailPane.append(nav,board);
 
 
             const loaded=new Set(),pending=new Map();
@@ -232,7 +240,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             };
             const selectPanel=async name=>{
                 if(name==='messages'){
-                    messageCard.scrollIntoView({block:'nearest'});composer.querySelector('textarea').focus();return;
+                    StudioMessageCard.setOpen(messageCard,true);composer.querySelector('textarea').focus();return;
                 }
                 for(const [key,panel] of Object.entries(panels))panel.hidden=key!==name;
                 nav.querySelectorAll('button').forEach(button=>{const active=button.dataset.jobScroll===name;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
@@ -257,8 +265,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
             };
             window.addEventListener('studio-job-action',handleAction);
             attention.querySelector('[data-view-workflow]').onclick=()=>header.querySelector('[data-job-workflow]').click();
-            messageHeader.querySelector('[data-message-search]').onclick=()=>{const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
-            messageHeader.querySelector('[data-message-more]').onclick=()=>{messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
+            messageHeader.querySelector('[data-message-search]').onclick=()=>{StudioMessageCard.setOpen(messageCard,true);const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
+            messageHeader.querySelector('[data-message-more]').onclick=()=>{StudioMessageCard.setOpen(messageCard,true);messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
 
             let workflow=null;
             const updateAge=()=>{
@@ -270,7 +278,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 try{
                     const view=await json('/api/jobs/'+job.id+'/connected-workflow');if(!current())return;
                     workflow=view;const data=view.data;
-                    window.StudioJobDetails.workflow(header.querySelector('.jd-workflow-track'),data,job,view,selector=>header.querySelector('[data-job-workflow]').onclick(selector));
+                    window.StudioJobDetails.workflow(header.querySelector('.jd-workflow-track'),data,job,view,selector=>header.querySelector('[data-job-workflow]').onclick(selector),header.querySelector('.jd-flow-summary'));
                     header.querySelector('.jd-status-pill').textContent=data.stage;
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(data.owner?studioFirstName(data.owner):'Unassigned');
                     header.querySelector('[data-job-blocked]').textContent=data.blockedReason?'Blocked: '+data.blockedReason:'';
@@ -342,6 +350,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
 
     }
 })();
+
 
 
 

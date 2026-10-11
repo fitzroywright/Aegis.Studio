@@ -272,18 +272,18 @@
         const messageRows=combinedCommunicationFeed.map(entry=>{
             if(entry.kind==='announcement'){
                 const a=entry.item;
-                return `<button class="mw-message-row announcement" data-announcement-workspace="${a.workspaceId||''}">
-                    <span class="mw-comm-type announcement" title="Announcement" aria-label="Announcement">📣</span>
-                    <span class="mw-message-copy"><strong>${esc(a.title||'Announcement')}</strong><small>${esc((a.workspaceName?a.workspaceName+' · ':'')+(a.body||''))}</small></span>
-                    <span class="mw-message-time">${a.createdAtUtc?formatDay(a.createdAtUtc):''}</span>
+                return `<button class="smc-row" data-announcement-workspace="${a.workspaceId||''}">
+                    <span class="smc-type" title="Announcement" aria-label="Announcement">📣</span>
+                    <span class="smc-copy"><strong>${esc(a.title||'Announcement')}</strong><small>${esc((a.workspaceName?a.workspaceName+' · ':'')+(a.body||''))}</small></span>
+                    <span class="smc-time">${a.createdAtUtc?formatDay(a.createdAtUtc):''}</span>
                     <span class="mw-chevron">›</span>
                 </button>`;
             }
             const n=entry.item;
-            return `<button class="mw-message-row message" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
-                <span class="mw-comm-type message" title="Message" aria-label="Message">✉</span>
-                <span class="mw-message-copy"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.eventType||'Studio message')}</small></span>
-                <span class="mw-message-time">${n.createdAtUtc?formatDay(n.createdAtUtc):''}</span>
+            return `<button class="smc-row" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
+                <span class="smc-type" title="Message" aria-label="Message">✉</span>
+                <span class="smc-copy"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.eventType||'Studio message')}</small></span>
+                <span class="smc-time">${n.createdAtUtc?formatDay(n.createdAtUtc):''}</span>
                 <span class="mw-chevron">›</span>
             </button>`;
         }).join('')||'<div class="mw-empty">No messages or announcements.</div>';
@@ -350,12 +350,12 @@
                     </main>
                     <aside class="mw-today-right studio-dashboard-template__aside" aria-label="Daily activity">
                         <section class="mw-list-panel" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button data-nav="schedule">Calendar →</button></header><div class="mw-section-rows">${phase('schedule',sessionRows)}</div></section>
+                        ${StudioMessageCard.html({id:'todayMessageCard',open:StudioMessageCard.isOpen(state.root?.querySelector('#todayMessageCard')),body:phase('notifications',messageRows),actions:'<button type="button" data-nav="messages">View All →</button>',footer:'<button type="button" data-nav="messages">✉ Send Message →</button>',attributes:'data-mw-region="messages"'})}
                         <section class="mw-list-panel" data-mw-region="attention"><header><h2><span class="studio-card-icon" aria-hidden="true">⚑</span> Needs Attention</h2><button data-nav="tasks">View All →</button></header><div class="mw-status-list">
                             <button class="mw-status-row warning" data-nav="tasks"><span class="studio-attention-label"><span aria-hidden="true">◷</span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
                             <button class="mw-status-row warning" data-nav="schedule"><span class="studio-attention-label"><span aria-hidden="true">▦</span>Needs scheduling</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
                             <button class="mw-status-row warning" data-nav="production"><span class="studio-attention-label"><span aria-hidden="true">⇧</span>Awaiting upload</span><strong>${metric('jobs',uploadJobs)}</strong></button>
                         </div></section>
-                        <section class="mw-list-panel" data-mw-region="messages"><header><h2><span class="studio-card-icon" aria-hidden="true">✉</span> Messages & Announcements</h2><button data-nav="messages">View All →</button></header><div class="mw-compact-messages">${phase('notifications',messageRows)}</div><footer class="mw-messages-card-footer"><button type="button" data-nav="messages" class="mw-send-message-link"><span aria-hidden="true">✉</span> Send Message <span aria-hidden="true">→</span></button></footer></section>
                     </aside>
                 </div>
             </section>`;
@@ -376,6 +376,7 @@
             if(focused)existing.querySelector('[data-mw-filter="'+focused+'"]')?.focus();
         });
         state.root=genericView.querySelector('.mw-page');
+        StudioMessageCard.bind(state.root.querySelector('#todayMessageCard'));
         window.studioSetBreadcrumb?.([{label:'Today',view:'today'}]);
         if(studioPageTools){
             const today=new Date();
@@ -728,12 +729,7 @@
                             </div>
                         </section>
 
-                        <section class="mw-list-panel workspace-announcements-panel">
-                            <header><h2><span class="mw-title-icon messages">✉</span> Announcements</h2><small>${announcements.length} recent</small></header>
-                            <div class="workspace-announcement-rail">
-                                ${announcements.length?announcements.map(a=>`<article class="workspace-wow-announcement"><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p><small>${esc(a.workspaceName)} · ${a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):''}</small></article>`).join(''):'<p class="mw-empty">No workspace announcements.</p>'}
-                            </div>
-                        </section>
+                        ${StudioMessageCard.html({id:'workspaceMessageCard',title:'Announcements',body:announcements.map(a=>`<article class="smc-row"><span aria-hidden="true">📣</span><span class="smc-copy"><strong>${esc(a.title)}</strong><small>${esc(a.body)}</small><small>${esc(a.workspaceName)} · ${esc(a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):'')}</small></span></article>`).join('')||'<p>No workspace announcements.</p>',footer:'<button type="button" data-nav-quick="messages">✉ Send Message →</button>'})}
 
                         <section class="mw-list-panel workspace-help-panel">
                             <header><h2><span class="mw-title-icon links">↗</span> Navigation</h2></header>
@@ -786,6 +782,7 @@
                 await selectWorkspace(button.dataset.openWorkspace,button.dataset.workspaceName);
             };
         });
+        StudioMessageCard.bind(genericView.querySelector('#workspaceMessageCard'));
         genericView.querySelectorAll('[data-nav-quick]').forEach(button=>{
             button.onclick=()=>window.studioNavigate(button.dataset.navQuick);
         });

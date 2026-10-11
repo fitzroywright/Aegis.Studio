@@ -52,7 +52,18 @@ button.jd-stage { position:absolute; display:flex; align-items:center; gap:6px; 
 button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-workflow-caption { grid-column:1/-1; margin-top:8px; display:flex; align-items:center; flex-wrap:wrap; gap:5px 12px; font-size:10px; color:#b4510f; }
 .jd-workflow-caption [data-job-blocked] { color:#bd3040; }
-.jd-workflow-caption .jd-link { margin-left:auto; }
+ .jd-flow-overview { grid-column:1/-1; display:flex; align-items:center; gap:14px; min-width:0; margin-top:10px; }
+.jd-flow-summary { display:flex; flex:1; min-width:0; align-items:center; gap:0; list-style:none; margin:0; padding:0; overflow-x:auto; }
+.jd-flow-phase { position:relative; display:flex; flex:1; align-items:center; gap:5px; min-width:88px; font-size:10px; color:var(--theme-muted,#69758b); }
+.jd-flow-phase:not(:last-child)::after { content:""; flex:1; height:2px; min-width:8px; margin:0 6px; background:#c5cad3; }
+.jd-flow-phase.complete::after { background:#318348; }
+.jd-flow-phase.complete,.jd-flow-phase.current { color:var(--theme-text,#162b50); font-weight:750; }
+.jd-flow-phase.complete .jd-stage-light { background:#318348; border-color:#318348; }
+.jd-flow-phase.current .jd-stage-light { background:#fb851c; border-color:#fb851c; }
+.jd-flow-phase.exception .jd-stage-light { background:#bd3040; border-color:#bd3040; }
+.jd-flow-phase.skipped .jd-stage-light { background:transparent; color:var(--theme-muted,#69758b); }
+.jd-flow-actions { flex:none; display:flex; align-items:center; gap:8px; }
+@media(max-width:900px) { .jd-flow-overview { flex-wrap:wrap; } .jd-flow-summary { flex-basis:100%; } .jd-flow-actions { margin-left:auto; } }
 .jd-link { border:0; background:transparent; color:#9c631c; padding:3px; font-size:11px; font-weight:750; cursor:pointer; }
 .job-detail-navigation { grid-column:1; display:flex; min-width:0; gap:0; border:1px solid var(--theme-border,#e1ded8); border-radius:7px; background:var(--theme-surface,#fff); }
 .job-detail-navigation button { flex:1; border:0; border-radius:0; background:transparent; color:var(--theme-text,#162b50); padding:8px 6px; font-size:12px; white-space:nowrap; box-shadow:none; }
@@ -99,7 +110,8 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-drag-over { outline:2px dashed #ed700d; outline-offset:-4px; }
 .jd-empty { font-size:12px; padding:10px; grid-column:1/-1; color:var(--theme-muted,#7d8591); }
 .jd-preview-fallback { display:grid; place-items:center; width:100%; height:100%; text-align:center; font-size:10px; color:var(--theme-muted,#7d8591); }
-.job-detail-right { grid-column:2; grid-row:1/4; display:grid; grid-template-rows:minmax(180px,43%) auto minmax(150px,1fr); gap:8px; min-height:0; min-width:0; overflow:hidden; }
+.job-detail-right { grid-column:2; grid-row:1/4;   gap:8px; min-height:0; min-width:0; overflow:hidden; display:flex;flex-direction:column;}
+.job-detail-selected-file { flex:1 1 0; }
 .job-detail-selected-content { flex:1; min-height:0; display:flex; flex-direction:column; gap:5px; padding:8px 10px; overflow:auto; }
 .jd-selected-preview { flex:none; aspect-ratio:1.8; width:100%; border-radius:4px; overflow:hidden; background:var(--theme-surface-alt,#ecebe6); }
 .jd-full-preview { display:grid; place-items:center; min-height:100px; }
@@ -114,7 +126,7 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-save { border:0; background:#e96b0d; color:#fff; padding:5px 9px; border-radius:4px; font-weight:650; font-size:10px; }
 .jd-file-links { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px; }
 .jd-file-links a,.jd-file-links button { border:0; padding:0; font-size:9px; font-weight:700; color:#996119; background:transparent; }
-.jd-attention { border-top:3px solid #d93344; }
+.jd-attention { border-top:3px solid #d93344; flex:1 1 0;}
 .jd-attention .jd-card-heading { border-bottom:0; padding:7px 10px 0; }
 .jd-attention-items { padding:0 10px; overflow:auto; max-height:75px; }
 .jd-attention-items p { margin:6px 0; font-size:11px; }
@@ -123,23 +135,9 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .job-detail-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:0 0 12px; }
 .job-detail-facts dt { color:var(--theme-muted,#69758b); font-size:11px; }
 .job-detail-facts dd { margin:2px 0 0; font-weight:650; overflow-wrap:anywhere; }
-/* The post-it card retains its warm colors and compact composer. */
-.job-detail-message-card { background:#fff5c8; border:1px solid #dfc66e; border-radius:7px; color:#5e4a20; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
-.job-detail-message-card > .job-panel-heading { background:#fff1b2; border-bottom:1px solid #e6d17c; color:#614a18; min-height:30px; padding:5px 10px; flex:none; }
-.job-detail-message-card > .messages { background:#fff5c8; color:#5e4a20; flex:1; min-height:0; overflow:auto; padding:7px; }
-.job-detail-message-card .message { margin-bottom:6px; padding-bottom:5px; border-bottom:1px solid #e6d17c; }
-.job-detail-message-card .message-content { background:transparent; }
-.job-detail-message-card .message-head { display:flex; flex-wrap:wrap; align-items:center; gap:4px; font-size:9px; }
-.job-detail-message-card .message-content p { font-size:11px; margin:3px 0; }
-.job-detail-message-card .composer { background:#fff1b2; border-top:1px solid #e6d17c; padding:5px 8px; flex:none; }
-.job-detail-message-card .composer .send-split { display:flex; gap:5px; }
-.job-detail-message-card .composer .send-split button { flex:1; padding:4px 8px; border:0; border-radius:4px; background:#a27527; color:#fff; }
-.job-detail-message-card .composer .send-split select { width:85px; min-width:0; padding:3px; }
-.job-detail-message-card .composer textarea { min-height:32px; max-height:50px; font-size:11px; }
-.job-detail-message-card .composer label,.job-detail-message-card .composer button,.job-detail-message-card .composer select { font-size:10px; }
-.job-detail-message-card .composer .muted:empty,.job-detail-message-card .composer [role=alert]:empty { display:none; }
 .job-detail-workflow-dialog { width:min(1000px,95vw); max-height:85vh; overflow:auto; }
 .job-detail-workflow-dialog .workflow-panel { margin:0; overflow:visible; }
 @media(max-width:1200px) { .jd-drop-hint { display:none; } .jd-contact-sheet { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr) 230px; } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-job-status { max-width:110px; } .jd-workflow-track { padding:6px 0 0; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } .job-detail-facts { grid-template-columns:1fr; } }
-@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:4; grid-template-rows:minmax(0,1fr); } .job-detail-selected-file,.jd-attention { display:none; } .job-detail-heading { padding:7px; gap:0 5px; } .jd-job-status { max-width:130px; } .jd-workflow-track { max-height:195px; } .job-detail-navigation button { padding:6px 2px; font-size:9px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
+@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:4;  display:flex;flex-direction:column;} .job-detail-selected-file,.jd-attention { display:none; } .job-detail-heading { padding:7px; gap:0 5px; } .jd-job-status { max-width:130px; } .jd-workflow-track { max-height:195px; } .job-detail-navigation button { padding:6px 2px; font-size:9px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
+

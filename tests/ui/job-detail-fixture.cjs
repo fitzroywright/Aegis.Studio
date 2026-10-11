@@ -2,7 +2,7 @@
 const fs=require('fs');
 const path=require('path');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-const scripts=['job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
+const scripts=['studio-message-card.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
 function setup(w){
  const jobs=[{id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Wedding selects review',clientName:'Williams & Clarke',status:'Awaiting Production Review',eventDate:'2026-10-11'},{id:'job2',workspaceId:'workspace',conversationId:'conversation2',title:'Graduation portraits',clientName:'School',status:'Awaiting Scheduling'}];
  const calls=[],alerts=[];

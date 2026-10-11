@@ -7,7 +7,7 @@
  const phases=['Pending','Needs Assignment','Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload','Awaiting Production Review','Active Production','Awaiting Approval','Ready for Delivery','Delivered','Completed','Changes Requested','Cancelled','Blocked','Reshoot Required'];
  const photographyStages=new Set(['Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload']);
  function phaseIndex(data){return phases.indexOf(data.stage);}
- function workflow(host,data,job={},view={},activate=null){
+ function workflow(host,data,job={},view={},activate=null,summaryHost=null){
   const next=root.StudioWorkflow?.nextAction({...view,data}),sessions=(data.sessions||[]).filter(s=>s.required!==false);
   const noShoot=/print|edit/i.test(job.jobType||job.type||'')&&!(data.sessions||[]).length;
   const crewAssigned=sessions.length>0&&sessions.every(s=>s.crew_finalized&&(s.crew||[]).length>0);
@@ -25,6 +25,11 @@
    const corrected=from==='Changes Requested'&&['Awaiting Production Review','Active Production'].includes(to);
    if(forward||corrected)passed.add(from);
   });
+  // The current forward gate also proves earlier gates that the service may skip in history.
+  // Exceptions retain the last normal gate without treating its failed exit as success.
+  const lastNormal=history.filter(h=>main.includes(h.new_stage)).at(-1)?.new_stage||(data.stage==='Changes Requested'?(data.correctionKind==='Source'?'Awaiting Production Review':data.correctionKind==='Production'?'Awaiting Approval':null):null);
+  const frontier=main.indexOf(main.includes(data.stage)?data.stage:lastNormal);
+  main.forEach((label,index)=>{if(index<frontier)passed.add(label);else passed.delete(label);});
   const positions=new Map();groups.forEach(([,labels],column)=>labels.forEach((label,row)=>positions.set(label,{x:column*170+18,y:32+row*25})));
   [['Cancelled',1],['Reshoot Required',2],['Changes Requested',4],['Blocked',5]].forEach(([label,column])=>positions.set(label,{x:column*170+18,y:151}));
   if(!positions.has(data.stage))positions.set(data.stage,{x:18,y:151});
@@ -33,10 +38,10 @@
    const skipped=noShoot&&(photographyStages.has(label)||label==='Reshoot Required'),current=label===data.stage||(label==='Blocked'&&!!data.blockedReason)||(label==='Reshoot Required'&&reshoot);
    const milestone=label==='Photographer Assigned'||label==='Shoot Complete';
    const complete=hostStageComplete(label),finished=label==='Completed'&&current;
-   const state=skipped?'skipped':finished?'current complete':current?(label==='Cancelled'||label==='Changes Requested'||label==='Blocked'||label==='Reshoot Required'?'current exception':'current'):complete?'complete':'pending';
+   const state=skipped?'skipped':current&&complete?'current complete':current?(label==='Cancelled'||label==='Changes Requested'||label==='Blocked'||label==='Reshoot Required'?'current exception':'current'):complete?'complete':'pending';
    const description=skipped?'Not required':finished?'Successfully completed':current?'Current':complete?(milestone?'Confirmed':'Successfully passed'):'Not yet passed';
    const point=positions.get(label);
-   return `<button type="button" style="left:${point.x-9}px;top:${point.y-9}px" class="jd-stage ${state}" data-flow-stage="${escape(label)}" title="${escape(label+' · '+description)}" ${label===data.stage?'aria-current="step"':''}><span class="jd-stage-light" aria-hidden="true">${skipped?'–':current&&state.includes('exception')?'!':finished||complete&&!current?'✓':''}</span><span>${escape(label)}${skipped?' <small>Not required</small>':''}</span></button>`;
+   return `<button type="button" style="left:${point.x-9}px;top:${point.y-9}px" class="jd-stage ${state}" data-flow-stage="${escape(label)}" title="${escape(label+' · '+description)}" ${label===data.stage?'aria-current="step"':''}><span class="jd-stage-light" aria-hidden="true">${skipped?'–':current&&state.includes('exception')?'!':complete?'✓':''}</span><span>${escape(label)}${skipped?' <small>Not required</small>':''}</span></button>`;
   }).join('');
   const edge=(from,to,kind='main',returning=false)=>{
    const a=positions.get(from),b=positions.get(to);if(!a||!b)return '';
@@ -56,6 +61,18 @@
   host.innerHTML=`<div class="jd-flow-canvas"><svg class="jd-flow-lines" viewBox="0 0 1020 184" aria-hidden="true" focusable="false">${mainEdges}${branches}</svg>${groups.map(([title],index)=>`<strong class="jd-flow-heading" style="left:${index*170+9}px">${title}</strong>`).join('')}${nodes}</div>`;
   host.setAttribute('aria-label','Job workflow: '+data.stage+(data.blockedReason?' · Blocked: '+data.blockedReason:''));
   const focusPoint=positions.get(data.stage);if(focusPoint&&host.clientWidth)host.scrollLeft=Math.max(0,focusPoint.x-host.clientWidth/2);
+  if(summaryHost){
+   const activeStage=main.includes(data.stage)?data.stage:lastNormal;
+   summaryHost.innerHTML=groups.map(([title,steps])=>{
+    const applicable=steps.filter(label=>!(noShoot&&photographyStages.has(label)));
+    const skipped=!applicable.length,complete=!skipped&&applicable.every(hostStageComplete);
+    const current=steps.includes(activeStage),exception=current&&(!main.includes(data.stage)||!!data.blockedReason||title==='Shoot'&&reshoot);
+    const state=skipped?'skipped':complete?'complete':exception?'current exception':current?'current':'pending';
+    const description=skipped?'Not required':complete?'Successfully passed':exception?'Needs attention':current?'Current':'Not yet passed';
+    return `<li class="jd-flow-phase ${state}" data-flow-phase="${title}" title="${title} · ${description}"><span class="jd-stage-light" aria-hidden="true">${skipped?'–':complete?'✓':exception?'!':''}</span><span>${title}</span><span class="sr-only">${description}</span></li>`;
+   }).join('');
+   summaryHost.setAttribute('aria-label','Main job flow: '+data.stage);
+  }
   host.querySelectorAll('.jd-stage').forEach(button=>{
    const label=button.dataset.flowStage,current=label===data.stage;
    const selector=current?next?.selector:label==='Blocked'&&data.blockedReason&&view.canManage?'[data-wf-block]':label==='Reshoot Required'&&reshoot&&view.canManage&&data.ownerAssignment?.status==='Accepted'&&['Scheduled','Photography In Progress','Awaiting Upload'].includes(data.stage)&&(data.outstandingRoster||[]).length?'[data-wf-remainder]':null;
@@ -189,3 +206,4 @@
  }
  root.StudioJobDetails={workflow,phaseIndex,media};
 })(window);
+
