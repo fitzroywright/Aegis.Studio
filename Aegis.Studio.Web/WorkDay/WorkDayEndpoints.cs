@@ -93,12 +93,9 @@ public static class WorkDayEndpoints
             if(!locationEnabled && request.Location is not null)
                 request=request with { Location=null };
 
-            if(request.AssignmentId is Guid assignmentId)
-            {
-                string permission=RequiredJobPermission(request.Kind);
-                if(!AssignmentAllowed(user,userName,assignmentId,db,schedules,access,permission))
-                    return Results.Forbid();
-            }
+            // Apply verifies the active reporter inside its Job/schedule transaction.
+            // Replay is checked first so a lost acknowledgement remains recoverable
+            // after the photographer is reassigned.
 
             try
             {

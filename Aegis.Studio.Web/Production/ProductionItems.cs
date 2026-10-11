@@ -3,6 +3,7 @@ using System.Text.Json;
 using Aegis.Studio.Web.Media;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Workflow;
 using Npgsql;
 
 namespace Aegis.Studio.Web.Production;
@@ -50,16 +51,32 @@ public static class ProductionItems
             return Results.Ok(JsonSerializer.Deserialize<JsonElement>((string)cmd.ExecuteScalar()!));
         }).RequireAuthorization();
         app.MapPut("/api/jobs/{jobId:guid}/production/{activityId:guid}/items/{itemId:guid}",
-            (Guid jobId,Guid activityId,Guid itemId,ProductionItemQcRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db)=>
+            (Guid jobId,Guid activityId,Guid itemId,ProductionItemQcRequest request,ClaimsPrincipal user,JobAccessService access,WorkflowStore workflow,StudioDatabase db)=>
         {
             if(!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
             try
             {
                 Validate(request);
+                bool productionManager=workflow.IsProductionManager(user);
+                if(!ProductionAuthorityRules.CanDecideQuality(productionManager,request.State))return Results.Forbid();
                 string actor=user.FindFirstValue("login_name")??user.Identity?.Name??"Studio";
                 using var c=db.OpenConnection();using var tx=c.BeginTransaction();
                 using(var guard=new NpgsqlCommand("select id from studio_jobs where id=$1 and status in ('Active Production','Changes Requested') for update",c,tx))
                 {guard.Parameters.AddWithValue(jobId);if(guard.ExecuteScalar() is null)throw new ArgumentException("This job is closed for production changes.");}
+                using(var task=new NpgsqlCommand("select assigned_to from studio_job_activities where id=$1 and job_id=$2 for update",c,tx))
+                {
+                    task.Parameters.AddWithValue(activityId);task.Parameters.AddWithValue(jobId);
+                    object? assignee=task.ExecuteScalar();
+                    if(assignee is null)return Results.NotFound();
+                    if(!productionManager&&!string.Equals(assignee as string,actor,StringComparison.OrdinalIgnoreCase))return Results.Forbid();
+                }
+                // Pending progress cannot silently undo a recorded technical decision.
+                using(var decision=new NpgsqlCommand("select qc_state from studio_production_items where id=$1 and activity_id=$2 for update",c,tx))
+                {
+                    decision.Parameters.AddWithValue(itemId);decision.Parameters.AddWithValue(activityId);
+                    if(decision.ExecuteScalar() is not string state)return Results.NotFound();
+                    if(!productionManager&&state!="Pending")return Results.Forbid();
+                }
                 using var update=new NpgsqlCommand("""
                     update studio_production_items i set completed_quantity=$4,qc_state=$5,qc_reason=$6,qc_by=$7,qc_at=now()
                     from studio_job_activities a where a.id=i.activity_id and a.job_id=$1 and a.id=$2 and i.id=$3

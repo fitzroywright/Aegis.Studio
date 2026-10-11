@@ -86,13 +86,52 @@ public sealed class PhotographerStore
 
     public PhotographerAvailability AddAvailability(string userName, PhotographerAvailabilityRequest request)
     {
-        if (request.EndsAtUtc <= request.StartsAtUtc) throw new InvalidOperationException("Availability end must be after start.");
-        if (Get(userName) is null) throw new KeyNotFoundException("Photographer was not found.");
-        PhotographerAvailability value = new(Guid.NewGuid(),userName.Trim(),request.StartsAtUtc.ToUniversalTime(),request.EndsAtUtc.ToUniversalTime(),NormalizeAvailabilityType(request.AvailabilityType),Clean(request.Note),DateTimeOffset.UtcNow);
-        using NpgsqlConnection connection = database.OpenConnection(); using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "insert into studio_photographer_availability(id,user_name,starts_at_utc,ends_at_utc,availability_type,note,created_at_utc) values($1,$2,$3,$4,$5,$6,$7)";
-        command.Parameters.AddWithValue(value.Id); command.Parameters.AddWithValue(value.UserName); command.Parameters.AddWithValue(value.StartsAtUtc); command.Parameters.AddWithValue(value.EndsAtUtc); command.Parameters.AddWithValue(value.AvailabilityType); command.Parameters.AddWithValue((object?)value.Note??DBNull.Value); command.Parameters.AddWithValue(value.CreatedAtUtc); command.ExecuteNonQuery();
-        return value;
+        if(request.EndsAtUtc<=request.StartsAtUtc||(request.EndsAtUtc-request.StartsAtUtc).TotalDays>366)
+            throw new InvalidOperationException("Availability must cover a valid period of at most 366 days.");
+        if(request.AvailabilityType is not ("Unavailable" or "Leave" or "Preferred" or "Available"))throw new InvalidOperationException("Choose a supported availability type.");
+        if((request.Note?.Length??0)>4000)throw new InvalidOperationException("Availability notes may contain at most 4000 characters.");
+        if(Get(userName) is not {IsActive:true} profile)throw new KeyNotFoundException("Active photographer was not found.");
+        Guid id=request.OperationId??Guid.NewGuid();
+        if(id==Guid.Empty)throw new InvalidOperationException("A valid operation ID is required.");
+        var value=new PhotographerAvailability(id,userName.Trim(),request.StartsAtUtc.ToUniversalTime(),request.EndsAtUtc.ToUniversalTime(),request.AvailabilityType,Clean(request.Note),DateTimeOffset.UtcNow);
+        using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",c,tx))
+        {guard.Parameters.AddWithValue("availability:"+id);guard.ExecuteNonQuery();}
+        using(var prior=new NpgsqlCommand("select user_name,starts_at_utc,ends_at_utc,availability_type,note,created_at_utc from studio_photographer_availability where id=$1",c,tx))
+        {
+            prior.Parameters.AddWithValue(id);using var r=prior.ExecuteReader();
+            if(r.Read())
+            {
+                if(!r.GetString(0).Equals(value.UserName,StringComparison.OrdinalIgnoreCase)||r.GetFieldValue<DateTimeOffset>(1)!=value.StartsAtUtc||r.GetFieldValue<DateTimeOffset>(2)!=value.EndsAtUtc||r.GetString(3)!=value.AvailabilityType||(r.IsDBNull(4)?null:r.GetString(4))!=value.Note)
+                    throw new InvalidOperationException("This availability operation ID was already used for different facts.");
+                return value with{CreatedAtUtc=r.GetFieldValue<DateTimeOffset>(5)};
+            }
+        }
+        using(var guard=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",c,tx))
+        {guard.Parameters.AddWithValue(profile.ScheduleResourceId.ToString("D"));guard.ExecuteNonQuery();}
+        using(var insert=new NpgsqlCommand("insert into studio_photographer_availability(id,user_name,starts_at_utc,ends_at_utc,availability_type,note,created_at_utc) values($1,$2,$3,$4,$5,$6,$7)",c,tx))
+        {
+            foreach(object? item in new object?[]{value.Id,value.UserName,value.StartsAtUtc,value.EndsAtUtc,value.AvailabilityType,value.Note,value.CreatedAtUtc})insert.Parameters.AddWithValue(item??DBNull.Value);
+            insert.ExecuteNonQuery();
+        }
+        // New leave/unavailability does not cancel confirmed sessions. It returns
+        // each affected Job to its accountable people as a scheduling exception.
+        if(value.AvailabilityType is "Unavailable" or "Leave")
+        {
+            var affected=new List<Guid>();
+            using(var q=new NpgsqlCommand("select distinct e.job_id from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id where er.resource_id=$1 and e.job_id is not null and e.status not in ('Cancelled','Completed') and coalesce(er.attendance_start_utc,e.starts_at_utc)<$3 and coalesce(er.attendance_end_utc,e.ends_at_utc)>$2",c,tx))
+            {
+                q.Parameters.AddWithValue(profile.ScheduleResourceId);q.Parameters.AddWithValue(value.StartsAtUtc);q.Parameters.AddWithValue(value.EndsAtUtc);
+                using var r=q.ExecuteReader();while(r.Read())affected.Add(r.GetGuid(0));
+            }
+            foreach(Guid job in affected)
+            {
+                // Notifications avoid a resource-lock -> Job-lock inversion with scheduling.
+                using var q=new NpgsqlCommand("select studio_workflow_notify($1,$2,'Owner','Photographer availability conflict',$3),studio_workflow_notify($1,$2||':manager','Manager','Photographer availability conflict',$3)",c,tx);
+                q.Parameters.AddWithValue(job);q.Parameters.AddWithValue("availability:"+id+":"+job);q.Parameters.AddWithValue($"{profile.DisplayName}: {value.AvailabilityType}, {value.StartsAtUtc:u} to {value.EndsAtUtc:u}. Review the session and reassign/reschedule where necessary.");q.ExecuteNonQuery();
+            }
+        }
+        tx.Commit();return value;
     }
 
     public bool IsAvailable(string userName, DateTimeOffset startsAtUtc, DateTimeOffset endsAtUtc)
@@ -127,4 +166,4 @@ public sealed class PhotographerStore
 public sealed record PhotographerProfile(string UserName,string DisplayName,string EmploymentType,bool IsActive,IReadOnlyList<string> Skills,string? DefaultEquipmentNotes,Guid ScheduleResourceId,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc);
 public sealed record PhotographerProfileRequest(string UserName,string? DisplayName,string? EmploymentType,bool IsActive,IReadOnlyList<string>? Skills,string? DefaultEquipmentNotes,Guid? ScheduleResourceId=null);
 public sealed record PhotographerAvailability(Guid Id,string UserName,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string AvailabilityType,string? Note,DateTimeOffset CreatedAtUtc);
-public sealed record PhotographerAvailabilityRequest(DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? AvailabilityType,string? Note);
+public sealed record PhotographerAvailabilityRequest(DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? AvailabilityType,string? Note,Guid? OperationId=null);

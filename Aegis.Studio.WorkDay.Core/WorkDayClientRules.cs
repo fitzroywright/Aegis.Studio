@@ -1,6 +1,6 @@
 namespace Aegis.Studio.WorkDay.Core;
 
-public enum LocalSyncState { Pending, Sending, Acknowledged, Failed, Conflict }
+public enum LocalSyncState { Pending, Sending, Acknowledged, Failed, Conflict, Resolved }
 public enum LocalUploadState { Pending, Uploading, Uploaded, Failed, Retrying }
 
 public static class WorkDayClientRules
@@ -25,6 +25,13 @@ public static class WorkDayClientRules
         "Arrive"=>"Arrived", "StartSession"=>"InProgress", "CompleteSession"=>"Completed",
         "SetExceptionStatus" when !string.IsNullOrWhiteSpace(category)=>category!, _=>current
     };
+
+    public static bool IsOutstanding(string? state) => state is not ("Acknowledged" or "Resolved");
+
+    // A conflict response establishes rejection. Reports never attempted can be
+    // retained as resolved history; uncertain transport results require replay.
+    public static bool CanResolveReport(string state, int attempts) =>
+        state == "Conflict" || (attempts == 0 && (state is "Pending" or "Failed"));
 
     public static bool IsPending(LocalSyncState state) =>
         state is LocalSyncState.Pending or LocalSyncState.Failed;

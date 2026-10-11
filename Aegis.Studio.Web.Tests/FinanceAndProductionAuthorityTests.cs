@@ -38,6 +38,15 @@ public sealed class FinanceAndProductionAuthorityTests
         => Assert.Equal(expected, ProductionAuthorityRules.CanDispatch(productionManager, owner, existing, requested));
 
     [Theory]
+    [InlineData(false,"Pending",true)]
+    [InlineData(false,"Passed",false)]
+    [InlineData(false,"Rejected",false)]
+    [InlineData(true,"Passed",true)]
+    [InlineData(true,"Rejected",true)]
+    public void AssignedStaffProgressDoesNotConferTechnicalApproval(bool manager,string state,bool expected)
+        =>Assert.Equal(expected,ProductionAuthorityRules.CanDecideQuality(manager,state));
+
+    [Theory]
     [InlineData(false, true, false, "Edit", false)]
     [InlineData(false, true, true, "Edit", true)]
     [InlineData(true, true, false, "Edit", true)]

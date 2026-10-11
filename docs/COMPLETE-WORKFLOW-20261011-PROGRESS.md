@@ -92,3 +92,14 @@ Final native Web/Core suite: **216 passed, 13 database tests skipped, 0 failed**
 - Corrected previously stale PostgreSQL booking tests: intake must create a Pending Job before payment, receipt replay must not duplicate Jobs/payments and recording a deposit must not automatically confirm. These corrected tests remain environment-gated, not demonstrated.
 - Rewrote acceptance report to distinguish new Finance, production, gallery, V1, webhook and reference implementation from outstanding connected/mobile/storage verification and incomplete legacy/navigation/recovery work.
 - Verification: .NET **248 passed / 15 skipped / 0 failed** (263 total); UI **99 passed / 0 failed**; JavaScript syntax and whitespace clean. No merge, deployment or live external messaging.
+
+## Local-validation handoff — recovery and alternate task actions
+
+User direction: builds and test execution will occur locally. No builds or tests have been run for changes in this checkpoint; the preceding 248/99 results apply to the previous commit only.
+
+- WorkDay provides report history and explicit conflict resolution after a fresh Studio snapshot. Original IDs, facts and timestamps remain encrypted/preserved; resolved reports are distinct from acknowledged reports. Unknown transport results cannot be discarded as resolved. Historical/removed assignments are marked separately. A replay acknowledgement no longer rolls a newer cached version backwards.
+- Availability/leave changes queue locally, retain stable operation IDs across restart/retry and show Pending/Conflict/Acknowledged states. Server replay validates the same actor/facts, serializes with photographer reservation locks and notifies accountable people about leave conflicting with existing sessions. Rejected availability can be retained as resolved history and corrected separately.
+- Reporter membership is checked inside Apply after idempotent replay, allowing an already committed report's lost acknowledgement to be recovered after reassignment. Removed/closed assignments return explicit conflicts.
+- Technical item QC decisions and approved production-source allocation require Production Manager authority. Assignees may record produced quantity while QC remains Pending. QC task completion is also protected. Existing task creation/progress buttons now use versioned connected commands rather than the old unversioned request payload.
+- Invoice release reconciles the connected invoice/Job set and counts each receipt once. Invoice status remains insufficient evidence of settlement. Until explicit invoice receipt allocation exists, an unpaid linked invoice set requires Finance authorization.
+- Added local test sources for conflict recovery, QC authority and shared invoice receipts. Mobile, SQL migrations, API/UI behavior and these tests await the user's local validation.

@@ -83,11 +83,11 @@ public static class CommercialEndpoints
                 """,jobId,string.IsNullOrWhiteSpace(term)?null:term,after);
             return Results.Content((string)q.ExecuteScalar()!,"application/json");
         }).RequireAuthorization();
-        app.MapPut("/api/production/work-orders/{id:guid}/source", (Guid id, WorkOrderSource request, ClaimsPrincipal user, JobAccessService access, StudioDatabase database) => Run(() =>
+        app.MapPut("/api/production/work-orders/{id:guid}/source", (Guid id, WorkOrderSource request, ClaimsPrincipal user, JobAccessService access, WorkflowStore workflow, StudioDatabase database) => Run(() =>
         {
             using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
             Guid job = OrderJob(c, tx, id);
-            if (!access.HasPermission(user, job, "ManageProduction")) return Results.Forbid();
+            if (!workflow.IsProductionManager(user)||!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
             using (var guard = Command(c, tx, "select status from studio_jobs where id=$1 for update", job))
                 if (guard.ExecuteScalar() is "Completed" or "Cancelled" or "Delivered") throw new ArgumentException("Job is closed for production changes.");
             if (Execute(c, tx, """
@@ -114,7 +114,7 @@ public static class CommercialEndpoints
         {
             if (string.IsNullOrWhiteSpace(request.Reason)) throw new ArgumentException("A reconciliation note is required.");
             using var c = database.OpenConnection(); using var tx = c.BeginTransaction(); Guid job = OrderJob(c, tx, id);
-            if (!workflow.CanManage(user, job)) return Results.Forbid();
+            if (!workflow.IsProductionManager(user)) return Results.Forbid();
             Execute(c,tx,"""
                 update studio_job_activities a set status=case when position(lower(a.step_definition->>'variation') in lower(coalesce(w.specifications,'')))>0 then 'NotStarted' else 'Cancelled' end,
                   optional_step=case when position(lower(a.step_definition->>'variation') in lower(coalesce(w.specifications,'')))>0 then coalesce((a.step_definition->>'optional')::boolean,false) else true end,

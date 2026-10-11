@@ -50,6 +50,11 @@ public sealed class WorkDayApiClient
             ? new{observationId=op.LocationObservationId??op.OperationId,latitude=op.Latitude.Value,longitude=op.Longitude.Value,accuracyMetres=op.AccuracyMetres,observedAtUtc=op.LocationObservedAtUtc??op.OccurredAtUtc,source=op.LocationSource,mockLocation=(bool?)null}
             : null;
         using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/operations",new{operationId=op.OperationId,kind=op.Kind,assignmentId=op.AssignmentId,occurredAtUtc=op.OccurredAtUtc,deviceId=op.DeviceId,text=op.Text,category=op.Category,location,expectedVersion=op.ExpectedVersion},ct);
+        if(r.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
+        {
+            string message=await ErrorAsync(r,ct);
+            return new(op.OperationId,"Conflict",DateTimeOffset.UtcNow,message,null);
+        }
         if(r.StatusCode!=System.Net.HttpStatusCode.Conflict)r.EnsureSuccessStatusCode();
         OperationResultDto? result=await r.Content.ReadFromJsonAsync<OperationResultDto>(cancellationToken:ct);
         if(result is null||result.OperationId!=op.OperationId||result.State is not ("Acknowledged" or "Conflict"))
@@ -83,11 +88,22 @@ public sealed class WorkDayApiClient
     public Task<List<PhotographerAvailabilityDto>?> GetAvailabilityAsync(DateTimeOffset from,DateTimeOffset to,CancellationToken ct=default)=>
         http.GetFromJsonAsync<List<PhotographerAvailabilityDto>>($"api/workday/availability?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}",ct);
 
-    public async Task<PhotographerAvailabilityDto> AddAvailabilityAsync(DateTimeOffset startsAtUtc,DateTimeOffset endsAtUtc,string availabilityType,string? note,CancellationToken ct=default)
+    public async Task<PhotographerAvailabilityDto> AddAvailabilityAsync(DateTimeOffset startsAtUtc,DateTimeOffset endsAtUtc,string availabilityType,string? note,Guid? operationId=null,CancellationToken ct=default)
     {
-        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/availability",new{startsAtUtc,endsAtUtc,availabilityType,note},ct);
-        r.EnsureSuccessStatusCode();
+        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/availability",new{startsAtUtc,endsAtUtc,availabilityType,note,operationId},ct);
+        if(!r.IsSuccessStatusCode)throw new HttpRequestException(await ErrorAsync(r,ct),null,r.StatusCode);
         return await r.Content.ReadFromJsonAsync<PhotographerAvailabilityDto>(cancellationToken:ct)??throw new InvalidOperationException("Studio did not return the availability entry.");
+    }
+
+    private static async Task<string> ErrorAsync(HttpResponseMessage response,CancellationToken ct)
+    {
+        try
+        {
+            using var payload=System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            if(payload.RootElement.TryGetProperty("error",out var error)&&error.ValueKind==System.Text.Json.JsonValueKind.String)return error.GetString()!;
+        }
+        catch(System.Text.Json.JsonException) { }
+        return $"Studio rejected this report ({(int)response.StatusCode}). Review it with the Job Owner.";
     }
 
     public Task<List<MessageThreadDto>?> GetThreadsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageThreadDto>>("api/messages/threads",ct);
@@ -120,17 +136,22 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
         try
         {
             LastAttemptUtc=DateTimeOffset.UtcNow;State="Sending";
-            WorkDayBootstrapDto? bootstrap=await api.BootstrapAsync(ct);
-            if(bootstrap is null) throw new InvalidOperationException("Studio returned no WorkDay bootstrap.");
-            LocationTrackingEnabled=bootstrap.LocationTrackingEnabled;
-            LocationTrackingMode=bootstrap.LocationTrackingMode;
-
-            await store.ReplaceAssignmentsAsync(bootstrap.Today.Concat(bootstrap.Upcoming).Select(x=>new LocalAssignment
+            await RefreshAssignmentsCoreAsync(ct);
+            foreach(var availability in (await store.GetAvailabilityAsync()).Where(x=>x.SyncState is "Pending" or "Failed" or "Sending"))
             {
-                Id=x.Id,JobId=x.JobId,BookingId=x.BookingId,WorkspaceId=x.WorkspaceId,ConversationId=x.ConversationId,
-                Title=x.Title,StartsAtUtc=x.StartsAtUtc,EndsAtUtc=x.EndsAtUtc,Location=x.Location,Status=x.Status,Instructions=x.Instructions,
-                CustomerName=x.CustomerName,CustomerEmail=x.CustomerEmail,CustomerPhone=x.CustomerPhone,Version=x.Version,CachedAtUtc=DateTimeOffset.UtcNow
-            }));
+                availability.SyncState="Sending";availability.AttemptCount++;await store.SaveAvailabilityAsync(availability);
+                try
+                {
+                    var result=await api.AddAvailabilityAsync(availability.StartsAtUtc,availability.EndsAtUtc,availability.AvailabilityType,availability.Note,availability.Id,ct);
+                    if(result.Id!=availability.Id)throw new InvalidOperationException("Studio did not acknowledge this availability operation. Update Studio before retrying.");
+                    availability.SyncState="Acknowledged";availability.LastError=null;
+                }
+                catch(HttpRequestException ex) when(ex.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
+                {availability.SyncState="Conflict";availability.LastError=ex.Message;}
+                catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+                {availability.SyncState="Failed";availability.LastError=ex.Message;await store.SaveAvailabilityAsync(availability);State="Waiting";return;}
+                await store.SaveAvailabilityAsync(availability);
+            }
 
             HashSet<Guid> blocked=(await store.UnacknowledgedAsync()).Where(x=>x.State==nameof(LocalSyncState.Conflict)&&x.AssignmentId.HasValue).Select(x=>x.AssignmentId!.Value).ToHashSet();
             foreach(LocalOperation op in await store.PendingAsync())
@@ -146,16 +167,40 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                     if(op.State==nameof(LocalSyncState.Acknowledged)&&op.AssignmentId is Guid id && result.ServerVersion is long version)
                     {
                         LocalAssignment? assignment=await store.GetAssignmentAsync(id);
-                        if(assignment is not null){assignment.Version=version;assignment.Status=OperationStatus(op.Kind,op.Category,assignment.Status);await store.ReplaceAssignmentsAsync([assignment]);}
+                        if(assignment is not null&&version>=assignment.Version){assignment.Version=version;assignment.Status=OperationStatus(op.Kind,op.Category,assignment.Status);await store.ReplaceAssignmentsAsync([assignment]);}
                     }
                 }
-                catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException)
+                catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or InvalidOperationException or System.Text.Json.JsonException)
                 {
                     op.State=nameof(LocalSyncState.Failed);op.LastError=ex.Message;await store.SaveOperationAsync(op);State="Waiting";return;
                 }
                 await store.SaveOperationAsync(op);
             }
-            LastSuccessUtc=DateTimeOffset.UtcNow;State=blocked.Count>0?"Degraded":"Healthy";
+            LastSuccessUtc=DateTimeOffset.UtcNow;State=blocked.Count>0||(await store.GetAvailabilityAsync()).Any(x=>x.SyncState=="Conflict")?"Degraded":"Healthy";
+        }
+        finally{gate.Release();}
+    }
+
+    private async Task RefreshAssignmentsCoreAsync(CancellationToken ct)
+    {
+        WorkDayBootstrapDto bootstrap=await api.BootstrapAsync(ct)??throw new InvalidOperationException("Studio returned no WorkDay bootstrap.");
+        LocationTrackingEnabled=bootstrap.LocationTrackingEnabled;LocationTrackingMode=bootstrap.LocationTrackingMode;
+        await store.ReplaceAssignmentsAsync(bootstrap.Today.Concat(bootstrap.Upcoming).Select(x=>new LocalAssignment
+        {
+            Id=x.Id,JobId=x.JobId,BookingId=x.BookingId,WorkspaceId=x.WorkspaceId,ConversationId=x.ConversationId,
+            Title=x.Title,StartsAtUtc=x.StartsAtUtc,EndsAtUtc=x.EndsAtUtc,Location=x.Location,Status=x.Status,Instructions=x.Instructions,
+            CustomerName=x.CustomerName,CustomerEmail=x.CustomerEmail,CustomerPhone=x.CustomerPhone,Version=x.Version,IsCurrent=true,CachedAtUtc=DateTimeOffset.UtcNow
+        }),authoritative:true);
+    }
+
+    public async Task ResolveAssignmentConflictAsync(Guid assignmentId,string reason,CancellationToken ct=default)
+    {
+        await gate.WaitAsync(ct);
+        try
+        {
+            await RefreshAssignmentsCoreAsync(ct);
+            await store.ResolveAssignmentConflictAsync(assignmentId,reason);
+            State=(await store.UnacknowledgedAsync()).Count>0?"Pending":"Healthy";
         }
         finally{gate.Release();}
     }

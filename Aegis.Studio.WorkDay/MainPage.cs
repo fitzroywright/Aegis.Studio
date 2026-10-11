@@ -26,7 +26,7 @@ public sealed class MainPage:ContentPage
         this.store=store;this.sync=sync;this.device=device;this.session=session;this.api=api;this.credentials=credentials;this.services=services;
         Title="My WorkDay";
         Button refresh=new(){Text="SYNC NOW"};refresh.Clicked+=async(_,_)=>await RefreshAsync();
-        Button availability=new(){Text="AVAILABILITY / LEAVE"};availability.Clicked+=async(_,_)=>await Navigation.PushAsync(new WorkDayAvailabilityPage(api,store));
+        Button availability=new(){Text="AVAILABILITY / LEAVE"};availability.Clicked+=async(_,_)=>await Navigation.PushAsync(new WorkDayAvailabilityPage(api,store,sync,session));
         Button logout=new(){Text="LOG OUT"};logout.Clicked+=async(_,_)=>await LogoutAsync();
         search.TextChanged+=async(_,_)=>RenderAssignments(await store.GetAssignmentsAsync());
         Content=new ScrollView{Content=new VerticalStackLayout{Padding=18,Spacing=12,Children={
@@ -55,7 +55,8 @@ public sealed class MainPage:ContentPage
             {connectivity.Text="OFFLINE / SYNC UNAVAILABLE — LOCAL REPORTS RETAINED";}
             lastSync.Text=sync.LastSuccessUtc is null?"Last synchronization: Never":$"Last synchronization: {sync.LastSuccessUtc.Value.ToLocalTime():g}";
             List<LocalOperation> outstanding=await store.UnacknowledgedAsync();
-            pending.Text=$"{outstanding.Count} report(s) awaiting acknowledgement";
+            int availabilityPending=(await store.GetAvailabilityAsync()).Count(x=>Aegis.Studio.WorkDay.Core.WorkDayClientRules.IsOutstanding(x.SyncState));
+            pending.Text=$"{outstanding.Count} report(s) and {availabilityPending} availability change(s) awaiting acknowledgement";
             attention.Text=outstanding.Count==0?"No pending reports.":string.Join(Environment.NewLine,
                 outstanding.Take(8).Select(x=>$"{x.Kind}: {x.State}{(x.LastError is null?"":" — "+x.LastError)}"));
             RenderAssignments(await store.GetAssignmentsAsync());
@@ -76,7 +77,7 @@ public sealed class MainPage:ContentPage
         foreach(LocalAssignment a in values.Where(x=>query.Length==0||x.Title.Contains(query,StringComparison.OrdinalIgnoreCase)||
             (x.CustomerName?.Contains(query,StringComparison.OrdinalIgnoreCase)??false)).OrderBy(x=>x.StartsAtUtc))
         {
-            Button open=new(){Text=$"{a.StartsAtUtc.ToLocalTime():ddd MMM dd HH:mm}  {a.Title}\n{a.Location??"Location not set"} · {a.Status}",HeightRequest=80};
+            Button open=new(){Text=$"{a.StartsAtUtc.ToLocalTime():ddd MMM dd HH:mm}  {a.Title}\n{a.Location??"Location not set"} · {a.Status}{(a.IsCurrent?"":" · Historical / review reports")}",HeightRequest=80};
             open.Clicked+=async(_,_)=>await Navigation.PushAsync(ActivatorUtilities.CreateInstance<AssignmentPage>(services,a));
             if(a.StartsAtUtc.ToLocalTime().Date<=DateTime.Today&&a.EndsAtUtc.ToLocalTime().Date>=DateTime.Today)todayList.Children.Add(open);
             else upcomingList.Children.Add(open);
@@ -87,7 +88,7 @@ public sealed class MainPage:ContentPage
 
     private async Task LogoutAsync()
     {
-        int reports=(await store.UnacknowledgedAsync()).Count;
+        int reports=(await store.UnacknowledgedAsync()).Count+(await store.GetAvailabilityAsync()).Count(x=>Aegis.Studio.WorkDay.Core.WorkDayClientRules.IsOutstanding(x.SyncState));
         int legacyFiles=await store.PendingUploadCountAsync();
         if(reports>0||legacyFiles>0)
         {

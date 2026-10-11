@@ -19,6 +19,7 @@ public sealed class AssignmentPage:ContentPage
             new Label{Text=assignment.CustomerName??""},
             new Label{Text=$"{assignment.StartsAtUtc.ToLocalTime():f} — {assignment.EndsAtUtc.ToLocalTime():t}"},
             new Label{Text=assignment.Location??"Location not set"},new Label{Text=assignment.Instructions??"No special instructions."},status,
+            Action("REVIEW REPORTS / RESOLVE CONFLICT",()=>Navigation.PushAsync(new WorkDayRecoveryPage(assignment.Id,store,sync))),
             Action("ACCEPT ASSIGNMENT",()=>ReportAsync("AcceptAssignment")),
             Action("DECLINE ASSIGNMENT",async()=>{string? reason=await DisplayPromptAsync("Decline assignment","Reason (required)");if(!string.IsNullOrWhiteSpace(reason))await ReportAsync("DeclineAssignment",reason);}),
             Action("ARRIVED",()=>ReportAsync("Arrive")),Action("START SESSION",()=>ReportAsync("StartSession")),
@@ -45,11 +46,11 @@ public sealed class AssignmentPage:ContentPage
     private async Task RefreshStatusAsync()
     {
         LocalAssignment? current=await store.GetAssignmentAsync(assignment.Id);
-        if(current is not null){assignment.Version=current.Version;assignment.Status=current.Status;}
+        if(current is not null){assignment.Version=current.Version;assignment.Status=current.Status;assignment.IsCurrent=current.IsCurrent;}
         List<LocalOperation> pending=(await store.UnacknowledgedAsync()).Where(x=>x.AssignmentId==assignment.Id).ToList();
         string projected=assignment.Status;
         foreach(LocalOperation op in pending)projected=WorkDayClientRules.AssignmentStatus(op.Kind,op.Category,projected);
-        status.Text=$"Studio: {assignment.Status}"+(pending.Count==0?"":$" · Local: {projected} · {pending.Count} report(s) unacknowledged");
+        status.Text=(assignment.IsCurrent?"":"Historical / no longer in current assignments · ")+$"Studio: {assignment.Status}"+(pending.Count==0?"":$" · Local: {projected} · {pending.Count} report(s) unacknowledged");
     }
 
     private async Task ReportAsync(string kind,string? text=null,string? category=null)
@@ -57,6 +58,7 @@ public sealed class AssignmentPage:ContentPage
         List<LocalOperation> outstanding=(await store.UnacknowledgedAsync()).Where(x=>x.AssignmentId==assignment.Id).ToList();
         if(outstanding.Any(x=>x.State==nameof(LocalSyncState.Conflict)))throw new InvalidOperationException("Resolve the conflicting assignment with the Job Owner before submitting dependent reports.");
         LocalAssignment current=await store.GetAssignmentAsync(assignment.Id)??assignment;
+        if(!current.IsCurrent)throw new InvalidOperationException("Refresh Studio assignments. This session is no longer in your current assignments; its old reports remain available for review.");
         long expected=WorkDayClientRules.NextExpectedVersionAfterPending(current.Version,
             outstanding.Where(x=>WorkDayClientRules.ChangesAssignmentStatus(x.Kind)&&x.ExpectedVersion.HasValue).Select(x=>x.ExpectedVersion!.Value));
         await store.QueueAsync(new LocalOperation{OperationId=Guid.NewGuid(),Kind=kind,AssignmentId=assignment.Id,

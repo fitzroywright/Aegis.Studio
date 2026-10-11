@@ -57,4 +57,20 @@ public sealed class FinanceReleasePersistenceTests
         q.ExecuteNonQuery();
         Assert.Equal(300, FinanceReleaseStore.Balance(c, null, Guid.Parse("11111111-1111-1111-1111-111111111111")));
     }
+    [StudioPostgresFact]
+    public void ReceiptsAreNotCountedAgainForEveryConnectedInvoice()
+    {
+        using var c=new NpgsqlConnection(Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES"));c.Open();
+        using var q=new NpgsqlCommand("""
+            create temp table studio_financial_events(job_id uuid,kind text,amount numeric);
+            create temp table studio_account_invoices(id uuid,status text,currency text,total_amount numeric);
+            create temp table studio_account_invoice_jobs(invoice_id uuid,job_id uuid);
+            insert into studio_account_invoices values('22222222-2222-2222-2222-222222222222','Paid','JMD',100),('44444444-4444-4444-4444-444444444444','Issued','JMD',200);
+            insert into studio_account_invoice_jobs values('22222222-2222-2222-2222-222222222222','11111111-1111-1111-1111-111111111111'),('44444444-4444-4444-4444-444444444444','11111111-1111-1111-1111-111111111111'),('44444444-4444-4444-4444-444444444444','33333333-3333-3333-3333-333333333333');
+            insert into studio_financial_events values('33333333-3333-3333-3333-333333333333','Payment',150);
+            """,c);q.ExecuteNonQuery();
+        Assert.Equal(150,FinanceReleaseStore.Balance(c,null,Guid.Parse("11111111-1111-1111-1111-111111111111")));
+        Assert.Equal(150,FinanceReleaseStore.Balance(c,null,Guid.Parse("33333333-3333-3333-3333-333333333333")));
+    }
+
 }

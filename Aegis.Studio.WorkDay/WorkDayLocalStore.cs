@@ -19,6 +19,7 @@ public sealed class LocalAssignment
     public string? CustomerName { get; set; }
     public string? CustomerEmail { get; set; }
     public string? CustomerPhone { get; set; }
+    public bool IsCurrent { get; set; }=true;
     public long Version { get; set; }
     public DateTimeOffset CachedAtUtc { get; set; }
 }
@@ -47,6 +48,8 @@ public sealed class LocalOperation
     public int AttemptCount { get; set; }
     public DateTimeOffset? LastAttemptUtc { get; set; }
     public string? LastError { get; set; }
+    public DateTimeOffset? ResolvedAtUtc { get; set; }
+    public string? ResolutionCiphertext { get; set; }
 }
 
 public sealed class LocalWorkSession
@@ -86,6 +89,11 @@ public sealed class LocalAvailability
     [Ignore] public string? Note { get; set; }
     public string? NoteCiphertext { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
+    public string SyncState { get; set; }=nameof(LocalSyncState.Acknowledged);
+    public int AttemptCount { get; set; }
+    public string? LastError { get; set; }
+    public string? ResolutionCiphertext { get; set; }
+    public DateTimeOffset? ResolvedAtUtc { get; set; }
 }
 
 public sealed class LocalMetadata
@@ -164,6 +172,12 @@ public sealed class WorkDayLocalStore
             await MigrateSensitiveQueueFieldsAsync();
             version=2;
         }
+        if(version<3)
+        {
+            await db.ExecuteAsync("update LocalAssignment set IsCurrent=1");
+            await db.ExecuteAsync("update LocalAvailability set SyncState='Acknowledged' where SyncState is null");
+            version=3;
+        }
         await db.InsertOrReplaceAsync(new LocalMetadata{Key="SchemaVersion",Value=version.ToString(System.Globalization.CultureInfo.InvariantCulture)});
     }
 
@@ -229,9 +243,10 @@ public sealed class WorkDayLocalStore
         public double? AccuracyMetres { get; set; }
     }
 
-    public async Task ReplaceAssignmentsAsync(IEnumerable<LocalAssignment> values)
+    public async Task ReplaceAssignmentsAsync(IEnumerable<LocalAssignment> values,bool authoritative=false)
     {
         await InitializeAsync();
+        List<LocalAssignment> prepared=[];
         foreach(LocalAssignment value in values)
         {
             LocalAssignment v=new()
@@ -240,12 +255,17 @@ public sealed class WorkDayLocalStore
                 Title=await protector.ProtectAsync(value.Title)??"",StartsAtUtc=value.StartsAtUtc,EndsAtUtc=value.EndsAtUtc,
                 Location=await protector.ProtectAsync(value.Location),Status=value.Status,Instructions=await protector.ProtectAsync(value.Instructions),
                 CustomerName=await protector.ProtectAsync(value.CustomerName),CustomerEmail=await protector.ProtectAsync(value.CustomerEmail),
-                CustomerPhone=await protector.ProtectAsync(value.CustomerPhone),Version=value.Version,CachedAtUtc=value.CachedAtUtc
+                CustomerPhone=await protector.ProtectAsync(value.CustomerPhone),IsCurrent=value.IsCurrent,Version=value.Version,CachedAtUtc=value.CachedAtUtc
             };
-            await db.InsertOrReplaceAsync(v);
+            prepared.Add(v);
         }
+        await db.RunInTransactionAsync(connection=>
+        {
+            if(authoritative)connection.Execute("update LocalAssignment set IsCurrent=0");
+            foreach(LocalAssignment value in prepared)connection.InsertOrReplace(value);
+        });
         DateTimeOffset cutoff=DateTimeOffset.UtcNow.AddDays(-14);
-        IReadOnlyList<Guid> protectedIds=(await PendingAsync()).Where(x=>x.AssignmentId.HasValue).Select(x=>x.AssignmentId!.Value)
+        IReadOnlyList<Guid> protectedIds=(await UnacknowledgedAsync()).Where(x=>x.AssignmentId.HasValue).Select(x=>x.AssignmentId!.Value)
             .Concat((await PendingUploadsAsync()).Select(x=>x.AssignmentId)).Distinct().ToArray();
         foreach(LocalAssignment old in await db.Table<LocalAssignment>().Where(x=>x.EndsAtUtc<cutoff).ToListAsync())
             if(!protectedIds.Contains(old.Id)) await db.DeleteAsync(old);
@@ -267,13 +287,65 @@ public sealed class WorkDayLocalStore
     public async Task ReplaceAvailabilityAsync(IEnumerable<LocalAvailability> values)
     {
         await InitializeAsync();
-        await db.DeleteAllAsync<LocalAvailability>();
+        HashSet<Guid> outstanding=(await GetAvailabilityAsync()).Where(x=>WorkDayClientRules.IsOutstanding(x.SyncState)).Select(x=>x.Id).ToHashSet();
+        List<LocalAvailability> prepared=[];
         foreach(LocalAvailability value in values)
         {
+            if(outstanding.Contains(value.Id))continue;
             value.NoteCiphertext=await protector.ProtectAsync(value.Note);
-            await db.InsertOrReplaceAsync(value);
+            prepared.Add(value);
         }
+        await db.RunInTransactionAsync(connection=>
+        {
+            connection.Execute("delete from LocalAvailability where SyncState='Acknowledged'");
+            foreach(LocalAvailability value in prepared)
+                if(connection.Table<LocalAvailability>().Where(x=>x.Id==value.Id).FirstOrDefault()?.SyncState!="Resolved")connection.InsertOrReplace(value);
+        });
     }
+
+    public async Task SaveAvailabilityAsync(LocalAvailability value)
+    {
+        await InitializeAsync();value.NoteCiphertext=await protector.ProtectAsync(value.Note);
+        await db.InsertOrReplaceAsync(value);
+    }
+
+    public async Task ResolveAvailabilityConflictAsync(Guid id,string reason)
+    {
+        if(string.IsNullOrWhiteSpace(reason)||reason.Length>4000)throw new InvalidOperationException("Record a resolution reason.");
+        string resolution=await protector.ProtectAsync(reason.Trim())??"";
+        await db.RunInTransactionAsync(connection=>
+        {
+            var value=connection.Table<LocalAvailability>().Where(x=>x.Id==id).FirstOrDefault();
+            if(value?.SyncState!="Conflict")throw new InvalidOperationException("Only a rejected availability change can be resolved locally.");
+            value.SyncState="Resolved";value.ResolvedAtUtc=DateTimeOffset.UtcNow;value.ResolutionCiphertext=resolution;connection.Update(value);
+        });
+    }
+
+    public async Task ResolveAssignmentConflictAsync(Guid assignmentId,string reason)
+    {
+        if(string.IsNullOrWhiteSpace(reason)||reason.Length>4000)throw new InvalidOperationException("Record how the Job Owner resolved these reports (at most 4000 characters).");
+        string resolution=await protector.ProtectAsync(reason.Trim())??"";
+        await db.RunInTransactionAsync(connection=>
+        {
+            var outstanding=connection.Table<LocalOperation>().Where(x=>x.AssignmentId==assignmentId&&x.State!="Acknowledged"&&x.State!="Resolved").ToList();
+            if(!outstanding.Any(x=>x.State=="Conflict"))throw new InvalidOperationException("Refresh the conflicting assignment first.");
+            if(outstanding.Any(x=>!WorkDayClientRules.CanResolveReport(x.State,x.AttemptCount)))
+                throw new InvalidOperationException("A report has an uncertain server result. Synchronize its original operation before resolving the conflict.");
+            foreach(var op in outstanding)
+            {
+                op.State=nameof(LocalSyncState.Resolved);op.ResolvedAtUtc=DateTimeOffset.UtcNow;op.ResolutionCiphertext=resolution;
+                connection.Update(op);
+            }
+        });
+    }
+
+    public async Task<List<LocalOperation>> OperationHistoryAsync(Guid assignmentId)
+    {
+        var values=await db.Table<LocalOperation>().Where(x=>x.AssignmentId==assignmentId).OrderBy(x=>x.OccurredAtUtc).ToListAsync();
+        foreach(var value in values)await UnprotectOperationAsync(value);
+        return values;
+    }
+    public Task<string?> ResolutionTextAsync(LocalOperation operation)=>protector.UnprotectAsync(operation.ResolutionCiphertext);
 
     public async Task<List<LocalAvailability>> GetAvailabilityAsync()
     {
@@ -297,7 +369,7 @@ public sealed class WorkDayLocalStore
     public async Task<DateTimeOffset?> OldestPendingOperationAsync()=> (await PendingAsync()).FirstOrDefault()?.OccurredAtUtc;
     public async Task<List<LocalOperation>> UnacknowledgedAsync()
     {
-        List<LocalOperation> values=await db.Table<LocalOperation>().Where(x=>x.State!=nameof(LocalSyncState.Acknowledged)).OrderBy(x=>x.OccurredAtUtc).ToListAsync();
+        List<LocalOperation> values=await db.Table<LocalOperation>().Where(x=>x.State!=nameof(LocalSyncState.Acknowledged)&&x.State!=nameof(LocalSyncState.Resolved)).OrderBy(x=>x.OccurredAtUtc).ToListAsync();
         foreach(LocalOperation value in values)await UnprotectOperationAsync(value);
         return values;
     }

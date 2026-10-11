@@ -428,14 +428,14 @@ public sealed class WorkDayStore(StudioDatabase database)
         using(var jobLock=new NpgsqlCommand("select j.id,j.status from studio_jobs j join studio_schedule_entries e on e.job_id=j.id where e.id=$1 for update of j",c,tx))
         {
             jobLock.Parameters.AddWithValue(assignmentId);using var r=jobLock.ExecuteReader();
-            if(!r.Read())throw new InvalidOperationException("This assignment has no operational Job.");
+            if(!r.Read())return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,"This assignment no longer has an operational Job. Review the original report with the Job Owner.",null);
             job=r.GetGuid(0);stage=r.GetString(1);
         }
-        if(stage is "Completed" or "Cancelled")throw new InvalidOperationException("Closed Jobs require an authorized reopening before reporting changes.");
+        if(stage is "Completed" or "Cancelled")return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,"Closed Jobs require authorized reopening. Review the original report with the Job Owner.",null);
         using(var assignmentLock=new NpgsqlCommand("select e.id from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id join studio_photographers p on p.schedule_resource_id=er.resource_id where e.id=$1 and p.is_active and lower(p.user_name)=$2 and e.status<>'Cancelled' for update of e",c,tx))
         {
             assignmentLock.Parameters.AddWithValue(assignmentId);assignmentLock.Parameters.AddWithValue(actor);
-            if(assignmentLock.ExecuteScalar() is null)throw new InvalidOperationException("You are no longer an active photographer on this assignment.");
+            if(assignmentLock.ExecuteScalar() is null)return new(request.OperationId,WorkDayOperationState.Conflict,DateTimeOffset.UtcNow,"You are no longer an active photographer on this assignment. Review the original report with the Job Owner.",null);
         }
         using(var attribution=new NpgsqlCommand("select set_config('studio.actor',$1,true),set_config('studio.reason',$2,true)",c,tx))
         {attribution.Parameters.AddWithValue(actor);attribution.Parameters.AddWithValue("WorkDay "+request.Kind+": "+(request.Text??""));attribution.ExecuteNonQuery();}

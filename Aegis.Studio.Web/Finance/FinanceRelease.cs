@@ -28,24 +28,34 @@ public static class FinanceReleaseRules
 
 public static class FinanceReleaseStore
 {
-    // Invoice status is administrative; only financial receipt events establish payment.
-    // A combined invoice is checked against receipts on all its linked Jobs, avoiding
-    // accidental release based on an empty ledger on one of the linked Jobs.
+    // Receipts are Job-scoped, not invoice allocations. A receipt must be counted
+    // once across the connected set of non-void invoices/Jobs. Until explicit
+    // allocation exists, an unpaid connected invoice set requires Finance consent.
     public static decimal Balance(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
     {
-        if (WorkflowStore.Exists(c, tx, "select exists(select 1 from studio_account_invoices i join studio_account_invoice_jobs ij on ij.invoice_id=i.id where ij.job_id=$1 and i.status<>'Void' and i.currency<>'JMD')", job))
-            throw new ArgumentException("Resolve the non-JMD invoice before final release.");
-        return Convert.ToDecimal(WorkflowStore.Scalar(c, tx, """
-            select greatest(0,
+        using var q = WorkflowStore.Command(c, tx, """
+            with recursive linked_jobs(id) as (
+              select $1::uuid
+              union
+              select other.job_id from linked_jobs linked
+                join studio_account_invoice_jobs current_link on current_link.job_id=linked.id
+                join studio_account_invoices invoice on invoice.id=current_link.invoice_id and invoice.status<>'Void'
+                join studio_account_invoice_jobs other on other.invoice_id=invoice.id
+            ), invoices as (
+              select i.* from studio_account_invoices i where i.status<>'Void'
+                and exists(select 1 from studio_account_invoice_jobs ij join linked_jobs j on j.id=ij.job_id where ij.invoice_id=i.id)
+            )
+            select exists(select 1 from invoices where currency<>'JMD'),greatest(0,
               coalesce((select sum(case when lower(kind) in ('charge','adjustment','discount') then amount
                 when lower(kind) in ('payment','deposit','refund','reversal') then -amount else 0 end)
                 from studio_financial_events where job_id=$1),0),
-              coalesce((select sum(greatest(0,i.total_amount-coalesce((select sum(e.amount)
-                from studio_financial_events e where lower(e.kind) in ('payment','deposit','refund','reversal')
-                  and e.job_id in(select job_id from studio_account_invoice_jobs where invoice_id=i.id)),0)))
-                from studio_account_invoices i where i.status<>'Void' and exists(
-                  select 1 from studio_account_invoice_jobs ij where ij.invoice_id=i.id and ij.job_id=$1)),0))
-            """, job));
+              coalesce((select sum(total_amount) from invoices),0)-coalesce((select sum(e.amount)
+                from studio_financial_events e join linked_jobs j on j.id=e.job_id
+                where lower(e.kind) in ('payment','deposit','refund','reversal')),0))
+            """, job);
+        using var r=q.ExecuteReader();r.Read();
+        if(r.GetBoolean(0))throw new ArgumentException("Resolve the non-JMD invoice before final release.");
+        return r.GetDecimal(1);
     }
 
     public static FinanceReleaseDecision Decision(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)

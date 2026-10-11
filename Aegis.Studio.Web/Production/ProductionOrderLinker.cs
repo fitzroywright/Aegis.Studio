@@ -3,6 +3,7 @@ using Aegis.Studio.Web.Media;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 using Npgsql;
+using Aegis.Studio.Web.Workflow;
 namespace Aegis.Studio.Web.Production;
 
 public static class ProductionOrderLinker
@@ -72,11 +73,12 @@ public static class ProductionOrderLinker
                 """,c);cmd.Parameters.AddWithValue(saleId);cmd.Parameters.AddWithValue(jobId.ToString("D"));using var r=cmd.ExecuteReader();var rows=new List<object>();
             while(r.Read())rows.Add(new{id=r.GetGuid(0),description=r.GetString(1),quantity=r.GetInt32(2),assetId=r.IsDBNull(3)?(Guid?)null:r.GetGuid(3),sourceVersionId=r.IsDBNull(4)?(Guid?)null:r.GetGuid(4)});return Results.Ok(rows);
         }).RequireAuthorization();
-        app.MapPut("/api/jobs/{jobId:guid}/production/{saleId:guid}/order-lines/{lineId:guid}/source",(Guid jobId,Guid saleId,Guid lineId,ProductionOrderSource request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db)=>
+        app.MapPut("/api/jobs/{jobId:guid}/production/{saleId:guid}/order-lines/{lineId:guid}/source",(Guid jobId,Guid saleId,Guid lineId,ProductionOrderSource request,ClaimsPrincipal user,JobAccessService access,WorkflowStore workflow,StudioDatabase db)=>
         {
             if(!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
+            if(!workflow.IsProductionManager(user))return Results.Forbid();
             using var c=db.OpenConnection();using var tx=c.BeginTransaction();
-            using(var guard=new NpgsqlCommand("select id from studio_jobs where id=$1 and status not in ('Ready for Client','Published','Completed','Cancelled') for update",c,tx))
+            using(var guard=new NpgsqlCommand("select id from studio_jobs where id=$1 and status not in ('Ready for Client','Ready for Delivery','Delivered','Published','Completed','Cancelled') for update",c,tx))
             {guard.Parameters.AddWithValue(jobId);if(guard.ExecuteScalar() is null)return Results.Conflict(new{error="Job is closed for production changes."});}
             using var cmd=new NpgsqlCommand("""
                 update studio_pos_line_media m set asset_id=a.id,source_version_id=a.approved_version_id

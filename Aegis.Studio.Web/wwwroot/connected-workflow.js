@@ -14,6 +14,17 @@
  }
  function options(people,current){return '<option value="">Choose employee</option>'+people.map(p=>`<option value="${esc(p.userName)}" ${String(p.userName).toLowerCase()===String(current||'').toLowerCase()?'selected':''}>${esc(p.displayName||p.userName)}</option>`).join('');}
  function localTime(value){if(!value)return '';const d=new Date(value);return new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
+ async function command(jobId,fields,holder={},expectedRevision){
+  const facts=JSON.stringify(fields);
+  if(!holder.__workflowCommand||holder.__workflowCommand.facts!==facts){
+   const revision=expectedRevision??(await send(`/api/jobs/${jobId}/connected-workflow`)).data.revision;
+   holder.__workflowCommand={facts,body:JSON.stringify({...fields,expectedRevision:revision,operationId:crypto.randomUUID()})};
+  }
+  const result=await send(`/api/jobs/${jobId}/connected-workflow`,{method:'POST',headers:{'Content-Type':'application/json'},body:holder.__workflowCommand.body});
+  delete holder.__workflowCommand;root.dispatchEvent(new CustomEvent('studio-workflow-changed',{detail:{jobId}}));return result;
+ }
+ const productionTask=kind=>['Cull','Edit','Retouch','Proof','Print','QC','Production','Export','FileIngest','Backup','Archive'].includes(kind);
+ const canReportTask=(view,task)=>Boolean(view.canReview||String(task.assignedTo||'').toLowerCase()===String(view.userName||'').toLowerCase()||(view.canManage&&!productionTask(task.activityType)));
  async function render(host,jobId,isCurrent=()=>true){
   const view=await send(`/api/jobs/${jobId}/connected-workflow`);if(!isCurrent())return;
   const data=view.data,managed=view.canManage,review=view.canReview;
@@ -113,7 +124,7 @@
    const rows=(await send('/api/workflow/assignment-requests')).filter(r=>r.job_id===jobId);const d=dialog('Assignment Requests',rows.map(r=>`<article><strong>${esc(r.user_name)} · ${esc(r.kind)}</strong><p>${esc(r.note)} · ${esc(r.status)}</p>${managed&&r.status==='Pending'?`<button class="action" type="button" data-decision="${r.id}" data-method="Approved">Approve</button><button class="action" type="button" data-decision="${r.id}" data-method="Rejected">Reject</button><button class="action" type="button" data-decision="${r.id}" data-method="Redirected">Redirect</button>`:''}</article>`).join('')||'<p>No requests.</p>');d.querySelector('[type=submit]').hidden=true;d.querySelectorAll('[data-decision]').forEach(b=>b.onclick=async()=>{const reason=prompt('Decision reason:');if(!reason)return;const row=rows.find(r=>r.id===b.dataset.decision);const userName=b.dataset.method==='Redirected'?prompt('Responsible manager username:'):null;const sessionId=row.kind==='Photographer'&&b.dataset.method==='Approved'?prompt('Unscheduled session ID:'):null;try{await mutate({action:'decide-request',assignmentRequestId:row.id,method:b.dataset.method,reason,userName,sessionId});d.close();}catch(err){d.querySelector('[role=alert]').textContent=err.message;}});
   });
  }
- root.StudioWorkflow={render,elapsed,crewPayload,escape:esc};
+ root.StudioWorkflow={render,command,productionTask,canReportTask,elapsed,crewPayload,escape:esc};
  if(typeof module!=='undefined')module.exports=root.StudioWorkflow;
 })(typeof window!=='undefined'?window:globalThis);
 
