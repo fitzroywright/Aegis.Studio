@@ -51,7 +51,7 @@ public sealed class UnifiedMessagingPersistenceTests
             [new("confirmation.txt","text/plain",Encoding.UTF8.GetBytes("Confirmed"))]);
         Assert.True(await f.Inbound.TryImportAsync(reply,default));Assert.True(await f.Inbound.TryImportAsync(reply,default));
         Assert.Equal(2,f.Messages.GetMessages(sent.ThreadId,f.Paul).Count);Assert.Equal(1,f.Count("studio_inbound_receipts"));
-        Assert.Equal(2,f.Attachments.GetForThread(sent.ThreadId).Count);Assert.Single(f.Book.GetAll().Where(e=>e.EmailAddress=="client@outside.test"));
+        Assert.Equal(2,f.Attachments.GetForThread(sent.ThreadId).Count);Assert.Single(f.Book.GetAll(), e=>e.EmailAddress=="client@outside.test");
         Assert.Throws<UnauthorizedAccessException>(()=>f.Router.GetDeliveries(sent.ThreadId,f.Tamara));
     }
     [StudioPostgresFact]
