@@ -1,32 +1,27 @@
-# Connected Workflow demo reset
+# Studio demo reset
 
-The Administration page offers **Generate Demo Data**, **Remove Demo Data**, and **Reset and Regenerate**. All three require an authenticated Studio Administrator.
+Studio Management offers Generate Demo Data and Reset and Regenerate. These require an authenticated Studio Administrator. Outside Development, set DemoData__Enabled=true.
 
-On the demo deployment, explicitly set:
+DemoData__AllowDestructiveReset is no longer required or checked.
 
-```ini
-DemoData__Enabled=true
-DemoData__AllowDestructiveReset=true
-```
+Reset and Regenerate requires the confirmation phrase REMOVE STUDIO DEMO DATA and Storage__FactoryResetExclusiveRoot=true. The configured bucket or filesystem root must be dedicated to Studio.
 
-Restart Studio after changing environment variables. Remove `DemoData__AllowDestructiveReset` after using the reset controls.
+The reset validates database cleanup before deleting files. For S3, Studio uses Common.Storage.IStorageBucketReset.PurgeBucketAsync, which purges the dedicated bucket including orphan objects outside the logical prefix. For filesystem providers, Studio enumerates keys, permanently purges each key and verifies the listing is empty. A purge failure stops the database reset; storage deletion may already be partial.
 
-**Reset and Regenerate** requires typing `REMOVE STUDIO DEMO DATA`. It runs in a single PostgreSQL transaction. It truncates `studio_jobs`, `studio_clients`, `studio_conversations` and every recursively discovered Studio foreign-key dependent table, refusing to touch protected authentication, workspace, or configuration tables. If a protected or non-Studio table depends on those records, PostgreSQL rolls back the entire operation. The endpoint does not delete external storage objects, and existing Workspaces remain. It is therefore **not** a full purge of every Studio database table or media object.
+After storage purge, the reset clears Studio business data and preserves Unassigned, staff/security/configuration and the active progress record. It then runs the full demo generator: jobs, schedules, clients, messages, payments, eight Job Templates, ten graph scenarios, two Work Order Templates and at least 40 people photographs for every demo job.
 
-Generation creates 15 deterministic sample Jobs across all Connected Workflow stages, four demonstration Workspaces, fictional contacts with `example.invalid` addresses, Front Desk bookings and deposit receipts, conversations, WorkDay schedule/shoot sessions, crew assignments, and production tasks. Re-running generation is idempotent for the fixture IDs. No real email addresses are seeded.
+Generate Demo Data runs the full generator without purging storage or resetting the database. It reuses existing seed data.
 
-## Validation
+## October 12 storage capability correction
 
-After pulling `main` on Windows:
+Common.Storage S3FileStorage exposes IStorageBucketReset, not IStorageLifecycle. Studio previously required IStorageLifecycle even though its error message advertised dedicated-bucket purge. The corrected dispatcher accepts and calls IStorageBucketReset while retaining the filesystem path.
 
-```powershell
-dotnet restore
-dotnet build --no-restore
-dotnet test --no-build
-```
+Update Common.Storage/main alongside Aegis.Studio before building and deploying. No manual TrueNAS purge is required for the S3 provider after deploying the correction. The legacy AmazonS3 adapter does not expose bucket reset; use the S3 provider configuration.
 
-On the demo site, sign in as Administrator. Run **Reset and Regenerate** and verify Today, Jobs, Front Desk, WorkDay, Production, and Workspaces show the same Jobs. If the reset reports a protected dependency, do not remove the safeguard; inspect the live foreign-key graph and adjust the explicit ownership model.
+Four focused regression tests cover bucket-only capability acceptance and dispatch, cancellation forwarding, exclusive-root refusal, unsupported-provider refusal and failure propagation. The .NET SDK is unavailable in this editing environment; these tests have not been executed here. Run locally:
 
-## Limitations
+~~~powershell
+dotnet test Aegis.Studio.Web.Tests --filter FullyQualifiedName~FactoryResetStorageTests
+~~~
 
-The fixture is an operational navigation dataset, **not** a proof that upload backup verification, real asset delivery, and external gallery publication occurred. Later-stage Jobs intentionally do not fabricate media assets or backup proofs. External storage and legacy demo Workspaces are not purged by this implementation. PostgreSQL-dependent integration tests must run against an actual test database before production acceptance.
+Live S3 reset/regeneration remains a deployment acceptance check. No external bucket purge or deployment was performed by this change.
