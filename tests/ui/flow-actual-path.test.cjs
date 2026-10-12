@@ -8,6 +8,19 @@ test('Job Details indicator uses the evaluated route when opened through the wor
  assert.ok(host.querySelector('[data-node="edit"]'));
  assert.equal(host.querySelector('[data-node="print"]'),null);
  assert.equal(host.querySelectorAll('.sg-edge').length,2);
+ const summary=w.document.querySelector('.jd-flow-summary');
+ assert.equal(summary.children.length,1);
+ assert.equal(summary.firstElementChild.dataset.flowPhase,'edit');
+ assert.ok(summary.firstElementChild.classList.contains('current'));
+ assert.equal(summary.textContent.includes('print'),false);
+ const toggle=w.document.querySelector('[data-toggle-flow-details]');
+ assert.equal(toggle.getAttribute('aria-expanded'),'false');
+ toggle.click();
+ assert.equal(toggle.getAttribute('aria-expanded'),'true');
+ assert.equal(summary.firstElementChild.dataset.flowPhase,'edit');
+ toggle.click();
+ assert.equal(toggle.getAttribute('aria-expanded'),'false');
+ assert.equal(summary.firstElementChild.dataset.flowPhase,'edit');
 });
 function setup(t){const dom=new JSDOM('<main></main><ul></ul>',{runScripts:'outside-only',url:'https://studio.test'});t.after(()=>dom.window.close());const w=dom.window;w.StudioWorkflow={nextAction:()=>({label:'Next action',selector:'[data-next]'})};for(const file of ['dagre.min.js','workflow-graph.js','job-details.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));return {w,host:w.document.querySelector('main'),summary:w.document.querySelector('ul')};}
 test('ordinary jobs do not advertise unused corrections or reshoots',t=>{
@@ -76,4 +89,29 @@ test('template canvases and canvases without evaluation retain the full definiti
   assert.equal(host.querySelectorAll('.sg-node').length,4);
   assert.equal(host.querySelectorAll('.sg-edge').length,4);
  }
+});
+test('collapsed summary groups selected parallel work and uses execution status',t=>{
+ const {w,host,summary}=setup(t),ev=evaluation();
+ ev.nodes.find(n=>n.id==='edit').status='Completed';
+ ev.nodes.find(n=>n.id==='print').status='InProgress';
+ ev.edges.e2='Completed';ev.edges.e3='Pending';
+ w.StudioGraph.summary(summary,w.StudioGraph.canvas(host,graph(),{actualPath:true,evaluation:ev}));
+ assert.equal(summary.children.length,1);
+ assert.match(summary.firstElementChild.dataset.flowPhase,/edit \/ print|print \/ edit/);
+ assert.ok(summary.firstElementChild.classList.contains('current'));
+ assert.equal(summary.querySelector('.jd-stage-light').textContent,'');
+ ev.nodes.find(n=>n.id==='print').status='Completed';
+ w.StudioGraph.summary(summary,w.StudioGraph.canvas(host,graph(),{actualPath:true,evaluation:ev}));
+ assert.ok(summary.firstElementChild.classList.contains('complete'));
+ assert.equal(summary.querySelector('.jd-stage-light').textContent,'✓');
+});
+test('collapsed summary keeps subflow milestones and omits nested task detail and wiring',t=>{
+ const {w,host,summary}=setup(t),g=graph(),ev=evaluation();
+ const edit=g.nodes.find(n=>n.id==='edit');edit.kind='Subflow';edit.label='Production';edit.subflow=graph();
+ ev.nodes=ev.nodes.filter(n=>n.id!=='edit').concat(evaluation().nodes.map(n=>({...n,id:'edit/'+n.id})));
+ w.StudioGraph.summary(summary,w.StudioGraph.canvas(host,g,{actualPath:true,evaluation:ev}));
+ assert.equal(summary.firstElementChild.dataset.flowPhase,'Production');
+ assert.equal(summary.children.length,1);
+ assert.equal(summary.textContent.includes('Start'),false);
+ assert.equal(summary.textContent.includes('print'),false);
 });
