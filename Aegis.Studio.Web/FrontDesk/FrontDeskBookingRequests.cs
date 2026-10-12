@@ -59,7 +59,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
     public FrontDeskRequest Create(PendingBookingRequest request,string user)
     {
         FrontDeskRequestRules.Validate(request);
-        request=request with{ClientName=request.ClientName.Trim(),ClientEmail=request.ClientEmail.Trim(),Title=request.Title.Trim(),Currency=request.Currency.Trim().ToUpperInvariant(),ExternalBookingId=string.IsNullOrWhiteSpace(request.ExternalBookingId)?null:request.ExternalBookingId.Trim()};
+        request=request with{ClientName=request.ClientName.Trim(),ClientEmail=request.ClientEmail.Trim(),Title=request.Title.Trim(),Currency=request.Currency.Trim().ToUpperInvariant(),ExternalBookingId=string.IsNullOrWhiteSpace(request.ExternalBookingId)?null:request.ExternalBookingId.Trim(),SelectedServiceIds=request.SelectedServiceIds?.Distinct().Order().ToArray()};
         using var connection=database.OpenConnection();using var tx=connection.BeginTransaction();
         if(request.ExternalBookingId is not null)
         {
@@ -70,7 +70,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
             {
                 FrontDeskRequest prior=Read(reader);
                 // The server's deposit policy can change between retries; compare the submitted booking facts.
-                if((prior.Request with { RequiredDeposit=request.RequiredDeposit }) != request)throw new ArgumentException("This booking reference was already used with different details.");
+                if(JsonSerializer.Serialize(prior.Request with { RequiredDeposit=request.RequiredDeposit },JsonOptions) != JsonSerializer.Serialize(request,JsonOptions))throw new ArgumentException("This booking reference was already used with different details.");
                 return prior;
             }
         }

@@ -36,6 +36,7 @@ public sealed class CommercialTemplateStore(StudioDatabase database)
         CommercialRules.Validate(definition, kind);
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
         Guid template = id ?? Guid.NewGuid(); int version = 1;
+        Execute(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","workflow-template:"+template);
         if (id.HasValue)
         {
             using var q = Command(c, tx, "select version,kind from studio_commercial_templates where id=$1 for update", template);
@@ -117,7 +118,7 @@ public sealed class CommercialTemplateStore(StudioDatabase database)
     }
     public static void GuardPublication(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
     {
-        JobGraphStore.GuardCompletion(c, tx, job);
+        JobGraphStore.GuardProductionReady(c, tx, job);
         using var q = Command(c, tx, """
             select exists(select 1 from studio_catalog_work_orders w where w.job_id=$1 and
              (w.exception_reason is not null or (w.quantity>0 and

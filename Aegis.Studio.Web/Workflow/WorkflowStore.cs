@@ -152,11 +152,11 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 }
                 Sql(c,tx,"update studio_workflow_crew set ready=$3,waiver_reason=$4 where session_id=$1 and lower(user_name)=lower($2)",request.SessionId,contributor,request.Action=="contribution-ready",request.Action=="waive-contribution"?request.Reason:null);break;
             case "task-progress":
-                EnsureMutable(stage);
                 if(request.TaskId is not Guid progressTask)throw new ArgumentException("Choose a task.");
                 string? assignee;string taskKind;
                 using(var q=Command(c,tx,"select assigned_to,activity_type from studio_job_activities where id=$1 and job_id=$2 for update",progressTask,job))using(var reader=q.ExecuteReader())
                 {if(!reader.Read())throw new KeyNotFoundException();assignee=reader.IsDBNull(0)?null:reader.GetString(0);taskKind=reader.GetString(1);}
+                if(stage!="Delivered"||taskKind!="Archive")EnsureMutable(stage);
                 if(!ProductionAuthorityRules.CanReport(review,manage,string.Equals(assignee,actor,StringComparison.OrdinalIgnoreCase),taskKind))throw new UnauthorizedAccessException();
                 if(request.Status is not ("NotStarted" or "Scheduled" or "InProgress" or "Blocked" or "Completed" or "Cancelled" or "WaitingOnCustomer" or "ReworkRequired" or "Partial" or "Failed" or "ReprintRequired" or "ReadyForDelivery" or "Archived"))throw new ArgumentException("Choose a supported task status.");
                 if(request.Status=="Blocked"&&string.IsNullOrWhiteSpace(request.BlockedReason))throw new ArgumentException("Record the blocked reason.");
@@ -373,7 +373,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(configuration["ClientGallery:Provider"]!="Manifest")throw new ArgumentException("Configure the existing gallery provider before publication.");
                 Publish(c,tx,job,request.OperationId,actor,publisher);break;
             case "deliver":
-                JobGraphStore.GuardCompletion(c,tx,job);
+                JobGraphStore.GuardProductionReady(c,tx,job);
                 FinanceReleaseStore.Require(c,tx,job);
                 CommercialTemplateStore.GuardPublication(c,tx,job);
                 if(!IsFrontDesk(user)&&!manage)throw new UnauthorizedAccessException();
@@ -381,11 +381,11 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(string.IsNullOrWhiteSpace(request.Method)||string.IsNullOrWhiteSpace(request.Reference))throw new ArgumentException("Record delivery method and receipt reference.");
                 if(Exists(c,tx,"select exists(select 1 from studio_workflow_delivery_requirements where job_id=$1 and required and not waived and delivered_at_utc is null)",job))
                     throw new ArgumentException("Record delivery evidence or an authorized waiver for every required deliverable first.");
-                Sql(c,tx,"insert into studio_workflow_deliveries(id,job_id,method,reference,actor) values($1,$2,$3,$4,$5)",request.OperationId,job,request.Method,request.Reference,actor);stateAction=true;break;
+                Sql(c,tx,"insert into studio_workflow_deliveries(id,job_id,method,reference,actor) values($1,$2,$3,$4,$5)",request.OperationId,job,request.Method,request.Reference,actor);JobGraphStore.CompleteMilestone(c,tx,job,"Delivery");stateAction=true;break;
             case "close":
                 JobGraphStore.GuardCompletion(c,tx,job);
                 if(!manage)throw new UnauthorizedAccessException();
-                if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Resolve open required operational tasks before closing.");
+                if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and workflow_node_id is null and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Resolve open required operational tasks before closing.");
                 if(Exists(c,tx,"select exists(select 1 from studio_workflow_delivery_requirements where job_id=$1 and required and not waived and delivered_at_utc is null)",job))throw new ArgumentException("Deliver or explicitly waive every required deliverable before closing.");
                 stateAction=true;break;
             case "require-delivery":
@@ -526,11 +526,12 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         """,job);
     private static void ValidateSourceReady(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
     {
+        JobGraphStore.GuardSourceReady(c,tx,job);
         if(Exists(c,tx,"select exists(select 1 from studio_workday_roster_progress where job_id=$1 and status in ('Not Photographed','NotStarted','InProgress','Deferred','Absent','NoShow','Needs Retake','Blocked'))",job))throw new ArgumentException("Photograph or explicitly cancel outstanding roster subjects; schedule a follow-up session for the remainder.");
         if(Exists(c,tx,"select exists(select 1 from studio_media_upload_receipts where job_id=$1 and status not in ('Stored','Cancelled'))",job))throw new ArgumentException("Resolve pending, failed and unmatched declared uploads before source submission.");
         if(!Exists(c,tx,"select exists(select 1 from studio_workflow_upload_batches where job_id=$1 and source_upload_batch_id is not null and invalidated_at_utc is null and backup_confirmed and expected_files=completed_files and failed_files=0)",job))throw new ArgumentException("Verify an actual stored upload batch and its backup before source submission.");
         if(!Exists(c,tx,"select exists(select 1 from studio_workflow_sessions where job_id=$1)",job)||Exists(c,tx,"select exists(select 1 from studio_workflow_sessions w left join studio_shoot_sessions s on s.id=w.shoot_id where w.job_id=$1 and w.required and (s.id is null or s.status='Cancelled' or s.checked_out_at_utc is null or exists(select 1 from studio_workflow_crew c where c.session_id=w.id and not c.ready and c.waiver_reason is null)))",job))throw new ArgumentException("Complete all required sessions and photographer contributions, or explicitly waive missing contributions.");
-        if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and activity_type in ('FileIngest','Backup') and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Complete the required ingest and backup verification tasks before submission.");
+        if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and workflow_node_id is null and activity_type in ('FileIngest','Backup') and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Complete the required ingest and backup verification tasks before submission.");
         if(!Exists(c,tx,"select exists(select 1 from studio_media_assets a join studio_asset_versions v on v.job_id=a.job_id and v.asset_key=a.asset_key where a.job_id=$1)",job))throw new ArgumentException("Upload required material before submitting.");
         if(Exists(c,tx,"select exists(select 1 from studio_workflow_sessions s where s.job_id=$1 and s.required and not exists(select 1 from studio_workflow_upload_batches b where b.id=(select latest.id from studio_workflow_upload_batches latest where latest.session_id=s.id order by latest.recorded_at_utc desc,latest.id desc limit 1) and b.expected_files=b.completed_files and b.failed_files=0 and b.backup_confirmed and b.invalidated_at_utc is null and b.source_upload_batch_id is not null))",job))
             throw new ArgumentException("Each required session needs a verified upload batch with every expected file completed, no failures and backup confirmed.");
@@ -538,7 +539,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
     private static void ValidateFinished(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
     {
         CommercialTemplateStore.GuardPublication(c,tx,job);
-        if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and activity_type in ('Cull','Edit','Retouch','Proof','Print','QC') and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Resolve required production tasks first.");
+        if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and workflow_node_id is null and activity_type in ('Cull','Edit','Retouch','Proof','Print','QC') and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Resolve required production tasks first.");
         if(Exists(c,tx,"select exists(select 1 from studio_media_assets a where a.job_id=$1 and (a.approved_version_id is null or exists(select 1 from studio_production_items i where i.asset_id=a.id and i.source_version_id=a.approved_version_id and i.qc_state not in ('Passed','Cancelled'))))",job))throw new ArgumentException("Pass current output quality checks before submission.");
     }
     private static void CreateSubmission(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,string kind,string actor)

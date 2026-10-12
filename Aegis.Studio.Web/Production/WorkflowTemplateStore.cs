@@ -17,6 +17,7 @@ public sealed class WorkflowTemplateStore(StudioDatabase database)
     }
     public WorkflowDraft SaveDraft(Guid id, SaveWorkflowDraft request, string actor)
     {
+        if(id==Guid.Empty)throw new ArgumentException("Template identity is required.");
         // A draft can be incomplete. Publication is the validation boundary.
         if (string.IsNullOrWhiteSpace(request.Definition.Name) || request.Definition.Name.Length > 200) throw new ArgumentException("Provide a template name of at most 200 characters.");
         if (JsonSerializer.Serialize(request.Definition, Json).Length > 500000) throw new ArgumentException("Template is too large.");
@@ -26,6 +27,7 @@ public sealed class WorkflowTemplateStore(StudioDatabase database)
         { var prior = current.ExecuteScalar(); if ((prior is int revision ? revision : 0) != request.ExpectedRevision) throw new InvalidOperationException("Draft changed. Refresh before saving."); }
         var published = Get(c, tx, id);
         int version = published?.Version ?? 0;
+        if (published is not null && published.Kind != "Job") throw new ArgumentException("Only Job Templates have workflow drafts.");
         if (version != request.BaseVersion) throw new InvalidOperationException("Published template changed. Refresh before editing.");
         int next = request.ExpectedRevision + 1;
         Execute(c, tx, """

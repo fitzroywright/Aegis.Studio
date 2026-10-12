@@ -36,7 +36,7 @@ public static class WorkflowGraphEngine
     {
         void Error(string id, string message) => issues.Add(new(prefix + id, message));
         if (depth > 8) { Error("", "Subflows may be nested at most eight levels."); return; }
-        if (g.Nodes is null || g.Edges is null || g.Nodes.Length is < 2 or > 300 || g.Edges.Length > 1000)
+        if (g.Nodes is null || g.Edges is null || g.Nodes.Length is < 2 or > 300 || g.Edges.Length > 1000 || g.Nodes.Any(n=>n is null) || g.Edges.Any(e=>e is null))
         { Error("", "Provide 2–300 nodes and at most 1,000 connections per flow."); return; }
         var nodes = new Dictionary<string, WorkflowNode>(StringComparer.Ordinal);
         foreach (var n in g.Nodes)
@@ -57,6 +57,7 @@ public static class WorkflowGraphEngine
         foreach (var e in g.Edges)
         {
             if (string.IsNullOrWhiteSpace(e.Id) || !edgeIds.Add(e.Id)) Error(e.From, "Connection IDs must be unique and nonempty.");
+            if ((e.Label?.Length??0)>200) Error(e.From, "Branch labels must be at most 200 characters.");
             if (!nodes.ContainsKey(e.From) || !nodes.ContainsKey(e.To) || e.From == e.To) Error(e.From, $"Connection {e.Id} has an invalid destination or creates a self dependency.");
             if (e.Condition is not null && !ValidCondition(e.Condition, 0)) Error(e.From, $"Connection {e.Id} has an invalid service condition.");
         }
@@ -73,7 +74,14 @@ public static class WorkflowGraphEngine
         {
             if (!reachable.Contains(n.Id)) Error(n.Id, "This node is disconnected from Start.");
             if (!terminating.Contains(n.Id)) Error(n.Id, "Connect this branch to a join or completion point.");
-            if (n.Kind == "Decision" && !g.Edges.Any(e => e.From == n.Id && e.Condition is null)) Error(n.Id, "Provide an unconditional continuation so an unselected service cannot deadlock the flow.");
+            if (n.Kind == "Decision")
+            {
+                var branches=g.Edges.Where(e=>e.From==n.Id).Select(e=>e.Condition).ToArray();
+                bool Complement(WorkflowCondition? a,WorkflowCondition? b)=>a is not null&&b?.Operator=="Not"&&b.Conditions is {Length:1}
+                    && System.Text.Json.JsonSerializer.Serialize(a)==System.Text.Json.JsonSerializer.Serialize(b.Conditions[0]);
+                if(!branches.Any(c=>c is null)&&!branches.Any(a=>branches.Any(b=>Complement(a,b))))
+                    Error(n.Id,"Provide an unconditional continuation or complementary conditions so every service selection can continue.");
+            }
             if (n.Kind == "Join" && g.Edges.Count(e => e.To == n.Id) < 2) Error(n.Id, "A join needs at least two incoming branches.");
         }
     }
@@ -83,7 +91,7 @@ public static class WorkflowGraphEngine
         while (pending.TryPop(out var id)) if (visited.Add(id)) foreach (var e in edges.Where(e => (reverse ? e.To : e.From) == id)) pending.Push(reverse ? e.From : e.To);
         return visited;
     }
-    private static bool ValidCondition(WorkflowCondition c, int depth) => depth <= 8 && (c.Operator switch
+    private static bool ValidCondition(WorkflowCondition c, int depth) => c is not null && depth <= 8 && (c.Operator switch
     {
         "ServiceSelected" => c.CatalogItemId.HasValue && c.CatalogItemId != Guid.Empty && (c.Conditions?.Length ?? 0) == 0,
         "Not" => c.Conditions is { Length: 1 } && ValidCondition(c.Conditions[0], depth + 1),
@@ -144,11 +152,12 @@ public static class WorkflowGraphEngine
             {
                 // Started work remains applicable after a service removal until explicitly reconciled.
                 if (taskStatus is "Completed" or "InProgress" or "Blocked" or "WaitingOnCustomer" or "ReworkRequired" or "Partial" or "Failed" or "ReprintRequired" or "ReadyForDelivery") status = taskStatus;
-                else if (taskStatus == "Cancelled" && n.Task?.Optional == true) status = "Skipped";
+                else if (taskStatus == "Cancelled" && n.Task?.Optional == true) status = inactive ? "Inactive" : ready || root ? "Skipped" : "Blocked";
             }
-            states[n.Id] = new(n.Id, status, incoming.Select(e => e.From).ToArray(), status == "Blocked" ? "Waiting for active prerequisites" : inactive ? "Service branch is inactive" : null);
+            states[n.Id] = new(n.Id, status, incoming.Select(e => e.From).ToArray(), !inactive && !ready && !root ? "Waiting for active prerequisites" : inactive ? "Service branch is inactive" : null);
             foreach (var e in graph.Edges.Where(e => e.From == n.Id))
-                edges[e.Id] = !Matches(e.Condition, services) || status == "Inactive" ? "Inactive" : status is "Completed" or "Skipped" ? "Completed" : "Pending";
+                edges[e.Id] = !Matches(e.Condition, services) || status == "Inactive" ? "Inactive" :
+                    (status is "Completed" or "Skipped") && (ready || root || inactive) ? "Completed" : "Pending";
         }
         var required = graph.Nodes.Where(n => n.Kind == "Task").Select(n => states[n.Id]);
         bool completed = states.Values.Where(s => graph.Nodes.Any(n => n.Id == s.Id && n.Kind == "End")).All(s => s.Status is "Completed" or "Inactive")

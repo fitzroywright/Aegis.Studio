@@ -40,8 +40,8 @@ internal static class DemoJobWorkflowGraphs
             using (var check = Command(c, tx, "select exists(select 1 from studio_job_template_instances where job_id=$1)", job)) if ((bool)check.ExecuteScalar()!) continue;
             var template = templates[i == 0 ? 5 : i == 1 ? 6 : i % 5];
             ApplyNewJob(c, tx, job, template, Guid.NewGuid(), actor);
-            if (i is 2 or 4 or 6 or 7 or 9) Execute(c, tx, "insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity) values($1,$2,$3,1)", Guid.NewGuid(), job, retouch);
-            if (i is 3 or 4 or 6 or 7 or 9) Execute(c, tx, "insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity) values($1,$2,$3,1)", Guid.NewGuid(), job, print);
+            if (i is 2 or 4 or 6 or 7 or 8 or 9) Execute(c, tx, "insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity) values($1,$2,$3,1)", Guid.NewGuid(), job, retouch);
+            if (i is 3 or 4 or 6 or 7 or 8 or 9) Execute(c, tx, "insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity) values($1,$2,$3,1)", Guid.NewGuid(), job, print);
             if (i >= 6) Execute(c, tx, "update studio_job_activities set status='Completed',completed_at_utc=now(),started_at_utc=now(),assigned_to=$2 where job_id=$1 and workflow_node_id in ('review','capture/shoot','capture/ingest')", job, actor);
             if (i == 6) Execute(c, tx, "update studio_job_activities set status='InProgress',started_at_utc=now(),assigned_to=$2 where job_id=$1 and workflow_node_id='retouch'", job, actor);
             if (i == 7) Execute(c, tx, "update studio_job_activities set status='Blocked',blocked_reason='Awaiting client selection',assigned_to=$2 where job_id=$1 and workflow_node_id='digital'", job, actor);

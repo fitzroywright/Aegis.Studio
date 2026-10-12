@@ -85,3 +85,28 @@ checkpoint results; prepare final delivery. No deployment and no merge into main
   enabled locally to avoid runtime resource problems. No build settings changed in repository.
 - Chromium verification script prepared; browser runtime installation in progress.
 - Latest GitHub checkpoint before this checkpoint: 1092ff1727539a417170619b2091cd35635408c5.
+
+## Verified implementation and final integration review
+
+- Full Web/Web.Tests builds passed repeatedly with zero warnings/errors.
+- Twelve original graph engine tests passed. Four additional dependency and complementary
+  conditional-path cases have since been added and need a fresh final test run.
+- Eight graph/editor UI tests passed; Chromium checks confirmed shared-node rendering,
+  real branch creation, no page overflow at 1440x900 and 1366x768, and readable 12px labels.
+- Final updated existing UI suite: 112 pass, 51 fail. Pristine upstream: 104 pass, 51 fail.
+  The final changed suite has no additional failure names; the 51 baseline failures remain.
+- Five persistence tests passed with explicit schema initialization and No Reset On Close
+  in the temporary PGlite connection. The separate Front Desk creation/retry/task execution
+  test passed after fixing structural comparison of service arrays.
+- The financial test now includes a posted sale; rerun after the final build.
+- Native PostgreSQL concurrency and multi-session stress remain unverified because this
+  runtime cannot launch native PostgreSQL as a non-root user. PGlite is a single-session
+  multiplexer, so its concurrent-update result must not be presented as native stress proof.
+- Final integration corrections: production approval excludes future Delivery/Archive tasks;
+  actual recorded delivery completes eligible graph Delivery milestones; post-delivery
+  Archive work remains actionable; graph-inactive tasks are excluded from legacy gate SQL.
+- Added a production-before-delivery/milestone replay persistence test.
+- Current final integration build is running. Full non-database .NET suite previously
+  returned 303 pass, 2 newly added dependency checks failed against an older Web assembly,
+  37 skipped. Those checks were corrected in source; rerun against the final rebuilt assembly.
+- Nothing deployed to Kratos; no external data reset; no merge into main.

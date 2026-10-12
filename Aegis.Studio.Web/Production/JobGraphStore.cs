@@ -6,11 +6,11 @@ using static Aegis.Studio.Web.Production.CommercialTemplateStore;
 namespace Aegis.Studio.Web.Production;
 
 public sealed record GraphTask(Guid Id, string NodeId, string Title, string Status, string? AssignedTo, string? Role,
-    string Eligibility, string[] Dependencies, bool Optional, string? Reason);
+    string Eligibility, string[] Dependencies, bool Optional, string? Reason, string[]? DependencyLabels = null, string? ActivityType = null);
 public sealed record JobGraphView(Guid JobId, Guid TemplateId, int TemplateVersion, long Revision,
     WorkflowGraph Graph, GraphEvaluation Evaluation, GraphTask[] Tasks, object[] History);
 public sealed record TemplateImpact(string[] Remain, string[] Added, string[] Removed, string[] CompletedAffected,
-    string[] AssignmentChanges, string[] DependencyChanges, bool RequiresConfirmation, string FinancialImplications, int TemplateVersion);
+    string[] AssignmentChanges, string[] DependencyChanges, bool RequiresConfirmation, string FinancialImplications, int TemplateVersion, Dictionary<string,string> TaskLabels);
 public sealed record WorkflowServicesRequest(Guid[] CatalogItemIds, Guid OperationId, long ExpectedRevision, bool ConfirmChanges = false, string? Reason = null);
 
 public sealed class JobGraphStore(StudioDatabase database)
@@ -61,6 +61,8 @@ public sealed class JobGraphStore(StudioDatabase database)
                 values($1,$2,$3,$4,'NotStarted','Normal',$5,$6,$7,now(),now(),$8,$9,$10::jsonb,$11,$12,$13,$14,$8)
                 on conflict(job_id,workflow_node_id) where workflow_node_id is not null do update set
                   title=case when studio_job_activities.status='Completed' then studio_job_activities.title else excluded.title end,
+                  activity_type=case when studio_job_activities.status='Completed' then studio_job_activities.activity_type else excluded.activity_type end,
+                  production_area=case when studio_job_activities.status='Completed' then studio_job_activities.production_area else excluded.production_area end,
                   assigned_to=coalesce(studio_job_activities.assigned_to,excluded.assigned_to),step_definition=excluded.step_definition,
                   optional_step=excluded.optional_step,quality_control_required=excluded.quality_control_required
                 """, Guid.NewGuid(), job, step.ActivityType, step.Title, step.DefaultAssignee, step.Area, actor, n.Id, step.Area,
@@ -77,19 +79,25 @@ public sealed class JobGraphStore(StudioDatabase database)
         var graph = Graph(definition); var evaluation = WorkflowGraphEngine.Evaluate(graph, Statuses(c, tx, job), Services(c, tx, job));
         var nodes = WorkflowGraphEngine.Flatten(graph).Nodes.ToDictionary(n => n.Id); var states = evaluation.Nodes.ToDictionary(n => n.Id);
         var tasks = new List<GraphTask>();
-        using (var q = Command(c, tx, "select id,workflow_node_id,title,status,assigned_to,optional_step,blocked_reason from studio_job_activities where job_id=$1 and workflow_node_id is not null order by step_order", job))
-        { using var r = q.ExecuteReader(); while (r.Read()) { var id = r.GetString(1); var s = states[id]; tasks.Add(new(r.GetGuid(0), id, r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), nodes[id].Role, s.Status, s.Dependencies, r.GetBoolean(5), r.IsDBNull(6) ? s.Reason : r.GetString(6))); } }
+        using (var q = Command(c, tx, "select id,workflow_node_id,title,status,assigned_to,optional_step,blocked_reason,activity_type from studio_job_activities where job_id=$1 and workflow_node_id is not null order by step_order", job))
+        { using var r = q.ExecuteReader(); while (r.Read()) { var id = r.GetString(1); var s = states[id]; tasks.Add(new(r.GetGuid(0), id, r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), nodes[id].Role, s.Status, s.Dependencies, r.GetBoolean(5), r.IsDBNull(6) ? s.Reason : r.GetString(6),s.Dependencies.Select(p=>nodes[p].Label).ToArray(),r.GetString(7))); } }
         var history = new List<object>();
         using (var q = Command(c, tx, "select title,status,assigned_to,completed_at_utc from studio_job_activities where job_id=$1 and workflow_node_id is null and template_step_key is not null and work_order_id is null order by created_at_utc", job))
         { using var r = q.ExecuteReader(); while (r.Read()) history.Add(new { title = r.GetString(0), status = r.GetString(1), assignedTo = r.IsDBNull(2) ? null : r.GetString(2), completedAtUtc = r.IsDBNull(3) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(3) }); }
-        tx.Commit(); return new(job, template, version, revision, graph, evaluation, tasks.ToArray(), history.ToArray());
+        var taskMap=tasks.ToDictionary(t=>t.NodeId);
+        WorkflowGraph Display(WorkflowGraph flow,string prefix)=>flow with{Nodes=flow.Nodes.Select(n=>
+            n.Kind=="Subflow"&&n.Subflow is not null?n with{Subflow=Display(n.Subflow,prefix+n.Id+"/")}:
+            taskMap.TryGetValue(prefix+n.Id,out var task)?n with{Label=task.Title,Task=n.Task! with{Title=task.Title,DefaultAssignee=task.AssignedTo,ActivityType=task.ActivityType??n.Task!.ActivityType}}:n).ToArray()};
+        tx.Commit(); return new(job, template, version, revision, Display(graph,""), evaluation, tasks.ToArray(), history.ToArray());
     }
     public static void GuardTask(NpgsqlConnection c, NpgsqlTransaction? tx, Guid activity, string requested)
     {
-        Guid job; string id; string current;
-        using (var q = Command(c, tx, "select job_id,workflow_node_id,status from studio_job_activities where id=$1 and workflow_node_id is not null", activity))
-        { using var r = q.ExecuteReader(); if (!r.Read()) return; job = r.GetGuid(0); id = r.GetString(1); current = r.GetString(2); }
+        Guid job; string? id; string current;
+        using (var q = Command(c, tx, "select job_id,workflow_node_id,status from studio_job_activities where id=$1 and (workflow_node_id is not null or (template_step_key is not null and work_order_id is null and exists(select 1 from studio_job_template_instances i where i.job_id=studio_job_activities.job_id)))", activity))
+        { using var r = q.ExecuteReader(); if (!r.Read()) return; job = r.GetGuid(0); id = r.IsDBNull(1)?null:r.GetString(1); current = r.GetString(2); }
+        if(id is null){if(requested!=current)throw new ArgumentException("Work preserved from an earlier template cannot be reopened. Add a correction task instead.");return;}
         if (current == "Completed" && requested != "Completed") throw new ArgumentException("Completed workflow work is immutable. Add a correction task instead.");
+        if (current == "Completed" && requested == "Completed") return;
         var def = Definition(c, tx, job)!; var graph = Graph(def); var n = WorkflowGraphEngine.Flatten(graph).Nodes.Single(n => n.Id == id);
         if (requested == "Archived") throw new ArgumentException("Workflow tasks cannot be silently archived.");
         if (requested == "Cancelled" && n.Task?.Optional != true) throw new ArgumentException("Only optional workflow tasks may be skipped.");
@@ -104,8 +112,37 @@ public sealed class JobGraphStore(StudioDatabase database)
     public static void GuardCompletion(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
     {
         var def = Definition(c, tx, job);
-        if (def?.Workflow is not null && !WorkflowGraphEngine.Evaluate(Graph(def), Statuses(c, tx, job), Services(c, tx, job)).Completed)
+        if (def is not null && !WorkflowGraphEngine.Evaluate(Graph(def), Statuses(c, tx, job), Services(c, tx, job)).Completed)
             throw new ArgumentException("Complete all applicable workflow tasks before delivery or closing.");
+    }
+    public static void GuardProductionReady(NpgsqlConnection c,NpgsqlTransaction? tx,Guid job)
+    {
+        var def=Definition(c,tx,job);if(def is null)return;
+        var nodes=WorkflowGraphEngine.Flatten(Graph(def)).Nodes.ToDictionary(n=>n.Id);
+        var evaluation=WorkflowGraphEngine.Evaluate(Graph(def),Statuses(c,tx,job),Services(c,tx,job));
+        if(evaluation.Nodes.Any(s=>nodes[s.Id].Kind=="Task"&&nodes[s.Id].Task!.ActivityType is not ("Delivery" or "Archive")&&s.Status is not ("Completed" or "Skipped" or "Inactive")))
+            throw new ArgumentException("Complete all applicable production workflow tasks before submission or delivery.");
+    }
+    public static void GuardSourceReady(NpgsqlConnection c,NpgsqlTransaction? tx,Guid job)
+    {
+        var def=Definition(c,tx,job);if(def is null)return;
+        var nodes=WorkflowGraphEngine.Flatten(Graph(def)).Nodes.ToDictionary(n=>n.Id);
+        if(WorkflowGraphEngine.Evaluate(Graph(def),Statuses(c,tx,job),Services(c,tx,job)).Nodes.Any(s=>
+            (nodes[s.Id].Task?.ActivityType is "FileIngest" or "Backup")&&s.Status is not ("Completed" or "Skipped" or "Inactive")))
+            throw new ArgumentException("Complete the active workflow ingest and backup tasks before source submission.");
+    }
+    public static void CompleteMilestone(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,string type)
+    {
+        var def=Definition(c,tx,job);if(def is null)return;
+        var nodes=WorkflowGraphEngine.Flatten(Graph(def)).Nodes.ToDictionary(n=>n.Id);
+        // Reevaluate between passes for multiple connected tasks fulfilled by the same domain event.
+        for(int pass=0;pass<nodes.Count;pass++)
+        {
+            var eligible=WorkflowGraphEngine.Evaluate(Graph(def),Statuses(c,tx,job),Services(c,tx,job)).Nodes
+                .Where(s=>nodes[s.Id].Task?.ActivityType==type&&(s.Status is "Available" or "InProgress")).Select(s=>s.Id).ToArray();
+            if(eligible.Length==0)return;
+            foreach(var id in eligible)Execute(c,tx,"update studio_job_activities set status='Completed',started_at_utc=coalesce(started_at_utc,now()),completed_at_utc=coalesce(completed_at_utc,now()),updated_at_utc=now() where job_id=$1 and workflow_node_id=$2",job,id);
+        }
     }
     internal static long Lock(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, long expected)
     {
@@ -140,7 +177,7 @@ public sealed class JobGraphStore(StudioDatabase database)
         var changed = remain.Where(id => !dependencies(id, previous!).SequenceEqual(dependencies(id, target.Definition))).ToArray();
         var affected = states.Where(s => s.Value == "Completed" && (removed.Contains(s.Key) || changed.Contains(s.Key) || (after.TryGetValue(s.Key, out var n) && JsonSerializer.Serialize(n.Task, Json) != JsonSerializer.Serialize(before[s.Key].Task, Json)))).Select(s => s.Key).ToArray();
         return new(remain, after.Keys.Except(before.Keys).ToArray(), removed, affected, assignment, changed,
-            states.Any(s => s.Value != "NotStarted" && s.Value != "Scheduled"), "Posted charges, invoices and payments remain unchanged. Adjust billing separately through POS.", target.Version);
+            states.Any(s => s.Value != "NotStarted" && s.Value != "Scheduled"), "Posted charges, invoices and payments remain unchanged. Adjust billing separately through POS.", target.Version, before.Values.Concat(after.Values).GroupBy(n=>n.Id).ToDictionary(g=>g.Key,g=>g.Last().Label));
     }
     public void Apply(Guid job, ApplyJobTemplateRequest request, string actor)
     {

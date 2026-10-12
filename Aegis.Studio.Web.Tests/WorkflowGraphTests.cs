@@ -37,7 +37,7 @@ public class WorkflowGraphTests
         Assert.Equal(selectedRetouch?"Available":"Inactive",State(result,"retouch"));
         Assert.Equal(selectedPrint?"Available":"Inactive",State(result,"print"));
         Assert.Equal(selectedRetouch||selectedPrint?"Blocked":"Available",State(result,"quality"));
-        Assert.Single(WorkflowGraphEngine.Flatten(g).Nodes.Where(n=>n.Id=="join"));
+        Assert.Single(WorkflowGraphEngine.Flatten(g).Nodes,n=>n.Id=="join");
     }
     [Fact] public void AnyJoinContinuesAfterOneQualifyingBranchWhileCompletionStillRequiresActiveTasks()
     {
@@ -81,5 +81,30 @@ public class WorkflowGraphTests
     {
         var both=new WorkflowCondition("All",Conditions:[new("ServiceSelected",retouch),new("Not",Conditions:[new("ServiceSelected",print)])]);
         Assert.True(WorkflowGraphEngine.Matches(both,new HashSet<Guid>{retouch}));Assert.False(WorkflowGraphEngine.Matches(both,new HashSet<Guid>{retouch,print}));
+    }
+    [Fact] public void SkippingAnOptionalTaskCannotBypassItsUnfinishedPredecessor()
+    {
+        var g=WorkflowGraphExamples.Linear();g=g with{Nodes=g.Nodes.Select(n=>n.Id=="produce"?n with{Task=n.Task! with{Optional=true}}:n).ToArray()};
+        var result=WorkflowGraphEngine.Evaluate(g,new Dictionary<string,string>{{"produce","Cancelled"}},new HashSet<Guid>());
+        Assert.Equal("Blocked",State(result,"delivery"));Assert.False(result.Completed);
+    }
+    [Fact] public void PreservedCompletedWorkCannotBypassAChangedDependency()
+    {
+        var g=WorkflowGraphExamples.Linear();var result=WorkflowGraphEngine.Evaluate(g,States("produce"),new HashSet<Guid>());
+        Assert.Equal("Completed",State(result,"produce"));Assert.Equal("Blocked",State(result,"delivery"));
+        Assert.False(result.Completed);
+    }
+    [Theory] [InlineData(true)] [InlineData(false)]
+    public void ExclusiveConditionalAlternativesRejoinWithoutAnArtificialBypass(bool selected)
+    {
+        var g=WorkflowGraphExamples.Graduation(retouch,print);
+        g=g with{Nodes=g.Nodes.Where(n=>n.Id!="digital").ToArray(),Edges=g.Edges.Where(e=>e.From!="digital"&&e.To!="digital")
+            .Select(e=>e.Id=="services-print"?e with{Condition=new("Not",Conditions:[new("ServiceSelected",retouch)])}:e).ToArray()};
+        Assert.Empty(WorkflowGraphEngine.Validate(g));
+        var services=selected?new HashSet<Guid>{retouch}:new HashSet<Guid>();var states=States("review","capture/shoot","capture/ingest");
+        var active=selected?"retouch":"print",inactive=selected?"print":"retouch";
+        Assert.Equal("Available",State(WorkflowGraphEngine.Evaluate(g,states,services),active));
+        Assert.Equal("Inactive",State(WorkflowGraphEngine.Evaluate(g,states,services),inactive));
+        states[active]="Completed";Assert.Equal("Available",State(WorkflowGraphEngine.Evaluate(g,states,services),"quality"));
     }
 }

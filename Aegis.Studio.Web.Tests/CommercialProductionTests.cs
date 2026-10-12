@@ -96,6 +96,8 @@ public class CommercialProductionTests
             activity=operations.UpdateActivity(task,new(step.ActivityType,step.Title,null,"Completed","High","Operator",null,activity.DueAtUtc,step.Area,null,null),"Admin");
             Assert.NotNull(activity.CompletedAtUtc);
         }
+        // The job-template review is a real required workflow task, separate from work-order QC.
+        Sql(c,"update studio_job_activities set status='Completed',completed_at_utc=now() where job_id=$1 and workflow_node_id='review'",job);
         CommercialTemplateStore.GuardPublication(c,null,job);
         Assert.Equal(4,Scalar(c,"select count(*)::int from studio_job_activities where work_order_id=$1 and status='Completed'",order));
         Assert.Equal(3000m,pos.Get(sale.Id)!.Total);
