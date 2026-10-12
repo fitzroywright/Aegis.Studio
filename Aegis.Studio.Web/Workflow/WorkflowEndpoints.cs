@@ -110,7 +110,6 @@ public static class WorkflowEndpoints
         }));
         admin.MapPost("/demo-data/remove",async (StudioDatabase db,IFileStorage storage,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request,CancellationToken cancellationToken)=>
         {
-            if(!config.GetValue("DemoData:AllowDestructiveReset",false))return Results.NotFound();
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
             if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
             try
@@ -125,7 +124,6 @@ public static class WorkflowEndpoints
         });
         admin.MapPost("/demo-data/reset-and-generate",(DemoSeedCoordinator coordinator,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request)=>
         {
-            if(!config.GetValue("DemoData:AllowDestructiveReset",false))return Results.NotFound();
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
             if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
             try
