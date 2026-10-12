@@ -1,3 +1,9 @@
+/* Shared role colors consumed by each left-rail card's owning rules. */
+:root { --studio-grid-header-bg:#203f63; --studio-grid-header-text:#fff; --studio-grid-header-border:#537395; }
+#studioContextRail > [data-rail-card] { --studio-rail-border:2px solid var(--studio-rail-accent); --studio-rail-title:#fff; --studio-rail-title-weight:750; }
+#studioContextRail > [data-rail-card="navigation"] { --studio-rail-accent:#24476c; }
+#studioContextRail > [data-rail-card="workspaces"] { --studio-rail-accent:#24665e; }
+#studioContextRail > [data-rail-card="actions"] { --studio-rail-accent:#875413; }
 /* Canonical Studio presentation. Responsive scope and cascade priority are preserved.
    Change the owning rule; do not append another correction layer. */
 :root {
@@ -1474,9 +1480,9 @@ dialog::backdrop {
 .pipeline-timeline-head {
   position: sticky;
   top: 0;
-  background: #f7f9fc;
+  background:var(--studio-grid-header-bg);
   z-index: 1;
-}
+color:var(--studio-grid-header-text);}
 .pipeline-timeline-head>span {
   padding: 10px;
   font-size: 11px;
@@ -1540,8 +1546,8 @@ dialog::backdrop {
   background: #eef6ff;
 }
 .pipeline-timeline-head .today {
-  background: #eef6ff;
-}
+  background:var(--studio-grid-header-bg);
+color:var(--studio-grid-header-text);}
 .pipeline-event {
   display: flex;
   align-items: flex-start;
@@ -4475,14 +4481,14 @@ body[data-studio-view="reports"] .op-card {
   color: #125fa4;
   background: #eaf4fc;
 }
-.studio-table thead th {
-  background: #eef4f8;
-  color: #425b72;
+.studio-table thead th,.op-table thead th {
+  background:var(--studio-grid-header-bg);
+  color:var(--studio-grid-header-text);
   border-bottom-color: var(--studio-border);
 }
 .pos-grid thead th {
-  background: #eef4f8;
-  color: #425b72;
+  background:var(--studio-grid-header-bg);
+  color:var(--studio-grid-header-text);
   border-bottom-color: var(--studio-border);
 }
 .studio-table tbody td {
@@ -7155,8 +7161,8 @@ body[data-studio-view="workspaces"] .generic {
   z-index: 3;
 }
 .production-queue-card .studio-table th {
-  background: #f3f5f7;
-  color: #475569;
+  background:var(--studio-grid-header-bg);
+  color:var(--studio-grid-header-text);
   text-align: left;
   font-size: 11px;
   padding: 8px;
@@ -7307,10 +7313,10 @@ body[data-studio-view="today"] .mw-today-job-columns .mw-job-column-filter selec
   min-width: 0;
   height: 23px;
   padding: 1px 17px 1px 5px;
-  border: 1px solid #cbd8e5;
+  border:1px solid #658bad;
   border-radius: 5px;
-  background: #fff;
-  color: #294461;
+  background:#2c537c;
+  color:#fff;
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
@@ -7429,8 +7435,8 @@ body[data-studio-view="today"] .mw-today-job-columns .mw-job-column-filter selec
   padding: 11px 14px;
   font-size: .72rem;
   font-weight: 700;
-  color: var(--muted,#64748b);
-  background: var(--surface-muted,#f5f6f8);
+  color:var(--studio-grid-header-text);
+  background:var(--studio-grid-header-bg);
 }
 .mw-today-job-list {
   max-height: min(63vh,740px);
@@ -8016,8 +8022,9 @@ body:not([data-studio-view="today"]) .shell>main>.generic>.mw-page {
   min-height: 0;
 }
 body .shell>.studio-context-rail .mw-list-panel>header h2 {
+  color:var(--studio-rail-title,#fff);
   font-size: .85rem;
-  font-weight: 600;
+  font-weight: 750;
 }
 body .shell>.studio-context-rail .mw-list-panel>header {
   min-height: 46px;
@@ -8074,28 +8081,28 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel>:not(header) {
   overflow-y: auto;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(1) {
-  border-color: #a6c8e8;
+  border-color:var(--studio-rail-accent);
   background: #f5faff;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(1)>header {
-  background: #e7f2ff;
-  border-bottom-color: #c9def3;
+  background:var(--studio-rail-accent);
+  border-bottom-color:var(--studio-rail-accent);
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(2) {
-  border-color: #c6d6cd;
+  border-color:var(--studio-rail-accent);
   background: #f7fbf8;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(2)>header {
-  background: #e9f3ec;
-  border-bottom-color: #d3e6d8;
+  background:var(--studio-rail-accent);
+  border-bottom-color:var(--studio-rail-accent);
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(3) {
-  border-color: #b6d7c1;
+  border-color:var(--studio-rail-accent);
   background: #f7fcf8;
 }
 body[data-studio-view="today"] .studio-context-card:nth-child(3)>header {
-  background: #e8f5ec;
-  border-bottom-color: #cce5d3;
+  background:var(--studio-rail-accent);
+  border-bottom-color:var(--studio-rail-accent);
 }
 body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="schedule"] {
   border-color: #a6c8e8;
@@ -8591,9 +8598,9 @@ body[data-studio-view="today"] .mw-today-job-toolbar .mw-today-search {
 body[data-studio-view="today"] .mw-today-job-columns {
   font-size: .75rem !important;
   font-weight: 850 !important;
-  color: #213c5a !important;
+  color:var(--studio-grid-header-text) !important;
   letter-spacing: .015em;
-  background: #e8eef5 !important;
+  background:var(--studio-grid-header-bg) !important;
   border-top: 1px solid #cad8e7;
   border-bottom: 1px solid #cad8e7;
 }
@@ -9191,9 +9198,9 @@ body .topbar #studioBreadcrumb .breadcrumb-label {
 .fd-table th {
   position: sticky;
   top: 0;
-  background: #f6f5f3;
+  background:var(--studio-grid-header-bg);
   z-index: 1;
-  color: #35302a;
+  color:var(--studio-grid-header-text);
   padding: 10px 12px;
   border-bottom: 1px solid #eee9e3;
 }
@@ -9720,6 +9727,7 @@ body .shell>.studio-context-rail {
   padding: 7px 0 6px !important;
 }
 body .shell>.studio-context-rail>.studio-context-card {
+  border:var(--studio-rail-border);
   display: flex !important;
   flex-direction: column !important;
   flex: initial !important;
@@ -9732,6 +9740,8 @@ body .shell>.studio-context-rail>.studio-context-card {
   box-sizing: border-box;
 }
 body .shell>.studio-context-rail>.studio-context-card>header {
+  background:var(--studio-rail-accent);
+  border-bottom:1px solid var(--studio-rail-accent);
   flex: 0 0 auto;
   min-height: 30px !important;
   padding: 3px 8px !important;
@@ -9797,10 +9807,10 @@ body[data-studio-view="frontdesk"] .fd-queue>.fd-table-scroll {
   max-width: 22px;
   height: 23px;
   padding: 0;
-  border: 1px solid #d6dce1;
+  border:1px solid #658bad;
   border-radius: 5px;
-  background: #fff;
-  color: #20354b;
+  background:#2c537c;
+  color:#fff;
   cursor: pointer;
 }
 .fd-data-pill {
@@ -9984,8 +9994,8 @@ body[data-studio-view="frontdesk"] .fd-queue .fd-table thead th {
   top: auto;
   z-index: auto;
   padding: 11px 14px;
-  background: var(--surface-muted,#f5f6f8);
-  color: var(--muted,#64748b);
+  background:var(--studio-grid-header-bg);
+  color:var(--studio-grid-header-text);
   font-size: .72rem;
   font-weight: 700;
   border: 0;
@@ -10021,9 +10031,9 @@ body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls butto
   font-weight: 700;
 }
 body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls select {
-  background: var(--surface,#fff);
-  color: inherit;
-  border-color: var(--border,#d6d9df);
+  background:#2c537c;
+  color:#fff;
+  border-color:#658bad;
 }
 body[data-studio-view="frontdesk"] .fd-queue .fd-table .action[data-fd-open] {
   border: 0;
@@ -10991,3 +11001,6 @@ body[data-studio-view="media"] .studio-media-page {
   max-width: 180px;
 }
 
+
+
+.management-workload-head { background:var(--studio-grid-header-bg); color:var(--studio-grid-header-text); }

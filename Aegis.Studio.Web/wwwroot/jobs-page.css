@@ -1,6 +1,6 @@
 /* Jobs owns this layout. Shared masthead, left rail and footer remain in studio.css. */
 .sj-page{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:8px;height:100%;min-height:0;color:#283442;font-size:12px}
-.sj-board,.sj-card,.sj-rail-card{background:#fff;border:1px solid #d5d9dd;border-radius:5px;box-shadow:0 2px 5px #2633440c;min-width:0;min-height:0;overflow:hidden}
+.sj-board,.sj-card,.sj-rail-card{background:#fff;border:var(--studio-rail-border,1px solid #d5d9dd);border-radius:5px;box-shadow:0 2px 5px #2633440c;min-width:0;min-height:0;overflow:hidden}
 .sj-board{display:flex;flex-direction:column}
 .sj-toolbar{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #e4e5e7;flex-wrap:wrap}
 .sj-toolbar h2{font-size:20px;margin:0 8px 0 0;color:#243044}
@@ -11,7 +11,7 @@
 .sj-summary button,.sj-gold,.sj-card footer button{color:#98701c;font-weight:700;background:none;border:0;padding:3px;cursor:pointer}
 .sj-table-scroll{flex:1;min-height:0;overflow:auto}
 .sj-table{line-height:1.25;width:100%;border-collapse:collapse;text-align:left;table-layout:fixed}
-.sj-table th{position:sticky;top:0;background:#f3f5f7;color:#526070;font-weight:600;}
+.sj-table th{position:sticky;top:0;background:var(--studio-grid-header-bg);color:var(--studio-grid-header-text);font-weight:700;}
 .sj-table th,.sj-table td{padding:6px 10px;border-bottom:1px solid #e8ebee;overflow-wrap:anywhere;vertical-align:middle}
 .sj-table th:first-child{width:25%}.sj-table th:nth-child(2){width:12%}.sj-table th:nth-child(3){width:15%}.sj-table th:nth-child(4){width:14%}.sj-table th:nth-child(5){width:17%}
 .sj-table td strong{display:block;font-size:12px;font-weight:600;color:#263449;margin-bottom:5px}
@@ -25,8 +25,8 @@
 .sj-pagination div{display:flex;gap:10px;align-items:center}.sj-pagination button{border:1px solid #d2d9e0;border-radius:4px;background:#fff;padding:4px 10px;cursor:pointer}.sj-pagination button[aria-current=page]{background:#d99a2a;color:#fff;border-color:#d99a2a}.sj-pagination button:disabled{opacity:.4;cursor:default}
 .sj-right{gap:8px;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
 .sj-card,.sj-rail-card{display:flex;flex-direction:column;flex:1 1 0;}
-.sj-card header,.sj-rail-card header{padding:9px 12px;border-bottom:1px solid #dedfe2;background:#fafbfc;flex-shrink:0}
-.sj-card h2,.sj-rail-card h2{font-size:13px;margin:0;font-weight:650;color:#344252}
+.sj-card header,.sj-rail-card header{padding:9px 12px;border-bottom:1px solid var(--studio-rail-accent,#dedfe2);background:var(--studio-rail-accent,#fafbfc);flex-shrink:0}
+.sj-card h2,.sj-rail-card h2{font-size:13px;margin:0;font-weight:var(--studio-rail-title-weight,650);color:var(--studio-rail-title,#344252)}
 .sj-card-body,.sj-rail-links{padding:8px 12px;overflow:auto;min-height:0;flex:1}
 .sj-card-body p{font-size:11px;color:#74808d;margin:8px 0}.sj-card-body h3{font-size:11px;margin:10px 0 4px;padding-top:9px;border-top:1px solid #e0e3e6;color:#576371}
 .sj-status-count,.sj-attention{display:grid;grid-template-columns:1fr auto;width:100%;border:0;background:none;text-align:left;gap:3px;padding:5px 0;font-size:11px;color:#52606f;cursor:pointer}
@@ -38,4 +38,5 @@
 @media(max-width:1200px){.sj-page{grid-template-columns:minmax(0,1fr) 230px}.sj-table th,.sj-table td{padding:9px 7px}.sj-toolbar{gap:5px;padding:8px}.sj-toolbar select{max-width:140px}}
 @media(max-width:900px){.sj-page{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 170px}.sj-right{display:flex;flex-direction:column;overflow:hidden;}.sj-table{min-width:740px}.sj-card header,.sj-card-body{padding:6px}.sj-card h2{font-size:11px}.sj-status-count{grid-template-columns:1fr auto}.sj-status-count meter{display:none}.sj-status-count b{grid-column:2}.sj-card footer{padding:4px}.sj-pagination div{gap:4px}}
 body[data-studio-view="jobs"] .mw-today-focus-icon{color:#e8b647}
+
 

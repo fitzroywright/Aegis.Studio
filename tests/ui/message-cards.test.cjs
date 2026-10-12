@@ -18,6 +18,7 @@ test('all operational right rails keep Messages open at the bottom with a Notes 
  const w=await full(t);
  for(const [view,rail] of [['today','.mw-today-right'],['jobs','.sj-right'],['frontdesk','.fd-secondary'],['workspaces','.workspace-right-rail'],['finance','.st-right'],['messages','.st-right'],['admin','.st-right']]){
   await w.studioNavigate(view);await settle();const card=checkBottom(w,rail);
+  assert.deepEqual(Array.from(w.document.querySelectorAll('#studioContextRail > section'),section=>section.dataset.railCard),['navigation','workspaces','actions'],view);
   await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.dataset.smcMode,'notes',view);assert.ok(card.querySelector('[data-notes-job]'),view);
   await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.querySelector('[data-smc-messages]').hidden,false,view);
  }
