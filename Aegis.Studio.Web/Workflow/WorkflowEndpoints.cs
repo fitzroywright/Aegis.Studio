@@ -28,10 +28,13 @@ public static class WorkflowEndpoints
         app.MapGet("/api/workflow/capabilities",(ClaimsPrincipal user,WorkflowStore store)=>Results.Ok(new{operations=store.IsOperations(user),frontDesk=store.IsFrontDesk(user),finance=store.IsFinance(user),production=store.IsProductionManager(user)})).RequireAuthorization();
         app.MapGet("/api/operations-management",(ClaimsPrincipal user,WorkflowStore store,StudioDatabase db)=>Run(()=>
         {
-            if(!store.IsOperations(user))throw new UnauthorizedAccessException();
+            // Everyone may inspect their accessible operational jobs; override requests
+            // remain visible only to Operations Managers.
+            var canDecide=store.IsOperations(user);
+            if(!canDecide)return Results.Ok(new{userName=WorkflowStore.Name(user),canDecideOverrides=false,overrideRequests=Array.Empty<object>(),jobs=store.Monitor(user)});
             using var c=db.OpenConnection();
             using var q=WorkflowStore.Command(c,null,"select coalesce(jsonb_agg(to_jsonb(r) order by created_at_utc desc),'[]'::jsonb)::text from (select r.*,j.title from studio_booking_override_requests r join studio_jobs j on j.id=r.job_id order by r.created_at_utc desc limit 250) r");
-            return Results.Ok(new{userName=WorkflowStore.Name(user),overrideRequests=JsonSerializer.Deserialize<JsonElement>((string)q.ExecuteScalar()!),jobs=store.Monitor(user)});
+            return Results.Ok(new{userName=WorkflowStore.Name(user),canDecideOverrides=true,overrideRequests=JsonSerializer.Deserialize<JsonElement>((string)q.ExecuteScalar()!),jobs=store.Monitor(user)});
         })).RequireAuthorization();
         app.MapGet("/api/workflow/jobs",(ClaimsPrincipal user,WorkflowStore store)=>Results.Ok(store.Monitor(user))).RequireAuthorization();
         app.MapGet("/api/jobs/{job:guid}/connected-workflow",(Guid job,ClaimsPrincipal user,WorkflowStore store)=>Run(()=>Results.Ok(store.View(job,user)))).RequireAuthorization();
