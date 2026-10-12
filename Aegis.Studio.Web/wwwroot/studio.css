@@ -8125,11 +8125,11 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="sc
   background: #e7f2ff;
   border-bottom-color: #c9def3;
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="attention"] {
+body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"] {
   border-color: #e6c29c;
   background: #fffaf4;
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header {
+body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header {
   background: #fff0de;
   border-bottom-color: #f0d4b4;
 }
@@ -8162,7 +8162,7 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel>header h2 {
 body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="schedule"]>header h2 {
   color: #235b8c;
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header h2 {
+body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header h2 {
   color: #945b23;
 }
 @media (max-width:1050px) {
@@ -8208,7 +8208,7 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="at
   background: #f5e9d7;
   color: #875413;
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="attention"] .studio-card-icon {
+body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"] .studio-card-icon {
   background: #f9e3c8;
   color: #955923;
 }
@@ -11019,6 +11019,11 @@ body[data-studio-view="media"] .studio-media-page {
 
 .management-workload-head { background:var(--studio-grid-header-bg); color:var(--studio-grid-header-text); }
 
+/* Shared Needs Attention card: same warm, restrained treatment as Today. */
+body[data-studio-view] .st-right .st-card.st-attention { border: 1px solid #e6c29c; border-radius: 9px; background: #fffaf4; overflow: hidden; }
+body[data-studio-view] .st-right .st-card.st-attention > header { background: #fff0de; border-bottom: 1px solid #f0d4b4; }
+body[data-studio-view] .st-right .st-card.st-attention > header h2 { color: #945b23; font-weight: 600; }
+body[data-studio-view] .st-right .st-card.st-attention .st-card-body { background: #fffaf4; color: #304b67; }
 /* Single artwork for the Studio identity, with the page title directly beside it. */
 body .topbar { padding-left: 0 !important; column-gap: 0 !important; }
 body .topbar .studio-script-brand { padding: 0 !important; margin: 0 !important; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
