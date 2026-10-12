@@ -54,7 +54,7 @@ internal static class StudioFactoryReset
     internal static async Task<long> PurgeStorageAsync(IFileStorage storage, CancellationToken cancellationToken)
     {
         if (storage is IStorageBucketReset bucketReset)
-        return await bucketReset.PurgeBucketAsync(cancellationToken);
+            return await bucketReset.PurgeBucketAsync(cancellationToken);
 
         long removed = 0;
         var query = (IStorageQuery)storage;
