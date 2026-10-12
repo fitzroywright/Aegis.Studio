@@ -16,6 +16,7 @@ function fixture(){
     w.json=async url=>{
         requests.push(url);
         if(url.startsWith('/api/messages/inbox'))return {total:1,items:[{thread:{id:'thread-1',scopeType:'Job',scopeId:'job-1',title:'Wedding',kind:'Thread'},message:{id:'message-1',senderUserName:'paul',body:'Private message',subject:'Handoff',createdAtUtc:'2026-10-11T16:00:00Z',recipientAddresses:['tamara@studio.test']}}]};
+        if(url==='/api/jobs')return [{id:'job-1',title:'Wedding',status:'Production'}];
         if(url==='/api/messages/address-book')return [{id:'job-1',scopeId:'job-1',contactType:'Job',displayName:'Wedding',status:'Active',deliveryMode:'InternalOnly'}];
         if(url==='/api/messages/threads')return [{id:'thread-1',scopeType:'Job',scopeId:'job-1',title:'Wedding'}];
         if(url==='/api/messages/threads/thread-1')return [{id:'message-1',senderUserName:'paul',subject:'Handoff',body:'Private message',createdAtUtc:'2026-10-11T16:00:00Z'}];
@@ -24,6 +25,8 @@ function fixture(){
         if(url==='/api/messages/identity')return {displayName:'Paul',emailAddress:'paul@studio.test'};
         return [];
     };
+    for(const name of ['studio-status-order.js','subject-picker.js','studio-message-card.js'])w.eval(fs.readFileSync(path.join(__dirname,'../../Aegis.Studio.Web/wwwroot',name),'utf8'));
+    w.ResizeObserver=class{observe(){}disconnect(){}};w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
     w.eval(source);return {dom,w,requests};
 }
 
@@ -58,4 +61,7 @@ test('Known delivery failure retries without uncertain outcome confirmation',asy
         f.w.document.querySelector('[data-retry-delivery]').click();await new Promise(resolve=>setImmediate(resolve));
         assert.equal(confirmed,false);assert.deepEqual(retryBody,{reconciledNotSent:false});
     }finally{f.dom.window.close();}
+});
+test('Reply attachments and request identity survive a failed send and retry',async()=>{
+ const f=fixture();try{const w=f.w,sent=[];await w.showStudioMessages();w.document.querySelector('[data-inbox-message]').click();await new Promise(r=>setImmediate(r));w.document.getElementById('studioMessageBody').value='Production reply';Object.defineProperty(w.document.getElementById('studioMessageFile'),'files',{value:[new w.File(['document'],'handoff.pdf',{type:'application/pdf'})]});w.fetch=async(url,o)=>{if(url==='/api/messages/send'){sent.push(o.body);return {ok:sent.length>1,json:async()=>sent.length>1?{threadId:'thread-1'}:{error:'Temporary failure'}};}return {ok:true};};let form=w.document.getElementById('studioMessageComposer');await form.onsubmit({preventDefault(){},target:form});assert.match(w.document.getElementById('studioSendFeedback').textContent,/Temporary failure/);assert.equal(w.document.getElementById('studioMessageBody').value,'Production reply');await form.onsubmit({preventDefault(){},target:form});const first=JSON.parse(sent[0].get('message')),second=JSON.parse(sent[1].get('message'));assert.equal(first.requestId,second.requestId);assert.equal(first.threadId,'thread-1');assert.equal(first.body,'Production reply');assert.equal(sent[0].get('files').name,'handoff.pdf');}finally{f.dom.window.close();}
 });

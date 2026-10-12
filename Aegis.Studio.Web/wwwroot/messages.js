@@ -46,10 +46,10 @@
         ++inboxRevision;selectedThread=null;selectedRecipients=[];sendRequestId=null;
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML = StudioPage.html({title:'Messages',showMessagesCard:false,summary:'<p>Private, workspace, job and client conversations. Internal messages stay in Studio.</p>',attention:'<p>External delivery outcomes appear in each conversation. Held deliveries need review before retrying.</p>',content:`
+        genericView.innerHTML = StudioPage.html({title:'Conversations',className:'st-messages-content',showMessagesCard:true,summaryTitle:'Conversation Context',summary:'<div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div>',attention:'<p>External delivery outcomes appear in each conversation. Held deliveries need review before retrying.</p>',content:`
             <div class="st-inbox">
                 <section class="studio-inbox-center">
-                    <header class="studio-inbox-toolbar"><div><h1>All Messages</h1><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New</button></div></header>
+                    <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New</button></div></header>
                     <div class="studio-inbox-table-wrap" id="studioInboxRows" role="list" aria-label="Messages"><div class="studio-inbox-loading">Loading messages…</div></div>
                     <nav class="studio-inbox-pagination" aria-label="Message pages"><button id="studioInboxPrevious" class="action">Previous</button><span id="studioInboxPage"></span><button id="studioInboxNext" class="action">Next</button></nav>
                 </section>
@@ -195,11 +195,18 @@
         };
     }
 
+    function setConversationContext(title, scope, sender, recipients, outcomes = []) {
+        const panel=document.getElementById('studioMessageContext');
+        if(!panel)return;
+        panel.innerHTML='<dl class="studio-context-details"><dt>Conversation</dt><dd>'+esc(title)+'</dd><dt>Linked to</dt><dd>'+esc(scope||'Direct conversation')+'</dd><dt>Send as</dt><dd>'+esc(sender||'Studio')+'</dd><dt>Recipients</dt><dd>'+esc(recipients||'Internal team')+'</dd>'+(outcomes.length?'<dt>Delivery</dt><dd>'+esc([...new Set(outcomes.map(d=>deliveryLabel(d.status)))].join(', '))+'</dd>':'')+'</dl>';
+    }
+
     async function openLegacyConversation(id) {
         const revision=++threadRevision;selectedThread=null;
         const target=document.getElementById('messageConversationPane');
         const [conversation,identities,files]=await Promise.all([json('/api/conversations/'+id),json('/api/conversations/'+id+'/sending-identities').catch(()=>null),json('/api/conversations/'+id+'/attachments').catch(()=>[])]);
         const pane=document.getElementById('messageConversationPane');if(!pane||pane!==target||revision!==threadRevision)return;
+        setConversationContext(conversation.subject,'Customer conversation',identities?.identities?.find(i=>i.isDefault)?.label||'Workspace',conversation.contactName);
         pane.innerHTML=`<div class="message-conversation-header"><div><h2>${esc(conversation.subject)}</h2><p>${esc(conversation.contactName)} · ${esc(conversation.contactAddress)}</p></div><button class="st-link" id="openConversationWorkspace">Open conversation</button></div><div class="studio-message-history">${conversation.messages.map(m=>renderMessage({id:m.id,senderUserName:m.author,body:m.body,createdAtUtc:m.createdAt},[])).join('')}${files.length?`<div class="studio-message-files">${files.map(f=>`<a href="/api/attachments/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.fileName)}</a>`).join('')}</div>`:''}</div>
             <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><select name="sendingIdentity" aria-label="Sender identity">${(identities?.identities||[{type:'Workspace',label:'Workspace'}]).map(i=>`<option value="${esc(i.type)}">${esc(i.label)}</option>`).join('')}</select><label><input name="internal" type="checkbox">Internal note</label><button class="primary" type="submit">Send</button></div></form>`;
         document.getElementById('openConversationWorkspace').onclick=async()=>{await selectWorkspace(conversation.workspaceId);await openConversation(id);};
@@ -231,6 +238,7 @@
         if (!pane || pane!==targetPane || revision!==threadRevision) return;
         selectedRecipients=recipients;sendRequestId=null;
         selectedSubject=[...messages].reverse().find(m=>m.subject)?.subject||thread?.title||'Studio message';
+        setConversationContext(thread?.title||selectedSubject,thread?.scopeType,identity?.emailAddress||identity?.displayName,recipients.map(r=>r.displayName).join(', '),deliveries);
         pane.innerHTML = `
             <div class="message-conversation-header"><div><h2>${esc(thread?.title || 'Messages')}</h2><p>${esc(thread?.scopeType || '')} · From: ${esc(identity?.emailAddress||identity?.displayName||'Studio')} · To: ${esc(recipients.map(r=>r.displayName).join(', ')||'Internal team')}</p></div></div>
             <div id="studioMessageHistory" class="studio-message-history">

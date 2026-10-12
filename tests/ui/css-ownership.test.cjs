@@ -16,7 +16,7 @@ test('shared CSS has one declaration for each selector, property and responsive 
 test('retired inbox filter rail and obsolete Media controls have no presentation rules',()=>{
  const source=fs.readFileSync(path.join(root,'css/core/studio-legacy.css'),'utf8');
  assert.doesNotMatch(source,/\.studio-inbox-(?:filters|job-filters|table)(?![\w-])|\.studio-media-(?:destinations|upload-heading)(?![\w-])|\.studio-shared-(?:page-heading|heading-copy|heading-trail)(?![\w-])/);
- assert.match(source,/\.studio-inbox-table-wrap/);assert.match(source,/\.studio-media-upload-actions/);
+ assert.match(fs.readFileSync(path.join(root,'css/pages/messages.css'),'utf8'),/\.studio-inbox-table-wrap/);assert.match(fs.readFileSync(path.join(root,'css/pages/media-review.css'),'utf8'),/\.studio-media-upload-actions/);assert.doesNotMatch(source,/\.studio-media-page|\.studio-inbox-center/);
 });
 
 test('grid row highlight and motion have one shared stylesheet owner',()=>{

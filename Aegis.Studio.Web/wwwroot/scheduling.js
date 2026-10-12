@@ -1,33 +1,23 @@
 // Pipeline is the planning home: stage groups, schedule entries and job tasks share one page.
 const pipelineStages = [
-    ['Booking / intake', ['New', 'Inquiry', 'Booking']],
-    ['Needs scheduling', ['Confirmed', 'Needs Scheduling']],
-    ['Scheduled', ['Scheduled']],
-    ['Photography', ['Photography', 'Shoot Today', 'In Shoot', 'Shoot Complete']],
+    ['Booking / intake', ['New', 'Inquiry', 'Booking', 'Pending', 'Pending Confirmation', 'Awaiting Deposit']],
+    ['Needs scheduling', ['Confirmed', 'Needs Scheduling', 'Needs Assignment', 'Awaiting Scheduling', 'Needs Photographer Assignment']],
+    ['Scheduled', ['Scheduled', 'Photographer Assigned']],
+    ['Photography', ['Photography', 'Shoot Today', 'In Shoot', 'Shoot Complete', 'Shooting', 'Photography In Progress']],
     ['Awaiting upload', ['Awaiting Upload']],
-    ['Production', ['Production', 'Culling', 'Editing', 'Retouching', 'QC', 'Printing']],
-    ['Client review', ['Client Review', 'Ready for Client', 'Waiting on Customer']],
-    ['Delivery', ['Ready for Delivery']],
-    ['Complete', ['Delivered', 'Completed', 'Complete', 'Archived']],
+    ['Production', ['Production', 'Culling', 'Editing', 'Retouching', 'QC', 'Printing', 'Awaiting Production Review', 'In Production', 'Active Production']],
+    ['Client review', ['Client Review', 'Ready for Client', 'Waiting on Customer', 'Waiting On Client', 'Awaiting Approval']],
+    ['Delivery', ['Ready for Delivery', 'Ready For Delivery']],
+    ['Complete', ['Delivered', 'Completed', 'Complete', 'Closed', 'Archived']],
     ['Cancelled', ['Cancelled']]
 ];
-const pipelineStageTargets = {
-    'Booking / intake':'Booking',
-    'Needs scheduling':'Needs Scheduling',
-    'Scheduled':'Scheduled',
-    'Photography':'Photography',
-    'Awaiting upload':'Awaiting Upload',
-    'Production':'Production',
-    'Client review':'Client Review',
-    'Delivery':'Ready for Delivery',
-    'Complete':'Completed',
-    'Cancelled':'Cancelled'
-};
-let pipelineView = 'timeline';
+let pipelineView = 'jobs';
 let pipelineAnchor = new Date();
 let pipelineSelectedJob = '';
 let pipelineSelectedStage = '';
-let pipelineIncludeClosed = false;
+let pipelineSelectedStatus = '';
+let pipelineSelectedWorkspace = '';
+let pipelineSearch = '';
 
 function pipelineStage(job) {
     return pipelineStages.find(([, statuses]) => statuses.includes(job.status))?.[0] || 'Other';
@@ -72,7 +62,7 @@ function pipelineTimeline(jobs, items, resourceMap) {
         return `<section class="pipeline-stage-lane"><h3>${esc(stage)} <small>${grouped.length}</small></h3>${grouped.map(job => {
             const byDay = days.map(day => items.filter(item => item.jobId === job.id && pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day));
             const jobItems=items.filter(item=>item.jobId===job.id),done=jobItems.filter(item=>['Completed','Ready'].includes(item.status)).length,progress=jobItems.length?Math.round(done/jobItems.length*100):0;
-            return `<div class="pipeline-timeline-row"><div class="pipeline-job-flow-card"><button class="pipeline-job-link" data-open-job="${job.id}"><strong>${esc(job.title)}</strong><small>${esc(job.clientName || 'Client not linked')} · ${esc(job.status)}</small></button><div class="pipeline-job-flow"><span><i style="width:${progress}%"></i></span><small>${progress}%</small></div><div class="pipeline-job-flow-actions"><button type="button" class="action" data-pipeline-advance="${job.id}" title="Move to next stage">Next</button><button type="button" class="action" data-pipeline-manage="${job.id}" title="Change stage or workspace">Move</button></div></div>${byDay.map((events, i) => `<div class="pipeline-day-cell ${days[i] === today ? 'today' : ''}" data-pipeline-day="${days[i]}">${events.map(event => pipelineItemMarkup(event,resourceMap)).join('')}</div>`).join('')}</div>`;
+            return `<div class="pipeline-timeline-row"><div class="pipeline-job-flow-card"><button class="pipeline-job-link" data-open-job="${job.id}"><strong>${esc(job.title)}</strong><small>${esc(job.clientName || 'Client not linked')} · ${esc(job.status)}</small></button><div class="pipeline-job-flow"><span><i style="width:${progress}%"></i></span><small>${progress}%</small></div><div class="pipeline-job-flow-actions"><button type="button" class="action" data-pipeline-advance="${job.id}" title="Open the next workflow action">Next</button><button type="button" class="action" data-pipeline-manage="${job.id}" title="Transfer workspace through the job workflow">Move</button></div></div>${byDay.map((events, i) => `<div class="pipeline-day-cell ${days[i] === today ? 'today' : ''}" data-pipeline-day="${days[i]}">${events.map(event => pipelineItemMarkup(event,resourceMap)).join('')}</div>`).join('')}</div>`;
         }).join('')}</section>`;
     }).join('');
     const unlinked = items.filter(item => !item.jobId);
@@ -88,6 +78,15 @@ function pipelineCalendar(items, resourceMap) {
         const events = items.filter(item => pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day);
         return `<section class="pipeline-calendar-day ${date.getMonth() !== first.getMonth() ? 'outside' : ''} ${day === pipelineLocalDay(new Date()) ? 'today' : ''}" data-pipeline-day="${day}"><time datetime="${day}">${date.getDate()}</time>${events.map(item => pipelineItemMarkup(item, resourceMap)).join('')}</section>`;
     }).join('')}</div></div>`;
+}
+
+function pipelineJobGrid(jobs, tasks, workspaces) {
+    const names=new Map(workspaces.map(w=>[String(w.id),w.name]));
+    return '<div class="operational-grid-scroll"><table class="operational-grid"><thead><tr><th>Job / Client</th><th>Current Stage</th><th>Job Lead</th><th>Next Action / Due</th><th>Actions</th></tr></thead><tbody>'+jobs.map(job=>{
+        const outstanding=tasks.filter(t=>t.jobId===job.id&&!['Completed','Cancelled'].includes(t.status)).sort((a,b)=>String(a.dueAtUtc||'9999').localeCompare(String(b.dueAtUtc||'9999')));
+        const next=outstanding[0],due=next?.dueAtUtc||job.dueAtUtc;
+        return '<tr data-pipeline-row="'+esc(job.id)+'"><td><button class="st-link" data-open-job="'+esc(job.id)+'">'+esc(job.title||job.jobNumber||'Job')+'</button><small>'+esc(job.clientName||'Client not linked')+'</small><small>'+esc(names.get(String(job.workspaceId))||'Unassigned')+'</small></td><td><span class="studio-status-pill">'+esc(job.status)+'</span><small>'+esc(pipelineStage(job))+'</small></td><td>'+esc(studioFirstName(job.jobLead||job.assignedTo)||'Unassigned')+'</td><td>'+esc(next?.title||'Review job workflow')+(due?'<small>'+esc(new Date(due).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'2-digit',year:'numeric'}))+'</small>':'')+'</td><td><div class="operational-row-actions"><button type="button" class="action" data-pipeline-advance="'+esc(job.id)+'">Next</button><button type="button" class="action" data-pipeline-manage="'+esc(job.id)+'">Move</button></div></td></tr>';
+    }).join('')+'</tbody></table>'+(jobs.length?'':'<p>No open jobs match these filters.</p>')+'</div>';
 }
 
 async function showPipeline() {
@@ -108,7 +107,8 @@ async function showPipeline() {
     ]);
     if(!current())return;
     studioRememberPeople(people);
-    const selected = jobs.filter(job => (pipelineIncludeClosed||job.id===pipelineSelectedJob||!StudioSubjectPicker.isClosed(job)) && (!pipelineSelectedJob || job.id === pipelineSelectedJob) && (!pipelineSelectedStage || pipelineStage(job) === pipelineSelectedStage));
+    const candidates = jobs.filter(job => (pipelineSelectedStatus?job.status===pipelineSelectedStatus:job.id===pipelineSelectedJob||!StudioSubjectPicker.isClosed(job)) && (!pipelineSelectedJob || job.id === pipelineSelectedJob) && (!pipelineSelectedWorkspace||String(job.workspaceId)===pipelineSelectedWorkspace) && (!pipelineSearch||[job.title,job.clientName,job.jobNumber].join(' ').toLowerCase().includes(pipelineSearch.toLowerCase())));
+    const selected = candidates.filter(job => !pipelineSelectedStage || pipelineStage(job) === pipelineSelectedStage);
     const resourceMap = new Map(resources.map(resource => [resource.id, resource]));
     const items = pipelineItems(entries, tasks, selected).filter(item => item.jobId || (!pipelineSelectedJob && !pipelineSelectedStage));
     const undated = tasks.filter(task => selected.some(job => job.id===task.jobId) && !task.scheduledAtUtc && !task.dueAtUtc && !['Completed','Cancelled'].includes(task.status));
@@ -116,12 +116,11 @@ async function showPipeline() {
     const today = pipelineLocalDay(new Date());
     const nearby = items.filter(item => pipelineLocalDay(item.end) >= today && pipelineLocalDay(item.start) <= pipelineDayAt(new Date(), 7));
     const isAdmin = (profile.user || profile).isAdministrator === true;
-    genericView.innerHTML=StudioPage.html({title:'Pipeline & Schedule',tools:'<button class="primary" id="pipelineNewSchedule">＋ Schedule item</button>',className:'st-pipeline-content',summary:StudioPage.metrics([['Jobs',selected.length],['Resources',resources.length],['Next 7 days',nearby.length]]),attention:StudioPage.metrics([['Tasks without dates',undated.length]]),content:`        <div class="pipeline-stage-summary">${stages.map(stage => `<button class="pipeline-stage-tile ${pipelineSelectedStage===stage?'active':''}" data-stage="${esc(stage)}" aria-pressed="${pipelineSelectedStage===stage}"><strong>${esc(stage)}</strong><span>${jobs.filter(job => (!pipelineSelectedJob || job.id===pipelineSelectedJob) && pipelineStage(job) === stage).length}</span></button>`).join('')}</div>
-        <div class="pipeline-planning-toolbar"><div class="pipeline-view-switch"><button data-pipeline-view="timeline" class="${pipelineView === 'timeline' ? 'active' : ''}">Timeline</button><button data-pipeline-view="calendar" class="${pipelineView === 'calendar' ? 'active' : ''}">Calendar</button></div><button class="action" data-pipeline-prev aria-label="Previous period">‹</button><button class="action" data-pipeline-today>Today</button><button class="action" data-pipeline-next aria-label="Next period">›</button><strong>${esc(pipelineView === 'calendar' ? pipelineAnchor.toLocaleDateString(undefined,{month:'long',year:'numeric'}) : pipelineAnchor.toLocaleDateString() + ' – ' + new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),pipelineAnchor.getDate()+13).toLocaleDateString())}</strong><label class="ssp-job-visibility"><input type="checkbox" data-pipeline-closed ${pipelineIncludeClosed?'checked':''}> Include closed / archived</label><label>Job <select data-job-picker id="pipelineJobFilter"><option value="">All jobs</option>${StudioSubjectPicker.jobOptions(jobs,pipelineSelectedJob)}</select></label></div>
+    genericView.innerHTML=StudioPage.html({title:'Job Pipeline',tools:'<button class="primary" id="pipelineNewSchedule">＋ Schedule item</button>',className:'st-pipeline-content',summary:StudioPage.metrics([['Jobs',selected.length],['Resources',resources.length],['Next 7 days',nearby.length]]),attention:StudioPage.metrics([['Tasks without dates',undated.length]]),content:`        <div class="pipeline-stage-summary">${stages.filter(stage=>candidates.some(job=>pipelineStage(job)===stage)||pipelineSelectedStage===stage).map(stage => `<button class="pipeline-stage-tile ${pipelineSelectedStage===stage?'active':''}" data-stage="${esc(stage)}" aria-pressed="${pipelineSelectedStage===stage}"><strong>${esc(stage)}</strong><span>${candidates.filter(job => pipelineStage(job) === stage).length}</span></button>`).join('')}</div>
+        <div class="pipeline-planning-toolbar"><div class="pipeline-view-switch"><button data-pipeline-view="jobs" class="${pipelineView==='jobs'?'active':''}">Jobs</button><button data-pipeline-view="timeline" class="${pipelineView === 'timeline' ? 'active' : ''}">Timeline</button><button data-pipeline-view="calendar" class="${pipelineView === 'calendar' ? 'active' : ''}">Calendar</button></div><button class="action" data-pipeline-prev aria-label="Previous period">‹</button><button class="action" data-pipeline-today>Today</button><button class="action" data-pipeline-next aria-label="Next period">›</button><strong>${esc(pipelineView === 'calendar' ? pipelineAnchor.toLocaleDateString(undefined,{month:'long',year:'numeric'}) : pipelineAnchor.toLocaleDateString() + ' – ' + new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),pipelineAnchor.getDate()+13).toLocaleDateString())}</strong><label>Status<select id="pipelineStatusFilter"><option value="">All Open Jobs</option>${StudioStatusOrder.sort(jobs.map(j=>j.status)).map(status=>`<option value="${esc(status)}" ${pipelineSelectedStatus===status?'selected':''}>${esc(status)}</option>`).join('')}</select></label><label>Workspace<select id="pipelineWorkspaceFilter"><option value="">All Workspaces</option>${workspaces.map(w=>`<option value="${esc(w.id)}" ${pipelineSelectedWorkspace===String(w.id)?'selected':''}>${esc(w.name)}</option>`).join('')}</select></label><label>Search<input type="search" id="pipelineSearch" value="${esc(pipelineSearch)}" placeholder="Job or client…"></label><label>Job <select data-job-picker id="pipelineJobFilter"><option value="">All jobs</option>${StudioSubjectPicker.jobOptions(jobs,pipelineSelectedJob)}</select></label></div>
         <p class="pipeline-key"><span>◉ Scheduled work</span><span>✓ Task / deadline</span><span>${nearby.length} items in the next 7 days</span></p>
-        <section class="pipeline-planning-surface">${pipelineView === 'calendar' ? pipelineCalendar(items, resourceMap) : pipelineTimeline(selected, items, resourceMap)}</section>${undated.length?`<details class="pipeline-resource-panel"><summary>${undated.length} tasks without dates</summary>${undated.map(task=>`<article class="task-card"><button class="link-button" data-open-job="${task.jobId}">${esc(task.title)}</button><small>${esc(task.assignedTo?studioFirstName(task.assignedTo):'Unassigned')} · ${esc(task.status)}</small></article>`).join('')}</details>`:''}
+        <section class="pipeline-planning-surface">${pipelineView === 'jobs' ? pipelineJobGrid(selected,tasks,workspaces) : pipelineView === 'calendar' ? pipelineCalendar(items, resourceMap) : pipelineTimeline(selected, items, resourceMap)}</section>${undated.length?`<details class="pipeline-resource-panel"><summary>${undated.length} tasks without dates</summary>${undated.map(task=>`<article class="task-card"><button class="link-button" data-open-job="${task.jobId}">${esc(task.title)}</button><small>${esc(task.assignedTo?studioFirstName(task.assignedTo):'Unassigned')} · ${esc(task.status)}</small></article>`).join('')}</details>`:''}
         <details class="pipeline-resource-panel"><summary>Resources (${resources.length})</summary><div id="scheduleResources">${resources.map(resource => `<div class="job-row"><div><b>${esc(resource.name)}</b><small>${esc(resource.resourceType)} · ${resource.isActive ? 'Active' : 'Inactive'}</small></div></div>`).join('') || '<p>No resources configured.</p>'}</div>${isAdmin ? '<div class="pos-entry"><label>Name<input id="scheduleResourceName"></label><label>Type<select id="scheduleResourceType"><option>Staff</option><option>Room</option><option>Equipment</option><option>Vehicle</option></select></label><button class="action" id="scheduleAddResource">Add resource</button></div>' : ''}</details>
-        <dialog id="pipelineMoveDialog"><form id="pipelineMoveForm" class="request-form"><h2>Move job</h2><input type="hidden" id="pipelineMoveJob"><label>Stage<select id="pipelineMoveStage">${pipelineStages.map(([stage])=>`<option value="${esc(stage)}">${esc(stage)}</option>`).join('')}</select></label><label>Workspace<select id="pipelineMoveWorkspace">${workspaces.map(workspace=>`<option value="${workspace.id}">${esc(workspace.name)}</option>`).join('')}</select></label><label>Reason<textarea id="pipelineMoveReason" maxlength="1000" placeholder="Optional reason or handoff note"></textarea></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-pipeline-move-cancel>Cancel</button><button type="submit" class="primary">Apply move</button></div></form></dialog>
         <dialog id="scheduleEntryDialog"><form id="scheduleEntryForm" class="request-form"><h2>Schedule item</h2><label>Job<select data-job-picker id="scheduleJob"><option value="">No linked job (administrators only)</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><label>Title<input id="scheduleTitle" required></label><div class="row"><label>Starts<input id="scheduleStart" type="datetime-local" required></label><label>Ends<input id="scheduleEnd" type="datetime-local" required></label></div><label>Location<input id="scheduleLocation"></label><label>Resources<select id="scheduleResourceIds" multiple size="6">${resources.map(resource => `<option value="${resource.id}">${esc(resource.resourceType)} · ${esc(resource.name)}</option>`).join('')}</select></label><label>Notes<textarea id="scheduleNotes"></textarea></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save</button></div></form></dialog>`});
     StudioPage.bind(genericView,current);
     StudioPage.setCount(selected.length+' jobs');
@@ -130,46 +129,29 @@ async function showPipeline() {
     genericView.querySelector('[data-pipeline-prev]').onclick = () => shiftPipeline(-1);
     genericView.querySelector('[data-pipeline-next]').onclick = () => shiftPipeline(1);
     genericView.querySelector('[data-pipeline-today]').onclick = () => { pipelineAnchor = new Date(); showPipeline().catch(pipelineError); };
-    genericView.querySelector('[data-pipeline-closed]').onchange=event=>{pipelineIncludeClosed=event.target.checked;showPipeline().catch(pipelineError);};
+    genericView.querySelector('#pipelineStatusFilter').onchange=event=>{pipelineSelectedStatus=event.target.value;pipelineSelectedStage='';showPipeline().catch(pipelineError);};
+    genericView.querySelector('#pipelineWorkspaceFilter').onchange=event=>{pipelineSelectedWorkspace=event.target.value;showPipeline().catch(pipelineError);};
+    genericView.querySelector('#pipelineSearch').onchange=event=>{pipelineSearch=event.target.value;showPipeline().catch(pipelineError);};
+    genericView.querySelectorAll('[data-pipeline-row]').forEach(row=>row.onclick=event=>{if(!event.target.closest('button,a,input,select'))void openWorkspaceJob(row.dataset.pipelineRow).catch(error=>alert(error.message));});
     genericView.querySelector('#pipelineJobFilter').onchange = event => { pipelineSelectedJob = event.target.value; showPipeline().catch(pipelineError); };
     genericView.querySelectorAll('[data-stage]').forEach(button => button.onclick = () => {pipelineSelectedStage = pipelineSelectedStage === button.dataset.stage ? '' : button.dataset.stage; showPipeline().catch(pipelineError);});
     genericView.querySelector('#pipelineNewSchedule').onclick = () => openScheduleEntryForm();
-    genericView.querySelectorAll('[data-pipeline-manage]').forEach(button=>button.onclick=event=>{event.stopPropagation();openPipelineMove(button.dataset.pipelineManage,jobs,workspaces);});
+    genericView.querySelectorAll('[data-pipeline-manage]').forEach(button=>button.onclick=event=>{event.stopPropagation();openPipelineMove(button.dataset.pipelineManage).catch(error=>alert(error.message));});
     genericView.querySelectorAll('[data-pipeline-advance]').forEach(button=>button.onclick=async event=>{event.stopPropagation();await advancePipelineJob(button.dataset.pipelineAdvance,jobs);});
-    genericView.querySelector('#pipelineMoveForm').onsubmit = event => savePipelineMove(event,jobs);
-    genericView.querySelector('#pipelineMoveDialog [data-pipeline-move-cancel]').onclick = () => genericView.querySelector('#pipelineMoveDialog').close();
     installPipelineDrag(entries,tasks);
     genericView.querySelector('#scheduleEntryForm').onsubmit = saveScheduleEntry;
     genericView.querySelector('#scheduleEntryDialog [data-cancel]').onclick = () => genericView.querySelector('#scheduleEntryDialog').close();
     if (isAdmin) genericView.querySelector('#scheduleAddResource').onclick = () => createScheduleResource().catch(pipelineError);
 }
-function openPipelineMove(jobId,jobs,workspaces){
-    const job=jobs.find(x=>x.id===jobId);if(!job)return;
-    const dialog=genericView.querySelector('#pipelineMoveDialog');
-    dialog.querySelector('#pipelineMoveJob').value=job.id;
-    dialog.querySelector('#pipelineMoveStage').value=pipelineStage(job);
-    dialog.querySelector('#pipelineMoveWorkspace').value=job.workspaceId;
-    dialog.querySelector('#pipelineMoveReason').value='';
-    dialog.querySelector('[role="alert"]').textContent='';
-    dialog.showModal();
+async function openPipelineMove(jobId){
+    // The connected workflow owns versioned workspace transfer and permission checks.
+    if(window.StudioWorkflow?.open)return StudioWorkflow.open(jobId,'[data-wf-transfer]');
+    return openWorkspaceJob(jobId);
 }
-async function savePipelineMove(event,jobs){
-    event.preventDefault();
-    const form=event.currentTarget,job=jobs.find(x=>x.id===form.querySelector('#pipelineMoveJob').value);
-    if(!job)return;
-    const stage=form.querySelector('#pipelineMoveStage').value,workspaceId=form.querySelector('#pipelineMoveWorkspace').value;
-    const body={status:pipelineStageTargets[stage]||job.status,workspaceId:workspaceId||null,reason:form.querySelector('#pipelineMoveReason').value.trim()||null};
-    const button=form.querySelector('[type="submit"]');button.disabled=true;
-    try{await json(`/api/jobs/${job.id}/pipeline-transition`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});form.closest('dialog').close();await showPipeline();}
-    catch(error){form.querySelector('[role="alert"]').textContent=error.message||error;button.disabled=false;}
-}
-async function advancePipelineJob(jobId,jobs){
-    const job=jobs.find(x=>x.id===jobId);if(!job)return;
-    const stages=pipelineStages.map(([name])=>name),current=stages.indexOf(pipelineStage(job));
-    if(current<0||current>=stages.length-1)return;
-    const next=stages[current+1];
-    await json(`/api/jobs/${job.id}/pipeline-transition`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:pipelineStageTargets[next],workspaceId:null,reason:`Advanced in Pipeline to ${next}`})});
-    await showPipeline();
+async function advancePipelineJob(jobId){
+    // Stages depend on the job's workflow; there is no direct status write from Pipeline.
+    if(window.StudioWorkflow?.open)return StudioWorkflow.open(jobId);
+    return openWorkspaceJob(jobId);
 }
 function installPipelineDrag(entries,tasks){
     const scheduleMap=new Map(entries.map(item=>[item.id,item])),taskMap=new Map(tasks.map(item=>[item.id,item]));
