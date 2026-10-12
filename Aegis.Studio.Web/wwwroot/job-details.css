@@ -22,7 +22,7 @@
 .jd-client-name > span { flex:none; color:var(--theme-muted,#69758b); font-size:10px; }
 .jd-client-name strong { min-width:0; overflow:hidden; text-overflow:ellipsis; font-weight:650; }
 .job-detail-title p { margin:0; font-size:11px; color:var(--theme-muted,#6f7a8b); }
-.jd-job-status { display:flex; flex-direction:column; align-items:flex-end; gap:5px; font-size:10px; }
+.jd-job-status { display:grid; grid-template-columns:auto auto; align-items:center; justify-items:end; gap:4px 10px; font-size:10px; }
 .jd-status-meta { display:flex; justify-content:flex-end; gap:10px; white-space:nowrap; text-align:right; color:#b4510f; }
 .jd-status-pill { display:inline-flex; align-items:center; gap:7px; border:0; box-shadow:none; cursor:pointer; font:inherit; font-size:11px; padding:4px 12px; border-radius:20px; background:#d2eedb; color:#204d34; font-weight:700; max-width:210px; text-align:center; }
 .jd-status-pill::after { content:"⌄"; transition:transform .24s ease; }
@@ -32,7 +32,7 @@
 .jd-flow-drawer.is-open { grid-template-rows:1fr; opacity:1; visibility:visible; transition:grid-template-rows .24s ease,opacity .24s ease,visibility 0s; }
 .jd-flow-drawer-inner { min-height:0; min-width:0; overflow:hidden; }
 @media(prefers-reduced-motion:reduce) { .jd-flow-drawer,.jd-flow-drawer.is-open,.jd-status-pill::after { transition:none; } }
-.jd-job-status small { color:var(--theme-muted,#7c8493); }
+.jd-job-status small { grid-column:2; color:var(--theme-muted,#7c8493); }
 .jd-workflow-track { display:block; padding:0; min-width:0; overflow:auto; max-height:172px; }
 .jd-flow-canvas { position:relative; width:1020px; height:161px; }
 .jd-flow-lines { position:absolute; inset:0; width:1020px; height:161px; pointer-events:none; }
