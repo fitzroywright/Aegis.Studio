@@ -173,6 +173,17 @@ test('Selected File saves collection and subjects while preserving production me
  const write=fixture.calls.find(c=>c.url.includes('/media/assets/')&&c.options?.method==='PUT');assert.ok(write);
  const body=JSON.parse(write.options.body);assert.equal(body.collection,'Unclassified');assert.deepEqual(body.subjects,['person']);assert.equal(body.status,'Ready');
 });
+test('Selected Image has a thin metadata title and saves token tags on the photo',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();w.document.querySelector('.jd-photo').click();
+ const card=w.document.querySelector('.job-detail-selected-file');assert.match(card.querySelector('.jd-card-heading h2').textContent,/Photo/);assert.match(card.querySelector('.jd-selected-file-meta').textContent,/JPEG.*v1/);
+ assert.equal(card.querySelector('.job-detail-selected-content > strong'),null);assert.equal(card.querySelectorAll('.jd-file-fields > label').length,2);
+ let input=card.querySelector('[data-tag-input]');input.value=' Portrait, portrait, Blue backdrop ';let prevented=false;
+ input.onkeydown({key:'Enter',preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(card.querySelectorAll('.jd-tag-token').length,2);
+ const form=card.querySelector('form');await form.onsubmit({preventDefault(){}});
+ const write=fixture.calls.find(c=>c.url.includes('/media/assets/')&&c.options?.method==='PUT');assert.deepEqual(JSON.parse(write.options.body).tags,['Portrait','Blue backdrop']);
+ assert.equal(card.querySelectorAll('.jd-tag-token').length,2);card.querySelector('[data-remove-tag]').click();await card.querySelector('form').onsubmit({preventDefault(){}});
+ assert.deepEqual(JSON.parse(fixture.calls.filter(c=>c.url.includes('/media/assets/')&&c.options?.method==='PUT').at(-1).options.body).tags,['Blue backdrop']);
+});
 test('Job Details left rail owns actions and respects media edit permissions',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.deepEqual(Array.from(w.document.querySelectorAll('.jd-rail-card h2'),el=>el.textContent),['Navigation','My Workspaces','Actions']);
@@ -248,4 +259,5 @@ test('Job Details dropped files declare receipts and retries preserve operation 
  const declarations=fixture.calls.filter(c=>c.url.endsWith('/media/upload-batches')).map(c=>JSON.parse(c.options.body));assert.deepEqual(declarations[0],declarations[1]);
  const uploads=fixture.calls.filter(c=>c.url.endsWith('/media/uploads'));assert.equal(uploads[0].options.body.get('uploadId'),uploads[1].options.body.get('uploadId'));
 });
+
 

@@ -107,14 +107,33 @@
    selectedId=asset.id;
    host.querySelectorAll('[data-jd-asset]').forEach(tile=>{const active=tile.dataset.jdAsset===asset.id;tile.classList.toggle('selected',active);tile.setAttribute('aria-pressed',String(active));});
    const collections=[...new Set(['Unclassified',...(data.collections||[]),asset.collection||'Unclassified'])];
-   selectedHost.innerHTML=`<div class="jd-selected-preview" tabindex="0" role="button" aria-label="Open selected photo preview">${picture(asset,true)}</div><strong>${escape(asset.fileName)}</strong><small>${escape((asset.contentType||'File').replace('image/','').toUpperCase())} · ${escape(formatBytes(asset.sizeBytes||0))} · v${escape(asset.version||1)}</small><form class="jd-file-form"><label>Collection<select name="collection" ${canEdit?'':'disabled'}>${collections.map(name=>`<option ${name===(asset.collection||'Unclassified')?'selected':''}>${escape(name)}</option>`).join('')}</select></label><label>Subjects<select name="subjects" multiple size="2" ${canEdit?'':'disabled'} aria-label="File subjects">${data.subjects.map(person=>`<option value="${escape(person.id)}" ${(asset.subjects||[]).includes(person.id)?'selected':''}>${escape(person.name)}</option>`).join('')}</select></label>${canEdit?'<button type="submit" class="jd-save">Save file details</button>':''}<p role="alert"></p></form><div class="jd-file-links"><a href="/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content" download="${escape(asset.fileName)}">Download original</a><button type="button" data-versions>Versions</button>${canEdit?'<button type="button" data-retry-preview>Regenerate preview</button>':''}</div>`;
+   const heading=selectedHost.closest('.job-detail-selected-file').querySelector('.jd-card-heading');
+   heading.innerHTML=`<h2 title="${escape(asset.fileName)}">${escape(asset.fileName)}</h2><small class="jd-selected-file-meta">${escape((asset.contentType||'File').replace('image/','').toUpperCase())} · ${escape(formatBytes(asset.sizeBytes||0))} · v${escape(asset.version||1)}</small>`;
+   let tags=[...new Set(asset.tags||[])];
+   const tagInputId='jd-photo-tags-'+asset.id;
+   selectedHost.innerHTML=`<div class="jd-selected-preview" tabindex="0" role="button" aria-label="Open selected photo preview">${picture(asset,true)}</div><form class="jd-file-form"><div class="jd-file-fields"><label>Collection<select name="collection" ${canEdit?'':'disabled'}>${collections.map(name=>`<option ${name===(asset.collection||'Unclassified')?'selected':''}>${escape(name)}</option>`).join('')}</select></label><label>Subjects<select name="subjects" multiple size="2" ${canEdit?'':'disabled'} aria-label="File subjects">${data.subjects.map(person=>`<option value="${escape(person.id)}" ${(asset.subjects||[]).includes(person.id)?'selected':''}>${escape(person.name)}</option>`).join('')}</select></label></div><label for="${escape(tagInputId)}">Tags</label><div class="jd-tag-editor"><div class="jd-tag-tokens" role="list" aria-label="Photo tags"></div><input id="${escape(tagInputId)}" type="text" data-tag-input placeholder="Add tags; Enter or comma" aria-label="Add photo tags" ${canEdit?'':'disabled'}></div>${canEdit?'<button type="submit" class="jd-save">Save file details</button>':''}<p role="alert"></p></form><div class="jd-file-links"><a href="/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content" download="${escape(asset.fileName)}">Download original</a><button type="button" data-versions>Versions</button>${canEdit?'<button type="button" data-retry-preview>Regenerate preview</button>':''}</div>`;
    bindImages(selectedHost);
    const previewButton=selectedHost.querySelector('.jd-selected-preview');previewButton.onclick=()=>openPreview(asset);previewButton.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openPreview(asset);}};
    selectedHost.querySelector('[data-versions]').onclick=()=>versions(asset);
    const form=selectedHost.querySelector('form');
+   const tokens=form.querySelector('.jd-tag-tokens'),tagInput=form.querySelector('[data-tag-input]');
+   const renderTags=()=>{
+    tokens.innerHTML=tags.map((tag,index)=>`<span class="jd-tag-token" role="listitem">${escape(tag)}${canEdit?`<button type="button" data-remove-tag="${index}" aria-label="Remove tag ${escape(tag)}">×</button>`:''}</span>`).join('');
+    tokens.querySelectorAll('[data-remove-tag]').forEach(button=>button.onclick=()=>{tags.splice(Number(button.dataset.removeTag),1);renderTags();tagInput.focus();});
+   };
+   const addTags=()=>{
+    if(!canEdit)return;
+    if(!tagInput.value.trim())return true;
+    const additions=tagInput.value.split(/[,\n]/).map(value=>value.trim()).filter(Boolean),next=[...tags];
+    for(const tag of additions)if(!next.some(value=>value.toLowerCase()===tag.toLowerCase()))next.push(tag);
+    if(next.length>50||next.some(value=>value.length>80)){form.querySelector('[role=alert]').textContent='Use at most 50 tags, with up to 80 characters per tag.';return false;}
+    tags=next;tagInput.value='';form.querySelector('[role=alert]').textContent='';renderTags();return true;
+   };
+   renderTags();tagInput.onkeydown=event=>{if(event.key==='Enter'||event.key===','){event.preventDefault();addTags();}};
+
    form.onsubmit=async event=>{
-    event.preventDefault();if(!canEdit)return;const button=form.querySelector('button');button.disabled=true;
-    try{await put(`/api/jobs/${job.id}/media/assets/${asset.id}`,{status:asset.status,collection:form.elements.collection.value,subjects:Array.from(form.elements.subjects.selectedOptions,o=>o.value),assignedTo:asset.assignedTo||null,captureAtUtc:asset.captureAtUtc||null});await load();}
+    event.preventDefault();if(!canEdit||addTags()===false)return;const button=form.querySelector('[type=submit]');button.disabled=true;
+    try{await put(`/api/jobs/${job.id}/media/assets/${asset.id}`,{status:asset.status,collection:form.elements.collection.value,subjects:Array.from(form.elements.subjects.selectedOptions,o=>o.value),assignedTo:asset.assignedTo||null,captureAtUtc:asset.captureAtUtc||null,tags});await load();}
     catch(error){if(form.isConnected)form.querySelector('[role=alert]').textContent=error.message;}
     finally{if(button.isConnected)button.disabled=false;}
    };
@@ -154,7 +173,7 @@
     host.ondrop=async e=>{e.preventDefault();host.classList.remove('jd-drag-over');try{await upload(await studioDroppedPhotos(e.dataTransfer));}catch(error){announce(error.message);}};
    }
    const selected=data.assets.find(a=>a.id===selectedId)||data.assets[0];
-   if(selected)select(selected);else{selectedId='';selectedHost.innerHTML='<p class="jd-empty">Select a photo in the gallery to inspect it.</p>';}
+   if(selected)select(selected);else{selectedId='';selectedHost.closest('.job-detail-selected-file').querySelector('.jd-card-heading').innerHTML='<h2>Selected Image</h2>';selectedHost.innerHTML='<p class="jd-empty">Select a photo in the gallery to inspect it.</p>';}
   }
   async function load(){
    const version=++request;
@@ -209,5 +228,6 @@
  }
  root.StudioJobDetails={workflow,phaseIndex,media};
 })(window);
+
 
 

@@ -36,6 +36,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             "alter table studio_job_subjects add column if not exists is_system boolean not null default false",
             "create table if not exists studio_media_assets(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,gallery_id uuid not null references studio_media_galleries(id),asset_key text not null,production_status text not null default 'Needs Sorting',assigned_to text null,capture_at_utc timestamptz null,unique(job_id,asset_key))",
             "alter table studio_media_assets add column if not exists approved_version_id uuid null references studio_asset_versions(id)",
+            "alter table studio_media_assets add column if not exists tags text[] not null default '{}'",
             "create table if not exists studio_media_asset_subjects(asset_id uuid not null references studio_media_assets(id) on delete cascade,subject_id uuid not null references studio_job_subjects(id) on delete cascade,primary key(asset_id,subject_id))",
             "create table if not exists studio_media_edit_batches(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,created_by text not null,created_at_utc timestamptz not null default now())",
             "create table if not exists studio_media_edit_items(token uuid primary key,batch_id uuid not null references studio_media_edit_batches(id) on delete cascade,asset_id uuid not null references studio_media_assets(id),source_version_id uuid not null references studio_asset_versions(id),export_name text not null,unique(batch_id,asset_id))",
@@ -88,7 +89,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             'hasMore',exists(select 1 from matching where id>(select max(id::text)::uuid from page)),
             'gallery',(select to_jsonb(g) from studio_media_galleries g where id=$1),
             'collections',coalesce((select jsonb_agg(name order by name) from studio_media_collections where job_id=$1),'[]'::jsonb),
-            'assets',coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'assetKey',a.asset_key,'status',a.production_status,'assignedTo',a.assigned_to,'captureAtUtc',a.capture_at_utc,
+            'assets',coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'assetKey',a.asset_key,'status',a.production_status,'assignedTo',a.assigned_to,'captureAtUtc',a.capture_at_utc,'tags',a.tags,
               'approvedVersionId',a.approved_version_id,'approvedVersionNumber',(select version_number from studio_asset_versions where id=a.approved_version_id),'approvedFileName',(select file_name from studio_asset_versions where id=a.approved_version_id),'previewStatus',coalesce(d.status,'Pending'),'versionId',v.id,'fileName',v.file_name,'contentType',v.content_type,'sizeBytes',v.size_bytes,'version',v.version_number,'uploadedAtUtc',v.created_at_utc,'uploadedBy',v.created_by,'photographer',(select assigned_to from studio_jobs where id=$1),'shootDate',(select event_date from studio_jobs where id=$1),
               'originalFileName',(select file_name from studio_asset_versions where job_id=$1 and asset_key=a.asset_key order by version_number limit 1),
               'collection',coalesce(col.collection_name,''),'subjects',coalesce((select jsonb_agg(subject_id) from studio_media_asset_subjects where asset_id=a.id),'[]'::jsonb)) order by a.id)
@@ -106,6 +107,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
     {
         MediaProductionRules.ValidateState(request.Status);
         if((request.Collection?.Length??0)>100||(request.AssignedTo?.Length??0)>200||(request.Subjects?.Length??0)>500)throw new ArgumentException("Asset details are too long.");
+        string[]? tags=request.Tags is null?null:NormalizeTags(request.Tags);
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         if(Scalar(c,tx,"select id from studio_jobs where id=$1 and status not in ('Completed','Cancelled') for update",job) is null)throw new ArgumentException("Reopen the Job before changing media.");
         string key=AssetKey(c,tx,job,id);
@@ -115,6 +117,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             if(Scalar(c,tx,"select id from studio_job_subjects where id=$1 and job_id=$2",subject,job) is null)throw new ArgumentException("Subject belongs to another job or no longer exists.");
         if((request.Subjects?.Length??0)>0 && string.IsNullOrWhiteSpace(request.Collection))throw new ArgumentException("Classified images must belong to a collection.");
         Execute(c,tx,"update studio_media_assets set production_status=$2,assigned_to=$3,capture_at_utc=$4 where id=$1",id,request.Status,(object?)request.AssignedTo??DBNull.Value,(object?)request.CaptureAtUtc?.ToUniversalTime()??DBNull.Value);
+        if(tags is not null)Execute(c,tx,"update studio_media_assets set tags=$2 where id=$1",id,tags);
         Execute(c,tx,"delete from studio_media_asset_subjects where asset_id=$1",id);
         Guid[] requestedSubjects=(request.Subjects??[]).Distinct().ToArray();
         if(requestedSubjects.Length==0)
@@ -127,7 +130,13 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         foreach(Guid subject in requestedSubjects)Execute(c,tx,"insert into studio_media_asset_subjects values($1,$2)",id,subject);
         if(string.IsNullOrWhiteSpace(request.Collection))Execute(c,tx,"delete from studio_job_asset_collections where job_id=$1 and asset_key=$2",job,key);
         else {EnsureCollection(c,tx,job,request.Collection.Trim());Execute(c,tx,"insert into studio_job_asset_collections values($1,$2,$3) on conflict(job_id,asset_key) do update set collection_name=excluded.collection_name",job,key,request.Collection.Trim());}
-        Audit(c,tx,job,"MediaChanged",user,"Updated image subjects, collection and production state.");tx.Commit();
+        Audit(c,tx,job,"MediaChanged",user,"Updated image subjects, collection, tags and production state.");tx.Commit();
+    }
+    public static string[] NormalizeTags(IEnumerable<string> values)
+    {
+        var tags=values.Select(value=>(value??"").Trim()).Where(value=>value.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if(tags.Length>50||tags.Any(value=>value.Length>80))throw new ArgumentException("Use at most 50 tags, with up to 80 characters per tag.");
+        return tags;
     }
     private static Guid EnsureUnclassifiedSubject(NpgsqlConnection c,NpgsqlTransaction tx,Guid job)
     {
@@ -315,7 +324,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
     internal static int Execute(NpgsqlConnection c,NpgsqlTransaction tx,string sql,params object[] args){using var cmd=new NpgsqlCommand(sql,c,tx);foreach(var value in args)cmd.Parameters.AddWithValue(value);return cmd.ExecuteNonQuery();}
     internal static object? Scalar(NpgsqlConnection c,NpgsqlTransaction tx,string sql,params object[] args){using var cmd=new NpgsqlCommand(sql,c,tx);foreach(var value in args)cmd.Parameters.AddWithValue(value);return cmd.ExecuteScalar();}
 }
-public sealed record MediaAssetUpdate(string Status,string? Collection,Guid[]? Subjects,string? AssignedTo,DateTimeOffset? CaptureAtUtc=null);
+public sealed record MediaAssetUpdate(string Status,string? Collection,Guid[]? Subjects,string? AssignedTo,DateTimeOffset? CaptureAtUtc=null,string[]? Tags=null);
 public sealed record RosterImport(string Csv,string NameColumn,string IdColumn);
 public sealed record SubjectStateRequest(string Status);
 public sealed record MediaExportRequest(Guid[] Assets);
@@ -331,3 +340,4 @@ public sealed record MediaPageQuery(string? Collection=null,Guid? SubjectId=null
         if(Status is not null)MediaProductionRules.ValidateState(Status);
     }
 }
+

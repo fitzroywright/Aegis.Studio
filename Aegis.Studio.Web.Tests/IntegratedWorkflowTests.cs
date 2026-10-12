@@ -22,6 +22,27 @@ using SkiaSharp;
 namespace Aegis.Studio.Web.Tests;
 public sealed class IntegratedWorkflowTests
 {
+    [Fact]
+    public void PhotoTagsAreNormalizedAndBounded()
+    {
+        Assert.Equal(new[]{"Portrait","Blue backdrop"},MediaProductionStore.NormalizeTags(new[]{" Portrait ","portrait","","Blue backdrop"}));
+        Assert.Throws<ArgumentException>(()=>MediaProductionStore.NormalizeTags(new[]{new string('x',81)}));
+        Assert.Throws<ArgumentException>(()=>MediaProductionStore.NormalizeTags(Enumerable.Range(0,51).Select(n=>"Tag "+n)));
+    }
+    [StudioPostgresFact]
+    public void PhotoTagsPersistAndLegacyAssetUpdatesPreserveThem()
+    {
+        using var context=new WorkflowContext();Guid asset=Guid.NewGuid(),version=Guid.NewGuid();
+        Sql(context.Connection,"insert into studio_media_galleries(id) values($1)",context.Job);
+        Sql(context.Connection,"insert into studio_asset_versions(id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc) values($1,$2,'tag-test',1,'Portrait.jpg','image/jpeg',1024,'test','tag-test','Test',now())",version,context.Job);
+        Sql(context.Connection,"insert into studio_media_assets(id,job_id,gallery_id,asset_key) values($1,$2,$2,'tag-test')",asset,context.Job);
+        var store=new MediaProductionStore(context.Database,context.Versions);
+        store.UpdateAsset(context.Job,asset,new("Needs Sorting","Unclassified",null,null,Tags:[" Family ","family","Blue backdrop"]),"Test");
+        string[] ReadTags()=>new MediaProductionStore(context.Database,context.Versions).Snapshot(context.Job,new(AssetId:asset)).GetProperty("assets")[0].GetProperty("tags").EnumerateArray().Select(value=>value.GetString()!).ToArray();
+        Assert.Equal(new[]{"Family","Blue backdrop"},ReadTags());
+        store.UpdateAsset(context.Job,asset,new("Needs Sorting","Unclassified",null,null),"Test");Assert.Equal(new[]{"Family","Blue backdrop"},ReadTags());
+        store.UpdateAsset(context.Job,asset,new("Needs Sorting","Unclassified",null,null,Tags:[]),"Test");Assert.Empty(ReadTags());
+    }
     [StudioPostgresFact]
     public void JobNotesPersistWithAuthorshipAndDoNotDuplicateOnRetry()
     {
@@ -245,4 +266,5 @@ public sealed class IntegratedWorkflowTests
     }
     private static void Sql(NpgsqlConnection c,string sql,params object[] values){using var cmd=new NpgsqlCommand(sql,c){CommandTimeout=120};if(values.Length>0&&sql.Contains(';')){foreach(string statement in sql.Split(';',StringSplitOptions.RemoveEmptyEntries))Sql(c,statement,values);return;}foreach(var value in values)cmd.Parameters.AddWithValue(value);cmd.ExecuteNonQuery();}
 }
+
 
