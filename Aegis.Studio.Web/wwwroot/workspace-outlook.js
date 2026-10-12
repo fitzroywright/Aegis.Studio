@@ -156,10 +156,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const header=detailPane.querySelector('.detail-header');
             header.className='job-detail-heading';
             const eventDate=job.eventDate?new Date(job.eventDate.includes('T')?job.eventDate:job.eventDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'2-digit',year:'numeric'}).replaceAll(',',''):'Needs scheduling';
-            const facts=[['Client',job.linkedClientName||job.clientName||'Not linked'],['Type',job.jobType||job.type||'Photography'],['Event date',eventDate],['Location','Loading…'],['Photographer',job.assignedTo?studioFirstName(job.assignedTo):'Unassigned']];
-            header.innerHTML=`<div class="job-detail-title"><h1>${esc(job.title)}</h1></div>
+            const clientName=job.linkedClientName||job.clientName||'Not linked';
+            const facts=[['Type',job.jobType||job.type||'Photography'],['Event date',eventDate],['Location','Loading…'],['Photographer',job.assignedTo?studioFirstName(job.assignedTo):'Unassigned']];
+            header.innerHTML=`<div class="job-detail-title"><h1 title="${esc(job.title)}">${esc(job.title)}</h1><span class="jd-client-name" title="${esc(clientName)}"><span>Client</span><strong>${esc(clientName)}</strong></span></div>
                 <div class="jd-job-status"><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show flow details">${esc(job.status)}</button><div class="jd-status-meta"><span data-job-owner>Owner: ${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</span><span data-stage-age></span></div><small>${esc(job.jobCode||job.code||'')}</small></div>
-                <dl class="job-detail-facts" aria-label="Job information">${facts.map(([name,value])=>`<div><dt>${esc(name)}</dt><dd${name==='Location'?' data-job-location':name==='Photographer'?' data-job-photographer':''}>${esc(value)}</dd></div>`).join('')}</dl>
+                <dl class="job-detail-facts" aria-label="Job information">${facts.map(([name,value])=>`<div><dt>${esc(name)}</dt><dd title="${esc(value)}"${name==='Location'?' data-job-location':name==='Photographer'?' data-job-photographer':''}>${esc(value)}</dd></div>`).join('')}</dl>
                 <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol><div class="jd-flow-actions"><button type="button" class="jd-link jd-flow-toggle" data-toggle-flow-details aria-expanded="false" aria-controls="jobFlowDrawer" aria-label="Expand flow details" title="Expand flow details"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button><button type="button" class="jd-link" data-close-job-flow hidden>Close ↑</button><button type="button" class="jd-link" data-job-workflow>Assignments &amp; Workflow →</button></div></div>
                 <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow details" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-workflow-track" aria-live="polite"></div></div></section>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
@@ -216,8 +217,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const refreshLocation=async()=>{
                 try{
                     const schedules=await json('/api/schedule/entries?jobId='+job.id+'&from='+encodeURIComponent(new Date(Date.now()-31536000000).toISOString())+'&to='+encodeURIComponent(new Date(Date.now()+94608000000).toISOString()));
-                    if(current())header.querySelector('[data-job-location]').textContent=schedules.find(s=>s.status!=='Cancelled'&&s.location)?.location||'Not scheduled';
-                }catch(error){if(current())header.querySelector('[data-job-location]').textContent='Unavailable';}
+                    if(current()){const field=header.querySelector('[data-job-location]');field.textContent=schedules.find(s=>s.status!=='Cancelled'&&s.location)?.location||'Not scheduled';field.title=field.textContent;}
+                }catch(error){if(current()){const field=header.querySelector('[data-job-location]');field.textContent='Unavailable';field.title=field.textContent;}}
             };
             const loadPanel=(name,force=false)=>{
                 if(pending.has(name))return pending.get(name);
@@ -297,6 +298,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     const crew=(data.sessions||[]).flatMap(session=>session.crew||[]);
                     const photographers=[...new Set(crew.map(person=>person.user_name).filter(Boolean))];
                     header.querySelector('[data-job-photographer]').textContent=photographers.length?photographers.map(person=>studioFirstName(person)).join(', '):job.assignedTo?studioFirstName(job.assignedTo):'Unassigned';
+                    header.querySelector('[data-job-photographer]').title=header.querySelector('[data-job-photographer]').textContent;
                     header.querySelector('[data-job-blocked]').textContent=data.blockedReason?'Blocked: '+data.blockedReason:'';
                     header.querySelector('.jd-workflow-caption').hidden=!data.blockedReason;
                     const next={'Pending':'Review and confirm booking','Needs Assignment':'Assign a job owner','Needs Photographer Assignment':'Assign photographers','Awaiting Scheduling':'Schedule required sessions','Scheduled':'Start photography','Photography In Progress':'Finish required sessions','Awaiting Upload':'Complete and submit source media','Awaiting Production Review':'Review source material','Active Production':'Complete production and submit finished work','Awaiting Approval':'Approve finished work','Changes Requested':'Resolve requested corrections','Ready for Delivery':'Publish gallery and record delivery','Delivered':'Complete job'}[data.stage];

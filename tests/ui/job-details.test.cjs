@@ -22,8 +22,9 @@ test('job facts appear below the title while Tasks and Activity render their own
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(button(w,'overview'),null);assert.equal(w.document.getElementById('jobDetail-overview'),null);
  const facts=w.document.querySelector('.job-detail-heading .job-detail-facts');
- assert.deepEqual(Array.from(facts.querySelectorAll('dt'),field=>field.textContent),['Client','Type','Event date','Location','Photographer']);
- assert.deepEqual(Array.from(facts.querySelectorAll('dd'),field=>field.textContent),['Williams & Clarke','Photography','Sun Oct 11 2026','Kingston Studio','Unassigned']);
+ assert.equal(w.document.querySelector('.job-detail-title .jd-client-name strong').textContent,'Williams & Clarke');
+ assert.deepEqual(Array.from(facts.querySelectorAll('dt'),field=>field.textContent),['Type','Event date','Location','Photographer']);
+ assert.deepEqual(Array.from(facts.querySelectorAll('dd'),field=>field.textContent),['Photography','Sun Oct 11 2026','Kingston Studio','Unassigned']);
  for(const [name,text] of [['tasks','Retouch portraits'],['activity','Front Desk booking']]){
   await button(w,name).onclick();const panel=w.document.getElementById('jobDetail-'+name);assert.equal(panel.hidden,false);assert.match(panel.textContent,new RegExp(text));
   assert.equal(w.document.querySelectorAll('.job-detail-center > section:not([hidden])').length,1);
