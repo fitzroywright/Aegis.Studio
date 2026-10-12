@@ -1,5 +1,11 @@
 
 body[data-theme="fluent-dark"] {
+  --attention-border:#915b66;
+  --attention-surface:#352b32;
+  --attention-title-bg:#4a303a;
+  --attention-title-border:#915b66;
+  --attention-title-text:#ffd4d5;
+  --attention-text:#f0dce1;
   --studio-grid-body-bg:#1a2836;
   --studio-grid-row-alt-bg:#203244;
   --studio-grid-border:#3b5267;
