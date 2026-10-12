@@ -86,7 +86,7 @@
             rail.querySelectorAll('[data-jobs-workspace-id]').forEach(b=>b.onclick=()=>window.studioOpenJobs?.(b.dataset.jobsWorkspaceId));
             return;
         }
-        const jobPage=document.querySelector('#conversationView.has-open-job .job-detail-page');
+        const jobPage=document.body.dataset.studioView==='workspaces'?document.querySelector('#conversationView.has-open-job .job-detail-page'):null;
         if(jobPage){
             const navigation=[['today','Today','⌂'],['frontdesk','Front Desk','▣'],['jobs','Jobs','▥'],['media','Media','▧'],['messages','Messages','✉']];
             const actions=[['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready']];

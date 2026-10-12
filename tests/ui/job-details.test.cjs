@@ -176,6 +176,8 @@ test('Selected File saves collection and subjects while preserving production me
 test('Job Details left rail owns actions and respects media edit permissions',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.deepEqual(Array.from(w.document.querySelectorAll('.jd-rail-card h2'),el=>el.textContent),['Navigation','My Workspaces','Actions']);
+ assert.equal(w.document.querySelector('.job-detail-right').firstElementChild.classList.contains('jd-attention'),true);
+ assert.equal(w.document.querySelector('#studioContextRail .jd-attention'),null);
  assert.equal(w.document.querySelector('[data-job-action=subject]').disabled,false);
  w.document.querySelector('[data-job-action=subject]').click();await settle();
  assert.equal(w.document.querySelector('#jobDetail-subjects').hidden,false);assert.equal(w.document.querySelector('#jobDetail-subjects form').hidden,false);

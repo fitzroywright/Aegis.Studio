@@ -92,8 +92,9 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-gallery-toolbar select,.jd-gallery-toolbar input { font-size:11px; min-height:28px; border:1px solid var(--theme-border,#d4d9e0); background:var(--theme-surface,#fff); color:var(--theme-text,#162b50); }
 .jd-gallery-toolbar select { width:auto; max-width:170px; padding:5px 7px; border-radius:6px; }
 .jd-gallery-toolbar input { flex:0 1 150px; width:150px; min-width:100px; max-width:150px; border-radius:16px; padding:5px 10px; }
-.jd-tool-button { flex:none; display:inline-flex; align-items:center; gap:5px; padding:5px 9px; min-height:28px; border:1px solid var(--theme-border,#d4d9e0); border-radius:6px; background:var(--theme-surface,#fff); color:var(--theme-text,#162b50); font-size:11px; font-weight:700; cursor:pointer; }
-.jd-tool-button:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
+.jd-tool-button { flex:none; display:inline-flex; align-items:center; gap:5px; padding:5px 9px; min-height:28px; border:1px solid #7ba6d6; border-radius:6px; background:#dfeefe; color:#184f88; font-size:11px; font-weight:700; cursor:pointer; }
+.jd-tool-button:hover { background:#c7dfff; }
+.jd-tool-button:focus-visible { outline:2px solid #295c98; outline-offset:2px; }
 .jd-drop-hint { margin-left:auto; font-size:10px; color:var(--theme-muted,#778399); }
 .jd-view-controls { display:flex; flex:none; }
 .jd-view-controls button { background:var(--theme-surface-alt,#f5f6f8); border:1px solid var(--theme-border,#d4d9e0); color:var(--theme-text,#243d61); padding:3px 7px; font-size:15px; }
@@ -139,11 +140,12 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-save { border:0; background:#e96b0d; color:#fff; padding:5px 9px; border-radius:4px; font-weight:650; font-size:10px; }
 .jd-file-links { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px; }
 .jd-file-links a,.jd-file-links button { border:0; padding:0; font-size:9px; font-weight:700; color:#996119; background:transparent; }
-.jd-attention { border-top:3px solid #d93344; flex:1 1 0;}
-.jd-attention .jd-card-heading { border-bottom:0; padding:7px 10px 0; }
-.jd-attention-items { padding:0 10px; overflow:auto; max-height:75px; }
+.jd-attention { border:1px solid #c53646; flex:0 1 auto; box-shadow:0 2px 7px #b52b3622; }
+.jd-attention .jd-card-heading { border-bottom:1px solid #a42030; padding:8px 10px; background:#b52b36; }
+.jd-attention h2 { color:#fff; }
+.jd-attention-items { padding:2px 10px; overflow:auto; max-height:120px; }
 .jd-attention-items p { margin:6px 0; font-size:11px; }
-.jd-attention .jd-link { align-self:flex-end; padding:5px 10px; }
+.jd-attention .jd-link { align-self:flex-end; padding:5px 10px; color:#b52b36; }
 .jd-blocked { color:#c52f42; }
 .job-detail-facts { grid-column:1/-1; display:flex; min-width:0; margin:8px 0 0; padding:6px 0; border:1px solid var(--theme-border,#dedbd4); border-radius:5px; background:var(--theme-surface-alt,#f5f6f8); overflow-x:auto; font-size:11px; line-height:1.4; }
 .job-detail-facts > div { display:flex; flex:1 0 140px; align-items:baseline; gap:6px; min-width:0; padding:0 10px; box-sizing:border-box; white-space:nowrap; }
@@ -154,6 +156,6 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .job-detail-workflow-dialog .workflow-panel { margin:0; overflow:visible; }
 @media(max-width:1200px) { .jd-drop-hint { display:none; } .jd-contact-sheet { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr) 230px; } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } }
-@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:3;  display:flex;flex-direction:column;} .job-detail-selected-file,.jd-attention { display:none; } .job-detail-heading { padding:7px; gap:0 5px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
+@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:3;  display:flex;flex-direction:column;} .job-detail-selected-file { display:none; } .job-detail-heading { padding:7px; gap:0 5px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
 
 
