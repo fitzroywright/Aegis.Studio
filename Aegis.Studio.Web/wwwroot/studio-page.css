@@ -9,8 +9,8 @@
 .st-card-scroll{overflow:auto;overscroll-behavior:contain}
 .st-right{gap:8px;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
 .st-card{display:flex;flex-direction:column;flex:1 1 0;}
-.st-card>header{padding:7px 10px;background:#f4f6f8;border-bottom:1px solid #dce1e6;flex-shrink:0}
-.st-card h2{margin:0;font-size:12px;font-weight:700;color:#253c54}
+.st-card>header{padding:7px 10px;background:var(--studio-rail-accent,#f4f6f8);border-bottom:1px solid var(--studio-rail-accent,#dce1e6);flex-shrink:0}
+.st-card h2{margin:0;font-size:12px;font-weight:var(--studio-rail-title-weight,700);color:var(--studio-rail-title,#253c54)}
 .st-card-body{padding:8px 10px;overflow:auto;min-height:0;flex:1;overscroll-behavior:contain}
 .st-card-body p{margin:0 0 8px;line-height:1.5;color:#647181}
 .st-stat{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #e9ecef}
