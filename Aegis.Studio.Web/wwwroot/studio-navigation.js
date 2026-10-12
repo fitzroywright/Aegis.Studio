@@ -672,6 +672,8 @@
             const previews=previewsFor(item);
             const status=current.length?'Active':item.jobs.length?'No active jobs':'Ready';
             const statusClass=current.length?'active':'ready';
+            const unassigned=String(item.workspace.name||'').trim().toLowerCase()==='unassigned'||String(item.workspace.systemKey||'').trim().toLowerCase()==='unassigned';
+            const email=String(item.workspace.emailAddress||'').trim();
             const subtitle=latest?.clientName||item.workspace.emailAddress||item.workspace.routeKey||'Studio workspace';
             const secondary=latest?.title||latest?.jobType||'No recent job';
             const lastActivity=latest?.eventDate||latest?.createdAtUtc||latest?.createdAt;
@@ -682,17 +684,17 @@
                         <strong>${esc(item.workspace.name)}</strong>
                         <small>${esc(subtitle)} · ${esc(secondary)}</small>
                     </span>
-                    <span class="workspace-wow-email" title="${esc(item.workspace.emailAddress||'No email address configured')}">${esc(item.workspace.emailAddress||'—')}</span>
+                    <span class="workspace-wow-email ${!email&&!unassigned?'workspace-email-warning':''}" title="${esc(email||(!unassigned?'Workspace email address must be configured':'System workspace: email not required'))}">${email?esc(email):unassigned?'—':'<span aria-label="Warning: email address not configured">⚠ Set email</span>'}</span>
                     <span class="workspace-wow-stat"><b>${item.metrics.activeJobs}</b></span>
                     <span class="workspace-wow-stat"><b>${item.metrics.completedJobs}</b></span>
                     <span class="workspace-wow-stat"><b>${item.metrics.upcomingShoots}</b></span>
-                    <span class="workspace-wow-previews">
-                        ${previews.map(url=>`<img src="${url}" alt="">`).join('')}
-                        ${photos>previews.length?`<i>+${photos-previews.length}</i>`:''}
-                    </span>
                     <span class="workspace-wow-activity">
                         <em class="workspace-reference-pill ${statusClass}">${status}</em>
                         <small>${lastActivity?'Updated '+esc(new Date(lastActivity).toLocaleDateString([],{month:'short',day:'numeric'})):'No activity yet'}</small>
+                    </span>
+                    <span class="workspace-wow-previews">
+                        ${previews.map(url=>`<img src="${url}" alt="">`).join('')}
+                        ${photos>previews.length?`<i>+${photos-previews.length}</i>`:''}
                     </span>
                     <span class="workspace-wow-arrow">›</span>
                 </button>
@@ -710,8 +712,8 @@
                             <span>Active Jobs</span>
                             <span>Completed Jobs</span>
                             <span>Upcoming Shoots</span>
-                            <span>Media</span>
                             <span>Status / Activity</span>
+                            <span>Media</span>
                             <span aria-hidden="true"></span>
                         </div>
 
