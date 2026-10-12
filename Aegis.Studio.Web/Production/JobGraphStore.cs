@@ -1,0 +1,183 @@
+using System.Text.Json;
+using Aegis.Studio.Web.Persistence;
+using Npgsql;
+using static Aegis.Studio.Web.Production.CommercialTemplateStore;
+
+namespace Aegis.Studio.Web.Production;
+
+public sealed record GraphTask(Guid Id, string NodeId, string Title, string Status, string? AssignedTo, string? Role,
+    string Eligibility, string[] Dependencies, bool Optional, string? Reason);
+public sealed record JobGraphView(Guid JobId, Guid TemplateId, int TemplateVersion, long Revision,
+    WorkflowGraph Graph, GraphEvaluation Evaluation, GraphTask[] Tasks, object[] History);
+public sealed record TemplateImpact(string[] Remain, string[] Added, string[] Removed, string[] CompletedAffected,
+    string[] AssignmentChanges, string[] DependencyChanges, bool RequiresConfirmation, string FinancialImplications);
+public sealed record WorkflowServicesRequest(Guid[] CatalogItemIds, Guid OperationId, long ExpectedRevision, bool ConfirmChanges = false, string? Reason = null);
+
+public sealed class JobGraphStore(StudioDatabase database)
+{
+    public static CommercialTemplate Normalize(CommercialTemplate template)
+    {
+        if (template.Workflow is null) return template;
+        var issues = WorkflowGraphEngine.Validate(template.Workflow);
+        if (issues.Length > 0) throw new ArgumentException(string.Join("\n", issues.Select(i => $"{i.NodeId}: {i.Message}")));
+        return template with { Steps = WorkflowGraphEngine.Flatten(template.Workflow).Nodes.Where(n => n.Kind == "Task").Select(n => n.Task! with { DependsOn = [] }).ToArray() };
+    }
+    internal static WorkflowGraph Graph(CommercialTemplate template) => template.Workflow ?? WorkflowGraphEngine.FromSteps(template.Steps);
+    internal static HashSet<Guid> Services(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
+    {
+        using var q = Command(c, tx, "select catalog_item_id from studio_job_catalog_agreements where job_id=$1 and workflow_selected union select catalog_item_id from studio_catalog_line_snapshots s join studio_pos_sale_lines l on l.id=s.sale_line_id join studio_pos_sales sale on sale.id=l.sale_id where sale.job_id=$1 and sale.status='Completed'", job);
+        using var r = q.ExecuteReader(); var result = new HashSet<Guid>(); while (r.Read()) result.Add(r.GetGuid(0)); return result;
+    }
+    internal static CommercialTemplate? Definition(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
+    {
+        using var q = Command(c, tx, "select definition::text from studio_job_template_instances where job_id=$1", job);
+        return q.ExecuteScalar() is string json ? JsonSerializer.Deserialize<CommercialTemplate>(json, Json) : null;
+    }
+    internal static Dictionary<string, string> Statuses(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
+    {
+        using var q = Command(c, tx, "select workflow_node_id,status from studio_job_activities where job_id=$1 and workflow_node_id is not null", job);
+        using var r = q.ExecuteReader(); var result = new Dictionary<string, string>(); while (r.Read()) result[r.GetString(0)] = r.GetString(1); return result;
+    }
+    internal static void Instantiate(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, CommercialTemplate template, string actor)
+    {
+        var nodes = WorkflowGraphEngine.Flatten(Graph(template)).Nodes.Where(n => n.Kind == "Task").ToArray();
+        int position = 0;
+        foreach (var n in nodes)
+        {
+            var step = n.Task!;
+            Execute(c, tx, """
+                insert into studio_job_activities(id,job_id,activity_type,title,status,priority,assigned_to,location,created_by,created_at_utc,updated_at_utc,
+                  template_step_key,production_area,step_definition,quality_control_required,optional_step,approved_image_required,step_order,workflow_node_id)
+                values($1,$2,$3,$4,'NotStarted','Normal',$5,$6,$7,now(),now(),$8,$9,$10::jsonb,$11,$12,$13,$14,$8)
+                on conflict(job_id,workflow_node_id) where workflow_node_id is not null do update set
+                  title=case when studio_job_activities.status='Completed' then studio_job_activities.title else excluded.title end,
+                  assigned_to=coalesce(studio_job_activities.assigned_to,excluded.assigned_to),step_definition=excluded.step_definition,
+                  optional_step=excluded.optional_step,quality_control_required=excluded.quality_control_required
+                """, Guid.NewGuid(), job, step.ActivityType, step.Title, step.DefaultAssignee, step.Area, actor, n.Id, step.Area,
+                JsonSerializer.Serialize(step, Json), step.QualityControl, step.Optional, step.RequiresApprovedImage, position++);
+        }
+    }
+    public JobGraphView? Get(Guid job)
+    {
+        using var c = database.OpenConnection(); using var tx = c.BeginTransaction(System.Data.IsolationLevel.RepeatableRead);
+        var definition = Definition(c, tx, job); if (definition is null) return null;
+        Guid template; int version; long revision;
+        using (var q = Command(c, tx, "select i.template_id,i.template_version,j.workflow_revision from studio_job_template_instances i join studio_jobs j on j.id=i.job_id where i.job_id=$1", job))
+        { using var r = q.ExecuteReader(); r.Read(); template = r.GetGuid(0); version = r.GetInt32(1); revision = r.GetInt64(2); }
+        var graph = Graph(definition); var evaluation = WorkflowGraphEngine.Evaluate(graph, Statuses(c, tx, job), Services(c, tx, job));
+        var nodes = WorkflowGraphEngine.Flatten(graph).Nodes.ToDictionary(n => n.Id); var states = evaluation.Nodes.ToDictionary(n => n.Id);
+        var tasks = new List<GraphTask>();
+        using (var q = Command(c, tx, "select id,workflow_node_id,title,status,assigned_to,optional_step,blocked_reason from studio_job_activities where job_id=$1 and workflow_node_id is not null order by step_order", job))
+        { using var r = q.ExecuteReader(); while (r.Read()) { var id = r.GetString(1); var s = states[id]; tasks.Add(new(r.GetGuid(0), id, r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), nodes[id].Role, s.Status, s.Dependencies, r.GetBoolean(5), r.IsDBNull(6) ? s.Reason : r.GetString(6))); } }
+        var history = new List<object>();
+        using (var q = Command(c, tx, "select title,status,assigned_to,completed_at_utc from studio_job_activities where job_id=$1 and workflow_node_id is null and template_step_key is not null and work_order_id is null order by created_at_utc", job))
+        { using var r = q.ExecuteReader(); while (r.Read()) history.Add(new { title = r.GetString(0), status = r.GetString(1), assignedTo = r.IsDBNull(2) ? null : r.GetString(2), completedAtUtc = r.IsDBNull(3) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(3) }); }
+        tx.Commit(); return new(job, template, version, revision, graph, evaluation, tasks.ToArray(), history.ToArray());
+    }
+    public static void GuardTask(NpgsqlConnection c, NpgsqlTransaction? tx, Guid activity, string requested)
+    {
+        Guid job; string id; string current;
+        using (var q = Command(c, tx, "select job_id,workflow_node_id,status from studio_job_activities where id=$1 and workflow_node_id is not null", activity))
+        { using var r = q.ExecuteReader(); if (!r.Read()) return; job = r.GetGuid(0); id = r.GetString(1); current = r.GetString(2); }
+        if (current == "Completed" && requested != "Completed") throw new ArgumentException("Completed workflow work is immutable. Add a correction task instead.");
+        var def = Definition(c, tx, job)!; var graph = Graph(def); var n = WorkflowGraphEngine.Flatten(graph).Nodes.Single(n => n.Id == id);
+        if (requested == "Archived") throw new ArgumentException("Workflow tasks cannot be silently archived.");
+        if (requested == "Cancelled" && n.Task?.Optional != true) throw new ArgumentException("Only optional workflow tasks may be skipped.");
+        if (requested is "InProgress" or "Completed" or "Partial" or "ReadyForDelivery")
+        {
+            var states = Statuses(c, tx, job); states[id] = "NotStarted";
+            var state = WorkflowGraphEngine.Evaluate(graph, states, Services(c, tx, job)).Nodes.Single(n => n.Id == id);
+            if (state.Status != "Available") throw new ArgumentException(state.Reason ?? "This task is not eligible.");
+        }
+    }
+    public static void GuardCompletion(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
+    {
+        var def = Definition(c, tx, job);
+        if (def?.Workflow is not null && !WorkflowGraphEngine.Evaluate(Graph(def), Statuses(c, tx, job), Services(c, tx, job)).Completed)
+            throw new ArgumentException("Complete all applicable workflow tasks before delivery or closing.");
+    }
+    internal static long Lock(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, long expected)
+    {
+        using var q = Command(c, tx, "select workflow_revision,status from studio_jobs where id=$1 for update", job); using var r = q.ExecuteReader();
+        if (!r.Read()) throw new KeyNotFoundException("Job was not found.");
+        if (r.GetString(1) is "Completed" or "Cancelled" or "Delivered") throw new ArgumentException("Job is closed for workflow changes.");
+        long revision = r.GetInt64(0); if (revision != expected) throw new InvalidOperationException("Job changed. Refresh its impact preview."); return revision;
+    }
+    internal static bool Replay(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, Guid operation, object request, string actor)
+    {
+        if (operation == Guid.Empty) throw new ArgumentException("Operation ID is required.");
+        string payload = JsonSerializer.Serialize(request, Json);
+        using var q = Command(c, tx, "select payload=$3::jsonb and actor=$4 from studio_job_workflow_operations where job_id=$1 and operation_id=$2", job, operation, payload, actor);
+        if (q.ExecuteScalar() is bool same) { if (!same) throw new ArgumentException("Operation ID was already used for a different change."); return true; }
+        return false;
+    }
+    internal static void Record(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, Guid operation, object request, string actor, string action)
+    {
+        Execute(c, tx, "insert into studio_job_workflow_operations(job_id,operation_id,payload,actor) values($1,$2,$3::jsonb,$4)", job, operation, JsonSerializer.Serialize(request, Json), actor);
+        Execute(c, tx, "update studio_jobs set workflow_revision=workflow_revision+1 where id=$1", job);
+        Execute(c, tx, "insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,$3,$4,$5,now())", Guid.NewGuid(), job, action, actor, JsonSerializer.Serialize(request, Json));
+    }
+    public TemplateImpact Impact(Guid job, Guid template)
+    { using var c = database.OpenConnection(); using var tx = c.BeginTransaction(System.Data.IsolationLevel.RepeatableRead); return Impact(c, tx, job, Get(c, tx, template) ?? throw new KeyNotFoundException()); }
+    internal static TemplateImpact Impact(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, TemplateVersion target)
+    {
+        var previous = Definition(c, tx, job); var before = previous is null ? new Dictionary<string, WorkflowNode>() : WorkflowGraphEngine.Flatten(Graph(previous)).Nodes.Where(n => n.Kind == "Task").ToDictionary(n => n.Id);
+        var after = WorkflowGraphEngine.Flatten(Graph(target.Definition)).Nodes.Where(n => n.Kind == "Task").ToDictionary(n => n.Id);
+        var states = Statuses(c, tx, job); var remain = before.Keys.Intersect(after.Keys).ToArray(); var removed = before.Keys.Except(after.Keys).ToArray();
+        string[] dependencies(string id, CommercialTemplate def) => WorkflowGraphEngine.Flatten(Graph(def)).Edges.Where(e => e.To == id).Select(e => JsonSerializer.Serialize(e with { Id = "" }, Json)).Order().ToArray();
+        var assignment = remain.Where(id => before[id].Role != after[id].Role || before[id].Task?.DefaultAssignee != after[id].Task?.DefaultAssignee).ToArray();
+        var changed = remain.Where(id => !dependencies(id, previous!).SequenceEqual(dependencies(id, target.Definition))).ToArray();
+        var affected = states.Where(s => s.Value == "Completed" && (removed.Contains(s.Key) || changed.Contains(s.Key) || (after.TryGetValue(s.Key, out var n) && n.Task != before[s.Key].Task))).Select(s => s.Key).ToArray();
+        return new(remain, after.Keys.Except(before.Keys).ToArray(), removed, affected, assignment, changed,
+            states.Any(s => s.Value != "NotStarted" && s.Value != "Scheduled"), "Posted charges, invoices and payments remain unchanged. Adjust billing separately through POS.");
+    }
+    public void Apply(Guid job, ApplyJobTemplateRequest request, string actor)
+    {
+        using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
+        // Lock before replay, so concurrent retries see the committed operation.
+        using (var q = Command(c, tx, "select id from studio_jobs where id=$1 for update", job)) if (q.ExecuteScalar() is null) throw new KeyNotFoundException();
+        if (Replay(c, tx, job, request.OperationId, request, actor)) return;
+        Lock(c, tx, job, request.ExpectedRevision);
+        var target = Get(c, tx, request.TemplateId) ?? throw new KeyNotFoundException("Template was not found.");
+        if (!target.Active || target.Kind != "Job") throw new ArgumentException("Choose a published active Job Template.");
+        var impact = Impact(c, tx, job, target);
+        if (impact.RequiresConfirmation && (!request.ConfirmChanges || string.IsNullOrWhiteSpace(request.Reason))) throw new ArgumentException("Review the impact and confirm the template change with a reason.");
+        Execute(c, tx, "insert into studio_job_workflow_history(id,job_id,definition,template_id,template_version,actor,reason) select $1,job_id,definition,template_id,template_version,$3,$4 from studio_job_template_instances where job_id=$2", Guid.NewGuid(), job, actor, request.Reason ?? "Template replaced before work began");
+        foreach (var id in impact.Removed)
+            Execute(c, tx, "update studio_job_activities set workflow_node_id=null,status=case when status='Completed' then status else 'Cancelled' end,updated_at_utc=now() where job_id=$1 and workflow_node_id=$2", job, id);
+        Execute(c, tx, """
+            insert into studio_job_template_instances(job_id,template_id,template_version,definition,operation_id,created_by)
+            values($1,$2,$3,$4::jsonb,$5,$6) on conflict(job_id) do update set template_id=excluded.template_id,template_version=excluded.template_version,
+              definition=excluded.definition,operation_id=excluded.operation_id,created_by=excluded.created_by,created_at=now()
+            """, job, target.Id, target.Version, JsonSerializer.Serialize(target.Definition, Json), request.OperationId, actor);
+        Instantiate(c, tx, job, target.Definition, actor);
+        // Agreements are operational service selections, never financial transaction deletion.
+        Execute(c, tx, "update studio_job_catalog_agreements set workflow_selected=false where job_id=$1", job);
+        foreach (var p in target.Definition.Products ?? []) SelectService(c, tx, job, p.CatalogItemId, p.Quantity, p.Specifications);
+        Record(c, tx, job, request.OperationId, request, actor, "JobWorkflowTemplateChanged"); tx.Commit();
+    }
+    private static void SelectService(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, Guid product, int quantity = 1, string? specifications = null)
+    {
+        using var q = Command(c, tx, "select id from studio_job_catalog_agreements where job_id=$1 and catalog_item_id=$2 order by confirmed_at desc nulls last limit 1", job, product);
+        if (q.ExecuteScalar() is Guid id) Execute(c, tx, "update studio_job_catalog_agreements set workflow_selected=true where id=$1", id);
+        else Execute(c, tx, "insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity,specifications) values($1,$2,$3,$4,$5)", Guid.NewGuid(), job, product, quantity, specifications);
+    }
+    public void SetServices(Guid job, WorkflowServicesRequest request, string actor)
+    {
+        using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
+        using (var q = Command(c, tx, "select id from studio_jobs where id=$1 for update", job)) if (q.ExecuteScalar() is null) throw new KeyNotFoundException();
+        if (Replay(c, tx, job, request.OperationId, request, actor)) return;
+        Lock(c, tx, job, request.ExpectedRevision); var def = Definition(c, tx, job) ?? throw new ArgumentException("Apply a Job Template first.");
+        if (request.CatalogItemIds.Length > 300) throw new ArgumentException("Too many services.");
+        foreach (var id in request.CatalogItemIds)
+        { using var q = Command(c, tx, "select exists(select 1 from studio_pos_catalog where id=$1 and is_active)", id); if (!(bool)q.ExecuteScalar()!) throw new ArgumentException("Choose active catalog services."); }
+        var states = Statuses(c, tx, job); var existing = Services(c, tx, job); var selected = request.CatalogItemIds.ToHashSet();
+        var old = WorkflowGraphEngine.Evaluate(Graph(def), new Dictionary<string, string>(), existing);
+        var next = WorkflowGraphEngine.Evaluate(Graph(def), new Dictionary<string, string>(), selected);
+        bool startedRemoved = old.Nodes.Any(n => n.Status != "Inactive" && next.Nodes.Any(x => x.Id == n.Id && x.Status == "Inactive") && states.TryGetValue(n.Id, out var status) && status is not ("NotStarted" or "Scheduled" or "Cancelled"));
+        if (startedRemoved && (!request.ConfirmChanges || string.IsNullOrWhiteSpace(request.Reason))) throw new ArgumentException("A removed service has started work. Confirm with a reason; work and history will be preserved.");
+        Execute(c, tx, "update studio_job_catalog_agreements set workflow_selected=false where job_id=$1", job);
+        foreach (var id in selected) SelectService(c, tx, job, id);
+        Record(c, tx, job, request.OperationId, request, actor, "JobWorkflowServicesChanged"); tx.Commit();
+    }
+}
