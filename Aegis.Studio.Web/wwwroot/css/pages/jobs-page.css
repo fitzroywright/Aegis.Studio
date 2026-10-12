@@ -57,3 +57,15 @@
 body[data-studio-view="jobs"] .mw-today-focus-icon{color:#e8b647}
 
 
+
+/* Today-style Jobs toolbar: view tabs left, calendar navigation right. */
+.sj-board>.sj-toolbar[hidden]{display:none!important}
+.sj-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:38px}
+.sj-summary .sj-calendar{display:flex;align-items:center;gap:4px;margin-left:auto;flex:0 0 auto;white-space:nowrap}
+.sj-calendar-views{display:flex;align-items:center;gap:0;border:1px solid var(--studio-control-border,#bacbd8);border-radius:6px;overflow:hidden}
+.sj-calendar button{height:28px;padding:3px 9px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;font-weight:650;cursor:pointer}
+.sj-calendar-views button{border:0;border-radius:0}
+.sj-calendar-views button.active{background:#244e77;color:#fff}
+.sj-calendar input[type=date]{width:125px;height:28px;box-sizing:border-box;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;padding:2px 4px}
+.sj-calendar button:focus-visible,.sj-calendar input:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
+@media(max-width:1100px){.sj-summary .sj-calendar{margin-left:0}}
