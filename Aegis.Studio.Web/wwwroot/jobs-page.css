@@ -25,7 +25,7 @@
 .sj-pagination div{display:flex;gap:10px;align-items:center}.sj-pagination button{border:1px solid #d2d9e0;border-radius:4px;background:#fff;padding:4px 10px;cursor:pointer}.sj-pagination button[aria-current=page]{background:#d99a2a;color:#fff;border-color:#d99a2a}.sj-pagination button:disabled{opacity:.4;cursor:default}
 .sj-right{gap:8px;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
 .sj-card,.sj-rail-card{display:flex;flex-direction:column;flex:1 1 0;}
-.sj-card header,.sj-rail-card header{padding:9px 12px;border-bottom:1px solid var(--studio-rail-accent,#dedfe2);background:var(--studio-rail-accent,#fafbfc);flex-shrink:0}
+.sj-card header,.sj-rail-card header{padding:8px 10px;border-bottom:1px solid var(--studio-rail-accent,#dedfe2);background:var(--studio-rail-accent,#fafbfc);flex-shrink:0}
 .sj-card h2,.sj-rail-card h2{font-size:13px;margin:0;font-weight:var(--studio-rail-title-weight,650);color:var(--studio-rail-title,#344252)}
 .sj-card-body,.sj-rail-links{padding:8px 12px;overflow:auto;min-height:0;flex:1}
 .sj-card-body p{font-size:11px;color:#74808d;margin:8px 0}.sj-card-body h3{font-size:11px;margin:10px 0 4px;padding-top:9px;border-top:1px solid #e0e3e6;color:#576371}
