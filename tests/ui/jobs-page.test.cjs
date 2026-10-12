@@ -19,7 +19,7 @@ test('Jobs route uses the new component and workspace links without an intermedi
  await new Promise(r=>setTimeout(r,20));await w.studioOpenJobs('w2');
  assert.equal(w.document.body.dataset.studioView,'jobs');assert.equal(w.document.getElementById('studioFooterRate').textContent,'8 jobs');assert.equal(w.document.querySelectorAll('.sj-rail-card').length,3);
  w.document.querySelector('tr[data-sj-job] strong').click();assert.equal(fixture.opened.length,1);
- assert.match(w.document.getElementById('studioTodayBrandTitle').textContent,/Every job, one clear view/);
+ assert.match(w.document.getElementById('studioTodayBrandTitle').textContent,/Find, filter and manage jobs across Studio workspaces/);
 });
 test('An older Jobs request cannot replace a newer render and opening errors stay inline',async t=>{
  const {w,fixture,host}=environment(t);let release;fixture.delay=new Promise(r=>release=r);const first=w.StudioJobsPage.render(host,fixture.options);fixture.delay=null;fixture.options.workspaceFilter='w2';fixture.options.openJob=async()=>{throw new Error('Access denied');};await w.StudioJobsPage.render(host,fixture.options);release();await first;
