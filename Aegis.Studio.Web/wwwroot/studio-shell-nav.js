@@ -104,7 +104,7 @@
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="today"><span>⌂</span><span>Today</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
-                    ${window.studioWorkflowCapabilities?.operations?'<button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations</span></button>':''}
+                    <button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations</span></button>
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
                     <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
                     <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
