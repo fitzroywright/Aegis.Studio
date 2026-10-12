@@ -136,7 +136,7 @@ function renderFrontDesk(){
       
       <div class="fd-layout"><div class="fd-main">
         
-        <section class="op-card fd-queue"><header class="fd-queue-header"><h2>Incoming Bookings &amp; Inquiries</h2></header>
+        <section class="op-card fd-queue">
           <div class="fd-table-scroll" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<table class="fd-table"><thead><tr><th>Date</th><th><div class="fd-customer-header"><span>Customer / Request</span><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search customers…" value="${esc(frontDeskTerm)}"></div></th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}<th aria-label="Open Record"></th></tr></thead><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table>`:'<div id="frontDeskJobList"></div>'}</div>
           </section>
         <div class="fd-metrics">${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}${metric('confirmation','Needs Confirmation',pending.length,'Review and confirm')}${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
