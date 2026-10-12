@@ -21,7 +21,7 @@
     })[character]);
 
     function labelFor(view) {
-        return ({'studio-management':'Studio Management','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
+        return ({'operations-management':'Operations','studio-management':'Studio Management','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
             || String(view || 'Studio').replace(/(^|\s)\S/g, match => match.toUpperCase());
     }
 

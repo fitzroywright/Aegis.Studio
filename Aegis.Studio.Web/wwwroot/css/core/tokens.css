@@ -1,5 +1,10 @@
 /* Canonical semantic component tokens. Theme files override values only. */
 :root {
+  --theme-header:#173653;
+  --studio-page-brown:#70503d;
+  --studio-page-header-text:#ffffff;
+  --studio-page-search-bg:#2c537c;
+  --studio-page-search-border:#6e96b8;
   --attention-border:#e6c29c;
   --attention-surface:#fffaf4;
   --attention-title-bg:#fff0de;
