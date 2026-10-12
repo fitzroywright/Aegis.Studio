@@ -1,6 +1,7 @@
 using Aegis.Studio.Web.Persistence;
 using Common.Storage;
 using Npgsql;
+using Aegis.Studio.Web.Workflow;
 
 namespace Aegis.Studio.Web.Operations;
 
@@ -25,25 +26,33 @@ public sealed class DemoSeedCoordinator
     private readonly StudioDatabase database;
     private readonly IFileStorage storage;
     private readonly ILogger<DemoSeedCoordinator> logger;
+    private readonly IConfiguration configuration;
+    private readonly IWebHostEnvironment environment;
     private readonly object gate = new();
     private Guid? activeRunId;
     private Task? activeTask;
     private bool schemaReady;
 
-    public DemoSeedCoordinator(StudioDatabase database, IFileStorage storage, ILogger<DemoSeedCoordinator> logger)
+    public DemoSeedCoordinator(StudioDatabase database, IFileStorage storage, ILogger<DemoSeedCoordinator> logger, IConfiguration configuration, IWebHostEnvironment environment)
     {
         this.database = database;
         this.storage = storage;
         this.logger = logger;
+        this.configuration = configuration;
+        this.environment = environment;
     }
 
-    public DemoSeedRunStatus Start(string login)
+    public DemoSeedRunStatus Start(string login, bool reset = false)
     {
         EnsureSchema();
         lock (gate)
         {
             if (activeTask is { IsCompleted: false } && activeRunId is Guid running)
+            {
+                if(reset) throw new InvalidOperationException("A demo load is already running. Wait for it to finish before resetting.");
                 return Get(running) ?? throw new InvalidOperationException("The active demo load could not be read.");
+            }
+            if(reset) StudioFactoryReset.ValidateStorage(storage, configuration);
 
             DemoSeedRunStatus? existing = ReadLatestRunning();
             if (existing is not null)
@@ -58,7 +67,7 @@ public sealed class DemoSeedCoordinator
             Write(new DemoSeedRunStatus(id, "Running", 0, "Preparing", 0, 0,
                 "Demo loading has started on the server.", now, now));
             activeRunId = id;
-            activeTask = Task.Run(() => Run(id, login));
+            activeTask = Task.Run(() => Run(id, login, reset));
             return Get(id)!;
         }
     }
@@ -95,11 +104,17 @@ public sealed class DemoSeedCoordinator
         }
     }
 
-    private void Run(Guid id, string login)
+    private async Task Run(Guid id, string login, bool reset)
     {
         DateTimeOffset started = Get(id)?.StartedAtUtc ?? DateTimeOffset.UtcNow;
         try
         {
+            if(reset)
+            {
+                Write(new DemoSeedRunStatus(id,"Running",0,"Resetting",0,0,
+                    "Removing Studio business records and files before rebuilding the full demo.",started,DateTimeOffset.UtcNow));
+                await StudioFactoryReset.ExecuteAsync(database,storage,configuration,environment,null,CancellationToken.None);
+            }
             string result = DemoDataEndpoints.Seed(database, storage, login, progress =>
             {
                 Write(new DemoSeedRunStatus(id, "Running", progress.Percent, progress.Stage,
@@ -115,7 +130,7 @@ public sealed class DemoSeedCoordinator
             logger.LogError(error, "Demo seed failed RunId={RunId}", id);
             DateTimeOffset now = DateTimeOffset.UtcNow;
             Write(new DemoSeedRunStatus(id, "Failed", 0, "Failed", 0, 0,
-                "Demo data could not be loaded. See server logs for details.",
+                "Demo data could not be loaded: " + error.Message,
                 started, now, now));
         }
         finally
@@ -216,3 +231,4 @@ public sealed class DemoSeedCoordinator
         r.GetString(6), r.GetFieldValue<DateTimeOffset>(7), r.GetFieldValue<DateTimeOffset>(8),
         r.IsDBNull(9) ? null : r.GetFieldValue<DateTimeOffset>(9));
 }
+

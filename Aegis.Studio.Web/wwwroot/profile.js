@@ -1,7 +1,6 @@
 (() => {
     const dialog = document.getElementById('profileDialog');
     const button = document.getElementById('profileButton');
-    const preferencesButton = document.querySelector('[data-preferences]');
     const form = document.getElementById('profileForm');
     const close = document.getElementById('closeProfile');
     const cancel = document.getElementById('cancelProfile');
@@ -59,7 +58,6 @@
         dialog.showModal();
         await load();
     });
-    preferencesButton?.addEventListener('click', () => button.click());
     close?.addEventListener('click', () => dialog.close());
     cancel?.addEventListener('click', () => dialog.close());
 
@@ -84,3 +82,4 @@
         return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
     }
 })();
+

@@ -812,16 +812,16 @@
     };
 
     async function renderAdmin(){
-        const current=StudioPage.begin('admin');
+        const current=StudioPage.begin('studio-management');
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML='<div class="today-loading">Loading administration…</div>';
+        genericView.innerHTML='<div class="today-loading">Loading Studio Management…</div>';
 
         const me=await json('/api/auth/me').catch(()=>null);
         if(!current())return;
         const isAdministrator=me?.user?.isAdministrator===true||me?.isAdministrator===true;
         if(!isAdministrator){
-            genericView.innerHTML=StudioPage.html({title:'Administration',content:'<section class="admin-card"><h2>Administrator access required</h2><p>Your account does not have permission to administer Studio.</p></section>'});StudioPage.bind(genericView,current);
+            genericView.innerHTML=StudioPage.html({title:'Studio Management',content:'<section class="admin-card"><h2>Administrator access required</h2><p>Your account does not have permission to administer Studio.</p></section>'});StudioPage.bind(genericView,current);
             return;
         }
 
@@ -830,15 +830,15 @@
         if(!current())return;
         const manageable=workspaceAccessCache.filter(item=>item.permissions?.editWorkspace||item.permissions?.manageMembers||item.permissions?.adminWorkspace);
 
-        genericView.innerHTML=StudioPage.html({title:'Administration',scroll:true,
+        genericView.innerHTML=StudioPage.html({title:'Studio Management',scroll:true,
             summary:StudioPage.metrics([['Managed workspaces',manageable.length],['Active roles',studioRolesCache.filter(x=>x.isActive).length]]),
             attention:'<p>Workspace access is controlled by memberships and reusable roles.</p>',
-            content:`<div class="st-admin-grid">                        <section class="admin-card admin-demo-card" id="studioDemoLoader">
+            content:`<div class="st-admin-grid">${studioManagementCatalogCards()}<section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
-                                <div><h2>Demo Data</h2><p>Generate workflow-native examples or remove the owned demo fixture.</p></div>
+                                <div><h2>Demo Data</h2><p>Rebuild the complete Studio demo with job templates, workflows, genuine photographs, bookings, schedules and payments.</p></div>
                                 <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Generate Demo Data</button><button class="primary" type="button" data-demo-reset>Reset and Regenerate</button></div>
                             </header>
-                            <p class="admin-card-note">Removal requires server-side DemoData:AllowDestructiveReset and an explicit confirmation. Generation uses fictional contacts only.</p>
+                            <p class="admin-card-note">Reset clears Studio business data and files; staff accounts, configuration and Unassigned are preserved. Demo contacts are fictional; photographs are genuine.</p>
                             <progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress>
                             <p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p>
                             <small data-demo-elapsed hidden></small>
@@ -873,7 +873,7 @@
 
                         <section class="admin-card" data-service-status><header class="admin-card-header"><h2>Service health</h2><button class="action" data-refresh-service-status>Refresh</button></header><div data-service-status-body>Loading…</div><button class="action" onclick="showPosCatalogManager()">Manage products</button><button class="action" data-service-audit>Recent audit</button></section>
                         <section class="admin-card admin-help-card">
-                            <header class="admin-card-header"><div><h2>Administration</h2></div></header>
+                            <header class="admin-card-header"><div><h2>Studio settings and access</h2></div></header>
                             <p>Workspace access remains membership-based. Use reusable roles where possible and one-off permissions only when required.</p>
                             <p>Every operational workspace requires a Workspace Manager. Integration routing is configured under Advanced / Integration Settings.</p>
                         </section>
@@ -906,23 +906,22 @@
             }catch(error){status.textContent='Preview failed: '+error.message;}
             finally{button.disabled=false;}
         };
-        panel.querySelector('[data-demo-reset]').onclick=async()=>{
-            const status=panel.querySelector('[data-demo-status]');
-            const confirmation=window.prompt('This removes all Studio business records and regenerates the Connected Workflow demo. Type REMOVE STUDIO DEMO DATA to continue.');
-            if(confirmation!=='REMOVE STUDIO DEMO DATA')return;
-            const button=panel.querySelector('[data-demo-reset]');
-            button.disabled=true;panel.setAttribute('aria-busy','true');
-            status.textContent='Resetting and regenerating Studio demo data…';
+        const runDemo=async(reset=false)=>{
+            const status=panel.querySelector('[data-demo-status]'),meter=panel.querySelector('[data-demo-progress]');
+            if(reset&&window.prompt('This clears Studio business records and files, then rebuilds the complete demo including job templates and photographs. Type REMOVE STUDIO DEMO DATA to continue.')!=='REMOVE STUDIO DEMO DATA')return;
+            const buttons=[...panel.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);panel.setAttribute('aria-busy','true');meter.hidden=false;meter.value=0;
+            status.textContent=reset?'Starting full demo reset and regeneration…':'Starting full Studio demo generation…';
             try{
-                const result=await json('/api/admin/connected-workflow/demo-data/reset-and-generate',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({confirmation})
-                });
-                status.textContent=result.message||'Reset and regeneration completed.';
-                await loadWorkspaces();
-            }catch(e){status.textContent='Reset/regeneration failed: '+e.message;}
-            finally{button.disabled=false;panel.setAttribute('aria-busy','false');}
+                const run=await window.studioLoadDemoData(progress=>{
+                    if(!panel.isConnected)return;
+                    meter.value=progress.percent||0;meter.setAttribute('aria-valuetext',`${progress.percent||0}% — ${progress.stage||progress.status}`);
+                    status.textContent=`${progress.percent||0}% · ${progress.stage||progress.status} — ${progress.message||''}`;
+                },{reset});
+                status.textContent=run.message;await loadWorkspaces();
+            }catch(e){status.textContent='Demo generation failed: '+e.message;}
+            finally{buttons.forEach(b=>b.disabled=false);panel.setAttribute('aria-busy','false');}
         };
+        panel.querySelector('[data-demo-reset]').onclick=()=>runDemo(true);
         panel.querySelector('[data-demo-remove]').onclick=async()=>{
             const status=panel.querySelector('[data-demo-status]');
             const confirmation=window.prompt('Type REMOVE STUDIO DEMO DATA to remove the Connected Workflow fixture. This cannot be undone.');
@@ -940,17 +939,7 @@
             }catch(e){status.textContent='Removal failed: '+e.message;}
             finally{button.disabled=false;}
         };
-        panel.querySelector('[data-load-demo]').onclick=async()=>{
-            const button=panel.querySelector('[data-load-demo]');
-            const status=panel.querySelector('[data-demo-status]');
-            button.disabled=true;status.textContent='Generating Connected Workflow records…';
-            try{
-                const result=await json('/api/admin/connected-workflow/demo-data/generate',{method:'POST'});
-                status.textContent=result.message||'Connected Workflow demo generated.';
-                await loadWorkspaces();
-            }catch(e){status.textContent='Generation failed: '+e.message;}
-            finally{button.disabled=false;}
-        };
+        panel.querySelector('[data-load-demo]').onclick=()=>runDemo(false);
 
         try{
             const current=await window.studioGetCurrentDemoDataRun?.();
@@ -965,6 +954,8 @@
             }
         }catch{/* Demo status is advisory; the load action remains available. */}
     }
+
+    window.StudioManagement={render:renderAdmin};
 
     const routes={
         today:renderToday,
@@ -989,7 +980,7 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
+    const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
 
     function navigationContext(view,options={}){
         return {studioView:view,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
@@ -1019,6 +1010,7 @@
     window.studioBeginJobNavigation=(id,options={})=>beginNavigation('workspaces',{...options,jobId:id});
 
     window.studioNavigate=async function(view,options={}){
+        if(view==='admin')view='studio-management';
         const route=routes[view];
         if(!route) throw new Error('Unknown Studio navigation view: '+view);
         const {context,revision}=beginNavigation(view,options);
@@ -1071,3 +1063,4 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+

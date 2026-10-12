@@ -12,9 +12,7 @@ internal static class StudioFactoryReset
     private const int PageLimit = 1000;
     private static readonly SemaphoreSlim Gate = new(1, 1);
 
-    internal static async Task<object> ExecuteAsync(
-        StudioDatabase database, IFileStorage storage, IConfiguration configuration,
-        IWebHostEnvironment environment, string? regenerateAs, CancellationToken cancellationToken)
+    internal static void ValidateStorage(IFileStorage storage, IConfiguration configuration)
     {
         // A shared bucket/library must never be emptied by a reset operation.
         // This flag must be explicitly configured after verifying the provider root
@@ -25,6 +23,13 @@ internal static class StudioFactoryReset
         if (storage is not IStorageQuery || storage is not IStorageLifecycle)
             throw new InvalidOperationException(
                 "Factory reset requires dedicated-bucket S3 purge or storage enumeration and irreversible lifecycle purge. No data was deleted.");
+    }
+
+    internal static async Task<object> ExecuteAsync(
+        StudioDatabase database, IFileStorage storage, IConfiguration configuration,
+        IWebHostEnvironment environment, string? regenerateAs, CancellationToken cancellationToken)
+    {
+        ValidateStorage(storage, configuration);
         await Gate.WaitAsync(cancellationToken);
         try
         {
@@ -66,7 +71,7 @@ internal static class StudioFactoryReset
             var databaseResult = ConnectedWorkflowDemo.Reset(database);
             object? generated = null;
             if (regenerateAs is not null)
-                generated = ConnectedWorkflowDemo.Generate(database, regenerateAs);
+                generated = Aegis.Studio.Web.Operations.DemoDataEndpoints.Seed(database, storage, regenerateAs);
             return new { storageObjectsPurged = removed, storageVerifiedEmpty = true,
                 database = databaseResult, generated,
                 message = "Studio factory reset completed; all enumerable storage objects purged and only Unassigned preserved." };
@@ -74,3 +79,4 @@ internal static class StudioFactoryReset
         finally { Gate.Release(); }
     }
 }
+

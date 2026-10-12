@@ -102,10 +102,11 @@ public static class WorkflowEndpoints
                 warning="Inventory only: foreign-key dependencies are not a deletion plan. Business-data classification and storage ownership must be verified before reset.",
                 tables});
         }));
-        admin.MapPost("/demo-data/generate",(StudioDatabase db,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config)=>Run(()=>
+        admin.MapPost("/demo-data/generate",(DemoSeedCoordinator coordinator,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config)=>Run(()=>
         {
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
-            return Results.Ok(ConnectedWorkflowDemo.Generate(db,WorkflowStore.Name(user)));
+            var run=coordinator.Start(WorkflowStore.Name(user));
+            return Results.Accepted($"/api/admin/demo/seed/{run.RunId}",run);
         }));
         admin.MapPost("/demo-data/remove",async (StudioDatabase db,IFileStorage storage,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request,CancellationToken cancellationToken)=>
         {
@@ -122,14 +123,15 @@ public static class WorkflowEndpoints
                     warning="Reset did not complete. Some storage objects may already have been purged. Correct the failure and retry."});
             }
         });
-        admin.MapPost("/demo-data/reset-and-generate",async (StudioDatabase db,IFileStorage storage,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request,CancellationToken cancellationToken)=>
+        admin.MapPost("/demo-data/reset-and-generate",(DemoSeedCoordinator coordinator,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request)=>
         {
             if(!config.GetValue("DemoData:AllowDestructiveReset",false))return Results.NotFound();
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
             if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
             try
             {
-                return Results.Ok(await StudioFactoryReset.ExecuteAsync(db,storage,config,environment,WorkflowStore.Name(user),cancellationToken));
+                var run=coordinator.Start(WorkflowStore.Name(user),reset:true);
+                return Results.Accepted($"/api/admin/demo/seed/{run.RunId}",run);
             }
             catch(Exception e) when(e is InvalidOperationException or IOException or NpgsqlException)
             {
@@ -199,3 +201,4 @@ public sealed class WorkflowMonitorWorker(IServiceScopeFactory scopes,ILogger<Wo
 public sealed record DemoResetConfirmation(string Confirmation);
 
 public sealed record ManualPhotographerReport(string Photographer,WorkDayOperationRequest Operation,string Reason);
+

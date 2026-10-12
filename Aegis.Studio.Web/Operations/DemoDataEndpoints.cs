@@ -72,7 +72,7 @@ public static class DemoDataEndpoints
         using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "select pg_advisory_xact_lock(72709128)";
+        command.CommandText = "select set_config('studio.demo_seed','true',true); select pg_advisory_xact_lock(72709128)";
         report?.Invoke(new(26, "Rich demo data", 0, 0, "Loading historical workflows and media separately from the operational schedule."));
         command.ExecuteNonQuery();
 
@@ -232,3 +232,4 @@ public static class DemoDataEndpoints
         """insert into studio_state(key,value,updated_at_utc) values('demo-data-v1',$1,now());"""
     ];
 }
+

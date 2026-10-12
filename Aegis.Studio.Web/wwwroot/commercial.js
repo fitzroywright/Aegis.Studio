@@ -5,9 +5,10 @@ function commercialPage(title,body,tools='',summary='') {
     StudioPage.bind(genericView);
     window.studioSetBreadcrumb?.([{label:'Studio Management',view:'studio-management'},{label:title}]);
 }
-async function showStudioManagement(){
-    commercialPage('Studio Management',`<div class="commercial-management"><section class="mw-list-panel"><header><h2>Products and services</h2></header><p>Manage the catalog, selling prices, variations and production requirements.</p><button class="fd-card-link" onclick="studioNavigate('catalog')">Product &amp; Services Catalog →</button></section><section class="mw-list-panel"><header><h2>Job Templates</h2></header><p>Define whole jobs, standard tasks, required staff and catalog deliverables.</p><button class="fd-card-link" onclick="studioNavigate('job-templates')">Manage Job Templates →</button></section><section class="mw-list-panel"><header><h2>Work Order Templates</h2></header><p>Define ordered production steps and final quality control.</p><button class="fd-card-link" onclick="studioNavigate('work-order-templates')">Manage Work Order Templates →</button></section></div>`);
+function studioManagementCatalogCards(){
+    return `<section class="admin-card"><header class="admin-card-header"><h2>Products and services</h2></header><p>Manage catalog items, prices and production requirements.</p><button class="fd-card-link" onclick="studioNavigate('catalog')">Product &amp; Services Catalog →</button></section><section class="admin-card"><header class="admin-card-header"><h2>Job Templates</h2></header><p>Design job workflows, branches and service requirements.</p><button class="fd-card-link" onclick="studioNavigate('job-templates')">Manage Job Templates →</button></section><section class="admin-card"><header class="admin-card-header"><h2>Work Order Templates</h2></header><p>Define production steps and final quality control.</p><button class="fd-card-link" onclick="studioNavigate('work-order-templates')">Manage Work Order Templates →</button></section>`;
 }
+async function showStudioManagement(){return window.StudioManagement.render();}
 async function showCommercialCatalog(){
     const current=StudioPage.begin('catalog');
     [commercialItems,commercialTemplates]=await Promise.all([json('/api/admin/pos/catalog/'),json('/api/admin/commercial/templates/WorkOrder')]);
@@ -88,4 +89,5 @@ async function openCommercialWorkOrder(order){
     });
     d.querySelector('[data-resolve]')?.addEventListener('click',async()=>{try{await json(`/api/production/work-orders/${order.id}/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:d.querySelector('[data-note]').value})});d.close();await showCatalogProduction();}catch(err){error(err);}});
 }
+
 

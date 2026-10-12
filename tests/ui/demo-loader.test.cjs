@@ -29,6 +29,18 @@ function setup(sequence){
  return {w,dom,calls};
 }
 
+test('reset and regeneration starts a full server run and waits through reset and photo stages',async()=>{
+ const runId='44444444-4444-4444-8444-444444444444';
+ const {w,dom,calls}=setup([
+  {url:'/api/admin/connected-workflow/demo-data/reset-and-generate',status:202,body:{runId,status:'Running',percent:0,stage:'Resetting'}},
+  {url:'/api/admin/demo/seed/'+runId,body:{runId,status:'Running',percent:60,stage:'Studio photographs'}},
+  {url:'/api/admin/demo/seed/'+runId,body:{runId,status:'Completed',percent:100,completed:true,message:'Full demo rebuilt'}}
+ ]);
+ const updates=[];const result=await w.studioLoadDemoData(p=>updates.push(p.stage),{reset:true});
+ assert.deepEqual(updates,['Resetting','Studio photographs',undefined]);assert.equal(result.completed,true);
+ assert.deepEqual(JSON.parse(calls[0].options.body),{confirmation:'REMOVE STUDIO DEMO DATA'});dom.window.close();
+});
+
 test('demo load starts a server run and polls until committed completion',async()=>{
  const runId='11111111-1111-4111-8111-111111111111';
  const {w,dom,calls}=setup([
@@ -68,3 +80,4 @@ test('current demo run can be recovered after reopening Admin',async()=>{
  assert.equal(current.percent,63);
  dom.window.close();
 });
+

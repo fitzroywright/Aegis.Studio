@@ -1,0 +1,98 @@
+using System.Collections.Concurrent;
+using System.Reflection;
+using Aegis.Studio.Web.Operations;
+using Aegis.Studio.Web.Workflow;
+using Common.Storage;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
+using Xunit;
+
+namespace Aegis.Studio.Web.Tests;
+
+[CollectionDefinition("FullStudioDemo",DisableParallelization=true)]
+public class FullStudioDemoCollection { }
+
+[Collection("FullStudioDemo")]
+public class FullDemoRegenerationTests
+{
+    private static void Sql(NpgsqlConnection c,string sql,params object[] values){using var q=new NpgsqlCommand(sql,c);foreach(var v in values)q.Parameters.AddWithValue(v);q.ExecuteNonQuery();}
+    private static object? Scalar(NpgsqlConnection c,string sql){using var q=new NpgsqlCommand(sql,c);return q.ExecuteScalar();}
+    private static readonly Type DemoType=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoDataExpansion")!;
+    private static readonly Type ResetType=typeof(WorkflowSchema).Assembly.GetType("Aegis.Studio.Web.Workflow.ConnectedWorkflowDemo")!;
+
+    [StudioPostgresFact] public void ResetClearsWorkflowSeedMarkersButPreservesConfigurationEmployeesAndRunningProgress()
+    {
+        using var ctx=new IntegratedWorkflowTests.WorkflowContext();WorkflowSchema.Ensure(ctx.Database);
+        new GlobalOperationalRoleStore(ctx.Database).EnsureSchema();
+        new StudioEmployeeDirectoryStore(ctx.Database).EnsureSchema();
+        Sql(ctx.Connection,"insert into studio_employees(user_name,display_name) values('kept.staff','Kept Staff')");
+        Sql(ctx.Connection,"insert into studio_state(key,value,updated_at_utc) values('demo-job-workflow-graphs-v1','seeded',now()),('provider-contract','preserved',now())");
+        Sql(ctx.Connection,"create table studio_demo_seed_runs(run_id uuid primary key,status text)");
+        Sql(ctx.Connection,"insert into studio_demo_seed_runs values($1,'Running'),($2,'Completed')",Guid.NewGuid(),Guid.NewGuid());
+        ResetType.GetMethod("Reset",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,[ctx.Database]);
+        Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_jobs"));
+        Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_workspaces where system_key='unassigned'"));
+        Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_state where key like 'demo-job-workflow-graphs-%'"));
+        Assert.Equal("preserved",Scalar(ctx.Connection,"select value from studio_state where key='provider-contract'"));
+        Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_employees where user_name='kept.staff'"));
+        Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_demo_seed_runs where status='Running'"));
+        Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_demo_seed_runs where status='Completed'"));
+    }
+
+    [StudioPostgresFact] public Task FullResetRebuildsPhotographsTemplatesAndWorkflowScenarios()=>Rebuild(false);
+    [StudioPostgresFact, Trait("Database","Native")] public Task NativeCoordinatorReportsFullResetCompletion()=>Rebuild(true);
+    private static async Task Rebuild(bool tracked)
+    {
+        using var ctx=new IntegratedWorkflowTests.WorkflowContext();
+        new Aegis.Studio.Web.FrontDesk.FrontDeskBookingRequestStore(ctx.Database).EnsureSchema();
+        WorkflowSchema.Ensure(ctx.Database);StudioOperationsEnhancements.EnsureSchema(ctx.Database,new WorkspaceStore(ctx.Database));
+        new GlobalOperationalRoleStore(ctx.Database).EnsureSchema();
+        new StudioEmployeeDirectoryStore(ctx.Database).EnsureSchema();
+        var storage=new LocalFileStorage(ctx.Root);
+        using(var old=new MemoryStream([1,2,3]))await storage.StoreAsync(new("old-demo.txt",old,"text/plain","old-demo.txt","Admin"));
+        Sql(ctx.Connection,"insert into studio_state(key,value,updated_at_utc) values('demo-job-workflow-graphs-v1','old',now()),('provider-contract','preserved',now())");
+        var cache=(ConcurrentDictionary<string,byte[]>)DemoType.GetField("weddingPhotoCache",BindingFlags.Static|BindingFlags.NonPublic)!.GetValue(null)!;
+        var original=cache.ToDictionary(x=>x.Key,x=>x.Value);
+        byte[] photo=await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory,"Fixtures","portrait.jpg"));
+        try
+        {
+            // Reuse the genuine repository photo fixture to test the complete pipeline without network downloads.
+            foreach(var url in (string[])DemoType.GetField("realPhotoUrls",BindingFlags.Static|BindingFlags.NonPublic)!.GetValue(null)!)cache[url]=photo;
+            foreach(var item in DemoPortraitCatalogue.Photos)cache[item.Url]=photo;
+            var configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Storage:FactoryResetExclusiveRoot","true"}}).Build();
+            if(tracked)
+            {
+                var coordinator=new DemoSeedCoordinator(ctx.Database,storage,NullLogger<DemoSeedCoordinator>.Instance,configuration,new TestEnvironment(ctx.Root));
+                var run=coordinator.Start("Admin",reset:true);Assert.False(run.Completed);
+                Assert.Throws<InvalidOperationException>(()=>coordinator.Start("Admin",reset:true));
+                var deadline=DateTime.UtcNow.AddMinutes(3);
+                do{await Task.Delay(100);run=coordinator.Get(run.RunId)!;}while(!run.Completed&&!run.Failed&&DateTime.UtcNow<deadline);
+                Assert.True(run.Completed,run.Message);Assert.Equal(100,run.Percent);
+            }
+            else
+            {
+                var factory=typeof(WorkflowSchema).Assembly.GetType("Aegis.Studio.Web.Workflow.StudioFactoryReset")!;
+                await (Task<object>)factory.GetMethod("ExecuteAsync",BindingFlags.Static|BindingFlags.NonPublic)!
+                    .Invoke(null,[ctx.Database,storage,configuration,new TestEnvironment(ctx.Root),"Admin",CancellationToken.None])!;
+            }
+            Assert.False(File.Exists(Path.Combine(ctx.Root,"old-demo.txt")));
+            Assert.Equal("preserved",Scalar(ctx.Connection,"select value from studio_state where key='provider-contract'"));
+            Assert.Equal(8,Scalar(ctx.Connection,"select count(*)::int from studio_commercial_templates where kind='Job'"));
+            Assert.Equal(10,Scalar(ctx.Connection,"select count(*)::int from studio_job_template_instances"));
+            Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_jobs"))>=126);
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_jobs j where j.id::text like 'de000000-0000-4000-0041-%' and (select count(*) from studio_media_assets m where m.job_id=j.id)<40"));
+            Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_photographers"))>=4);
+            Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_frontdesk_requests"))>0);
+        }
+        finally{cache.Clear();foreach(var item in original)cache[item.Key]=item.Value;}
+    }
+    private class TestEnvironment(string root):IWebHostEnvironment
+    {
+        public string ApplicationName{get;set;}="Tests";public string EnvironmentName{get;set;}="Test";
+        public string ContentRootPath{get;set;}=root;public string WebRootPath{get;set;}=root;
+        public IFileProvider ContentRootFileProvider{get;set;}=new NullFileProvider();public IFileProvider WebRootFileProvider{get;set;}=new NullFileProvider();
+    }
+}
