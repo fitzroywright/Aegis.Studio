@@ -49,7 +49,7 @@
     <nav class="studio-shell-breadcrumb" id="studioBreadcrumb" aria-label="Breadcrumb"></nav>
     
     <button id="notificationButton" class="action icon-action shell-icon-button" title="Notifications"><svg><use href="#i-bell"></use></svg></button>
-    <details class="user-menu"><summary class="user-menu-trigger" title="User profile and account menu"><span class="studio-profile-avatar" aria-hidden="true"><img id="studioProfilePhoto" alt="" hidden><svg id="studioProfilePlaceholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></svg></span><span id="userAvatar" class="sr-only">--</span><span id="signedInUser" class="sr-only">Signed in</span><span class="user-menu-caret" aria-hidden="true">⌄</span></summary><div class="user-menu-popover"><button id="profileButton" type="button">Profile</button><button type="button" data-preferences>Preferences</button><button type="button" data-view="admin" id="adminMenuButton">Administration</button><button id="signOutButton" type="button">Sign Out</button></div></details>
+    <details class="user-menu"><summary class="user-menu-trigger" title="User profile and account menu"><span class="studio-profile-avatar" aria-hidden="true"><img id="studioProfilePhoto" alt="" hidden><svg id="studioProfilePlaceholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></svg></span><span id="userAvatar" class="sr-only">--</span><span id="signedInUser" class="sr-only">Signed in</span><span class="user-menu-caret" aria-hidden="true">⌄</span></summary><div class="user-menu-popover"><button id="profileButton" type="button">Profile</button><button type="button" data-preferences>Preferences</button><button type="button" data-studio-profile-management>Studio Management</button><button type="button" data-view="admin" id="adminMenuButton">Administration</button><button id="signOutButton" type="button">Sign Out</button></div></details>
     <button id="topNewButton" class="primary top-new-button" type="button" hidden>＋ New</button>
   </header>
   <div class="shell">
@@ -79,5 +79,15 @@
   <script src="/job-handoff.js?v=20261004-storage-recovery-v10"></script><script src="/job-workspace.js?v=20261011-field-journey-v1"></script><script src="/media-production.js?v=20261012-combined-ui-v1"></script><script src="/studio-workspace-actions.js?v=20261004-storage-recovery-v10"></script><script src="/job-details.js?v=20261012-module-load-fix-v1"></script><script src="/workspace-outlook.js?v=20261012-combined-ui-v1"></script><script src="/media-fallback.js?v=20261010-canonical-v1"></script><script src="/demo-loader.js?v=20261004-storage-recovery-v10"></script><script src="/media-review.js?v=20261012-combined-ui-v1"></script><script src="/commercial.js?v=20261011-today-v1"></script><script src="/frontdesk-pos.js?v=20261012-combined-ui-v1"></script><script src="/jobs-page.js?v=20261012-combined-ui-v1"></script><script src="/studio-navigation.js?v=20261012-combined-ui-v1"></script>
   <script src="/studio-shell-nav.js?v=20261011-complete-workflow-v1"></script>
   <script src="/studio-search.js?v=20261004-storage-recovery-v10"></script>
+<script>
+    document.addEventListener('click',event=>{
+      const management=event.target.closest('[data-studio-profile-management]');
+      if(management) window.studioNavigate?.('studio-management');
+      if(event.target.closest('.user-menu-popover button')){
+        const menu=event.target.closest('details.user-menu');
+        if(menu) menu.open=false;
+      }
+    });
+  </script>
 </body>
 </html>
