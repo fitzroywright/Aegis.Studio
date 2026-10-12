@@ -1,12 +1,12 @@
 /* Shared role colors consumed by each left-rail card's owning rules. */
-:root { --studio-grid-header-bg:#203f63; --studio-grid-header-text:#fff; --studio-grid-header-border:#537395; }
+:root { --studio-grid-header-bg:#536a80; --studio-grid-header-text:#f2f5f8; --studio-grid-header-border:#8394a4; }
 /* Today is the canonical left-rail presentation across Studio pages. */
 #studioContextRail > [data-rail-card] { --studio-rail-border:2px solid var(--studio-rail-accent); --studio-rail-title:#fff; --studio-rail-title-weight:750; border:var(--studio-rail-border); border-radius:7px; background:var(--theme-surface,#fff); overflow:hidden; min-width:0; }
 #studioContextRail > [data-rail-card] > header { background:var(--studio-rail-accent); border-bottom:1px solid var(--studio-rail-accent); padding:8px 10px; min-height:0; }
 #studioContextRail > [data-rail-card] > header h2 { margin:0; color:var(--studio-rail-title); font-size:13px; font-weight:var(--studio-rail-title-weight); }
-#studioContextRail > [data-rail-card="navigation"] { --studio-rail-accent:#24476c; }
-#studioContextRail > [data-rail-card="workspaces"] { --studio-rail-accent:#875413; }
-#studioContextRail > [data-rail-card="actions"] { --studio-rail-accent:#24665e; }
+#studioContextRail > [data-rail-card="navigation"] { --studio-rail-accent:#536d86; }
+#studioContextRail > [data-rail-card="workspaces"] { --studio-rail-accent:#92734b; }
+#studioContextRail > [data-rail-card="actions"] { --studio-rail-accent:#527e77; }
 /* Canonical Studio presentation. Responsive scope and cascade priority are preserved.
    Change the owning rule; do not append another correction layer. */
 :root {
@@ -8125,11 +8125,11 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="sc
   background: #e7f2ff;
   border-bottom-color: #c9def3;
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="attention"] {
+body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"] {
   border-color: #e6c29c;
   background: #fffaf4;
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header {
+body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header {
   background: #fff0de;
   border-bottom-color: #f0d4b4;
 }
@@ -8162,7 +8162,7 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel>header h2 {
 body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="schedule"]>header h2 {
   color: #235b8c;
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header h2 {
+body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header h2 {
   color: #945b23;
 }
 @media (max-width:1050px) {
@@ -8208,7 +8208,7 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="at
   background: #f5e9d7;
   color: #875413;
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="attention"] .studio-card-icon {
+body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"] .studio-card-icon {
   background: #f9e3c8;
   color: #955923;
 }
@@ -11018,3 +11018,14 @@ body[data-studio-view="media"] .studio-media-page {
 
 
 .management-workload-head { background:var(--studio-grid-header-bg); color:var(--studio-grid-header-text); }
+
+/* Shared Needs Attention card: same warm, restrained treatment as Today. */
+body[data-studio-view] .st-right .st-card.st-attention { border: 1px solid #e6c29c; border-radius: 9px; background: #fffaf4; overflow: hidden; }
+body[data-studio-view] .st-right .st-card.st-attention > header { background: #fff0de; border-bottom: 1px solid #f0d4b4; }
+body[data-studio-view] .st-right .st-card.st-attention > header h2 { color: #945b23; font-weight: 600; }
+body[data-studio-view] .st-right .st-card.st-attention .st-card-body { background: #fffaf4; color: #304b67; }
+/* Single artwork for the Studio identity, with the page title directly beside it. */
+body .topbar { padding-left: 0 !important; column-gap: 0 !important; }
+body .topbar .studio-script-brand { padding: 0 !important; margin: 0 !important; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
+body .topbar .studio-script-brand .studio-bryans-brand-image { display: block; width: 216px; height: 56px; object-fit: contain; }
+body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left: 0 !important; border-left: 0 !important; }

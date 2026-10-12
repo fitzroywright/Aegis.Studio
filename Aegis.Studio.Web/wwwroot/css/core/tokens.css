@@ -1,0 +1,17 @@
+/* Canonical semantic component tokens. Theme files override values only. */
+:root {
+  --attention-border:#e6c29c;
+  --attention-surface:#fffaf4;
+  --attention-title-bg:#fff0de;
+  --attention-title-border:#f0d4b4;
+  --attention-title-text:#945b23;
+  --attention-text:#304b67;
+  --studio-grid-body-bg:#ffffff;
+  --studio-grid-row-alt-bg:#f7f9fb;
+  --studio-grid-border:#d9e2e9;
+  --studio-card-surface:#ffffff;
+  --studio-card-title-surface:#eef2f5;
+  --studio-control-surface:#ffffff;
+  --studio-control-text:#233e57;
+  --studio-control-border:#bacbd8;
+}

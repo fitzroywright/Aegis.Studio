@@ -25,6 +25,23 @@
             || String(view || 'Studio').replace(/(^|\s)\S/g, match => match.toUpperCase());
     }
 
+    // One purpose-driven tagline per page; keep all masthead descriptions here.
+    const pageTaglines = {
+        today: 'Review your jobs, upcoming sessions and items needing attention.',
+        jobs: 'Find, filter and manage jobs across Studio workspaces.',
+        workspaces: 'Manage workspace jobs, messaging, media and activity.',
+        frontdesk: 'Review customer inquiries, prepare bookings and manage arrivals.',
+        messages: 'Read, reply to and organize conversations with clients and colleagues.',
+        media: 'Upload, review and organize images by workspace, job and collection.',
+        production: 'Track production tasks, progress and work awaiting completion.',
+        schedule: 'View scheduled shoots, assignments and staff availability.',
+        pipeline: 'Track jobs through their workflow stages and next actions.',
+        finance: 'Review invoices, payments and outstanding balances.',
+        'operations-management': 'Monitor operational work, assignments and exceptions.',
+        'studio-management': 'Configure Studio settings, staff access and workspaces.'
+    };
+    const taglineFor = view => pageTaglines[view] || 'Manage Studio work and related information.';
+
     function iconFor(view) {
         return quickLinks.find(([key]) => key === view)?.[2] || '▤';
     }
@@ -81,17 +98,18 @@
         // Job Detail retains its contextual actions in the shared Actions card.
         const jobPage=document.body.dataset.studioView==='workspaces'?document.querySelector('#conversationView.has-open-job .job-detail-page'):null;
         const jobActions=[['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready']];
-        const actionItems=jobPage?jobActions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''):'<button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>'+(document.body.dataset.studioView==='today'?'<button type="button" data-studio-assign-job-lead><span>▣</span><span>Assign Job Lead</span></button>':'');
+        const actionItems=jobPage?jobActions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''):'<button type="button" data-studio-new-booking><span>＋</span><span>New Booking</span></button>'+(document.body.dataset.studioView==='today'?'<button type="button" data-studio-assign-job-lead><span>▣</span><span>Assign Job Lead</span></button>':'');
         rail.innerHTML = `<section class="mw-list-panel studio-context-card" data-rail-card="navigation">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">↗</span> Navigation</h2></header>
                 <div class="mw-today-rail-links">
-                    <button type="button" data-studio-side="today"><span>⌂</span><span>Today</span></button><button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button><button type="button" data-studio-side="messages"><span>✉</span><span>Messages</span></button><button type="button" data-studio-side="workspaces"><span>▰</span><span>Workspaces</span></button>
+                    <button type="button" data-studio-side="today"><span>⌂</span><span>Today</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
-                    ${window.studioWorkflowCapabilities?.operations?'<button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations Management</span></button>':''}
-                    <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
-                    <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
-                    <button type="button" data-studio-side="studio-management"><span>⚙</span><span>Studio Management</span></button>
+                    <button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations</span></button>
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
+                    <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
+                    <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
+                    <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
+                    <button type="button" data-studio-side="messages"><span>✉</span><span>Messages</span></button>
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
@@ -101,10 +119,12 @@
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card" data-rail-card="workspaces">
-                <header><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2></header>
+                <header class="studio-workspaces-card-header"><h2><span class="studio-card-icon" aria-hidden="true">▣</span> Workspaces</h2><button type="button" class="studio-workspaces-view-all" data-studio-view-all-workspaces>View All →</button></header>
                 <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
             </section>
 `;
+        rail.querySelector('[data-studio-view-all-workspaces]')?.addEventListener('click',()=>window.studioNavigate?.('workspaces'));
+        rail.querySelector('[data-studio-new-booking]')?.addEventListener('click',()=>window.studioLaunchNewBooking?.());
         rail.querySelector('[data-studio-assign-job-lead]')?.addEventListener('click',()=>document.getElementById('genericView')?.dispatchEvent(new CustomEvent('studio-assign-job-lead')));
         rail.querySelectorAll('[data-job-action]').forEach(button => button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
@@ -209,7 +229,7 @@
                 const heading = title.querySelector('strong');
                 if (heading) heading.innerHTML = 'Today <em>Your focus</em>';
                 const tagline = title.querySelector('small');
-                if (tagline) tagline.textContent = 'What needs your attention, what’s coming up, and the work to move forward.';
+                if (tagline) tagline.textContent = taglineFor('today');
             }
             return;
         }
@@ -225,12 +245,12 @@
             masthead.insertBefore(breadcrumb, bell);
         }
         if (title) {
-            const jobOpen=view==='workspaces' && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
+            const jobOpen=view==='workspaces' && !document.getElementById('conversationView')?.classList.contains('hidden') && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
             title.querySelector('strong')?.replaceChildren(document.createTextNode(jobOpen?'Job Details':labelFor(view)));
             title.setAttribute('aria-label',jobOpen?'Job Details':labelFor(view));
             const icon=title.querySelector('.mw-today-focus-icon');if(icon)icon.innerHTML=view==='jobs'?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16v14H4zM8 6V3h8v3M4 11h16M10 11v3h4v-3"/></svg>':jobOpen?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="13" r="4"/></svg>':'✦';
             const tagline = title.querySelector('small');
-            if (tagline) tagline.textContent = jobOpen?'Media, workflow and conversations':view==='jobs'?'Every job, one clear view':view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : 'Studio workspace';
+            if (tagline) tagline.textContent = jobOpen ? 'Review job details, assignments, workflow, media and conversations.' : taglineFor(view);
         }
         main.classList.add('studio-standard-main');
     }

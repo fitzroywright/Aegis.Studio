@@ -52,6 +52,7 @@ internal static class DemoJobWorkflowGraphs
                 Execute(c, tx, "insert into studio_job_activities(id,job_id,activity_type,title,status,priority,assigned_to,created_by,created_at_utc,updated_at_utc,completed_at_utc,template_step_key) values($1,$2,'Other','Completed consultation from previous template','Completed','Normal',$3,$3,now(),now(),now(),'previous-consultation')", Guid.NewGuid(), job, actor);
             }
         }
-        Execute(c, tx, "insert into studio_state(key,value) values('demo-job-workflow-graphs-v1','seeded') on conflict do nothing");
+        Execute(c, tx, "insert into studio_state(key,value,updated_at_utc) values('demo-job-workflow-graphs-v1','seeded',now()) on conflict do nothing");
     }
 }
+

@@ -1,0 +1,41 @@
+/* Theme variants. Standard deliberately inherits the existing Studio design. */
+body[data-theme="office-light"] {
+  --attention-border:#eab7b9;
+  --attention-surface:#fff9f5;
+  --attention-title-bg:#fff0ef;
+  --attention-title-border:#eab7b9;
+  --attention-title-text:#99535b;
+  --attention-text:#344b61;
+  --studio-grid-body-bg:#ffffff;
+  --studio-grid-row-alt-bg:#f5f9fc;
+  --studio-grid-border:#d2e1ed;
+  --studio-card-surface:#ffffff;
+  --studio-card-title-surface:#eaf3f9;
+  --studio-control-surface:#ffffff;
+  --studio-control-text:#173451;
+  --studio-control-border:#b9d3e7;
+  --theme-bg:#f3f7fb; --theme-surface:#ffffff; --theme-surface-2:#f5f9fc;
+  --theme-border:#b9d3e7; --theme-text:#173451; --theme-muted:#617f99;
+  --theme-header:#0b2b4b; --theme-accent:#2d6fa9; --theme-accent-soft:#e7f1fa;
+  --studio-grid-header-bg:#dcebf6; --studio-grid-header-text:#234a70; --studio-grid-header-border:#b8d4e7;
+  --studio-rail-title:#193d61;
+  background:var(--theme-bg);color:var(--theme-text);
+}
+
+
+body[data-theme="office-light"] .studio-context-card[data-rail-card="navigation"]>header {background:#e7f1fb;color:#234d76;}
+
+
+body[data-theme="office-light"] .studio-context-card[data-rail-card="actions"]>header {background:#f0eafb;color:#60498c;}
+
+
+body[data-theme="office-light"] .studio-context-card[data-rail-card="workspaces"]>header {background:#e7f5ec;color:#27684a;}
+
+
+body[data-theme="office-light"] :is(.mw-list-panel,.studio-context-card,.st-card) {border-radius:10px;}
+
+
+body[data-theme="office-light"] .mw-list-panel[data-mw-region="attention"],body[data-theme="office-light"] .st-card.st-attention {background:#fff9f5;border-color:#eab7b9;}
+
+
+body[data-theme="office-light"] .mw-list-panel[data-mw-region="attention"]>header,body[data-theme="office-light"] .st-card.st-attention>header {background:#fff0ef;border-color:#eab7b9;}

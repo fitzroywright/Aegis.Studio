@@ -160,3 +160,48 @@ Update Common.Messaging to its current main if IEmailRecipientDirectory is missi
 Do not use the temporary local source-snapshot commit ancestry for a git push: GitHub
 branch ancestry is authoritative. The local source checkout was materialized through the
 connector; its baseline commit differs from upstream even though its baseline sources match.
+
+
+
+## Resumed verification — October 12, 2026
+
+This section supersedes the earlier interruption and unexecuted-results status.
+
+- Recovered source from GitHub checkpoint 510aae63f41e7ba23ed7d1750056dc59f1bd2000 into a fresh workspace.
+- Reconciled all current main changes through e19c5994efc6dc8eddd9097c09337d6db42de4f4,
+  preserving the latest Operations navigation, Workspaces rail, profile menu, page descriptions,
+  booking action, search styling and canonical CSS migration. Resolved the stylesheet conflict.
+- Graph CSS is now loaded from css/components/workflow-graph.css, in the current CSS structure.
+- Full Web/Web.Tests build: zero warnings, zero errors, after the final backend changes.
+- Full non-database .NET suite: 307 passed, zero failed, 39 database-dependent tests skipped.
+  The expanded graph engine suite accounts for 16 passing cases.
+- All eight graph/editor UI tests passed.
+- All eight workflow persistence tests passed against fresh embedded PostgreSQL (PGlite).
+  Coverage includes draft/version isolation, validation, Front Desk creation/retry/task execution,
+  template impact/replay/completed-work preservation, posted-sale safety, update revision conflicts,
+  production/delivery milestone guards and replay, and demo graph scenarios/retry idempotence.
+- The new demo test found and fixed a real defect: the graph seed marker omitted the required
+  studio_state.updated_at_utc timestamp, which would roll back the rich-demo transaction.
+  The test now verifies eight templates, ten jobs, conditional/started/blocked/completed scenarios,
+  preserved previous-template work and a retry without duplicate templates or activities.
+- Chromium 153: editor interaction created a conditional branch connected at both ends to
+  one shared destination; no page errors; no page overflow at 1440x900 or 1366x768; 12px labels.
+  These checks used production HTML/CSS/scripts and deterministic API fixtures, not a live server.
+- Latest integrated UI suite: 109 passed, 58 failed. Pristine main at the commit above:
+  101 passed, the SAME 58 failure names. No additional failure names from this branch.
+  This is a scoped regression comparison, not a claim that the overall UI suite is green.
+
+### Remaining acceptance boundary
+
+Native PostgreSQL cannot start in this runtime because switching to an unprivileged user is
+blocked. The PGlite socket server multiplexes a single PostgreSQL session. Its passing revision
+conflict test does not prove native multi-session locking or stress behavior. Run the supplied
+persistence tests on disposable native PostgreSQL before merging. Other database-dependent
+regression classes remain unexecuted in this resume; the full-suite skip count is explicit above.
+Full media-backed demo regeneration was not run: the new test verifies the graph seed itself,
+not public image downloads, S3 storage, or the entire historical seed. No external demo reset,
+Kratos deployment or merge into main occurred. PR #118 remains a draft pending native/database
+and whole-demo acceptance. See docs/JOB-WORKFLOW-20261012-VERIFICATION.md.
+
+The fresh local git repository is a recovery snapshot, not upstream ancestry. The GitHub merge
+checkpoint has the actual feature and main commits as parents. Never push local snapshot ancestry.

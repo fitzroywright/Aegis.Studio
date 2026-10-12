@@ -498,14 +498,19 @@
             if(workspace)selectWorkspace(workspace.id,workspace.name);
         });
         genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
+        genericView._assignJobLeadController?.abort();
+        genericView._assignJobLeadController = new AbortController();
         genericView.addEventListener('studio-assign-job-lead',async()=>{
             if(!(state.auth?.user||state.auth)?.isAdministrator)return;
             const activeJobs=jobs.filter(job=>!['Completed','Closed','Cancelled','Published'].includes(String(job.status||'')))
                 .sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));
             if(!activeJobs.length){alert('There are no active jobs available to assign.');return;}
+            if(genericView._assignJobLeadOpening)return;
+            genericView._assignJobLeadOpening=true;
             let employees;
             try{employees=await json('/api/studio-employees?assignable=true');}
-            catch(error){alert(error.message);return;}
+            catch(error){genericView._assignJobLeadOpening=false;alert(error.message);return;}
+            genericView._assignJobLeadOpening=false;
             const dialog=studioDialog('Assign Job Lead',`
                 <form class="subject-form" data-job-lead-form>
                     <label>Job
@@ -548,7 +553,7 @@
                 }catch(errorValue){error.textContent=errorValue.message||String(errorValue);}
                 finally{submit.disabled=false;}
             };
-        });
+        }, {signal:genericView._assignJobLeadController.signal});
         genericView.querySelectorAll('.mw-session-thumb img[data-fallback-src]').forEach(img=>{
             img.dataset.previewOwner='today';
             img.addEventListener('error',()=>{
@@ -667,26 +672,29 @@
             const previews=previewsFor(item);
             const status=current.length?'Active':item.jobs.length?'No active jobs':'Ready';
             const statusClass=current.length?'active':'ready';
+            const unassigned=String(item.workspace.name||'').trim().toLowerCase()==='unassigned'||String(item.workspace.systemKey||'').trim().toLowerCase()==='unassigned';
+            const email=String(item.workspace.emailAddress||'').trim();
             const subtitle=latest?.clientName||item.workspace.emailAddress||item.workspace.routeKey||'Studio workspace';
             const secondary=latest?.title||latest?.jobType||'No recent job';
             const lastActivity=latest?.eventDate||latest?.createdAtUtc||latest?.createdAt;
-            return `<article class="workspace-wow-row" data-workspace-row data-status="${item.metrics.activeJobs?'active':'inactive'}" data-search="${esc((item.workspace.name+' '+subtitle+' '+secondary+' '+status).toLowerCase())}">
+            return `<article class="workspace-wow-row" data-workspace-row data-status="${item.metrics.activeJobs?'active':'inactive'}" data-search="${esc((item.workspace.name+' '+(item.workspace.emailAddress||'')+' '+subtitle+' '+secondary+' '+status).toLowerCase())}">
                 <button type="button" class="workspace-wow-main" data-open-workspace="${item.workspace.id}" data-workspace-name="${esc(item.workspace.name)}">
                     <span class="workspace-wow-thumb">${hero?`<img src="${hero}" alt="">`:'<span class="workspace-photo-fallback">📷</span>'}</span>
                     <span class="workspace-wow-copy">
                         <strong>${esc(item.workspace.name)}</strong>
                         <small>${esc(subtitle)} · ${esc(secondary)}</small>
                     </span>
-                    <span class="workspace-wow-stat"><b>${item.metrics.activeJobs}</b><small>Active Jobs</small></span>
-                    <span class="workspace-wow-stat"><b>${item.metrics.completedJobs}</b><small>Completed Jobs</small></span>
-                    <span class="workspace-wow-stat"><b>${item.metrics.upcomingShoots}</b><small>Upcoming Shoots</small></span>
-                    <span class="workspace-wow-previews">
-                        ${previews.map(url=>`<img src="${url}" alt="">`).join('')}
-                        ${photos>previews.length?`<i>+${photos-previews.length}</i>`:''}
-                    </span>
+                    <span class="workspace-wow-email ${!email&&!unassigned?'workspace-email-warning':''}" title="${esc(email||(!unassigned?'Workspace email address must be configured':'System workspace: email not required'))}">${email?esc(email):unassigned?'—':'<span aria-label="Warning: email address not configured">⚠ Set email</span>'}</span>
+                    <span class="workspace-wow-stat"><b>${item.metrics.activeJobs}</b></span>
+                    <span class="workspace-wow-stat"><b>${item.metrics.completedJobs}</b></span>
+                    <span class="workspace-wow-stat"><b>${item.metrics.upcomingShoots}</b></span>
                     <span class="workspace-wow-activity">
                         <em class="workspace-reference-pill ${statusClass}">${status}</em>
                         <small>${lastActivity?'Updated '+esc(new Date(lastActivity).toLocaleDateString([],{month:'short',day:'numeric'})):'No activity yet'}</small>
+                    </span>
+                    <span class="workspace-wow-previews">
+                        ${previews.map(url=>`<img src="${url}" alt="">`).join('')}
+                        ${photos>previews.length?`<i>+${photos-previews.length}</i>`:''}
                     </span>
                     <span class="workspace-wow-arrow">›</span>
                 </button>
@@ -697,23 +705,16 @@
             <section class="workspace-list-page mw-list-page">
                 <div class="mw-list-layout workspace-list-layout">
                     <section class="mw-list-panel workspace-center-panel">
-                        <header class="workspace-center-header">
-                            <div>
-                                <h2><span class="mw-title-icon assigned">▰</span> Workspaces</h2>
-                                <small>Jobs, clients, conversations and media grouped by operational workspace.</small>
-                            </div>
-                            <div class="workspace-center-actions"><button type="button" data-workspace-jobs>View Jobs →</button><span class="workspace-wow-list-count">${workspaceData.length}</span></div>
-                        </header>
-
-                        <div class="workspace-list-toolbar">
-                            <div class="workspace-wow-search">
-                                <span>⌕</span><input type="search" placeholder="Search workspaces…" data-workspace-search>
-                            </div>
-                            <select data-workspace-sort aria-label="Sort workspaces">
-                                <option value="name">Name A–Z</option>
-                                <option value="jobs">Most jobs</option>
-                                <option value="photos">Most photos</option>
-                            </select>
+                        <div class="workspace-column-header" role="row" aria-label="Workspace columns">
+                            <span class="workspace-column-thumbnail" aria-hidden="true"></span>
+                            <label class="workspace-column-name"><span>Workspace</span><input type="search" placeholder="Search workspaces…" aria-label="Search workspaces" data-workspace-search></label>
+                            <span>Email Address</span>
+                            <span>Active Jobs</span>
+                            <span>Completed Jobs</span>
+                            <span>Upcoming Shoots</span>
+                            <span>Status / Activity</span>
+                            <span>Media</span>
+                            <span aria-hidden="true"></span>
                         </div>
 
                         <div class="workspace-wow-list workspace-list-rows" data-workspace-list>${renderRows(workspaceData)}</div>
@@ -751,7 +752,6 @@
 
         const allRows=()=>[...genericView.querySelectorAll('[data-workspace-row]')];
         let term='';
-        let sort='name';
 
         const refresh=()=>{
             const list=genericView.querySelector('[data-workspace-list]');
@@ -761,13 +761,7 @@
                 row.hidden=!matchesTerm;
             });
 
-            rows.sort((a,b)=>{
-                const ai=workspaceData.find(x=>String(x.workspace.id)===String(a.querySelector('[data-open-workspace]').dataset.openWorkspace));
-                const bi=workspaceData.find(x=>String(x.workspace.id)===String(b.querySelector('[data-open-workspace]').dataset.openWorkspace));
-                if(sort==='jobs')return (bi?.jobs.length||0)-(ai?.jobs.length||0);
-                if(sort==='photos')return photoCount(bi||{media:[]})-photoCount(ai||{media:[]});
-                return String(ai?.workspace.name||'').localeCompare(String(bi?.workspace.name||''));
-            }).forEach(row=>list.appendChild(row));
+
         };
 
         const search=genericView.querySelector('[data-workspace-search]');
@@ -777,8 +771,6 @@
             refresh();
         };
         if(search)search.oninput=e=>updateTerm(e.target.value);
-        const sortControl=genericView.querySelector('[data-workspace-sort]');
-        if(sortControl)sortControl.onchange=e=>{sort=e.target.value;refresh();};
 
         genericView.querySelectorAll('[data-open-workspace]').forEach(button=>{
             button.onclick=async()=>{

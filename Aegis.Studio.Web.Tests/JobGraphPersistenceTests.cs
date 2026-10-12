@@ -10,6 +10,31 @@ namespace Aegis.Studio.Web.Tests;
 
 public class JobGraphPersistenceTests
 {
+    [StudioPostgresFact] public void DemoGraphSeedCreatesBranchScenariosAndRetriesWithoutDuplicatingWork()
+    {
+        using var ctx=new IntegratedWorkflowTests.WorkflowContext();
+        int[] numbers=[101,201,203,301,303,401,501,502,601,602];
+        Guid DemoJob(int number)=>Guid.Parse($"de000000-0000-4000-0041-{number:000000000000}");
+        foreach(var number in numbers)
+            Sql(ctx.Connection,"insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,created_at_utc) select $1,workspace_id,conversation_id,$2,client_name,'In Production',now() from studio_jobs where id=$3",DemoJob(number),"Demo "+number,ctx.Job);
+        var seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoJobWorkflowGraphs")!
+            .GetMethod("Seed",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic)!;
+        void Seed(){using var tx=ctx.Connection.BeginTransaction();seed.Invoke(null,[ctx.Connection,tx,"Admin"]);tx.Commit();}
+        Seed();
+        Assert.Equal(8,Scalar(ctx.Connection,"select count(*)::int from studio_commercial_templates where kind='Job'"));
+        Assert.Equal(10,Scalar(ctx.Connection,"select count(*)::int from studio_job_template_instances"));
+        var store=new JobGraphStore(ctx.Database);
+        Assert.Equal("Inactive",store.Get(DemoJob(203))!.Tasks.Single(t=>t.NodeId=="print").Eligibility);
+        Assert.Equal("Inactive",store.Get(DemoJob(301))!.Tasks.Single(t=>t.NodeId=="retouch").Eligibility);
+        Assert.Equal("InProgress",store.Get(DemoJob(501))!.Tasks.Single(t=>t.NodeId=="retouch").Eligibility);
+        Assert.Equal("Blocked",store.Get(DemoJob(502))!.Tasks.Single(t=>t.NodeId=="digital").Eligibility);
+        Assert.True(store.Get(DemoJob(601))!.Evaluation.Completed);
+        Assert.Contains(store.Get(DemoJob(602))!.History,h=>h.GetType().GetProperty("title")?.GetValue(h) as string=="Completed consultation from previous template");
+        var tasks=Scalar(ctx.Connection,"select count(*)::int from studio_job_activities");
+        Seed();
+        Assert.Equal(tasks,Scalar(ctx.Connection,"select count(*)::int from studio_job_activities"));
+        Assert.Equal(8,Scalar(ctx.Connection,"select count(*)::int from studio_commercial_templates where kind='Job'"));
+    }
     private static CommercialTemplate Linear(string name="Linear") => JobGraphStore.Normalize(new(name,"",[],Workflow:WorkflowGraphExamples.Linear()));
     private static object? Scalar(NpgsqlConnection c,string sql,params object[] values){using var q=new NpgsqlCommand(sql,c);foreach(var v in values)q.Parameters.AddWithValue(v);return q.ExecuteScalar();}
     private static void Sql(NpgsqlConnection c,string sql,params object[] values){using var q=new NpgsqlCommand(sql,c);foreach(var v in values)q.Parameters.AddWithValue(v);q.ExecuteNonQuery();}
@@ -106,3 +131,4 @@ public class JobGraphPersistenceTests
         Assert.Equal(completed,Scalar(ctx.Connection,"select completed_at_utc from studio_job_activities where job_id=$1 and workflow_node_id='delivery'",ctx.Job));
     }
 }
+
