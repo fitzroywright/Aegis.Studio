@@ -60,7 +60,7 @@
         }
         if (profile) {
             profile.innerHTML = optionsHtml();
-            profile.addEventListener('change', () => applyTheme(profile.value));
+            profile.addEventListener('change', () => persistTheme(profile.value));
         }
     }
 
@@ -84,12 +84,6 @@
         wireSelectors();
         await loadProfileTheme();
 
-        const profileForm = document.getElementById('profileForm');
-        if (profileForm) {
-            profileForm.addEventListener('submit', () => {
-                const profile = document.getElementById('prefTheme');
-                if (profile) persistTheme(profile.value);
-            });
-        }
+        // Theme selection persists immediately; the profile form saves other preferences.
     });
 })();
