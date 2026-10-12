@@ -2,7 +2,7 @@
 const fs=require('fs');
 const path=require('path');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-const scripts=['studio-message-card.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
+const scripts=['studio-status-order.js','subject-picker.js','studio-message-card.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
 function setup(w){
  const jobs=[{id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Wedding selects review',clientName:'Williams & Clarke',status:'Awaiting Production Review',eventDate:'2026-10-11'},{id:'job2',workspaceId:'workspace',conversationId:'conversation2',title:'Graduation portraits',clientName:'School',status:'Awaiting Scheduling'}];
  const calls=[],alerts=[];
@@ -46,10 +46,9 @@ function environment(t){
  w.HTMLElement.prototype.scrollIntoView=function(){};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
  w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
+ w.ResizeObserver=class {observe(){} disconnect(){}};w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
  const fixture=setup(w);
  for(const script of scripts)w.eval(fs.readFileSync(path.join(root,script),'utf8'));
  return {w,fixture,dom};
 }
 module.exports={environment,setup,scripts,root};
-
-

@@ -1,0 +1,28 @@
+/* Sole owner of searchable subject selectors. */
+.ssp-control{display:inline-flex;flex-direction:column;min-width:0;width:100%;max-width:300px;vertical-align:middle;font-size:11px}
+.ssp-control.ssp-inline{width:160px;max-width:160px;flex:0 1 160px}
+.ssp-control>select[hidden],.ssp-panel[hidden],.ssp-more[hidden]{display:none}
+.ssp-toggle{width:100%;min-width:0;padding:6px 9px;border:1px solid #66829e;border-radius:7px;background:#fff;color:#203f63;font:inherit;font-weight:700;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.ssp-toggle:disabled{opacity:.65;cursor:default}
+.ssp-toggle:focus-visible,.ssp-token button:focus-visible,.ssp-panel input:focus-visible{outline:2px solid #ba7819;outline-offset:1px}
+.ssp-tokens{display:flex;flex-wrap:wrap;gap:3px;max-height:72px;overflow:auto}
+.ssp-tokens:empty{display:none}
+.ssp-token{display:inline-flex;align-items:center;gap:3px;max-width:100%;padding:2px 5px;margin-bottom:3px;border:1px solid #94b3cc;border-radius:9px;background:#e7f0f8;color:#203f63;overflow-wrap:anywhere}
+.ssp-token button{border:0;background:transparent;color:#203f63;padding:0 2px;font:inherit;cursor:pointer}
+.ssp-panel{position:fixed;z-index:10000;display:flex;flex-direction:column;gap:5px;box-sizing:border-box;padding:8px;border:2px solid #45698f;border-radius:8px;background:#fff;color:#203f63;box-shadow:0 5px 20px #152e4840;font-size:12px}
+.ssp-panel input{box-sizing:border-box;flex:none;width:100%;min-width:0;padding:7px;border:1px solid #94b3cc;border-radius:7px;background:#f7fbff;color:#203f63;font:inherit}
+.ssp-results{display:flex;flex-direction:column;overflow:auto;min-height:0;overscroll-behavior:contain}
+.ssp-results button{display:flex;flex-direction:column;flex:none;gap:2px;padding:7px;border:0;border-bottom:1px solid #dfebf4;border-radius:0;background:#fff;color:#203f63;text-align:left;font:inherit;cursor:pointer;overflow-wrap:anywhere}
+.ssp-results button[aria-selected=true]{background:#e1effa;font-weight:700}
+.ssp-results button.ssp-active,.ssp-results button:hover{background:#203f63;color:#fff}
+.ssp-results small{font-size:10px;color:inherit}
+.ssp-panel>small{font-size:10px}
+.ssp-more{border:0;border-radius:4px;background:#e1effa;color:#203f63;padding:5px;font:inherit;font-weight:700;cursor:pointer}
+@media(prefers-reduced-motion:no-preference){.ssp-panel{animation:ssp-open .15s ease-out}@keyframes ssp-open{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}}
+
+.ssp-status{flex:none;width:100%;padding:5px;border:1px solid #94b3cc;border-radius:5px;background:#203f63;color:#fff;font:inherit}
+.ssp-closed{display:flex;align-items:center;gap:5px;flex:none;font-size:11px}
+.ssp-closed input{width:auto;margin:0}
+
+.ssp-job-visibility{display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
+.ssp-job-visibility input{width:auto;margin:0}
