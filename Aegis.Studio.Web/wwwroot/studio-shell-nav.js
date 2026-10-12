@@ -226,12 +226,12 @@
             masthead.insertBefore(breadcrumb, bell);
         }
         if (title) {
-            const jobOpen=view==='workspaces' && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
+            const jobOpen=view==='workspaces' && !document.getElementById('conversationView')?.classList.contains('hidden') && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
             title.querySelector('strong')?.replaceChildren(document.createTextNode(jobOpen?'Job Details':labelFor(view)));
             title.setAttribute('aria-label',jobOpen?'Job Details':labelFor(view));
             const icon=title.querySelector('.mw-today-focus-icon');if(icon)icon.innerHTML=view==='jobs'?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16v14H4zM8 6V3h8v3M4 11h16M10 11v3h4v-3"/></svg>':jobOpen?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="13" r="4"/></svg>':'✦';
             const tagline = title.querySelector('small');
-            if (tagline) tagline.textContent = jobOpen?'Media, workflow and conversations':view==='jobs'?'Find, filter and manage jobs across Studio workspaces':view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : 'Studio workspace';
+            if (tagline) tagline.textContent = jobOpen?'Media, workflow and conversations':view==='jobs'?'Find, filter and manage jobs across Studio workspaces':view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : view === 'workspaces' ? 'Manage workspace jobs, messaging, media and activity.' : 'Studio workspace';
         }
         main.classList.add('studio-standard-main');
     }
