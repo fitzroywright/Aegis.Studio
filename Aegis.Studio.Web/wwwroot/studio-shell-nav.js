@@ -110,7 +110,6 @@
                     <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
                     <button type="button" data-studio-side="messages"><span>✉</span><span>Messages</span></button>
-                    <button type="button" data-studio-side="studio-management"><span>⚙</span><span>Studio Management</span></button>
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
