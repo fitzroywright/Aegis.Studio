@@ -66,13 +66,17 @@
    const active=steps.includes(data.stage);
    return {title,done,active,skipped:!applicable.length,stage:active?data.stage:steps.at(-1)};
   });
-  const exceptions=[
-   {title:'Changes / Reshoot',labels:['Changes Requested','Reshoot Required'],active:data.stage==='Changes Requested'||data.stage==='Reshoot Required'||reshoot},
-   {title:'Cancelled / Blocked',labels:['Cancelled','Blocked'],active:data.stage==='Cancelled'||data.stage==='Blocked'||!!data.blockedReason}
+  // Only exceptional stages are nodes on branch lanes. Return targets are
+  // annotations, not duplicate main-flow nodes; terminal states never rejoin.
+  const branches=[
+   {label:'Changes Requested',from:'Production',to:data.correctionKind==='Source'?'Upload':'Production',active:data.stage==='Changes Requested'},
+   {label:'Reshoot Required',from:'Shoot',to:'Shoot',active:data.stage==='Reshoot Required'||reshoot}
   ];
-  host.innerHTML=`<div class="jd-flow-compact" role="group" aria-label="Workflow milestones and exception routes">
+  const terminal=['Cancelled','Blocked'].includes(data.stage)?data.stage:data.blockedReason?'Blocked':null;
+  host.innerHTML=`<div class="jd-flow-compact" role="group" aria-label="Workflow milestones and rejoining exception routes">
    <div class="jd-flow-mainline">${groupState.map((g,i)=>`<button type="button" class="jd-compact-stage ${g.done?'complete':g.active?'current':g.skipped?'skipped':''}" data-flow-stage="${escape(g.stage)}" title="${escape(g.title)}: ${g.done?'Complete':g.active?'Current':g.skipped?'Not required':'Pending'}"><span class="jd-compact-dot" aria-hidden="true">${g.done?'✓':i+1}</span><span>${escape(g.title)}</span></button>`).join('')}</div>
-   ${exceptions.map((line,i)=>`<div class="jd-flow-exception-lane ${line.active?'is-active':''}"><span class="jd-flow-lane-label">${i===0?'↪':'⊘'} ${escape(line.title)}</span><span class="jd-flow-lane-rule" aria-hidden="true"></span>${line.labels.map(label=>`<button type="button" class="jd-compact-exception ${label===data.stage?'current':''}" data-flow-stage="${escape(label)}" title="View ${escape(label)} details">${escape(label)}</button>`).join('')}</div>`).join('')}
+   ${branches.map(line=>`<div class="jd-flow-exception-lane ${line.active?'is-active':''}"><span class="jd-flow-lane-origin">${escape(line.from)}</span><span class="jd-flow-lane-rule" aria-hidden="true"></span><button type="button" class="jd-compact-exception ${line.active?'current':''}" data-flow-stage="${escape(line.label)}" title="View ${escape(line.label)} details">${escape(line.label)}</button><span class="jd-flow-lane-rule" aria-hidden="true"></span><span class="jd-flow-lane-return" title="Returns to main workflow">↗ ${escape(line.to)}</span></div>`).join('')}
+   ${terminal?`<div class="jd-flow-terminal" role="status">⛔ ${escape(terminal)} · workflow stopped (does not rejoin)</div>`:''}
   </div>`;
   host.setAttribute('aria-label','Job workflow: '+data.stage+(data.blockedReason?' · Blocked: '+data.blockedReason:''));
   if(summaryHost){
