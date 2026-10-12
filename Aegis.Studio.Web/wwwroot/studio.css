@@ -11019,10 +11019,8 @@ body[data-studio-view="media"] .studio-media-page {
 
 .management-workload-head { background:var(--studio-grid-header-bg); color:var(--studio-grid-header-text); }
 
-/* Studio photographer identity: compact brand and adjacent page heading. */
+/* Single artwork for the Studio identity, with the page title directly beside it. */
 body .topbar { padding-left: 0 !important; column-gap: 0 !important; }
 body .topbar .studio-script-brand { padding: 0 !important; margin: 0 !important; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
-body .topbar .studio-script-brand .studio-bryans-brand-image { width: 78px; height: 54px; object-fit: contain; }
-body .topbar .studio-script-brand .studio-bryans-brand-text { display: block; color: #fff; font-family: "Snell Roundhand", "Apple Chancery", "URW Chancery L", "Segoe Script", cursive; font-style: italic; font-weight: 300; font-size: 45px; line-height: 1; letter-spacing: -.055em; -webkit-text-stroke: 0; text-transform: none; }
+body .topbar .studio-script-brand .studio-bryans-brand-image { display: block; width: 216px; height: 56px; object-fit: contain; }
 body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left: 0 !important; border-left: 0 !important; }
-body .topbar .studio-shell-page-tools { margin-left: 0; }
