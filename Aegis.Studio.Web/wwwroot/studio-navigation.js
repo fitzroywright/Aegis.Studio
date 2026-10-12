@@ -499,6 +499,7 @@
         });
         genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
         genericView.addEventListener('studio-assign-job-lead',async()=>{
+            if(!(state.auth?.user||state.auth)?.isAdministrator)return;
             const activeJobs=jobs.filter(job=>!['Completed','Closed','Cancelled','Published'].includes(String(job.status||'')))
                 .sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));
             if(!activeJobs.length){alert('There are no active jobs available to assign.');return;}
