@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const {environment}=require('./job-detail-fixture.cjs');
 const settle=()=>new Promise(r=>setTimeout(r,20));
 const button=(w,name)=>w.document.querySelector('[data-job-scroll="'+name+'"]');
-const subjectDetails=w=>{const select=w.document.querySelector('[data-job-subject]');select.value='__details';return select.onchange();};
+const subjectDetails=async w=>{let select=w.document.querySelector('[data-job-subject]');if(!select){await settle();select=w.document.querySelector('[data-job-subject]');}select.value='__details';return select.onchange();};
 test('Today job opens with working reply and Subjects controls in their final containers',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(fixture.alerts.length,0);assert.ok(w.document.querySelector('.job-detail-page'));
@@ -42,7 +42,7 @@ test('viewer can inspect Subjects without an Add Subject action',async t=>{
  assert.equal(w.document.querySelector('[data-job-add-subject]').hidden,true);assert.equal(w.document.querySelector('#addJobSubject'),null);
 });
 test('stale Subjects response cannot overwrite a subsequently opened job',async t=>{
- const {w,fixture}=environment(t);await w.openWorkspaceJob('job');let release;fixture.delaySubjects=new Promise(r=>release=r);
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();let release;fixture.delaySubjects=new Promise(r=>release=r);
  const pending=subjectDetails(w);await w.openWorkspaceJob('job2');release();await pending;await settle();
  assert.match(w.document.querySelector('.job-detail-title h1').textContent,/Graduation portraits/);
  assert.equal(w.document.querySelector('#jobDetail-subjects').hidden,true);assert.equal(w.document.querySelector('#jobDetail-subjects .person-card'),null);
@@ -58,6 +58,7 @@ test('subject View Photos returns to Media and refreshes the subject filter',asy
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(button(w,'subjects'),null);
  const select=w.document.querySelector('[data-job-subject]');select.value='person';await select.onchange();
+ assert.equal(w.document.querySelector('[data-collection]').nextElementSibling.matches('[data-job-subject]'),true);
  assert.equal(select.value,'person');assert.ok(fixture.calls.some(c=>c.url.includes('/media?')&&c.url.includes('subjectId=person')));
  select.value='';await select.onchange();assert.equal(select.value,'');
  assert.equal(new URL(fixture.calls.filter(c=>c.url.includes('/media?')).at(-1).url,'https://studio.test').searchParams.has('subjectId'),false);
