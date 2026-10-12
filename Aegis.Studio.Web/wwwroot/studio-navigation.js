@@ -350,12 +350,12 @@
                     </main>
                     <aside class="mw-today-right studio-dashboard-template__aside" aria-label="Daily activity">
                         <section class="mw-list-panel" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button data-nav="schedule">Calendar →</button></header><div class="mw-section-rows">${phase('schedule',sessionRows)}</div></section>
-                        ${StudioMessageCard.html({id:'todayMessageCard',open:StudioMessageCard.isOpen(state.root?.querySelector('#todayMessageCard')),body:phase('notifications',messageRows),actions:'<button type="button" data-nav="messages">View All →</button>',footer:'<button type="button" data-nav="messages">✉ Send Message →</button>',attributes:'data-mw-region="messages"'})}
                         <section class="mw-list-panel" data-mw-region="attention"><header><h2><span class="studio-card-icon" aria-hidden="true">⚑</span> Needs Attention</h2><button data-nav="tasks">View All →</button></header><div class="mw-status-list">
                             <button class="mw-status-row warning" data-nav="tasks"><span class="studio-attention-label"><span aria-hidden="true">◷</span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
                             <button class="mw-status-row warning" data-nav="schedule"><span class="studio-attention-label"><span aria-hidden="true">▦</span>Needs scheduling</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
                             <button class="mw-status-row warning" data-nav="production"><span class="studio-attention-label"><span aria-hidden="true">⇧</span>Awaiting upload</span><strong>${metric('jobs',uploadJobs)}</strong></button>
                         </div></section>
+                        ${StudioMessageCard.html({id:'todayMessageCard',body:phase('notifications',messageRows),actions:'<button type="button" data-nav="messages">View All →</button>',footer:'<button type="button" data-nav="messages">✉ Send Message →</button>',attributes:'data-mw-region="messages"'})}
                     </aside>
                 </div>
             </section>`;
@@ -368,6 +368,7 @@
         }
         else next.querySelectorAll('[data-mw-region]').forEach(region=>{
             const existing=genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]');
+            if(region.dataset.mwRegion==='messages'){existing.querySelector('.smc-feed').innerHTML=region.querySelector('.smc-feed').innerHTML;return;}
             if(existing.innerHTML===region.innerHTML)return;
             const scroll=[...existing.querySelectorAll('div')].map(el=>el.scrollTop);
             const focused=document.activeElement?.dataset?.mwFilter;
@@ -729,7 +730,6 @@
                             </div>
                         </section>
 
-                        ${StudioMessageCard.html({id:'workspaceMessageCard',title:'Announcements',body:announcements.map(a=>`<article class="smc-row"><span aria-hidden="true">📣</span><span class="smc-copy"><strong>${esc(a.title)}</strong><small>${esc(a.body)}</small><small>${esc(a.workspaceName)} · ${esc(a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):'')}</small></span></article>`).join('')||'<p>No workspace announcements.</p>',footer:'<button type="button" data-nav-quick="messages">✉ Send Message →</button>'})}
 
                         <section class="mw-list-panel workspace-help-panel">
                             <header><h2><span class="mw-title-icon links">↗</span> Navigation</h2></header>
@@ -738,6 +738,7 @@
                                 <button type="button" data-nav-quick="pipeline"><span>▥</span><span>View Pipeline</span><b>›</b></button>
                             </div>
                         </section>
+                        ${StudioMessageCard.html({id:'workspaceMessageCard',title:'Announcements',body:announcements.map(a=>`<article class="smc-row"><span aria-hidden="true">📣</span><span class="smc-copy"><strong>${esc(a.title)}</strong><small>${esc(a.body)}</small><small>${esc(a.workspaceName)} · ${esc(a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):'')}</small></span></article>`).join('')||'<p>No workspace announcements.</p>',footer:'<button type="button" data-nav-quick="messages">✉ Send Message →</button>'})}
                     </aside>
                 </div>
             </section>`;
@@ -1060,5 +1061,6 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 
 

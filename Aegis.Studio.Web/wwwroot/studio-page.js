@@ -12,7 +12,7 @@
         return () => version === revision && matches();
     }
     function html({title, tools = '', content = '', summary = '', attention = '', className = '', scroll = false, showMessagesCard = true}) {
-        return `<section class="st-page ${className}" aria-label="${escape(title)}"><section class="st-board"><header class="st-toolbar"><h1>${escape(title)}</h1><div class="st-tools">${tools}</div></header><div class="st-content${scroll ? ' st-card-scroll' : ''}">${content}</div></section><aside class="st-right" aria-label="Page information">${card('Overview',summary || '<p>No summary available.</p>')}${showMessagesCard ? StudioMessageCard.html({id:'pageMessageCard',body:'<div data-page-messages role="status">Loading messages…</div>',footer:'<button type="button" data-page-send>✉ Send Message →</button>'}) : ''}${card('Needs Attention',attention || '<p>No attention items reported.</p>','st-attention')}</aside></section>`;
+        return `<section class="st-page ${className}" aria-label="${escape(title)}"><section class="st-board"><header class="st-toolbar"><h1>${escape(title)}</h1><div class="st-tools">${tools}</div></header><div class="st-content${scroll ? ' st-card-scroll' : ''}">${content}</div></section><aside class="st-right" aria-label="Page information">${card('Overview',summary || '<p>No summary available.</p>')}${card('Needs Attention',attention || '<p>No attention items reported.</p>','st-attention')}${showMessagesCard ? StudioMessageCard.html({id:'pageMessageCard',body:'<div data-page-messages role="status">Loading messages…</div>',footer:'<button type="button" data-page-send>✉ Send Message →</button>'}) : ''}</aside></section>`;
     }
     function metrics(items) {
         return items.map(([label, value]) => `<div class="st-stat"><span>${escape(label)}</span><strong>${escape(value)}</strong></div>`).join('');
@@ -57,3 +57,4 @@
     }
     window.StudioPage = {html, card, metrics, bind, begin, setCount, escape, invalidate(){++revision;}};
 })();
+

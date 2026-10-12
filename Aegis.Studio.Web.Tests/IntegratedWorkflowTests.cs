@@ -45,6 +45,17 @@ public sealed class IntegratedWorkflowTests
         Assert.Throws<ArgumentException>(()=>store.AddNote(context.Job,new(Guid.NewGuid()," "),"studio.manager"));
         Assert.Throws<ArgumentException>(()=>store.AddNote(context.Job,new(Guid.Empty,"Note"),"studio.manager"));
         Assert.Throws<ArgumentException>(()=>store.AddNote(context.Job,new(Guid.NewGuid(),new string('x',10001)),"studio.manager"));
+        Assert.Throws<UnauthorizedAccessException>(()=>store.UpdateNote(context.Job,id,new(1,"Not my note"),"another.user",false));
+        Assert.True(store.UpdateNote(context.Job,id,new(1,"Updated print sizes."),"studio.manager",false));
+        Assert.True(store.UpdateNote(context.Job,id,new(1,"Updated print sizes."),"studio.manager",false));
+        var edited=Assert.Single(store.Notes(context.Job));
+        Assert.Equal(2,edited.Revision);Assert.Equal("Updated print sizes.",edited.Body);
+        Assert.Equal(note.CreatedBy,edited.CreatedBy);Assert.Equal(note.CreatedAtUtc,edited.CreatedAtUtc);
+        Assert.Equal("studio.manager",edited.UpdatedBy);
+        Assert.Throws<InvalidOperationException>(()=>store.UpdateNote(context.Job,id,new(1,"Stale update"),"studio.manager",true));
+        Assert.False(store.UpdateNote(otherJob,id,new(2,"Wrong job"),"studio.manager",true));
+        using var history=new NpgsqlCommand("select body from studio_job_note_revisions where note_id=$1 and revision=1",context.Connection);
+        history.Parameters.AddWithValue(id);Assert.Equal(note.Body,history.ExecuteScalar());
     }
     [Fact] public void PhotoCatalogueCannotFabricateScaleByRepeatingSources()
     {

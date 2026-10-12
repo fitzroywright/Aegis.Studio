@@ -21,9 +21,10 @@ function setup(w){
   if(base.endsWith('/subjects')){if(fixture.delaySubjects)await fixture.delaySubjects;if(fixture.failSubjects)throw new Error('Subjects unavailable');return subjects;}
   if(base.endsWith('/media')){const q=new URL(url,'https://studio.test').searchParams;const filtered=assets.filter(a=>(!q.get('subjectId')||a.subjects.includes(q.get('subjectId')))&&(!q.get('collection')||a.collection===q.get('collection'))).sort((a,b)=>a.id.localeCompare(b.id));const matching=filtered.filter(a=>!q.get('after')||a.id>q.get('after'));const limit=Number(q.get('limit')||100);return {assets:matching.slice(0,limit),subjects,unmatched:[],collections:['Selections'],collectionCounts:{Selections:40},gallery:{default_lens:'Auto'},totalAssets:filtered.length,totalSubjects:1,hasMore:matching.length>limit};}
   if(base.endsWith('/access'))return {permissions:{editJob:fixture.canEdit,manageProduction:fixture.canEdit}};
+  if(/\/notes\/[^/]+$/.test(base)&&options?.method==='PUT'){const jobId=base.split('/')[3],id=base.split('/')[5],request=JSON.parse(options.body),note=(fixture.jobNotes[jobId]||[]).find(n=>n.id===id);if(!note)throw Error('Not found');if(note.revision!==request.expectedRevision)throw Error('This note has changed. Reload it before saving your edit.');Object.assign(note,{body:request.body,revision:note.revision+1,updatedBy:'studio.admin',updatedAtUtc:'2026-10-12T04:00:00Z'});return null;}
   if(base.endsWith('/notes')){
    const jobId=base.split('/')[3];fixture.jobNotes[jobId]??=[];
-   if(options?.method==='POST'){const note=JSON.parse(options.body);if(!fixture.jobNotes[jobId].some(n=>n.id===note.id))fixture.jobNotes[jobId].push({...note,createdBy:'studio.admin',createdAtUtc:'2026-10-12T03:00:00Z'});return {id:note.id};}
+   if(options?.method==='POST'){const note=JSON.parse(options.body);if(!fixture.jobNotes[jobId].some(n=>n.id===note.id))fixture.jobNotes[jobId].push({...note,createdBy:'studio.admin',createdAtUtc:'2026-10-12T03:00:00Z',revision:1});return {id:note.id};}
    return fixture.jobNotes[jobId];
   }
   if(url.includes('/threads/Job/'))return {id:'thread'};

@@ -127,8 +127,6 @@ function mergeJobMessages(teamMessages, customerMessages) {
             studioRememberPeople(people);
         }
         if (version !== revision || (job && !currentJobOpening(version))) return;
-        const previousMessageCard=detailPane.querySelector('#jobDetailMessages');
-        const messagesOpen=previousMessageCard?.dataset.messageJobId===job?.id&&StudioMessageCard.isOpen(previousMessageCard);
         const combined = mergeJobMessages(messages, conversation?.messages || []);
         disposeJobView();disposeJobView=()=>{};
         detailPane.classList.remove('empty');
@@ -198,14 +196,14 @@ function mergeJobMessages(teamMessages, customerMessages) {
             selectedFile.innerHTML='<header class="jd-card-heading"><h2>Selected File</h2></header><div class="job-detail-selected-content"><p class="muted">Select a photo in the gallery to inspect it.</p></div>';
             const selectedContent=selectedFile.querySelector('.job-detail-selected-content');
             const messagesPanel=document.getElementById('combinedJobMessages'),composer=document.getElementById('hierarchyCompose');
-            const messageCard=StudioMessageCard.create({id:'jobDetailMessages',title:'Messages',open:!!messagesOpen,attributes:'data-message-job-id="'+esc(job.id)+'"',actions:'<button type="button" data-message-search aria-label="Search messages">⌕</button><button type="button" data-message-more aria-label="Show all messages">⋮</button>'});
+            const messageCard=StudioMessageCard.create({id:'jobDetailMessages',title:'Messages',attributes:'data-message-job-id="'+esc(job.id)+'"',actions:'<button type="button" data-message-search aria-label="Search messages">⌕</button><button type="button" data-message-more aria-label="Show all messages">⋮</button>'});
             const messageHeader=messageCard.querySelector('.smc-header');
             messageCard.querySelector('.smc-feed').append(messagesPanel);
             messageCard.querySelector('.smc-content').append(composer);
             StudioMessageCard.bind(messageCard);
             const attention=document.createElement('section');attention.className='jd-panel jd-attention';
             attention.innerHTML='<header class="jd-card-heading"><h2>⚠ Needs Attention</h2></header><div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
-            right.append(selectedFile,messageCard,attention);board.append(center,right);detailPane.append(board);
+            right.append(selectedFile,attention,messageCard);board.append(center,right);detailPane.append(board);
             const footerTools=document.getElementById('studioFooterJobTools');
             const makeDrawer=(key,title,label)=>{
                 const toggle=document.createElement('button');toggle.type='button';toggle.className='jd-footer-link';toggle.dataset['job'+key]='';toggle.textContent=label;toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','job'+key+'Drawer');
@@ -213,8 +211,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 drawer.innerHTML=`<header class="jd-card-heading"><h2 id="job${key}Title">${title}</h2><button type="button" class="jd-link" data-close-drawer aria-label="Close ${title}">×</button></header><div class="jd-footer-drawer-content"></div>`;
                 detailPane.append(drawer);footerTools.append(toggle);return {toggle,drawer,host:drawer.querySelector('.jd-footer-drawer-content')};
             };
-            const activityView=makeDrawer('Activity','Recent Activity','◷ Activity'),notesView=makeDrawer('Notes','Job Notes','✎ Notes');
-            const drawerViews=[activityView,notesView];
+            const activityView=makeDrawer('Activity','Recent Activity','◷ Activity');
+            const drawerViews=[activityView];
             const {toggle:activityToggle,drawer:activityDrawer}=activityView;
             contents.activity=activityView.host;
 
@@ -257,33 +255,6 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 dialog.addEventListener('close',()=>{if(taskDialog===dialog){taskDialog=null;loaded.delete('tasks');pending.delete('tasks');if(current()){if(trigger?.isConnected&&trigger!==document.body)trigger.focus();else contents.media.querySelector('[data-job-tasks]')?.focus();}}}, {once:true});
                 await loadPanel('tasks',true);
             };
-            let notesLoaded=false,notesLoading=false;
-            const loadNotes=async()=>{
-                if(notesLoaded||notesLoading)return;
-                notesLoading=true;
-                const host=notesView.host;host.innerHTML='<p role="status">Loading notes…</p>';
-                try{
-                    const [notes,access]=await Promise.all([json(`/api/jobs/${job.id}/notes`),json(`/api/jobs/${job.id}/access`)]);if(!current())return;
-                    const permissions=access.permissions||access,canAdd=!!(permissions.editJob||permissions.manageProduction);
-                    host.innerHTML='<div class="jd-note-list"></div>'+(canAdd?'<form class="jd-note-form"><label>New note<textarea name="body" maxlength="10000" required placeholder="Add a note to this job…"></textarea></label><button type="submit" class="jd-save">Save note</button><p role="status" aria-live="polite"></p></form>':'');
-                    const drawNotes=items=>{host.querySelector('.jd-note-list').innerHTML=items.map(note=>`<article class="jd-note"><header><strong>${esc(studioFirstName(note.createdBy))}</strong><time datetime="${esc(note.createdAtUtc)}">${esc(new Date(note.createdAtUtc).toLocaleString())}</time></header><p>${esc(note.body)}</p></article>`).join('')||'<p class="muted">No notes yet.</p>';};
-                    drawNotes(notes);notesLoaded=true;
-                    const form=host.querySelector('form');if(!form)return;
-                    let pendingNote=null;
-                    form.onsubmit=async event=>{
-                        event.preventDefault();const body=form.elements.body.value.trim();if(!body)return;
-                        const button=form.querySelector('button'),output=form.querySelector('[role=status]');button.disabled=true;form.elements.body.readOnly=true;output.textContent='Saving…';
-                        try{
-                            pendingNote??={id:crypto.randomUUID(),body};
-                            await json(`/api/jobs/${job.id}/notes`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pendingNote)});
-                            pendingNote=null;form.elements.body.value='';output.textContent='Note saved.';
-                            const items=await json(`/api/jobs/${job.id}/notes`);if(current())drawNotes(items);
-                        }catch(error){if(current())output.textContent=error.message||String(error);}
-                        finally{if(current()){button.disabled=false;form.elements.body.readOnly=!!pendingNote;}}
-                    };
-                }catch(error){if(current()){host.innerHTML='<p role="alert"></p><button type="button" class="jd-save">Retry</button>';host.querySelector('p').textContent=error.message||String(error);host.querySelector('button').onclick=loadNotes;}}
-                finally{notesLoading=false;}
-            };
             const closeDrawer=(view,restoreFocus=false)=>{view.drawer.classList.remove('is-open');view.drawer.setAttribute('aria-hidden','true');view.drawer.setAttribute('inert','');view.toggle.setAttribute('aria-expanded','false');if(restoreFocus)view.toggle.focus();};
             const openDrawer=async(view,load)=>{
                 drawerViews.filter(other=>other!==view).forEach(other=>closeDrawer(other));
@@ -291,7 +262,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 view.drawer.classList.add('is-open');view.drawer.setAttribute('aria-hidden','false');view.drawer.removeAttribute('inert');view.toggle.setAttribute('aria-expanded','true');view.drawer.querySelector('[data-close-drawer]').focus();await load();
             };
             for(const view of drawerViews){
-                const load=view===activityView?()=>loadPanel('activity',true):loadNotes;
+                const load=()=>loadPanel('activity',true);
                 view.toggle.onclick=()=>view.toggle.getAttribute('aria-expanded')==='true'?closeDrawer(view,true):openDrawer(view,load);
                 view.drawer.querySelector('[data-close-drawer]').onclick=()=>closeDrawer(view,true);
                 view.drawer.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeDrawer(view,true);}});
@@ -302,7 +273,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 if(name==='tasks')return openTasks();
                 if(name==='activity')return openDrawer(activityView,()=>loadPanel('activity',true));
                 if(name==='messages'){
-                    StudioMessageCard.setOpen(messageCard,true);composer.querySelector('textarea').focus();return;
+                    StudioMessageCard.setMode(messageCard,'messages');composer.querySelector('textarea').focus();return;
                 }
                 for(const [key,panel] of Object.entries(panels))panel.hidden=key!==name;
                 await loadPanel(name);
@@ -328,8 +299,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
             };
             window.addEventListener('studio-job-action',handleAction);
             attention.querySelector('[data-view-workflow]').onclick=()=>header.querySelector('[data-job-workflow]').click();
-            messageHeader.querySelector('[data-message-search]').onclick=()=>{StudioMessageCard.setOpen(messageCard,true);const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
-            messageHeader.querySelector('[data-message-more]').onclick=()=>{StudioMessageCard.setOpen(messageCard,true);messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
+            messageHeader.querySelector('[data-message-search]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
+            messageHeader.querySelector('[data-message-more]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
 
             let workflow=null;
             const updateAge=()=>{

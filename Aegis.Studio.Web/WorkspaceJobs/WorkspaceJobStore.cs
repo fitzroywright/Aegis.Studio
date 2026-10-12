@@ -16,6 +16,10 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
             "create index if not exists ix_workspace_announcements on studio_workspace_announcements(workspace_id, created_at_utc desc)",
             "create table if not exists studio_job_notes(id uuid primary key, job_id uuid not null references studio_jobs(id) on delete cascade, body text not null, created_by text not null, created_at_utc timestamptz not null default now())",
             "create index if not exists ix_job_notes on studio_job_notes(job_id, created_at_utc desc)",
+            "alter table studio_job_notes add column if not exists revision bigint not null default 1",
+            "alter table studio_job_notes add column if not exists updated_by text null",
+            "alter table studio_job_notes add column if not exists updated_at_utc timestamptz null",
+            "create table if not exists studio_job_note_revisions(note_id uuid not null references studio_job_notes(id) on delete cascade, revision bigint not null, body text not null, edited_by text not null, edited_at_utc timestamptz not null, primary key(note_id,revision))",
             "create table if not exists studio_job_subjects(id uuid primary key, job_id uuid not null references studio_jobs(id) on delete cascade, name text not null, reference text not null default '', notes text not null default '', updated_by text not null, updated_at_utc timestamptz not null default now())",
             "alter table studio_job_subjects add column if not exists collection_name text not null default 'General'",
             "alter table studio_job_subjects add column if not exists scheduled_at_utc timestamptz null",
@@ -86,11 +90,11 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
     public IReadOnlyList<JobNote> Notes(Guid jobId)
     {
         using var connection = database.OpenConnection();
-        using var command = new NpgsqlCommand("select id,body,created_by,created_at_utc from studio_job_notes where job_id=$1 order by created_at_utc desc,id", connection);
+        using var command = new NpgsqlCommand("select id,body,created_by,created_at_utc,revision,updated_by,updated_at_utc from studio_job_notes where job_id=$1 order by created_at_utc desc,id", connection);
         command.Parameters.AddWithValue(jobId);
         using var reader = command.ExecuteReader();
         List<JobNote> result = [];
-        while (reader.Read()) result.Add(new(reader.GetGuid(0),reader.GetString(1),reader.GetString(2),reader.GetFieldValue<DateTimeOffset>(3)));
+        while (reader.Read()) result.Add(new(reader.GetGuid(0),reader.GetString(1),reader.GetString(2),reader.GetFieldValue<DateTimeOffset>(3),reader.GetInt64(4),reader.IsDBNull(5)?null:reader.GetString(5),reader.IsDBNull(6)?null:reader.GetFieldValue<DateTimeOffset>(6)));
         return result;
     }
 
@@ -108,6 +112,34 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
         command.Parameters.AddWithValue(request.Id);command.Parameters.AddWithValue(jobId);
         command.Parameters.AddWithValue(request.Body.Trim());command.Parameters.AddWithValue(user);
         return command.ExecuteScalar() is Guid id?id:throw new ArgumentException("This note identifier has already been used for a different note.");
+    }
+
+    public bool UpdateNote(Guid jobId,Guid noteId,JobNoteUpdateRequest request,string user,bool mayEditOthers)
+    {
+        RequireText(request.Body,10000,"Note");
+        using var connection=database.OpenConnection();using var transaction=connection.BeginTransaction();
+        using var read=new NpgsqlCommand("select body,created_by,created_at_utc,revision,updated_by,updated_at_utc from studio_job_notes where id=$1 and job_id=$2 for update",connection,transaction);
+        read.Parameters.AddWithValue(noteId);read.Parameters.AddWithValue(jobId);
+        string body,author,previousEditor;long revision;DateTimeOffset previousTime;
+        using(var reader=read.ExecuteReader())
+        {
+            if(!reader.Read())return false;
+            body=reader.GetString(0);author=reader.GetString(1);revision=reader.GetInt64(3);
+            previousEditor=reader.IsDBNull(4)?author:reader.GetString(4);
+            previousTime=reader.GetFieldValue<DateTimeOffset>(reader.IsDBNull(5)?2:5);
+        }
+        if(!mayEditOthers&&!author.Equals(user,StringComparison.OrdinalIgnoreCase))throw new UnauthorizedAccessException();
+        string nextBody=request.Body.Trim();
+        if(revision!=request.ExpectedRevision)
+        {
+            if(revision==request.ExpectedRevision+1&&body==nextBody&&previousEditor.Equals(user,StringComparison.OrdinalIgnoreCase)){transaction.Commit();return true;}
+            throw new InvalidOperationException("This note has changed. Reload it before saving your edit.");
+        }
+        using var history=new NpgsqlCommand("insert into studio_job_note_revisions(note_id,revision,body,edited_by,edited_at_utc) values($1,$2,$3,$4,$5) on conflict(note_id,revision) do nothing",connection,transaction);
+        history.Parameters.AddWithValue(noteId);history.Parameters.AddWithValue(revision);history.Parameters.AddWithValue(body);history.Parameters.AddWithValue(previousEditor);history.Parameters.AddWithValue(previousTime);history.ExecuteNonQuery();
+        using var update=new NpgsqlCommand("update studio_job_notes set body=$3,revision=revision+1,updated_by=$4,updated_at_utc=now() where id=$1 and job_id=$2",connection,transaction);
+        update.Parameters.AddWithValue(noteId);update.Parameters.AddWithValue(jobId);update.Parameters.AddWithValue(nextBody);update.Parameters.AddWithValue(user);update.ExecuteNonQuery();
+        transaction.Commit();return true;
     }
 
     public IReadOnlyList<JobSubject> Subjects(Guid jobId)
@@ -174,8 +206,9 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
 
 public sealed record WorkspaceAnnouncement(Guid Id,string Title,string Body,string CreatedBy,DateTimeOffset CreatedAtUtc);
 public sealed record AnnouncementRequest(string Title,string Body);
-public sealed record JobNote(Guid Id,string Body,string CreatedBy,DateTimeOffset CreatedAtUtc);
+public sealed record JobNote(Guid Id,string Body,string CreatedBy,DateTimeOffset CreatedAtUtc,long Revision,string? UpdatedBy,DateTimeOffset? UpdatedAtUtc);
 public sealed record JobNoteRequest(Guid Id,string Body);
+public sealed record JobNoteUpdateRequest(long ExpectedRevision,string Body);
 public sealed record JobSubject(Guid Id,string Name,string Reference,string Notes,string Collection,DateTimeOffset? ScheduledAtUtc,string ScheduleLocation,string ContactName,string ContactEmail,string ContactPhone,string PhotoNotes,bool IsSystem);
 public sealed record SubjectRequest(string Name,string? Reference,string? Notes,string? Collection=null,DateTimeOffset? ScheduledAtUtc=null,string? ScheduleLocation=null,string? ContactName=null,string? ContactEmail=null,string? ContactPhone=null,string? PhotoNotes=null);
 public sealed record CollectionRequest(string Name);
@@ -203,6 +236,14 @@ public static class WorkspaceJobEndpoints
             var permissions=access.GetPermissions(user,jobId);
             if(!permissions.ViewJob||!(permissions.EditJob||permissions.ManageProduction))return Results.Forbid();
             return Validated(()=>Results.Ok(new{id=new WorkspaceJobStore(db).AddNote(jobId,request,UserName(user))}));
+        }).RequireAuthorization();
+        app.MapPut("/api/jobs/{jobId:guid}/notes/{noteId:guid}", (Guid jobId,Guid noteId,JobNoteUpdateRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db) =>
+        {
+            var permissions=access.GetPermissions(user,jobId);
+            if(!permissions.ViewJob||!(permissions.EditJob||permissions.ManageProduction))return Results.Forbid();
+            try{return Validated(()=>new WorkspaceJobStore(db).UpdateNote(jobId,noteId,request,UserName(user),permissions.EditJob)?Results.NoContent():Results.NotFound());}
+            catch(UnauthorizedAccessException){return Results.Forbid();}
+            catch(InvalidOperationException ex){return Results.Conflict(new{error=ex.Message});}
         }).RequireAuthorization();
         app.MapGet("/api/jobs/{jobId:guid}/subjects", (Guid jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db) => access.HasPermission(user,jobId,"ViewJob") ? Results.Ok(new WorkspaceJobStore(db).Subjects(jobId)) : Results.Forbid()).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/subjects", (Guid jobId,SubjectRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db) =>

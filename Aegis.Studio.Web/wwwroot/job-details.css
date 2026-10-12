@@ -78,15 +78,6 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-footer-drawer { position:fixed; z-index:80; left:12px; right:12px; bottom:var(--jd-drawer-bottom,32px); height:min(340px,50vh); display:flex; flex-direction:column; border:1px solid var(--theme-border,#dedbd4); border-radius:8px 8px 0 0; background:var(--theme-surface,#fff); color:var(--theme-text,#162b50); box-shadow:0 -8px 28px #0002; overflow:hidden; transform:translateY(calc(100% + var(--jd-drawer-bottom,32px))); opacity:0; visibility:hidden; transition:transform .24s ease,opacity .24s ease,visibility 0s .24s; }
 .jd-footer-drawer.is-open { transform:translateY(0); opacity:1; visibility:visible; transition:transform .24s ease,opacity .24s ease,visibility 0s; }
 .jd-footer-drawer > .jd-footer-drawer-content { flex:1; min-height:0; overflow:auto; padding:10px 14px; }
-.jd-note-list { display:flex; flex-direction:column; gap:8px; }
-.jd-note { padding:8px 10px; border:1px solid var(--theme-border,#dedbd4); border-radius:5px; background:var(--theme-surface-alt,#f5f6f8); }
-.jd-note header { display:flex; justify-content:space-between; gap:8px; font-size:11px; }
-.jd-note time { color:var(--theme-muted,#69758b); }
-.jd-note p { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
-.jd-note-form { display:flex; flex-direction:column; align-items:flex-start; gap:6px; margin-top:10px; }
-.jd-note-form label { width:100%; font-size:11px; font-weight:650; }
-.jd-note-form textarea { display:block; width:100%; min-height:65px; margin-top:4px; box-sizing:border-box; padding:8px; color:var(--theme-text,#162b50); background:var(--theme-surface,#fff); border:1px solid var(--theme-border,#dedbd4); border-radius:4px; resize:vertical; }
-.jd-note-form [role=status] { margin:0; font-size:11px; }
 @media(prefers-reduced-motion:reduce) { .jd-footer-drawer,.jd-footer-drawer.is-open { transition:none; } }
 .job-detail-board { display:contents; }
 .job-detail-center { grid-column:1; grid-row:2; display:flex; min-width:0; min-height:0; overflow:hidden; }

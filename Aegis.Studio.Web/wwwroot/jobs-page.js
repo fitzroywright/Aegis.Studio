@@ -38,7 +38,7 @@
     <div class="sj-error" role="alert" data-sj-error hidden></div>
     <div class="sj-table-scroll"><table class="sj-table"><thead><tr><th>Job / Client</th><th>Workspace</th><th>Event date</th><th>Job Owner</th><th>Status</th><th>Next Action</th></tr></thead><tbody></tbody></table></div>
     <footer class="sj-pagination"><span data-sj-range></span><div><button type="button" data-sj-prev aria-label="Previous page">‹</button><span data-sj-page></span><button type="button" data-sj-next aria-label="Next page">›</button></div></footer>
-   </section><aside class="sj-right" aria-label="Job information">${card('Job Status','<div class="sj-card-body" data-sj-statuses></div>')}${StudioMessageCard.html({id:'jobsMessageCard',body:'<div data-sj-messages><p>Loading messages…</p></div>',footer:'<button type="button" data-sj-message>✉ Send Message →</button>'})}${card('Needs Attention','<div class="sj-card-body" data-sj-attention></div>','sj-attention-card')}</aside></section>`;
+   </section><aside class="sj-right" aria-label="Job information">${card('Job Status','<div class="sj-card-body" data-sj-statuses></div>')}${card('Needs Attention','<div class="sj-card-body" data-sj-attention></div>','sj-attention-card')}${StudioMessageCard.html({id:'jobsMessageCard',body:'<div data-sj-messages><p>Loading messages…</p></div>',footer:'<button type="button" data-sj-message>✉ Send Message →</button>'})}</aside></section>`;
    const find=s=>host.querySelector(s);
    StudioMessageCard.bind(find('.smc-card'));
    find('[data-sj-search]').value=term;find('[data-sj-workspace]').value=workspace;find('[data-sj-status]').value=stage;find('[data-sj-sort]').value=sort;
@@ -87,4 +87,5 @@
  }
  window.StudioJobsPage={render,dispose(){active?.dispose();active=null;}};
 })();
+
 

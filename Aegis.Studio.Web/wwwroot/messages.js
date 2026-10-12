@@ -45,7 +45,7 @@
         ++inboxRevision;selectedThread=null;selectedRecipients=[];sendRequestId=null;
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML = StudioPage.html({title:'Messages',showMessagesCard:false,summary:'<p>Private, workspace, job and client conversations. Internal messages stay in Studio.</p>',attention:'<p>External delivery outcomes appear in each conversation. Held deliveries need review before retrying.</p>',content:`
+        genericView.innerHTML = StudioPage.html({title:'Messages',summary:'<p>Private, workspace, job and client conversations. Internal messages stay in Studio.</p>',attention:'<p>External delivery outcomes appear in each conversation. Held deliveries need review before retrying.</p>',content:`
             <div class="st-inbox">
                 <section class="studio-inbox-center">
                     <header class="studio-inbox-toolbar"><div><h1>All Messages</h1><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New</button></div></header>
@@ -604,4 +604,5 @@
     // Give authentication and the initial shell a moment to settle, then show the digest once.
     setTimeout(() => showAwayDigestOnce(), 450);
 })();
+
 

@@ -35,38 +35,42 @@ test('job facts appear below the title while Tasks and Activity render their own
  assert.equal(w.document.querySelectorAll('.job-detail-center > section:not([hidden])').length,1);
  w.document.querySelector('[data-message-more]').click();assert.equal(w.document.activeElement.id,'hierarchyBody');
 });
-test('footer Notes exists on empty jobs and saves authored notes independently of messages',async t=>{
+test('card Notes saves, views and edits job notes independently of messages',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
- const notes=w.document.querySelector('#studioFooterJobTools [data-job-notes]');assert.ok(notes);
- await notes.onclick();const drawer=w.document.getElementById('jobNotesDrawer');assert.match(drawer.textContent,/No notes yet/);
- const form=drawer.querySelector('form');form.elements.body.value='Bring the large backdrop.';
- await form.onsubmit({preventDefault(){}});assert.match(drawer.querySelector('.jd-note-list').textContent,/Bring the large backdrop/);
- assert.equal(fixture.jobNotes.job.length,1);assert.equal(form.elements.body.value,'');
+ const card=w.document.getElementById('jobDetailMessages');await card.querySelector('[data-smc-notes-toggle]').onclick();assert.match(card.querySelector('.smc-notes').textContent,/No notes yet/);
+ let form=card.querySelector('.smc-note-form');form.elements.body.value='Bring the large backdrop.';await form.onsubmit({preventDefault(){}});
+ assert.match(card.querySelector('.smc-note-list').textContent,/Bring the large backdrop/);assert.equal(fixture.jobNotes.job.length,1);
+ card.querySelector('[data-edit-note]').click();form=card.querySelector('.smc-note-form');form.elements.body.value='Bring the blue backdrop.';await form.onsubmit({preventDefault(){}});
+ assert.equal(fixture.jobNotes.job[0].body,'Bring the blue backdrop.');assert.equal(fixture.jobNotes.job[0].revision,2);assert.equal(fixture.jobNotes.job[0].createdBy,'studio.admin');
  assert.equal(fixture.calls.some(c=>c.url.endsWith('/messages')&&c.options?.method==='POST'),false);
- await w.openWorkspaceJob('job2');await settle();await w.document.querySelector('[data-job-notes]').onclick();
- assert.match(w.document.querySelector('#jobNotesDrawer').textContent,/No notes yet/);assert.doesNotMatch(w.document.querySelector('#jobNotesDrawer').textContent,/large backdrop/);
+ await w.openWorkspaceJob('job2');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();assert.match(w.document.querySelector('.smc-notes').textContent,/No notes yet/);
 });
-test('notes retry reuses the note identifier after a lost save response',async t=>{
- const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-job-notes]').onclick();
- const original=w.json;let fail=true;
- w.json=async(url,options)=>{const result=await original(url,options);if(url.endsWith('/notes')&&options?.method==='POST'&&fail){fail=false;throw Error('Connection lost');}return result;};
- const form=w.document.querySelector('.jd-note-form');form.elements.body.value='Keep this note.';
- await form.onsubmit({preventDefault(){}});assert.match(form.textContent,/Connection lost/);assert.equal(form.elements.body.value,'Keep this note.');
- await form.onsubmit({preventDefault(){}});assert.equal(fixture.jobNotes.job.length,1);
- const posts=fixture.calls.filter(c=>c.url.endsWith('/notes')&&c.options?.method==='POST');assert.equal(JSON.parse(posts[0].options.body).id,JSON.parse(posts[1].options.body).id);
+test('notes retry reuses the identifier after a lost save response',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();
+ const original=w.json;let fail=true;w.json=async(url,options)=>{const result=await original(url,options);if(url.endsWith('/notes')&&options?.method==='POST'&&fail){fail=false;throw Error('Connection lost');}return result;};
+ const form=w.document.querySelector('.smc-note-form');form.elements.body.value='Keep this note.';await form.onsubmit({preventDefault(){}});assert.match(form.textContent,/Connection lost/);assert.equal(form.elements.body.value,'Keep this note.');
+ await form.onsubmit({preventDefault(){}});assert.equal(fixture.jobNotes.job.length,1);const posts=fixture.calls.filter(c=>c.url.endsWith('/notes')&&c.options?.method==='POST');assert.equal(JSON.parse(posts[0].options.body).id,JSON.parse(posts[1].options.body).id);
 });
-test('footer drawers switch, close with Escape and disappear with task popup on navigation',async t=>{
- const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
- await w.document.querySelector('[data-job-activity]').onclick();await w.document.querySelector('[data-job-notes]').onclick();
- assert.equal(w.document.getElementById('jobActivityDrawer').getAttribute('aria-hidden'),'true');
- const notes=w.document.getElementById('jobNotesDrawer');notes.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
- assert.equal(notes.getAttribute('aria-hidden'),'true');assert.equal(w.document.activeElement.dataset.jobNotes,'');
- await w.document.querySelector('[data-job-tasks]').onclick();await w.studioNavigate('today');await settle();
- assert.equal(w.document.querySelector('.jd-tasks-dialog'),null);assert.equal(w.document.querySelector('[data-job-notes]'),null);assert.equal(w.document.querySelector('.jd-footer-drawer'),null);
+test('stale note edits preserve the draft and display the conflict',async t=>{
+ const {w,fixture}=environment(t);fixture.jobNotes.job=[{id:'note',body:'Original',revision:1,createdBy:'studio.admin',createdAtUtc:'2026-10-12T03:00:00Z'}];
+ await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();w.document.querySelector('[data-edit-note]').click();
+ const form=w.document.querySelector('.smc-note-form');form.elements.body.value='My edit';fixture.jobNotes.job[0]={...fixture.jobNotes.job[0],body:'Newer edit',revision:2};
+ await form.onsubmit({preventDefault(){}});assert.match(form.textContent,/note has changed/);assert.equal(form.elements.body.value,'My edit');assert.equal(fixture.jobNotes.job[0].body,'Newer edit');
 });
-test('viewer can read Notes without a save form',async t=>{
- const {w,fixture}=environment(t);fixture.canEdit=false;await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-job-notes]').onclick();
- assert.match(w.document.getElementById('jobNotesDrawer').textContent,/No notes yet/);assert.equal(w.document.querySelector('.jd-note-form'),null);
+test('Activity closes with Escape and disappears with Tasks popup on navigation',async t=>{
+ const {w}=environment(t);await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-job-activity]').onclick();
+ const activity=w.document.getElementById('jobActivityDrawer');activity.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(activity.getAttribute('aria-hidden'),'true');assert.equal(w.document.activeElement.dataset.jobActivity,'');
+ assert.equal(w.document.querySelector('#studioFooterJobTools [data-job-notes]'),null);
+ await w.document.querySelector('[data-job-tasks]').onclick();await w.studioNavigate('today');await settle();assert.equal(w.document.querySelector('.jd-tasks-dialog'),null);assert.equal(w.document.querySelector('.jd-footer-drawer'),null);
+});
+test('viewer can read Notes without add or edit controls',async t=>{
+ const {w,fixture}=environment(t);fixture.canEdit=false;await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();assert.match(w.document.querySelector('.smc-notes').textContent,/No notes yet/);assert.equal(w.document.querySelector('.smc-note-form'),null);assert.equal(w.document.querySelector('[data-edit-note]'),null);
+});
+test('a contributor can edit their own Notes but cannot edit another author',async t=>{
+ const {w,fixture}=environment(t);fixture.jobNotes.job=[{id:'own',body:'My note',revision:1,createdBy:'studio.admin',createdAtUtc:'2026-10-12T03:00:00Z'},{id:'other',body:'Other note',revision:1,createdBy:'another.user',createdAtUtc:'2026-10-12T03:00:00Z'}];
+ const original=w.json;w.json=(url,options)=>url.endsWith('/access')?Promise.resolve({permissions:{editJob:false,manageProduction:true}}):original(url,options);
+ await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-smc-notes-toggle]').onclick();
+ assert.ok(w.document.querySelector('[data-edit-note="own"]'));assert.equal(w.document.querySelector('[data-edit-note="other"]'),null);
 });
 test('Subjects load errors stay visible and Retry restores the panel',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');fixture.failSubjects=true;

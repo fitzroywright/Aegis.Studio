@@ -10,34 +10,37 @@ async function full(t){
  for(const script of w.document.querySelectorAll('script[src]'))require('node:vm').runInContext(fs.readFileSync(path.join(root,new URL(script.src).pathname),'utf8'),dom.getInternalVMContext());
  await settle();await w.studioTodayReady;return w;
 }
-function checkMiddle(w,railSelector){
+function checkBottom(w,railSelector){
  const rail=w.document.querySelector(railSelector),card=rail.querySelector('.smc-card');
- assert.equal(rail.children.length,3);assert.equal(rail.children[1],card);assert.equal(card.querySelector('.smc-toggle').getAttribute('aria-expanded'),'false');assert.equal(card.querySelector('.smc-drawer').hasAttribute('inert'),true);return card;
+ assert.equal(rail.children.length,3,railSelector+' on '+w.document.body.dataset.studioView);assert.equal(rail.lastElementChild,card);assert.equal(card.querySelector('.smc-toggle'),null);assert.equal(card.querySelector('.smc-drawer'),null);assert.ok(card.querySelector('[data-smc-notes-toggle]'));return card;
 }
-test('Today, Jobs, Front Desk, Workspaces and the shared shell render the same middle card',async t=>{
+test('all operational right rails keep Messages open at the bottom with a Notes toggle',async t=>{
  const w=await full(t);
  for(const [view,rail] of [['today','.mw-today-right'],['jobs','.sj-right'],['frontdesk','.fd-secondary'],['workspaces','.workspace-right-rail'],['finance','.st-right'],['messages','.st-right'],['admin','.st-right']]){
-  await w.studioNavigate(view);await settle();const card=checkMiddle(w,rail),toggle=card.querySelector('.smc-toggle');
-  toggle.click();assert.equal(toggle.getAttribute('aria-expanded'),'true',view);assert.equal(card.querySelector('.smc-drawer').hasAttribute('inert'),false,view);
-  toggle.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(toggle.getAttribute('aria-expanded'),'false',view);assert.equal(w.document.activeElement,toggle,view);
+  await w.studioNavigate(view);await settle();const card=checkBottom(w,rail);
+  await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.dataset.smcMode,'notes',view);assert.ok(card.querySelector('[data-notes-job]'),view);
+  await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.querySelector('[data-smc-messages]').hidden,false,view);
  }
 });
-test('Today partial renders and Front Desk filters preserve the expanded card and rebind once',async t=>{
+test('Today and Front Desk filtering preserve the Notes panel without duplicate binding',async t=>{
  const w=await full(t);await w.studioNavigate('today');await w.studioTodayReady;
- w.document.querySelector('#todayMessageCard .smc-toggle').click();
+ let card=w.document.getElementById('todayMessageCard');await card.querySelector('[data-smc-notes-toggle]').onclick();
+ let job=card.querySelector('[data-notes-job]');job.value='j0';await job.onchange();card.querySelector('.smc-note-form textarea').value='Today note draft';
  const search=w.document.querySelector('[data-mw-job-search]');search.value='Portrait';search.dispatchEvent(new w.Event('input',{bubbles:true}));await settle();
- let card=w.document.getElementById('todayMessageCard');assert.equal(w.StudioMessageCard.isOpen(card),true);card.querySelector('.smc-toggle').click();assert.equal(w.StudioMessageCard.isOpen(card),false);
- await w.studioNavigate('frontdesk');w.document.querySelector('#frontDeskMessageCard .smc-toggle').click();
+ assert.equal(w.document.getElementById('todayMessageCard'),card);assert.equal(card.dataset.smcMode,'notes');assert.equal(card.querySelector('.smc-note-form textarea').value,'Today note draft');await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.dataset.smcMode,'messages');
+ await w.studioNavigate('frontdesk');card=w.document.getElementById('frontDeskMessageCard');await card.querySelector('[data-smc-notes-toggle]').onclick();
+ job=card.querySelector('[data-notes-job]');job.value='j1';await job.onchange();card.querySelector('.smc-note-form textarea').value='Front Desk note draft';
  const filter=w.document.querySelector('[data-fd-filter]');filter.dispatchEvent(new w.Event('change',{bubbles:true}));await settle();
- card=w.document.getElementById('frontDeskMessageCard');assert.equal(w.StudioMessageCard.isOpen(card),true);card.querySelector('.smc-toggle').click();assert.equal(w.StudioMessageCard.isOpen(card),false);
+ assert.equal(w.document.getElementById('frontDeskMessageCard'),card);assert.equal(card.dataset.smcMode,'notes');assert.equal(card.querySelector('.smc-note-form textarea').value,'Front Desk note draft');await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.dataset.smcMode,'messages');
 });
-test('Job Details uses the middle card and retains drafts, message actions and reply handlers',async t=>{
+test('Job Details Notes toggle retains the message draft and reply handlers',async t=>{
  const {environment}=require('./job-detail-fixture.cjs'),{w}=environment(t);await w.openWorkspaceJob('job');await settle();
- const card=checkMiddle(w,'.job-detail-right'),toggle=card.querySelector('.smc-toggle'),composer=card.querySelector('#hierarchyCompose');
- assert.equal(typeof composer.onsubmit,'function');toggle.click();composer.querySelector('textarea').value='Draft kept during collapse';
- toggle.click();toggle.click();assert.equal(composer.querySelector('textarea').value,'Draft kept during collapse');
- toggle.click();card.querySelector('[data-message-more]').click();assert.equal(w.StudioMessageCard.isOpen(card),true);assert.equal(w.document.activeElement.id,'hierarchyBody');
- composer.querySelector('textarea').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(w.StudioMessageCard.isOpen(card),false);assert.equal(w.document.activeElement,toggle);
+ const card=checkBottom(w,'.job-detail-right'),toggle=card.querySelector('[data-smc-notes-toggle]'),composer=card.querySelector('#hierarchyCompose');
+ assert.equal(typeof composer.onsubmit,'function');composer.querySelector('textarea').value='Draft kept while viewing notes';
+ await toggle.onclick();assert.equal(card.querySelector('[data-smc-messages]').hidden,true);assert.equal(card.querySelector('[data-notes-job]'),null);
+ await toggle.onclick();assert.equal(composer.querySelector('textarea').value,'Draft kept while viewing notes');
+ card.querySelector('[data-message-more]').click();assert.equal(card.dataset.smcMode,'messages');assert.equal(w.document.activeElement.id,'hierarchyBody');
+ composer.querySelector('textarea').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(card.querySelector('[data-smc-messages]').hidden,false);
 });
 test('one controller and one stylesheet own message cards without page-specific skins',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');assert.equal((html.match(/src="\/studio-message-card\.js/g)||[]).length,1);assert.equal((html.match(/href="\/studio-message-card\.css/g)||[]).length,1);assert.ok(html.indexOf('/studio-message-card.js')<html.indexOf('/studio-page.js'));
@@ -57,3 +60,4 @@ test('message card and rail styles contain valid declarations and no duplicate p
   visit(ast.children);
  }
 });
+
