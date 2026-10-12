@@ -81,3 +81,28 @@ test('current demo run can be recovered after reopening Admin',async()=>{
  dom.window.close();
 });
 
+
+test('reset rejection shows the server reason without starting polling',async()=>{
+ const reason='Factory reset requires Storage:FactoryResetExclusiveRoot=true after verifying the configured storage root is dedicated to Studio.';
+ const {w,dom,calls}=setup([
+  {url:'/api/admin/connected-workflow/demo-data/reset-and-generate',status:409,body:{error:reason}}
+ ]);
+ await assert.rejects(w.studioLoadDemoData(()=>assert.fail('No run was started'),{reset:true}),{message:reason});
+ assert.equal(calls.length,1);dom.window.close();
+});
+
+test('active-run conflict retains the wait instruction',async()=>{
+ const reason='A demo load is already running. Wait for it to finish before resetting.';
+ const {w,dom}=setup([{url:'/api/admin/connected-workflow/demo-data/reset-and-generate',status:409,body:{error:reason}}]);
+ await assert.rejects(w.studioLoadDemoData(()=>{},{reset:true}),{message:reason});dom.window.close();
+});
+
+test('unstructured rejection retains an HTTP fallback',async()=>{
+ const {w,dom}=setup([{url:'/api/admin/demo/seed',status:502,body:null}]);
+ await assert.rejects(w.studioLoadDemoData(()=>{}),/Demo loader returned HTTP 502/);dom.window.close();
+});
+
+test('status failures also show the server reason',async()=>{
+ const {w,dom}=setup([{url:'/api/admin/demo/seed/current',status:409,body:{error:'Run status is unavailable.'}}]);
+ await assert.rejects(w.studioGetCurrentDemoDataRun(),/Run status is unavailable/);dom.window.close();
+});
