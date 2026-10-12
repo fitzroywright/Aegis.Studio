@@ -8,6 +8,11 @@
 .sj-toolbar input{flex:1 1 230px;width:230px}
 .sj-toolbar select{width:128px;max-width:150px}.sj-toolbar :focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:2px}.sj-table th{white-space:normal;line-height:1.35}.sj-table td{min-width:0}
 .sj-summary{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:#fafafa;color:#67707b;border-bottom:1px solid #e3e6e9;gap:8px}
+.sj-summary .sj-view-tabs{display:flex;align-items:center;flex:0 1 auto;gap:3px;min-width:0;flex-wrap:wrap}
+.sj-summary .sj-view-tabs button{padding:7px 11px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:7px;background:transparent;color:inherit;cursor:pointer;font-size:11px;font-weight:600}
+.sj-summary .sj-view-tabs button.active{background:#986c55;border-color:#986c55;color:#fff}
+.sj-summary .sj-view-tabs button:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:2px}
+.sj-summary [data-sj-count]{margin-left:auto;white-space:nowrap;font-size:11px}
 .sj-summary button,.sj-gold,.sj-card footer button{color:#98701c;font-weight:700;background:none;border:0;padding:3px;cursor:pointer}
 .sj-table-scroll{flex:1;min-height:0;overflow:auto}
 .sj-table{line-height:1.25;width:100%;border-collapse:collapse;text-align:left;table-layout:fixed}
