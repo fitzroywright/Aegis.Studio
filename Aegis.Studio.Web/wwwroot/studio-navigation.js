@@ -702,14 +702,6 @@
             <section class="workspace-list-page mw-list-page">
                 <div class="mw-list-layout workspace-list-layout">
                     <section class="mw-list-panel workspace-center-panel">
-                        <header class="workspace-center-header">
-                            <div>
-                                <h2><span class="mw-title-icon assigned">▰</span> Workspaces</h2>
-                                <small>Jobs, clients, conversations and media grouped by operational workspace.</small>
-                            </div>
-                            <div class="workspace-center-actions"><button type="button" data-workspace-jobs>View Jobs →</button><span class="workspace-wow-list-count">${workspaceData.length}</span></div>
-                        </header>
-
                         <div class="workspace-column-header" role="row" aria-label="Workspace columns">
                             <span class="workspace-column-thumbnail" aria-hidden="true"></span>
                             <label class="workspace-column-name"><span>Workspace</span><input type="search" placeholder="Search workspaces…" aria-label="Search workspaces" data-workspace-search></label>
@@ -717,7 +709,7 @@
                             <span>Completed Jobs</span>
                             <span>Upcoming Shoots</span>
                             <span>Media</span>
-                            <label class="workspace-column-sort"><span>Status / Activity</span><select data-workspace-sort aria-label="Sort workspaces"><option value="name">Name A–Z</option><option value="jobs">Most jobs</option><option value="photos">Most photos</option></select></label>
+                            <span>Status / Activity</span>
                             <span aria-hidden="true"></span>
                         </div>
 
@@ -756,7 +748,6 @@
 
         const allRows=()=>[...genericView.querySelectorAll('[data-workspace-row]')];
         let term='';
-        let sort='name';
 
         const refresh=()=>{
             const list=genericView.querySelector('[data-workspace-list]');
@@ -766,13 +757,7 @@
                 row.hidden=!matchesTerm;
             });
 
-            rows.sort((a,b)=>{
-                const ai=workspaceData.find(x=>String(x.workspace.id)===String(a.querySelector('[data-open-workspace]').dataset.openWorkspace));
-                const bi=workspaceData.find(x=>String(x.workspace.id)===String(b.querySelector('[data-open-workspace]').dataset.openWorkspace));
-                if(sort==='jobs')return (bi?.jobs.length||0)-(ai?.jobs.length||0);
-                if(sort==='photos')return photoCount(bi||{media:[]})-photoCount(ai||{media:[]});
-                return String(ai?.workspace.name||'').localeCompare(String(bi?.workspace.name||''));
-            }).forEach(row=>list.appendChild(row));
+
         };
 
         const search=genericView.querySelector('[data-workspace-search]');
@@ -782,8 +767,6 @@
             refresh();
         };
         if(search)search.oninput=e=>updateTerm(e.target.value);
-        const sortControl=genericView.querySelector('[data-workspace-sort]');
-        if(sortControl)sortControl.onchange=e=>{sort=e.target.value;refresh();};
 
         genericView.querySelectorAll('[data-open-workspace]').forEach(button=>{
             button.onclick=async()=>{
