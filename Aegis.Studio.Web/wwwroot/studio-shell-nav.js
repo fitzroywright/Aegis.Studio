@@ -119,7 +119,7 @@
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card" data-rail-card="workspaces">
-                <header class="studio-workspaces-card-header"><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2><button type="button" class="studio-workspaces-view-all" data-studio-view-all-workspaces>View All →</button></header>
+                <header class="studio-workspaces-card-header"><h2><span class="studio-card-icon" aria-hidden="true">▣</span> Workspaces</h2><button type="button" class="studio-workspaces-view-all" data-studio-view-all-workspaces>View All →</button></header>
                 <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
             </section>
 `;
