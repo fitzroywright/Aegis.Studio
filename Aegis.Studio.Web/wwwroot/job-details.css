@@ -1,5 +1,5 @@
 /* Canonical Job Details layout. Only this file owns these components. */
-.jd-rail-card { display:flex; flex-direction:column; min-height:0; min-width:0; border:2px solid var(--studio-rail-accent,#24476c); border-radius:7px; overflow:hidden; background:var(--theme-surface,#fff); }
+.jd-rail-card { display:flex; flex-direction:column; min-height:0; min-width:0; border:var(--studio-rail-border,2px solid var(--studio-rail-accent,#24476c)); border-radius:7px; overflow:hidden; background:var(--theme-surface,#fff); }
 .jd-rail-card > header { padding:8px 10px; border-bottom:1px solid var(--studio-rail-accent,#24476c); background:var(--studio-rail-accent,#24476c); }
 .jd-rail-card h2 { margin:0; font-size:13px; color:#fff; font-weight:750; }
 .jd-rail-links { display:flex; flex-direction:column; gap:3px; min-height:0; overflow:auto; padding:5px 7px; }
