@@ -14,11 +14,13 @@
   const current=()=>!disposed&&options.isCurrent();
   host.innerHTML='<div class="sj-loading" role="status">Loading jobs…</div>';
   try {
-   const [jobData,workflowResult,notificationResult,peopleResult]=await Promise.all([
+   const [jobData,workflowResult,notificationResult,peopleResult,authResult,taskResult]=await Promise.all([
     options.json('/api/jobs'),
     options.json('/api/workflow/jobs').then(value=>({value:array(value)}),()=>({error:true,value:[]})),
     options.json('/api/notifications?count=100').then(value=>({value:array(value)}),()=>({error:true,value:[]})),
-    options.json('/api/studio-employees?assignable=true').catch(()=>[])
+    options.json('/api/studio-employees?assignable=true').catch(()=>[]),
+    options.json('/api/auth/me').catch(()=>({})),
+    options.json('/api/today/tasks').catch(()=>[])
    ]);
    if(!current())return controller;
    const jobs=array(jobData),workspaces=array(options.workspaces).filter(w=>w.permissions?.accessWorkspace!==false&&w.permissions?.view!==false),workspacesById=new Map(workspaces.map(w=>[String(w.id),w]));
@@ -28,13 +30,20 @@
    const status=job=>flows.get(String(job.id))?.stage||job.status||'Status unavailable';
    const owner=job=>flows.get(String(job.id))?.owner||job.jobLead||job.assignedTo||'';
    const ownerLabel=job=>people.get(String(owner(job)).toLowerCase())||owner(job)||'Unassigned';
+   const me=authResult?.user||authResult||{};
+   const user=String(me.userName||me.loginName||'').trim().toLowerCase();
+   const normalized=value=>String(value||'').trim().toLowerCase();
+   const tasks=array(taskResult);
+   const isLead=job=>Boolean(user)&&normalized(job.jobLead||flows.get(String(job.id))?.jobLead)===user;
+   const isInvolved=job=>isLead(job)||Boolean(user)&&[job.assignedTo,job.jobOwner,job.photographerUserName,owner(job)].some(value=>normalized(value)===user)||job.isCrewMember===true||tasks.some(task=>String(task.jobId)===String(job.id)&&normalized(task.assignedTo)===user)||(array(job.crew).some(member=>normalized(member.userName||member)===user));
    let saved={};try{saved=JSON.parse(sessionStorage.getItem('studio-jobs-view')||'{}');}catch{}
+   let view=['led','involved','all'].includes(saved.view)?saved.view:'involved';
    let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',attention='',includeClosed=false,page=1;
    const stages=StudioStatusOrder.sort(jobs.map(status));if(!stages.includes(stage))stage='';
    const card=(title,body,cls='')=>`<section class="sj-card ${cls}"><header><h2>${title}</h2></header>${body}</section>`;
    host.innerHTML=`<section class="sj-page" aria-label="Jobs"><section class="sj-board">
     <div class="sj-toolbar"><h2>Jobs</h2><button type="button" class="sj-gold" data-sj-settings hidden>Workspace settings</button></div>
-    <div class="sj-summary"><span data-sj-count></span><button type="button" data-sj-clear>Clear filters</button></div>
+    <div class="sj-summary"><div class="mw-today-view-tabs sj-view-tabs" role="group" aria-label="Job view"><button type="button" data-sj-view="led">Jobs Led By Me</button><button type="button" data-sj-view="involved">Jobs I’m Involved In</button><button type="button" data-sj-view="all">All Jobs</button></div><span data-sj-count></span></div>
     <div class="sj-error" role="alert" data-sj-error hidden></div>
     <div class="sj-table-scroll"><table class="sj-table"><thead><tr><th><div class="sj-job-header"><span>Job / Client</span><input type="search" data-sj-search aria-label="Search jobs, clients or references" placeholder="Search jobs…" autocomplete="off"></div></th><th><label class="sj-column-filter">Workspace<select data-sj-workspace aria-label="Filter by workspace"><option value="">All workspaces</option>${workspaces.map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select></label></th><th><label class="sj-column-filter">Event date<select data-sj-sort aria-label="Sort by event date"><option value="date-desc">Newest first ↓</option><option value="date-asc">Oldest first ↑</option></select></label></th><th>Job Owner</th><th><label class="sj-column-filter">Status<select data-sj-status aria-label="Filter by status"><option value="">All Open Jobs</option>${stages.map(s=>`<option>${esc(s)}</option>`).join('')}</select></label></th><th>Next Action</th></tr></thead><tbody></tbody></table></div>
     <footer class="sj-pagination"><span data-sj-range></span><div><button type="button" data-sj-prev aria-label="Previous page">‹</button><span data-sj-page></span><button type="button" data-sj-next aria-label="Next page">›</button></div></footer>
@@ -48,7 +57,8 @@
    const need=(job,key)=>key==='owner'?!owner(job)&&!/completed|delivered|cancelled/i.test(status(job)):key==='changes'?/changes requested/i.test(status(job)):/needs photographer assignment/i.test(status(job));
    function apply(reset=true){
     if(!current())return;if(reset)page=1;
-    const base=jobs.filter(j=>belongs(j,workspace)&&(stage ? status(j)===stage : !StudioSubjectPicker.isClosed({...j,stage:status(j)})));
+    const base=jobs.filter(j=>(view==='all'||(view==='led'?isLead(j):isInvolved(j)))&&belongs(j,workspace)&&(stage ? status(j)===stage : !StudioSubjectPicker.isClosed({...j,stage:status(j)})));
+    host.querySelectorAll('[data-sj-view]').forEach(button=>{const selected=button.dataset.sjView===view;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
     const filtered=base.filter(j=>(!stage||status(j)===stage)&&(!attention||need(j,attention))&&[j.title,j.clientName,j.reference,j.jobNumber,workspacesById.get(String(j.workspaceId))?.name,ownerLabel(j)].join(' ').toLowerCase().includes(term.toLowerCase().trim()));
     filtered.sort((a,b)=>{const ad=date(a.eventDate),bd=date(b.eventDate);return !ad&&!bd?String(a.id).localeCompare(String(b.id)):!ad?1:!bd?-1:(+ad-+bd)*(sort==='date-asc'?1:-1)||String(a.id).localeCompare(String(b.id));});
     const pages=Math.max(1,Math.ceil(filtered.length/13));page=Math.min(page,pages);
@@ -63,14 +73,14 @@
     const changes=notificationResult.value.filter(n=>/status|workflow/i.test(n.eventType||n.type||n.title||'')&&base.some(j=>String(j.id)===String(n.referenceId))).sort((a,b)=>+(date(b.createdAtUtc||b.createdAt)||0)-+(date(a.createdAtUtc||a.createdAt)||0)).slice(0,3);
     find('[data-sj-statuses]').innerHTML=(workflowResult.error?'<p>Workflow unavailable. Showing recorded job statuses.</p>':'')+counts.map(([s,n])=>`<button type="button" class="sj-status-count sj-${tone(s)}" data-sj-stage="${esc(s)}" aria-pressed="${stage===s}"><span>${esc(s)}</span><b>${n}</b><meter min="0" max="${Math.max(1,base.length)}" value="${n}" aria-label="${esc(s)} jobs">${n}</meter></button>`).join('')+'<h3>Recent Status Changes</h3>'+(changes.map(n=>`<button type="button" class="sj-note" data-sj-job="${esc(n.referenceId)}"><strong>${esc(n.title||n.subject||n.eventType)}</strong><small>${esc(n.body||'')} · ${esc(dateLabel(n.createdAtUtc||n.createdAt))}</small></button>`).join('')||'<p>No recent status changes.</p>');
     find('[data-sj-attention]').innerHTML=[['owner','Owner needed'],['changes','Changes requested'],['photographers','Photographers needed']].map(([key,label])=>`<button type="button" class="sj-attention" data-sj-need="${key}" aria-pressed="${attention===key}"><span>${label}</span><b>${base.filter(j=>need(j,key)).length}</b></button>`).join('')+'<button type="button" class="sj-gold" data-sj-view-all>View all →</button>';
-    try{sessionStorage.setItem('studio-jobs-view',JSON.stringify({term,stage,sort}));}catch{}
+    try{sessionStorage.setItem('studio-jobs-view',JSON.stringify({term,stage,sort,view}));}catch{}
    }
    find('[data-sj-search]').oninput=e=>{term=e.target.value;apply();};
    find('[data-sj-workspace]').onchange=e=>{workspace=e.target.value;options.setWorkspaceFilter(workspace);apply();};
    find('[data-sj-status]').onchange=e=>{stage=e.target.value;apply();};
    
    find('[data-sj-sort]').onchange=e=>{sort=e.target.value;apply();};
-   find('[data-sj-clear]').onclick=()=>{term='';stage='';workspace='';attention='';options.setWorkspaceFilter('');find('[data-sj-search]').value='';find('[data-sj-status]').value='';find('[data-sj-workspace]').value='';apply();};
+   host.querySelectorAll('[data-sj-view]').forEach(button=>button.onclick=()=>{view=button.dataset.sjView;attention='';apply();});
    find('[data-sj-prev]').onclick=()=>{page--;apply(false);find('.sj-table-scroll').scrollTop=0;};find('[data-sj-next]').onclick=()=>{page++;apply(false);find('.sj-table-scroll').scrollTop=0;};
    host.onclick=e=>{if(!current())return;const number=e.target.closest('[data-sj-page-number]');if(number){page=Number(number.dataset.sjPageNumber);apply(false);find('.sj-table-scroll').scrollTop=0;return;}const row=e.target.closest('[data-sj-job]');if(row){void open(row.dataset.sjJob);return;}const s=e.target.closest('[data-sj-stage]');if(s){stage=stage===s.dataset.sjStage?'':s.dataset.sjStage;find('[data-sj-status]').value=stage;apply();}const n=e.target.closest('[data-sj-need]');if(n){attention=attention===n.dataset.sjNeed?'':n.dataset.sjNeed;apply();}if(e.target.closest('[data-sj-view-all]')){attention='';stage='';term='';find('[data-sj-status]').value='';find('[data-sj-search]').value='';apply();}};
    host.onkeydown=e=>{const row=e.target.closest('tr[data-sj-job]');if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void open(row.dataset.sjJob);}};
