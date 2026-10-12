@@ -105,7 +105,7 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-card-heading h2 { font-size:13px; margin:0; line-height:1.1; }
 .job-detail-center > .jd-panel > div:last-child { flex:1; min-height:0; overflow:auto; padding:10px; }
 .job-detail-center > .job-media-section > .job-media-content { display:flex; flex-direction:column; padding:0; overflow:hidden; }
-.jd-gallery-toolbar { display:flex; align-items:center; gap:6px; padding:7px 10px; flex:none; min-width:0; overflow-x:auto; border-bottom:1px solid var(--theme-border,#d4d9e0); background:var(--theme-surface-alt,#f5f6f8); }
+.jd-gallery-toolbar { display:flex; align-items:center; gap:6px; padding:7px 10px; flex:none; min-width:0; flex-wrap:wrap; overflow-x:hidden; border-bottom:1px solid var(--theme-border,#d4d9e0); background:var(--theme-surface-alt,#f5f6f8); }
 .jd-gallery-toolbar h2 { flex:none; margin:0 6px 0 0; padding-right:10px; border-right:1px solid var(--theme-border,#d4d9e0); font-size:13px; }
 .jd-gallery-toolbar select,.jd-gallery-toolbar input { font-size:11px; min-height:28px; border:1px solid var(--theme-border,#d4d9e0); background:var(--theme-surface,#fff); color:var(--theme-text,#162b50); }
 .jd-gallery-toolbar select { width:auto; max-width:170px; padding:5px 7px; border-radius:6px; }
