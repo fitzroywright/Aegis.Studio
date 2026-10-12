@@ -675,16 +675,17 @@
             const subtitle=latest?.clientName||item.workspace.emailAddress||item.workspace.routeKey||'Studio workspace';
             const secondary=latest?.title||latest?.jobType||'No recent job';
             const lastActivity=latest?.eventDate||latest?.createdAtUtc||latest?.createdAt;
-            return `<article class="workspace-wow-row" data-workspace-row data-status="${item.metrics.activeJobs?'active':'inactive'}" data-search="${esc((item.workspace.name+' '+subtitle+' '+secondary+' '+status).toLowerCase())}">
+            return `<article class="workspace-wow-row" data-workspace-row data-status="${item.metrics.activeJobs?'active':'inactive'}" data-search="${esc((item.workspace.name+' '+(item.workspace.emailAddress||'')+' '+subtitle+' '+secondary+' '+status).toLowerCase())}">
                 <button type="button" class="workspace-wow-main" data-open-workspace="${item.workspace.id}" data-workspace-name="${esc(item.workspace.name)}">
                     <span class="workspace-wow-thumb">${hero?`<img src="${hero}" alt="">`:'<span class="workspace-photo-fallback">📷</span>'}</span>
                     <span class="workspace-wow-copy">
                         <strong>${esc(item.workspace.name)}</strong>
                         <small>${esc(subtitle)} · ${esc(secondary)}</small>
                     </span>
-                    <span class="workspace-wow-stat"><b>${item.metrics.activeJobs}</b><small>Active Jobs</small></span>
-                    <span class="workspace-wow-stat"><b>${item.metrics.completedJobs}</b><small>Completed Jobs</small></span>
-                    <span class="workspace-wow-stat"><b>${item.metrics.upcomingShoots}</b><small>Upcoming Shoots</small></span>
+                    <span class="workspace-wow-email" title="${esc(item.workspace.emailAddress||'No email address configured')}">${esc(item.workspace.emailAddress||'—')}</span>
+                    <span class="workspace-wow-stat"><b>${item.metrics.activeJobs}</b></span>
+                    <span class="workspace-wow-stat"><b>${item.metrics.completedJobs}</b></span>
+                    <span class="workspace-wow-stat"><b>${item.metrics.upcomingShoots}</b></span>
                     <span class="workspace-wow-previews">
                         ${previews.map(url=>`<img src="${url}" alt="">`).join('')}
                         ${photos>previews.length?`<i>+${photos-previews.length}</i>`:''}
@@ -705,6 +706,7 @@
                         <div class="workspace-column-header" role="row" aria-label="Workspace columns">
                             <span class="workspace-column-thumbnail" aria-hidden="true"></span>
                             <label class="workspace-column-name"><span>Workspace</span><input type="search" placeholder="Search workspaces…" aria-label="Search workspaces" data-workspace-search></label>
+                            <span>Email Address</span>
                             <span>Active Jobs</span>
                             <span>Completed Jobs</span>
                             <span>Upcoming Shoots</span>
