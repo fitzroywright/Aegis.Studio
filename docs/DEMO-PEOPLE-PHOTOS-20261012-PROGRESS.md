@@ -13,7 +13,11 @@ Unrestricted keyword image downloads were removed to avoid scenery/cartoon resul
 Sources and image bytes are persisted through the existing verified VersionStore path.
 Source photographs may be reused between jobs; the minimum counts refer to assets per job.
 
-Verification checkpoint: clean Web/Web.Tests build, zero warnings/errors. Full regeneration
-and non-database regression tests are running. Regeneration checks every job has at least
-40 assets, larger galleries survive, and a second photo pass does not duplicate assets.
+Verification complete: clean Web/Web.Tests build, zero warnings/errors; 307 non-database
+tests passed (42 database skips). Both embedded PostgreSQL reset/regeneration checks passed
+in 1 minute 38 seconds. Every generated job has at least 40 assets, the 180-photo school
+gallery survives, and a second photo pass does not duplicate assets.
 The persistence check uses a genuine cached photo fixture; public hosts/S3 remain deployment checks.
+
+Pull main and redeploy, then use Studio Management > Demo Data > Reset and Regenerate.
+Generate Demo Data can also top up an existing demo without clearing it.
