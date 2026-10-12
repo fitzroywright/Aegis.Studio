@@ -56,7 +56,7 @@
    else if(!drag.id){box.x=drag.box.x-dx;box.y=drag.box.y-dy;update();}
   };
   svg.onpointerup=e=>{
-   if(connect){const target=e.target.closest('[data-node]');if(target&&target.dataset.node!==connect)options.onConnect?.(connect,target.dataset.node);connect=null;}
+   if(connect){const target=e.target.closest('[data-node]');if(target&&e.target.closest('[data-port="in"]')&&target.dataset.node!==connect)options.onConnect?.(connect,target.dataset.node);connect=null;}
    if(drag?.node&&drag.moved){const p=layout.node(drag.id);drag.node.source.x=(drag.node.x??p.x)+(e.clientX-drag.startX)*drag.ratio;drag.node.source.y=(drag.node.y??p.y)+(e.clientY-drag.startY)*drag.ratio;options.onChange?.();}
    else if(drag?.id&&!drag.moved)options.onSelect?.(drag.id);drag=null;
   };

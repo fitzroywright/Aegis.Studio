@@ -102,7 +102,7 @@ public class WorkflowGraphTests
             .Select(e=>e.Id=="services-print"?e with{Condition=new("Not",Conditions:[new("ServiceSelected",retouch)])}:e).ToArray()};
         Assert.Empty(WorkflowGraphEngine.Validate(g));
         var services=selected?new HashSet<Guid>{retouch}:new HashSet<Guid>();var states=States("review","capture/shoot","capture/ingest");
-        var active=selected?"retouch":"print",inactive=selected?"print":"retouch";
+        var active=selected?"retouch":"print";var inactive=selected?"print":"retouch";
         Assert.Equal("Available",State(WorkflowGraphEngine.Evaluate(g,states,services),active));
         Assert.Equal("Inactive",State(WorkflowGraphEngine.Evaluate(g,states,services),inactive));
         states[active]="Completed";Assert.Equal("Available",State(WorkflowGraphEngine.Evaluate(g,states,services),"quality"));

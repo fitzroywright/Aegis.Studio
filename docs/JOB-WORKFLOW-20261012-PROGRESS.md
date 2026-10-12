@@ -110,3 +110,53 @@ checkpoint results; prepare final delivery. No deployment and no merge into main
   returned 303 pass, 2 newly added dependency checks failed against an older Web assembly,
   37 skipped. Those checks were corrected in source; rerun against the final rebuilt assembly.
 - Nothing deployed to Kratos; no external data reset; no merge into main.
+
+## Interruption and resume checkpoint — October 12, 2026
+
+The local execution environment disconnected while the final integration build and
+verification pass were running. Native execution returned:
+"409 Conflict, environment_offline: Environment is not connected."
+A read-only reconnection attempt also failed. No final build/test result could be retrieved.
+
+The implementation is NOT declared complete or fully verified. The latest branch includes
+the integrated graph engine/editor, draft publication, POS conditions, Front Desk, job
+changes, Job Details/Production, demo graph scenarios, and lifecycle gate corrections.
+A final static review corrected a multiple-declarator var statement in the new conditional
+test and retained the post-delivery milestone refresh and canonical graph CSS rules through
+GitHub after local execution became unavailable. These last corrections are unexecuted.
+
+Last executed evidence:
+- Repeated full Web/Web.Tests builds: zero warnings/errors before the last integration changes.
+- Initial graph engine suite: 12 passed. Latest 16-case engine suite needs execution.
+- Graph/editor UI suite: 8 passed before the last port/style cleanup.
+- Updated full UI suite: 112 passed / 51 failed; upstream baseline had the same 51 failure names.
+- Embedded PostgreSQL: five persistence checks passed together; Front Desk journey passed
+  separately after the booking retry fix. Latest posted-sale safeguard and delivery milestone
+  additions need a fresh run against the final build.
+- Chromium editor checks: no errors, one shared reconnection node, no page overflow at
+  1440x900 and 1366x768; dark renderer screenshot captured.
+- Full .NET suite before fresh engine assembly: 303 passed / 2 new dependency checks failed /
+  37 skipped. Do not report this suite as passing. Rerun after rebuilding.
+- Native PostgreSQL multi-session concurrency and full demo regeneration remain unverified.
+
+Resume from feature/job-workflow-graph-20261012. Do not merge or deploy before finishing
+the requested acceptance checks. Nothing was deployed to Kratos or reset externally.
+
+Suggested native local commands (from the Studio checkout; Common sibling repos required):
+```bash
+git fetch origin
+git switch feature/job-workflow-graph-20261012
+git pull --ff-only
+dotnet restore Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj
+dotnet build Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj --no-restore
+dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj --no-build
+# Set STUDIO_TEST_POSTGRES to a disposable native PostgreSQL database, then rerun tests.
+cd tests/ui
+npm ci
+npm test
+```
+
+Update Common.Messaging to its current main if IEmailRecipientDirectory is missing.
+Do not use the temporary local source-snapshot commit ancestry for a git push: GitHub
+branch ancestry is authoritative. The local source checkout was materialized through the
+connector; its baseline commit differs from upstream even though its baseline sources match.
