@@ -31,20 +31,20 @@
   const frontier=main.indexOf(main.includes(data.stage)?data.stage:lastNormal);
   main.forEach((label,index)=>{if(index<frontier)passed.add(label);else passed.delete(label);});
   function hostStageComplete(label){return label==='Photographer Assigned'?crewAssigned:label==='Shoot Complete'?shootComplete:label==='Completed'?data.stage==='Completed':passed.has(label);}
-  // The expanded detail has one milestone line and exactly two exception lanes.
+  // Show applicable milestones and only exception routes used by this job.
   // Keep all stage detail available through the existing workflow dialog.
   const groupState=groups.map(([title,steps])=>{
    const applicable=steps.filter(label=>!(noShoot&&photographyStages.has(label)));
    const done=applicable.length>0&&applicable.every(hostStageComplete);
    const active=steps.includes(data.stage);
-   return {title,done,active,skipped:!applicable.length,stage:active?data.stage:steps.at(-1)};
-  });
+   return {title,done,active,skipped:!applicable.length,stage:active?data.stage:applicable.at(-1)};
+  }).filter(g=>!g.skipped);
   // Only exceptional stages are nodes on branch lanes. Return targets are
   // annotations, not duplicate main-flow nodes; terminal states never rejoin.
   const branches=[
-   {label:'Changes Requested',from:'Production',to:data.correctionKind==='Source'?'Upload':'Production',active:data.stage==='Changes Requested'},
-   {label:'Reshoot Required',from:'Shoot',to:'Shoot',active:data.stage==='Reshoot Required'||reshoot}
-  ];
+   {label:'Changes Requested',from:'Production',to:data.correctionKind==='Source'?'Upload':'Production',active:data.stage==='Changes Requested',used:history.some(h=>h.new_stage==='Changes Requested')},
+   {label:'Reshoot Required',from:'Shoot',to:'Shoot',active:data.stage==='Reshoot Required'||reshoot,used:history.some(h=>h.new_stage==='Reshoot Required')}
+  ].filter(line=>line.active||line.used);
   const terminal=['Cancelled','Blocked'].includes(data.stage)?data.stage:data.blockedReason?'Blocked':null;
   host.innerHTML=`<div class="jd-flow-compact" role="group" aria-label="Workflow milestones and rejoining exception routes">
    <div class="jd-flow-mainline">${groupState.map((g,i)=>`<button type="button" class="jd-compact-stage ${g.done?'complete':g.active?'current':g.skipped?'skipped':''}" data-flow-stage="${escape(g.stage)}" title="${escape(g.title)}: ${g.done?'Complete':g.active?'Current':g.skipped?'Not required':'Pending'}"><span class="jd-compact-dot" aria-hidden="true">${g.done?'✓':i+1}</span><span>${escape(g.title)}</span></button>`).join('')}</div>
@@ -54,7 +54,7 @@
   host.setAttribute('aria-label','Job workflow: '+data.stage+(data.blockedReason?' · Blocked: '+data.blockedReason:''));
   if(summaryHost){
    const activeStage=main.includes(data.stage)?data.stage:lastNormal;
-   summaryHost.innerHTML=groups.map(([title,steps])=>{
+   summaryHost.innerHTML=groups.filter(([,steps])=>steps.some(label=>!(noShoot&&photographyStages.has(label)))).map(([title,steps])=>{
     const applicable=steps.filter(label=>!(noShoot&&photographyStages.has(label)));
     const skipped=!applicable.length,complete=!skipped&&applicable.every(hostStageComplete);
     const current=steps.includes(activeStage),exception=current&&(!main.includes(data.stage)||!!data.blockedReason||title==='Shoot'&&reshoot);
@@ -220,3 +220,4 @@
  }
  root.StudioJobDetails={workflow,phaseIndex,media};
 })(window);
+
