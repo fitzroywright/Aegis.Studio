@@ -58,9 +58,23 @@
   const previous=(data.history||[]).filter(h=>positions.has(h.new_stage)&&!['Cancelled','Blocked','Reshoot Required','Changes Requested'].includes(h.new_stage)).at(-1)?.new_stage;
   const branchOrigin=main.includes(data.stage)?data.stage:previous||'Pending';
   const branches=correctionEdges+edge('Shoot Complete','Reshoot Required','reshoot')+edge('Reshoot Required','Awaiting Scheduling','reshoot',true)+edge(branchOrigin,'Cancelled','cancel')+edge(branchOrigin,'Blocked','block');
-  host.innerHTML=`<div class="jd-flow-canvas"><svg class="jd-flow-lines" viewBox="0 0 1020 161" aria-hidden="true" focusable="false">${mainEdges}${branches}</svg>${nodes}</div>`;
+  // The expanded detail has one milestone line and exactly two exception lanes.
+  // Keep all stage detail available through the existing workflow dialog.
+  const groupState=groups.map(([title,steps])=>{
+   const applicable=steps.filter(label=>!(noShoot&&photographyStages.has(label)));
+   const done=applicable.length>0&&applicable.every(hostStageComplete);
+   const active=steps.includes(data.stage);
+   return {title,done,active,skipped:!applicable.length,stage:steps.at(-1)};
+  });
+  const exceptions=[
+   {title:'Changes / Reshoot',labels:['Changes Requested','Reshoot Required'],active:data.stage==='Changes Requested'||data.stage==='Reshoot Required'||reshoot},
+   {title:'Cancelled / Blocked',labels:['Cancelled','Blocked'],active:data.stage==='Cancelled'||data.stage==='Blocked'||!!data.blockedReason}
+  ];
+  host.innerHTML=`<div class="jd-flow-compact" role="group" aria-label="Workflow milestones and exception routes">
+   <div class="jd-flow-mainline">${groupState.map((g,i)=>`<button type="button" class="jd-compact-stage ${g.done?'complete':g.active?'current':g.skipped?'skipped':''}" data-flow-stage="${escape(g.stage)}" title="${escape(g.title)}: ${g.done?'Complete':g.active?'Current':g.skipped?'Not required':'Pending'}"><span class="jd-compact-dot" aria-hidden="true">${g.done?'✓':i+1}</span><span>${escape(g.title)}</span></button>`).join('')}</div>
+   ${exceptions.map((line,i)=>`<div class="jd-flow-exception-lane ${line.active?'is-active':''}"><span class="jd-flow-lane-label">${i===0?'↪':'⊘'} ${escape(line.title)}</span><span class="jd-flow-lane-rule" aria-hidden="true"></span>${line.labels.map(label=>`<button type="button" class="jd-compact-exception ${label===data.stage?'current':''}" data-flow-stage="${escape(label)}" title="View ${escape(label)} details">${escape(label)}</button>`).join('')}</div>`).join('')}
+  </div>`;
   host.setAttribute('aria-label','Job workflow: '+data.stage+(data.blockedReason?' · Blocked: '+data.blockedReason:''));
-  const focusPoint=positions.get(data.stage);if(focusPoint&&host.clientWidth)host.scrollLeft=Math.max(0,focusPoint.x-host.clientWidth/2);
   if(summaryHost){
    const activeStage=main.includes(data.stage)?data.stage:lastNormal;
    summaryHost.innerHTML=groups.map(([title,steps])=>{
@@ -73,7 +87,7 @@
    }).join('');
    summaryHost.setAttribute('aria-label','Main job flow: '+data.stage);
   }
-  host.querySelectorAll('.jd-stage').forEach(button=>{
+  host.querySelectorAll('[data-flow-stage]').forEach(button=>{
    const label=button.dataset.flowStage,current=label===data.stage;
    const selector=current?next?.selector:label==='Blocked'&&data.blockedReason&&view.canManage?'[data-wf-block]':label==='Reshoot Required'&&reshoot&&view.canManage&&data.ownerAssignment?.status==='Accepted'&&['Scheduled','Photography In Progress','Awaiting Upload'].includes(data.stage)&&(data.outstandingRoster||[]).length?'[data-wf-remainder]':null;
    button.setAttribute('aria-label',current?(next?.label||data.stage):button.title+' · View workflow details');
