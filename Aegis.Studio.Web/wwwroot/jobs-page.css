@@ -12,6 +12,9 @@
 .sj-table-scroll{flex:1;min-height:0;overflow:auto}
 .sj-table{line-height:1.25;width:100%;border-collapse:collapse;text-align:left;table-layout:fixed}
 .sj-table th{position:sticky;top:0;background:var(--studio-grid-header-bg);color:var(--studio-grid-header-text);font-weight:700;}
+.sj-column-filter{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:11px;font-weight:700;color:inherit}
+.sj-column-filter select{width:100%;max-width:100%;min-width:0;height:23px;padding:1px 16px 1px 4px;box-sizing:border-box;border:1px solid #658bad;border-radius:4px;background:#2c537c;color:#fff;font-size:10px;font-weight:600;cursor:pointer}
+.sj-column-filter select:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
 .sj-table th,.sj-table td{padding:6px 10px;border-bottom:1px solid #e8ebee;overflow-wrap:anywhere;vertical-align:middle}
 .sj-table th:first-child{width:25%}.sj-table th:nth-child(2){width:12%}.sj-table th:nth-child(3){width:15%}.sj-table th:nth-child(4){width:14%}.sj-table th:nth-child(5){width:17%}
 .sj-table td strong{display:block;font-size:12px;font-weight:600;color:#263449;margin-bottom:5px}
