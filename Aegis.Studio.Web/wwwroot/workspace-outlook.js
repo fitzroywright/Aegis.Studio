@@ -151,7 +151,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if (scope === 'Job') {
             detailPane.classList.add('job-reading-view','job-detail-page');
             conversationView.classList.add('has-open-job');
-            let disposed=false,workflowDialog=null;
+            let disposed=false,workflowDialog=null,taskDialog=null;
             const current=()=>!disposed && version===revision && selectedJob?.id===job.id && detailPane.classList.contains('job-detail-page') && !conversationView.classList.contains('hidden');
             const header=detailPane.querySelector('.detail-header');
             header.className='job-detail-heading';
@@ -185,13 +185,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     event.preventDefault();event.stopPropagation();setFlowOpen(false,true);
                 }
             });
-            const nav=document.createElement('nav');
-            nav.className='job-detail-navigation';nav.setAttribute('aria-label','Job information');
-            nav.innerHTML=[['media','▣ Media'],['tasks','☑ Tasks'],['activity','◷ Activity']].map(([name,label])=>`<button type="button" data-job-scroll="${name}" aria-controls="jobDetail-${name}">${label}</button>`).join('');
+            const tools=document.createElement('div');tools.className='job-detail-tools';
+            tools.innerHTML='<button type="button" class="jd-link" data-job-media hidden>← Back to Media</button><button type="button" class="jd-save" data-job-tasks aria-haspopup="dialog">☑ Tasks</button>';
             const board=document.createElement('div');board.className='job-detail-board';
             const center=document.createElement('div');center.className='job-detail-center';
             const panels={},contents={};
-            for(const [name,title] of [['media','All Media'],['subjects','Subjects'],['tasks','Tasks'],['activity','Recent Activity']]){
+            for(const [name,title] of [['media','All Media'],['subjects','Subjects']]){
                 const panel=document.createElement('section');panel.className='jd-panel job-'+name+'-section';panel.id='jobDetail-'+name;panel.hidden=name!=='media';
                 panel.innerHTML=(name==='media'?'':`<header class="jd-card-heading"><h2>${title}</h2>${name==='subjects'?'<button type="button" class="jd-link" data-job-add-subject hidden>＋ Add Subject</button>':''}</header>`)+`<div class="job-${name}-content"></div>`;
                 panels[name]=panel;contents[name]=panel.querySelector('.job-'+name+'-content');center.append(panel);
@@ -208,8 +207,18 @@ function mergeJobMessages(teamMessages, customerMessages) {
             StudioMessageCard.bind(messageCard);
             const attention=document.createElement('section');attention.className='jd-panel jd-attention';
             attention.innerHTML='<header class="jd-card-heading"><h2>⚠ Needs Attention</h2></header><div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
-            right.append(selectedFile,messageCard,attention);board.append(center,right);detailPane.append(nav,board);
-
+            right.append(selectedFile,messageCard,attention);board.append(center,right);detailPane.append(tools,board);
+            const footerTools=document.getElementById('studioFooterJobTools');
+            const makeDrawer=(key,title,label)=>{
+                const toggle=document.createElement('button');toggle.type='button';toggle.className='jd-footer-link';toggle.dataset['job'+key]='';toggle.textContent=label;toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','job'+key+'Drawer');
+                const drawer=document.createElement('aside');drawer.id='job'+key+'Drawer';drawer.className='jd-footer-drawer';drawer.setAttribute('aria-labelledby','job'+key+'Title');drawer.setAttribute('aria-hidden','true');drawer.setAttribute('inert','');
+                drawer.innerHTML=`<header class="jd-card-heading"><h2 id="job${key}Title">${title}</h2><button type="button" class="jd-link" data-close-drawer aria-label="Close ${title}">×</button></header><div class="jd-footer-drawer-content"></div>`;
+                detailPane.append(drawer);footerTools.append(toggle);return {toggle,drawer,host:drawer.querySelector('.jd-footer-drawer-content')};
+            };
+            const activityView=makeDrawer('Activity','Recent Activity','◷ Activity'),notesView=makeDrawer('Notes','Job Notes','✎ Notes');
+            const drawerViews=[activityView,notesView];
+            const {toggle:activityToggle,drawer:activityDrawer}=activityView;
+            contents.activity=activityView.host;
 
             const loaded=new Set(),pending=new Map();
             const refreshLocation=async()=>{
@@ -221,36 +230,87 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const loadPanel=(name,force=false)=>{
                 if(pending.has(name))return pending.get(name);
                 if(loaded.has(name)&&!force)return Promise.resolve(true);
-                const host=contents[name];
+                const host=contents[name],requestDialog=taskDialog;
+                const requestCurrent=()=>current()&&(name!=='tasks'||(taskDialog===requestDialog&&requestDialog?.open));
                 if(name==='media'&&host.studioJobMedia)return host.studioJobMedia.reload();
                 host.innerHTML='<p role="status">Loading…</p>';
                 const request=(async()=>{
                     try{
-                        if(name==='media')await window.StudioJobDetails.media(job,host,selectedContent,current,(mediaCount,subjectCount,permissions)=>{detailPane.dataset.productionEnabled=String(!!permissions.manageProduction);detailPane.dataset.editEnabled=String(!!permissions.editJob);detailPane.dataset.mediaCount=mediaCount;detailPane.dataset.subjectCount=subjectCount;nav.querySelector('[data-job-scroll=media]').textContent='Media '+mediaCount;window.dispatchEvent(new CustomEvent('studio-job-view-changed'));});
-                        else await renderJobTab(name,job,host,current,()=>loadPanel(name,true));
-                        if(!current())return false;
+                        if(name==='media')await window.StudioJobDetails.media(job,host,selectedContent,current,(mediaCount,subjectCount,permissions)=>{detailPane.dataset.productionEnabled=String(!!permissions.manageProduction);detailPane.dataset.editEnabled=String(!!permissions.editJob);detailPane.dataset.mediaCount=mediaCount;detailPane.dataset.subjectCount=subjectCount;window.dispatchEvent(new CustomEvent('studio-job-view-changed'));});
+                        else await renderJobTab(name,job,host,requestCurrent,()=>loadPanel(name,true));
+                        if(!requestCurrent())return false;
                         loaded.add(name);
                         if(name==='subjects')panels.subjects.querySelector('[data-job-add-subject]').hidden=!host.querySelector('#addJobSubject');
                         return true;
                     }catch(error){
-                        if(current()){
+                        if(requestCurrent()){
                             host.innerHTML='<p role="alert"></p><button type="button" class="action">Retry</button>';
                             host.querySelector('p').textContent=error.message||String(error);
                             host.querySelector('button').onclick=()=>loadPanel(name,true);
                         }
                         return false;
-                    }finally{pending.delete(name);}
+                    }finally{if(pending.get(name)===request)pending.delete(name);}
                 })();pending.set(name,request);return request;
             };
+            const openTasks=async()=>{
+                if(taskDialog?.open){taskDialog.focus();return;}
+                const dialog=studioDialog('Tasks','<div class="job-tasks-content"></div>');dialog.classList.add('jd-tasks-dialog');taskDialog=dialog;contents.tasks=dialog.querySelector('.job-tasks-content');
+                dialog.addEventListener('close',()=>{if(taskDialog===dialog){taskDialog=null;loaded.delete('tasks');pending.delete('tasks');if(current())tools.querySelector('[data-job-tasks]').focus();}}, {once:true});
+                await loadPanel('tasks',true);
+            };
+            let notesLoaded=false,notesLoading=false;
+            const loadNotes=async()=>{
+                if(notesLoaded||notesLoading)return;
+                notesLoading=true;
+                const host=notesView.host;host.innerHTML='<p role="status">Loading notes…</p>';
+                try{
+                    const [notes,access]=await Promise.all([json(`/api/jobs/${job.id}/notes`),json(`/api/jobs/${job.id}/access`)]);if(!current())return;
+                    const permissions=access.permissions||access,canAdd=!!(permissions.editJob||permissions.manageProduction);
+                    host.innerHTML='<div class="jd-note-list"></div>'+(canAdd?'<form class="jd-note-form"><label>New note<textarea name="body" maxlength="10000" required placeholder="Add a note to this job…"></textarea></label><button type="submit" class="jd-save">Save note</button><p role="status" aria-live="polite"></p></form>':'');
+                    const drawNotes=items=>{host.querySelector('.jd-note-list').innerHTML=items.map(note=>`<article class="jd-note"><header><strong>${esc(studioFirstName(note.createdBy))}</strong><time datetime="${esc(note.createdAtUtc)}">${esc(new Date(note.createdAtUtc).toLocaleString())}</time></header><p>${esc(note.body)}</p></article>`).join('')||'<p class="muted">No notes yet.</p>';};
+                    drawNotes(notes);notesLoaded=true;
+                    const form=host.querySelector('form');if(!form)return;
+                    let pendingNote=null;
+                    form.onsubmit=async event=>{
+                        event.preventDefault();const body=form.elements.body.value.trim();if(!body)return;
+                        const button=form.querySelector('button'),output=form.querySelector('[role=status]');button.disabled=true;form.elements.body.readOnly=true;output.textContent='Saving…';
+                        try{
+                            pendingNote??={id:crypto.randomUUID(),body};
+                            await json(`/api/jobs/${job.id}/notes`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pendingNote)});
+                            pendingNote=null;form.elements.body.value='';output.textContent='Note saved.';
+                            const items=await json(`/api/jobs/${job.id}/notes`);if(current())drawNotes(items);
+                        }catch(error){if(current())output.textContent=error.message||String(error);}
+                        finally{if(current()){button.disabled=false;form.elements.body.readOnly=!!pendingNote;}}
+                    };
+                }catch(error){if(current()){host.innerHTML='<p role="alert"></p><button type="button" class="jd-save">Retry</button>';host.querySelector('p').textContent=error.message||String(error);host.querySelector('button').onclick=loadNotes;}}
+                finally{notesLoading=false;}
+            };
+            const closeDrawer=(view,restoreFocus=false)=>{view.drawer.classList.remove('is-open');view.drawer.setAttribute('aria-hidden','true');view.drawer.setAttribute('inert','');view.toggle.setAttribute('aria-expanded','false');if(restoreFocus)view.toggle.focus();};
+            const openDrawer=async(view,load)=>{
+                drawerViews.filter(other=>other!==view).forEach(other=>closeDrawer(other));
+                view.drawer.style.setProperty('--jd-drawer-bottom',(document.getElementById('studioShellFooter').getBoundingClientRect().height||32)+'px');
+                view.drawer.classList.add('is-open');view.drawer.setAttribute('aria-hidden','false');view.drawer.removeAttribute('inert');view.toggle.setAttribute('aria-expanded','true');view.drawer.querySelector('[data-close-drawer]').focus();await load();
+            };
+            for(const view of drawerViews){
+                const load=view===activityView?()=>loadPanel('activity',true):loadNotes;
+                view.toggle.onclick=()=>view.toggle.getAttribute('aria-expanded')==='true'?closeDrawer(view,true):openDrawer(view,load);
+                view.drawer.querySelector('[data-close-drawer]').onclick=()=>closeDrawer(view,true);
+                view.drawer.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeDrawer(view,true);}});
+            }
+            const dismissDrawers=event=>{for(const view of drawerViews)if(view.toggle.getAttribute('aria-expanded')==='true'&&!view.drawer.contains(event.target)&&!view.toggle.contains(event.target))closeDrawer(view);};
+            document.addEventListener('pointerdown',dismissDrawers);
             const selectPanel=async name=>{
+                if(name==='tasks')return openTasks();
+                if(name==='activity')return openDrawer(activityView,()=>loadPanel('activity',true));
                 if(name==='messages'){
                     StudioMessageCard.setOpen(messageCard,true);composer.querySelector('textarea').focus();return;
                 }
                 for(const [key,panel] of Object.entries(panels))panel.hidden=key!==name;
-                nav.querySelectorAll('button').forEach(button=>{const active=button.dataset.jobScroll===name;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
+                tools.querySelector('[data-job-media]').hidden=name==='media';
                 await loadPanel(name);
             };
-            nav.querySelectorAll('[data-job-scroll]').forEach(button=>button.onclick=()=>selectPanel(button.dataset.jobScroll));
+            tools.querySelector('[data-job-media]').onclick=()=>selectPanel('media');
+            tools.querySelector('[data-job-tasks]').onclick=openTasks;
             contents.media.studioOpenSubjects=()=>selectPanel('subjects');
             panels.media.dataset.jobTab='gallery';
             // Subject photo/roster links use this page-owned callback, never a global DOM lookup.
@@ -308,14 +368,18 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     workflowDialog=null;
                     if(current()){
                         refreshWorkflow();refreshLocation();
-                        for(const name of ['tasks','activity']){loaded.delete(name);if(!panels[name].hidden)loadPanel(name,true);}
+                        for(const name of ['tasks','activity'])loaded.delete(name);
+                        if(taskDialog?.open)loadPanel('tasks',true);
+                        if(activityToggle.getAttribute('aria-expanded')==='true')loadPanel('activity',true);
                     }
                 }, {once:true});
                 try{await window.StudioWorkflow.render(host,job.id,()=>current()&&dialog.isConnected);if(selector)host.querySelector(selector)?.click();}catch(error){host.textContent=error.message||String(error);}
             };
             // No detached panel retains a running clock.
             const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);
-            disposeJobView=()=>{disposed=true;clearInterval(timer);workflowDialog?.close();contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
+            const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
+            navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
+            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);workflowDialog?.close();taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
         } else {

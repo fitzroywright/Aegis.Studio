@@ -25,11 +25,47 @@ test('job facts appear below the title while Tasks and Activity render their own
  assert.equal(w.document.querySelector('.job-detail-title .jd-client-name strong').textContent,'Williams & Clarke');
  assert.deepEqual(Array.from(facts.querySelectorAll('dt'),field=>field.textContent),['Type','Event date','Location','Photographer']);
  assert.deepEqual(Array.from(facts.querySelectorAll('dd'),field=>field.textContent),['Photography','Sun Oct 11 2026','Kingston Studio','Unassigned']);
- for(const [name,text] of [['tasks','Retouch portraits'],['activity','Front Desk booking']]){
-  await button(w,name).onclick();const panel=w.document.getElementById('jobDetail-'+name);assert.equal(panel.hidden,false);assert.match(panel.textContent,new RegExp(text));
-  assert.equal(w.document.querySelectorAll('.job-detail-center > section:not([hidden])').length,1);
- }
+ assert.equal(button(w,'tasks'),null);assert.equal(button(w,'activity'),null);
+ await w.document.querySelector('[data-job-tasks]').onclick();
+ const tasks=w.document.querySelector('.jd-tasks-dialog');assert.equal(tasks.open,true);assert.match(tasks.textContent,/Retouch portraits/);tasks.close();
+ const activity=w.document.querySelector('#studioFooterJobTools [data-job-activity]');await activity.onclick();
+ const drawer=w.document.getElementById('jobActivityDrawer');assert.equal(drawer.getAttribute('aria-hidden'),'false');assert.match(drawer.textContent,/Front Desk booking/);
+ drawer.querySelector('[data-close-drawer]').click();assert.equal(activity.getAttribute('aria-expanded'),'false');
+ assert.equal(w.document.querySelectorAll('.job-detail-center > section:not([hidden])').length,1);
  w.document.querySelector('[data-message-more]').click();assert.equal(w.document.activeElement.id,'hierarchyBody');
+});
+test('footer Notes exists on empty jobs and saves authored notes independently of messages',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
+ const notes=w.document.querySelector('#studioFooterJobTools [data-job-notes]');assert.ok(notes);
+ await notes.onclick();const drawer=w.document.getElementById('jobNotesDrawer');assert.match(drawer.textContent,/No notes yet/);
+ const form=drawer.querySelector('form');form.elements.body.value='Bring the large backdrop.';
+ await form.onsubmit({preventDefault(){}});assert.match(drawer.querySelector('.jd-note-list').textContent,/Bring the large backdrop/);
+ assert.equal(fixture.jobNotes.job.length,1);assert.equal(form.elements.body.value,'');
+ assert.equal(fixture.calls.some(c=>c.url.endsWith('/messages')&&c.options?.method==='POST'),false);
+ await w.openWorkspaceJob('job2');await settle();await w.document.querySelector('[data-job-notes]').onclick();
+ assert.match(w.document.querySelector('#jobNotesDrawer').textContent,/No notes yet/);assert.doesNotMatch(w.document.querySelector('#jobNotesDrawer').textContent,/large backdrop/);
+});
+test('notes retry reuses the note identifier after a lost save response',async t=>{
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-job-notes]').onclick();
+ const original=w.json;let fail=true;
+ w.json=async(url,options)=>{const result=await original(url,options);if(url.endsWith('/notes')&&options?.method==='POST'&&fail){fail=false;throw Error('Connection lost');}return result;};
+ const form=w.document.querySelector('.jd-note-form');form.elements.body.value='Keep this note.';
+ await form.onsubmit({preventDefault(){}});assert.match(form.textContent,/Connection lost/);assert.equal(form.elements.body.value,'Keep this note.');
+ await form.onsubmit({preventDefault(){}});assert.equal(fixture.jobNotes.job.length,1);
+ const posts=fixture.calls.filter(c=>c.url.endsWith('/notes')&&c.options?.method==='POST');assert.equal(JSON.parse(posts[0].options.body).id,JSON.parse(posts[1].options.body).id);
+});
+test('footer drawers switch, close with Escape and disappear with task popup on navigation',async t=>{
+ const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
+ await w.document.querySelector('[data-job-activity]').onclick();await w.document.querySelector('[data-job-notes]').onclick();
+ assert.equal(w.document.getElementById('jobActivityDrawer').getAttribute('aria-hidden'),'true');
+ const notes=w.document.getElementById('jobNotesDrawer');notes.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ assert.equal(notes.getAttribute('aria-hidden'),'true');assert.equal(w.document.activeElement.dataset.jobNotes,'');
+ await w.document.querySelector('[data-job-tasks]').onclick();await w.studioNavigate('today');await settle();
+ assert.equal(w.document.querySelector('.jd-tasks-dialog'),null);assert.equal(w.document.querySelector('[data-job-notes]'),null);assert.equal(w.document.querySelector('.jd-footer-drawer'),null);
+});
+test('viewer can read Notes without a save form',async t=>{
+ const {w,fixture}=environment(t);fixture.canEdit=false;await w.openWorkspaceJob('job');await settle();await w.document.querySelector('[data-job-notes]').onclick();
+ assert.match(w.document.getElementById('jobNotesDrawer').textContent,/No notes yet/);assert.equal(w.document.querySelector('.jd-note-form'),null);
 });
 test('Subjects load errors stay visible and Retry restores the panel',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');fixture.failSubjects=true;

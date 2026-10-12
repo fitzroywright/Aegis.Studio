@@ -217,6 +217,8 @@
     // The Today route is deliberately excluded from these structural changes.
     function syncPageFrame() {
         const view = document.body.dataset.studioView || currentView;
+        const jobTools=document.getElementById('studioFooterJobTools');
+        if(jobTools)jobTools.hidden=!(view==='workspaces'&&document.querySelector('#conversationView.has-open-job .job-detail-page'));
         if (view === 'today') {
             const title = document.getElementById('studioTodayBrandTitle');
             if (title) {
@@ -287,5 +289,6 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })();
+
 
 

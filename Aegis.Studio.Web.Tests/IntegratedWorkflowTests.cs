@@ -22,6 +22,30 @@ using SkiaSharp;
 namespace Aegis.Studio.Web.Tests;
 public sealed class IntegratedWorkflowTests
 {
+    [StudioPostgresFact]
+    public void JobNotesPersistWithAuthorshipAndDoNotDuplicateOnRetry()
+    {
+        using var context=new WorkflowContext();
+        var store=new WorkspaceJobStore(context.Database);
+        Assert.Empty(store.Notes(context.Job));
+        Guid id=Guid.NewGuid();
+        var request=new JobNoteRequest(id,"  Confirm the client's print sizes.  ");
+        Assert.Equal(id,store.AddNote(context.Job,request,"studio.manager"));
+        Assert.Equal(id,store.AddNote(context.Job,request,"studio.manager"));
+        var note=Assert.Single(new WorkspaceJobStore(context.Database).Notes(context.Job));
+        Assert.Equal("Confirm the client's print sizes.",note.Body);
+        Assert.Equal("studio.manager",note.CreatedBy);
+        Assert.NotEqual(default,note.CreatedAtUtc);
+        Assert.Throws<ArgumentException>(()=>store.AddNote(context.Job,new(id,"Different note"),"studio.manager"));
+        Assert.Throws<ArgumentException>(()=>store.AddNote(context.Job,request,"different.user"));
+        Guid otherJob=Guid.NewGuid();
+        Sql(context.Connection,"insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,created_at_utc) select $1,workspace_id,conversation_id,'Other job',client_name,status,now() from studio_jobs where id=$2",otherJob,context.Job);
+        Assert.Throws<ArgumentException>(()=>store.AddNote(otherJob,request,"studio.manager"));
+        Assert.Empty(store.Notes(otherJob));
+        Assert.Throws<ArgumentException>(()=>store.AddNote(context.Job,new(Guid.NewGuid()," "),"studio.manager"));
+        Assert.Throws<ArgumentException>(()=>store.AddNote(context.Job,new(Guid.Empty,"Note"),"studio.manager"));
+        Assert.Throws<ArgumentException>(()=>store.AddNote(context.Job,new(Guid.NewGuid(),new string('x',10001)),"studio.manager"));
+    }
     [Fact] public void PhotoCatalogueCannotFabricateScaleByRepeatingSources()
     {
         var photos=DemoPortraitCatalogue.Photos;
@@ -210,3 +234,4 @@ public sealed class IntegratedWorkflowTests
     }
     private static void Sql(NpgsqlConnection c,string sql,params object[] values){using var cmd=new NpgsqlCommand(sql,c){CommandTimeout=120};if(values.Length>0&&sql.Contains(';')){foreach(string statement in sql.Split(';',StringSplitOptions.RemoveEmptyEntries))Sql(c,statement,values);return;}foreach(var value in values)cmd.Parameters.AddWithValue(value);cmd.ExecuteNonQuery();}
 }
+
