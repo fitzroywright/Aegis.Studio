@@ -314,6 +314,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     const view=await json('/api/jobs/'+job.id+'/connected-workflow');if(!current())return;
                     workflow=view;const data=view.data;
                     window.StudioJobDetails.workflow(header.querySelector('.jd-workflow-track'),data,job,view,selector=>header.querySelector('[data-job-workflow]').onclick(selector),header.querySelector('.jd-flow-summary'));
+                    const graphView=await json(`/api/jobs/${job.id}/workflow-graph`);
+                    if(current()&&graphView?.graph){const graphHost=header.querySelector('.jd-workflow-track');graphHost.style.height='230px';StudioGraph.canvas(graphHost,graphView.graph,{evaluation:graphView.evaluation,onSelect:()=>StudioJobGraph.open(job.id)});}
+                    let graphButton=header.querySelector('[data-template-workflow]');
+                    if(!graphButton){graphButton=document.createElement('button');graphButton.className='action';graphButton.dataset.templateWorkflow='';graphButton.textContent='Template Workflow';header.querySelector('[data-job-workflow]').insertAdjacentElement('afterend',graphButton);}
+                    graphButton.onclick=()=>StudioJobGraph.open(job.id);
                     header.querySelector('.jd-status-pill').textContent=data.stage;
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(data.owner?studioFirstName(data.owner):'Unassigned');
                     const crew=(data.sessions||[]).flatMap(session=>session.crew||[]);
@@ -350,6 +355,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
             navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
             disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);workflowDialog?.close();taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
+            const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};document.addEventListener('studio-workflow-changed',graphChanged);const previousDispose=disposeJobView;disposeJobView=()=>{document.removeEventListener('studio-workflow-changed',graphChanged);previousDispose();};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
         } else {
@@ -394,6 +400,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
 
     }
 })();
+
 
 
 

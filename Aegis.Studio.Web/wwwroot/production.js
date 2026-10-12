@@ -54,8 +54,10 @@ function renderShootRow(shoot,canManage=true) {
 }
 
 function renderActivityRow(activity) {
+    const eligible=!activity.workflowEligibility||['Available','InProgress','Blocked','WaitingOnCustomer','Partial','Failed','ReworkRequired','ReprintRequired','ReadyForDelivery'].includes(activity.workflowEligibility);
+    const disabled=eligible?'':'disabled';
     const job = operationalJobs.get(activity.jobId);
-    return `<div class="job-row"><div><b>${esc(activity.activityType)} · ${esc(activity.title)}</b><div class="meta">${esc(job?.title || 'Job')} · ${esc(activity.assignedTo ? studioFirstName(activity.assignedTo) : 'Unassigned')} · ${esc(activity.priority)} · ${esc(activity.status)}${activity.dueAtUtc ? ' · due '+new Date(activity.dueAtUtc).toLocaleString() : ''}${activity.blockedReason ? ' · '+esc(activity.blockedReason) : ''}</div></div><div class="job-actions"><button class="action" onclick="setOperationalActivityStatus('${activity.id}','InProgress')">Start</button><button class="action" onclick="blockOperationalActivity('${activity.id}')">Block</button><button class="action" onclick="setOperationalActivityStatus('${activity.id}','Completed')">Complete</button><button class="action" onclick="openJobOperations('${activity.jobId}')">Job</button></div></div>`;
+    return `<div class="job-row"><div><b>${esc(activity.activityType)} · ${esc(activity.title)}</b><div class="meta">${esc(job?.title || 'Job')} · ${esc(activity.assignedTo ? studioFirstName(activity.assignedTo) : 'Unassigned')} · ${esc(activity.priority)} · ${esc(activity.workflowEligibility||activity.status)}${activity.dueAtUtc ? ' · due '+new Date(activity.dueAtUtc).toLocaleString() : ''}${activity.blockedReason ? ' · '+esc(activity.blockedReason) : ''}</div></div><div class="job-actions"><button class="action" ${disabled} onclick="setOperationalActivityStatus('${activity.id}','InProgress')">Start</button><button class="action" onclick="blockOperationalActivity('${activity.id}')">Block</button><button class="action" ${disabled} onclick="setOperationalActivityStatus('${activity.id}','Completed')">Complete</button><button class="action" onclick="openJobOperations('${activity.jobId}')">Job</button></div></div>`;
 }
 
 function buildActivityDialog(jobs) {
@@ -182,3 +184,4 @@ async function openPhotographerReport(jobId,assignmentId=null){
  let original=null;
  f.onsubmit=async e=>{e.preventDefault();const button=f.querySelector('button.primary');button.disabled=true;try{if(!original){const row=rows[Number(f.elements.person.value)];original={photographer:row.userName,reason:f.elements.reason.value,operation:{operationId:crypto.randomUUID(),kind:Number(f.elements.kind.value),assignmentId:row.assignmentId,occurredAtUtc:new Date(f.elements.occurred.value).toISOString(),deviceId:'StudioManual',text:f.elements.note.value||null,category:null,location:null,expectedVersion:row.version}};f.querySelectorAll('input,textarea,select').forEach(x=>x.disabled=true);}await json(`/api/jobs/${jobId}/photographer-reports`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(original)});d.close();await openWorkspaceJob(jobId);}catch(error){f.querySelector('[role=alert]').textContent=error.message+' Refresh assignment facts before recording a new decision if this report conflicts.';button.disabled=false;button.textContent='Retry original report';}};
 }
+

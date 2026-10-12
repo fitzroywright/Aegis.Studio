@@ -236,7 +236,16 @@ public sealed class IntegratedWorkflowTests
             string connectionString=Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES")!;
             Root=Path.Combine(Path.GetTempPath(),schema);
             admin=new NpgsqlConnection(connectionString);admin.Open();Sql(admin,$"create schema {schema}");
-            source=NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(connectionString){SearchPath=schema}.ConnectionString);
+            var builder=new NpgsqlDataSourceBuilder(new NpgsqlConnectionStringBuilder(connectionString){SearchPath=schema}.ConnectionString);
+            // Explicitly initialize physical connections too: embedded protocol servers may ignore startup options.
+            builder.UsePhysicalConnectionInitializer(connection=>
+            {
+                using var command=new NpgsqlCommand($"set search_path to {schema}",connection);command.ExecuteNonQuery();
+            },async connection=>
+            {
+                await using var command=new NpgsqlCommand($"set search_path to {schema}",connection);await command.ExecuteNonQueryAsync();
+            });
+            source=builder.Build();
             Database=new StudioDatabase(source);
             Connection=Database.OpenConnection();
             try
@@ -266,5 +275,6 @@ public sealed class IntegratedWorkflowTests
     }
     private static void Sql(NpgsqlConnection c,string sql,params object[] values){using var cmd=new NpgsqlCommand(sql,c){CommandTimeout=120};if(values.Length>0&&sql.Contains(';')){foreach(string statement in sql.Split(';',StringSplitOptions.RemoveEmptyEntries))Sql(c,statement,values);return;}foreach(var value in values)cmd.Parameters.AddWithValue(value);cmd.ExecuteNonQuery();}
 }
+
 
 

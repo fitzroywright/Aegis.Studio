@@ -7,11 +7,12 @@ public sealed record TemplateStep(string Key, string Title, string ActivityType 
 public sealed record TemplateProduct(Guid CatalogItemId, int Quantity = 1, string? Specifications = null);
 public sealed record CommercialTemplate(string Name, string Description, TemplateStep[] Steps,
     TemplateProduct[]? Products = null, string[]? RequiredRoles = null, string[]? Skills = null,
-    bool SchedulingRequired = false, bool InHouse = true);
+    bool SchedulingRequired = false, bool InHouse = true, WorkflowGraph? Workflow = null,
+    string[]? Deliverables = null, string? CompletionRequirements = null);
 public sealed record TemplateVersion(Guid Id, string Kind, int Version, bool Active, CommercialTemplate Definition);
 public sealed record BundleComponent(Guid CatalogItemId, int Quantity);
 public sealed record WorkOrderCommand(string Status, string? AssignedTo, string? BlockedReason, Guid OperationId, long ExpectedRevision);
-public sealed record ApplyJobTemplateRequest(Guid TemplateId, Guid OperationId, long ExpectedRevision);
+public sealed record ApplyJobTemplateRequest(Guid TemplateId, Guid OperationId, long ExpectedRevision, bool ConfirmChanges = false, string? Reason = null, int? ExpectedTemplateVersion = null);
 
 public static class CommercialRules
 {
@@ -21,11 +22,16 @@ public static class CommercialRules
         if (kind is not ("Job" or "WorkOrder")) throw new ArgumentException("Unknown template kind.");
         if (string.IsNullOrWhiteSpace(template.Name) || template.Name.Length > 200 || template.Description.Length > 4000)
             throw new ArgumentException("Provide a template name and a description of at most 4,000 characters.");
-        if (template.Steps is null || template.Steps.Length is < 1 or > 100) throw new ArgumentException("Provide 1–100 steps.");
+        if (template.Workflow is not null)
+        {
+            var issues = WorkflowGraphEngine.Validate(template.Workflow);
+            if (issues.Length > 0) throw new ArgumentException(string.Join("\n", issues.Select(i => $"{i.NodeId}: {i.Message}")));
+        }
+        if (template.Steps is null || template.Steps.Length is < 1 or > 300) throw new ArgumentException("Provide 1–300 tasks.");
         var keys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var step in template.Steps)
         {
-            if (string.IsNullOrWhiteSpace(step.Key) || step.Key.Length > 100 || !keys.Add(step.Key) ||
+            if (string.IsNullOrWhiteSpace(step.Key) || step.Key.Length > 900 || !keys.Add(step.Key) ||
                 string.IsNullOrWhiteSpace(step.Title) || step.Title.Length > 200 || !Areas.Contains(step.Area) ||
                 step.EstimatedMinutes < 0 || step.EstimatedCost < 0 || (step.QualityControl && !string.IsNullOrWhiteSpace(step.Variation)))
                 throw new ArgumentException("Steps need unique keys, titles, valid production areas and nonnegative estimates.");
@@ -34,7 +40,7 @@ public static class CommercialRules
         keys.Clear();
         foreach (var step in template.Steps)
         {
-            if ((step.DependsOn ?? []).Any(key => !keys.Contains(key)))
+            if (template.Workflow is null && (step.DependsOn ?? []).Any(key => !keys.Contains(key)))
                 throw new ArgumentException("Dependencies must refer to earlier steps.");
             keys.Add(step.Key);
         }

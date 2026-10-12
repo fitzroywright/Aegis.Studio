@@ -7,7 +7,7 @@ using static Aegis.Studio.Web.Production.CommercialTemplateStore;
 
 namespace Aegis.Studio.Web.Production;
 
-public sealed record SaveCommercialTemplate(CommercialTemplate Definition, int ExpectedVersion = 0, bool Active = true);
+public sealed record SaveCommercialTemplate(CommercialTemplate Definition, int ExpectedVersion = 0, bool Active = true, int ExpectedDraftRevision = 0);
 public sealed record WorkOrderSource(Guid AssetId);
 public sealed record WorkOrderResolution(string Reason);
 public sealed record WorkOrderAmendment(string Specifications,string Reason,string? ExpectedSpecifications);
@@ -19,8 +19,12 @@ public static class CommercialEndpoints
         var db = app.Services.GetRequiredService<StudioDatabase>(); CommercialSchema.Ensure(db);
         var admin = app.MapGroup("/api/admin/commercial/templates").RequireAuthorization(policy => policy.RequireRole("Administrator"));
         admin.MapGet("/{kind}", (string kind, StudioDatabase database) => Results.Ok(new CommercialTemplateStore(database).List(kind, true)));
-        admin.MapPost("/{kind}", (string kind, SaveCommercialTemplate request, ClaimsPrincipal user, StudioDatabase database) => Run(() => Results.Ok(new CommercialTemplateStore(database).Save(null, kind, request.Definition, 0, request.Active, WorkflowStore.Name(user)))));
-        admin.MapPut("/{kind}/{id:guid}", (string kind, Guid id, SaveCommercialTemplate request, ClaimsPrincipal user, StudioDatabase database) => Run(() => Results.Ok(new CommercialTemplateStore(database).Save(id, kind, request.Definition, request.ExpectedVersion, request.Active, WorkflowStore.Name(user)))));
+        admin.MapPost("/{kind}", (string kind, SaveCommercialTemplate request, ClaimsPrincipal user, StudioDatabase database) => Run(() => kind == "Job"
+            ? Results.Ok(new WorkflowTemplateStore(database).SaveDraft(Guid.NewGuid(), new(request.Definition, Active: request.Active), WorkflowStore.Name(user)))
+            : Results.Ok(new CommercialTemplateStore(database).Save(null, kind, request.Definition, 0, request.Active, WorkflowStore.Name(user)))));
+        admin.MapPut("/{kind}/{id:guid}", (string kind, Guid id, SaveCommercialTemplate request, ClaimsPrincipal user, StudioDatabase database) => Run(() => kind == "Job"
+            ? Results.Ok(new WorkflowTemplateStore(database).SaveDraft(id, new(request.Definition, request.ExpectedDraftRevision, request.ExpectedVersion, request.Active), WorkflowStore.Name(user)))
+            : Results.Ok(new CommercialTemplateStore(database).Save(id, kind, request.Definition, request.ExpectedVersion, request.Active, WorkflowStore.Name(user)))));
         admin.MapPost("/{id:guid}/duplicate", (Guid id, ClaimsPrincipal user, StudioDatabase database) => Run(() =>
         {
             var store = new CommercialTemplateStore(database); var original = store.Get(id) ?? throw new KeyNotFoundException();
@@ -43,8 +47,8 @@ public static class CommercialEndpoints
             using var c = database.OpenConnection(); using var q = Command(c, null, """
                 select coalesce(jsonb_agg(jsonb_build_object('id',a.id,'catalogItemId',a.catalog_item_id,'name',p.name,'quantity',a.quantity,
                   'specifications',a.specifications,'unitPrice',coalesce(a.confirmed_unit_price,round(p.unit_price*(1+p.tax_rate/100),2)),
-                  'confirmed',a.confirmed_at is not null,'saleLineId',a.sale_line_id)),'[]')::text
-                from studio_job_catalog_agreements a join studio_pos_catalog p on p.id=a.catalog_item_id where a.job_id=$1
+                  'confirmed',a.confirmed_at is not null,'saleLineId',a.sale_line_id,'workflowSelected',a.workflow_selected)),'[]')::text
+                from studio_job_catalog_agreements a join studio_pos_catalog p on p.id=a.catalog_item_id where a.job_id=$1 and (a.workflow_selected or a.confirmed_at is not null or a.sale_line_id is not null)
                 """, jobId);
             return Results.Content((string)q.ExecuteScalar()!, "application/json");
         }).RequireAuthorization();

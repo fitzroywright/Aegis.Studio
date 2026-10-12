@@ -30,7 +30,17 @@ public sealed class OperationalWorkStore
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<JobActivity> values = [];
         while (reader.Read()) values.Add(ReadActivity(reader));
-        return values;
+        reader.Close();
+        var graphStore=new JobGraphStore(database);
+        var eligibility=new Dictionary<Guid,GraphTask>();
+        foreach(var job in values.Select(a=>a.JobId).Distinct())
+        {
+            var graph=graphStore.Get(job);
+            if(graph is not null)foreach(var task in graph.Tasks)eligibility[task.Id]=task;
+        }
+        return values.Select(a=>eligibility.TryGetValue(a.Id,out var task)
+            ? a with { WorkflowEligibility=task.Eligibility, WorkflowDependencies=task.Dependencies, WorkflowRole=task.Role, BlockedReason=task.Reason??a.BlockedReason }
+            : a).ToArray();
     }
 
     public JobActivity CreateActivity(Guid jobId, JobActivityRequest request, string userName)
@@ -219,7 +229,7 @@ public sealed class OperationalWorkStore
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value)?null:value.Trim();
 }
 
-public sealed record JobActivity(Guid Id,Guid JobId,string ActivityType,string Title,string? Description,string Status,string Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,DateTimeOffset? StartedAtUtc,DateTimeOffset? CompletedAtUtc,string? Location,string? BlockedReason,string? HandoffTo,string CreatedBy,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc,string? CollectionName=null,long WorkflowRevision=0);
+public sealed record JobActivity(Guid Id,Guid JobId,string ActivityType,string Title,string? Description,string Status,string Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,DateTimeOffset? StartedAtUtc,DateTimeOffset? CompletedAtUtc,string? Location,string? BlockedReason,string? HandoffTo,string CreatedBy,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc,string? CollectionName=null,long WorkflowRevision=0,string? WorkflowEligibility=null,string[]? WorkflowDependencies=null,string? WorkflowRole=null);
 public sealed record JobActivityRequest(string? ActivityType,string Title,string? Description,string? Status,string? Priority,string? AssignedTo,DateTimeOffset? ScheduledAtUtc,DateTimeOffset? DueAtUtc,string? Location,string? BlockedReason,string? HandoffTo,long? ExpectedRevision=null,Guid OperationId=default);
 public sealed record ShootSession(Guid Id,Guid JobId,Guid? ScheduleEntryId,string PhotographerUserName,string? AssistantUserName,DateTimeOffset CallTimeUtc,DateTimeOffset PlannedEndUtc,string? Location,string Status,DateTimeOffset? CheckedInAtUtc,DateTimeOffset? CheckedOutAtUtc,int ImageCount,bool BackupConfirmed,bool ReshootRequired,string? CoverageNotes,string? EquipmentNotes,string HandoffStatus,string? HandoffTo,DateTimeOffset CreatedAtUtc,DateTimeOffset UpdatedAtUtc);
 public sealed record ShootSessionRequest(Guid? ScheduleEntryId,string PhotographerUserName,string? AssistantUserName,DateTimeOffset CallTimeUtc,DateTimeOffset PlannedEndUtc,string? Location,string? CoverageNotes,string? EquipmentNotes);
