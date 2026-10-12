@@ -59,3 +59,11 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .studio-context-card .studio-workspaces-view-all:focus-visible{outline:2px solid currentColor;outline-offset:3px}
 
 .studio-context-card .studio-workspaces-card-header .studio-workspaces-view-all{color:inherit!important;opacity:.95}
+
+/* Consistent Today-style search fields in Jobs and Front Desk grid headers. */
+body[data-studio-view="jobs"] .sj-job-header input[data-sj-search],
+body[data-studio-view="frontdesk"] #frontDeskSearch{background:#2c537c!important;color:#fff!important;border:1px solid #6e96b8!important;border-radius:5px;font-weight:600}
+body[data-studio-view="jobs"] .sj-job-header input[data-sj-search]::placeholder,
+body[data-studio-view="frontdesk"] #frontDeskSearch::placeholder{color:#e5eef7!important;opacity:1}
+body[data-studio-view="jobs"] .sj-job-header input[data-sj-search]:focus,
+body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!important;color:#fff!important;outline:2px solid #cf792a;outline-offset:1px}
