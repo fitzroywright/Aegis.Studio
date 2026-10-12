@@ -7872,7 +7872,7 @@ body[data-studio-view="today"] .mw-list-panel>header h2 {
   font-weight: 600;
   font-size: .85rem;
 }
-body[data-studio-view="today"] .studio-context-card>header h2 {
+.studio-context-rail .studio-context-card>header h2 {
   font-weight: 600;
   font-size: .85rem;
 }
@@ -8040,13 +8040,13 @@ body .shell>.studio-context-rail .mw-list-panel>header {
     padding: 86px 8px 8px !important;
   }
 }
-body[data-studio-view="today"] .shell>.studio-context-rail {
+.shell>.studio-context-rail {
   display: grid !important;
   grid-template-rows: repeat(3,minmax(0,1fr));
   align-content: stretch;
   overflow: hidden;
 }
-body[data-studio-view="today"] .shell>.studio-context-rail>.studio-context-card {
+.shell>.studio-context-rail>.studio-context-card {
   min-height: 0;
   max-height: 100%;
   height: 100%;
@@ -8055,7 +8055,7 @@ body[data-studio-view="today"] .shell>.studio-context-rail>.studio-context-card 
   flex-direction: column;
   overflow: hidden;
 }
-body[data-studio-view="today"] .studio-context-card>.mw-today-rail-links {
+.studio-context-rail .studio-context-card>.mw-today-rail-links {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -8083,27 +8083,27 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel>:not(header) {
   min-height: 0;
   overflow-y: auto;
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(1) {
+.studio-context-rail .studio-context-card:nth-child(1) {
   border-color:var(--studio-rail-accent);
   background: #f5faff;
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(1)>header {
+.studio-context-rail .studio-context-card:nth-child(1)>header {
   background:var(--studio-rail-accent);
   border-bottom-color:var(--studio-rail-accent);
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(2) {
+.studio-context-rail .studio-context-card:nth-child(2) {
   border-color:var(--studio-rail-accent);
   background: #f7fbf8;
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(2)>header {
+.studio-context-rail .studio-context-card:nth-child(2)>header {
   background:var(--studio-rail-accent);
   border-bottom-color:var(--studio-rail-accent);
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(3) {
+.studio-context-rail .studio-context-card:nth-child(3) {
   border-color:var(--studio-rail-accent);
   background: #f7fcf8;
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(3)>header {
+.studio-context-rail .studio-context-card:nth-child(3)>header {
   background:var(--studio-rail-accent);
   border-bottom-color:var(--studio-rail-accent);
 }
@@ -8161,7 +8161,7 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="at
   display:flex;flex-direction:column;}
 }
 @media (max-height:650px) {
-  body[data-studio-view="today"] .shell>.studio-context-rail {
+  .shell>.studio-context-rail {
     overflow-y: auto;
   }
   body[data-studio-view="today"] .mw-today-right {
@@ -8308,7 +8308,7 @@ body[data-studio-view="today"] .mw-today-focus-label {
   padding: 2px 7px;
   font-size: .58rem;
 }
-body[data-studio-view="today"] .shell>.studio-context-rail {
+.shell>.studio-context-rail {
   padding-top: 62px;
   padding-bottom: 6px;
   gap: 7px;
@@ -8502,15 +8502,15 @@ body[data-studio-view="today"] .studio-status-pill[data-status*="editing"] {
   border-color: #c2dfd1;
   color: #36765c;
 }
-body[data-studio-view="today"] .studio-context-card .mw-today-rail-links button:nth-child(3n+1)>span:first-child {
+.studio-context-rail .studio-context-card .mw-today-rail-links button:nth-child(3n+1)>span:first-child {
   background: #dceafb;
   color: #2165a2;
 }
-body[data-studio-view="today"] .studio-context-card .mw-today-rail-links button:nth-child(3n+2)>span:first-child {
+.studio-context-rail .studio-context-card .mw-today-rail-links button:nth-child(3n+2)>span:first-child {
   background: #ffe8cf;
   color: #a05c1c;
 }
-body[data-studio-view="today"] .studio-context-card .mw-today-rail-links button:nth-child(3n)>span:first-child {
+.studio-context-rail .studio-context-card .mw-today-rail-links button:nth-child(3n)>span:first-child {
   background: #e1efe9;
   color: #3a7865;
 }
@@ -9516,7 +9516,7 @@ body .shell>.studio-shell-footer .studio-grid-item-count {
     min-height: 0;
     overflow-y: auto;
   }
-  body[data-studio-view="today"] .shell>.studio-context-rail {
+  .shell>.studio-context-rail {
     min-height: 0;
     padding-top: 7px !important;
     padding-bottom: 6px !important;
@@ -9532,7 +9532,7 @@ body .shell>.studio-shell-footer .studio-grid-item-count {
   body[data-studio-view="today"] .studio-dashboard-template__primary>.mw-today-jobs {
     height: auto !important;
   }
-  body[data-studio-view="today"] .shell>.studio-context-rail {
+  .shell>.studio-context-rail {
     padding-top: 0 !important;
     padding-bottom: 0 !important;
   }
@@ -9620,11 +9620,12 @@ body:not([data-studio-view="today"]) .shell>main>#genericView {
   box-sizing: border-box;
   padding: 7px 12px 6px 5px !important;
 }
-body:not([data-studio-view="today"]) .shell>.studio-context-rail {
+.shell>.studio-context-rail {
   min-height: 0;
-  overflow-y: auto;
-  padding-top: 7px;
+  overflow: hidden;
+  padding-top: 62px;
   padding-bottom: 6px;
+  gap: 7px;
 }
 body:not([data-studio-view="today"]) .shell>.studio-shell-footer {
   display: flex;
