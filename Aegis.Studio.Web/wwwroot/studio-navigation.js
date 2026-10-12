@@ -892,6 +892,9 @@
         await refreshWorkflowList();
         await renderGlobalRoleAdministration();
         await renderAnnouncementAdministration();
+        if(!current())return;
+        const adminGrid=genericView.querySelector('.st-admin-grid');
+        for(const section of [...genericView.children].filter(el=>el.classList.contains('job-section'))){section.classList.add('admin-card');adminGrid.appendChild(section);}
 
         const panel=document.getElementById('studioDemoLoader');
         panel.querySelector('[data-demo-preview]').onclick=async()=>{
@@ -1017,7 +1020,7 @@
         setActive(view);
         if(view!=='today'){
             if(studioPageTools)studioPageTools.innerHTML='';
-            window.studioSetBreadcrumb?.([{label:view==='workspaces'?'Workspaces':view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
+            window.studioSetBreadcrumb?.([{label:navigationLabels[view]||view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
             if(context.studioJobId)await window.openWorkspaceJob(context.studioJobId,{navigationRecorded:true,history:false});

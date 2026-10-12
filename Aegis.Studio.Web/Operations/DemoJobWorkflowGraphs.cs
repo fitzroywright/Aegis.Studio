@@ -10,7 +10,6 @@ internal static class DemoJobWorkflowGraphs
 {
     internal static void Seed(NpgsqlConnection c, NpgsqlTransaction tx, string actor)
     {
-        using (var q = Command(c, tx, "select exists(select 1 from studio_state where key='demo-job-workflow-graphs-v1')")) if ((bool)q.ExecuteScalar()!) return;
         Guid Service(string code, string name, string category)
         {
             using var q = Command(c, tx, "select id from studio_pos_catalog where code=$1", code);
@@ -19,6 +18,22 @@ internal static class DemoJobWorkflowGraphs
             Execute(c, tx, "insert into studio_pos_catalog(id,code,name,category,unit_price,is_active,sort_order,updated_at_utc) values($1,$2,$3,$4,500,true,0,now())", id, code, name, category); return id;
         }
         Guid retouch = Service("GRAPH-RETOUCH", "Professional retouching", "Production"), print = Service("GRAPH-PRINT", "Printed photographs", "Prints");
+        Guid WorkOrder(string name,string type,string area)
+        {
+            using(var existing=Command(c,tx,"select id from studio_commercial_templates where kind='WorkOrder' and definition->>'name'=$1 order by updated_at limit 1",name))
+                if(existing.ExecuteScalar() is Guid found)return found;
+            var definition=new CommercialTemplate(name,"Demo production and mandatory quality control",[
+                new("produce",name,type,area),new("qc","Quality inspection","QC","Quality Control",DependsOn:["produce"],QualityControl:true)]);
+            CommercialRules.Validate(definition,"WorkOrder");Guid id=Guid.NewGuid();string json=JsonSerializer.Serialize(definition,Json);
+            Execute(c,tx,"insert into studio_commercial_templates(id,kind,version,active,definition,updated_by) values($1,'WorkOrder',1,true,$2::jsonb,$3)",id,json,actor);
+            Execute(c,tx,"insert into studio_commercial_template_versions(template_id,version,definition,created_by) values($1,1,$2::jsonb,$3)",id,json,actor);
+            return id;
+        }
+        var retouchOrder=WorkOrder("Retouching and Quality Control","Retouch","Editing");
+        var printOrder=WorkOrder("Printing and Quality Control","Print","Printing");
+        Execute(c,tx,"update studio_pos_catalog set requires_production=true,work_order_template_id=$2 where id=$1",retouch,retouchOrder);
+        Execute(c,tx,"update studio_pos_catalog set requires_production=true,work_order_template_id=$2 where id=$1",print,printOrder);
+        using (var q = Command(c, tx, "select exists(select 1 from studio_state where key='demo-job-workflow-graphs-v1')")) if ((bool)q.ExecuteScalar()!) return;
         var conditional = WorkflowGraphExamples.Graduation(retouch, print); var parallel = WorkflowGraphExamples.Parallel(); var linear = WorkflowGraphExamples.Linear();
         var names = new[] { "Graduation Photography", "Wedding Photography", "Corporate Headshots", "ID Photography", "Portrait Photography", "Photo Printing", "Photo Restoration", "Image Editing" };
         var templates = new List<TemplateVersion>();

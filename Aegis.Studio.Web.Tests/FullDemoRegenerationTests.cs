@@ -49,6 +49,9 @@ public class FullDemoRegenerationTests
         using var ctx=new IntegratedWorkflowTests.WorkflowContext();
         new Aegis.Studio.Web.FrontDesk.FrontDeskBookingRequestStore(ctx.Database).EnsureSchema();
         WorkflowSchema.Ensure(ctx.Database);StudioOperationsEnhancements.EnsureSchema(ctx.Database,new WorkspaceStore(ctx.Database));
+        new Aegis.Studio.Web.WorkDay.WorkDayStore(ctx.Database).EnsureSchema();
+        new StudioAccountsStore(ctx.Database).EnsureSchema();new ClientPortalStore(ctx.Database).EnsureSchema();
+        Sql(ctx.Connection,"create table studio_job_fulfillment(operation_id uuid primary key,job_id uuid not null unique references studio_jobs(id),method text not null,recipient text not null,recorded_by text not null,recorded_at timestamptz not null default now())");
         new GlobalOperationalRoleStore(ctx.Database).EnsureSchema();
         new StudioEmployeeDirectoryStore(ctx.Database).EnsureSchema();
         var storage=new LocalFileStorage(ctx.Root);
@@ -82,6 +85,8 @@ public class FullDemoRegenerationTests
             Assert.Equal("preserved",Scalar(ctx.Connection,"select value from studio_state where key='provider-contract'"));
             Assert.Equal(8,Scalar(ctx.Connection,"select count(*)::int from studio_commercial_templates where kind='Job'"));
             Assert.Equal(10,Scalar(ctx.Connection,"select count(*)::int from studio_job_template_instances"));
+            Assert.Equal(2,Scalar(ctx.Connection,"select count(*)::int from studio_commercial_templates where kind='WorkOrder'"));
+            Assert.Equal(2,Scalar(ctx.Connection,"select count(*)::int from studio_pos_catalog where code like 'GRAPH-%' and requires_production and work_order_template_id is not null"));
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_jobs"))>=126);
             Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_jobs j where j.id::text like 'de000000-0000-4000-0041-%' and (select count(*) from studio_media_assets m where m.job_id=j.id)<40"));
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_photographers"))>=4);
