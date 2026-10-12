@@ -35,7 +35,7 @@
 .jd-job-status small { grid-column:2; color:var(--theme-muted,#7c8493); }
 .jd-workflow-track { display:block; padding:5px 0; min-width:0; overflow:hidden; max-height:none; }
 /* Compact detail workflow: six milestones, two exception lanes, no nested scrollbars. */
-.jd-flow-compact { display:grid; gap:9px; width:100%; min-width:0; padding:6px 4px; box-sizing:border-box; }
+.jd-flow-compact { display:grid; gap:9px; width:100%; min-width:0; padding:9px 12px; box-sizing:border-box; background:var(--theme-surface-alt,#f2f5f8); border:1px solid var(--theme-border,#d9e0e8); border-radius:6px; }
 .jd-flow-mainline { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:3px; position:relative; }
 .jd-flow-mainline::before { content:""; position:absolute; top:11px; left:8%; right:8%; height:3px; background:#abb5c2; }
 .jd-compact-stage { position:relative; display:flex; flex-direction:column; align-items:center; gap:5px; min-width:0; padding:0 2px; border:0; background:transparent; color:var(--theme-text,#162b50); font-size:10px; font-weight:700; cursor:pointer; }
