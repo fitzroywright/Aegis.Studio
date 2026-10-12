@@ -42,12 +42,3 @@
 .st-tools [data-period]{width:auto;max-width:180px}.st-content [data-finance-filter]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:8px}.st-content [data-finance-filter] p{grid-column:1/-1}.st-content [data-finance-filter] label{font-size:11px}
 .st-content .op-metric b,.st-content .op-metric small{display:block}.st-content .op-metric>span{min-width:0}
 
-/* Front Desk: Today-style inline column controls, owned by the shared page component. */
-body[data-studio-view="frontdesk"] .fd-queue .fd-table thead th{padding:7px 9px}
-body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls{display:flex;align-items:center;gap:6px;white-space:nowrap}
-body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls select{flex:1 1 auto;width:auto;min-width:76px;max-width:175px;height:25px;padding:2px 18px 2px 6px;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600}
-body[data-studio-view="frontdesk"] .fd-customer-header{display:flex;align-items:center;gap:7px;min-width:0}
-body[data-studio-view="frontdesk"] .fd-customer-header>span{flex:0 0 auto}
-body[data-studio-view="frontdesk"] .fd-customer-header input{flex:1 1 100px;min-width:100px;width:100%;max-width:310px;height:26px;box-sizing:border-box;padding:3px 7px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:4px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;font-weight:400}
-body[data-studio-view="frontdesk"] .fd-customer-header input:focus-visible,body[data-studio-view="frontdesk"] .fd-column-controls select:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
-body[data-studio-view="frontdesk"] .fd-table{min-width:960px}
