@@ -86,8 +86,9 @@ public static class DemoDataEndpoints
                 +DemoFullStudioData.RepairMedia(connection,transaction,login,storage,report);
             DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
         DemoJobWorkflowGraphs.Seed(connection,transaction,login);
-            report?.Invoke(new(99,"Committing repairs",0,0,"Saving repaired demo photo references."));
+            report?.Invoke(new(96,"Committing repairs",0,0,"Saving repaired demo photo references."));
             transaction.Commit();
+            DemoJobPhotoPopulation.Seed(database,storage,login,report);
             return $"Operational demo ready with {denseJobs} jobs covering {DemoDenseScheduleData.Days} days across all six workspaces. Full Studio demo verified; restored {restored} missing seeded photo versions and preserved existing edits.";
         }
 
@@ -113,8 +114,9 @@ public static class DemoDataEndpoints
         bool fullStudioExpanded = DemoFullStudioData.Seed(connection, transaction, login, storage, report);
         DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
         DemoJobWorkflowGraphs.Seed(connection,transaction,login);
-        report?.Invoke(new(99, "Committing rich demo", 0, 0, "Saving historical workflow and media data."));
+        report?.Invoke(new(96, "Committing rich demo", 0, 0, "Saving historical workflow and media data."));
         transaction.Commit();
+        DemoJobPhotoPopulation.Seed(database,storage,login,report);
 
         return fullStudioExpanded
             ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days across all six workspaces, plus the full Studio media demonstration."
