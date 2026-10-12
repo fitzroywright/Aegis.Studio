@@ -43,15 +43,15 @@
 .jd-compact-stage.complete .jd-compact-dot { background:#168447; border-color:#168447; color:#fff; }
 .jd-compact-stage.current .jd-compact-dot { background:#e97818; border-color:#e97818; color:#fff; }
 .jd-compact-stage.skipped { opacity:.5; }
-.jd-flow-exception-lane { display:flex; align-items:center; gap:10px; min-width:0; font-size:10px; }
-.jd-flow-lane-label { flex:0 0 135px; font-weight:700; color:#315f9e; }
-.jd-flow-exception-lane:nth-child(3) .jd-flow-lane-label { color:#bc3546; }
-.jd-flow-lane-rule { flex:1; min-width:12px; border-top:2px dashed #8baee0; }
-.jd-flow-exception-lane:nth-child(3) .jd-flow-lane-rule { border-color:#df9ba3; }
-.jd-compact-exception { flex:none; border:0; background:transparent; color:var(--theme-muted,#65728a); font-size:10px; cursor:pointer; }
-.jd-compact-exception.current,.jd-flow-exception-lane.is-active .jd-flow-lane-label { font-weight:800; color:#bd3040; }
+.jd-flow-exception-lane { display:flex; align-items:center; gap:7px; min-width:0; font-size:10px; }
+.jd-flow-lane-origin,.jd-flow-lane-return { flex:0 0 80px; min-width:0; font-weight:700; color:var(--theme-muted,#65728a); text-align:center; }
+.jd-flow-lane-return { color:#315f9e; }
+.jd-flow-lane-rule { flex:1 1 16px; min-width:10px; border-top:2px dashed #8baee0; }
+.jd-compact-exception { flex:0 1 auto; min-width:0; padding:4px 9px; border:1px solid #b9cde3; border-radius:12px; background:var(--theme-surface,#fff); color:var(--theme-text,#34475f); font-size:10px; font-weight:650; cursor:pointer; }
+.jd-compact-exception.current { border-color:#d17c35; color:#9a4814; background:#fff3e6; font-weight:800; }
+.jd-flow-terminal { padding:5px 8px; border:1px solid #e4b3b7; border-radius:4px; color:#a23443; font-size:10px; font-weight:700; }
 .jd-compact-stage:focus-visible,.jd-compact-exception:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
-@media(max-width:750px) { .jd-flow-lane-label { flex-basis:95px; } .jd-compact-stage { font-size:9px; } .jd-flow-exception-lane { gap:4px; } }
+@media(max-width:750px) { .jd-flow-lane-origin,.jd-flow-lane-return { flex-basis:55px; } .jd-compact-stage { font-size:9px; } .jd-flow-exception-lane { gap:4px; } }
 .jd-flow-canvas { position:relative; width:1020px; height:161px; }
 .jd-flow-lines { position:absolute; inset:0; width:1020px; height:161px; pointer-events:none; }
 .jd-flow-edge { fill:none; stroke:#c5cad3; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
