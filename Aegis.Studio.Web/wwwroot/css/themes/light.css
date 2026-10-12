@@ -115,7 +115,7 @@ body[data-theme="office-light"] :is(.mw-today-job-columns,.sj-job-header,.sj-col
 body[data-theme="office-light"] #frontDeskSearch {
   background:#fff!important;color:var(--theme-text)!important;border-color:var(--studio-control-border)!important;
 }
-body[data-theme="office-light"][data-studio-view] :is(#frontDeskSearch,.sj-job-header input[data-sj-search],.mw-today-job-columns input,.workspace-column-header input):is(:focus,:focus-visible) {
+body[data-theme="office-light"][data-studio-view] :is(#frontDeskSearch,.sj-job-header input[data-sj-search],.mw-today-job-columns input,.workspace-column-header input) {
   background:#fff!important;color:var(--theme-text)!important;border-color:var(--studio-control-border)!important;
 }
 body[data-theme="office-light"] :is(input,textarea)::placeholder {color:var(--theme-muted)!important;opacity:1;}
