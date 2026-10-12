@@ -6,6 +6,7 @@
     ];
 
     const storageKey = 'aegis.studio.theme';
+    let userChangedTheme = false;
 
     function normalizeTheme(themeName) {
         const value = String(themeName || '').trim().toLowerCase();
@@ -36,6 +37,7 @@
     }
 
     async function persistTheme(themeName) {
+        userChangedTheme = true;
         applyTheme(themeName);
         try {
             const response = await fetch('/api/profile/theme', {
@@ -45,7 +47,7 @@
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const profile = await response.json();
-            applyTheme(profile.themeName || themeName);
+            if (normalizeTheme(localStorage.getItem(storageKey)) === normalizeTheme(themeName)) applyTheme(profile.themeName || themeName);
         } catch (error) {
             console.warn('Theme was applied locally but could not be saved to the profile.', error);
         }
@@ -69,9 +71,9 @@
             const response = await fetch('/api/profile');
             if (!response.ok) return;
             const profile = await response.json();
-            applyTheme(profile.themeName || localStorage.getItem(storageKey) || 'standard');
+            if (!userChangedTheme) applyTheme(profile.themeName || localStorage.getItem(storageKey) || 'standard');
         } catch {
-            applyTheme(localStorage.getItem(storageKey) || 'standard');
+            if (!userChangedTheme) applyTheme(localStorage.getItem(storageKey) || 'standard');
         }
     }
 
