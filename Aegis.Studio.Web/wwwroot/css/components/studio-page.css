@@ -42,3 +42,11 @@
 .st-tools [data-period]{width:auto;max-width:180px}.st-content [data-finance-filter]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:8px}.st-content [data-finance-filter] p{grid-column:1/-1}.st-content [data-finance-filter] label{font-size:11px}
 .st-content .op-metric b,.st-content .op-metric small{display:block}.st-content .op-metric>span{min-width:0}
 
+
+/* Shared Today-density layout: reduce outer gutters without changing grid internals. */
+body:is([data-studio-view="jobs"],[data-studio-view="workspaces"],[data-studio-view="frontdesk"]) .generic{padding:6px 8px!important}
+body:is([data-studio-view="jobs"],[data-studio-view="workspaces"],[data-studio-view="frontdesk"]) :is(.mw-list-page,.workspace-list-page,.fd-page){margin:0;padding:0;gap:8px}
+body:is([data-studio-view="jobs"],[data-studio-view="workspaces"],[data-studio-view="frontdesk"]) :is(.mw-list-layout,.workspace-list-layout,.fd-layout){gap:8px}
+body:is([data-studio-view="jobs"],[data-studio-view="workspaces"],[data-studio-view="frontdesk"]) :is(.mw-list-panel,.op-card){margin:0}
+body[data-studio-view="frontdesk"] .fd-page{padding:0!important;gap:8px}
+body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
