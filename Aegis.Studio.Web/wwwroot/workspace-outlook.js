@@ -314,6 +314,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     const view=await json('/api/jobs/'+job.id+'/connected-workflow');if(!current())return;
                     workflow=view;const data=view.data;
                     window.StudioJobDetails.workflow(header.querySelector('.jd-workflow-track'),data,job,view,selector=>header.querySelector('[data-job-workflow]').onclick(selector),header.querySelector('.jd-flow-summary'));
+                    const graphView=await json(`/api/jobs/${job.id}/workflow-graph`);
+                    if(current()&&graphView){const graphHost=header.querySelector('.jd-workflow-track');graphHost.style.height='230px';StudioGraph.canvas(graphHost,graphView.graph,{evaluation:graphView.evaluation,onSelect:()=>StudioJobGraph.open(job.id)});}
+                    let graphButton=header.querySelector('[data-template-workflow]');
+                    if(!graphButton){graphButton=document.createElement('button');graphButton.className='action';graphButton.dataset.templateWorkflow='';graphButton.textContent='Template Workflow';header.querySelector('[data-job-workflow]').insertAdjacentElement('afterend',graphButton);}
+                    graphButton.onclick=()=>StudioJobGraph.open(job.id);
                     header.querySelector('.jd-status-pill').textContent=data.stage;
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(data.owner?studioFirstName(data.owner):'Unassigned');
                     const crew=(data.sessions||[]).flatMap(session=>session.crew||[]);
@@ -394,6 +399,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
 
     }
 })();
+
 
 
 

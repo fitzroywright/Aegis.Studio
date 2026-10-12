@@ -83,21 +83,21 @@ public static class WorkflowGraphEngine
         while (pending.TryPop(out var id)) if (visited.Add(id)) foreach (var e in edges.Where(e => (reverse ? e.To : e.From) == id)) pending.Push(reverse ? e.From : e.To);
         return visited;
     }
-    private static bool ValidCondition(WorkflowCondition c, int depth) => depth <= 8 && c.Operator switch
+    private static bool ValidCondition(WorkflowCondition c, int depth) => depth <= 8 && (c.Operator switch
     {
         "ServiceSelected" => c.CatalogItemId.HasValue && c.CatalogItemId != Guid.Empty && (c.Conditions?.Length ?? 0) == 0,
         "Not" => c.Conditions is { Length: 1 } && ValidCondition(c.Conditions[0], depth + 1),
         "All" or "Any" => c.Conditions is { Length: > 0 and <= 20 } && c.Conditions.All(x => ValidCondition(x, depth + 1)),
         _ => false
-    };
-    public static bool Matches(WorkflowCondition? c, ISet<Guid> services) => c is null || c.Operator switch
+    });
+    public static bool Matches(WorkflowCondition? c, ISet<Guid> services) => c is null || (c.Operator switch
     {
         "ServiceSelected" => c.CatalogItemId.HasValue && services.Contains(c.CatalogItemId.Value),
         "Not" => !Matches(c.Conditions![0], services),
         "All" => c.Conditions!.All(x => Matches(x, services)),
         "Any" => c.Conditions!.Any(x => Matches(x, services)),
         _ => throw new ArgumentException("Invalid workflow condition.")
-    };
+    });
     public static WorkflowGraph Flatten(WorkflowGraph graph)
     {
         var nodes = new List<WorkflowNode>(); var edges = new List<WorkflowEdge>();

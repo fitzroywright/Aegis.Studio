@@ -8,7 +8,7 @@ using Aegis.Studio.Web.Production;
 
 namespace Aegis.Studio.Web.FrontDesk;
 
-public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null,string? ExternalBookingId=null,DateTimeOffset? StartsAtUtc=null,DateTimeOffset? EndsAtUtc=null,string? Location=null,string? ClientPhone=null,string? Destination=null,string BookingSource="FrontDesk",Guid? JobTemplateId=null);
+public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null,string? ExternalBookingId=null,DateTimeOffset? StartsAtUtc=null,DateTimeOffset? EndsAtUtc=null,string? Location=null,string? ClientPhone=null,string? Destination=null,string BookingSource="FrontDesk",Guid? JobTemplateId=null,Guid[]? SelectedServiceIds=null);
 public sealed record VerifiedDepositRequest(decimal Amount,string Currency,string Provider,string Reference);
 public sealed record FrontDeskRequest(Guid Id,PendingBookingRequest Request,string Status,Guid? JobId,decimal RecordedDeposit,DateTimeOffset CreatedAtUtc);
 
@@ -215,6 +215,17 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         {
             var template=CommercialTemplateStore.Get(c,tx,templateId)??throw new ArgumentException("Job Template was not found.");
             CommercialTemplateStore.ApplyNewJob(c,tx,job,template,Guid.NewGuid(),user);
+            if(r.SelectedServiceIds is not null)
+            {
+                CommercialTemplateStore.Execute(c,tx,"update studio_job_catalog_agreements set workflow_selected=false where job_id=$1",job);
+                foreach(var service in r.SelectedServiceIds.Distinct())
+                {
+                    using var check=CommercialTemplateStore.Command(c,tx,"select exists(select 1 from studio_pos_catalog where id=$1 and is_active)",service);
+                    if(!(bool)check.ExecuteScalar()!)throw new ArgumentException("Choose an active catalog service.");
+                    CommercialTemplateStore.Execute(c,tx,"insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity) select $1,$2,$3,1 where not exists(select 1 from studio_job_catalog_agreements where job_id=$2 and catalog_item_id=$3)",Guid.NewGuid(),job,service);
+                    CommercialTemplateStore.Execute(c,tx,"update studio_job_catalog_agreements set workflow_selected=true where job_id=$1 and catalog_item_id=$2",job,service);
+                }
+            }
         }
         return job;
     }

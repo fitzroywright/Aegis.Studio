@@ -43,7 +43,7 @@ public static class CommercialEndpoints
             using var c = database.OpenConnection(); using var q = Command(c, null, """
                 select coalesce(jsonb_agg(jsonb_build_object('id',a.id,'catalogItemId',a.catalog_item_id,'name',p.name,'quantity',a.quantity,
                   'specifications',a.specifications,'unitPrice',coalesce(a.confirmed_unit_price,round(p.unit_price*(1+p.tax_rate/100),2)),
-                  'confirmed',a.confirmed_at is not null,'saleLineId',a.sale_line_id)),'[]')::text
+                  'confirmed',a.confirmed_at is not null,'saleLineId',a.sale_line_id,'workflowSelected',a.workflow_selected)),'[]')::text
                 from studio_job_catalog_agreements a join studio_pos_catalog p on p.id=a.catalog_item_id where a.job_id=$1
                 """, jobId);
             return Results.Content((string)q.ExecuteScalar()!, "application/json");

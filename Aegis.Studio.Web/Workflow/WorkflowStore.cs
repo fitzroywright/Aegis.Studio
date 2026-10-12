@@ -372,6 +372,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(configuration["ClientGallery:Provider"]!="Manifest")throw new ArgumentException("Configure the existing gallery provider before publication.");
                 Publish(c,tx,job,request.OperationId,actor,publisher);break;
             case "deliver":
+                JobGraphStore.GuardCompletion(c,tx,job);
                 FinanceReleaseStore.Require(c,tx,job);
                 CommercialTemplateStore.GuardPublication(c,tx,job);
                 if(!IsFrontDesk(user)&&!manage)throw new UnauthorizedAccessException();
@@ -381,6 +382,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                     throw new ArgumentException("Record delivery evidence or an authorized waiver for every required deliverable first.");
                 Sql(c,tx,"insert into studio_workflow_deliveries(id,job_id,method,reference,actor) values($1,$2,$3,$4,$5)",request.OperationId,job,request.Method,request.Reference,actor);stateAction=true;break;
             case "close":
+                JobGraphStore.GuardCompletion(c,tx,job);
                 if(!manage)throw new UnauthorizedAccessException();
                 if(Exists(c,tx,"select exists(select 1 from studio_job_activities where job_id=$1 and status not in ('Completed','Cancelled','Archived'))",job))throw new ArgumentException("Resolve open required operational tasks before closing.");
                 if(Exists(c,tx,"select exists(select 1 from studio_workflow_delivery_requirements where job_id=$1 and required and not waived and delivered_at_utc is null)",job))throw new ArgumentException("Deliver or explicitly waive every required deliverable before closing.");
@@ -592,3 +594,4 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
     internal static object? Scalar(NpgsqlConnection c,NpgsqlTransaction? tx,string sql,params object?[] values){using var q=Command(c,tx,sql,values);return q.ExecuteScalar();}
     internal static bool Exists(NpgsqlConnection c,NpgsqlTransaction? tx,string sql,params object?[] values)=>(bool)Scalar(c,tx,sql,values)!;
 }
+

@@ -48,3 +48,22 @@ PostgreSQL binaries: /workspace/scratch/0b27c7c33946/test-deps/pgserver.
 No new functionality has been verified yet. Baseline --no-restore build failed because the
 current environment does not have the referenced NuGet packages. Restore is being investigated.
 Do not report tests as passing until actually executed.
+
+## Second implementation checkpoint
+
+- Draft save/publication/version endpoints written, with catalog and employee reference checks.
+- Shared Dagre canvas, integrated Job Template designer, visual port connections, branch
+  reconnection, nested flow editing, service preview and node properties written.
+- Front Desk service selection/preview and atomic booking graph creation integrated.
+- Job Details graph view, Apply or Change Template impact, assignment/progress actions,
+  service changes, preserved prior work and Production workflow task view integrated.
+- Demo graph examples added to comprehensive existing demo generation without media changes.
+- Pure graph tests written. None reported as passing yet.
+- Package restore resolved using a temporary local NuGet feed. Build discovered stale local
+  Common.Messaging missing IEmailRecipientDirectory; acquiring current dependency source.
+- Native local PostgreSQL cannot start under this restricted root runtime (user switching
+  unavailable). Investigating PGlite for transaction tests; concurrency must still be tested
+  against native PostgreSQL if the embedded runtime cannot verify it.
+
+Next: compile/correct; add integration and visual tests; fix UI/layout defects; verify;
+checkpoint results; prepare final delivery. No deployment and no merge into main yet.

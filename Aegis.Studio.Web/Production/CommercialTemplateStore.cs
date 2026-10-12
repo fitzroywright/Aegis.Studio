@@ -32,6 +32,7 @@ public sealed class CommercialTemplateStore(StudioDatabase database)
     private static TemplateVersion Read(NpgsqlDataReader r) => new(r.GetGuid(0), r.GetString(1), r.GetInt32(2), r.GetBoolean(3), JsonSerializer.Deserialize<CommercialTemplate>(r.GetString(4), Json)!);
     public TemplateVersion Save(Guid? id, string kind, CommercialTemplate definition, int expectedVersion, bool active, string actor)
     {
+        definition = JobGraphStore.Normalize(definition);
         CommercialRules.Validate(definition, kind);
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
         Guid template = id ?? Guid.NewGuid(); int version = 1;
@@ -63,36 +64,13 @@ public sealed class CommercialTemplateStore(StudioDatabase database)
     }
     public void ApplyToJob(Guid job, ApplyJobTemplateRequest request, string actor)
     {
-        if (request.OperationId == Guid.Empty) throw new ArgumentException("Operation ID is required.");
-        using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
-        long revision;
-        using (var q = Command(c, tx, "select workflow_revision,status from studio_jobs where id=$1 for update", job))
-        {
-            using var r = q.ExecuteReader(); if (!r.Read()) throw new KeyNotFoundException("Job was not found.");
-            if (r.GetString(1) is "Completed" or "Cancelled" or "Delivered" or "Ready for Delivery") throw new ArgumentException("Job is closed for template changes.");
-            revision=r.GetInt64(0);
-        }
-        using (var q = Command(c, tx, "select template_id,operation_id from studio_job_template_instances where job_id=$1", job))
-        {
-            using var r = q.ExecuteReader(); if (r.Read())
-            {
-                if (r.GetGuid(0) != request.TemplateId || r.GetGuid(1)!=request.OperationId) throw new ArgumentException("This Job already has a template. Existing work cannot be replaced.");
-                return;
-            }
-        }
-        if(revision!=request.ExpectedRevision)throw new InvalidOperationException("Job changed. Refresh before applying its template.");
-        var template = Get(c, tx, request.TemplateId) ?? throw new KeyNotFoundException("Template was not found.");
-        if (!template.Active || template.Kind != "Job") throw new ArgumentException("Select an active Job Template.");
-        ApplyNewJob(c, tx, job, template, request.OperationId, actor);
-        Execute(c, tx, "update studio_jobs set workflow_revision=workflow_revision+1 where id=$1", job);
-        Execute(c, tx, "insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'JobTemplateApplied',$3,$4,now())", Guid.NewGuid(), job, actor, $"{template.Definition.Name} v{template.Version}");
-        tx.Commit();
+        new JobGraphStore(database).Apply(job, request, actor);
     }
     internal static void ApplyNewJob(NpgsqlConnection c,NpgsqlTransaction tx,Guid job,TemplateVersion template,Guid operation,string actor)
     {
         if(!template.Active||template.Kind!="Job")throw new ArgumentException("Select an active Job Template.");
         Execute(c, tx, "insert into studio_job_template_instances(job_id,template_id,template_version,definition,operation_id,created_by) values($1,$2,$3,$4::jsonb,$5,$6)", job, template.Id, template.Version, JsonSerializer.Serialize(template.Definition, Json), operation, actor);
-        InstantiateSteps(c, tx, job, null, template.Definition.Steps, actor);
+        JobGraphStore.Instantiate(c, tx, job, template.Definition, actor);
         foreach (var product in template.Definition.Products ?? [])
             Execute(c, tx, "insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity,specifications) values($1,$2,$3,$4,$5)", Guid.NewGuid(), job, product.CatalogItemId, product.Quantity, product.Specifications);
     }
@@ -114,6 +92,7 @@ public sealed class CommercialTemplateStore(StudioDatabase database)
     }
     public static void GuardTask(NpgsqlConnection c, NpgsqlTransaction? tx, Guid activity, string status)
     {
+        JobGraphStore.GuardTask(c, tx, activity, status);
         if (status is not ("InProgress" or "Completed" or "Cancelled")) return;
         using(var variation=Command(c,tx,"select exists(select 1 from studio_job_activities a join studio_catalog_work_orders w on w.id=a.work_order_id where a.id=$1 and nullif(a.step_definition->>'variation','') is not null and position(lower(a.step_definition->>'variation') in lower(coalesce(w.specifications,'')))=0)",activity))
             if((bool)variation.ExecuteScalar()! && status!="Cancelled")throw new ArgumentException("This variation does not apply to the ordered specifications.");
@@ -138,6 +117,7 @@ public sealed class CommercialTemplateStore(StudioDatabase database)
     }
     public static void GuardPublication(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
     {
+        JobGraphStore.GuardCompletion(c, tx, job);
         using var q = Command(c, tx, """
             select exists(select 1 from studio_catalog_work_orders w where w.job_id=$1 and
              (w.exception_reason is not null or (w.quantity>0 and

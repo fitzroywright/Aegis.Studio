@@ -25,7 +25,7 @@ public sealed class JobGraphStore(StudioDatabase database)
     internal static WorkflowGraph Graph(CommercialTemplate template) => template.Workflow ?? WorkflowGraphEngine.FromSteps(template.Steps);
     internal static HashSet<Guid> Services(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
     {
-        using var q = Command(c, tx, "select catalog_item_id from studio_job_catalog_agreements where job_id=$1 and workflow_selected union select catalog_item_id from studio_catalog_line_snapshots s join studio_pos_sale_lines l on l.id=s.sale_line_id join studio_pos_sales sale on sale.id=l.sale_id where sale.job_id=$1 and sale.status='Completed'", job);
+        using var q = Command(c, tx, "select catalog_item_id from studio_job_catalog_agreements where job_id=$1 and workflow_selected union select catalog_item_id from studio_catalog_line_snapshots s join studio_pos_sale_lines l on l.id=s.sale_line_id join studio_pos_sales sale on sale.id=l.sale_id where sale.reference_type='StudioJob' and sale.reference_id=$1::text and sale.status=2", job);
         using var r = q.ExecuteReader(); var result = new HashSet<Guid>(); while (r.Read()) result.Add(r.GetGuid(0)); return result;
     }
     internal static CommercialTemplate? Definition(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
@@ -87,7 +87,8 @@ public sealed class JobGraphStore(StudioDatabase database)
         {
             var states = Statuses(c, tx, job); states[id] = "NotStarted";
             var state = WorkflowGraphEngine.Evaluate(graph, states, Services(c, tx, job)).Nodes.Single(n => n.Id == id);
-            if (state.Status != "Available") throw new ArgumentException(state.Reason ?? "This task is not eligible.");
+            bool preservedStartedWork = state.Status == "Inactive" && current is not ("NotStarted" or "Scheduled" or "Cancelled");
+            if (state.Status != "Available" && !preservedStartedWork) throw new ArgumentException(state.Reason ?? "This task is not eligible.");
         }
     }
     public static void GuardCompletion(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
@@ -118,7 +119,7 @@ public sealed class JobGraphStore(StudioDatabase database)
         Execute(c, tx, "insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,$3,$4,$5,now())", Guid.NewGuid(), job, action, actor, JsonSerializer.Serialize(request, Json));
     }
     public TemplateImpact Impact(Guid job, Guid template)
-    { using var c = database.OpenConnection(); using var tx = c.BeginTransaction(System.Data.IsolationLevel.RepeatableRead); return Impact(c, tx, job, Get(c, tx, template) ?? throw new KeyNotFoundException()); }
+    { using var c = database.OpenConnection(); using var tx = c.BeginTransaction(System.Data.IsolationLevel.RepeatableRead); return Impact(c, tx, job, CommercialTemplateStore.Get(c, tx, template) ?? throw new KeyNotFoundException()); }
     internal static TemplateImpact Impact(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, TemplateVersion target)
     {
         var previous = Definition(c, tx, job); var before = previous is null ? new Dictionary<string, WorkflowNode>() : WorkflowGraphEngine.Flatten(Graph(previous)).Nodes.Where(n => n.Kind == "Task").ToDictionary(n => n.Id);
@@ -138,7 +139,7 @@ public sealed class JobGraphStore(StudioDatabase database)
         using (var q = Command(c, tx, "select id from studio_jobs where id=$1 for update", job)) if (q.ExecuteScalar() is null) throw new KeyNotFoundException();
         if (Replay(c, tx, job, request.OperationId, request, actor)) return;
         Lock(c, tx, job, request.ExpectedRevision);
-        var target = Get(c, tx, request.TemplateId) ?? throw new KeyNotFoundException("Template was not found.");
+        var target = CommercialTemplateStore.Get(c, tx, request.TemplateId) ?? throw new KeyNotFoundException("Template was not found.");
         if (!target.Active || target.Kind != "Job") throw new ArgumentException("Choose a published active Job Template.");
         var impact = Impact(c, tx, job, target);
         if (impact.RequiresConfirmation && (!request.ConfirmChanges || string.IsNullOrWhiteSpace(request.Reason))) throw new ArgumentException("Review the impact and confirm the template change with a reason.");

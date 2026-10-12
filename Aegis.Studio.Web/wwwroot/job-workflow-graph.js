@@ -1,0 +1,54 @@
+(function(root){
+ 'use strict';
+ const esc=StudioGraph.esc,send=(url,body,method='POST')=>json(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ async function open(job){
+  const authority=await json(`/api/jobs/${job}/connected-workflow`),canChange=authority.canManage||authority.canFrontDesk;
+  const d=studioDialog('Job workflow',`<div class="sg-job-toolbar"><button data-refresh>Refresh</button>${canChange?'<button class="action" data-template>Apply or Change Template</button><button class="action" data-services>Review services</button>':''}<span data-version></span></div><div data-job-canvas></div><div class="sg-task-list" data-task-list></div><p role="alert"></p>`);d.classList.add('sg-job-dialog');
+  let view=null;const error=e=>d.querySelector('[role=alert]').textContent=e.message||String(e);
+  async function render(){
+   view=await json(`/api/jobs/${job}/workflow-graph`);
+   if(!d.isConnected)return;
+   if(!view){d.querySelector('[data-job-canvas]').innerHTML='<p>No template is applied. Use Apply or Change Template to create the job workflow.</p>';d.querySelector('[data-task-list]').innerHTML='';return;}
+   d.querySelector('[data-version]').textContent='Template v'+view.templateVersion+' · '+(view.evaluation.completed?'Complete':'In progress');
+   const table=d.querySelector('[data-task-list]');
+   table.innerHTML=`<table><thead><tr><th>Task</th><th>Assigned / role</th><th>Status / dependencies</th><th>Actions</th></tr></thead><tbody>${view.tasks.map(t=>{
+    const allowed=authority.canReview||authority.canManage||t.assignedTo?.toLowerCase()===authority.userName?.toLowerCase();
+    return `<tr data-task-row="${t.id}"><td>${esc(t.title)}</td><td>${esc(t.assignedTo||'Unassigned')}<small>${esc(t.role||'')}</small></td><td>${esc(t.eligibility)}<small>${esc(t.reason||t.dependencies.join(', '))}</small></td><td>${allowed&&['Available','InProgress','Blocked','WaitingOnCustomer','Partial','Failed','ReworkRequired','ReprintRequired','ReadyForDelivery'].includes(t.eligibility)?`${t.eligibility==='Available'?`<button data-status="InProgress" data-task="${t.id}">Start</button>`:''}<button data-status="Completed" data-task="${t.id}">Complete</button>${t.optional?`<button data-status="Cancelled" data-task="${t.id}">Skip</button>`:''}`:''}${(authority.canReview||authority.canManage)&&t.status!=='Completed'?`<button data-assign="${t.id}">Assign</button>`:''}</td></tr>`;
+   }).join('')}</tbody></table>${view.history.length?`<details><summary>Preserved work from previous templates (${view.history.length})</summary>${view.history.map(h=>`<p>${esc(h.title)} · ${esc(h.status)} · ${esc(h.assignedTo||'Unassigned')}</p>`).join('')}</details>`:''}`;
+   StudioGraph.canvas(d.querySelector('[data-job-canvas]'),view.graph,{evaluation:view.evaluation,onSelect:id=>{const t=view.tasks.find(t=>t.nodeId===id);if(t)table.querySelector(`[data-task-row="${t.id}"]`)?.scrollIntoView({block:'nearest'});}});
+   table.querySelectorAll('[data-status]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await send(`/api/jobs/${job}/connected-workflow`,{action:'task-progress',taskId:b.dataset.task,status:b.dataset.status,operationId:crypto.randomUUID(),expectedRevision:view.revision});await render();document.dispatchEvent(new CustomEvent('studio-workflow-changed',{detail:{jobId:job}}));}catch(e){error(e);b.disabled=false;}});
+   table.querySelectorAll('[data-assign]').forEach(b=>b.onclick=async()=>{try{
+    const staff=await json('/api/studio-employees?assignable=true&limit=100'),t=view.tasks.find(t=>t.id===b.dataset.assign);
+    const assignment=studioDialog('Assign workflow task',`<label>Employee<select data-person><option value="">Unassigned</option>${staff.map(p=>`<option value="${esc(p.userName)}" ${p.userName===t.assignedTo?'selected':''}>${esc(p.displayName||p.userName)}</option>`).join('')}</select></label><button class="primary" data-save>Assign</button><p role="alert"></p>`);
+    assignment.querySelector('[data-save]').onclick=async()=>{try{const graphNode=StudioGraph.visible(view.graph,new Set(allSubflows(view.graph))).nodes.find(n=>n.id===t.nodeId);await send(`/api/jobs/${job}/connected-workflow`,{action:'task',taskId:t.id,kind:graphNode.task.activityType,title:t.title,userName:assignment.querySelector('[data-person]').value||null,operationId:crypto.randomUUID(),expectedRevision:view.revision});assignment.close();await render();}catch(e){assignment.querySelector('[role=alert]').textContent=e.message;}};
+   }catch(e){error(e);}});
+  }
+  d.querySelector('[data-refresh]').onclick=()=>render().catch(error);
+  d.querySelector('[data-template]')?.addEventListener('click',()=>change(job,render).catch(error));
+  d.querySelector('[data-services]')?.addEventListener('click',()=>services(job,view,render).catch(error));
+  await render();return d;
+ }
+ function allSubflows(graph,prefix=''){return graph.nodes.flatMap(n=>n.kind==='Subflow'?[prefix+n.id,...allSubflows(n.subflow,prefix+n.id+'/')]:[]);}
+ async function change(job,refresh){
+  const [templates,authority,products]=await Promise.all([json('/api/commercial/templates/Job'),json(`/api/jobs/${job}/connected-workflow`),json('/api/pos/catalog')]);
+  const d=studioDialog('Apply or Change Template',`<label>Job Template<select data-template><option value="">Choose a published template</option>${templates.map(t=>`<option value="${t.id}">${esc(t.definition.name)} · v${t.version}</option>`).join('')}</select></label><button data-preview disabled>Preview workflow</button><div class="sg-impact" data-impact></div><p>Posted charges, invoices and payments remain unchanged. Adjust billing separately through POS.</p><label>Change reason<input data-reason maxlength="4000"></label><label><input type="checkbox" data-confirm> I reviewed the impact and confirm this change.</label><button class="primary" data-apply disabled>Apply template</button><p role="alert"></p>`);d.classList.add('sg-job-dialog');let impact=null;
+  const select=d.querySelector('[data-template]');select.onchange=async()=>{d.querySelector('[data-apply]').disabled=true;if(!select.value)return;try{impact=await json(`/api/jobs/${job}/workflow-graph/impact/${select.value}`);d.querySelector('[data-impact]').innerHTML=[['Remain',impact.remain],['Added',impact.added],['Removed (history retained)',impact.removed],['Completed work affected',impact.completedAffected],['Assignment defaults changed',impact.assignmentChanges],['Dependencies changed',impact.dependencyChanges]].map(([label,rows])=>`<div><b>${label}</b><p>${rows.map(esc).join(', ')||'None'}</p></div>`).join('');d.querySelector('[data-apply]').disabled=false;d.querySelector('[data-preview]').disabled=false;}catch(e){d.querySelector('[role=alert]').textContent=e.message;}};
+  d.querySelector('[data-preview]').onclick=()=>StudioGraphTemplates.preview(templates.find(t=>t.id===select.value).definition,products);
+  d.querySelector('[data-apply]').onclick=async()=>{const b=d.querySelector('[data-apply]');b.disabled=true;try{await send(`/api/jobs/${job}/commercial/template`,{templateId:select.value,operationId:crypto.randomUUID(),expectedRevision:authority.data.revision,confirmChanges:d.querySelector('[data-confirm]').checked,reason:d.querySelector('[data-reason]').value||null});d.close();await refresh?.();document.dispatchEvent(new CustomEvent('studio-workflow-changed',{detail:{jobId:job}}));}catch(e){d.querySelector('[role=alert]').textContent=e.message;b.disabled=false;}};return d;
+ }
+ async function services(job,view,refresh){
+  if(!view)throw Error('Apply a Job Template before selecting its services.');
+  const [products,agreements]=await Promise.all([json('/api/pos/catalog'),json(`/api/jobs/${job}/commercial/agreement`)]);
+  const d=studioDialog('Job services and workflow',`<div class="sg-service-list">${products.filter(p=>p.isActive).map(p=>`<label><input data-service="${p.id}" type="checkbox" ${agreements.some(a=>a.catalogItemId===p.id&&a.workflowSelected!==false)?'checked':''}>${esc(p.name)}</label>`).join('')}</div><button data-preview>Preview branches</button><p>Removing a service preserves started and completed work. Posted purchases remain applicable until resolved through POS.</p><label>Reconciliation reason<input data-reason></label><label><input data-confirm type="checkbox"> Confirm consequences for started work</label><button data-save class="primary">Save service selection</button><p role="alert"></p>`);
+  const ids=()=>[...d.querySelectorAll('[data-service]:checked')].map(el=>el.dataset.service);
+  d.querySelector('[data-preview]').onclick=()=>StudioGraphTemplates.preview({name:'Service selections',workflow:view.graph,products:[]},products,ids());
+  d.querySelector('[data-save]').onclick=async()=>{try{await send(`/api/jobs/${job}/workflow-graph/services`,{catalogItemIds:ids(),expectedRevision:view.revision,operationId:crypto.randomUUID(),confirmChanges:d.querySelector('[data-confirm]').checked,reason:d.querySelector('[data-reason]').value||null},'PUT');d.close();await refresh();}catch(e){d.querySelector('[role=alert]').textContent=e.message;}};
+ }
+ async function production(){
+  const current=StudioPage.begin('production');let rows=await json('/api/production/workflow-tasks');if(!current())return;
+  commercialPage('Production Workflow Tasks',`<div class="sg-job-toolbar"><label>Show<select data-state><option value="">All tasks</option>${['Available','InProgress','Blocked','WaitingOnCustomer','Completed','Inactive','Skipped'].map(s=>`<option>${s}</option>`).join('')}</select></label><label><input type="checkbox" data-mine> Assigned to me</label><button data-orders>Work orders</button></div><div class="commercial-grid" data-table></div>`);
+  const draw=()=>{const state=genericView.querySelector('[data-state]').value;const filtered=rows.filter(r=>!state||r.task.eligibility===state);genericView.querySelector('[data-table]').innerHTML=`<table class="pos-grid"><thead><tr><th>Task</th><th>Assigned / role</th><th>State</th><th>Dependencies</th></tr></thead><tbody>${filtered.map(r=>`<tr data-job="${r.jobId}" tabindex="0"><td>${esc(r.task.title)}</td><td>${esc(r.task.assignedTo||r.task.role||'Unassigned')}</td><td>${esc(r.task.eligibility)}</td><td>${esc(r.task.reason||r.task.dependencies.join(', '))}</td></tr>`).join('')||'<tr><td colspan="4">No matching workflow tasks.</td></tr>'}</tbody></table>`;genericView.querySelectorAll('[data-job]').forEach(el=>{el.onclick=()=>open(el.dataset.job);el.onkeydown=e=>{if(e.key==='Enter')el.click();};});StudioPage.setCount(filtered.length+' tasks');};
+  genericView.querySelector('[data-state]').onchange=draw;genericView.querySelector('[data-mine]').onchange=async e=>{rows=await json('/api/production/workflow-tasks?mine='+e.target.checked);draw();};genericView.querySelector('[data-orders]').onclick=()=>showCatalogProduction();draw();
+ }
+ root.StudioJobGraph={open,change,services,production};
+})(window);

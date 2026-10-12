@@ -301,6 +301,7 @@ app.MapMediaBulkSelection();
 app.MapProductionItems();
 app.MapProductionOrders();
 app.MapCommercialProduction();
+app.MapJobWorkflowGraphs();
 app.MapFrontDeskPosLaunch();
 app.MapJobLifecycle();
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
@@ -698,3 +699,4 @@ app.MapGet("/api/attachments/{id:guid}", (Guid id, ClaimsPrincipal user, Attachm
 app.MapGet("/api/accounts/summary", (StudioStore store) => Results.Ok(store.GetAccountsSummary()));
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
+
