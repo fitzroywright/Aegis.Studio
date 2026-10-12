@@ -278,6 +278,27 @@ function renderFrontDeskJob(job){return `<article class="front-desk-row"><div><s
 function frontDeskDialog(title,contents){
     const dialog=document.createElement('dialog');dialog.className='frontdesk-dialog';dialog.innerHTML=`<form class="request-form"><header class="studio-dialog-heading"><h2>${esc(title)}</h2><button class="studio-dialog-close" type="button" data-cancel aria-label="Close">×</button></header>${contents}<p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`;document.body.appendChild(dialog);dialog.querySelectorAll('[data-cancel]').forEach(button=>button.onclick=()=>dialog.close());dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();return dialog;
 }
+async function launchStudioNewBookingAction(){
+    try{
+        const me=await json('/api/auth/me');
+        const role=await json('/api/security/global-role-me');
+        if(!role?.frontDesk&&!(me.user||me).isAdministrator){
+            alert('You are not assigned to the Front Desk operational role.');
+            return;
+        }
+        const [workspaces,clients]=await Promise.all([
+            json('/api/frontdesk/workspaces'),
+            json('/api/frontdesk/clients')
+        ]);
+        frontDeskWorkspaces=Array.isArray(workspaces)?workspaces:[];
+        frontDeskClients=Array.isArray(clients)?clients:[];
+        await openPendingBookingForm(null,null);
+    }catch(error){
+        console.error('[Studio New Booking]',error);
+        alert('Unable to open New Booking: '+(error?.message||'Request failed'));
+    }
+}
+window.studioLaunchNewBooking=launchStudioNewBookingAction;
 async function openPendingBookingForm(enquiry,client){
     const jobTemplates=await json('/api/commercial/templates/Job');
     const dialog=frontDeskDialog('Pending booking request',`<p>A Pending Job is created now. FrontDesk reviews, routes and confirms it separately.</p><label>Job Template<select name="jobTemplate"><option value="">Custom Job</option>${jobTemplates.map(t=>`<option value="${t.id}">${esc(t.definition.name)}</option>`).join('')}</select></label><label>Workspace<select name="workspace" required>${frontDeskWorkspaces.map(w=>`<option value="${w.id}" ${w.id===enquiry?.workspaceId?'selected':''}>${esc(w.name)}</option>`).join('')}</select></label><label>Customer<input name="customer" required maxlength="200" value="${esc(enquiry?.contactName||client?.displayName||'')}"></label><label>Email<input name="email" type="email" required maxlength="320" value="${esc(enquiry?.channel==='Email'?enquiry.contactAddress:(client?.email||''))}"></label><label>Phone (international format, e.g. +1876…)<input name="phone" maxlength="80" value="${esc(client?.phone||'')}"></label><label>Wedding / session title<input name="title" required maxlength="200" value="${esc(enquiry?.subject||'')}"></label><label>Event date<input name="date" type="date" required></label><label>Required deposit (JMD)<input name="deposit" type="number" min="0" max="999999999" step="0.01" value="0"></label><label>Notes<textarea name="notes" maxlength="4000"></textarea></label>`);
