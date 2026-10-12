@@ -8123,7 +8123,7 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="at
   background: #fff0de;
   border-bottom-color: #f0d4b4;
 }
-body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links button>span:first-child {
+.studio-context-rail .mw-today-rail-links button>span:first-child {
   flex: 0 0 25px;
   display: grid;
   place-items: center;
@@ -8132,11 +8132,11 @@ body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links button>
   color: #205b91;
   font-weight: 800;
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(2) .mw-today-rail-links button>span:first-child {
+.studio-context-card:nth-child(2) .mw-today-rail-links button>span:first-child {
   background: #e2f0e7;
   color: #397b60;
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(3) .mw-today-rail-links button>span:first-child {
+.studio-context-card:nth-child(3) .mw-today-rail-links button>span:first-child {
   background: #dff2e4;
   color: #247d4b;
 }
@@ -8168,12 +8168,12 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="at
     overflow-y: auto;
   display:flex;flex-direction:column;}
 }
-body[data-studio-view="today"] .studio-context-rail .studio-context-card>header {
+.studio-context-rail .studio-context-card>header {
   height: auto;
   gap: 6px;
 }
 
-body[data-studio-view="today"] .studio-context-rail .studio-context-card>header h2 {
+.studio-context-rail .studio-context-card>header h2 {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -8182,7 +8182,7 @@ body[data-studio-view="today"] .studio-context-rail .studio-context-card>header 
   font-size: .81rem;
 }
 
-body[data-studio-view="today"] .studio-card-icon {
+.studio-card-icon {
   display: inline-grid;
   place-items: center;
   flex: 0 0 23px;
@@ -8190,11 +8190,11 @@ body[data-studio-view="today"] .studio-card-icon {
   color: #245c90;
   font-weight: 800;
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(2) .studio-card-icon {
+.studio-context-card:nth-child(2) .studio-card-icon {
   background: #e0efe7;
   color: #397b60;
 }
-body[data-studio-view="today"] .studio-context-card:nth-child(3) .studio-card-icon {
+.studio-context-card:nth-child(3) .studio-card-icon {
   background: #d9f0e0;
   color: #247d4b;
 }
@@ -8323,29 +8323,29 @@ body[data-studio-view="today"] .mw-today-layout {
   gap: 7px;
 }
 
-body[data-studio-view="today"] .studio-context-rail .studio-context-card>header {
+.studio-context-rail .studio-context-card>header {
   min-height: 30px !important;
   padding: 3px 8px !important;
 }
 
-body[data-studio-view="today"] .studio-card-icon {
+.studio-card-icon {
   width: 19px;
   height: 19px;
   flex-basis: 19px;
   font-size: 12px;
   border-radius: 5px;
 }
-body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links {
+.studio-context-rail .mw-today-rail-links {
   padding: 2px 5px;
   gap: 0;
 }
-body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links button {
+.studio-context-rail .mw-today-rail-links button {
   min-height: 26px;
   padding: 2px 5px;
   gap: 6px;
   font-size: .76rem;
 }
-body[data-studio-view="today"] .studio-context-rail .mw-today-rail-links button>span:first-child {
+.studio-context-rail .mw-today-rail-links button>span:first-child {
   width: 19px;
   height: 19px;
   flex-basis: 19px;
