@@ -1,5 +1,11 @@
 /* Theme variants. Standard deliberately inherits the existing Studio design. */
 body[data-theme="office-light"] {
+  --attention-border:#eab7b9;
+  --attention-surface:#fff9f5;
+  --attention-title-bg:#fff0ef;
+  --attention-title-border:#eab7b9;
+  --attention-title-text:#99535b;
+  --attention-text:#344b61;
   --studio-grid-body-bg:#ffffff;
   --studio-grid-row-alt-bg:#f5f9fc;
   --studio-grid-border:#d2e1ed;
