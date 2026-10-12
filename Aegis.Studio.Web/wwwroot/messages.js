@@ -201,6 +201,7 @@
         pane.innerHTML=`<div class="message-conversation-header"><div><h2>${esc(conversation.subject)}</h2><p>${esc(conversation.contactName)} · ${esc(conversation.contactAddress)}</p></div><button class="st-link" id="openConversationWorkspace">Open conversation</button></div><div class="studio-message-history">${conversation.messages.map(m=>renderMessage({id:m.id,senderUserName:m.author,body:m.body,createdAtUtc:m.createdAt},[])).join('')}${files.length?`<div class="studio-message-files">${files.map(f=>`<a href="/api/attachments/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.fileName)}</a>`).join('')}</div>`:''}</div>
             <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><select name="sendingIdentity" aria-label="Sender identity">${(identities?.identities||[{type:'Workspace',label:'Workspace'}]).map(i=>`<option value="${esc(i.type)}">${esc(i.label)}</option>`).join('')}</select><label><input name="internal" type="checkbox">Internal note</label><button class="primary" type="submit">Send</button></div></form>`;
         document.getElementById('openConversationWorkspace').onclick=async()=>{await selectWorkspace(conversation.workspaceId);await openConversation(id);};
+        StudioMessageCard.bindEditors(pane);
         document.getElementById('legacyMessageComposer').onsubmit=async event=>{
             event.preventDefault();const form=event.target,button=form.querySelector('[type=submit]');button.disabled=true;
             try{await json('/api/conversations/'+id+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:form.elements.body.value,isInternal:form.elements.internal.checked,sendingIdentity:form.elements.sendingIdentity.value})});await openLegacyConversation(id);await loadInbox(false);}
@@ -241,6 +242,7 @@
                 <div class="studio-compose-actions"><label class="action message-attachment-control">Attach document<input id="studioMessageFile" type="file" multiple hidden></label>
                 <button class="action" id="studioWhatsAppSend" type="button" title="Send this message to the photographer via WhatsApp">WhatsApp</button><button class="primary" type="submit">Send</button></div>
             </form>`;
+        StudioMessageCard.bindEditors(pane);
         document.getElementById('studioMessageComposer').onsubmit = sendMessage;
         document.getElementById('studioWhatsAppSend').onclick = sendWhatsApp;
         pane.querySelectorAll('[data-retry-routing]').forEach(button=>button.onclick=()=>retryRouting(button.dataset.retryRouting));

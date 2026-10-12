@@ -9,6 +9,21 @@
  function state(card){return card.__studioMessageCard??=( {version:0,jobId:card.dataset.messageJobId||'',loaded:false,notes:[],permissions:{},userName:''} );}
  const live=(card,s,version)=>card.isConnected&&s.version===version;
  const firstName=name=>window.studioFirstName?window.studioFirstName(name):String(name||'Studio');
+ function fitEditor(field){
+  if(!field||!field.isConnected||!field.getClientRects().length)return;
+  const style=getComputedStyle(field);
+  field.style.height='auto';
+  field.style.height=Math.ceil(Math.max(parseFloat(style.minHeight)||96,field.scrollHeight+(parseFloat(style.borderTopWidth)||0)+(parseFloat(style.borderBottomWidth)||0)))+'px';
+ }
+ function bindEditors(card){
+  if(card.__studioEditorSizing)return;
+  let frame=0,width=0;
+  const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;card.querySelectorAll('.composer textarea,.smc-note-form textarea,.studio-message-composer textarea').forEach(fitEditor);});};
+  card.addEventListener('input',event=>{if(event.target.matches('.composer textarea,.smc-note-form textarea,.studio-message-composer textarea'))fitEditor(event.target);});
+  const mutations=new MutationObserver(schedule);mutations.observe(card,{childList:true,subtree:true});
+  const resize=new ResizeObserver(entries=>{const next=entries[0].contentRect.width;if(next!==width){width=next;schedule();}});
+  resize.observe(card);card.__studioEditorSizing={mutations,resize,schedule};schedule();
+ }
  function renderNotes(card,s){
   const host=card.querySelector('[data-smc-note-editor]');if(!host)return;
   const canAdd=!!(s.permissions.editJob||s.permissions.manageProduction);
@@ -19,10 +34,10 @@
   const output=form.querySelector('[role=status]'),save=form.querySelector('[data-save-note]'),cancel=form.querySelector('[data-cancel-edit]');
   host.querySelectorAll('[data-edit-note]').forEach(button=>button.onclick=()=>{
    if(saving||pendingNote)return;
-   editing=s.notes.find(note=>note.id===button.dataset.editNote);form.elements.body.value=editing.body;
+   editing=s.notes.find(note=>note.id===button.dataset.editNote);form.elements.body.value=editing.body;fitEditor(form.elements.body);
    form.querySelector('[data-note-label]').firstChild.textContent='Edit note';save.textContent='Save changes';cancel.hidden=false;form.elements.body.focus();
   });
-  cancel.onclick=()=>{if(saving)return;editing=null;pendingNote=null;form.elements.body.value='';form.elements.body.readOnly=false;form.querySelector('[data-note-label]').firstChild.textContent='New note';save.textContent='Save note';cancel.hidden=true;output.textContent='';};
+  cancel.onclick=()=>{if(saving)return;editing=null;pendingNote=null;form.elements.body.value='';fitEditor(form.elements.body);form.elements.body.readOnly=false;form.querySelector('[data-note-label]').firstChild.textContent='New note';save.textContent='Save note';cancel.hidden=true;output.textContent='';};
   form.querySelector('[data-reload-notes]').onclick=()=>{if(saving)return;loadJobNotes(card,s,true);};
   form.onsubmit=async event=>{
    event.preventDefault();const body=form.elements.body.value.trim();if(!body||saving)return;
@@ -73,8 +88,9 @@
   const toggle=card.querySelector('[data-smc-notes-toggle]');toggle.setAttribute('aria-pressed',String(notes));toggle.textContent=notes?'✉ Messages':'✎ Notes';
   const title=card.querySelector('.smc-title');title.querySelector('strong').textContent=notes?'Job Notes':title.dataset.messageTitle;
   card.querySelector('[data-smc-message-actions]').hidden=notes;
+  card.__studioEditorSizing?.schedule();
   if(notes)return ensureNotes(card);
  }
- function bind(card){if(!card)return;state(card);card.querySelector('[data-smc-notes-toggle]').onclick=()=>setMode(card,card.dataset.smcMode==='notes'?'messages':'notes');}
- window.StudioMessageCard={html,create,bind,setMode};
+ function bind(card){if(!card)return;state(card);bindEditors(card);card.querySelector('[data-smc-notes-toggle]').onclick=()=>setMode(card,card.dataset.smcMode==='notes'?'messages':'notes');}
+ window.StudioMessageCard={html,create,bind,setMode,bindEditors};
 })();

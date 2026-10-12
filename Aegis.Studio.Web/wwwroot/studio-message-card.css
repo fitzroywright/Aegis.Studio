@@ -1,5 +1,5 @@
 /* Sole owner of the always-open Messages / Notes card. */
-.smc-card{display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:32px;box-sizing:border-box;overflow:hidden;border:1px solid #dfc66e;border-radius:7px;background:#fff5c8;color:#5e4a20}
+.smc-card{display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:220px;box-sizing:border-box;overflow:hidden;border:1px solid #dfc66e;border-radius:7px;background:#fff5c8;color:#5e4a20}
 .smc-header{display:flex;align-items:center;gap:5px;flex:0 0 30px;min-width:0;box-sizing:border-box;padding:0 8px;background:#fff1b2;color:#614a18}
 .smc-actions button:focus-visible,.smc-footer button:focus-visible{outline:2px solid #a27527;outline-offset:-2px}
 .smc-actions{display:flex;align-items:center;gap:3px;flex:none}
@@ -29,7 +29,7 @@
 .smc-content>.composer .send-split{display:flex;gap:5px}
 .smc-content>.composer .send-split button{flex:1;padding:4px 8px;border:0;border-radius:4px;background:#a27527;color:#fff}
 .smc-content>.composer .send-split select{width:85px;min-width:0;padding:3px}
-.smc-content>.composer textarea{height:32px;min-height:32px;max-height:50px;font-size:11px}
+.smc-content>.composer textarea{display:block;width:100%;min-width:0;box-sizing:border-box;height:96px;min-height:96px;max-height:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;resize:none;line-height:1.45;font-size:11px}
 .smc-content>.composer label,.smc-content>.composer button,.smc-content>.composer select{font-size:10px}
 .smc-content>.composer .muted:empty,.smc-content>.composer [role=alert]:empty{display:none}
 
@@ -49,6 +49,6 @@
 .smc-note header button{margin-left:auto}
 .smc-note-form{display:flex;flex-direction:column;gap:5px;margin-top:8px}
 .smc-note-form label{font-weight:700}
-.smc-note-form textarea{display:block;width:100%;box-sizing:border-box;min-height:64px;margin-top:4px;padding:5px;border:1px solid #dfc66e;border-radius:4px;background:#fffbea;color:#5e4a20;font-size:11px;resize:vertical}
+.smc-note-form textarea{display:block;width:100%;box-sizing:border-box;height:96px;min-height:96px;max-height:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;margin-top:4px;padding:5px;border:1px solid #dfc66e;border-radius:4px;background:#fffbea;color:#5e4a20;font-size:11px;resize:none}
 .smc-note-form>div{display:flex;flex-wrap:wrap;gap:4px}
 .smc-note-form [role=status]{margin:0;font-size:10px}
