@@ -35,6 +35,14 @@
  function canvas(host,graph,options={}){
   const expanded=options.expanded||new Set(),model=visible(graph,expanded),states=new Map((options.evaluation?.nodes||[]).map(n=>[n.id,n]));
   for(const n of model.nodes.filter(n=>n.kind==='Subflow')){const children=[...states.values()].filter(s=>s.id.startsWith(n.id+'/'));if(children.length)states.set(n.id,{status:children.every(s=>s.status==='Inactive')?'Inactive':children.every(s=>['Completed','Skipped','Inactive'].includes(s.status))?'Completed':children.some(s=>s.status==='InProgress')?'InProgress':children.some(s=>s.status==='Available')?'Available':'Blocked'});}
+  // Job views use the server's selected route, including pending required work.
+  // Keep started tasks if a later service change disables their incoming branch.
+  // Definition/editor canvases retain every possible path.
+  if(options.actualPath&&options.evaluation&&!options.editable){
+   model.nodes=model.nodes.filter(n=>states.get(n.id)?.status!=='Inactive');
+   const ids=new Set(model.nodes.map(n=>n.id));
+   model.edges=model.edges.filter(e=>options.evaluation.edges?.[e.id]!=='Inactive'&&ids.has(e.from)&&ids.has(e.to));
+  }
   const layout=new dagre.graphlib.Graph({multigraph:true}).setGraph({rankdir:'LR',nodesep:46,ranksep:80,marginx:24,marginy:28}).setDefaultEdgeLabel(()=>({}));
   for(const n of model.nodes)layout.setNode(n.id,{width:180,height:74});
   for(const e of model.edges)if(layout.hasNode(e.from)&&layout.hasNode(e.to))layout.setEdge(e.from,e.to,{width:e.label?Math.min(240,e.label.length*6):0,height:e.label?22:0},e.id);
@@ -85,4 +93,5 @@
  }
  root.StudioGraph={canvas,visible,fromSteps,restoreEndpoints,esc};
 })(window);
+
 
