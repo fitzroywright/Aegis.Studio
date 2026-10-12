@@ -89,9 +89,30 @@
   });
   host.querySelectorAll('[data-edge]').forEach(el=>{el.onclick=()=>options.onEdge?.(el.dataset.edge);el.onkeydown=e=>{if(e.key==='Enter')options.onEdge?.(el.dataset.edge);};});
   viewport.onkeydown=e=>{if(e.target!==viewport)return;const moves={ArrowLeft:[-40,0],ArrowRight:[40,0],ArrowUp:[0,-40],ArrowDown:[0,40]};if(moves[e.key]){e.preventDefault();box.x+=moves[e.key][0];box.y+=moves[e.key][1];update();}};
-  return {model,layout,expanded};
+  return {model,layout,expanded,states};
  }
- root.StudioGraph={canvas,visible,fromSteps,restoreEndpoints,esc};
+ function summary(host,route){
+  // Keep subflows as milestones. Parallel work shares one position in the
+  // main route; decisions, fork/join wiring and nested detail stay in the drawer.
+  const milestones=route.model.nodes.filter(n=>['Task','Subflow'].includes(n.kind)).sort((a,b)=>route.layout.node(a.id).x-route.layout.node(b.id).x||route.layout.node(a.id).y-route.layout.node(b.id).y);
+  if(!milestones.length)return;
+  const groups=[];
+  for(const n of milestones){
+   const rank=route.layout.node(n.id).x,last=groups.at(-1);
+   if(last&&Math.abs(last.rank-rank)<1)last.nodes.push(n);else groups.push({rank,nodes:[n]});
+  }
+  host.innerHTML=groups.map(({nodes})=>{
+   const statuses=nodes.map(n=>route.states.get(n.id)?.status||'Pending');
+   const complete=statuses.every(s=>['Completed','Skipped'].includes(s));
+   const exception=statuses.some(s=>['WaitingOnCustomer','ReworkRequired','Partial','Failed','ReprintRequired'].includes(s));
+   const current=statuses.some(s=>['Available','InProgress','ReadyForDelivery'].includes(s))||exception;
+   const state=complete?'complete':exception?'current exception':current?'current':'pending';
+   const label=nodes.map(n=>n.label).join(' / '),description=nodes.map((n,i)=>n.label+': '+statuses[i]).join('; ');
+   return `<li class="jd-flow-phase ${state}" data-flow-phase="${esc(label)}" title="${esc(description)}"><span class="jd-stage-light" aria-hidden="true">${complete?'✓':exception?'!':''}</span><span>${esc(label)}</span><span class="sr-only">${esc(description)}${nodes.length>1?' · Parallel work':''}</span></li>`;
+  }).join('');
+  host.setAttribute('aria-label','Main job flow');
+ }
+ root.StudioGraph={canvas,summary,visible,fromSteps,restoreEndpoints,esc};
 })(window);
 
 
