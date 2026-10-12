@@ -17,3 +17,12 @@ test('three theme stylesheets and shared theme surfaces are loaded',()=>{
  for(const name of ['standard','light','dark'])assert.ok(hrefs.includes('css/themes/'+name+'.css'));
  assert.ok(hrefs.includes('css/components/theme-surfaces.css'));
 });
+
+test('attention component uses shared color variables',()=>{
+ const card=fs.readFileSync(path.join(root,'css/components/needs-attention.css'),'utf8');
+ assert.ok(card.includes('var(--attention-surface)'));
+ for(const theme of ['css/core/tokens.css','css/themes/light.css','css/themes/dark.css']){
+  const styles=fs.readFileSync(path.join(root,theme),'utf8');
+  assert.ok(styles.includes('--attention-surface:'),theme);
+ }
+});
