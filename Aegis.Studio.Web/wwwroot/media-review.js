@@ -20,7 +20,7 @@
       <header class="studio-media-heading"><div><h1>Media Review &amp; Upload</h1><p>Upload, organise and review Job media and source files.</p></div></header>
       <div class="studio-media-workspace"><section class="studio-media-panel studio-media-browser"><h2>Media Destinations</h2>
         <div class="studio-media-tree-layout">
-          <div><input id="studioMediaJobSearch" type="search" placeholder="Search Workspaces, Jobs, Collections, Subjects…" aria-label="Search media destinations"><select id="studioMediaJobStatus" aria-label="Filter jobs by status"><option value="">All statuses</option>${StudioStatusOrder.sort(jobs.map(j=>j.status||'Unknown')).map(x=>`<option>${escMedia(x)}</option>`).join('')}</select><label class="ssp-job-visibility"><input type="checkbox" id="studioMediaClosed"> Include closed / archived</label><label>Job<select id="studioMediaQuickJob" data-job-picker><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><div id="studioMediaTree" class="studio-media-tree" role="tree"></div><small id="studioMediaJobMatches"></small></div>
+          <div><input id="studioMediaJobSearch" type="search" placeholder="Search Workspaces, Jobs, Collections, Subjects…" aria-label="Search media destinations"><select id="studioMediaJobStatus" aria-label="Filter jobs by status"><option value="">All Open Jobs</option>${StudioStatusOrder.sort(jobs.map(j=>j.status||'Unknown')).map(x=>`<option>${escMedia(x)}</option>`).join('')}</select><label>Job<select id="studioMediaQuickJob" data-job-picker><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><div id="studioMediaTree" class="studio-media-tree" role="tree"></div><small id="studioMediaJobMatches"></small></div>
           
         </div>
         <div class="studio-media-targets" hidden><select id="studioMediaJob"><option value="">Select Job</option></select><select id="studioMediaCollection"><option value="Unclassified">Unclassified</option></select><select id="studioMediaSubject"><option value="">No Subject</option></select></div>
@@ -40,7 +40,7 @@
       </div></div></div>`;
     const root=genericView.querySelector('.studio-media-page'),job=root.querySelector('#studioMediaJob'),collection=root.querySelector('#studioMediaCollection'),subject=root.querySelector('#studioMediaSubject'),files=root.querySelector('#studioMediaFiles'),progress=root.querySelector('#studioMediaProgress'),gallery=root.querySelector('#studioMediaGallery'),count=root.querySelector('#studioMediaCount'),notice=root.querySelector('#studioMediaDestinationNotice');
     const search=root.querySelector('#studioMediaJobSearch'),matches=root.querySelector('#studioMediaJobMatches'),tree=root.querySelector('#studioMediaTree'),path=root.querySelector('#studioMediaPath');
-    root.querySelector('#studioMediaJobStatus').onchange=renderTree;root.querySelector('#studioMediaClosed').onchange=renderTree;
+    root.querySelector('#studioMediaJobStatus').onchange=renderTree;
     const workspaceNames=new Map(workspaces.map(w=>[String(w.id),w.name||w.title||'Workspace']));
     const describe=j=>[j.jobNumber||j.reference||'',j.title||j.name||'Job',j.clientName||j.customerName||''].filter(Boolean).join(' · ');
     const expanded=new Set(['workspaces']),cache=new Map();
@@ -48,7 +48,7 @@
     let selection='';
     function renderTree(){
       const q=search.value.trim().toLowerCase(),stage=root.querySelector('#studioMediaJobStatus').value;
-      const visibleJobs=jobs.filter(j=>(root.querySelector('#studioMediaClosed').checked||!StudioSubjectPicker.isClosed(j))&&(!stage||j.status===stage));
+      const visibleJobs=jobs.filter(j=>(stage ? j.status===stage : !StudioSubjectPicker.isClosed(j)));
       const matchesText=(...parts)=>!q||parts.join(' ').toLowerCase().includes(q);
       const node=(id,name,depth,children,icon)=>'<button type="button" role="treeitem" data-tree-id="'+escMedia(id)+'" class="studio-media-tree-node'+(selection===id?' selected':'')+'" style="padding-left:'+(12+depth*20)+'px"><span>'+ (children?(expanded.has(id)||q?'⌄':'›'):'·') +'</span><span>'+icon+'</span><span>'+escMedia(name)+'</span></button>';
       let html=node('workspaces','Workspaces',0,true,'▣');
