@@ -1,7 +1,9 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),path=require('path'),{JSDOM}=require('jsdom');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');const {api,jobs,workspaces,permissions}=require('./shared-controller-fixture.cjs');
-async function environment(t,full=false){
- const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://studio.test/',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window,calls=[],alerts=[];const spaces=JSON.parse(JSON.stringify(workspaces));
+async function environment(t,full=false,url='https://studio.test/'){
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url,runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window,calls=[],alerts=[];const spaces=JSON.parse(JSON.stringify(workspaces));
+ w.console.info=()=>{};
+ w.ResizeObserver=class {observe(){} disconnect(){}};w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
  w.alert=s=>alerts.push(s);w.confirm=()=>false;w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};w.HTMLElement.prototype.scrollIntoView=function(){};
  w.fetch=async (url,options)=>{const u=new URL(url,'https://studio.test'),p=u.pathname;calls.push({url,options});let body=api(u);
  if(p==='/api/workspace-access')body=spaces.map(workspace=>({workspace,permissions:workspace.permissions}));
@@ -47,3 +49,23 @@ test('workspace card and rail entries open the same filtered Jobs grid and a row
  assert.equal(w.document.querySelector('[data-sj-workspace]').value,'w1');
  assert.equal(w.document.querySelector('tr[data-sj-job]').dataset.sjJob,'j1');
 });
+
+async function travel(w,direction){const event=new Promise(resolve=>w.addEventListener('popstate',resolve,{once:true}));w.history[direction]();await event;await new Promise(resolve=>setTimeout(resolve,25));}
+test('real browser Back and Forward restore workspace Jobs and individual Job Details without adding entries',async t=>{
+ const {w}=await environment(t,true);await w.studioOpenJobs('w0');assert.equal(w.history.state.studioWorkspaceId,'w0');await w.openWorkspaceJob('j0');assert.equal(w.history.state.studioJobId,'j0');assert.match(w.location.hash,/job=j0/);await w.studioNavigate('messages');const length=w.history.length;
+ await travel(w,'back');assert.equal(w.history.state.studioJobId,'j0');assert.equal(w.document.body.dataset.studioView,'workspaces');assert.equal(w.document.querySelector('.job-detail-title h1').textContent,jobs.find(j=>j.id==='j0').title);
+ await travel(w,'back');assert.equal(w.document.body.dataset.studioView,'jobs');assert.equal(w.document.querySelector('[data-sj-workspace]').value,'w0');assert.equal(w.history.length,length);
+ await travel(w,'forward');assert.equal(w.history.state.studioJobId,'j0');assert.ok(w.document.querySelector('.job-detail-title h1'));assert.equal(w.history.length,length);
+});
+test('Back between jobs restores the preceding job; repeat open does not create a duplicate entry',async t=>{
+ const {w}=await environment(t,true);await w.openWorkspaceJob('j0');await w.openWorkspaceJob('j1');const length=w.history.length;await w.openWorkspaceJob('j1');assert.equal(w.history.length,length);await travel(w,'back');assert.equal(w.history.state.studioJobId,'j0');assert.equal(w.document.querySelector('.job-detail-title h1').textContent,jobs.find(j=>j.id==='j0').title);
+});
+test('changing workspace scope on the same Jobs view is a separate browser destination',async t=>{
+ const {w}=await environment(t,true);await w.studioOpenJobs('w0');await w.studioOpenJobs('w1');await travel(w,'back');assert.equal(w.document.querySelector('[data-sj-workspace]').value,'w0');assert.equal(w.document.body.dataset.studioView,'jobs');
+});
+test('refresh at a Job Details URL restores that job without routing through Today',async t=>{
+ const {w}=await environment(t,true,'https://studio.test/#studio=workspaces&job=j0');assert.equal(w.history.state.studioJobId,'j0');assert.equal(w.history.length,1);assert.equal(w.document.querySelector('.job-detail-title h1').textContent,jobs.find(j=>j.id==='j0').title);
+});
+
+test('Jobs and Today status filters follow workflow event order',async t=>{const {w}=await environment(t,true);let control=w.document.querySelector('[data-mw-job-status]');let values=Array.from(control.options,o=>o.value).filter(Boolean);assert.deepEqual(values,Array.from(w.StudioStatusOrder.sort(values)));await w.studioNavigate('jobs');control=w.document.querySelector('[data-sj-status]');values=Array.from(control.options,o=>o.value).filter(Boolean);assert.deepEqual(values,Array.from(w.StudioStatusOrder.sort(values)));});
+test('shared and Front Desk popups place functional Close controls beside the title',async t=>{const {w}=await environment(t,true);const shared=w.studioDialog('Assignments & Workflow','<p>Details</p>');const close=shared.querySelector('[data-close]');assert.equal(close.parentElement,shared.querySelector('.studio-dialog-heading'));assert.equal(close.previousElementSibling.tagName,'H2');close.click();assert.equal(shared.open,false);const front=w.frontDeskDialog('Booking','<p>Details</p>');assert.equal(front.querySelector('.studio-dialog-close').parentElement,front.querySelector('.studio-dialog-heading'));front.querySelector('.studio-dialog-close').click();assert.equal(front.open,false);});

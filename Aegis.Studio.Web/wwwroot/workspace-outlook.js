@@ -43,8 +43,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
         }
         return window.studioOpenJobs('');
     }
-    window.StudioWorkspace={select:selectWorkspaceView,load:loadWorkspaceConversations};
-    window.openWorkspaceJob = async function(id) {
+    window.StudioWorkspace={select:selectWorkspaceView,load:loadWorkspaceConversations,invalidate(){revision++;disposeJobView();disposeJobView=()=>{};}};
+    window.openWorkspaceJob = async function(id,options={}) {
+        if(!options.navigationRecorded)window.studioBeginJobNavigation?.(id,options);
         const version=beginJobLoading();
         try {
             const [job]=await Promise.all([

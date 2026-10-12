@@ -96,7 +96,7 @@ function renderFrontDesk(){
         ...frontDeskRequests.filter(Boolean).map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Customer',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:'Booking',request:x}))
     ].sort((a,b)=>new Date(b.created||0)-new Date(a.created||0));
     const entryType=e=>e.kind==='enquiry'?'Inquiry':'Booking';
-    const valuesFor=key=>[...new Set(entries.map(e=>key==='type'?entryType(e):String(e[key]||'')))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+    const valuesFor=key=>{const values=[...new Set(entries.map(e=>key==='type'?entryType(e):String(e[key]||'')))].filter(Boolean);return key==='status'?StudioStatusOrder.sort(values):values.sort((a,b)=>a.localeCompare(b));};
     const metricMatch=e=>{
         if(!frontDeskMetricView)return true;
         if(frontDeskMetricView==='enquiries')return e.kind==='enquiry';
@@ -276,7 +276,7 @@ function renderFrontDeskRows(){
 }
 function renderFrontDeskJob(job){return `<article class="front-desk-row"><div><strong>${esc(job.clientName)}</strong><div>${esc(job.title)}</div><div class="meta">${esc(job.status)}${job.eventDate?' · '+esc(job.eventDate):''}</div></div><div class="front-desk-actions"><button class="action" onclick="linkFrontDeskClient('${job.id}')">${job.clientId?'Linked client':'Link client'}</button><button class="action" onclick="openFrontDeskClient('${job.id}')">Customer conversation</button><button class="action" onclick="showFrontDeskFlow('${job.id}')">Next action / Flow</button><button class="action" onclick="messageFrontDeskJob('${job.id}','workspace')">Message Workspace</button><button class="action" onclick="messageFrontDeskJob('${job.id}','escalate')">Escalate</button><button class="action" onclick="messageFrontDeskJob('${job.id}','finance')">Message Accounts / Finance</button><button class="action" data-frontdesk-job="${job.id}">Open job</button><button class="primary" data-frontdesk-pos="${job.id}">New Sale</button><button class="action" onclick="launchFrontDeskPos('TakePayment',{jobId:'${job.id}'})">Take Payment</button><button class="action" onclick="pickFrontDeskSale('IssueRefund','${job.id}')">Issue Refund</button><button class="action" onclick="pickFrontDeskSale('ViewReceipt','${job.id}')">View Receipt</button>${['Ready for Client','Ready for Delivery','Published'].includes(job.status)?`<button class="primary" data-frontdesk-fulfill="${job.id}">Record collection / delivery</button>`:''}</div></article>`;}
 function frontDeskDialog(title,contents){
-    const dialog=document.createElement('dialog');dialog.className='frontdesk-dialog';dialog.innerHTML=`<form class="request-form"><h2>${esc(title)}</h2>${contents}<p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`;document.body.appendChild(dialog);dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();return dialog;
+    const dialog=document.createElement('dialog');dialog.className='frontdesk-dialog';dialog.innerHTML=`<form class="request-form"><header class="studio-dialog-heading"><h2>${esc(title)}</h2><button class="studio-dialog-close" type="button" data-cancel aria-label="Close">×</button></header>${contents}<p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`;document.body.appendChild(dialog);dialog.querySelectorAll('[data-cancel]').forEach(button=>button.onclick=()=>dialog.close());dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();return dialog;
 }
 async function openPendingBookingForm(enquiry,client){
     const jobTemplates=await json('/api/commercial/templates/Job');
@@ -414,7 +414,7 @@ async function loadFrontDeskCommunications(){
 }
 function openFrontDeskMessagePicker(){
     const jobs=frontDeskJobs.filter(job=>job?.id).sort((a,b)=>String(a.clientName||a.title||'').localeCompare(String(b.clientName||b.title||'')));
-    const dialog=frontDeskDialog('Send Message',`<p>Select the Job conversation to message. Messages are retained with the Job.</p><label>Job / Customer<select name="jobId" required><option value="">Select a Job…</option>${jobs.map(job=>`<option value="${esc(job.id)}">${esc((job.clientName||'Client')+' — '+(job.title||'Untitled Job'))}</option>`).join('')}</select></label><p class="muted">The message composer will open in a popup after you select a Job.</p>`);
+    const dialog=frontDeskDialog('Send Message',`<p>Select the Job conversation to message. Messages are retained with the Job.</p><label>Job / Customer<select data-job-picker name="jobId" required><option value="">Select a Job…</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><p class="muted">The message composer will open in a popup after you select a Job.</p>`);
     const form=dialog.querySelector('form');
     form.querySelector('[type=submit]').textContent='Continue';
     if(!jobs.length){form.querySelector('[role=alert]').textContent='No Jobs are available for messaging.';form.querySelector('[type=submit]').disabled=true;}
@@ -463,5 +463,3 @@ async function recordFrontDeskFulfillment(jobId){
  const dialog=frontDeskDialog('Confirm collection / delivery',`<p>${esc(job?.title||'Job')} · ${esc(job?.clientName||'')}</p><label>Method<select name="method"><option value="Collected">Customer collected</option><option value="Delivered">Delivered to customer</option></select></label><label>Received by<input name="recipient" required maxlength="200"></label>`);
  dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{await json(`/api/frontdesk/jobs/${jobId}/fulfillment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId,expectedRevision:workflow.data.revision,method:form.elements.method.value,recipient:form.elements.recipient.value})});dialog.close();await showFrontDesk();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
-
-

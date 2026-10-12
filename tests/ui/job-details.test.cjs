@@ -90,6 +90,7 @@ test('stale Subjects response cannot overwrite a subsequently opened job',async 
 });
 test('compact workflow opens full assignment controls without clipping the page',async t=>{
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
+ const original=w.json;w.json=async(url,options)=>{const result=await original(url,options);if(url.endsWith('/connected-workflow'))result.data={...result.data,stage:'Awaiting Scheduling',ownerAssignment:{assigned_to:'studio.admin',status:'Accepted'}};return result;};
  assert.match(w.document.querySelector('[data-job-owner]').textContent,/Owner: studio/);
  await w.document.querySelector('[data-job-workflow]').onclick();
  const dialog=w.document.querySelector('.job-detail-workflow-dialog');assert.ok(dialog.open);assert.ok(dialog.querySelector('[data-wf-session]'));assert.ok(dialog.querySelector('[data-wf-owner]'));
@@ -202,13 +203,13 @@ test('gallery search and list controls operate on the displayed page',async t=>{
  w.document.querySelector('[data-list]').click();assert.equal(w.document.querySelector('.jd-contact-sheet').classList.contains('list'),true);
  w.document.querySelector('[data-grid]').click();assert.equal(w.document.querySelector('.jd-contact-sheet').classList.contains('list'),false);
 });
-test('workflow ribbon reflects current stage, corrections and cancellation',async t=>{
+test('compact workflow marks the active milestone and exception route',async t=>{
  const {w}=environment(t);const host=w.document.createElement('div');
- for(const [stage,correctionKind,index] of [['Pending',null,0],['Active Production',null,3],['Awaiting Approval',null,4],['Changes Requested','Source',2],['Changes Requested','Production',3]]){
-  w.StudioJobDetails.workflow(host,{stage,correctionKind});assert.equal(Array.from(host.children).indexOf(host.querySelector('.current')),index);
+ for(const [stage,title] of [['Pending','Booking'],['Active Production','Production'],['Awaiting Approval','Production']]){
+  w.StudioJobDetails.workflow(host,{stage});assert.match(host.querySelector('.jd-flow-mainline .current').textContent,new RegExp(title));assert.equal(host.querySelector('.jd-flow-mainline .current').dataset.flowStage,stage);
  }
- w.StudioJobDetails.workflow(host,{stage:'Cancelled'});assert.equal(host.querySelectorAll('.complete,.current').length,0);
- w.StudioJobDetails.workflow(host,{stage:'Completed'});assert.equal(host.querySelectorAll('.complete').length,6);
+ for(const stage of ['Changes Requested','Cancelled','Blocked']){w.StudioJobDetails.workflow(host,{stage});assert.equal(host.querySelector('.jd-compact-exception.current').dataset.flowStage,stage);}
+ w.StudioJobDetails.workflow(host,{stage:'Completed'});assert.equal(host.querySelectorAll('.jd-flow-mainline button').length,6);assert.equal(host.querySelectorAll('.jd-flow-exception-lane').length,2);
 });
 test('upload selection queues files immediately into the current collection',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
@@ -261,3 +262,5 @@ test('Job Details dropped files declare receipts and retries preserve operation 
 });
 
 
+
+test('Job Notes slides the editor open and preserves a draft when closed',async t=>{const {w}=environment(t);await w.openWorkspaceJob('job');await settle();const card=w.document.getElementById('jobDetailMessages');await card.querySelector('[data-smc-notes-toggle]').onclick();const opener=card.querySelector('[data-note-slide]'),slide=card.querySelector('.smc-note-slide'),form=card.querySelector('.smc-note-form');assert.equal(slide.dataset.open,'false');opener.click();assert.equal(slide.dataset.open,'true');form.elements.body.value='Draft instructions';form.querySelector('[data-close-note]').click();assert.equal(slide.dataset.open,'false');opener.click();assert.equal(form.elements.body.value,'Draft instructions');await form.onsubmit({preventDefault(){}});assert.equal(card.querySelector('.smc-note-slide').dataset.open,'false');card.querySelector('[data-edit-note]').click();assert.equal(card.querySelector('.smc-note-slide').dataset.open,'true');});
