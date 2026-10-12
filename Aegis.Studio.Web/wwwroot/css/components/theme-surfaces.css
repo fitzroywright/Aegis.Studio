@@ -17,4 +17,4 @@ body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.mw-today-jo
 body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(input,select,textarea,.theme-picker) { background:var(--theme-surface);color:var(--theme-text);border-color:var(--theme-border)!important; }
 
 
-body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.mw-status-row,.mw-today-job-row,.mw-today-rail-links button,.st-card-body) { color:var(--theme-text);border-color:var(--theme-border); }
+body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.mw-status-row,.mw-today-job-row,.mw-today-rail-links button,.st-card-body) { background:var(--studio-grid-body-bg);color:var(--theme-text);border-color:var(--studio-grid-border); }
