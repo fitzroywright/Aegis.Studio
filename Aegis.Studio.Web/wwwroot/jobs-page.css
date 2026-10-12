@@ -6,7 +6,7 @@
 .sj-toolbar h2{font-size:20px;margin:0 8px 0 0;color:#243044}
 .sj-toolbar input,.sj-toolbar select{border:1px solid #d7dce1;background:#fff;border-radius:4px;padding:8px;color:#344152;font-size:12px;min-width:0;height:34px}
 .sj-toolbar input{flex:1 1 230px;width:230px}
-.sj-toolbar select{width:128px;max-width:150px}
+.sj-toolbar select{width:128px;max-width:150px}.sj-toolbar :focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:2px}.sj-table th{white-space:normal;line-height:1.35}.sj-table td{min-width:0}
 .sj-summary{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:#fafafa;color:#67707b;border-bottom:1px solid #e3e6e9;gap:8px}
 .sj-summary button,.sj-gold,.sj-card footer button{color:#98701c;font-weight:700;background:none;border:0;padding:3px;cursor:pointer}
 .sj-table-scroll{flex:1;min-height:0;overflow:auto}

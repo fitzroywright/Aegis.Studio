@@ -4,7 +4,7 @@
 .st-board{display:flex;flex-direction:column}
 .st-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid #e4e5e7;flex-wrap:wrap;flex-shrink:0}
 .st-toolbar h1{font-size:20px;margin:0;color:#243044}
-.st-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.st-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}.st-tools input,.st-tools select,.st-tools button{min-width:0;max-width:100%;box-sizing:border-box}.st-tools :focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:2px}
 .st-content{display:flex;flex-direction:column;gap:8px;padding:8px;flex:1;min-height:0;min-width:0;overflow:hidden}
 .st-card-scroll{overflow:auto;overscroll-behavior:contain}
 .st-right{gap:8px;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
