@@ -89,6 +89,7 @@ internal static class DemoDenseScheduleData
         if (batchIndex < 0 || batchIndex >= BatchCount)
             throw new ArgumentOutOfRangeException(nameof(batchIndex));
 
+        Execute(connection,transaction,"select set_config('studio.demo_seed','true',true)");
         EnsureReferenceData(connection, transaction, login);
 
         int firstDay = batchIndex * BatchDays;
@@ -337,3 +338,4 @@ internal static class DemoDenseScheduleData
         command.ExecuteNonQuery();
     }
 }
+

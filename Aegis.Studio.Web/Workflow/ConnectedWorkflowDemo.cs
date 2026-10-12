@@ -184,17 +184,21 @@ internal static class ConnectedWorkflowDemo
             "studio_workspaces","studio_state","studio_user_profiles","studio_employees",
             "studio_workflow_thresholds","studio_workflow_audiences",
             "studio_workflow_migrations","studio_global_operational_roles",
-            "studio_global_operational_role_members"
+            "studio_global_operational_role_members","studio_demo_seed_runs"
         };
+        string schema;
+        using(var current=new NpgsqlCommand("select current_schema()",c,tx))schema=(string)current.ExecuteScalar()!;
         var tables=new HashSet<string>(StringComparer.Ordinal);
         using(var q=new NpgsqlCommand(@"select tablename from pg_tables
-            where schemaname='public' and tablename like 'studio_%'",c,tx))
+            where schemaname=$1 and tablename like 'studio_%'",c,tx)){q.Parameters.AddWithValue(schema);
+
         using(var reader=q.ExecuteReader())
             while(reader.Read())
             {
                 var table=reader.GetString(0);
                 if(!protectedTables.Contains(table))tables.Add(table);
             }
+        }
 
         // PostgreSQL will reject TRUNCATE if any foreign-key child is omitted.
         // Explicitly reject protected or non-Studio dependencies rather than CASCADE.
@@ -202,7 +206,8 @@ internal static class ConnectedWorkflowDemo
             from pg_constraint fk join pg_class child on child.oid=fk.conrelid
             join pg_class parent on parent.oid=fk.confrelid
             join pg_namespace ns on ns.oid=child.relnamespace
-            where fk.contype='f' and ns.nspname='public'",c,tx))
+            where fk.contype='f' and ns.nspname=$1",c,tx)){q.Parameters.AddWithValue(schema);
+
         using(var reader=q.ExecuteReader())
             while(reader.Read())
             {
@@ -212,6 +217,7 @@ internal static class ConnectedWorkflowDemo
                     throw new InvalidOperationException(
                         "Factory reset blocked by protected dependency: "+child+" -> "+parent);
             }
+        }
 
         // Workspace memberships and seed-run markers are business/demo records.
         // Never truncate the system workspace itself: its immutable identity is
@@ -222,7 +228,7 @@ internal static class ConnectedWorkflowDemo
             {
                 if(!System.Text.RegularExpressions.Regex.IsMatch(name,@"^studio_[a-z0-9_]+$"))
                     throw new InvalidOperationException("Unsafe database identifier: "+name);
-                return "public."+name;
+                return new NpgsqlCommandBuilder().QuoteIdentifier(schema)+"."+new NpgsqlCommandBuilder().QuoteIdentifier(name);
             }));
             Exec(c,tx,"truncate table "+names+" restart identity");
         }
@@ -239,7 +245,9 @@ internal static class ConnectedWorkflowDemo
         // studio_state also holds persistent application configuration; clear
         // only seed bookkeeping, never the whole table.
         Exec(c,tx,@"delete from studio_state where key like 'demo-data-%'
-            or key like 'studio-demo-%'");
+            or key like 'studio-demo-%' or key like 'demo-job-workflow-graphs-%'");
+        using(var exists=new NpgsqlCommand("select to_regclass('studio_demo_seed_runs') is not null",c,tx))
+            if((bool)exists.ExecuteScalar()!)Exec(c,tx,"delete from studio_demo_seed_runs where status <> 'Running'");
         return new {clearedTables=tables.Count,workspacesRemaining=1,
             message="Studio database business data cleared; only Unassigned remains. External storage must be independently purged and verified."};
     }
@@ -254,3 +262,4 @@ internal static class ConnectedWorkflowDemo
         q.ExecuteNonQuery();
     }
 }
+
