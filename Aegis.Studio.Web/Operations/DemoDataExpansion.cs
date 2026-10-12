@@ -13,9 +13,9 @@ internal static class DemoDataExpansion
 
     private static HttpClient CreateDemoPhotoClient()
     {
-        var client=new HttpClient { Timeout=TimeSpan.FromSeconds(30) };
+        var client=new HttpClient { Timeout=TimeSpan.FromSeconds(60) };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Aegis.Studio/1.0 (demo-data)");
-        client.DefaultRequestHeaders.Accept.ParseAdd("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
+        client.DefaultRequestHeaders.Accept.ParseAdd("image/jpeg,image/png;q=0.9");
         return client;
     }
 
@@ -23,14 +23,10 @@ internal static class DemoDataExpansion
 
     private static HttpResponseMessage DownloadDemoPhoto(string preferredUrl,int variant,string? searchTerm=null)
     {
-        string gender=(variant&1)==0?"women":"men";
-        DemoPhotoCandidate[] candidates=
-        [
-            new(preferredUrl,"Wikimedia Commons","Public domain/CC0 as catalogued",preferredUrl),
-            new($"https://randomuser.me/api/portraits/{gender}/{Math.Abs(variant)%100}.jpg","RandomUser","Profile image supplied for application testing by RandomUser",$"https://randomuser.me/photos")
-        ];
-
-        int start=Random.Shared.Next(candidates.Length);
+        var entry=DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==preferredUrl);
+        var preferredCandidate=new DemoPhotoCandidate(preferredUrl,entry?.Source??"Wikimedia Commons",entry?.License??"Previously recorded source license",entry?.Page??preferredUrl);
+        DemoPhotoCandidate[] candidates=[preferredCandidate];
+        int start=0;
         Exception? lastError=null;
         for(int offset=0;offset<candidates.Length;offset++)
         {
@@ -39,7 +35,7 @@ internal static class DemoDataExpansion
             {
                 try
                 {
-                    HttpResponseMessage response=demoPhotoClient.GetAsync(candidate.Url).GetAwaiter().GetResult();
+                    HttpResponseMessage response=demoPhotoClient.GetAsync(candidate.Url,HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult();
                     if(response.IsSuccessStatusCode)
                     {
                         response.Headers.TryAddWithoutValidation("X-Aegis-Demo-Source",candidate.Source);
@@ -68,40 +64,84 @@ internal static class DemoDataExpansion
         throw new HttpRequestException("All configured demo image sources failed.",lastError);
     }
 
+
+    private static byte[] DownloadOriginal(string url,int variant,string? searchTerm)
+    {
+        string cacheRoot=Environment.GetEnvironmentVariable("DemoData__Photos__CachePath")??Path.Combine(Path.GetTempPath(),"aegis-studio-demo-originals-v2");
+        Directory.CreateDirectory(cacheRoot);
+        string path=Path.Combine(cacheRoot,Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".jpg");
+        byte[] bytes;
+        if(File.Exists(path))
+        {
+            try
+            {
+                if(new FileInfo(path).Length>DemoPhotoPolicy.MaximumBytes)throw new InvalidOperationException("Cached demo photo exceeds the byte limit.");
+                bytes=File.ReadAllBytes(path);
+                using var cached=new MemoryStream(bytes,false);
+                using var image=StudioImageProcessor.DecodeOriented(cached);
+                DemoPhotoPolicy.ValidateDimensions(image.Width,image.Height);
+                var source=DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==url);
+                demoPhotoSourceCache[url]=url;
+                demoPhotoSourceNameCache[url]=source?.Source??"Previously recorded source";
+                demoPhotoLicenseCache[url]=source?.License??"Previously recorded source license";
+                demoPhotoPageCache[url]=source?.Page??url;
+                return bytes;
+            }
+            catch(IOException){File.Delete(path);}
+            catch(InvalidOperationException){File.Delete(path);}
+        }
+        using var response=DownloadDemoPhoto(url,variant,searchTerm);
+        if(response.Content.Headers.ContentLength>DemoPhotoPolicy.MaximumBytes)throw new InvalidOperationException("Demo photo exceeds the byte limit.");
+        using var bodyTimeout=new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        using var input=response.Content.ReadAsStreamAsync(bodyTimeout.Token).GetAwaiter().GetResult();
+        using var buffer=new MemoryStream();
+        byte[] chunk=new byte[81920];
+        int read;
+        while((read=input.ReadAsync(chunk.AsMemory(),bodyTimeout.Token).AsTask().GetAwaiter().GetResult())>0)
+        {
+            if(buffer.Length+read>DemoPhotoPolicy.MaximumBytes)throw new InvalidOperationException("Demo photo exceeds the byte limit.");
+            buffer.Write(chunk,0,read);
+        }
+        bytes=buffer.ToArray();
+        using(var stream=new MemoryStream(bytes,false))
+        using(var image=StudioImageProcessor.DecodeOriented(stream))
+        {
+            DemoPhotoPolicy.ValidateDimensions(image.Width,image.Height);
+            // Preserve JPEG originals byte-for-byte; other raster formats retain full dimensions.
+            if(bytes.Length<3||bytes[0]!=0xff||bytes[1]!=0xd8)bytes=StudioImageProcessor.EncodeJpeg(image,95);
+        }
+        demoPhotoSourceCache[url]=response.RequestMessage?.RequestUri?.ToString()??url;
+        demoPhotoSourceNameCache[url]=Header(response,"X-Aegis-Demo-Source","Reviewed photo source");
+        demoPhotoLicenseCache[url]=Header(response,"X-Aegis-Demo-License","Provider terms apply");
+        demoPhotoPageCache[url]=Header(response,"X-Aegis-Demo-Page",url);
+        string temporary=path+"."+Guid.NewGuid().ToString("N")+".tmp";
+        try{File.WriteAllBytes(temporary,bytes);File.Move(temporary,path,true);}
+        finally{if(File.Exists(temporary))File.Delete(temporary);}
+        // Keep memory bounded; the disk pool is reused across Jobs and resets.
+        while(weddingPhotoCache.Count>0&&weddingPhotoCache.Sum(p=>(long)p.Value.Length)+bytes.Length>64_000_000)
+        {
+            string? oldest=weddingPhotoCache.Keys.FirstOrDefault();
+            if(oldest is null)break;
+            weddingPhotoCache.TryRemove(oldest,out _);
+        }
+        if(bytes.Length<=64_000_000)weddingPhotoCache[url]=bytes;
+        return bytes;
+    }
+
+    private static string PhotoSource(string? url)=>DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==url)?.Source??"Previously recorded source";
+    private static string PhotoPage(string? url)=>DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==url)?.Page??url??"";
+    private static string PhotoLicense(string? url)=>DemoPortraitCatalogue.Photos.FirstOrDefault(p=>p.Url==url)?.License??"Previously recorded source license";
+
     private static string Header(HttpResponseMessage response,string name,string fallback)
         => response.Headers.TryGetValues(name,out IEnumerable<string>? values)?values.FirstOrDefault()??fallback:fallback;
 
-    private static readonly string[] weddingPhotoUrls =
-    [
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bride_and_bridegroom.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bride_and_Groom_at_their_introduction_ceremony.1.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1294168).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1293933).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1294004).jpg"
-    ];
+    private static readonly string[] weddingPhotoUrls = DemoPortraitCatalogue.Photos.Where(p=>p.Category=="Wedding").Select(p=>p.Url).ToArray();
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,byte[]> weddingPhotoCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,string> demoPhotoSourceCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,string> demoPhotoSourceNameCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,string> demoPhotoLicenseCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,string> demoPhotoPageCache = new(StringComparer.OrdinalIgnoreCase);
-    // Curated real photographs only. Each file is CC0 or public domain on Wikimedia Commons.
-    // Keep the Commons file URL in storage metadata so every seeded image retains provenance.
-    private static readonly string[] realPhotoUrls =
-    [
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Graduating_pupils.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Graduating_Students(GN11751).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Graduation_pictures.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Ceremony_graduation.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Headshot.Corporate.2023.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Woman_(headshot).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Parents_and_their_baby.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/New_born_baby_with_father.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Team_picture_time.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Woman_(headshot).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/People_at_Wedding_ceremony.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/A_group_picture_together_with_the_groom_at_Wedding_ceremony.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Family_portrait.jpg"
-    ];
+    private static readonly string[] realPhotoUrls = DemoPortraitCatalogue.Photos.Where(p=>p.Category=="Portrait").Select(p=>p.Url).ToArray();
     internal static readonly int[] JobNumbers = [1,2,4,5,7,8];
     internal static Guid Id(int group,int number) => Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
 
@@ -114,7 +154,7 @@ internal static class DemoDataExpansion
         string[] names=["Morgan","Taylor","Alex","Jordan","Casey","Riley"];
         for(int workspace=1;workspace<=3;workspace++)
         {
-            Execute(connection,transaction,"insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,$3,$4,$5)",Id(20,workspace),Id(1,workspace),"DEMO — Explore this workspace","Open a job to try Media collections and version history, People, Tasks / Calendar and Activity. Carter Wedding includes fifty seeded wedding photographs with people assignments; nothing is published.",login);
+            Execute(connection,transaction,"insert into studio_workspace_announcements(id,workspace_id,title,body,created_by) values($1,$2,$3,$4,$5)",Id(20,workspace),Id(1,workspace),"DEMO — Explore this workspace","Open a job to try Media collections and version history, People, Tasks / Calendar and Activity. Carter Wedding includes reviewed wedding photographs with people assignments; nothing is published.",login);
             Execute(connection,transaction,"insert into studio_schedule_resources(id,name,resource_type,is_active,notes,created_at_utc) values($1,$2,'Room',true,'Fictional demo resource',now())",Id(21,workspace),$"DEMO — Studio {workspace}");
         }
         for(int index=0;index<JobNumbers.Length;index++)
@@ -224,8 +264,8 @@ internal static class DemoDataExpansion
                 }
             }
             string mediaMessage=number==4
-                ?"Demo gallery ready: five distinct wedding photographs across Getting Ready, Ceremony, Portraits and Reception, linked to the people and groups in the People roster."
-                :"Demo gallery ready: four real public-domain photographs across Selects and Proofs, with two versions of the first image.";
+                ?"Demo gallery ready: reviewed full-resolution wedding photographs across Getting Ready, Ceremony, Portraits and Reception, linked to the people and groups in the People roster."
+                :"Demo gallery ready: reviewed full-resolution people photographs across Selects and Proofs, with two versions of the first image.";
             Execute(connection,transaction,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Studio','Internal',$3,now())",Id(28,number),Id(2,number),mediaMessage);
         }
         Execute(connection,transaction,"insert into studio_state(key,value,updated_at_utc) values('demo-data-v3',$1,now()) on conflict(key) do update set value=excluded.value,updated_at_utc=excluded.updated_at_utc",login);
@@ -290,19 +330,7 @@ internal static class DemoDataExpansion
             {
                 if(!weddingPhotoCache.TryGetValue(url,out bytes))
                 {
-                    using HttpResponseMessage response=DownloadDemoPhoto(url,photoIndex,"wedding");
-                    byte[] sourceBytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-                    selectedUrl=response.RequestMessage?.RequestUri?.ToString()??url;
-                    demoPhotoSourceCache[url]=selectedUrl;
-                    demoPhotoSourceNameCache[url]=Header(response,"X-Aegis-Demo-Source","Wikimedia Commons");
-                    demoPhotoLicenseCache[url]=Header(response,"X-Aegis-Demo-License","Public domain/CC0 as catalogued");
-                    demoPhotoPageCache[url]=Header(response,"X-Aegis-Demo-Page",url);
-                    using var sourceStream=new MemoryStream(sourceBytes,writable:false);
-                    using var photograph=StudioImageProcessor.DecodeOriented(sourceStream);
-                    using var resized=StudioImageProcessor.ResizeMax(photograph,1200);
-                    bytes=StudioImageProcessor.EncodeJpeg(resized,85);
-                    if(weddingPhotoCache.Count>=64)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
-                    weddingPhotoCache[url]=bytes;
+                    bytes=DownloadOriginal(url,photoIndex,"wedding");
                 }
                 selectedUrl=demoPhotoSourceCache.GetValueOrDefault(url,url);
                 break;
@@ -314,7 +342,7 @@ internal static class DemoDataExpansion
             }
         }
         if(bytes is null)
-            throw new InvalidOperationException("Unable to download any configured CC0 wedding demo photograph.",lastError);
+            throw new InvalidOperationException("Unable to load a high-resolution wedding photograph. Check photo-host access and retry; no profile-picture substitute is used.",lastError);
 
         using var content=new MemoryStream(bytes,false);
         string stored=$"{job:N}/demo/{id:N}.jpg";
@@ -332,10 +360,11 @@ internal static class DemoDataExpansion
                 ["AssetKey"]=key,
                 ["VersionId"]=id.ToString("D"),
                 ["Demo"]="true",
-                ["DemoSource"]=demoPhotoSourceNameCache.FirstOrDefault(x=>x.Value==selectedUrl).Value??"Demo image source",
+                ["DemoPhotoPolicy"]="Original2400-v2",
+                ["DemoSource"]=PhotoSource(selectedUrl),
                 ["DemoSourceUrl"]=selectedUrl??string.Empty,
-                ["DemoSourcePage"]=demoPhotoPageCache.FirstOrDefault(x=>demoPhotoSourceCache.GetValueOrDefault(x.Key)==selectedUrl).Value??selectedUrl??string.Empty,
-                ["DemoSourceLicense"]=demoPhotoLicenseCache.FirstOrDefault(x=>demoPhotoSourceCache.GetValueOrDefault(x.Key)==selectedUrl).Value??"Provider terms apply"
+                ["DemoSourcePage"]=PhotoPage(selectedUrl),
+                ["DemoSourceLicense"]=PhotoLicense(selectedUrl)
             })).GetAwaiter().GetResult();
 
         using(var verified=storage.OpenReadAsync(stored).GetAwaiter().GetResult())
@@ -382,6 +411,13 @@ internal static class DemoDataExpansion
                 if(metadata?.Metadata.TryGetValue("DemoSourceUrl",out string? previousUrl)==true&&!string.IsNullOrWhiteSpace(previousUrl))sourceUrl=previousUrl;
             }
         }
+        if(sourceUrl is null)
+        {
+            using var kind=new NpgsqlCommand("select title from studio_jobs where id=$1",connection,transaction);
+            kind.Parameters.AddWithValue(job);
+            var pool=DemoPortraitCatalogue.ForJob(searchTerm??kind.ExecuteScalar()?.ToString(),job);
+            sourceUrl=pool[(variant&int.MaxValue)%pool.Count].Url;
+        }
         byte[]? bytes=null;
         string? selectedUrl=null;
         string orphan=$"{job:N}/demo/{id:N}.jpg";
@@ -403,19 +439,7 @@ internal static class DemoDataExpansion
             {
                 if(!weddingPhotoCache.TryGetValue(url,out bytes))
                 {
-                    using HttpResponseMessage response=DownloadDemoPhoto(url,variant,searchTerm);
-                    byte[] sourceBytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-                    selectedUrl=response.RequestMessage?.RequestUri?.ToString()??url;
-                    demoPhotoSourceCache[url]=selectedUrl;
-                    demoPhotoSourceNameCache[url]=Header(response,"X-Aegis-Demo-Source","Wikimedia Commons");
-                    demoPhotoLicenseCache[url]=Header(response,"X-Aegis-Demo-License","Public domain/CC0 as catalogued");
-                    demoPhotoPageCache[url]=Header(response,"X-Aegis-Demo-Page",url);
-                    using var sourceStream=new MemoryStream(sourceBytes,writable:false);
-                    using var photograph=StudioImageProcessor.DecodeOriented(sourceStream);
-                    using var resized=StudioImageProcessor.ResizeMax(photograph,1200);
-                    bytes=StudioImageProcessor.EncodeJpeg(resized,85);
-                    if(weddingPhotoCache.Count>=64)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
-                    weddingPhotoCache[url]=bytes;
+                    bytes=DownloadOriginal(url,variant,searchTerm);
                 }
                 selectedUrl=demoPhotoSourceCache.GetValueOrDefault(url,url);
                 break;
@@ -427,7 +451,7 @@ internal static class DemoDataExpansion
             }
         }
         if(bytes is null)
-            throw new InvalidOperationException("Unable to download any configured public-domain demo photograph.",lastError);
+            throw new InvalidOperationException("Unable to load a high-resolution demo photograph. Check photo-host access and retry; no low-resolution substitute is used. "+lastError?.Message,lastError);
 
         string extension=".jpg";
         string contentType="image/jpeg";
@@ -447,10 +471,11 @@ internal static class DemoDataExpansion
                 ["AssetKey"]=key,
                 ["VersionId"]=id.ToString("D"),
                 ["Demo"]="true",
-                ["DemoSource"]=sourceUrl is not null?demoPhotoSourceNameCache.GetValueOrDefault(sourceUrl,"Wikimedia Commons"):demoPhotoSourceNameCache.FirstOrDefault(x=>x.Value==selectedUrl).Value??"Demo image source",
+                ["DemoPhotoPolicy"]="Original2400-v2",
+                ["DemoSource"]=sourceUrl is not null?demoPhotoSourceNameCache.GetValueOrDefault(sourceUrl,PhotoSource(sourceUrl)):PhotoSource(selectedUrl),
                 ["DemoSourceUrl"]=selectedUrl??string.Empty,
-                ["DemoSourcePage"]=sourceUrl is not null?demoPhotoPageCache.GetValueOrDefault(sourceUrl,selectedUrl??string.Empty):selectedUrl??string.Empty,
-                ["DemoSourceLicense"]=sourceUrl is not null?demoPhotoLicenseCache.GetValueOrDefault(sourceUrl,"Provider terms apply"):"Provider terms apply"
+                ["DemoSourcePage"]=sourceUrl is not null?demoPhotoPageCache.GetValueOrDefault(sourceUrl,PhotoPage(sourceUrl)):selectedUrl??string.Empty,
+                ["DemoSourceLicense"]=sourceUrl is not null?demoPhotoLicenseCache.GetValueOrDefault(sourceUrl,PhotoLicense(sourceUrl)):"Provider terms apply"
             })).GetAwaiter().GetResult();
 
         using(var verified=storage.OpenReadAsync(stored).GetAwaiter().GetResult())

@@ -12,13 +12,14 @@ internal static class DemoJobPhotoPopulation
     internal static void Seed(StudioDatabase database,IFileStorage storage,string login,Action<DemoSeedProgress>? report=null)
     {
         using var connection=database.OpenConnection();
-        var jobs=new List<Guid>();
-        using(var query=new NpgsqlCommand("select id from studio_jobs where id::text like 'de000000-%' or id::text like 'de100000-%' order by id",connection))
-        using(var reader=query.ExecuteReader())while(reader.Read())jobs.Add(reader.GetGuid(0));
+        var jobs=new List<(Guid Id,string Title)>();
+        using(var query=new NpgsqlCommand("select id,title from studio_jobs where id::text like 'de000000-%' or id::text like 'de100000-%' order by id",connection))
+        using(var reader=query.ExecuteReader())while(reader.Read())jobs.Add((reader.GetGuid(0),reader.GetString(1)));
         var versions=new PrefixedFileStorage(storage,"VersionStore");
         for(int ordinal=0;ordinal<jobs.Count;ordinal++)
         {
-            Guid job=jobs[ordinal];
+            Guid job=jobs[ordinal].Id;
+            var pool=DemoPortraitCatalogue.ForJob(jobs[ordinal].Title,job);
             // Each job is durable independently, so interrupted downloads can resume.
             using var transaction=connection.BeginTransaction();
             Execute(connection,transaction,"select set_config('studio.demo_seed','true',true); select pg_advisory_xact_lock(72709128)");
@@ -31,11 +32,28 @@ internal static class DemoJobPhotoPopulation
             }
             // Check our stored photographs on every run, including jobs already full.
             int target=existing.Count(x=>x.StartsWith("demo-people/",StringComparison.Ordinal)) + Math.Max(0,40-existing.Count);
+            var sourcesByKey=new Dictionary<string,string>(StringComparer.Ordinal);
+            var usedSources=new HashSet<string>(StringComparer.Ordinal);
+            if(target>0)
+            {
+                using var sourceQuery=new NpgsqlCommand("select asset_key,stored_path from studio_asset_versions where job_id=$1 and version_number=1",connection,transaction);
+                sourceQuery.Parameters.AddWithValue(job);
+                using var sourceReader=sourceQuery.ExecuteReader();
+                while(sourceReader.Read())
+                {
+                    var metadata=versions.GetMetadataAsync(sourceReader.GetString(1)).GetAwaiter().GetResult();
+                    string? url=metadata?.Metadata.GetValueOrDefault("DemoSourceUrl");
+                    if(!string.IsNullOrWhiteSpace(url)){sourcesByKey[sourceReader.GetString(0)]=url;usedSources.Add(url);}
+                }
+            }
             for(int photo=0;photo<target;photo++)
             {
                 report?.Invoke(new(96+3*ordinal/Math.Max(1,jobs.Count),"Photos for every job",ordinal,jobs.Count,$"Job {ordinal+1}/{jobs.Count}: checking people photograph {photo+1}/{target}."));
                 string key=$"demo-people/{photo+1:000}";
-                DemoDataExpansion.AddImage(connection,transaction,versions,job,key,Id(job,key+"/version"),1,photo,null,login,sourceUrl:DemoPortraitCatalogue.Url(photo%40),searchTerm:"portrait");
+                string source=sourcesByKey.GetValueOrDefault(key)??pool.FirstOrDefault(p=>!usedSources.Contains(p.Url))?.Url
+                    ??throw new InvalidOperationException($"Not enough distinct {DemoPortraitCatalogue.Category(jobs[ordinal].Title)} photographs to fill this Job.");
+                DemoDataExpansion.AddImage(connection,transaction,versions,job,key,Id(job,key+"/version"),1,photo,null,login,sourceUrl:source,searchTerm:jobs[ordinal].Title);
+                usedSources.Add(source);
                 Guid asset=Id(job,key+"/asset");
                 Execute(connection,transaction,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status) values($1,$2,$2,$3,'Needs Sorting') on conflict(job_id,asset_key) do nothing",asset,job,key);
                 Execute(connection,transaction,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,'Unclassified') on conflict do nothing",job,key);

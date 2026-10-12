@@ -78,13 +78,30 @@ public sealed class IntegratedWorkflowTests
         using var history=new NpgsqlCommand("select body from studio_job_note_revisions where note_id=$1 and revision=1",context.Connection);
         history.Parameters.AddWithValue(id);Assert.Equal(note.Body,history.ExecuteScalar());
     }
-    [Fact] public void PhotoCatalogueCannotFabricateScaleByRepeatingSources()
+    [Fact] public void PhotoCatalogueHasDistinctRelevantHighResolutionPools()
     {
         var photos=DemoPortraitCatalogue.Photos;
-        Assert.True(photos.Count>=700);
-        Assert.Equal(photos.Count,photos.Select(p=>p.SourceSha1).Distinct().Count());
-        Assert.All(photos,p=>{Assert.Equal("Public domain",p.License);Assert.StartsWith("https://",p.Url);Assert.StartsWith("https://commons.wikimedia.org/wiki/File:",p.Page);});
+        Assert.True(photos.Count>=200);
+        Assert.All(photos,p=>
+        {
+            Assert.Equal("Pexels License",p.License);
+            Assert.StartsWith("https://images.pexels.com/photos/",p.Url);
+            Assert.StartsWith("https://www.pexels.com/photo/",p.Page);
+            DemoPhotoPolicy.ValidateDimensions(p.Width,p.Height);
+        });
+        foreach(string category in new[]{"Wedding","Family","Graduation","Portrait","Corporate"})
+        {
+            var first=DemoPortraitCatalogue.ForJob(category,Guid.Parse("de000000-0000-4000-0001-000000000001"));
+            Assert.True(first.Count>=40);
+            Assert.Equal(first.Count,first.Select(p=>p.Url).Distinct().Count());
+            Assert.All(first,p=>Assert.Equal(category,p.Category));
+            Assert.Equal(first.Select(p=>p.Url),DemoPortraitCatalogue.ForJob(category,Guid.Parse("de000000-0000-4000-0001-000000000001")).Select(p=>p.Url));
+        }
         Assert.Throws<ArgumentOutOfRangeException>(()=>DemoPortraitCatalogue.Url(photos.Count));
+        Assert.Throws<InvalidOperationException>(()=>DemoPhotoPolicy.ValidateDimensions(128,128));
+        Assert.Throws<InvalidOperationException>(()=>DemoPhotoPolicy.ValidateDimensions(2399,1600));
+        Assert.Throws<InvalidOperationException>(()=>DemoPhotoPolicy.ValidateDimensions(10000,10000));
+        DemoPhotoPolicy.ValidateDimensions(1600,2400);
     }
     [Fact] public void InvalidBulkAndQcInputsAreRejected()
     {

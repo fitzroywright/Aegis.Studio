@@ -242,15 +242,8 @@ internal static class DemoFullStudioData
 
     private static int MediaCount(DemoJob job)
     {
-        int requested = job.Number switch
-        {
-            106 => 180, // employee ID job
-            303 => 100, // school portraits
-            301 => 120, // executive headshots
-            401 => 241, // large roster
-            _ => MinimumDemoImagesPerJob
-        };
-        return Math.Max(MinimumDemoImagesPerJob, requested);
+        // 40–50 distinct reviewed sources per Job, rather than inflating counts by repeating images.
+        return Math.Min(MinimumDemoImagesPerJob+job.Number%11,DemoPortraitCatalogue.ForJob(job.Type,Id(41,job.Number)).Count);
     }
 
     internal static int RepairMedia(NpgsqlConnection c,NpgsqlTransaction tx,string login,IFileStorage storage,Action<DemoSeedProgress>? report)
@@ -296,39 +289,14 @@ internal static class DemoFullStudioData
         "Booking"=>"Needs Scheduling",
         _=>status
     };
-    private static bool IsPortraitCorpus(DemoJob job)=>job.Number is 106 or 301 or 303 or 401||
-        job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||
-        job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)||
-        job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase);
-    private static string? PortraitSource(DemoJob job,int asset)
+    private static string PortraitSource(DemoJob job,int asset)
     {
-        if(!IsPortraitCorpus(job))return DemoPortraitCatalogue.Url(asset);
-        int offset=job.Number switch{106=>0,301=>180,303=>300,401=>400,_=>641+Array.FindIndex(Jobs.Where(j=>IsPortraitCorpus(j)&&j.Number is not(106 or 301 or 303 or 401)).ToArray(),j=>j.Number==job.Number)*8};
-        return DemoPortraitCatalogue.Url(offset+asset);
+        var pool=DemoPortraitCatalogue.ForJob(job.Type,Id(41,job.Number));
+        // Older large galleries retain their IDs during repair; fresh seeds use MediaCount's distinct pool.
+        return pool[asset%pool.Count].Url;
     }
-
-    private static int PhysicalSourceCount(DemoJob job)
-    {
-        if(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return 2;
-        if(job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)) return 4;
-        if(job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)) return 2;
-        if(job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return 1;
-        return 1;
-    }
-
-    private static int SelectPhotoVariant(DemoJob job,int index)
-    {
-        // Indices map to the curated real-photo catalogue in DemoDataExpansion.
-        if(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return 10+(index%2);
-        if(job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)) return index%4;
-        if(job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)) return 4+(index%2);
-        if(job.Type.Contains("Product",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Campaign",StringComparison.OrdinalIgnoreCase)) return 9;
-        if(job.Type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)) return 8;
-        if(job.Type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)) return 7;
-        if(job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return 12;
-        if(job.Type.Contains("Portrait",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Senior",StringComparison.OrdinalIgnoreCase)) return 4+(index%2);
-        return 4+(index%2);
-    }
+    private static int PhysicalSourceCount(DemoJob job)=>MediaCount(job);
+    private static int SelectPhotoVariant(DemoJob job,int index)=>index;
 
     private static void SeedConversation(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,DemoClient client,Guid conversation,int ordinal)
     {
