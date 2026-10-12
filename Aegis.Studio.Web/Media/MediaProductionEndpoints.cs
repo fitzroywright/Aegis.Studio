@@ -29,7 +29,7 @@ public static class MediaProductionEndpoints
                   count(*) filter(where a.approved_version_id is not null),
                   count(*) filter(where a.production_status='Completed'),
                   count(*) filter(where a.production_status in ('Blocked','Needs Retake')),
-                  array(select v.id from studio_media_assets aa join lateral(select id from studio_asset_versions where job_id=aa.job_id and asset_key=aa.asset_key and content_type like 'image/%' order by version_number desc limit 1) v on true where aa.job_id=a.job_id order by aa.id limit 3)
+                  array(select v.id from studio_media_assets aa join lateral(select id from studio_asset_versions where job_id=aa.job_id and asset_key=aa.asset_key and (content_type like 'image/%' or file_name ~* '\.(3fr|arw|cr2|cr3|crw|dng|erf|fff|iiq|kdc|mos|mrw|nef|nrw|orf|pef|raf|raw|rw2|rwl|sr2|srf|srw|x3f)$') order by version_number desc limit 1) v on true where aa.job_id=a.job_id order by aa.id limit 3)
                 from studio_media_assets a left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key
                 where a.job_id=any($1) group by a.job_id,coalesce(col.collection_name,'Unclassified')
                 """,c);cmd.Parameters.AddWithValue(allowed);using var r=cmd.ExecuteReader();var rows=new List<object>();
@@ -111,3 +111,4 @@ public sealed record MediaGallerySettings(string Name,string DefaultLens);
 public sealed record MediaCollectionRequest(string Name);
 
 public sealed record CancelUploadBatch(string Reason);
+

@@ -144,7 +144,7 @@
       const jobId=job.value;
       gallery.innerHTML=shown.length?shown.map(a=>{
         const id=assetIdOf(a),version=a.versionId||a.latestVersionId||a.thumbnailVersionId;
-        const image=version&&String(a.contentType||a.mimeType||'image/').startsWith('image/');
+        const image=version&&(String(a.contentType||a.mimeType||'image/').startsWith('image/')||/\.(3fr|arw|cr2|cr3|crw|dng|erf|fff|iiq|kdc|mos|mrw|nef|nrw|orf|pef|raf|raw|rw2|rwl|sr2|srf|srw|x3f)$/i.test(String(a.fileName||nameOf(a)||'')));
         const preview=image?'/api/jobs/'+encodeURIComponent(jobId)+'/versions/by-id/'+encodeURIComponent(version)+'/preview?size=thumbnail':'';
         const fallback=image?'/api/jobs/'+encodeURIComponent(jobId)+'/versions/by-id/'+encodeURIComponent(version)+'/preview/fallback':'';
         return '<button type="button" class="studio-media-asset studio-media-asset-button'+(selectedAssetId===id?' selected':'')+'" data-media-asset="'+escMedia(id)+'">'+(image?'<img loading="lazy" src="'+preview+'" onerror="this.onerror=null;this.src=\''+fallback+'\'" alt="'+escMedia(nameOf(a))+'">':'<span class="studio-media-file-icon">▧</span>')+'<strong>'+escMedia(nameOf(a))+'</strong><small>'+escMedia(statusOf(a))+'</small></button>';
@@ -231,3 +231,4 @@
     sync();
   };
 })();
+
