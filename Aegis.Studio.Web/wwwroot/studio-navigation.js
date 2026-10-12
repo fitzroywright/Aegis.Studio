@@ -1037,7 +1037,8 @@
     };
 
     window.addEventListener('popstate',event=>{
-        const view=event.state?.studioView||'today';
+        const requested=new URLSearchParams(window.location.hash.replace(/^#/, '')).get('studio');
+        const view=(event.state?.studioView&&routes[event.state.studioView] ? event.state.studioView : (requested&&routes[requested] ? requested : 'today'));
         if(view!==currentNavigationView||view!==document.body.dataset.studioView)window.studioNavigate(view,{browserHistory:true,history:false}).catch(error=>console.error('Studio browser navigation failed.',error));
     });
 
