@@ -64,7 +64,7 @@ public static class WorkflowGraphEngine
         if (issues.Any(i => i.NodeId.StartsWith(prefix, StringComparison.Ordinal))) return;
         var starts = g.Nodes.Where(n => n.Kind == "Start").ToArray();
         var ends = g.Nodes.Where(n => n.Kind == "End").ToArray();
-        if (starts.Length != 1 || ends.Length != 1) { Error("", "Each flow needs exactly one Start and one completion node."); return; }
+        if (starts.Length != 1 || ends.Length != 1) { Error("", $"Each flow needs exactly one Start and one completion node. Found {starts.Length} Start and {ends.Length} completion nodes. Use Restore Start / Complete in the designer for missing endpoints, or remove duplicate endpoints."); return; }
         if (g.Edges.Any(e => e.To == starts[0].Id || e.From == ends[0].Id)) Error(starts[0].Id, "Start cannot have incoming connections; completion cannot have outgoing connections.");
         var sorted = Sort(g);
         if (sorted.Count != nodes.Count) Error("", "Circular dependencies are not allowed. Remove the connection that loops back.");
@@ -165,3 +165,4 @@ public static class WorkflowGraphEngine
         return new(states.Values.ToArray(), edges, completed);
     }
 }
+

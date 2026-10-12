@@ -12,7 +12,43 @@ function setup(t){
  return {w,calls,definition,product};
 }
 const flush=()=>new Promise(resolve=>setTimeout(resolve,20));
+test('the last Start and Complete cannot be removed by button or keyboard',async t=>{
+ const {w,calls,definition}=setup(t);await w.StudioGraphTemplates.edit({id:'template',version:1,active:true,definition});
+ for(const id of ['start','end']){
+  w.document.querySelector(`[data-node="${id}"]`).onkeydown({key:'Enter',preventDefault(){}});
+  assert.equal(w.document.querySelector('[data-delete]').disabled,true);
+  w.document.querySelector(`[data-node="${id}"]`).onkeydown({key:'Delete',preventDefault(){}});
+  assert.ok(w.document.querySelector(`[data-node="${id}"]`));
+ }
+ await w.document.querySelector('[data-save]').onclick();
+ const g=calls.find(c=>c.url.endsWith('/draft')).body.definition.workflow;
+ assert.equal(g.nodes.filter(n=>n.kind==='Start').length,1);assert.equal(g.nodes.filter(n=>n.kind==='End').length,1);
+});
+test('an existing draft restores missing root and nested endpoints without losing tasks or dependencies',async t=>{
+ const {w,calls,definition}=setup(t);const g=definition.workflow;
+ g.nodes=g.nodes.filter(n=>!['Start','End'].includes(n.kind));g.edges=g.edges.filter(e=>e.from!=='start'&&e.to!=='end');
+ const nested=w.StudioGraph.fromSteps([{key:'upload',title:'Upload',activityType:'FileIngest',area:'Editing'}]);
+ nested.nodes=nested.nodes.filter(n=>n.kind!=='End');nested.edges=nested.edges.filter(e=>e.to!=='end');
+ g.nodes.push({id:'capture',label:'Capture',kind:'Subflow',subflow:nested});g.edges.push({id:'capture-review',from:'capture',to:'review'});
+ await w.StudioGraphTemplates.edit({id:'template',version:1,active:true,definition});w.document.querySelector('[data-restore-endpoints]').click();
+ await w.document.querySelector('[data-save]').onclick();const repaired=calls.find(c=>c.url.endsWith('/draft')).body.definition.workflow;
+ for(const flow of [repaired,repaired.nodes.find(n=>n.id==='capture').subflow]){
+  assert.equal(flow.nodes.filter(n=>n.kind==='Start').length,1);assert.equal(flow.nodes.filter(n=>n.kind==='End').length,1);
+ }
+ assert.ok(repaired.edges.some(e=>e.from==='review'&&e.to==='delivery'));assert.ok(repaired.edges.some(e=>e.from==='start'&&e.to==='capture'));assert.ok(repaired.edges.some(e=>e.from==='delivery'&&e.to==='end'));
+ assert.equal(repaired.nodes.find(n=>n.id==='review').task.title,'Review requirements');
+ assert.match(w.document.querySelector('[role=alert]').textContent,/Draft saved/);
+});
+test('endpoint restoration is idempotent and duplicate endpoints can be removed without deleting the last one',async t=>{
+ const {w,calls,definition}=setup(t);definition.workflow.nodes.push({id:'extra-start',label:'Extra Start',kind:'Start'});
+ await w.StudioGraphTemplates.edit({id:'template',version:1,active:true,definition});
+ w.document.querySelector('[data-node="extra-start"]').onkeydown({key:'Enter',preventDefault(){}});assert.equal(w.document.querySelector('[data-delete]').disabled,false);w.document.querySelector('[data-delete]').click();
+ w.document.querySelector('[data-restore-endpoints]').click();w.document.querySelector('[data-restore-endpoints]').click();await w.document.querySelector('[data-save]').onclick();
+ const repaired=calls.find(c=>c.url.endsWith('/draft')).body.definition.workflow;
+ assert.equal(repaired.nodes.filter(n=>n.kind==='Start').length,1);assert.equal(repaired.nodes.length,definition.workflow.nodes.length-1);assert.equal(repaired.edges.length,definition.workflow.edges.length);
+});
 test('editing a published template saves a draft without mutating its published definition',async t=>{const {w,calls,definition}=setup(t),original=JSON.stringify(definition);await w.StudioGraphTemplates.edit({id:'template',version:1,active:true,definition});w.document.querySelector('[data-name]').value='Revised graduation';await w.document.querySelector('[data-save]').onclick();const request=calls.find(c=>c.url==='/api/admin/workflow-templates/template/draft');assert.equal(request.options.method,'PUT');assert.equal(request.body.baseVersion,1);assert.equal(request.body.expectedRevision,0);assert.equal(request.body.definition.name,'Revised graduation');assert.equal(JSON.stringify(definition),original);assert.equal(calls.some(c=>c.url.endsWith('/publish')),false);});
 test('Add Branch connects both ends to existing nodes without duplicating the shared destination',async t=>{const {w,calls,definition,product}=setup(t);await w.StudioGraphTemplates.edit({id:'template',version:1,active:true,definition});w.document.querySelector('[data-node="review"]').onkeydown({key:'Enter',preventDefault(){}});w.document.querySelector('[data-branch]').click();const d=w.document.querySelector('dialog');d.querySelector('[data-kind]').value='Conditional';d.querySelector('[data-title]').value='Professional retouching';d.querySelector('[data-rejoin]').value='delivery';d.querySelector('[data-service]').value=product.id;d.querySelector('[data-create]').click();await w.document.querySelector('[data-save]').onclick();const g=calls.find(c=>c.url.endsWith('/draft')).body.definition.workflow;const branch=g.nodes.find(n=>n.label==='Professional retouching');assert.ok(branch);assert.equal(g.nodes.filter(n=>n.id==='delivery').length,1);assert.ok(g.edges.some(e=>e.from==='review'&&e.to===branch.id&&e.condition.catalogItemId===product.id));assert.ok(g.edges.some(e=>e.from===branch.id&&e.to==='delivery'));});
 test('publication saves the current draft then submits its revision for validation and publication',async t=>{const {w,calls,definition}=setup(t);await w.StudioGraphTemplates.edit({id:'template',version:1,active:true,definition});await w.document.querySelector('[data-publish]').onclick();const writes=calls.filter(c=>c.options?.method);assert.equal(writes[0].url,'/api/admin/workflow-templates/template/draft');assert.equal(writes[1].url,'/api/admin/workflow-templates/template/publish');assert.equal(writes[1].body.expectedRevision,1);assert.match(w.document.querySelector('[role=alert]').textContent,/Published v2/);});
 test('workflow preview sends catalog identifiers and refreshes its evaluation when a service is selected',async t=>{const {w,calls,definition,product}=setup(t);const d=await w.StudioGraphTemplates.preview(definition,[product]);let preview=calls.filter(c=>c.url.endsWith('/preview')).at(-1);assert.deepEqual(preview.body.catalogItemIds,[]);d.querySelector('[data-service]').checked=true;d.querySelector('[data-service]').onchange();await flush();preview=calls.filter(c=>c.url.endsWith('/preview')).at(-1);assert.deepEqual(preview.body.catalogItemIds,[product.id]);assert.ok(d.querySelector('[data-node="review"]').classList.contains('available'));});
+
