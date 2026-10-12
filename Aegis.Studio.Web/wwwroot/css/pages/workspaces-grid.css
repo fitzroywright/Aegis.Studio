@@ -5,8 +5,10 @@
 .workspace-list-page .workspace-column-header label{display:flex;align-items:center;gap:5px;min-width:0;font-size:10px;font-weight:700;white-space:nowrap}
 .workspace-list-page .workspace-column-header input,.workspace-list-page .workspace-column-header select{box-sizing:border-box;min-width:0;max-width:100%;height:25px;padding:2px 5px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:4px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:10px;font-weight:500}
 .workspace-list-page .workspace-column-name input{flex:1 1 100px;width:100%}
-.workspace-list-page .workspace-column-sort{flex-wrap:wrap;gap:2px!important}
-.workspace-list-page .workspace-column-sort select{width:100%}
 .workspace-list-page .workspace-wow-main{grid-template-columns:var(--workspace-grid-columns)}
 .workspace-list-page .workspace-column-header :is(input,select):focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
 @media(max-width:1050px){.workspace-list-page .workspace-column-header,.workspace-list-page .workspace-wow-main{min-width:850px}.workspace-list-page .workspace-center-panel{overflow-x:auto}}
+
+/* Keep the Workspaces heading in the global banner; grid starts with its column header. */
+.workspace-list-page .workspace-center-panel{min-height:0}
+.workspace-list-page .workspace-column-header>span:nth-child(7){white-space:nowrap}
