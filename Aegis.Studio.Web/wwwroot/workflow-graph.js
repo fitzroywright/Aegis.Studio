@@ -8,6 +8,21 @@
   for(const t of steps.filter(t=>!steps.some(x=>(x.dependsOn||[]).includes(t.key))))edges.push({id:crypto.randomUUID(),from:t.key,to:'end'});
   return {nodes,edges};
  }
+ function restoreEndpoints(graph){
+  let restored=0;
+  function restore(flow){
+   if(!Array.isArray(flow.nodes)||!Array.isArray(flow.edges))throw Error('This flow has no editable node or connection list.');
+   for(const node of flow.nodes)if(node.kind==='Subflow'&&node.subflow)restore(node.subflow);
+   for(const kind of ['Start','End']){
+    if(flow.nodes.some(n=>n.kind===kind))continue;
+    const preferred=kind==='Start'?'start':'end',id=flow.nodes.some(n=>n.id===preferred)?crypto.randomUUID():preferred;
+    flow.nodes.push({id,label:kind==='Start'?'Start':'Complete',kind,join:'All'});restored++;
+    const targets=flow.nodes.filter(n=>n.id!==id&&!flow.edges.some(e=>kind==='Start'?e.to===n.id:e.from===n.id));
+    for(const target of targets)flow.edges.push({id:crypto.randomUUID(),from:kind==='Start'?id:target.id,to:kind==='Start'?target.id:id});
+   }
+  }
+  restore(graph);return restored;
+ }
  function visible(graph,expanded=new Set()){
   const nodes=[],edges=[];
   function add(g,prefix){
@@ -68,5 +83,6 @@
   viewport.onkeydown=e=>{if(e.target!==viewport)return;const moves={ArrowLeft:[-40,0],ArrowRight:[40,0],ArrowUp:[0,-40],ArrowDown:[0,40]};if(moves[e.key]){e.preventDefault();box.x+=moves[e.key][0];box.y+=moves[e.key][1];update();}};
   return {model,layout,expanded};
  }
- root.StudioGraph={canvas,visible,fromSteps,esc};
+ root.StudioGraph={canvas,visible,fromSteps,restoreEndpoints,esc};
 })(window);
+
