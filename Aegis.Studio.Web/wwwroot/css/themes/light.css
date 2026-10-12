@@ -1,41 +1,128 @@
-/* Theme variants. Standard deliberately inherits the existing Studio design. */
+/* Light palette only: layout and component behavior remain owned by their stylesheets. */
 body[data-theme="office-light"] {
-  --attention-border:#eab7b9;
-  --attention-surface:#fff9f5;
-  --attention-title-bg:#fff0ef;
-  --attention-title-border:#eab7b9;
-  --attention-title-text:#99535b;
-  --attention-text:#344b61;
+  color-scheme:light;
+  --theme-bg:#f5f8fb;
+  --theme-surface:#ffffff;
+  --theme-surface-2:#f3f9fc;
+  --theme-surface-alt:#eaf3ff;
+  --theme-border:#c9ddec;
+  --theme-text:#173451;
+  --theme-muted:#596f88;
+  --theme-header:#0b2b4b;
+  --theme-accent:#0068d9;
+  --theme-accent-soft:#e8f2ff;
+  --studio-bg:var(--theme-bg);
+  --studio-panel:var(--theme-surface);
+  --studio-text:var(--theme-text);
+  --studio-muted:var(--theme-muted);
+  --studio-border:var(--theme-border);
+  --studio-row-highlight:#e8f2ff;
+  --studio-row-accent:#0068d9;
+  --studio-row-focus:#0068d9;
+  --surface:var(--theme-surface);
+  --surface-muted:var(--theme-surface-2);
+  --border:var(--theme-border);
+  --muted:var(--theme-muted);
   --studio-grid-body-bg:#ffffff;
-  --studio-grid-row-alt-bg:#f5f9fc;
-  --studio-grid-border:#d2e1ed;
+  --studio-grid-row-alt-bg:#f7fbfe;
+  --studio-grid-border:#dce8f2;
+  --studio-grid-header-bg:#edf7fc;
+  --studio-grid-header-text:#173451;
+  --studio-grid-header-border:#b9dcef;
   --studio-card-surface:#ffffff;
-  --studio-card-title-surface:#eaf3f9;
+  --studio-card-title-surface:#edf7fc;
   --studio-control-surface:#ffffff;
   --studio-control-text:#173451;
-  --studio-control-border:#b9d3e7;
-  --theme-bg:#f3f7fb; --theme-surface:#ffffff; --theme-surface-2:#f5f9fc;
-  --theme-border:#b9d3e7; --theme-text:#173451; --theme-muted:#617f99;
-  --theme-header:#0b2b4b; --theme-accent:#2d6fa9; --theme-accent-soft:#e7f1fa;
-  --studio-grid-header-bg:#dcebf6; --studio-grid-header-text:#234a70; --studio-grid-header-border:#b8d4e7;
-  --studio-rail-title:#193d61;
-  background:var(--theme-bg);color:var(--theme-text);
+  --studio-control-border:#aacce5;
+  --studio-page-search-bg:#ffffff;
+  --studio-page-search-border:#aacce5;
+  --studio-rail-title:#173451;
+  --attention-border:#ff647e;
+  --attention-surface:#ffffff;
+  --attention-title-bg:#fff1f4;
+  --attention-title-border:#ffc0cd;
+  --attention-title-text:#173451;
+  --attention-text:#173451;
+  background:var(--theme-bg);
+  color:var(--theme-text);
 }
 
-
-body[data-theme="office-light"] .studio-context-card[data-rail-card="navigation"]>header {background:#e7f1fb;color:#234d76;}
-
-
-body[data-theme="office-light"] .studio-context-card[data-rail-card="actions"]>header {background:#f0eafb;color:#60498c;}
-
-
-body[data-theme="office-light"] .studio-context-card[data-rail-card="workspaces"]>header {background:#e7f5ec;color:#27684a;}
-
-
+/* Preserve the existing Light theme rounding. */
 body[data-theme="office-light"] :is(.mw-list-panel,.studio-context-card,.st-card) {border-radius:10px;}
 
+/* Cards use white bodies and a pastel title with a matching colored outline. */
+body[data-theme="office-light"] :is(.mw-list-panel,.studio-context-card,.st-card,.op-card,.mw-card,.st-board,.sj-board,.sj-card,.sj-rail-card,.studio-media-panel,.workspace-wow-list-card,.workspace-wow-side-card,.conversation-card,.detail-pane,.list-pane,.job-section) {
+  --light-card-border:#59acff;
+  --light-card-title:#edf7fc;
+  background:var(--theme-surface)!important;
+  color:var(--theme-text);
+  border-color:var(--light-card-border)!important;
+}
+body[data-theme="office-light"] :is(.mw-list-panel,.studio-context-card,.st-card,.op-card,.mw-card,.sj-card,.sj-rail-card)>header {
+  background:var(--light-card-title)!important;
+  color:var(--theme-text)!important;
+  border-bottom-color:var(--light-card-border)!important;
+}
+body[data-theme="office-light"] :is(.mw-list-panel,.studio-context-card,.st-card,.op-card,.mw-card,.sj-card,.sj-rail-card)>header :is(h2,h3) {
+  color:var(--theme-text)!important;
+}
 
-body[data-theme="office-light"] .mw-list-panel[data-mw-region="attention"],body[data-theme="office-light"] .st-card.st-attention {background:#fff9f5;border-color:#eab7b9;}
+/* Explicit ID scope overrides the canonical rail's stronger role rules. */
+body[data-theme="office-light"] #studioContextRail>[data-rail-card] {
+  --studio-rail-title:var(--theme-text);
+  --studio-card-header-text:var(--theme-text);
+  --studio-rail-accent:var(--light-card-border);
+  background:var(--theme-surface)!important;
+  border-color:var(--light-card-border)!important;
+}
+body[data-theme="office-light"] #studioContextRail>[data-rail-card]>header {
+  background:var(--light-card-title)!important;
+  color:var(--theme-text)!important;
+  border-bottom-color:var(--light-card-border)!important;
+}
+body[data-theme="office-light"] #studioContextRail>[data-rail-card]>header h2 {color:var(--theme-text)!important;}
+body[data-theme="office-light"] :is([data-rail-card="actions"],[data-mw-region="actions"]) {--light-card-border:#a078ff;--light-card-title:#f4f0fc;}
+body[data-theme="office-light"] :is([data-rail-card="workspaces"],[data-mw-region="quick-links"],[data-mw-region="tasks"]) {--light-card-border:#58be91;--light-card-title:#eef8f3;}
+body[data-theme="office-light"] :is([data-mw-region="attention"],.st-attention) {--light-card-border:var(--attention-border);--light-card-title:var(--attention-title-bg);}
+body[data-theme="office-light"] :is([data-mw-region="attention"],.st-attention) :is(.st-card-body,.mw-attention-list) {background:var(--theme-surface)!important;color:var(--theme-text);}
 
+/* Match the reference's pink Messages card, including its reply and notes surfaces. */
+body[data-theme="office-light"] .smc-card {background:#fff;color:var(--theme-text);border-color:#f16c9b;}
+body[data-theme="office-light"] :is(.smc-header,.smc-footer,.smc-content>.composer) {background:#fff1f6;color:var(--theme-text);border-color:#f6b8cf;}
+body[data-theme="office-light"] :is(.smc-row,.smc-feed,.smc-note,.smc-feed .message) {color:var(--theme-text);border-color:#f0dbe4;}
+body[data-theme="office-light"] :is(.smc-note-job select,.smc-note-form textarea) {background:#fff;color:var(--theme-text);border-color:var(--studio-control-border);}
+body[data-theme="office-light"] :is(.smc-actions button,.smc-footer>button,.smc-note-open,.smc-note button,.smc-note-form button,.smc-notes [data-notes-retry]) {background:transparent;color:var(--theme-accent);}
+body[data-theme="office-light"] :is(.smc-actions button,.smc-footer>button,.smc-note-open,.smc-note button):hover {background:#fce5ef;}
 
-body[data-theme="office-light"] .mw-list-panel[data-mw-region="attention"]>header,body[data-theme="office-light"] .st-card.st-attention>header {background:#fff0ef;border-color:#eab7b9;}
+/* Tables, Media headings and secondary bars share the pale blue treatment. */
+body[data-theme="office-light"] :is(.mw-today-job-columns,.management-workload-head,.sj-table th,.operational-grid th,.op-table th,.workspace-table th,.fd-table th,.studio-media-panel h2,.studio-media-detail>h3,.studio-media-gallery-header>div:first-child,.operations-workspace-overview>header) {
+  background:var(--studio-grid-header-bg)!important;
+  color:var(--studio-grid-header-text)!important;
+  border-color:var(--studio-grid-header-border)!important;
+}
+body[data-theme="office-light"] :is(.sj-summary,.st-toolbar,.mw-today-job-toolbar,.studio-media-gallery-tools,.pane-heading,.job-section>header) {background:var(--theme-surface-2);color:var(--theme-text);border-color:var(--studio-grid-border);}
+body[data-theme="office-light"] :is(.st-card-body,.message-content) {background:var(--theme-surface);color:var(--theme-text);border-color:var(--studio-grid-border);}
+body[data-theme="office-light"] :is(.mw-today-job-row,.mw-status-row,.job-row):not(:hover):not(:focus-visible) {background:var(--theme-surface);color:var(--theme-text);border-color:var(--studio-grid-border);}
+body[data-theme="office-light"] :is(.mw-today-rail-links button,.studio-media-tree-node):hover {background:var(--theme-accent-soft);}
+body[data-theme="office-light"] :is(.mw-today-rail-links button,.mw-action-list button,.mw-quick-link-list button) {color:var(--theme-text);}
+body[data-theme="office-light"] #studioContextRail .mw-today-rail-links button>span:first-child {background:#e8f2ff;color:#0068d9;}
+body[data-theme="office-light"] #studioContextRail [data-rail-card="actions"] .mw-today-rail-links button>span:first-child {background:#ebe0fa;color:#8253c4;}
+body[data-theme="office-light"] #studioContextRail [data-rail-card="workspaces"] .mw-today-rail-links button>span:first-child {background:#def3e9;color:#238760;}
+
+/* Controls stay readable inside pale grid headers, including the Today search. */
+body[data-theme="office-light"] :is(input,select,textarea,.theme-picker) {background:#fff;color:var(--theme-text);border-color:var(--studio-control-border)!important;accent-color:var(--theme-accent);}
+body[data-theme="office-light"] :is(.mw-today-job-columns,.sj-job-header,.sj-column-filter,.operations-workspace-overview,.studio-media-gallery-tools,.workspace-column-header,.fd-column-controls,.fd-customer-header) :is(input,select),
+body[data-theme="office-light"] #frontDeskSearch {
+  background:#fff!important;color:var(--theme-text)!important;border-color:var(--studio-control-border)!important;
+}
+body[data-theme="office-light"][data-studio-view] :is(#frontDeskSearch,.sj-job-header input[data-sj-search],.mw-today-job-columns input,.workspace-column-header input):is(:focus,:focus-visible) {
+  background:#fff!important;color:var(--theme-text)!important;border-color:var(--studio-control-border)!important;
+}
+body[data-theme="office-light"] :is(input,textarea)::placeholder {color:var(--theme-muted)!important;opacity:1;}
+body[data-theme="office-light"] :is(input,select,textarea,button,a):focus-visible {outline-color:var(--theme-accent);}
+body[data-theme="office-light"] :is(.st-link,.sj-gold,.text-button,.link-button,.studio-workspaces-view-all,.mw-list-right header button,.mw-today-right header button) {color:var(--theme-accent)!important;}
+body[data-theme="office-light"] :is(.primary,.smc-content>.composer .send-split button) {background:#0068d9;color:#fff;border-color:#0068d9;}
+body[data-theme="office-light"] :is(.primary,.smc-content>.composer .send-split button):hover {background:#075fc0;border-color:#075fc0;}
+body[data-theme="office-light"] :is(.sj-view-tabs button.active,.mw-today-view-tabs button.active,.studio-media-status-tabs button.active,.operations-view-switch button[aria-pressed="true"]) {background:var(--theme-accent-soft);color:var(--theme-accent);border-color:var(--studio-control-border);}
+body[data-theme="office-light"] :is(dialog,.studio-dialog,.user-menu-popover) {background:#fff;color:var(--theme-text);border-color:var(--theme-border);}
+body[data-theme="office-light"] dialog::backdrop {background:#17345166;}
