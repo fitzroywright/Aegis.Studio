@@ -1,5 +1,13 @@
 /* Theme variants. Standard deliberately inherits the existing Studio design. */
 body[data-theme="office-light"] {
+  --studio-grid-body-bg:#ffffff;
+  --studio-grid-row-alt-bg:#f5f9fc;
+  --studio-grid-border:#d2e1ed;
+  --studio-card-surface:#ffffff;
+  --studio-card-title-surface:#eaf3f9;
+  --studio-control-surface:#ffffff;
+  --studio-control-text:#173451;
+  --studio-control-border:#b9d3e7;
   --theme-bg:#f3f7fb; --theme-surface:#ffffff; --theme-surface-2:#f5f9fc;
   --theme-border:#b9d3e7; --theme-text:#173451; --theme-muted:#617f99;
   --theme-header:#0b2b4b; --theme-accent:#2d6fa9; --theme-accent-soft:#e7f1fa;
