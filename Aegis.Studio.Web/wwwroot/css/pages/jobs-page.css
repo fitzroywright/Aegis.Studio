@@ -12,6 +12,10 @@
 .sj-table-scroll{flex:1;min-height:0;overflow:auto}
 .sj-table{line-height:1.25;width:100%;border-collapse:collapse;text-align:left;table-layout:fixed}
 .sj-table th{position:sticky;top:0;background:var(--studio-grid-header-bg);color:var(--studio-grid-header-text);font-weight:700;}
+.sj-job-header{display:flex;align-items:center;gap:8px;min-width:0}
+.sj-job-header>span{flex:0 0 auto;white-space:nowrap}
+.sj-job-header input[data-sj-search]{flex:1 1 100px;min-width:0;width:100%;max-width:220px;height:24px;box-sizing:border-box;padding:2px 7px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:4px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;font-weight:400}
+.sj-job-header input[data-sj-search]:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
 .sj-column-filter{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:11px;font-weight:700;color:inherit}
 .sj-column-filter select{width:100%;max-width:100%;min-width:0;height:23px;padding:1px 16px 1px 4px;box-sizing:border-box;border:1px solid #658bad;border-radius:4px;background:#2c537c;color:#fff;font-size:10px;font-weight:600;cursor:pointer}
 .sj-column-filter select:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
