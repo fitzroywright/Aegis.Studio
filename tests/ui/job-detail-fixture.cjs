@@ -2,7 +2,7 @@
 const fs=require('fs');
 const path=require('path');
 const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
-const scripts=['studio-status-order.js','subject-picker.js','studio-message-card.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
+const scripts=['studio-status-order.js','dagre.min.js','workflow-graph.js','subject-picker.js','studio-message-card.js','job-handoff.js','job-workspace.js','media-production.js','connected-workflow.js','job-details.js','workspace-outlook.js','studio-shell-nav.js'];
 function setup(w){
  const jobs=[{id:'job',workspaceId:'workspace',conversationId:'conversation',title:'Wedding selects review',clientName:'Williams & Clarke',status:'Awaiting Production Review',eventDate:'2026-10-11'},{id:'job2',workspaceId:'workspace',conversationId:'conversation2',title:'Graduation portraits',clientName:'School',status:'Awaiting Scheduling'}];
  const calls=[],alerts=[];
@@ -17,6 +17,7 @@ function setup(w){
   calls.push({url,options});const base=url.split('?')[0];
   if(base==='/api/jobs')return jobs;
   if(base==='/api/jobs/job'||base==='/api/jobs/job2')return jobs.find(j=>base.endsWith('/'+j.id));
+  if(base.endsWith('/workflow-graph'))return null;
   if(base.endsWith('/connected-workflow'))return workflow(jobs.find(j=>base.includes('/'+j.id+'/'))||jobs[0]);
   if(base.endsWith('/subjects')){if(fixture.delaySubjects)await fixture.delaySubjects;if(fixture.failSubjects)throw new Error('Subjects unavailable');return subjects;}
   if(/\/media\/assets\/[^/]+$/.test(base)&&options?.method==='PUT'){const asset=assets.find(a=>base.endsWith('/'+a.id));if(!asset)throw Error('Unknown photo');Object.assign(asset,JSON.parse(options.body));return null;}
@@ -52,3 +53,4 @@ function environment(t){
  return {w,fixture,dom};
 }
 module.exports={environment,setup,scripts,root};
+

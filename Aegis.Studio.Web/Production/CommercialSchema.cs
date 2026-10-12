@@ -6,6 +6,7 @@ namespace Aegis.Studio.Web.Production;
 public static class CommercialSchema
 {
     public const string Sql = """
+        alter table studio_jobs add column if not exists workflow_revision bigint not null default 0;
         create table if not exists studio_workflow_template_drafts(
           template_id uuid primary key,revision integer not null,definition jsonb not null,active boolean not null,
           base_version integer not null,updated_by text not null,updated_at timestamptz not null default now());

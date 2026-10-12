@@ -16,7 +16,7 @@ internal static class DemoJobWorkflowGraphs
             using var q = Command(c, tx, "select id from studio_pos_catalog where code=$1", code);
             if (q.ExecuteScalar() is Guid found) return found;
             Guid id = Guid.NewGuid();
-            Execute(c, tx, "insert into studio_pos_catalog(id,code,name,category,unit_price,is_active) values($1,$2,$3,$4,500,true)", id, code, name, category); return id;
+            Execute(c, tx, "insert into studio_pos_catalog(id,code,name,category,unit_price,is_active,sort_order,updated_at_utc) values($1,$2,$3,$4,500,true,0,now())", id, code, name, category); return id;
         }
         Guid retouch = Service("GRAPH-RETOUCH", "Professional retouching", "Production"), print = Service("GRAPH-PRINT", "Printed photographs", "Prints");
         var conditional = WorkflowGraphExamples.Graduation(retouch, print); var parallel = WorkflowGraphExamples.Parallel(); var linear = WorkflowGraphExamples.Linear();

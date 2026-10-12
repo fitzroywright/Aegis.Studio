@@ -12,7 +12,7 @@ public sealed record CommercialTemplate(string Name, string Description, Templat
 public sealed record TemplateVersion(Guid Id, string Kind, int Version, bool Active, CommercialTemplate Definition);
 public sealed record BundleComponent(Guid CatalogItemId, int Quantity);
 public sealed record WorkOrderCommand(string Status, string? AssignedTo, string? BlockedReason, Guid OperationId, long ExpectedRevision);
-public sealed record ApplyJobTemplateRequest(Guid TemplateId, Guid OperationId, long ExpectedRevision, bool ConfirmChanges = false, string? Reason = null);
+public sealed record ApplyJobTemplateRequest(Guid TemplateId, Guid OperationId, long ExpectedRevision, bool ConfirmChanges = false, string? Reason = null, int? ExpectedTemplateVersion = null);
 
 public static class CommercialRules
 {
@@ -31,7 +31,7 @@ public static class CommercialRules
         var keys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var step in template.Steps)
         {
-            if (string.IsNullOrWhiteSpace(step.Key) || step.Key.Length > 100 || !keys.Add(step.Key) ||
+            if (string.IsNullOrWhiteSpace(step.Key) || step.Key.Length > 900 || !keys.Add(step.Key) ||
                 string.IsNullOrWhiteSpace(step.Title) || step.Title.Length > 200 || !Areas.Contains(step.Area) ||
                 step.EstimatedMinutes < 0 || step.EstimatedCost < 0 || (step.QualityControl && !string.IsNullOrWhiteSpace(step.Variation)))
                 throw new ArgumentException("Steps need unique keys, titles, valid production areas and nonnegative estimates.");

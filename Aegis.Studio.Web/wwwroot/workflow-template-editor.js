@@ -27,7 +27,7 @@
   function remove(id){const g=graph();g.nodes=g.nodes.filter(n=>n.id!==id);g.edges=g.edges.filter(e=>e.from!==id&&e.to!==id);selected=null;render();}
   function render(){
    field('[data-path]').textContent=['Main workflow',...scope].join(' → ');field('[data-back]').disabled=!scope.length;
-   StudioGraph.canvas(field('[data-canvas]'),graph(),{editable:true,selected,evaluation,expanded,onSelect:id=>{selected=id;edgeSelected=null;props();},onEdge:id=>{edgeSelected=id;selected=null;props();},onConnect:connection,onDelete:remove,onChange:()=>{evaluation=null;render();}});props();
+   StudioGraph.canvas(field('[data-canvas]'),graph(),{editable:true,selected,evaluation,expanded,onSelect:id=>{const parts=id.split('/');if(parts.length>1){scope.push(...parts.slice(0,-1));selected=parts.at(-1);expanded.clear();render();}else{selected=id;edgeSelected=null;props();}},onEdge:id=>{edgeSelected=id;selected=null;props();},onConnect:connection,onDelete:remove,onChange:()=>{evaluation=null;render();}});props();
   }
   function props(){
    const g=graph(),n=g.nodes.find(n=>n.id===selected),edge=g.edges.find(e=>e.id===edgeSelected);

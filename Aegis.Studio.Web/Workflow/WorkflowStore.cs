@@ -163,8 +163,9 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 if(request.Status=="Completed"&&!review&&(taskKind=="QC"||Exists(c,tx,"select exists(select 1 from studio_job_activities where id=$1 and quality_control_required)",progressTask)))
                     throw new UnauthorizedAccessException("Production Manager authority is required for a technical quality decision.");
                 CommercialTemplateStore.GuardTask(c,tx,progressTask,request.Status!);
+                if(request.Status=="Completed"&&Scalar(c,tx,"select status from studio_job_activities where id=$1",progressTask) is "Completed")break;
                 if(request.Status=="Completed"&&Exists(c,tx,"select exists(select 1 from studio_production_items where activity_id=$1 and qc_state not in ('Passed','Cancelled'))",progressTask))throw new ArgumentException("Pass all required item QC checks first.");
-                Sql(c,tx,"update studio_job_activities set status=$3,blocked_reason=$4,started_at_utc=case when $3='InProgress' then coalesce(started_at_utc,now()) else started_at_utc end,completed_at_utc=case when $3='Completed' then now() else null end,updated_at_utc=now() where id=$1 and job_id=$2",progressTask,job,request.Status,request.Status=="Blocked"?request.BlockedReason:null);
+                Sql(c,tx,"update studio_job_activities set status=$3,blocked_reason=$4,started_at_utc=case when $3='InProgress' then coalesce(started_at_utc,now()) else started_at_utc end,completed_at_utc=case when $3='Completed' then coalesce(completed_at_utc,now()) else completed_at_utc end,updated_at_utc=now() where id=$1 and job_id=$2",progressTask,job,request.Status,request.Status=="Blocked"?request.BlockedReason:null);
                 Notify(c,tx,job,request.OperationId.ToString(),"Owner","Task updated: "+request.Status);break;
             case "task":
                 if(!manage&&!review)throw new UnauthorizedAccessException();EnsureMutable(stage);

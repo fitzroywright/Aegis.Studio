@@ -67,3 +67,21 @@ Do not report tests as passing until actually executed.
 
 Next: compile/correct; add integration and visual tests; fix UI/layout defects; verify;
 checkpoint results; prepare final delivery. No deployment and no merge into main yet.
+
+## Verification checkpoint
+
+- Pure graph model/engine/example files compiled with the .NET 10 Roslyn compiler.
+- Four new graph UI tests executed and passed (shared joins, nested expansion/collapse,
+  status/zoom/fit/selection/connections, and a 100-node graph).
+- Existing UI suite: 103 passed, 52 failed. Investigating upstream baseline failures
+  separately from introduced defects; do not label all failures preexisting yet.
+- Job Details fixture now loads the graph dependency and explicitly returns no graph
+  for jobs without templates; the workflow-dialog interaction check now passes.
+- Draft/booking/template-change/service-removal/concurrency PostgreSQL tests written.
+- Temporary PGlite server available; persistence tests not executed yet.
+- Current local dependency sources: Common.Messaging main 183dba11388500726abed74129295504dd10fea8,
+  isolated at sibling CommonBuild; all other existing Common projects reused locally.
+- Full .NET build still being investigated; it has not passed. Compiler worker limiting
+  enabled locally to avoid runtime resource problems. No build settings changed in repository.
+- Chromium verification script prepared; browser runtime installation in progress.
+- Latest GitHub checkpoint before this checkpoint: 1092ff1727539a417170619b2091cd35635408c5.

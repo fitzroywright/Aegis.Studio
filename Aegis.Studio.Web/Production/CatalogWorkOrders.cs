@@ -98,7 +98,7 @@ public static class CatalogWorkOrders
     {
         Execute(c, tx, """
             update studio_job_catalog_agreements a set confirmed_unit_price=coalesce((select l.unit_price from studio_pos_sale_lines l where l.id=a.sale_line_id),round(p.unit_price*(1+p.tax_rate/100),2)),definition=to_jsonb(p),confirmed_at=now()
-            from studio_pos_catalog p where a.job_id=$1 and a.catalog_item_id=p.id and a.confirmed_at is null
+            from studio_pos_catalog p where a.job_id=$1 and a.catalog_item_id=p.id and a.confirmed_at is null and a.workflow_selected
             """, job);
     }
 }

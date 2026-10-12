@@ -19,6 +19,7 @@
  }
  function canvas(host,graph,options={}){
   const expanded=options.expanded||new Set(),model=visible(graph,expanded),states=new Map((options.evaluation?.nodes||[]).map(n=>[n.id,n]));
+  for(const n of model.nodes.filter(n=>n.kind==='Subflow')){const children=[...states.values()].filter(s=>s.id.startsWith(n.id+'/'));if(children.length)states.set(n.id,{status:children.every(s=>s.status==='Inactive')?'Inactive':children.every(s=>['Completed','Skipped','Inactive'].includes(s.status))?'Completed':children.some(s=>s.status==='InProgress')?'InProgress':children.some(s=>s.status==='Available')?'Available':'Blocked'});}
   const layout=new dagre.graphlib.Graph({multigraph:true}).setGraph({rankdir:'LR',nodesep:46,ranksep:80,marginx:24,marginy:28}).setDefaultEdgeLabel(()=>({}));
   for(const n of model.nodes)layout.setNode(n.id,{width:180,height:74});
   for(const e of model.edges)if(layout.hasNode(e.from)&&layout.hasNode(e.to))layout.setEdge(e.from,e.to,{width:e.label?120:0,height:e.label?22:0},e.id);
@@ -26,7 +27,8 @@
   const width=Math.max(layout.graph().width||400,400),height=Math.max(layout.graph().height||160,160), marker='graph-arrow-'+crypto.randomUUID();
   host.classList.add('studio-graph');
   host.innerHTML=`<div class="sg-tools"><button type="button" data-zoom="1.2" aria-label="Zoom in">＋</button><button type="button" data-zoom="0.83" aria-label="Zoom out">−</button><button type="button" data-fit>Fit</button><button type="button" data-layout>Auto layout</button><span>${options.editable?'Drag nodes or connect the right port to a left port.':'Drag empty space to pan. Select a task to view details.'}</span></div><div class="sg-viewport" tabindex="0" aria-label="Workflow graph canvas"><svg role="img" aria-label="Connected workflow" viewBox="0 0 ${width} ${height}"><defs><marker id="${marker}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><g class="sg-world">${model.edges.filter(e=>layout.hasEdge(e.from,e.to,e.id)).map(e=>{
-    const l=layout.edge(e.from,e.to,e.id),state=options.evaluation?.edges?.[e.id]||'Pending',points=l.points;
+    const l=layout.edge(e.from,e.to,e.id),state=options.evaluation?.edges?.[e.id]||'Pending',points=l.points.map(p=>({...p}));
+    if(options.editable){const a=model.nodes.find(n=>n.id===e.from),b=model.nodes.find(n=>n.id===e.to),ap=layout.node(e.from),bp=layout.node(e.to);points[0]={x:(a.x??ap.x)+90,y:a.y??ap.y};points[points.length-1]={x:(b.x??bp.x)-90,y:b.y??bp.y};}
     return `<g class="sg-edge ${esc(state.toLowerCase())}" tabindex="${options.editable?'0':'-1'}" role="button" aria-label="Connection ${esc(e.label||e.id)}" data-edge="${esc(e.id)}"><polyline points="${points.map(p=>p.x+','+p.y).join(' ')}" marker-end="url(#${marker})"/><text x="${l.x||points[Math.floor(points.length/2)].x}" y="${(l.y||points[Math.floor(points.length/2)].y)-7}">${esc(e.label||'')}</text><title>${esc(e.label||e.id)}</title></g>`;
    }).join('')}${model.nodes.map(n=>{
     const p=layout.node(n.id),state=states.get(n.id)?.status||'Definition',x=options.editable&&Number.isFinite(n.x)?n.x:p.x,y=options.editable&&Number.isFinite(n.y)?n.y:p.y;
@@ -37,6 +39,7 @@
   const update=()=>svg.setAttribute('viewBox',`${box.x} ${box.y} ${box.w} ${box.h}`);
   host.querySelectorAll('[data-zoom]').forEach(b=>b.onclick=()=>{const f=Number(b.dataset.zoom),w=box.w/f,h=box.h/f;box.x+=(box.w-w)/2;box.y+=(box.h-h)/2;box.w=w;box.h=h;update();});
   host.querySelector('[data-fit]').onclick=()=>{box={x:0,y:0,w:width,h:height};update();};
+  if(expanded.size){const collapse=document.createElement('button');collapse.type='button';collapse.textContent='Collapse subflows';collapse.onclick=()=>{expanded.clear();canvas(host,graph,{...options,expanded});};host.querySelector('.sg-tools').append(collapse);}
   host.querySelector('[data-layout]').onclick=()=>{if(options.editable){for(const n of model.nodes){delete n.source.x;delete n.source.y;}options.onChange?.();}else host.querySelector('[data-fit]').click();};
   viewport.onwheel=e=>{e.preventDefault();host.querySelector(`[data-zoom="${e.deltaY<0?'1.2':'0.83'}"]`).click();};
   let drag=null,connect=null;

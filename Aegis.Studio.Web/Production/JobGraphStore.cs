@@ -10,7 +10,7 @@ public sealed record GraphTask(Guid Id, string NodeId, string Title, string Stat
 public sealed record JobGraphView(Guid JobId, Guid TemplateId, int TemplateVersion, long Revision,
     WorkflowGraph Graph, GraphEvaluation Evaluation, GraphTask[] Tasks, object[] History);
 public sealed record TemplateImpact(string[] Remain, string[] Added, string[] Removed, string[] CompletedAffected,
-    string[] AssignmentChanges, string[] DependencyChanges, bool RequiresConfirmation, string FinancialImplications);
+    string[] AssignmentChanges, string[] DependencyChanges, bool RequiresConfirmation, string FinancialImplications, int TemplateVersion);
 public sealed record WorkflowServicesRequest(Guid[] CatalogItemIds, Guid OperationId, long ExpectedRevision, bool ConfirmChanges = false, string? Reason = null);
 
 public sealed class JobGraphStore(StudioDatabase database)
@@ -25,7 +25,17 @@ public sealed class JobGraphStore(StudioDatabase database)
     internal static WorkflowGraph Graph(CommercialTemplate template) => template.Workflow ?? WorkflowGraphEngine.FromSteps(template.Steps);
     internal static HashSet<Guid> Services(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
     {
-        using var q = Command(c, tx, "select catalog_item_id from studio_job_catalog_agreements where job_id=$1 and workflow_selected union select catalog_item_id from studio_catalog_line_snapshots s join studio_pos_sale_lines l on l.id=s.sale_line_id join studio_pos_sales sale on sale.id=l.sale_id where sale.reference_type='StudioJob' and sale.reference_id=$1::text and sale.status=2", job);
+        using var q = Command(c, tx, """
+            with selected as (
+              select catalog_item_id from studio_job_catalog_agreements where job_id=$1 and workflow_selected
+              union select catalog_item_id from studio_catalog_line_snapshots s
+              join studio_pos_sale_lines l on l.id=s.sale_line_id join studio_pos_sales sale on sale.id=l.sale_id
+              where sale.reference_type='StudioJob' and sale.reference_id=$1::text and sale.status=2
+                and l.quantity>coalesce((select sum(r.quantity) from studio_pos_refund_lines r where r.sale_line_id=l.id),0)
+            ) select catalog_item_id from selected
+              union select (component->>'catalogItemId')::uuid from selected s join studio_pos_catalog p on p.id=s.catalog_item_id
+              cross join lateral jsonb_array_elements(p.bundle) component
+            """, job);
         using var r = q.ExecuteReader(); var result = new HashSet<Guid>(); while (r.Read()) result.Add(r.GetGuid(0)); return result;
     }
     internal static CommercialTemplate? Definition(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
@@ -128,9 +138,9 @@ public sealed class JobGraphStore(StudioDatabase database)
         string[] dependencies(string id, CommercialTemplate def) => WorkflowGraphEngine.Flatten(Graph(def)).Edges.Where(e => e.To == id).Select(e => JsonSerializer.Serialize(e with { Id = "" }, Json)).Order().ToArray();
         var assignment = remain.Where(id => before[id].Role != after[id].Role || before[id].Task?.DefaultAssignee != after[id].Task?.DefaultAssignee).ToArray();
         var changed = remain.Where(id => !dependencies(id, previous!).SequenceEqual(dependencies(id, target.Definition))).ToArray();
-        var affected = states.Where(s => s.Value == "Completed" && (removed.Contains(s.Key) || changed.Contains(s.Key) || (after.TryGetValue(s.Key, out var n) && n.Task != before[s.Key].Task))).Select(s => s.Key).ToArray();
+        var affected = states.Where(s => s.Value == "Completed" && (removed.Contains(s.Key) || changed.Contains(s.Key) || (after.TryGetValue(s.Key, out var n) && JsonSerializer.Serialize(n.Task, Json) != JsonSerializer.Serialize(before[s.Key].Task, Json)))).Select(s => s.Key).ToArray();
         return new(remain, after.Keys.Except(before.Keys).ToArray(), removed, affected, assignment, changed,
-            states.Any(s => s.Value != "NotStarted" && s.Value != "Scheduled"), "Posted charges, invoices and payments remain unchanged. Adjust billing separately through POS.");
+            states.Any(s => s.Value != "NotStarted" && s.Value != "Scheduled"), "Posted charges, invoices and payments remain unchanged. Adjust billing separately through POS.", target.Version);
     }
     public void Apply(Guid job, ApplyJobTemplateRequest request, string actor)
     {
@@ -141,6 +151,7 @@ public sealed class JobGraphStore(StudioDatabase database)
         Lock(c, tx, job, request.ExpectedRevision);
         var target = CommercialTemplateStore.Get(c, tx, request.TemplateId) ?? throw new KeyNotFoundException("Template was not found.");
         if (!target.Active || target.Kind != "Job") throw new ArgumentException("Choose a published active Job Template.");
+        if (request.ExpectedTemplateVersion.HasValue && request.ExpectedTemplateVersion != target.Version) throw new InvalidOperationException("The published template changed. Review its impact again.");
         var impact = Impact(c, tx, job, target);
         if (impact.RequiresConfirmation && (!request.ConfirmChanges || string.IsNullOrWhiteSpace(request.Reason))) throw new ArgumentException("Review the impact and confirm the template change with a reason.");
         Execute(c, tx, "insert into studio_job_workflow_history(id,job_id,definition,template_id,template_version,actor,reason) select $1,job_id,definition,template_id,template_version,$3,$4 from studio_job_template_instances where job_id=$2", Guid.NewGuid(), job, actor, request.Reason ?? "Template replaced before work began");
@@ -160,7 +171,7 @@ public sealed class JobGraphStore(StudioDatabase database)
     private static void SelectService(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, Guid product, int quantity = 1, string? specifications = null)
     {
         using var q = Command(c, tx, "select id from studio_job_catalog_agreements where job_id=$1 and catalog_item_id=$2 order by confirmed_at desc nulls last limit 1", job, product);
-        if (q.ExecuteScalar() is Guid id) Execute(c, tx, "update studio_job_catalog_agreements set workflow_selected=true where id=$1", id);
+        if (q.ExecuteScalar() is Guid id) Execute(c, tx, "update studio_job_catalog_agreements set workflow_selected=true,quantity=case when confirmed_at is null then $2 else quantity end,specifications=case when confirmed_at is null then $3 else specifications end where id=$1", id, quantity, specifications);
         else Execute(c, tx, "insert into studio_job_catalog_agreements(id,job_id,catalog_item_id,quantity,specifications) values($1,$2,$3,$4,$5)", Guid.NewGuid(), job, product, quantity, specifications);
     }
     public void SetServices(Guid job, WorkflowServicesRequest request, string actor)
