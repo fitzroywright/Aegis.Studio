@@ -23,13 +23,10 @@ internal static class DemoDataExpansion
 
     private static HttpResponseMessage DownloadDemoPhoto(string preferredUrl,int variant,string? searchTerm=null)
     {
-        string keyword=Uri.EscapeDataString(string.IsNullOrWhiteSpace(searchTerm)?"portrait":searchTerm.Trim().Replace(' ','-'));
-        int lockId=Math.Abs(variant)+1000;
         string gender=(variant&1)==0?"women":"men";
         DemoPhotoCandidate[] candidates=
         [
             new(preferredUrl,"Wikimedia Commons","Public domain/CC0 as catalogued",preferredUrl),
-            new($"https://loremflickr.com/1200/1200/{keyword}?lock={lockId}","LoremFlickr","Creative Commons image selected by LoremFlickr",$"https://loremflickr.com/1200/1200/{keyword}?lock={lockId}"),
             new($"https://randomuser.me/api/portraits/{gender}/{Math.Abs(variant)%100}.jpg","RandomUser","Profile image supplied for application testing by RandomUser",$"https://randomuser.me/photos")
         ];
 
@@ -100,7 +97,7 @@ internal static class DemoDataExpansion
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/Parents_and_their_baby.jpg",
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/New_born_baby_with_father.jpg",
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/Team_picture_time.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Product_photo.jpg",
+        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Woman_(headshot).jpg",
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/People_at_Wedding_ceremony.jpg",
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/A_group_picture_together_with_the_groom_at_Wedding_ceremony.jpg",
         "https://commons.wikimedia.org/wiki/Special:Redirect/file/Family_portrait.jpg"
@@ -304,7 +301,7 @@ internal static class DemoDataExpansion
                     using var photograph=StudioImageProcessor.DecodeOriented(sourceStream);
                     using var resized=StudioImageProcessor.ResizeMax(photograph,1200);
                     bytes=StudioImageProcessor.EncodeJpeg(resized,85);
-                    if(weddingPhotoCache.Count>=32)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
+                    if(weddingPhotoCache.Count>=64)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
                     weddingPhotoCache[url]=bytes;
                 }
                 selectedUrl=demoPhotoSourceCache.GetValueOrDefault(url,url);
@@ -417,7 +414,7 @@ internal static class DemoDataExpansion
                     using var photograph=StudioImageProcessor.DecodeOriented(sourceStream);
                     using var resized=StudioImageProcessor.ResizeMax(photograph,1200);
                     bytes=StudioImageProcessor.EncodeJpeg(resized,85);
-                    if(weddingPhotoCache.Count>=32)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
+                    if(weddingPhotoCache.Count>=64)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
                     weddingPhotoCache[url]=bytes;
                 }
                 selectedUrl=demoPhotoSourceCache.GetValueOrDefault(url,url);
@@ -506,4 +503,5 @@ internal static class DemoDataExpansion
         command.ExecuteNonQuery();
     }
 }
+
 
