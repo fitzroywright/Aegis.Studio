@@ -7406,6 +7406,11 @@ body[data-studio-view="today"] .mw-today-job-columns .mw-job-column-search input
   color: white;
   border-color: #986c55;
 }
+/* Today toolbar action: intentional primary action, not a default browser button. */
+body[data-studio-view="today"] .mw-today-toolbar-actions [data-assign-job-lead]{display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:5px 12px;border:1px solid #a45e19;border-radius:6px;background:#895119;color:#fff;font-size:12px;font-weight:700;line-height:1.2;white-space:nowrap;cursor:pointer;box-shadow:none}
+body[data-studio-view="today"] .mw-today-toolbar-actions [data-assign-job-lead]:hover{background:#75420f}
+body[data-studio-view="today"] .mw-today-toolbar-actions [data-assign-job-lead]:focus-visible{outline:2px solid #f2a454;outline-offset:2px}
+body[data-studio-view="today"] .mw-today-toolbar-actions [data-assign-job-lead]:disabled{opacity:.55;cursor:not-allowed}
 .mw-today-search {
   flex: 1 1 190px;
   max-width: 320px;
