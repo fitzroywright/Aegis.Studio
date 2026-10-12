@@ -3,13 +3,14 @@ const assert=require('node:assert/strict');
 const {environment}=require('./job-detail-fixture.cjs');
 const settle=()=>new Promise(r=>setTimeout(r,20));
 const button=(w,name)=>w.document.querySelector('[data-job-scroll="'+name+'"]');
+const subjectDetails=w=>{const select=w.document.querySelector('[data-job-subject]');select.value='__details';return select.onchange();};
 test('Today job opens with working reply and Subjects controls in their final containers',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
  assert.equal(fixture.alerts.length,0);assert.ok(w.document.querySelector('.job-detail-page'));
  assert.equal(typeof w.document.querySelector('#hierarchyCompose').onsubmit,'function');
  assert.match(w.document.querySelector('#studioTodayBrandTitle strong').textContent,/Job Details/);
  assert.equal(w.document.querySelector('#studioFooterRate').textContent,'40 files · 1 subject');
- await button(w,'subjects').onclick();
+ await subjectDetails(w);
  const subjects=w.document.querySelector('#jobDetail-subjects');assert.equal(subjects.hidden,false);assert.match(subjects.textContent,/Morgan/);
  const add=subjects.querySelector('[data-job-add-subject]');assert.equal(add.hidden,false);add.click();assert.equal(subjects.querySelector('form').hidden,false);
  assert.equal(w.document.querySelector('#jobDetail-media').hidden,true);
@@ -31,17 +32,17 @@ test('job facts appear below the title while Tasks and Activity render their own
 });
 test('Subjects load errors stay visible and Retry restores the panel',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');fixture.failSubjects=true;
- await button(w,'subjects').onclick();const panel=w.document.querySelector('#jobDetail-subjects');assert.match(panel.querySelector('[role=alert]').textContent,/Subjects unavailable/);
+ await subjectDetails(w);const panel=w.document.querySelector('#jobDetail-subjects');assert.match(panel.querySelector('[role=alert]').textContent,/Subjects unavailable/);
  fixture.failSubjects=false;await panel.querySelector('.job-subjects-content > button').onclick();assert.match(panel.textContent,/Morgan/);
  assert.equal(fixture.alerts.length,0);
 });
 test('viewer can inspect Subjects without an Add Subject action',async t=>{
- const {w,fixture}=environment(t);fixture.canEdit=false;await w.openWorkspaceJob('job');await button(w,'subjects').onclick();
+ const {w,fixture}=environment(t);fixture.canEdit=false;await w.openWorkspaceJob('job');await subjectDetails(w);
  assert.equal(w.document.querySelector('[data-job-add-subject]').hidden,true);assert.equal(w.document.querySelector('#addJobSubject'),null);
 });
 test('stale Subjects response cannot overwrite a subsequently opened job',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');let release;fixture.delaySubjects=new Promise(r=>release=r);
- const pending=button(w,'subjects').onclick();await w.openWorkspaceJob('job2');release();await pending;await settle();
+ const pending=subjectDetails(w);await w.openWorkspaceJob('job2');release();await pending;await settle();
  assert.match(w.document.querySelector('.job-detail-title h1').textContent,/Graduation portraits/);
  assert.equal(w.document.querySelector('#jobDetail-subjects').hidden,true);assert.equal(w.document.querySelector('#jobDetail-subjects .person-card'),null);
 });
@@ -53,7 +54,13 @@ test('compact workflow opens full assignment controls without clipping the page'
  dialog.close();await settle();assert.equal(w.document.querySelector('.job-detail-workflow-dialog'),null);
 });
 test('subject View Photos returns to Media and refreshes the subject filter',async t=>{
- const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();await button(w,'subjects').onclick();
+ const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
+ assert.equal(button(w,'subjects'),null);
+ const select=w.document.querySelector('[data-job-subject]');select.value='person';await select.onchange();
+ assert.equal(select.value,'person');assert.ok(fixture.calls.some(c=>c.url.includes('/media?')&&c.url.includes('subjectId=person')));
+ select.value='';await select.onchange();assert.equal(select.value,'');
+ assert.equal(new URL(fixture.calls.filter(c=>c.url.includes('/media?')).at(-1).url,'https://studio.test').searchParams.has('subjectId'),false);
+ await subjectDetails(w);
  w.document.querySelector('[data-show-media]').click();await settle();
  assert.equal(w.document.querySelector('#jobDetail-media').hidden,false);
  assert.ok(fixture.calls.some(c=>c.url.includes('/media?')&&c.url.includes('subjectId=person')));

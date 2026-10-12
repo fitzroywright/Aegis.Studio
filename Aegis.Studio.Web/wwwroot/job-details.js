@@ -161,7 +161,7 @@
     const [snapshot,access]=await Promise.all([json(`/api/jobs/${job.id}/media?${q}`),json(`/api/jobs/${job.id}/access`)]);
     if(!current()||version!==request)return;
     data=snapshot;canEdit=!!(access.permissions||access).manageProduction;draw();
-    const counts=Object.values(data.collectionCounts||{});onCounts(counts.length?counts.reduce((a,b)=>a+Number(b),0):data.totalAssets??data.assets.length,data.totalSubjects??data.subjects.length,access.permissions||access);
+    const counts=Object.values(data.collectionCounts||{});onCounts(counts.length?counts.reduce((a,b)=>a+Number(b),0):data.totalAssets??data.assets.length,data.totalSubjects??data.subjects.length,access.permissions||access,data.subjects,subject);
    }catch(error){if(current()&&version===request){host.innerHTML='<p role="alert"></p><button type="button" class="jd-save">Retry</button>';host.querySelector('p').textContent=error.message;host.querySelector('button').onclick=load;}}
    finally{if(current()&&version===request)host.removeAttribute('aria-busy');}
   }
@@ -206,4 +206,5 @@
  }
  root.StudioJobDetails={workflow,phaseIndex,media};
 })(window);
+
 

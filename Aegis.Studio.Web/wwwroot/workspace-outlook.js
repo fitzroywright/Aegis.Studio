@@ -186,7 +186,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
             });
             const nav=document.createElement('nav');
             nav.className='job-detail-navigation';nav.setAttribute('aria-label','Job information');
-            nav.innerHTML=[['media','▣ Media'],['subjects','♙ Subjects'],['tasks','☑ Tasks'],['activity','◷ Activity']].map(([name,label])=>`<button type="button" data-job-scroll="${name}" aria-controls="jobDetail-${name}">${label}</button>`).join('');
+            nav.innerHTML=`<button type="button" data-job-scroll="media" aria-controls="jobDetail-media">▣ Media</button><label class="jd-subject-filter"><span>♙ Subjects</span><select data-job-subject aria-label="Select job subject"><option value="">All subjects</option><option value="__details">Subject details…</option></select></label>`+[['tasks','☑ Tasks'],['activity','◷ Activity']].map(([name,label])=>`<button type="button" data-job-scroll="${name}" aria-controls="jobDetail-${name}">${label}</button>`).join('');
+            const subjectSelect=nav.querySelector('[data-job-subject]');
+            let selectedMediaSubject='';
             const board=document.createElement('div');board.className='job-detail-board';
             const center=document.createElement('div');center.className='job-detail-center';
             const panels={},contents={};
@@ -225,7 +227,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 host.innerHTML='<p role="status">Loading…</p>';
                 const request=(async()=>{
                     try{
-                        if(name==='media')await window.StudioJobDetails.media(job,host,selectedContent,current,(mediaCount,subjectCount,permissions)=>{detailPane.dataset.productionEnabled=String(!!permissions.manageProduction);detailPane.dataset.editEnabled=String(!!permissions.editJob);detailPane.dataset.mediaCount=mediaCount;detailPane.dataset.subjectCount=subjectCount;nav.querySelector('[data-job-scroll=media]').textContent='Media '+mediaCount;nav.querySelector('[data-job-scroll=subjects]').textContent='Subjects '+subjectCount;window.dispatchEvent(new CustomEvent('studio-job-view-changed'));});
+                        if(name==='media')await window.StudioJobDetails.media(job,host,selectedContent,current,(mediaCount,subjectCount,permissions,subjects,selectedSubject)=>{detailPane.dataset.productionEnabled=String(!!permissions.manageProduction);detailPane.dataset.editEnabled=String(!!permissions.editJob);detailPane.dataset.mediaCount=mediaCount;detailPane.dataset.subjectCount=subjectCount;nav.querySelector('[data-job-scroll=media]').textContent='Media '+mediaCount;selectedMediaSubject=selectedSubject;subjectSelect.innerHTML='<option value="">All subjects</option>'+subjects.map(person=>`<option value="${esc(person.id)}">${esc(person.name)}</option>`).join('')+'<option value="__details">Subject details…</option>';subjectSelect.value=panels.subjects.hidden?selectedSubject:'__details';window.dispatchEvent(new CustomEvent('studio-job-view-changed'));});
                         else await renderJobTab(name,job,host,current,()=>loadPanel(name,true));
                         if(!current())return false;
                         loaded.add(name);
@@ -246,10 +248,18 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     StudioMessageCard.setOpen(messageCard,true);composer.querySelector('textarea').focus();return;
                 }
                 for(const [key,panel] of Object.entries(panels))panel.hidden=key!==name;
+                if(name==='subjects')subjectSelect.value='__details';
+                else if(name==='media')subjectSelect.value=selectedMediaSubject;
                 nav.querySelectorAll('button').forEach(button=>{const active=button.dataset.jobScroll===name;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
                 await loadPanel(name);
             };
             nav.querySelectorAll('[data-job-scroll]').forEach(button=>button.onclick=()=>selectPanel(button.dataset.jobScroll));
+            subjectSelect.onchange=async()=>{
+                if(subjectSelect.value==='__details'){await selectPanel('subjects');return;}
+                selectedMediaSubject=subjectSelect.value;
+                window.studioMediaFocus={jobId:job.id,subjectId:selectedMediaSubject};
+                await selectPanel('media');await loadPanel('media',true);
+            };
             panels.media.dataset.jobTab='gallery';
             // Subject photo/roster links use this page-owned callback, never a global DOM lookup.
             contents.subjects.studioOpenMedia=async()=>{await selectPanel('media');return loadPanel('media',true);};
@@ -260,7 +270,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 try{
                     const action=event.detail?.action;
                     if(action==='upload'){await selectPanel('media');contents.media.studioJobMedia?.upload();}
-                    if(action==='subject'){await selectPanel('subjects');contents.subjects.querySelector('#addJobSubject')?.click();}
+                    if(action==='subject'){subjectSelect.value='__details';await selectPanel('subjects');contents.subjects.querySelector('#addJobSubject')?.click();}
                     if(action==='task'){await selectPanel('tasks');contents.tasks.querySelector('form input')?.focus();}
                     if(action==='edit')await openJobDetailsEditor(job);
                     if(action==='workflow')header.querySelector('[data-job-workflow]').click();
