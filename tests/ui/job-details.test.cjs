@@ -26,6 +26,7 @@ test('job facts appear below the title while Tasks and Activity render their own
  assert.deepEqual(Array.from(facts.querySelectorAll('dt'),field=>field.textContent),['Type','Event date','Location','Photographer']);
  assert.deepEqual(Array.from(facts.querySelectorAll('dd'),field=>field.textContent),['Photography','Sun Oct 11 2026','Kingston Studio','Unassigned']);
  assert.equal(button(w,'tasks'),null);assert.equal(button(w,'activity'),null);
+ assert.equal(w.document.querySelector('[data-media-search]').nextElementSibling.matches('[data-job-tasks]'),true);
  await w.document.querySelector('[data-job-tasks]').onclick();
  const tasks=w.document.querySelector('.jd-tasks-dialog');assert.equal(tasks.open,true);assert.match(tasks.textContent,/Retouch portraits/);tasks.close();
  const activity=w.document.querySelector('#studioFooterJobTools [data-job-activity]');await activity.onclick();

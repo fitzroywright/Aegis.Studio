@@ -185,14 +185,12 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     event.preventDefault();event.stopPropagation();setFlowOpen(false,true);
                 }
             });
-            const tools=document.createElement('div');tools.className='job-detail-tools';
-            tools.innerHTML='<button type="button" class="jd-link" data-job-media hidden>← Back to Media</button><button type="button" class="jd-save" data-job-tasks aria-haspopup="dialog">☑ Tasks</button>';
             const board=document.createElement('div');board.className='job-detail-board';
             const center=document.createElement('div');center.className='job-detail-center';
             const panels={},contents={};
             for(const [name,title] of [['media','All Media'],['subjects','Subjects']]){
                 const panel=document.createElement('section');panel.className='jd-panel job-'+name+'-section';panel.id='jobDetail-'+name;panel.hidden=name!=='media';
-                panel.innerHTML=(name==='media'?'':`<header class="jd-card-heading"><h2>${title}</h2>${name==='subjects'?'<button type="button" class="jd-link" data-job-add-subject hidden>＋ Add Subject</button>':''}</header>`)+`<div class="job-${name}-content"></div>`;
+                panel.innerHTML=(name==='media'?'':`<header class="jd-card-heading"><h2>${title}</h2>${name==='subjects'?'<div><button type="button" class="jd-link" data-job-media>← Media</button><button type="button" class="jd-link" data-job-add-subject hidden>＋ Add Subject</button></div>':''}</header>`)+`<div class="job-${name}-content"></div>`;
                 panels[name]=panel;contents[name]=panel.querySelector('.job-'+name+'-content');center.append(panel);
             }
             const right=document.createElement('aside');right.className='job-detail-right';right.setAttribute('aria-label','Job tools and messages');
@@ -207,7 +205,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             StudioMessageCard.bind(messageCard);
             const attention=document.createElement('section');attention.className='jd-panel jd-attention';
             attention.innerHTML='<header class="jd-card-heading"><h2>⚠ Needs Attention</h2></header><div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
-            right.append(selectedFile,messageCard,attention);board.append(center,right);detailPane.append(tools,board);
+            right.append(selectedFile,messageCard,attention);board.append(center,right);detailPane.append(board);
             const footerTools=document.getElementById('studioFooterJobTools');
             const makeDrawer=(key,title,label)=>{
                 const toggle=document.createElement('button');toggle.type='button';toggle.className='jd-footer-link';toggle.dataset['job'+key]='';toggle.textContent=label;toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','job'+key+'Drawer');
@@ -252,10 +250,11 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     }finally{if(pending.get(name)===request)pending.delete(name);}
                 })();pending.set(name,request);return request;
             };
-            const openTasks=async()=>{
+            const openTasks=async event=>{
                 if(taskDialog?.open){taskDialog.focus();return;}
+                const trigger=event?.currentTarget||document.activeElement;
                 const dialog=studioDialog('Tasks','<div class="job-tasks-content"></div>');dialog.classList.add('jd-tasks-dialog');taskDialog=dialog;contents.tasks=dialog.querySelector('.job-tasks-content');
-                dialog.addEventListener('close',()=>{if(taskDialog===dialog){taskDialog=null;loaded.delete('tasks');pending.delete('tasks');if(current())tools.querySelector('[data-job-tasks]').focus();}}, {once:true});
+                dialog.addEventListener('close',()=>{if(taskDialog===dialog){taskDialog=null;loaded.delete('tasks');pending.delete('tasks');if(current()){if(trigger?.isConnected&&trigger!==document.body)trigger.focus();else contents.media.querySelector('[data-job-tasks]')?.focus();}}}, {once:true});
                 await loadPanel('tasks',true);
             };
             let notesLoaded=false,notesLoading=false;
@@ -306,11 +305,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     StudioMessageCard.setOpen(messageCard,true);composer.querySelector('textarea').focus();return;
                 }
                 for(const [key,panel] of Object.entries(panels))panel.hidden=key!==name;
-                tools.querySelector('[data-job-media]').hidden=name==='media';
                 await loadPanel(name);
             };
-            tools.querySelector('[data-job-media]').onclick=()=>selectPanel('media');
-            tools.querySelector('[data-job-tasks]').onclick=openTasks;
+            panels.subjects.querySelector('[data-job-media]').onclick=()=>selectPanel('media');
+            contents.media.studioOpenTasks=openTasks;
             contents.media.studioOpenSubjects=()=>selectPanel('subjects');
             panels.media.dataset.jobTab='gallery';
             // Subject photo/roster links use this page-owned callback, never a global DOM lookup.
