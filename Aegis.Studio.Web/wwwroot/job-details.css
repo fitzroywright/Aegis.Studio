@@ -20,6 +20,7 @@
 .job-detail-title h1 { margin:0 0 4px; font-size:20px; line-height:1.15; overflow-wrap:anywhere; }
 .job-detail-title p { margin:0; font-size:11px; color:var(--theme-muted,#6f7a8b); }
 .jd-job-status { display:flex; flex-direction:column; align-items:flex-end; gap:5px; font-size:10px; }
+.jd-status-meta { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:3px 10px; max-width:240px; text-align:right; color:#b4510f; }
 .jd-status-pill { display:inline-flex; align-items:center; gap:7px; border:0; box-shadow:none; cursor:pointer; font:inherit; font-size:11px; padding:4px 12px; border-radius:20px; background:#d2eedb; color:#204d34; font-weight:700; max-width:210px; text-align:center; }
 .jd-status-pill::after { content:"⌄"; transition:transform .24s ease; }
 .jd-status-pill[aria-expanded=true]::after { transform:rotate(180deg); }
