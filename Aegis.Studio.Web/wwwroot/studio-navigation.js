@@ -710,15 +710,15 @@
                             <div class="workspace-center-actions"><button type="button" data-workspace-jobs>View Jobs →</button><span class="workspace-wow-list-count">${workspaceData.length}</span></div>
                         </header>
 
-                        <div class="workspace-list-toolbar">
-                            <div class="workspace-wow-search">
-                                <span>⌕</span><input type="search" placeholder="Search workspaces…" data-workspace-search>
-                            </div>
-                            <select data-workspace-sort aria-label="Sort workspaces">
-                                <option value="name">Name A–Z</option>
-                                <option value="jobs">Most jobs</option>
-                                <option value="photos">Most photos</option>
-                            </select>
+                        <div class="workspace-column-header" role="row" aria-label="Workspace columns">
+                            <span class="workspace-column-thumbnail" aria-hidden="true"></span>
+                            <label class="workspace-column-name"><span>Workspace</span><input type="search" placeholder="Search workspaces…" aria-label="Search workspaces" data-workspace-search></label>
+                            <span>Active Jobs</span>
+                            <span>Completed Jobs</span>
+                            <span>Upcoming Shoots</span>
+                            <span>Media</span>
+                            <label class="workspace-column-sort"><span>Status / Activity</span><select data-workspace-sort aria-label="Sort workspaces"><option value="name">Name A–Z</option><option value="jobs">Most jobs</option><option value="photos">Most photos</option></select></label>
+                            <span aria-hidden="true"></span>
                         </div>
 
                         <div class="workspace-wow-list workspace-list-rows" data-workspace-list>${renderRows(workspaceData)}</div>
