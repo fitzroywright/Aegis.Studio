@@ -498,14 +498,19 @@
             if(workspace)selectWorkspace(workspace.id,workspace.name);
         });
         genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
+        genericView._assignJobLeadController?.abort();
+        genericView._assignJobLeadController = new AbortController();
         genericView.addEventListener('studio-assign-job-lead',async()=>{
             if(!(state.auth?.user||state.auth)?.isAdministrator)return;
             const activeJobs=jobs.filter(job=>!['Completed','Closed','Cancelled','Published'].includes(String(job.status||'')))
                 .sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));
             if(!activeJobs.length){alert('There are no active jobs available to assign.');return;}
+            if(genericView._assignJobLeadOpening)return;
+            genericView._assignJobLeadOpening=true;
             let employees;
             try{employees=await json('/api/studio-employees?assignable=true');}
-            catch(error){alert(error.message);return;}
+            catch(error){genericView._assignJobLeadOpening=false;alert(error.message);return;}
+            genericView._assignJobLeadOpening=false;
             const dialog=studioDialog('Assign Job Lead',`
                 <form class="subject-form" data-job-lead-form>
                     <label>Job
@@ -548,7 +553,7 @@
                 }catch(errorValue){error.textContent=errorValue.message||String(errorValue);}
                 finally{submit.disabled=false;}
             };
-        });
+        }, {signal:genericView._assignJobLeadController.signal});
         genericView.querySelectorAll('.mw-session-thumb img[data-fallback-src]').forEach(img=>{
             img.dataset.previewOwner='today';
             img.addEventListener('error',()=>{
