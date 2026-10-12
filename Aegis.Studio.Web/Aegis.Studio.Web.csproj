@@ -21,6 +21,7 @@
     <ProjectReference Include="$(CommonRoot)\Common.Registration\Common.Registration.csproj" AdditionalProperties="Configuration=$(Configuration)" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="Media/raw_preview.py;Media/raw-preview-requirements.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Demo/portrait-catalogue.json" />
     <EmbeddedResource Include="Workflow/WorkflowSchema.sql" />
     <EmbeddedResource Include="Messaging/UnifiedMessagingSchema.sql" />
@@ -73,3 +74,4 @@
            Text="Authentication plugin was not staged to $(PublishDir)plugins." />
   </Target>
 </Project>
+

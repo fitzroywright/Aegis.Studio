@@ -86,7 +86,7 @@ public static class StudioVersionEndpoints
             if(!access.HasPermission(user,jobId,"ViewAttachments"))return Results.Forbid();
             var version=new StudioVersionStore(db,storage).Get(jobId,versionId);
             if(version is null)return Results.NotFound();
-            if(!version.ContentType.StartsWith("image/",StringComparison.OrdinalIgnoreCase))
+            if(!version.ContentType.StartsWith("image/",StringComparison.OrdinalIgnoreCase) && !RawPreviewDecoder.IsRaw(version.FileName))
                 return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
 
             // Encourage the durable derivative queue to retry while this request supplies
@@ -103,6 +103,10 @@ public static class StudioVersionEndpoints
                 retry.Parameters.AddWithValue(versionId);
                 await retry.ExecuteNonQueryAsync(context.RequestAborted);
             }
+
+            // RAW decoding belongs to the background queue, never a browser request.
+            if (RawPreviewDecoder.IsRaw(version.FileName))
+                return Results.Json(new { error = "RAW preview queued. Refresh when processing finishes." }, statusCode: 503);
 
             string temp=Path.Combine(Path.GetTempPath(),"studio-fallback-"+Guid.NewGuid().ToString("N"));
             try
@@ -194,4 +198,5 @@ public static class StudioVersionEndpoints
 }
 
 public sealed record RestoreVersionRequest(string? Note);
+
 

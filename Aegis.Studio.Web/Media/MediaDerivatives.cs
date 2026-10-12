@@ -8,7 +8,7 @@ namespace Aegis.Studio.Web.Media;
 
 // A durable, leased queue over existing versions. Storage bytes never live in SQL.
 public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage storage,
-    IWebHostEnvironment environment, ILogger<MediaDerivativeWorker> logger) : BackgroundService
+    IWebHostEnvironment environment, ILogger<MediaDerivativeWorker> logger, IConfiguration? configuration = null) : BackgroundService
 {
     public const string Schema = """
         create table if not exists studio_media_derivatives(
@@ -88,20 +88,27 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
             var version = new StudioVersionStore(database, storage).Get(job, id)!;
             await using var original = await new StoredVersionRecovery(storage, environment).OpenAsync(version, token);
             // Seekable disk staging bounds memory for large originals and remote streams.
-            string temp = Path.Combine(Path.GetTempPath(), "studio-preview-" + Guid.NewGuid().ToString("N"));
+            string directory = Path.Combine(Path.GetTempPath(), "studio-preview-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            if (!OperatingSystem.IsWindows())
+                File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             try
             {
-                await using var staged = new FileStream(temp, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
-                    65536, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
-                await original.CopyToAsync(staged, token); staged.Position = 0;
-                using var image = StudioImageProcessor.DecodeOriented(staged);
+                string temp = Path.Combine(directory, "source.dat");
+                await using (var staged = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    65536, FileOptions.Asynchronous))
+                    await original.CopyToAsync(staged, token);
+                // Close the staging handle before invoking the decoder (also required on Windows).
+                using var image = RawPreviewDecoder.IsRaw(version.FileName)
+                    ? await new RawPreviewDecoder(configuration ?? new ConfigurationBuilder().Build(), environment).DecodeAsync(temp, token)
+                    : DecodeStandard(temp);
                 string thumb = $"MediaDerivatives/{job:N}/{id:N}/{lease:N}/thumbnail.jpg";
                 string preview = $"MediaDerivatives/{job:N}/{id:N}/{lease:N}/preview.jpg";
                 await Write(image, 384, thumb, token);
                 await Write(image, 1600, preview, token);
                 await SetState(id,lease, "Ready", thumb, preview, null, token);
             }
-            finally { if (File.Exists(temp)) File.Delete(temp); }
+            finally { Directory.Delete(directory, recursive: true); }
         }
         catch (StudioUnsupportedImageException error) { await SetState(id,lease,"Unsupported",null,null,error.Message,token); }
         catch (StorageException error) when (error.Code=="STORAGE-MISSING-001")
@@ -115,6 +122,11 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
             logger.LogWarning(error, "Preview generation failed for version {VersionId}; original is retained", id);
             await SetState(id,lease, "Failed", null, null, "Preview unavailable. Retry generation or download the original.", token);
         }
+    }
+    private static SKBitmap DecodeStandard(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return StudioImageProcessor.DecodeOriented(stream);
     }
     private async Task Write(SKBitmap original, int edge, string key, CancellationToken token)
     {
@@ -136,3 +148,4 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
         await cmd.ExecuteNonQueryAsync(token);
     }
 }
+

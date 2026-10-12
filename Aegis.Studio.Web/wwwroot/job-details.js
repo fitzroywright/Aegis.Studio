@@ -92,9 +92,10 @@
   function bindImages(container){
    container.querySelectorAll('img').forEach(img=>img.onerror=()=>{img.hidden=true;const fallback=img.nextElementSibling;if(fallback)fallback.hidden=false;});
   }
-  const picture=(asset,large=false)=>String(asset.contentType||'').startsWith('image/')?`<img ${large?'':'loading="lazy"'} src="${preview(asset)}${large?'':'?size=thumbnail'}" alt="${escape(asset.fileName)}"><span class="jd-preview-fallback" hidden>Preview ${escape(asset.previewStatus||'unavailable')}<br>Original file is retained</span>`:'<span class="jd-preview-fallback">▤ Document</span>';
+  const isPreviewable=asset=>String(asset.contentType||asset.mimeType||'').startsWith('image/')||/\.(3fr|arw|cr2|cr3|crw|dng|erf|fff|iiq|kdc|mos|mrw|nef|nrw|orf|pef|raf|raw|rw2|rwl|sr2|srf|srw|x3f)$/i.test(String(asset.fileName||asset.name||''));
+  const picture=(asset,large=false)=>isPreviewable(asset)?`<img ${large?'':'loading="lazy"'} src="${preview(asset)}${large?'':'?size=thumbnail'}" alt="${escape(asset.fileName)}"><span class="jd-preview-fallback" hidden>Preview ${escape(asset.previewStatus||'unavailable')}<br>Original file is retained</span>`:'<span class="jd-preview-fallback">▤ Document</span>';
   function openPreview(asset){
-   if(!String(asset.contentType||'').startsWith('image/'))return;
+   if(!isPreviewable(asset))return;
    const dialog=studioDialog(asset.fileName,`<div class="jd-full-preview">${picture(asset,true)}</div>`);
    bindImages(dialog);
   }
