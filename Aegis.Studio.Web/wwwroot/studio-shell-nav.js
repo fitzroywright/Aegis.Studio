@@ -104,14 +104,13 @@
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="today"><span>⌂</span><span>Today</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
-                    <button type="button" data-studio-side="workspaces"><span>▰</span><span>Workspaces</span></button>
+                    ${window.studioWorkflowCapabilities?.operations?'<button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations</span></button>':''}
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
                     <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
                     <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
                     <button type="button" data-studio-side="messages"><span>✉</span><span>Messages</span></button>
                     <button type="button" data-studio-side="studio-management"><span>⚙</span><span>Studio Management</span></button>
-                    ${window.studioWorkflowCapabilities?.operations?'<button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations Management</span></button>':''}
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
@@ -121,10 +120,11 @@
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card" data-rail-card="workspaces">
-                <header><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2></header>
+                <header class="studio-workspaces-card-header"><h2><span class="studio-card-icon" aria-hidden="true">▣</span> My Workspaces</h2><button type="button" class="studio-workspaces-view-all" data-studio-view-all-workspaces>View All →</button></header>
                 <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
             </section>
 `;
+        rail.querySelector('[data-studio-view-all-workspaces]')?.addEventListener('click',()=>window.studioNavigate?.('workspaces'));
         rail.querySelector('[data-studio-new-booking]')?.addEventListener('click',()=>window.studioLaunchNewBooking?.());
         rail.querySelector('[data-studio-assign-job-lead]')?.addEventListener('click',()=>document.getElementById('genericView')?.dispatchEvent(new CustomEvent('studio-assign-job-lead')));
         rail.querySelectorAll('[data-job-action]').forEach(button => button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
