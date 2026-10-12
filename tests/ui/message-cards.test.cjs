@@ -4,6 +4,7 @@ const {api}=require('./shared-controller-fixture.cjs');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,25));
 async function full(t){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://studio.test/',runScripts:'outside-only',virtualConsole:new VirtualConsole()}),w=dom.window;t.after(()=>w.close());
+ w.ResizeObserver=class {observe(){} disconnect(){}};w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
  w.alert=message=>{throw Error(message);};w.confirm=()=>false;w.CSS={escape:v=>String(v)};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};w.HTMLElement.prototype.scrollIntoView=function(){};
  w.fetch=async url=>{const u=new URL(url,'https://studio.test'),body=api(u);return {ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body),headers:{get:()=>null}};};

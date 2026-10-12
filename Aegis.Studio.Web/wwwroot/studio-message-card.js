@@ -28,16 +28,19 @@
   const host=card.querySelector('[data-smc-note-editor]');if(!host)return;
   const canAdd=!!(s.permissions.editJob||s.permissions.manageProduction);
   const canEdit=note=>canAdd&&(s.permissions.editJob||String(note.createdBy).toLowerCase()===s.userName.toLowerCase());
-  host.innerHTML='<div class="smc-note-list">'+(s.notes.map(note=>`<article class="smc-note"><header><strong>${escape(firstName(note.createdBy))}</strong><time datetime="${escape(note.createdAtUtc)}">${escape(new Date(note.createdAtUtc).toLocaleString())}</time>${canEdit(note)?`<button type="button" data-edit-note="${escape(note.id)}">Edit</button>`:''}</header><p>${escape(note.body)}</p>${note.updatedAtUtc?`<small>Edited by ${escape(firstName(note.updatedBy))} · ${escape(new Date(note.updatedAtUtc).toLocaleString())}</small>`:''}</article>`).join('')||'<p>No notes yet.</p>')+'</div>'+(canAdd?'<form class="smc-note-form"><label data-note-label>New note<textarea name="body" maxlength="10000" required placeholder="Add a note to this job…"></textarea></label><div><button type="submit" data-save-note>Save note</button><button type="button" data-cancel-edit hidden>Cancel edit</button><button type="button" data-reload-notes>Reload notes</button></div><p role="status" aria-live="polite"></p></form>':'');
+  host.innerHTML='<div class="smc-note-list">'+(s.notes.map(note=>`<article class="smc-note"><header><strong>${escape(firstName(note.createdBy))}</strong><time datetime="${escape(note.createdAtUtc)}">${escape(new Date(note.createdAtUtc).toLocaleString())}</time>${canEdit(note)?`<button type="button" data-edit-note="${escape(note.id)}">Edit</button>`:''}</header><p>${escape(note.body)}</p>${note.updatedAtUtc?`<small>Edited by ${escape(firstName(note.updatedBy))} · ${escape(new Date(note.updatedAtUtc).toLocaleString())}</small>`:''}</article>`).join('')||'<p>No notes yet.</p>')+'</div>'+(canAdd?'<button type="button" class="smc-note-open" data-note-slide aria-expanded="false">✎ Add note</button><div class="smc-note-slide" data-open="false"><form class="smc-note-form"><label data-note-label>New note<textarea name="body" maxlength="10000" required placeholder="Add a note to this job…"></textarea></label><div><button type="submit" data-save-note>Save note</button><button type="button" data-cancel-edit hidden>Cancel edit</button><button type="button" data-close-note>Close editor</button><button type="button" data-reload-notes>Reload notes</button></div><p role="status" aria-live="polite"></p></form></div>':'');
   const form=host.querySelector('form');if(!form)return;
   let editing=null,pendingNote=null,saving=false;
+  const slide=host.querySelector('.smc-note-slide'),opener=host.querySelector('[data-note-slide]');
+  const showEditor=open=>{slide.dataset.open=String(open);form.inert=!open;opener.setAttribute('aria-expanded',String(open));opener.textContent=open?'✎ Hide editor':'✎ Add note';if(open){fitEditor(form.elements.body);form.elements.body.focus();}};
+  form.inert=true;opener.onclick=()=>showEditor(slide.dataset.open!=='true');form.querySelector('[data-close-note]').onclick=()=>{if(!saving)showEditor(false);};
   const output=form.querySelector('[role=status]'),save=form.querySelector('[data-save-note]'),cancel=form.querySelector('[data-cancel-edit]');
   host.querySelectorAll('[data-edit-note]').forEach(button=>button.onclick=()=>{
    if(saving||pendingNote)return;
-   editing=s.notes.find(note=>note.id===button.dataset.editNote);form.elements.body.value=editing.body;fitEditor(form.elements.body);
+   showEditor(true);editing=s.notes.find(note=>note.id===button.dataset.editNote);form.elements.body.value=editing.body;fitEditor(form.elements.body);
    form.querySelector('[data-note-label]').firstChild.textContent='Edit note';save.textContent='Save changes';cancel.hidden=false;form.elements.body.focus();
   });
-  cancel.onclick=()=>{if(saving)return;editing=null;pendingNote=null;form.elements.body.value='';fitEditor(form.elements.body);form.elements.body.readOnly=false;form.querySelector('[data-note-label]').firstChild.textContent='New note';save.textContent='Save note';cancel.hidden=true;output.textContent='';};
+  cancel.onclick=()=>{if(saving)return;editing=null;pendingNote=null;form.elements.body.value='';fitEditor(form.elements.body);form.elements.body.readOnly=false;form.querySelector('[data-note-label]').firstChild.textContent='New note';save.textContent='Save note';cancel.hidden=true;output.textContent='';showEditor(false);};
   form.querySelector('[data-reload-notes]').onclick=()=>{if(saving)return;loadJobNotes(card,s,true);};
   form.onsubmit=async event=>{
    event.preventDefault();const body=form.elements.body.value.trim();if(!body||saving)return;
@@ -69,13 +72,13 @@
  async function ensureNotes(card){
   const s=state(card),panel=card.querySelector('.smc-notes');
   if(panel.querySelector('[data-smc-note-editor]'))return loadJobNotes(card,s);
-  panel.innerHTML=(card.dataset.messageJobId?'':'<label class="smc-note-job">Job<select data-notes-job aria-label="Choose a job for Notes"><option value="">Choose a job…</option></select></label>')+'<div data-smc-note-editor></div>';
+  panel.innerHTML=(card.dataset.messageJobId?'':'<label class="smc-note-job">Job<select data-job-picker data-notes-job aria-label="Choose a job for Notes"><option value="">Choose a job…</option></select></label>')+'<div data-smc-note-editor></div>';
   const select=panel.querySelector('[data-notes-job]');
   if(select){
    const version=++s.version;select.disabled=true;
    try{
     const jobs=await json('/api/jobs');if(!live(card,s,version))return;
-    select.innerHTML='<option value="">Choose a job…</option>'+jobs.map(job=>`<option value="${escape(job.id)}">${escape(job.title)}${job.clientName?' · '+escape(job.clientName):''}</option>`).join('');
+    select.innerHTML='<option value="">Choose a job…</option>'+StudioSubjectPicker.jobOptions(jobs);
     select.disabled=false;select.onchange=()=>{s.version++;s.jobId=select.value;s.loaded=false;s.loading=false;return loadJobNotes(card,s);};
    }catch(error){if(live(card,s,version)){panel.innerHTML='<p role="alert"></p><button type="button">Retry</button>';panel.querySelector('p').textContent=error.message||String(error);panel.querySelector('button').onclick=()=>ensureNotes(card);return;}}
   }

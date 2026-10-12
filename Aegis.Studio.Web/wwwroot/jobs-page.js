@@ -29,12 +29,12 @@
    const owner=job=>flows.get(String(job.id))?.owner||job.jobLead||job.assignedTo||'';
    const ownerLabel=job=>people.get(String(owner(job)).toLowerCase())||owner(job)||'Unassigned';
    let saved={};try{saved=JSON.parse(sessionStorage.getItem('studio-jobs-view')||'{}');}catch{}
-   let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',attention='',page=1;
-   const stages=[...new Set(jobs.map(status))].sort();if(!stages.includes(stage))stage='';
+   let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',attention='',includeClosed=false,page=1;
+   const stages=[...new Set(jobs.map(status))].sort();if(!stages.includes(stage)||StudioSubjectPicker.isClosed({status:stage}))stage='';
    const card=(title,body,cls='')=>`<section class="sj-card ${cls}"><header><h2>${title}</h2></header>${body}</section>`;
    host.innerHTML=`<section class="sj-page" aria-label="Jobs"><section class="sj-board">
     <div class="sj-toolbar"><h2>Jobs</h2><input type="search" data-sj-search aria-label="Search jobs, clients or references" placeholder="Search jobs, clients or references…"><select data-sj-workspace aria-label="Workspace"><option value="">All workspaces</option>${workspaces.map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select><select data-sj-status aria-label="Status"><option value="">All statuses</option>${stages.map(s=>`<option>${esc(s)}</option>`).join('')}</select><select data-sj-sort aria-label="Sort jobs"><option value="date-desc">Event date ↓</option><option value="date-asc">Event date ↑</option></select><button type="button" class="sj-gold" data-sj-settings hidden>Workspace settings</button></div>
-    <div class="sj-summary"><span data-sj-count></span><button type="button" data-sj-clear>Clear filters</button></div>
+    <div class="sj-summary"><span data-sj-count></span><label><input type="checkbox" data-sj-closed> Include closed / archived jobs</label><button type="button" data-sj-clear>Clear filters</button></div>
     <div class="sj-error" role="alert" data-sj-error hidden></div>
     <div class="sj-table-scroll"><table class="sj-table"><thead><tr><th>Job / Client</th><th>Workspace</th><th>Event date</th><th>Job Owner</th><th>Status</th><th>Next Action</th></tr></thead><tbody></tbody></table></div>
     <footer class="sj-pagination"><span data-sj-range></span><div><button type="button" data-sj-prev aria-label="Previous page">‹</button><span data-sj-page></span><button type="button" data-sj-next aria-label="Next page">›</button></div></footer>
@@ -48,7 +48,7 @@
    const need=(job,key)=>key==='owner'?!owner(job)&&!/completed|delivered|cancelled/i.test(status(job)):key==='changes'?/changes requested/i.test(status(job)):/needs photographer assignment/i.test(status(job));
    function apply(reset=true){
     if(!current())return;if(reset)page=1;
-    const base=jobs.filter(j=>belongs(j,workspace));
+    const base=jobs.filter(j=>belongs(j,workspace)&&(includeClosed||!StudioSubjectPicker.isClosed({...j,stage:status(j)})));
     const filtered=base.filter(j=>(!stage||status(j)===stage)&&(!attention||need(j,attention))&&[j.title,j.clientName,j.reference,j.jobNumber,workspacesById.get(String(j.workspaceId))?.name,ownerLabel(j)].join(' ').toLowerCase().includes(term.toLowerCase().trim()));
     filtered.sort((a,b)=>{const ad=date(a.eventDate),bd=date(b.eventDate);return !ad&&!bd?String(a.id).localeCompare(String(b.id)):!ad?1:!bd?-1:(+ad-+bd)*(sort==='date-asc'?1:-1)||String(a.id).localeCompare(String(b.id));});
     const pages=Math.max(1,Math.ceil(filtered.length/13));page=Math.min(page,pages);
@@ -67,9 +67,10 @@
    }
    find('[data-sj-search]').oninput=e=>{term=e.target.value;apply();};
    find('[data-sj-workspace]').onchange=e=>{workspace=e.target.value;options.setWorkspaceFilter(workspace);apply();};
-   find('[data-sj-status]').onchange=e=>{stage=e.target.value;apply();};
+   find('[data-sj-status]').onchange=e=>{stage=e.target.value;if(StudioSubjectPicker.isClosed({status:stage})){includeClosed=true;find('[data-sj-closed]').checked=true;}apply();};
+   find('[data-sj-closed]').onchange=e=>{includeClosed=e.target.checked;apply();};
    find('[data-sj-sort]').onchange=e=>{sort=e.target.value;apply();};
-   find('[data-sj-clear]').onclick=()=>{term='';stage='';workspace='';attention='';options.setWorkspaceFilter('');find('[data-sj-search]').value='';find('[data-sj-status]').value='';find('[data-sj-workspace]').value='';apply();};
+   find('[data-sj-clear]').onclick=()=>{term='';stage='';workspace='';attention='';includeClosed=false;find('[data-sj-closed]').checked=false;options.setWorkspaceFilter('');find('[data-sj-search]').value='';find('[data-sj-status]').value='';find('[data-sj-workspace]').value='';apply();};
    find('[data-sj-prev]').onclick=()=>{page--;apply(false);find('.sj-table-scroll').scrollTop=0;};find('[data-sj-next]').onclick=()=>{page++;apply(false);find('.sj-table-scroll').scrollTop=0;};
    host.onclick=e=>{if(!current())return;const number=e.target.closest('[data-sj-page-number]');if(number){page=Number(number.dataset.sjPageNumber);apply(false);find('.sj-table-scroll').scrollTop=0;return;}const row=e.target.closest('[data-sj-job]');if(row){void open(row.dataset.sjJob);return;}const s=e.target.closest('[data-sj-stage]');if(s){stage=stage===s.dataset.sjStage?'':s.dataset.sjStage;find('[data-sj-status]').value=stage;apply();}const n=e.target.closest('[data-sj-need]');if(n){attention=attention===n.dataset.sjNeed?'':n.dataset.sjNeed;apply();}if(e.target.closest('[data-sj-view-all]')){attention='';stage='';term='';find('[data-sj-status]').value='';find('[data-sj-search]').value='';apply();}};
    host.onkeydown=e=>{const row=e.target.closest('tr[data-sj-job]');if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void open(row.dataset.sjJob);}};

@@ -45,10 +45,17 @@
 .smc-note header{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font-size:10px}
 .smc-note time,.smc-note small{font-size:9px}
 .smc-note p{margin:5px 0;white-space:pre-wrap;overflow-wrap:anywhere}
-.smc-note button,.smc-note-form button,.smc-notes [data-notes-retry]{border:0;border-radius:4px;background:#ffe38b;color:#705219;padding:3px 6px;font-size:10px;font-weight:700;cursor:pointer}
+.smc-note-open,.smc-note button,.smc-note-form button,.smc-notes [data-notes-retry]{border:0;border-radius:4px;background:#ffe38b;color:#705219;padding:3px 6px;font-size:10px;font-weight:700;cursor:pointer}
 .smc-note header button{margin-left:auto}
 .smc-note-form{display:flex;flex-direction:column;gap:5px;margin-top:8px}
 .smc-note-form label{font-weight:700}
 .smc-note-form textarea{display:block;width:100%;box-sizing:border-box;height:96px;min-height:96px;max-height:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;margin-top:4px;padding:5px;border:1px solid #dfc66e;border-radius:4px;background:#fffbea;color:#5e4a20;font-size:11px;resize:none}
 .smc-note-form>div{display:flex;flex-wrap:wrap;gap:4px}
 .smc-note-form [role=status]{margin:0;font-size:10px}
+
+.smc-note-slide{display:grid;grid-template-rows:0fr;transition:grid-template-rows .2s ease}
+.smc-note-slide[data-open=true]{grid-template-rows:1fr}
+.smc-note-slide>.smc-note-form{min-height:0;overflow:hidden;margin-top:0}
+.smc-note-slide[data-open=true]>.smc-note-form{padding-top:8px}
+.smc-note-open{margin-top:8px}
+@media(prefers-reduced-motion:reduce){.smc-note-slide{transition:none}}

@@ -20,7 +20,7 @@
       <header class="studio-media-heading"><div><h1>Media Review &amp; Upload</h1><p>Upload, organise and review Job media and source files.</p></div></header>
       <div class="studio-media-workspace"><section class="studio-media-panel studio-media-browser"><h2>Media Destinations</h2>
         <div class="studio-media-tree-layout">
-          <div><input id="studioMediaJobSearch" type="search" placeholder="Search Workspaces, Jobs, Collections, Subjects…" aria-label="Search media destinations"><div id="studioMediaTree" class="studio-media-tree" role="tree"></div><small id="studioMediaJobMatches"></small></div>
+          <div><input id="studioMediaJobSearch" type="search" placeholder="Search Workspaces, Jobs, Collections, Subjects…" aria-label="Search media destinations"><select id="studioMediaJobStatus" aria-label="Filter jobs by status"><option value="">All statuses</option>${[...new Set(jobs.map(j=>j.status||'Unknown'))].sort().map(x=>`<option>${escMedia(x)}</option>`).join('')}</select><label class="ssp-job-visibility"><input type="checkbox" id="studioMediaClosed"> Include closed / archived</label><label>Job<select id="studioMediaQuickJob" data-job-picker><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><div id="studioMediaTree" class="studio-media-tree" role="tree"></div><small id="studioMediaJobMatches"></small></div>
           
         </div>
         <div class="studio-media-targets" hidden><select id="studioMediaJob"><option value="">Select Job</option></select><select id="studioMediaCollection"><option value="Unclassified">Unclassified</option></select><select id="studioMediaSubject"><option value="">No Subject</option></select></div>
@@ -40,19 +40,21 @@
       </div></div></div>`;
     const root=genericView.querySelector('.studio-media-page'),job=root.querySelector('#studioMediaJob'),collection=root.querySelector('#studioMediaCollection'),subject=root.querySelector('#studioMediaSubject'),files=root.querySelector('#studioMediaFiles'),progress=root.querySelector('#studioMediaProgress'),gallery=root.querySelector('#studioMediaGallery'),count=root.querySelector('#studioMediaCount'),notice=root.querySelector('#studioMediaDestinationNotice');
     const search=root.querySelector('#studioMediaJobSearch'),matches=root.querySelector('#studioMediaJobMatches'),tree=root.querySelector('#studioMediaTree'),path=root.querySelector('#studioMediaPath');
+    root.querySelector('#studioMediaJobStatus').onchange=renderTree;root.querySelector('#studioMediaClosed').onchange=renderTree;
     const workspaceNames=new Map(workspaces.map(w=>[String(w.id),w.name||w.title||'Workspace']));
     const describe=j=>[j.jobNumber||j.reference||'',j.title||j.name||'Job',j.clientName||j.customerName||''].filter(Boolean).join(' · ');
     const expanded=new Set(['workspaces']),cache=new Map();
     let activeTab='',selectedAssetId='';
     let selection='';
     function renderTree(){
-      const q=search.value.trim().toLowerCase();
+      const q=search.value.trim().toLowerCase(),stage=root.querySelector('#studioMediaJobStatus').value;
+      const visibleJobs=jobs.filter(j=>(root.querySelector('#studioMediaClosed').checked||!StudioSubjectPicker.isClosed(j))&&(!stage||j.status===stage));
       const matchesText=(...parts)=>!q||parts.join(' ').toLowerCase().includes(q);
       const node=(id,name,depth,children,icon)=>'<button type="button" role="treeitem" data-tree-id="'+escMedia(id)+'" class="studio-media-tree-node'+(selection===id?' selected':'')+'" style="padding-left:'+(12+depth*20)+'px"><span>'+ (children?(expanded.has(id)||q?'⌄':'›'):'·') +'</span><span>'+icon+'</span><span>'+escMedia(name)+'</span></button>';
       let html=node('workspaces','Workspaces',0,true,'▣');
       if(expanded.has('workspaces')||q){
-        const groups=workspaces.map(w=>({id:String(w.id),name:w.name||w.title||'Workspace',jobs:jobs.filter(j=>String(j.workspaceId)===String(w.id))}));
-        const other=jobs.filter(j=>!workspaceNames.has(String(j.workspaceId)));
+        const groups=workspaces.map(w=>({id:String(w.id),name:w.name||w.title||'Workspace',jobs:visibleJobs.filter(j=>String(j.workspaceId)===String(w.id))}));
+        const other=visibleJobs.filter(j=>!workspaceNames.has(String(j.workspaceId)));
         if(other.length)groups.push({id:'other',name:'Other Jobs',jobs:other});
         for(const w of groups){
           const matching=w.jobs.filter(j=>matchesText(w.name,describe(j)));
@@ -66,9 +68,9 @@
               const names=['Unclassified',...new Set((data.collections||[]).map(c=>typeof c==='string'?c:c.name).filter(x=>x&&x!=='Unclassified'))];
               for(const name of names){
                 const subjects=(data.subjects||[]).filter(x=>!x.isSystem&&(x.collection||'Unclassified')===name);
-                if(!matchesText(name,describe(j))&&!subjects.some(x=>matchesText(x.name,describe(j))))continue;
+                if(!matchesText(name,describe(j))&&!subjects.some(x=>matchesText(x.name,x.reference,describe(j))))continue;
                 const cid='c:'+j.id+':'+encodeURIComponent(name);html+=node(cid,name,3,subjects.length>0,'▱');
-                if(expanded.has(cid)||q)for(const sub of subjects)if(matchesText(sub.name,name,describe(j)))html+=node('s:'+j.id+':'+sub.id,sub.name,4,false,'♙');
+                if(expanded.has(cid)||q)for(const sub of subjects)if(matchesText(sub.name,sub.reference,name,describe(j)))html+=node('s:'+j.id+':'+sub.id,sub.name,4,false,'♙');
               }
             }
           }
@@ -78,16 +80,20 @@
       if(expanded.has('legacy')||q)html+=node('legacy:unclassified','Unclassified',1,false,'▱');
       html+=node('scratch','Scratch Space',0,false,'▱');
       tree.innerHTML=html;
-      matches.textContent=jobs.length+' accessible Jobs';
+      matches.textContent=visibleJobs.length+' matching Jobs';
     }
     search.oninput=renderTree;
     tree.onclick=async e=>{
       const button=e.target.closest('[data-tree-id]');if(!button)return;
-      const id=button.dataset.treeId,parts=id.split(':'),jobId=['j','c','s'].includes(parts[0])?parts[1]:'';
+      await selectDestination(button.dataset.treeId);
+    };
+    root.querySelector('#studioMediaQuickJob').onchange=e=>{if(e.target.value)void selectDestination('j:'+e.target.value);};
+    async function selectDestination(id){
+      const parts=id.split(':'),jobId=['j','c','s'].includes(parts[0])?parts[1]:'';
       if(['workspaces','legacy'].includes(id)||parts[0]==='w'){expanded.has(id)?expanded.delete(id):expanded.add(id);renderTree();return;}
       if(parts[0]==='pending')return;
       if(parts[0]==='j'||parts[0]==='c'){expanded.has(id)?expanded.delete(id):expanded.add(id);}
-      selection=id;job.innerHTML=jobId?'<option value="'+escMedia(jobId)+'">Selected Job</option>':'<option value="">Select Job</option>';job.value=jobId;collection.value='Unclassified';subject.value='';
+      selection=id;root.querySelector('#studioMediaQuickJob').value=jobId;StudioSubjectPicker.enhance(root.querySelector('#studioMediaQuickJob')).sync();job.innerHTML=jobId?'<option value="'+escMedia(jobId)+'">Selected Job</option>':'<option value="">Select Job</option>';job.value=jobId;collection.value='Unclassified';subject.value='';
       if(jobId){
         if(!cache.has(jobId)){try{cache.set(jobId,await json('/api/jobs/'+encodeURIComponent(jobId)+'/media'));}catch(error){progress.textContent=error.message||'Unable to load media.';}}
         await refresh();
@@ -158,17 +164,13 @@
         const collectionNames=['Unclassified',...new Set((media?.collections||[]).map(c=>typeof c==='string'?c:c.name).filter(x=>x&&x!=='Unclassified'))];
         const collectionOptions=collectionNames.map(x=>'<option value="'+escMedia(x)+'"'+(x===currentCollection?' selected':'')+'>'+escMedia(x)+'</option>').join('');
         const subjects=(media?.subjects||[]).filter(x=>!x.isSystem);
-        detail.innerHTML='<h3>File Details</h3><strong class="studio-media-detail-name">'+escMedia(nameOf(a))+'</strong><div class="studio-media-detail-fields"><label>Job<input type="text" value="'+escMedia(describe(jobRecord||{})||job.value)+'" readonly title="Changing the Job requires moving the asset between Jobs"></label><label>Collection<select id="studioMediaDetailCollection">'+collectionOptions+'</select></label><fieldset class="studio-media-detail-subjects"><legend>Subjects</legend><div id="studioMediaDetailSubjects"></div></fieldset><button type="button" class="primary" id="studioMediaSaveTags">Save Tags</button><small id="studioMediaTagFeedback" role="status" aria-live="polite"></small></div>';
+        detail.innerHTML='<h3>File Details</h3><strong class="studio-media-detail-name">'+escMedia(nameOf(a))+'</strong><div class="studio-media-detail-fields"><label>Job<input type="text" value="'+escMedia(describe(jobRecord||{})||job.value)+'" readonly title="Changing the Job requires moving the asset between Jobs"></label><label>Collection<select id="studioMediaDetailCollection">'+collectionOptions+'</select></label><label>Subjects<select data-subject-picker multiple aria-label="Photo subjects" id="studioMediaDetailSubjects"></select></label><button type="button" class="primary" id="studioMediaSaveTags">Save Tags</button><small id="studioMediaTagFeedback" role="status" aria-live="polite"></small></div>';
         const collectionInput=detail.querySelector('#studioMediaDetailCollection');
         const subjectList=detail.querySelector('#studioMediaDetailSubjects');
-        function drawSubjects(){
-          const relevant=subjects.filter(x=>(x.collection||'Unclassified')===collectionInput.value);
-          subjectList.innerHTML=relevant.length?relevant.map(x=>'<label class="studio-media-subject-option"><input type="checkbox" value="'+escMedia(x.id)+'"'+(currentSubjects.includes(String(x.id))?' checked':'')+'> '+escMedia(x.name)+'</label>').join(''):'<small>No Subjects in this Collection.</small>';
-        }
-        collectionInput.onchange=drawSubjects;drawSubjects();
+        subjectList.innerHTML=StudioSubjectPicker.options(subjects,currentSubjects);
         const save=detail.querySelector('#studioMediaSaveTags'),feedback=detail.querySelector('#studioMediaTagFeedback');
         save.onclick=async()=>{
-          const chosenCollection=collectionInput.value,chosenSubjects=Array.from(subjectList.querySelectorAll('input:checked')).map(x=>x.value);
+          const chosenCollection=collectionInput.value,chosenSubjects=Array.from(subjectList.selectedOptions,x=>x.value);
           const assetId=a.id||a.assetId;
           if(!assetId){feedback.textContent='This file has no editable asset identifier.';return;}
           save.disabled=true;feedback.textContent='Saving tags…';

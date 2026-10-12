@@ -32,7 +32,7 @@
 
     function renderToday(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',jobStatusFilter:'',jobRoleFilter:'',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',jobStatusFilter:'',jobRoleFilter:'',includeClosedJobs:false,selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['today','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         todayLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -202,7 +202,7 @@
             ||(Array.isArray(job.crew)&&job.crew.some(member=>normalized(member.userName||member)===user));
         const jobViews={led:'Jobs Led By Me',involved:"Jobs I'm Involved In",all:'All Jobs'};
         const viewJobs=state.jobView==='led'?jobs.filter(isLead):state.jobView==='all'?jobs:jobs.filter(isInvolved);
-        const searchedJobs=viewJobs.filter(job=>[job.title,job.clientName,job.clientDisplayName,job.status,job.jobLead,job.id].some(value=>normalized(value).includes(normalized(state.jobSearch))));
+        const searchedJobs=viewJobs.filter(job=>state.includeClosedJobs||!StudioSubjectPicker.isClosed(job)).filter(job=>[job.title,job.clientName,job.clientDisplayName,job.status,job.jobLead,job.id].some(value=>normalized(value).includes(normalized(state.jobSearch))));
         const roleForJob=job=>isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
         const statusOptions=[...new Set(viewJobs.map(job=>String(job.status||'Unknown')))].sort((a,b)=>a.localeCompare(b));
         const roleOptions=[...new Set(viewJobs.map(roleForJob))].sort((a,b)=>a.localeCompare(b));
@@ -341,7 +341,7 @@
                                     ${Object.entries(jobViews).map(([key,label])=>`<button type="button" data-mw-job-view="${key}" class="${state.jobView===key?'active':''}" aria-pressed="${state.jobView===key}">${label}</button>`).join('')}
                                 </div>
                                 <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div><div class="mw-today-toolbar-actions">${(auth.user||auth).isAdministrator?'<button type="button" data-assign-job-lead>Assign Job Lead</button>':''}${state.status.media==='error'?'<button type="button" data-mw-retry="media">Retry previews</button>':''}</div>
-                                <label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
+                                <label class="ssp-job-visibility"><input type="checkbox" data-mw-closed ${state.includeClosedJobs?'checked':''}> Include closed / archived</label><label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
                             </div>
                             
                             <div class="mw-today-job-columns"><span>Job / Client</span><label class="mw-job-column-filter"><span>Status</span><select data-mw-job-status aria-label="Filter jobs by status"><option value="">All statuses</option>${statusOptions.map(value=>`<option value="${esc(value)}" ${state.jobStatusFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span>Progress</span><span>Event Date</span><label class="mw-job-column-filter"><span>My Role</span><select data-mw-job-role aria-label="Filter jobs by role"><option value="">All roles</option>${roleOptions.map(value=>`<option value="${esc(value)}" ${state.jobRoleFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span></span></div>
@@ -482,7 +482,8 @@
             state.jobSearch='';
             paintToday(state);
         });
-        genericView.querySelector('[data-mw-job-status]')?.addEventListener('change',event=>{state.jobStatusFilter=event.target.value;paintToday(state);});
+        genericView.querySelector('[data-mw-closed]')?.addEventListener('change',event=>{state.includeClosedJobs=event.target.checked;paintToday(state);});
+        genericView.querySelector('[data-mw-job-status]')?.addEventListener('change',event=>{state.jobStatusFilter=event.target.value;if(StudioSubjectPicker.isClosed({status:state.jobStatusFilter}))state.includeClosedJobs=true;paintToday(state);});
         genericView.querySelector('[data-mw-job-role]')?.addEventListener('change',event=>{state.jobRoleFilter=event.target.value;paintToday(state);});
         genericView.querySelector('[data-mw-job-search]')?.addEventListener('input',event=>{
             state.jobSearch=event.target.value;
@@ -507,8 +508,8 @@
             const dialog=studioDialog('Assign Job Lead',`
                 <form class="subject-form" data-job-lead-form>
                     <label>Job
-                        <select name="jobId" required>
-                            ${activeJobs.map(job=>'<option value="'+esc(job.id)+'">'+esc(job.title)+' · '+esc(job.clientName||'Client')+'</option>').join('')}
+                        <select data-job-picker name="jobId" required>
+                            ${StudioSubjectPicker.jobOptions(jobs)}
                         </select>
                     </label>
                     <label>Job Lead

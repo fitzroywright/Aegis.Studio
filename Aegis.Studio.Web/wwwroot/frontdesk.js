@@ -414,7 +414,7 @@ async function loadFrontDeskCommunications(){
 }
 function openFrontDeskMessagePicker(){
     const jobs=frontDeskJobs.filter(job=>job?.id).sort((a,b)=>String(a.clientName||a.title||'').localeCompare(String(b.clientName||b.title||'')));
-    const dialog=frontDeskDialog('Send Message',`<p>Select the Job conversation to message. Messages are retained with the Job.</p><label>Job / Customer<select name="jobId" required><option value="">Select a Job…</option>${jobs.map(job=>`<option value="${esc(job.id)}">${esc((job.clientName||'Client')+' — '+(job.title||'Untitled Job'))}</option>`).join('')}</select></label><p class="muted">The message composer will open in a popup after you select a Job.</p>`);
+    const dialog=frontDeskDialog('Send Message',`<p>Select the Job conversation to message. Messages are retained with the Job.</p><label>Job / Customer<select data-job-picker name="jobId" required><option value="">Select a Job…</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><p class="muted">The message composer will open in a popup after you select a Job.</p>`);
     const form=dialog.querySelector('form');
     form.querySelector('[type=submit]').textContent='Continue';
     if(!jobs.length){form.querySelector('[role=alert]').textContent='No Jobs are available for messaging.';form.querySelector('[type=submit]').disabled=true;}

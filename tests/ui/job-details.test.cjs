@@ -261,3 +261,5 @@ test('Job Details dropped files declare receipts and retries preserve operation 
 });
 
 
+
+test('Job Notes slides the editor open and preserves a draft when closed',async t=>{const {w}=environment(t);await w.openWorkspaceJob('job');await settle();const card=w.document.getElementById('jobDetailMessages');await card.querySelector('[data-smc-notes-toggle]').onclick();const opener=card.querySelector('[data-note-slide]'),slide=card.querySelector('.smc-note-slide'),form=card.querySelector('.smc-note-form');assert.equal(slide.dataset.open,'false');opener.click();assert.equal(slide.dataset.open,'true');form.elements.body.value='Draft instructions';form.querySelector('[data-close-note]').click();assert.equal(slide.dataset.open,'false');opener.click();assert.equal(form.elements.body.value,'Draft instructions');await form.onsubmit({preventDefault(){}});assert.equal(card.querySelector('.smc-note-slide').dataset.open,'false');card.querySelector('[data-edit-note]').click();assert.equal(card.querySelector('.smc-note-slide').dataset.open,'true');});
