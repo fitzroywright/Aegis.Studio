@@ -267,6 +267,10 @@
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();});
+        // Job details and the workspace list share a route. Refresh the masthead
+        // when the visible panel changes, not only when the route changes.
+        const conversation=document.getElementById('conversationView');
+        if(conversation)new MutationObserver(()=>syncPageFrame()).observe(conversation,{attributes:true,attributeFilter:['class']});
 
 
         if (pageTools) {

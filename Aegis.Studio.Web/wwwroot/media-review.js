@@ -209,6 +209,11 @@
       Promise.resolve(openWorkspaceJob(job.value)).catch(error=>{progress.textContent=error.message||'Unable to open Job details.';});
     };
 
+    collection.onchange=()=>{
+      // A subject from a different collection must not be attached to new uploads.
+      const selected=subject.selectedOptions[0];
+      if(selected?.dataset.collection && selected.dataset.collection!==collection.value)subject.value='';
+    };
     subject.onchange=()=>{const selected=subject.selectedOptions[0];if(selected?.dataset.collection)collection.value=selected.dataset.collection};
     async function uploadFiles(){
       if(uploading||!job.value||!selectedFiles.length)return;
