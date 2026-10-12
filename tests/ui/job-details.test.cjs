@@ -17,9 +17,13 @@ test('Today job opens with working reply and Subjects controls in their final co
  await form.onsubmit({preventDefault(){},currentTarget:form});
  assert.ok(fixture.calls.some(c=>c.url==='/api/conversations/conversation/messages'&&JSON.parse(c.options.body).body==='Confirmed'));
 });
-test('Details, Tasks and Activity render their own visible panels',async t=>{
+test('job facts appear below the title while Tasks and Activity render their own panels',async t=>{
  const {w}=environment(t);await w.openWorkspaceJob('job');await settle();
- for(const [name,text] of [['overview','Kingston Studio'],['tasks','Retouch portraits'],['activity','Front Desk booking']]){
+ assert.equal(button(w,'overview'),null);assert.equal(w.document.getElementById('jobDetail-overview'),null);
+ const facts=w.document.querySelector('.job-detail-heading .job-detail-facts');
+ assert.deepEqual(Array.from(facts.querySelectorAll('dt'),field=>field.textContent),['Client','Type','Event date','Location','Photographer']);
+ assert.deepEqual(Array.from(facts.querySelectorAll('dd'),field=>field.textContent),['Williams & Clarke','Photography','Sun Oct 11 2026','Kingston Studio','Unassigned']);
+ for(const [name,text] of [['tasks','Retouch portraits'],['activity','Front Desk booking']]){
   await button(w,name).onclick();const panel=w.document.getElementById('jobDetail-'+name);assert.equal(panel.hidden,false);assert.match(panel.textContent,new RegExp(text));
   assert.equal(w.document.querySelectorAll('.job-detail-center > section:not([hidden])').length,1);
  }
@@ -192,3 +196,4 @@ test('Job Details dropped files declare receipts and retries preserve operation 
  const declarations=fixture.calls.filter(c=>c.url.endsWith('/media/upload-batches')).map(c=>JSON.parse(c.options.body));assert.deepEqual(declarations[0],declarations[1]);
  const uploads=fixture.calls.filter(c=>c.url.endsWith('/media/uploads'));assert.equal(uploads[0].options.body.get('uploadId'),uploads[1].options.body.get('uploadId'));
 });
+
