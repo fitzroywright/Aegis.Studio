@@ -1,0 +1,2 @@
+/* Standard uses the canonical Studio appearance; OS dark preference maps to Dark. */
+body[data-theme="studio-default"] { color-scheme:light; }
