@@ -1,0 +1,21 @@
+
+body[data-theme="fluent-dark"] {
+  --theme-bg:#101923; --theme-surface:#1a2836; --theme-surface-2:#203244;
+  --theme-border:#3b5267; --theme-text:#e8f1f8; --theme-muted:#a8bfd0;
+  --theme-header:#081b30; --theme-accent:#82b8df; --theme-accent-soft:#294257;
+  --studio-grid-header-bg:#263d52; --studio-grid-header-text:#e5f0f8; --studio-grid-header-border:#476177;
+  --studio-rail-title:#eaf3fa;
+  background:var(--theme-bg);color:var(--theme-text);color-scheme:dark;
+}
+
+
+body[data-theme="fluent-dark"] :is(.mw-today-job-row,.mw-status-row,.mw-today-rail-links button):hover {background:#2c455b;}
+
+
+body[data-theme="fluent-dark"] .mw-list-panel[data-mw-region="attention"],body[data-theme="fluent-dark"] .st-card.st-attention {background:#352b32;border-color:#915b66;}
+
+
+body[data-theme="fluent-dark"] .mw-list-panel[data-mw-region="attention"]>header,body[data-theme="fluent-dark"] .st-card.st-attention>header {background:#4a303a;border-color:#915b66;}
+
+
+body[data-theme="fluent-dark"] :is(.mw-list-panel[data-mw-region="attention"],.st-card.st-attention) > header h2 {color:#ffd4d5;}
