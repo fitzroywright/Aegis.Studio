@@ -11019,11 +11019,6 @@ body[data-studio-view="media"] .studio-media-page {
 
 .management-workload-head { background:var(--studio-grid-header-bg); color:var(--studio-grid-header-text); }
 
-/* Shared Needs Attention card: same warm, restrained treatment as Today. */
-body[data-studio-view] .st-right .st-card.st-attention { border: 1px solid #e6c29c; border-radius: 9px; background: #fffaf4; overflow: hidden; }
-body[data-studio-view] .st-right .st-card.st-attention > header { background: #fff0de; border-bottom: 1px solid #f0d4b4; }
-body[data-studio-view] .st-right .st-card.st-attention > header h2 { color: #945b23; font-weight: 600; }
-body[data-studio-view] .st-right .st-card.st-attention .st-card-body { background: #fffaf4; color: #304b67; }
 /* Single artwork for the Studio identity, with the page title directly beside it. */
 body .topbar { padding-left: 0 !important; column-gap: 0 !important; }
 body .topbar .studio-script-brand { padding: 0 !important; margin: 0 !important; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
