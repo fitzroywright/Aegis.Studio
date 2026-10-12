@@ -160,7 +160,7 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .job-detail-facts > div + div { border-left:1px solid var(--theme-border,#dedbd4); }
 .job-detail-facts dt { flex:none; color:var(--theme-muted,#69758b); font-size:9px; letter-spacing:.3px; text-transform:uppercase; }
 .job-detail-facts dd { margin:0; font-weight:650; min-width:0; overflow:hidden; text-overflow:ellipsis; color:var(--theme-text,#162b50); }
-.job-detail-workflow-dialog { width:min(1000px,95vw); max-height:85vh; overflow:auto; }
+.job-detail-workflow-dialog { width:min(1000px,95vw); max-height:85vh; }
 .job-detail-workflow-dialog .workflow-panel { margin:0; overflow:visible; }
 @media(max-width:1200px) { .jd-drop-hint { display:none; } .jd-contact-sheet { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr) 230px; } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } }

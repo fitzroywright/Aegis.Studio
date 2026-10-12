@@ -204,7 +204,7 @@
         const viewJobs=state.jobView==='led'?jobs.filter(isLead):state.jobView==='all'?jobs:jobs.filter(isInvolved);
         const searchedJobs=viewJobs.filter(job=>[job.title,job.clientName,job.clientDisplayName,job.status,job.jobLead,job.id].some(value=>normalized(value).includes(normalized(state.jobSearch))));
         const roleForJob=job=>isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
-        const statusOptions=[...new Set(viewJobs.map(job=>String(job.status||'Unknown')))].sort((a,b)=>a.localeCompare(b));
+        const statusOptions=StudioStatusOrder.sort(viewJobs.map(job=>String(job.status||'Unknown')));
         const roleOptions=[...new Set(viewJobs.map(roleForJob))].sort((a,b)=>a.localeCompare(b));
         const filteredJobs=searchedJobs.filter(job=>(!state.jobStatusFilter||String(job.status||'Unknown')===state.jobStatusFilter)&&(!state.jobRoleFilter||roleForJob(job)===state.jobRoleFilter));
         const sortedJobs=[...filteredJobs].sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0));
@@ -803,7 +803,7 @@
         return StudioJobsPage.render(genericView,{
             json,workspaces:workspaceCache||[],
             workspaceFilter:jobsWorkspaceFilter===null?(typeof selectedWorkspace!=='undefined'?selectedWorkspace||'':''):jobsWorkspaceFilter,
-            setWorkspaceFilter:value=>{jobsWorkspaceFilter=value;},
+            setWorkspaceFilter:value=>{jobsWorkspaceFilter=value;recordNavigation('jobs',{workspaceId:value,replaceHistory:true});},
             isCurrent,openJob:id=>openWorkspaceJob(id),navigate:view=>window.studioNavigate(view),
             sendMessage:async()=>{await window.studioNavigate('messages');if(document.body.dataset.studioView==='messages')document.getElementById('newDirectMessage')?.click();},
             openWorkspace:id=>selectWorkspace(id,(workspaceCache||[]).find(w=>String(w.id)===String(id))?.name||'Workspace'),
@@ -997,31 +997,45 @@
     let currentNavigationView=document.body.dataset.studioView||'today';
     const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
 
-    function replaceNavigationHistory(view){
-        const url='#studio='+encodeURIComponent(view);
-        window.history.replaceState({studioView:view},'',url);
+    function navigationContext(view,options={}){
+        return {studioView:view,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
     }
+    function recordNavigation(view,options={}){
+        const next=navigationContext(view,options),previous=window.history.state;
+        const params=new URLSearchParams({studio:view});
+        if(next.studioWorkspaceId)params.set('workspace',next.studioWorkspaceId);
+        if(next.studioJobId)params.set('job',next.studioJobId);
+        const same=previous?.studioView===next.studioView&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId;
+        if(options.replaceHistory)window.history.replaceState(next,'','#'+params);
+        else if(!options.browserHistory&&options.history!==false&&!same)window.history.pushState(next,'','#'+params);
+        currentNavigationView=view;
+        if(view==='jobs')jobsWorkspaceFilter=next.studioWorkspaceId;
+        return next;
+    }
+    function beginNavigation(view,options){
+        const context=recordNavigation(view,options),revision=++navigationRevision;
+        window.StudioJobsPage?.dispose();
+        window.StudioPage?.invalidate();
+        window.StudioMessages?.invalidate();
+        window.StudioWorkspace?.invalidate();
+        todayLoad?.abort();
+        return {context,revision};
+    }
+    // Job Details shares the workspace surface, but has its own history destination.
+    window.studioBeginJobNavigation=(id,options={})=>beginNavigation('workspaces',{...options,jobId:id});
 
     window.studioNavigate=async function(view,options={}){
         const route=routes[view];
         if(!route) throw new Error('Unknown Studio navigation view: '+view);
-        const previous=currentNavigationView;
-        if(!options.browserHistory&&options.history!==false&&previous!==view){
-            window.history.pushState({studioView:view},'','#studio='+encodeURIComponent(view));
-        }
-        currentNavigationView=view;
-        const revision=++navigationRevision;
-        window.StudioJobsPage?.dispose();
-        window.StudioPage?.invalidate();
-        window.StudioMessages?.invalidate();
-        todayLoad?.abort();
+        const {context,revision}=beginNavigation(view,options);
         setActive(view);
         if(view!=='today'){
             if(studioPageTools)studioPageTools.innerHTML='';
             window.studioSetBreadcrumb?.([{label:view==='workspaces'?'Workspaces':view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
-            await route();
+            if(context.studioJobId)await window.openWorkspaceJob(context.studioJobId,{navigationRecorded:true,history:false});
+            else await route();
             if(revision===navigationRevision){
                 setActive(view);
                 if(view!=='today'&&typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
@@ -1036,10 +1050,14 @@
         }
     };
 
+    function destinationFromLocation(state){
+        const params=new URLSearchParams(window.location.hash.replace(/^#/,''));
+        const view=state?.studioView&&routes[state.studioView]?state.studioView:params.get('studio');
+        return {view:view&&routes[view]?view:'today',workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
+    }
     window.addEventListener('popstate',event=>{
-        const requested=new URLSearchParams(window.location.hash.replace(/^#/, '')).get('studio');
-        const view=(event.state?.studioView&&routes[event.state.studioView] ? event.state.studioView : (requested&&routes[requested] ? requested : 'today'));
-        if(view!==currentNavigationView||view!==document.body.dataset.studioView)window.studioNavigate(view,{browserHistory:true,history:false}).catch(error=>console.error('Studio browser navigation failed.',error));
+        const destination=destinationFromLocation(event.state);
+        window.studioNavigate(destination.view,{...destination,browserHistory:true,history:false}).catch(error=>console.error('Studio browser navigation failed.',error));
     });
 
     document.querySelectorAll('[data-view]').forEach(button=>{
@@ -1051,11 +1069,8 @@
     if(topNew) topNew.onclick=async()=>{topNew.disabled=true;try{await loadWorkspaces();document.getElementById('newRequestDialog')?.showModal();}catch(error){alert(error.message);}finally{topNew.disabled=false;}};
 
     const startStudio=async()=>{
-        const requested=new URLSearchParams(window.location.hash.replace(/^#/,'')).get('studio');
-        const initial=requested&&routes[requested]?requested:'today';
-        currentNavigationView=initial;
-        replaceNavigationHistory(initial);
-        window.studioNavigate(initial,{history:false}).catch(error=>{
+        const destination=destinationFromLocation(window.history.state);
+        window.studioNavigate(destination.view,{...destination,history:false,replaceHistory:true}).catch(error=>{
             console.error('Studio startup navigation failed.',error);
         });
     };

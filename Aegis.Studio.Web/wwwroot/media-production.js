@@ -2,7 +2,7 @@ function studioMediaIsPreviewable(asset){return String(asset.contentType||asset.
 const mediaStates=['Photographed','Needs Sorting','Needs Editing','Needs Review','Needs Approval','Needs Retake','Ready','Ready for Production','Needs Print','Needs QC','Needs Delivery','Completed','Blocked'];
 function studioDialog(title,content,flyout=false){
  const dialog=document.createElement('dialog');dialog.className='studio-work-dialog'+(flyout?' studio-flyout':'');
- dialog.innerHTML=`<header><h2>${esc(title)}</h2><button type="button" data-close aria-label="Close">×</button></header><div class="studio-dialog-body">${content}</div>`;
+ dialog.innerHTML=`<header class="studio-dialog-heading"><h2>${esc(title)}</h2><button class="studio-dialog-close" type="button" data-close aria-label="Close">×</button></header><div class="studio-dialog-body">${content}</div>`;
  document.body.appendChild(dialog);dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();return dialog;
 }
 async function openWorkspaceSettings(id){

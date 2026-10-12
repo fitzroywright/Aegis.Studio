@@ -1,0 +1,8 @@
+/* Sole owner of shared popup title bars and close controls. */
+.studio-work-dialog{padding:0;border-radius:7px;border:1px solid var(--theme-border,#dedbd4);background:var(--theme-surface,#fff);color:var(--theme-text,#162b50);max-height:90vh;overflow:hidden}
+.studio-work-dialog[open]{display:flex;flex-direction:column}
+.studio-dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;padding:10px 14px;border-bottom:2px solid #ed7010}
+.studio-dialog-heading>h2{flex:1;min-width:0;margin:0;font-size:16px;overflow-wrap:anywhere}
+.studio-dialog-heading>.studio-dialog-close{flex:none;margin-left:auto;width:32px;height:32px;padding:0;border:1px solid var(--theme-border,#dedbd4);border-radius:5px;background:var(--theme-surface,#fff);color:var(--theme-text,#162b50);font-size:20px;line-height:1;cursor:pointer}
+.studio-dialog-close:focus-visible{outline:2px solid #1677ff;outline-offset:2px}
+.studio-work-dialog>.studio-dialog-body{flex:1;min-height:0;overflow:auto;padding:14px;overscroll-behavior:contain}
