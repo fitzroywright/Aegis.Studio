@@ -77,32 +77,11 @@
             .filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false)
             .map(workspace => '<button type="button" data-studio-workspace-id="' + escText(workspace.id) + '"><span>▣</span><span>' + escText(workspace.name) + '</span></button>')
             .join('');
-        if(document.body.dataset.studioView==='jobs'){
-            const navigation=[['today','Today','⌂'],['frontdesk','Front Desk','▣'],['jobs','Jobs','▥'],['media','Media','▧'],['messages','Messages','✉']];
-            const card=(title,body)=>'<section class="sj-rail-card" data-rail-card="'+railRole(title)+'"><header><h2>'+title+'</h2></header><div class="sj-rail-links">'+body+'</div></section>';
-            const counts=document.getElementById('genericView')?.studioJobsWorkspaceCounts||{};
-            const items=workspaces.filter(w=>w.permissions?.accessWorkspace!==false&&w.permissions?.view!==false).map(w=>'<button type="button" data-jobs-workspace-id="'+escText(w.id)+'"><span>▣</span><span>'+escText(w.name)+'</span>'+(counts[String(w.id)]!==undefined?'<b>'+counts[String(w.id)]+'</b>':'')+'</button>').join('');
-            rail.innerHTML=card('Navigation',navigation.map(([view,title,icon])=>'<button type="button" data-studio-side="'+view+'"'+(view==='jobs'?' class="active" aria-current="page"':'')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''))+card('My Workspaces',items||'<p>No workspaces available.</p>')+card('Actions','<button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button><button type="button" data-studio-side="schedule"><span>▦</span><span>View Calendar</span></button>');
-            rail.querySelectorAll('[data-studio-side]').forEach(b=>b.onclick=()=>window.studioNavigate?.(b.dataset.studioSide));
-            rail.querySelectorAll('[data-jobs-workspace-id]').forEach(b=>b.onclick=()=>window.studioOpenJobs?.(b.dataset.jobsWorkspaceId));
-            return;
-        }
+        // All views share the exact Today rail markup and presentation.
+        // Job Detail retains its contextual actions in the shared Actions card.
         const jobPage=document.body.dataset.studioView==='workspaces'?document.querySelector('#conversationView.has-open-job .job-detail-page'):null;
-        if(jobPage){
-            const navigation=[['today','Today','⌂'],['frontdesk','Front Desk','▣'],['jobs','Jobs','▥'],['media','Media','▧'],['messages','Messages','✉']];
-            const actions=[['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready']];
-            const card=(title,body)=>'<section class="jd-rail-card" data-rail-card="'+railRole(title)+'"><header><h2>'+title+'</h2></header><div class="jd-rail-links">'+body+'</div></section>';
-            rail.innerHTML=card('Navigation',navigation.map(([view,title,icon])=>'<button type="button" data-studio-side="'+view+'"><span>'+icon+'</span><span>'+title+'</span></button>').join(''))+
-                card('My Workspaces',workspaceItems||'<p class="mw-empty">No workspaces available.</p>')+
-                card('Actions',actions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''));
-            rail.querySelectorAll('[data-studio-side]').forEach(button=>button.onclick=()=>window.studioNavigate?.(button.dataset.studioSide));
-            rail.querySelectorAll('[data-job-action]').forEach(button=>button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
-            rail.querySelectorAll('[data-studio-workspace-id]').forEach(button=>{
-                button.classList.toggle('active',typeof selectedWorkspace!=='undefined'&&String(selectedWorkspace)===button.dataset.studioWorkspaceId);
-                button.onclick=()=>{const workspace=workspaces.find(item=>String(item.id)===button.dataset.studioWorkspaceId);return selectWorkspace(button.dataset.studioWorkspaceId,workspace?.name||'Workspace');};
-            });
-            return;
-        }
+        const jobActions=[['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready']];
+        const actionItems=jobPage?jobActions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''):'<button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>';
         rail.innerHTML = `<section class="mw-list-panel studio-context-card" data-rail-card="navigation">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">↗</span> Navigation</h2></header>
                 <div class="mw-today-rail-links">
@@ -121,10 +100,11 @@
             </section>            <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
-                    <button type="button" data-studio-side="frontdesk"><span>＋</span><span>New Booking</span></button>
+                    ${actionItems}
                 </div>
             </section>
 `;
+        rail.querySelectorAll('[data-job-action]').forEach(button => button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
             button.onclick = () => window.studioNavigate?.(button.dataset.studioSide);
         });
