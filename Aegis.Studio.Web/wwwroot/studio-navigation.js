@@ -340,7 +340,7 @@
                                 <div class="mw-today-view-tabs" role="group" aria-label="Job view">
                                     ${Object.entries(jobViews).map(([key,label])=>`<button type="button" data-mw-job-view="${key}" class="${state.jobView===key?'active':''}" aria-pressed="${state.jobView===key}">${label}</button>`).join('')}
                                 </div>
-                                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div><div class="mw-today-toolbar-actions">${(auth.user||auth).isAdministrator?'<button type="button" data-assign-job-lead>Assign Job Lead</button>':''}${state.status.media==='error'?'<button type="button" data-mw-retry="media">Retry previews</button>':''}</div>
+                                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div><div class="mw-today-toolbar-actions">${state.status.media==='error'?'<button type="button" data-mw-retry="media">Retry previews</button>':''}</div>
                                 
                             </div>
                             
@@ -498,7 +498,8 @@
             if(workspace)selectWorkspace(workspace.id,workspace.name);
         });
         genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
-        genericView.querySelector('[data-assign-job-lead]')?.addEventListener('click',async()=>{
+        genericView.addEventListener('studio-assign-job-lead',async()=>{
+            if(!(state.auth?.user||state.auth)?.isAdministrator)return;
             const activeJobs=jobs.filter(job=>!['Completed','Closed','Cancelled','Published'].includes(String(job.status||'')))
                 .sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));
             if(!activeJobs.length){alert('There are no active jobs available to assign.');return;}
