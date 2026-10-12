@@ -32,7 +32,7 @@
 
     function renderToday(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',jobStatusFilter:'',jobRoleFilter:'',selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',jobStatusFilter:'',jobRoleFilter:'',includeClosedJobs:false,selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['today','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         todayLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -202,9 +202,9 @@
             ||(Array.isArray(job.crew)&&job.crew.some(member=>normalized(member.userName||member)===user));
         const jobViews={led:'Jobs Led By Me',involved:"Jobs I'm Involved In",all:'All Jobs'};
         const viewJobs=state.jobView==='led'?jobs.filter(isLead):state.jobView==='all'?jobs:jobs.filter(isInvolved);
-        const searchedJobs=viewJobs.filter(job=>[job.title,job.clientName,job.clientDisplayName,job.status,job.jobLead,job.id].some(value=>normalized(value).includes(normalized(state.jobSearch))));
+        const searchedJobs=viewJobs.filter(job=>state.includeClosedJobs||!StudioSubjectPicker.isClosed(job)).filter(job=>[job.title,job.clientName,job.clientDisplayName,job.status,job.jobLead,job.id].some(value=>normalized(value).includes(normalized(state.jobSearch))));
         const roleForJob=job=>isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
-        const statusOptions=[...new Set(viewJobs.map(job=>String(job.status||'Unknown')))].sort((a,b)=>a.localeCompare(b));
+        const statusOptions=StudioStatusOrder.sort(viewJobs.map(job=>String(job.status||'Unknown')));
         const roleOptions=[...new Set(viewJobs.map(roleForJob))].sort((a,b)=>a.localeCompare(b));
         const filteredJobs=searchedJobs.filter(job=>(!state.jobStatusFilter||String(job.status||'Unknown')===state.jobStatusFilter)&&(!state.jobRoleFilter||roleForJob(job)===state.jobRoleFilter));
         const sortedJobs=[...filteredJobs].sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0));
@@ -341,7 +341,7 @@
                                     ${Object.entries(jobViews).map(([key,label])=>`<button type="button" data-mw-job-view="${key}" class="${state.jobView===key?'active':''}" aria-pressed="${state.jobView===key}">${label}</button>`).join('')}
                                 </div>
                                 <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div><div class="mw-today-toolbar-actions">${(auth.user||auth).isAdministrator?'<button type="button" data-assign-job-lead>Assign Job Lead</button>':''}${state.status.media==='error'?'<button type="button" data-mw-retry="media">Retry previews</button>':''}</div>
-                                <label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
+                                <label class="ssp-job-visibility"><input type="checkbox" data-mw-closed ${state.includeClosedJobs?'checked':''}> Include closed / archived</label><label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label>
                             </div>
                             
                             <div class="mw-today-job-columns"><span>Job / Client</span><label class="mw-job-column-filter"><span>Status</span><select data-mw-job-status aria-label="Filter jobs by status"><option value="">All statuses</option>${statusOptions.map(value=>`<option value="${esc(value)}" ${state.jobStatusFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span>Progress</span><span>Event Date</span><label class="mw-job-column-filter"><span>My Role</span><select data-mw-job-role aria-label="Filter jobs by role"><option value="">All roles</option>${roleOptions.map(value=>`<option value="${esc(value)}" ${state.jobRoleFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span></span></div>
@@ -482,7 +482,8 @@
             state.jobSearch='';
             paintToday(state);
         });
-        genericView.querySelector('[data-mw-job-status]')?.addEventListener('change',event=>{state.jobStatusFilter=event.target.value;paintToday(state);});
+        genericView.querySelector('[data-mw-closed]')?.addEventListener('change',event=>{state.includeClosedJobs=event.target.checked;paintToday(state);});
+        genericView.querySelector('[data-mw-job-status]')?.addEventListener('change',event=>{state.jobStatusFilter=event.target.value;if(StudioSubjectPicker.isClosed({status:state.jobStatusFilter}))state.includeClosedJobs=true;paintToday(state);});
         genericView.querySelector('[data-mw-job-role]')?.addEventListener('change',event=>{state.jobRoleFilter=event.target.value;paintToday(state);});
         genericView.querySelector('[data-mw-job-search]')?.addEventListener('input',event=>{
             state.jobSearch=event.target.value;
@@ -507,8 +508,8 @@
             const dialog=studioDialog('Assign Job Lead',`
                 <form class="subject-form" data-job-lead-form>
                     <label>Job
-                        <select name="jobId" required>
-                            ${activeJobs.map(job=>'<option value="'+esc(job.id)+'">'+esc(job.title)+' · '+esc(job.clientName||'Client')+'</option>').join('')}
+                        <select data-job-picker name="jobId" required>
+                            ${StudioSubjectPicker.jobOptions(jobs)}
                         </select>
                     </label>
                     <label>Job Lead
@@ -803,7 +804,7 @@
         return StudioJobsPage.render(genericView,{
             json,workspaces:workspaceCache||[],
             workspaceFilter:jobsWorkspaceFilter===null?(typeof selectedWorkspace!=='undefined'?selectedWorkspace||'':''):jobsWorkspaceFilter,
-            setWorkspaceFilter:value=>{jobsWorkspaceFilter=value;},
+            setWorkspaceFilter:value=>{jobsWorkspaceFilter=value;recordNavigation('jobs',{workspaceId:value,replaceHistory:true});},
             isCurrent,openJob:id=>openWorkspaceJob(id),navigate:view=>window.studioNavigate(view),
             sendMessage:async()=>{await window.studioNavigate('messages');if(document.body.dataset.studioView==='messages')document.getElementById('newDirectMessage')?.click();},
             openWorkspace:id=>selectWorkspace(id,(workspaceCache||[]).find(w=>String(w.id)===String(id))?.name||'Workspace'),
@@ -997,31 +998,45 @@
     let currentNavigationView=document.body.dataset.studioView||'today';
     const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Administration',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
 
-    function replaceNavigationHistory(view){
-        const url='#studio='+encodeURIComponent(view);
-        window.history.replaceState({studioView:view},'',url);
+    function navigationContext(view,options={}){
+        return {studioView:view,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
     }
+    function recordNavigation(view,options={}){
+        const next=navigationContext(view,options),previous=window.history.state;
+        const params=new URLSearchParams({studio:view});
+        if(next.studioWorkspaceId)params.set('workspace',next.studioWorkspaceId);
+        if(next.studioJobId)params.set('job',next.studioJobId);
+        const same=previous?.studioView===next.studioView&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId;
+        if(options.replaceHistory)window.history.replaceState(next,'','#'+params);
+        else if(!options.browserHistory&&options.history!==false&&!same)window.history.pushState(next,'','#'+params);
+        currentNavigationView=view;
+        if(view==='jobs')jobsWorkspaceFilter=next.studioWorkspaceId;
+        return next;
+    }
+    function beginNavigation(view,options){
+        const context=recordNavigation(view,options),revision=++navigationRevision;
+        window.StudioJobsPage?.dispose();
+        window.StudioPage?.invalidate();
+        window.StudioMessages?.invalidate();
+        window.StudioWorkspace?.invalidate();
+        todayLoad?.abort();
+        return {context,revision};
+    }
+    // Job Details shares the workspace surface, but has its own history destination.
+    window.studioBeginJobNavigation=(id,options={})=>beginNavigation('workspaces',{...options,jobId:id});
 
     window.studioNavigate=async function(view,options={}){
         const route=routes[view];
         if(!route) throw new Error('Unknown Studio navigation view: '+view);
-        const previous=currentNavigationView;
-        if(!options.browserHistory&&options.history!==false&&previous!==view){
-            window.history.pushState({studioView:view},'','#studio='+encodeURIComponent(view));
-        }
-        currentNavigationView=view;
-        const revision=++navigationRevision;
-        window.StudioJobsPage?.dispose();
-        window.StudioPage?.invalidate();
-        window.StudioMessages?.invalidate();
-        todayLoad?.abort();
+        const {context,revision}=beginNavigation(view,options);
         setActive(view);
         if(view!=='today'){
             if(studioPageTools)studioPageTools.innerHTML='';
             window.studioSetBreadcrumb?.([{label:view==='workspaces'?'Workspaces':view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
-            await route();
+            if(context.studioJobId)await window.openWorkspaceJob(context.studioJobId,{navigationRecorded:true,history:false});
+            else await route();
             if(revision===navigationRevision){
                 setActive(view);
                 if(view!=='today'&&typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
@@ -1036,10 +1051,14 @@
         }
     };
 
+    function destinationFromLocation(state){
+        const params=new URLSearchParams(window.location.hash.replace(/^#/,''));
+        const view=state?.studioView&&routes[state.studioView]?state.studioView:params.get('studio');
+        return {view:view&&routes[view]?view:'today',workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
+    }
     window.addEventListener('popstate',event=>{
-        const requested=new URLSearchParams(window.location.hash.replace(/^#/, '')).get('studio');
-        const view=(event.state?.studioView&&routes[event.state.studioView] ? event.state.studioView : (requested&&routes[requested] ? requested : 'today'));
-        if(view!==currentNavigationView||view!==document.body.dataset.studioView)window.studioNavigate(view,{browserHistory:true,history:false}).catch(error=>console.error('Studio browser navigation failed.',error));
+        const destination=destinationFromLocation(event.state);
+        window.studioNavigate(destination.view,{...destination,browserHistory:true,history:false}).catch(error=>console.error('Studio browser navigation failed.',error));
     });
 
     document.querySelectorAll('[data-view]').forEach(button=>{
@@ -1051,17 +1070,11 @@
     if(topNew) topNew.onclick=async()=>{topNew.disabled=true;try{await loadWorkspaces();document.getElementById('newRequestDialog')?.showModal();}catch(error){alert(error.message);}finally{topNew.disabled=false;}};
 
     const startStudio=async()=>{
-        const requested=new URLSearchParams(window.location.hash.replace(/^#/,'')).get('studio');
-        const initial=requested&&routes[requested]?requested:'today';
-        currentNavigationView=initial;
-        replaceNavigationHistory(initial);
-        window.studioNavigate(initial,{history:false}).catch(error=>{
+        const destination=destinationFromLocation(window.history.state);
+        window.studioNavigate(destination.view,{...destination,history:false,replaceHistory:true}).catch(error=>{
             console.error('Studio startup navigation failed.',error);
         });
     };
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
-
-
-

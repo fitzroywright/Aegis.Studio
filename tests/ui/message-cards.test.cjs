@@ -4,6 +4,7 @@ const {api}=require('./shared-controller-fixture.cjs');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,25));
 async function full(t){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://studio.test/',runScripts:'outside-only',virtualConsole:new VirtualConsole()}),w=dom.window;t.after(()=>w.close());
+ w.ResizeObserver=class {observe(){} disconnect(){}};w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
  w.alert=message=>{throw Error(message);};w.confirm=()=>false;w.CSS={escape:v=>String(v)};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};w.HTMLElement.prototype.scrollIntoView=function(){};
  w.fetch=async url=>{const u=new URL(url,'https://studio.test'),body=api(u);return {ok:true,status:200,json:async()=>body,text:async()=>JSON.stringify(body),headers:{get:()=>null}};};
@@ -17,7 +18,7 @@ function checkBottom(w,railSelector){
 test('all operational right rails keep Messages open at the bottom with a Notes toggle',async t=>{
  const w=await full(t);
  for(const [view,rail] of [['today','.mw-today-right'],['jobs','.sj-right'],['frontdesk','.fd-secondary'],['workspaces','.workspace-right-rail'],['finance','.st-right'],['messages','.st-right'],['admin','.st-right']]){
-  await w.studioNavigate(view);await settle();const card=checkBottom(w,rail);
+  await w.studioNavigate(view);await settle();if(view==='messages'){assert.equal(w.document.querySelector(rail+' .smc-card'),null,'Messages page uses its full inbox instead of a duplicate card');continue;}const card=checkBottom(w,rail);
   assert.deepEqual(Array.from(w.document.querySelectorAll('#studioContextRail > section'),section=>section.dataset.railCard),['navigation','workspaces','actions'],view);
   await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.dataset.smcMode,'notes',view);assert.ok(card.querySelector('[data-notes-job]'),view);
   await card.querySelector('[data-smc-notes-toggle]').onclick();assert.equal(card.querySelector('[data-smc-messages]').hidden,false,view);
@@ -61,4 +62,3 @@ test('message card and rail styles contain valid declarations and no duplicate p
   visit(ast.children);
  }
 });
-
