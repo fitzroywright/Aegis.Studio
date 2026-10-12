@@ -25,6 +25,23 @@
             || String(view || 'Studio').replace(/(^|\s)\S/g, match => match.toUpperCase());
     }
 
+    // One purpose-driven tagline per page; keep all masthead descriptions here.
+    const pageTaglines = {
+        today: 'Review your jobs, upcoming sessions and items needing attention.',
+        jobs: 'Find, filter and manage jobs across Studio workspaces.',
+        workspaces: 'Manage workspace jobs, messaging, media and activity.',
+        frontdesk: 'Review customer inquiries, prepare bookings and manage arrivals.',
+        messages: 'Read, reply to and organize conversations with clients and colleagues.',
+        media: 'Upload, review and organize images by workspace, job and collection.',
+        production: 'Track production tasks, progress and work awaiting completion.',
+        schedule: 'View scheduled shoots, assignments and staff availability.',
+        pipeline: 'Track jobs through their workflow stages and next actions.',
+        finance: 'Review invoices, payments and outstanding balances.',
+        'operations-management': 'Monitor operational work, assignments and exceptions.',
+        'studio-management': 'Configure Studio settings, staff access and workspaces.'
+    };
+    const taglineFor = view => pageTaglines[view] || 'Manage Studio work and related information.';
+
     function iconFor(view) {
         return quickLinks.find(([key]) => key === view)?.[2] || '▤';
     }
@@ -210,7 +227,7 @@
                 const heading = title.querySelector('strong');
                 if (heading) heading.innerHTML = 'Today <em>Your focus</em>';
                 const tagline = title.querySelector('small');
-                if (tagline) tagline.textContent = 'What needs your attention, what’s coming up, and the work to move forward.';
+                if (tagline) tagline.textContent = taglineFor('today');
             }
             return;
         }
@@ -231,7 +248,7 @@
             title.setAttribute('aria-label',jobOpen?'Job Details':labelFor(view));
             const icon=title.querySelector('.mw-today-focus-icon');if(icon)icon.innerHTML=view==='jobs'?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16v14H4zM8 6V3h8v3M4 11h16M10 11v3h4v-3"/></svg>':jobOpen?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="13" r="4"/></svg>':'✦';
             const tagline = title.querySelector('small');
-            if (tagline) tagline.textContent = jobOpen?'Media, workflow and conversations':view==='jobs'?'Find, filter and manage jobs across Studio workspaces':view === 'frontdesk' ? 'Manage new bookings, inquiries and customer requests.' : view === 'workspaces' ? 'Manage workspace jobs, messaging, media and activity.' : 'Studio workspace';
+            if (tagline) tagline.textContent = jobOpen ? 'Review job details, assignments, workflow, media and conversations.' : taglineFor(view);
         }
         main.classList.add('studio-standard-main');
     }
