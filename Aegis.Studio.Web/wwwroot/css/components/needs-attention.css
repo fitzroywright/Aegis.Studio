@@ -1,0 +1,5 @@
+/* Shared Needs Attention card: same warm, restrained treatment as Today. */
+body[data-studio-view] .st-right .st-card.st-attention { border: 1px solid var(--attention-border); border-radius: 9px; background: var(--attention-surface); overflow: hidden; }
+body[data-studio-view] .st-right .st-card.st-attention > header { background: var(--attention-title-bg); border-bottom: 1px solid var(--attention-title-border); }
+body[data-studio-view] .st-right .st-card.st-attention > header h2 { color: var(--attention-title-text); font-weight: 600; }
+body[data-studio-view] .st-right .st-card.st-attention .st-card-body { background: var(--attention-surface); color: var(--attention-text); }
