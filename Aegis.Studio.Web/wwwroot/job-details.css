@@ -130,14 +130,14 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .job-detail-selected-file > .jd-card-heading h2 { min-width:0; font-size:11px; color:#fff; font-weight:750; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .jd-selected-file-meta { flex:none; font-size:9px; color:#dceaff; white-space:nowrap; }
 .job-detail-selected-content { flex:1; min-height:0; display:flex; flex-direction:column; gap:4px; padding:6px 8px; overflow:visible; }
-.jd-selected-preview { flex:none; height:clamp(88px,17vh,160px); width:100%; border-radius:4px; overflow:hidden; background:var(--theme-surface-alt,#ecebe6); }
+.jd-selected-preview { flex:none; height:clamp(76px,14vh,132px); width:100%; border-radius:4px; overflow:hidden; background:var(--theme-surface-alt,#ecebe6); }
 .jd-full-preview { display:grid; place-items:center; min-height:100px; }
 .jd-full-preview img { max-width:100%; max-height:72vh; object-fit:contain; }
 .jd-selected-preview img { width:100%; height:100%; object-fit:contain; }
 .jd-file-form { display:flex; flex-direction:column; gap:5px; }
 .jd-file-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 .jd-file-form label { display:flex; flex-direction:column; min-width:0; gap:3px; font-size:10px; }
-.jd-file-form select { width:100%; min-width:0; height:34px; box-sizing:border-box; font-size:10px; padding:3px 5px; border:1px solid var(--theme-border,#d6dbe4); border-radius:4px; color:var(--theme-text,#162b50); background:var(--theme-surface,#fff); }
+.jd-file-form select { width:100%; min-width:0; height:30px; box-sizing:border-box; font-size:10px; padding:3px 5px; border:1px solid var(--theme-border,#d6dbe4); border-radius:4px; color:var(--theme-text,#162b50); background:var(--theme-surface,#fff); }
 .jd-tag-editor { display:flex; flex-wrap:wrap; align-items:center; gap:4px; padding:4px; border:1px solid var(--theme-border,#d6dbe4); border-radius:5px; background:var(--theme-surface,#fff); }
 .jd-tag-tokens { display:contents; }
 .jd-tag-token { display:inline-flex; align-items:center; gap:4px; max-width:100%; padding:2px 5px; border-radius:12px; background:#dfeefe; color:#184f88; font-size:10px; overflow-wrap:anywhere; }
