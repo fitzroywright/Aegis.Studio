@@ -20,7 +20,7 @@ internal static class StudioFactoryReset
         if (!configuration.GetValue("Storage:FactoryResetExclusiveRoot", false))
             throw new InvalidOperationException(
                 "Factory reset requires Storage:FactoryResetExclusiveRoot=true after verifying the configured storage root is dedicated to Studio.");
-        if (storage is not IStorageQuery || storage is not IStorageLifecycle)
+        if (storage is not IStorageBucketReset && (storage is not IStorageQuery || storage is not IStorageLifecycle))
             throw new InvalidOperationException(
                 "Factory reset requires dedicated-bucket S3 purge or storage enumeration and irreversible lifecycle purge. No data was deleted.");
     }
@@ -34,35 +34,7 @@ internal static class StudioFactoryReset
         try
         {
             ConnectedWorkflowDemo.ValidateReset(database);
-            long removed = 0;
-            var query = (IStorageQuery)storage;
-            var lifecycle = (IStorageLifecycle)storage;
-            var previousBatch = new HashSet<string>(StringComparer.Ordinal);
-            // Repeat bounded listings until every storage object has been purged.
-            for (;;)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var batch = await query.ListAsync(
-                    new StorageListRequest(MaximumResults: PageLimit), cancellationToken);
-                if (batch.Count == 0) break;
-                var keys = batch.Select(item => item.StorageKey).Distinct(StringComparer.Ordinal).ToArray();
-                if (keys.Length > 0 && previousBatch.SetEquals(keys))
-                    throw new InvalidOperationException("Storage purge made no progress; investigate provider deletion behavior.");
-                previousBatch = keys.ToHashSet(StringComparer.Ordinal);
-                if (keys.Length == 0)
-                    throw new InvalidOperationException("Storage enumeration returned no usable keys.");
-                foreach (var key in keys)
-                {
-                    if (string.IsNullOrWhiteSpace(key) || key.StartsWith("/", StringComparison.Ordinal)
-                        || key.Contains("..", StringComparison.Ordinal))
-                        throw new InvalidOperationException("Unsafe storage key in reset inventory.");
-                    await lifecycle.PurgeAsync(key, cancellationToken);
-                    removed++;
-                }
-            }
-            var remaining = await query.ListAsync(new StorageListRequest(MaximumResults: 1), cancellationToken);
-            if (remaining.Count != 0)
-                throw new InvalidOperationException("Storage verification failed: Studio files remain.");
+            long removed = await PurgeStorageAsync(storage, cancellationToken);
 
             // Local delivery cache is derived from attachments, not user content.
             var cache = Path.Combine(environment.ContentRootPath, "Storage", ".delivery-cache");
@@ -74,9 +46,47 @@ internal static class StudioFactoryReset
                 generated = Aegis.Studio.Web.Operations.DemoDataEndpoints.Seed(database, storage, regenerateAs);
             return new { storageObjectsPurged = removed, storageVerifiedEmpty = true,
                 database = databaseResult, generated,
-                message = "Studio factory reset completed; all enumerable storage objects purged and only Unassigned preserved." };
+                message = "Studio factory reset completed; storage purge verified and only Unassigned preserved." };
         }
         finally { Gate.Release(); }
+    }
+
+    internal static async Task<long> PurgeStorageAsync(IFileStorage storage, CancellationToken cancellationToken)
+    {
+        if (storage is IStorageBucketReset bucketReset)
+        return await bucketReset.PurgeBucketAsync(cancellationToken);
+
+        long removed = 0;
+        var query = (IStorageQuery)storage;
+        var lifecycle = (IStorageLifecycle)storage;
+        var previousBatch = new HashSet<string>(StringComparer.Ordinal);
+        // Repeat bounded listings until every storage object has been purged.
+        for (;;)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var batch = await query.ListAsync(
+                new StorageListRequest(MaximumResults: PageLimit), cancellationToken);
+            if (batch.Count == 0) break;
+            var keys = batch.Select(item => item.StorageKey).Distinct(StringComparer.Ordinal).ToArray();
+            if (keys.Length > 0 && previousBatch.SetEquals(keys))
+                throw new InvalidOperationException("Storage purge made no progress; investigate provider deletion behavior.");
+            previousBatch = keys.ToHashSet(StringComparer.Ordinal);
+            if (keys.Length == 0)
+                throw new InvalidOperationException("Storage enumeration returned no usable keys.");
+            foreach (var key in keys)
+            {
+                if (string.IsNullOrWhiteSpace(key) || key.StartsWith("/", StringComparison.Ordinal)
+                    || key.Contains("..", StringComparison.Ordinal))
+                    throw new InvalidOperationException("Unsafe storage key in reset inventory.");
+                await lifecycle.PurgeAsync(key, cancellationToken);
+                removed++;
+            }
+        }
+        var remaining = await query.ListAsync(new StorageListRequest(MaximumResults: 1), cancellationToken);
+        if (remaining.Count != 0)
+            throw new InvalidOperationException("Storage verification failed: Studio files remain.");
+
+        return removed;
     }
 }
 
