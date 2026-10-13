@@ -8,7 +8,7 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class ClosedJobStartupTests
 {
     [StudioPostgresFact]
-    public async Task RestartSkipsClosedJobsBackfillsOpenJobsAndKeepsGuardActive()
+    public async Task RestartPreservesJobLeadsAndKeepsGuardActive()
     {
         using var context = new IntegratedWorkflowTests.WorkflowContext();
         WorkflowSchema.Ensure(context.Database);
@@ -45,8 +45,7 @@ public sealed class ClosedJobStartupTests
             Assert.Equal(1, insert.ExecuteNonQuery());
         }
 
-        // Exercise the feature initializer on its own, then repeated complete startup.
-        // Running the core initializer first would conceal a missing open-job backfill here.
+        // Startup must not populate or rewrite job leads on existing jobs.
         await features.InitializeAsync();
         for (int restart = 0; restart < 2; restart++)
         {
@@ -60,8 +59,7 @@ public sealed class ClosedJobStartupTests
             using var reader = read.ExecuteReader();
             Assert.True(reader.Read());
             Assert.Equal(job.Key, reader.GetString(0));
-            if (job.Key == "In Production") Assert.Equal("legacy-lead", reader.GetString(1));
-            else Assert.True(reader.IsDBNull(1));
+            Assert.True(reader.IsDBNull(1));
         }
         foreach (string status in new[] { "Completed", "Cancelled" })
         {
