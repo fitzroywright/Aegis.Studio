@@ -33,7 +33,8 @@ public sealed class StudioFeatureDatabase
             );
             alter table studio_workspaces add column if not exists default_job_lead text null;
             alter table studio_jobs add column if not exists job_lead text null;
-            update studio_jobs set job_lead=assigned_to where job_lead is null and assigned_to is not null;
+            -- Keep this backfill aligned with StudioDatabase: closed jobs retain their historical details.
+            update studio_jobs set job_lead=assigned_to where job_lead is null and assigned_to is not null and status not in ('Completed', 'Cancelled');
             create index if not exists ix_studio_jobs_lead on studio_jobs(lower(job_lead),status,created_at_utc desc);
 
             create index if not exists ix_studio_workspace_members_user on studio_workspace_members(lower(user_name),workspace_id);
