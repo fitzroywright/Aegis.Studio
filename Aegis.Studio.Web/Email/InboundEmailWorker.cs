@@ -64,6 +64,8 @@ public sealed class InboundEmailWorker : BackgroundService
         {
             try
             {
+                using var operation = Aegis.Studio.Web.Operations.DemoMaintenance.TryEnterOperation(database);
+                if (operation is null) { await Task.Delay(1000, stoppingToken); continue; }
                 string? deltaLink = deltaStateStore.GetDeltaLink();
                 MicrosoftGraphInboxDeltaBatch batch = await graphClient.GetInboxChangesAsync(deltaLink, stoppingToken);
 

@@ -106,20 +106,6 @@ create trigger workflow_job_before before insert or update on studio_jobs for ea
 drop trigger if exists workflow_job_after on studio_jobs;
 create trigger workflow_job_after after insert or update on studio_jobs for each row execute function studio_workflow_job_after();
 
--- History/extra schedule staff are reconciled additively, including installations already at v1.
-do $$ begin
- if not exists(select 1 from studio_workflow_migrations where version=2) then
-  insert into studio_workflow_history(id,job_id,new_stage,entered_at_utc,actor,reason,revision)
-  select gen_random_uuid(),id,status,stage_entered_at_utc,'Migration','Historical stage entry timestamp is unknown',workflow_revision from studio_jobs
-  where not exists(select 1 from studio_workflow_history h where h.job_id=studio_jobs.id) on conflict do nothing;
-  insert into studio_workflow_crew(session_id,user_name,role,assigned_by)
-  select w.id,lower(p.user_name),'Additional','Migration' from studio_workflow_sessions w join studio_shoot_sessions s on s.id=w.shoot_id
-  join studio_schedule_entry_resources er on er.entry_id=s.schedule_entry_id join studio_photographers p on p.schedule_resource_id=er.resource_id
-  where not exists(select 1 from studio_workflow_crew c where c.session_id=w.id and lower(c.user_name)=lower(p.user_name)) on conflict do nothing;
-  insert into studio_workflow_migrations(version) values(2);
- end if;
-end $$;
-
 create table if not exists studio_workflow_configuration_audit(id uuid primary key,action text not null,actor text not null,detail jsonb not null,created_at_utc timestamptz not null default now());
 alter table studio_schedule_entry_resources add column if not exists attendance_start_utc timestamptz;
 alter table studio_schedule_entry_resources add column if not exists attendance_end_utc timestamptz;
@@ -310,11 +296,6 @@ create table if not exists studio_job_owner_assignments(
  response_reason text,responded_at_utc timestamptz,superseded_at_utc timestamptz);
 create unique index if not exists ux_current_owner_assignment on studio_job_owner_assignments(job_id) where status in ('Assigned','Accepted');
 alter table studio_jobs add column if not exists owner_assignment_id uuid references studio_job_owner_assignments(id);
-insert into studio_job_owner_assignments(id,job_id,assigned_to,assigned_by,status)
- select md5('legacy-owner:'||id)::uuid,id,job_lead,'System migration','Assigned' from studio_jobs
- where nullif(trim(job_lead),'') is not null and owner_assignment_id is null and status not in ('Completed','Cancelled') on conflict do nothing;
-update studio_jobs set owner_assignment_id=md5('legacy-owner:'||id)::uuid
- where owner_assignment_id is null and status not in ('Completed','Cancelled') and exists(select 1 from studio_job_owner_assignments a where a.id=md5('legacy-owner:'||studio_jobs.id)::uuid);
 drop trigger if exists closed_child_guard on studio_job_owner_assignments;
 create trigger closed_child_guard before insert or update or delete on studio_job_owner_assignments for each row execute function studio_closed_child_guard();
 

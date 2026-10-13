@@ -31,35 +31,24 @@ public sealed class StudioEmployeeDirectoryStore
             create index if not exists ix_studio_employees_assignable on studio_employees(is_active,is_assignable,display_name);
             """;
         cmd.ExecuteNonQuery();
-        RefreshFromStudioSources();
-    }
-
-    private void RefreshFromStudioSources()
-    {
-        using var c=database.OpenConnection();using var cmd=c.CreateCommand();
-        cmd.CommandText="""
-            insert into studio_employees(user_name,display_name,is_active,is_assignable,source,last_synced_at_utc)
-              select user_name,max(display_name),bool_or(is_active),true,'Existing Studio identity',now() from studio_global_operational_role_members group by user_name
-              on conflict(user_name) do nothing;
-            insert into studio_employees(user_name,display_name,is_active,is_assignable,source,workday_user_name,last_synced_at_utc)
-              select user_name,display_name,is_active,is_active,'Studio photographer',user_name,now() from studio_photographers
-              on conflict(user_name) do nothing;
-            insert into studio_employees(user_name,display_name,is_active,is_assignable,source,last_synced_at_utc)
-              select user_name,max(display_name),bool_or(is_active),true,'Workspace member',now() from studio_workspace_members group by user_name
-              on conflict(user_name) do nothing;
-            """;
-        cmd.ExecuteNonQuery();
     }
 
     public IReadOnlyList<StudioEmployee> GetAll(bool assignableOnly=false)
     {
-        RefreshFromStudioSources();
         using var c=database.OpenConnection();using var cmd=c.CreateCommand();
         cmd.CommandText="""
             select e.user_name,e.display_name,e.email_address,e.is_active,e.is_assignable,e.source,e.external_id,e.skills,e.workday_user_name,e.last_synced_at_utc,
               coalesce(array(select distinct r.name from studio_global_operational_role_members m join studio_global_operational_roles r on r.id=m.role_id
                 where m.is_active and r.is_active and lower(m.user_name)=lower(e.user_name) order by r.name),'{}')
-            from studio_employees e where not $1 or (e.is_active and e.is_assignable) order by e.display_name,e.user_name
+            from (
+              select distinct on (lower(user_name)) user_name,display_name,email_address,is_active,is_assignable,source,external_id,skills,workday_user_name,last_synced_at_utc
+              from (
+                select 0 priority,user_name,display_name,email_address,is_active,is_assignable,source,external_id,skills,workday_user_name,last_synced_at_utc from studio_employees
+                union all select 1,user_name,display_name,null,is_active,is_active,'Studio photographer',null,skills,user_name,null from studio_photographers
+                union all select 2,user_name,display_name,null,is_active,true,'Studio role member',null,'{}'::text[],null,null from studio_global_operational_role_members
+                union all select 3,user_name,display_name,null,is_active,true,'Workspace member',null,'{}'::text[],null,null from studio_workspace_members
+              ) identities order by lower(user_name),priority,display_name
+            ) e where not $1 or (e.is_active and e.is_assignable) order by e.display_name,e.user_name
             """;
         cmd.Parameters.AddWithValue(assignableOnly);
         using var r=cmd.ExecuteReader();List<StudioEmployee> rows=[];
@@ -68,11 +57,7 @@ public sealed class StudioEmployeeDirectoryStore
     }
 
     public bool IsAssignable(string userName)
-    {
-        RefreshFromStudioSources();using var c=database.OpenConnection();
-        using var q=new NpgsqlCommand("select exists(select 1 from studio_employees where lower(user_name)=lower($1) and is_active and is_assignable)",c);
-        q.Parameters.AddWithValue(userName);return (bool)q.ExecuteScalar()!;
-    }
+        => GetAll(true).Any(person => person.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase));
     public IReadOnlyList<StudioEmployee> Search(string? query,int limit=25,bool photographersOnly=false)
     {
         string term=query?.Trim()??"";

@@ -836,7 +836,7 @@
             content:`<div class="st-admin-grid">${studioManagementCatalogCards()}<section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
                                 <div><h2>Demo Data</h2><p>Rebuild the complete Studio demo with job templates, workflows, genuine photographs, bookings, schedules and payments.</p></div>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Generate Demo Data</button><button class="primary" type="button" data-demo-reset>Reset and Regenerate</button></div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Clear and Recreate Demo Data</button><button class="primary" type="button" data-demo-reset>Reset and Regenerate</button></div>
                             </header>
                             <p class="admin-card-note">Reset clears Studio business data and files; staff accounts, configuration and Unassigned are preserved. Demo contacts are fictional; photographs are genuine.</p>
                             <progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress>
@@ -909,11 +909,12 @@
             }catch(error){status.textContent='Preview failed: '+error.message;}
             finally{button.disabled=false;}
         };
-        const runDemo=async(reset=false)=>{
+        const runDemo=async(reset=true)=>{
+            reset=true;
             const status=panel.querySelector('[data-demo-status]'),meter=panel.querySelector('[data-demo-progress]');
             if(reset&&window.prompt('This clears Studio business records and files, then rebuilds the complete demo including job templates and photographs. Type REMOVE STUDIO DEMO DATA to continue.')!=='REMOVE STUDIO DEMO DATA')return;
             const buttons=[...panel.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);panel.setAttribute('aria-busy','true');meter.hidden=false;meter.value=0;
-            status.textContent=reset?'Starting full demo reset and regeneration…':'Starting full Studio demo generation…';
+            status.textContent=reset?'Starting full demo reset and regeneration…':'Starting full demo reset and recreation…';
             try{
                 const run=await window.studioLoadDemoData(progress=>{
                     if(!panel.isConnected)return;
@@ -927,22 +928,22 @@
         panel.querySelector('[data-demo-reset]').onclick=()=>runDemo(true);
         panel.querySelector('[data-demo-remove]').onclick=async()=>{
             const status=panel.querySelector('[data-demo-status]');
-            const confirmation=window.prompt('Type REMOVE STUDIO DEMO DATA to remove the Connected Workflow fixture. This cannot be undone.');
+            const confirmation=window.prompt('This clears all Studio business records and stored files while preserving system configuration. Type REMOVE STUDIO DEMO DATA to continue.');
             if(confirmation!=='REMOVE STUDIO DEMO DATA')return;
             const button=panel.querySelector('[data-demo-remove]');
             button.disabled=true;
-            status.textContent='Removing owned demo records…';
+            status.textContent='Clearing Studio business records and files…';
             try{
                 const result=await json('/api/admin/connected-workflow/demo-data/remove',{
                     method:'POST',headers:{'Content-Type':'application/json'},
                     body:JSON.stringify({confirmation})
                 });
-                status.textContent=result.message||'Demo fixture removed.';
+                status.textContent=result.message||'Studio data cleared.';
                 await loadWorkspaces();
             }catch(e){status.textContent='Removal failed: '+e.message;}
             finally{button.disabled=false;}
         };
-        panel.querySelector('[data-load-demo]').onclick=()=>runDemo(false);
+        panel.querySelector('[data-load-demo]').onclick=()=>runDemo(true);
 
         try{
             const current=await window.studioGetCurrentDemoDataRun?.();

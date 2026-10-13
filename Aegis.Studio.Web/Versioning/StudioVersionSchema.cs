@@ -23,6 +23,7 @@ internal static class StudioVersionSchema
             note text null,
             unique(job_id,asset_key,version_number)
         );
+        alter table studio_asset_versions add column if not exists demo_source jsonb null;
         create index if not exists ix_studio_asset_versions_history
             on studio_asset_versions(job_id,asset_key,version_number desc);
         """;

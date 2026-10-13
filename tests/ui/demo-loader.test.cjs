@@ -44,7 +44,7 @@ test('reset and regeneration starts a full server run and waits through reset an
 test('demo load starts a server run and polls until committed completion',async()=>{
  const runId='11111111-1111-4111-8111-111111111111';
  const {w,dom,calls}=setup([
-  {url:'/api/admin/demo/seed',status:202,body:{runId,status:'Running',percent:0,stage:'Preparing',message:'Started',completed:false,failed:false}},
+  {url:'/api/admin/connected-workflow/demo-data/reset-and-generate',status:202,body:{runId,status:'Running',percent:0,stage:'Preparing',message:'Started',completed:false,failed:false}},
   {url:'/api/admin/demo/seed/'+runId,body:{runId,status:'Running',percent:52,stage:'Studio photographs',message:'Carter — photo 17/320',completed:false,failed:false}},
   {url:'/api/admin/demo/seed/'+runId,body:{runId,status:'Completed',percent:100,stage:'Complete',message:'Loaded',completed:true,failed:false}}
  ]);
@@ -61,7 +61,7 @@ test('demo load starts a server run and polls until committed completion',async(
 test('server-side demo failure is surfaced from persisted run status',async()=>{
  const runId='22222222-2222-4222-8222-222222222222';
  const {w,dom}=setup([
-  {url:'/api/admin/demo/seed',status:202,body:{runId,status:'Running',percent:42,stage:'Studio photographs',message:'Working',completed:false,failed:false}},
+  {url:'/api/admin/connected-workflow/demo-data/reset-and-generate',status:202,body:{runId,status:'Running',percent:42,stage:'Studio photographs',message:'Working',completed:false,failed:false}},
   {url:'/api/admin/demo/seed/'+runId,body:{runId,status:'Failed',percent:42,stage:'Failed',message:'Rolled back',completed:false,failed:true}}
  ]);
  const updates=[];
@@ -98,7 +98,7 @@ test('active-run conflict retains the wait instruction',async()=>{
 });
 
 test('unstructured rejection retains an HTTP fallback',async()=>{
- const {w,dom}=setup([{url:'/api/admin/demo/seed',status:502,body:null}]);
+ const {w,dom}=setup([{url:'/api/admin/connected-workflow/demo-data/reset-and-generate',status:502,body:null}]);
  await assert.rejects(w.studioLoadDemoData(()=>{}),/Demo loader returned HTTP 502/);dom.window.close();
 });
 

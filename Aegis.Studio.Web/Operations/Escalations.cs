@@ -33,7 +33,7 @@ public static class EscalationEndpoints
         {
             while (!token.IsCancellationRequested)
             {
-                try { store.Scan(); }
+                try { using var operation = DemoMaintenance.TryEnterOperation(database); if (operation is not null) store.Scan(); }
                 catch (Exception exception) { app.Logger.LogError(exception, "Escalation scan failed."); }
                 try { await Task.Delay(TimeSpan.FromMinutes(1), token); }
                 catch (OperationCanceledException) { break; }

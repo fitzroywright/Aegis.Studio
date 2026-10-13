@@ -78,8 +78,7 @@ public static class WorkflowEndpoints
         {
             using var c=db.OpenConnection();return Results.Ok(JsonSerializer.Deserialize<JsonElement>((string)WorkflowStore.Scalar(c,null,"select jsonb_build_object('thresholds',coalesce((select jsonb_agg(to_jsonb(t)) from studio_workflow_thresholds t),'[]'::jsonb),'audiences',coalesce((select jsonb_agg(to_jsonb(a)) from studio_workflow_audiences a),'[]'::jsonb),'failures',coalesce((select jsonb_agg(to_jsonb(f)) from studio_workflow_delivery_failures f),'[]'::jsonb),'reconciliation',coalesce((select jsonb_agg(to_jsonb(r)) from studio_workflow_reconciliation r),'[]'::jsonb),'timingPolicy','Elapsed','timezone','America/Jamaica')::text")!));
         });
-        // Read-only reset inventory. No destructive endpoint is exposed until the
-        // complete dependency-aware cleanup and demo seeder are implemented.
+        // Read-only inventory; reset and recreation use the exclusive lifecycle below.
         admin.MapGet("/demo-data/preview",(StudioDatabase db)=>Run(()=>
         {
             using var c=db.OpenConnection();
@@ -98,13 +97,14 @@ public static class WorkflowEndpoints
             using var reader=q.ExecuteReader();
             var tables=new List<object>();
             while(reader.Read())tables.Add(new {table=reader.GetString(0),columns=reader.GetInt64(1),inboundForeignKeys=reader.GetInt64(2)});
-            return Results.Ok(new {readyForReset=false,requiresExplicitDemoEnvironment=true,
-                warning="Inventory only: foreign-key dependencies are not a deletion plan. Business-data classification and storage ownership must be verified before reset.",
+            return Results.Ok(new {readyForReset=true,requiresExplicitDemoEnvironment=true,
+                warning="Clear deletes Studio business records and stored files. System configuration and the permanent Unassigned workspace are preserved.",
                 tables});
         }));
-        admin.MapPost("/demo-data/generate",(DemoSeedCoordinator coordinator,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config)=>Run(()=>
+        admin.MapPost("/demo-data/generate",(DemoSeedCoordinator coordinator,ClaimsPrincipal user,IWebHostEnvironment environment,IConfiguration config,DemoResetConfirmation request)=>Run(()=>
         {
             if(!environment.IsDevelopment()&&!config.GetValue("DemoData:Enabled",false))return Results.NotFound();
+            if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Confirm clearing and recreating demo data."});
             var run=coordinator.Start(WorkflowStore.Name(user));
             return Results.Accepted($"/api/admin/demo/seed/{run.RunId}",run);
         }));
@@ -128,7 +128,7 @@ public static class WorkflowEndpoints
             if(request.Confirmation!="REMOVE STUDIO DEMO DATA")return Results.BadRequest(new{error="Explicit confirmation is required."});
             try
             {
-                var run=coordinator.Start(WorkflowStore.Name(user),reset:true);
+                var run=coordinator.Start(WorkflowStore.Name(user));
                 return Results.Accepted($"/api/admin/demo/seed/{run.RunId}",run);
             }
             catch(Exception e) when(e is InvalidOperationException or IOException or NpgsqlException)
@@ -166,7 +166,9 @@ public sealed class WorkflowMonitorWorker(IServiceScopeFactory scopes,ILogger<Wo
         {
             try
             {
-                using var scope=scopes.CreateScope();var db=scope.ServiceProvider.GetRequiredService<StudioDatabase>();using var c=db.OpenConnection();using var tx=c.BeginTransaction();
+                using var scope=scopes.CreateScope();var db=scope.ServiceProvider.GetRequiredService<StudioDatabase>();using var operation = Aegis.Studio.Web.Operations.DemoMaintenance.TryEnterOperation(db);
+                if (operation is null) continue;
+                using var c=db.OpenConnection();using var tx=c.BeginTransaction();
                 if(!(bool)WorkflowStore.Scalar(c,tx,"select pg_try_advisory_xact_lock(hashtextextended('studio-workflow-monitor',0))")!){tx.Rollback();continue;}
                 // Unknown historical clocks do not trigger alerts; scheduled clocks use upcoming session deadlines.
                 var rows=new List<(Guid Job,string Key,string Stage)>();

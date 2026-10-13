@@ -177,7 +177,6 @@ public sealed class StudioAccountsStore
                 updated_at_utc timestamptz not null
             );
             create table if not exists studio_account_invoice_jobs(invoice_id uuid not null references studio_account_invoices(id) on delete cascade,job_id uuid not null references studio_jobs(id),primary key(invoice_id,job_id));
-            insert into studio_account_invoice_jobs(invoice_id,job_id) select id,job_id from studio_account_invoices on conflict do nothing;
             create index if not exists ix_studio_account_invoices_job on studio_account_invoices(job_id,created_at_utc desc);
             create index if not exists ix_studio_account_invoices_due on studio_account_invoices(status,due_at_utc);
             create table if not exists studio_account_invoice_lines

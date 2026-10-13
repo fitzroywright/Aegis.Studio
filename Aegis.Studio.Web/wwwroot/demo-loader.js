@@ -19,10 +19,10 @@
     }
 
     window.studioLoadDemoData = async (onProgress, options = {}) => {
-        const response = await fetch(options.reset?'/api/admin/connected-workflow/demo-data/reset-and-generate':'/api/admin/demo/seed', {
+        const response = await fetch('/api/admin/connected-workflow/demo-data/reset-and-generate', {
             method:'POST',
-            headers:{Accept:'application/json',...(options.reset?{'Content-Type':'application/json'}:{})},
-            ...(options.reset?{body:JSON.stringify({confirmation:'REMOVE STUDIO DEMO DATA'})}:{})
+            headers:{Accept:'application/json','Content-Type':'application/json'},
+            body:JSON.stringify({confirmation:'REMOVE STUDIO DEMO DATA'})
         });
         if (!response.ok) throw await responseError(response, 'Demo loader');
 

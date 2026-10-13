@@ -14,10 +14,11 @@ public sealed class OutboundEmailWorker : BackgroundService
     private readonly IConfiguration configuration;
     private readonly IChannelSecretResolver secrets;
     private readonly Aegis.Studio.Web.Messaging.StudioMessageAttachmentStore attachments;
+    private readonly Aegis.Studio.Web.Persistence.StudioDatabase? database;
     private readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(60)};
-    public OutboundEmailWorker(IEnumerable<IExternalMessageChannel> externalChannels,IConfiguration configuration,OutboundEmailStore outbox,StudioOperationsFlowPublisher flows,ILogger<OutboundEmailWorker> logger,IChannelSecretResolver secrets,Aegis.Studio.Web.Messaging.StudioMessageAttachmentStore attachments)
+    public OutboundEmailWorker(IEnumerable<IExternalMessageChannel> externalChannels,IConfiguration configuration,OutboundEmailStore outbox,StudioOperationsFlowPublisher flows,ILogger<OutboundEmailWorker> logger,IChannelSecretResolver secrets,Aegis.Studio.Web.Messaging.StudioMessageAttachmentStore attachments,Aegis.Studio.Web.Persistence.StudioDatabase? database=null)
     {
-        this.configuration=configuration;this.outbox=outbox;this.flows=flows;this.logger=logger;this.secrets=secrets;this.attachments=attachments;
+        this.database=database;this.configuration=configuration;this.outbox=outbox;this.flows=flows;this.logger=logger;this.secrets=secrets;this.attachments=attachments;
         channels=new(StringComparer.Ordinal);
         foreach(var channel in externalChannels)
             if(channel.Channel is MessageChannel.MsEmail or MessageChannel.WhatsApp)channels.TryAdd(channel.Channel==MessageChannel.MsEmail?"Email":"WhatsApp",channel);
@@ -29,6 +30,8 @@ public sealed class OutboundEmailWorker : BackgroundService
         {
             try
             {
+                using var operation = database is null ? null : Aegis.Studio.Web.Operations.DemoMaintenance.TryEnterOperation(database);
+                if (database is not null && operation is null) { await Task.Delay(1000, stoppingToken); continue; }
                 for(int n=0;n<25&&!stoppingToken.IsCancellationRequested;n++)
                 {
                     Guid lease=Guid.NewGuid();var message=outbox.ClaimNext(channels.Keys.ToArray(),lease);if(message is null)break;

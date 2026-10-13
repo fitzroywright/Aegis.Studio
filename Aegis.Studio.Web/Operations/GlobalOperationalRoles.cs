@@ -61,12 +61,6 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
                 updated_at_utc timestamptz not null
             );
 
-            alter table studio_global_operational_roles drop column if exists view_all_jobs;
-            alter table studio_global_operational_roles drop column if exists reply_to_clients;
-            alter table studio_global_operational_roles drop column if exists notify_job_members;
-            alter table studio_global_operational_roles drop column if exists billing;
-            alter table studio_global_operational_roles drop column if exists view_client_attachments;
-            alter table studio_global_operational_roles drop column if exists add_client_attachments;
 
             create table if not exists studio_global_operational_role_members
             (
@@ -95,23 +89,24 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
             """;
         command.ExecuteNonQuery();
 
-        EnsureRole(UserRoleId, StudioRoleNames.User, "Baseline role for authenticated Studio users.");
-        EnsureRole(FrontDeskRoleId, StudioRoleNames.FrontDesk, "Cross-workspace reception and client-service operations.");
-        EnsureRole(OperationsManagerRoleId, StudioRoleNames.OperationsManager, "Overall Studio operational escalation manager.");
-        EnsureRole(AdministratorRoleId, StudioRoleNames.Administrator, "Application security and unrestricted administration.");
+        var created = new HashSet<Guid>();
+        if (EnsureRole(UserRoleId, StudioRoleNames.User, "Baseline role for authenticated Studio users.")) created.Add(UserRoleId);
+        if (EnsureRole(FrontDeskRoleId, StudioRoleNames.FrontDesk, "Cross-workspace reception and client-service operations.")) created.Add(FrontDeskRoleId);
+        if (EnsureRole(OperationsManagerRoleId, StudioRoleNames.OperationsManager, "Overall Studio operational escalation manager.")) created.Add(OperationsManagerRoleId);
+        if (EnsureRole(AdministratorRoleId, StudioRoleNames.Administrator, "Application security and unrestricted administration.")) created.Add(AdministratorRoleId);
 
-        EnsureRole(FinanceManagerRoleId, StudioRoleNames.FinanceManager, "Contractual credit, final delivery authorization and outstanding receivables.");
-        EnsureRole(ProductionManagerRoleId, StudioRoleNames.ProductionManager, "Production dispatch and final technical approval.");
+        if (EnsureRole(FinanceManagerRoleId, StudioRoleNames.FinanceManager, "Contractual credit, final delivery authorization and outstanding receivables.")) created.Add(FinanceManagerRoleId);
+        if (EnsureRole(ProductionManagerRoleId, StudioRoleNames.ProductionManager, "Production dispatch and final technical approval.")) created.Add(ProductionManagerRoleId);
         foreach (var role in new[] { FinanceManagerRoleId, ProductionManagerRoleId })
         {
-            EnsurePermission(role, StudioPermissions.Access);
-            EnsurePermission(role, StudioPermissions.ViewAllJobs);
-            EnsurePermission(role, StudioPermissions.ViewClientAttachments);
-            EnsurePermission(role, StudioPermissions.NotifyJobMembers);
+            SeedPermission(role, StudioPermissions.Access);
+            SeedPermission(role, StudioPermissions.ViewAllJobs);
+            SeedPermission(role, StudioPermissions.ViewClientAttachments);
+            SeedPermission(role, StudioPermissions.NotifyJobMembers);
         }
-        EnsurePermission(FinanceManagerRoleId, StudioPermissions.Billing);
-        EnsurePermission(ProductionManagerRoleId, StudioPermissions.AddClientAttachments);
-        EnsurePermission(UserRoleId, StudioPermissions.Access);
+        SeedPermission(FinanceManagerRoleId, StudioPermissions.Billing);
+        SeedPermission(ProductionManagerRoleId, StudioPermissions.AddClientAttachments);
+        SeedPermission(UserRoleId, StudioPermissions.Access);
         foreach (string permission in new[]
         {
             StudioPermissions.Access,
@@ -123,7 +118,7 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
             StudioPermissions.AddClientAttachments
         })
         {
-            EnsurePermission(FrontDeskRoleId, permission);
+            SeedPermission(FrontDeskRoleId, permission);
         }
 
         foreach (string permission in new[]
@@ -133,10 +128,13 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
             StudioPermissions.NotifyJobMembers
         })
         {
-            EnsurePermission(OperationsManagerRoleId, permission);
+            SeedPermission(OperationsManagerRoleId, permission);
         }
 
-        EnsurePermission(AdministratorRoleId, PermissionAuthorizer.AllPermissions);
+        SeedPermission(AdministratorRoleId, PermissionAuthorizer.AllPermissions);
+
+        void SeedPermission(Guid role, string permission)
+        { if (created.Contains(role)) EnsurePermission(role, permission); }
 
         foreach (string group in administratorGroups ?? Array.Empty<string>())
         {
@@ -369,19 +367,19 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
         return Task.FromResult<IReadOnlyCollection<RoleDefinition>>(roles);
     }
 
-    private void EnsureRole(Guid id, string name, string description)
+    private bool EnsureRole(Guid id, string name, string description)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             insert into studio_global_operational_roles(id,name,description,is_active,created_at_utc,updated_at_utc)
             values($1,$2,$3,true,now(),now())
-            on conflict(name) do update set description=excluded.description,is_active=true,updated_at_utc=now()
+            on conflict(name) do nothing returning id
             """;
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(name);
         command.Parameters.AddWithValue(description);
-        command.ExecuteNonQuery();
+        return command.ExecuteScalar() is Guid;
     }
 
     private void EnsurePermission(Guid roleId, string permission)

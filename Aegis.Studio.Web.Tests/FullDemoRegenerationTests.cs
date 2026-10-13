@@ -63,14 +63,15 @@ public class FullDemoRegenerationTests
         try
         {
             // Reuse the genuine repository photo fixture to test the complete pipeline without network downloads.
-            foreach(var url in (string[])DemoType.GetField("realPhotoUrls",BindingFlags.Static|BindingFlags.NonPublic)!.GetValue(null)!)cache[url]=photo;
+            foreach(var field in new[]{"realPhotoUrls","weddingPhotoUrls"})
+            foreach(var url in (string[])DemoType.GetField(field,BindingFlags.Static|BindingFlags.NonPublic)!.GetValue(null)!)cache[url]=photo;
             foreach(var item in DemoPortraitCatalogue.Photos)cache[item.Url]=photo;
             var configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Storage:FactoryResetExclusiveRoot","true"}}).Build();
             if(tracked)
             {
                 var coordinator=new DemoSeedCoordinator(ctx.Database,storage,NullLogger<DemoSeedCoordinator>.Instance,configuration,new TestEnvironment(ctx.Root));
-                var run=coordinator.Start("Admin",reset:true);Assert.False(run.Completed);
-                Assert.Throws<InvalidOperationException>(()=>coordinator.Start("Admin",reset:true));
+                var run=coordinator.Start("Admin");Assert.False(run.Completed);
+                Assert.Throws<InvalidOperationException>(()=>coordinator.Start("Admin"));
                 var deadline=DateTime.UtcNow.AddMinutes(5);
                 do{await Task.Delay(100);run=coordinator.Get(run.RunId)!;}while(!run.Completed&&!run.Failed&&DateTime.UtcNow<deadline);
                 Assert.True(run.Completed,run.Message);Assert.Equal(100,run.Percent);
@@ -84,7 +85,7 @@ public class FullDemoRegenerationTests
             Assert.False(File.Exists(Path.Combine(ctx.Root,"old-demo.txt")));
             Assert.Equal("preserved",Scalar(ctx.Connection,"select value from studio_state where key='provider-contract'"));
             Assert.Equal(8,Scalar(ctx.Connection,"select count(*)::int from studio_commercial_templates where kind='Job'"));
-            Assert.Equal(10,Scalar(ctx.Connection,"select count(*)::int from studio_job_template_instances"));
+            Assert.Equal(Scalar(ctx.Connection,"select count(*)::int from studio_jobs"),Scalar(ctx.Connection,"select count(*)::int from studio_job_template_instances"));
             Assert.Equal(2,Scalar(ctx.Connection,"select count(*)::int from studio_commercial_templates where kind='WorkOrder'"));
             Assert.Equal(2,Scalar(ctx.Connection,"select count(*)::int from studio_pos_catalog where code like 'GRAPH-%' and requires_production and work_order_template_id is not null"));
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_jobs"))>=126);

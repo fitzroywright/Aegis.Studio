@@ -3,7 +3,7 @@ using Common.Storage;
 using Npgsql;
 namespace Aegis.Studio.Web.Operations;
 
-// Idempotent additive upgrade. Existing user edits and pinned approval sources are retained.
+// Scenario assembly for a freshly cleared demo dataset.
 internal static class DemoIntegratedWorkflow
 {
     internal static void Seed(NpgsqlConnection c,NpgsqlTransaction tx,string actor,IFileStorage storage,Action<DemoSeedProgress>? report)
@@ -11,7 +11,7 @@ internal static class DemoIntegratedWorkflow
         using(var current=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v7-integrated-workflow')",c,tx))if((bool)current.ExecuteScalar()!)return;
         report?.Invoke(new(97,"Connected workflow",0,0,"Linking shared workspaces, approved production, QC, payments and collection history."));
         Guid? approvalExample=null;string? approvalKey=null;Guid approvalJob=DemoDataExpansion.Id(41,101);
-        using(var pick=new NpgsqlCommand("select a.asset_key from studio_media_assets a where a.job_id=$1 and a.approved_version_id is null and a.asset_key like 'demo-full/%' and not exists(select 1 from studio_asset_versions own where own.job_id=a.job_id and own.asset_key=a.asset_key and coalesce(own.note,'') not like 'Real CC0/public-domain photograph from Wikimedia Commons.%') and (select max(version_number) from studio_asset_versions v where v.job_id=a.job_id and v.asset_key=a.asset_key)<=2 order by a.id limit 1",c,tx))
+        using(var pick=new NpgsqlCommand("select a.asset_key from studio_media_assets a where a.job_id=$1 and a.approved_version_id is null and a.asset_key like 'demo-full/%' and not exists(select 1 from studio_asset_versions own where own.job_id=a.job_id and own.asset_key=a.asset_key and coalesce(own.demo_source->>'demo','false') <> 'true') and (select max(version_number) from studio_asset_versions v where v.job_id=a.job_id and v.asset_key=a.asset_key)<=2 order by a.id limit 1",c,tx))
         {pick.Parameters.AddWithValue(approvalJob);approvalKey=pick.ExecuteScalar() as string;}
         var versionStorage=new PrefixedFileStorage(storage,"VersionStore");string? exampleUrl=null;
         if(approvalKey is not null)
@@ -29,7 +29,7 @@ internal static class DemoIntegratedWorkflow
             using(var get=new NpgsqlCommand("select status from studio_jobs where id=$1",c,tx)){get.Parameters.AddWithValue(job);status=get.ExecuteScalar() as string;}
             if(status is not ("In Production" or "Ready for Client" or "Completed"))continue;
             // Each order retains its source version even when a later revision is uploaded.
-            Sql("update studio_media_assets a set approved_version_id=(select id from studio_asset_versions v where v.job_id=a.job_id and v.asset_key=a.asset_key order by v.version_number desc limit 1) where a.job_id=$1 and a.approved_version_id is null and a.asset_key like 'demo-full/%' and (select note from studio_asset_versions v where v.job_id=a.job_id and v.asset_key=a.asset_key order by version_number desc limit 1) like 'Real CC0/public-domain photograph from Wikimedia Commons.%'",job);
+            Sql("update studio_media_assets a set approved_version_id=(select id from studio_asset_versions v where v.job_id=a.job_id and v.asset_key=a.asset_key order by v.version_number desc limit 1) where a.job_id=$1 and a.approved_version_id is null and a.asset_key like 'demo-full/%' and (select v.demo_source->>'demo' from studio_asset_versions v where v.job_id=a.job_id and v.asset_key=a.asset_key order by version_number desc limit 1)='true'",job);
             Guid activity=DemoDataExpansion.Id(80,number);
             Sql("""
                 insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,created_by,created_at_utc,updated_at_utc)
@@ -42,7 +42,7 @@ internal static class DemoIntegratedWorkflow
                 select md5('demo-production:'||a.id::text)::uuid,$2,a.id,a.approved_version_id,'Approved photo print',1,
                   case when $3 or row_number() over(order by a.id)%3<>0 then 1 else 0 end,
                   case when $3 or row_number() over(order by a.id)%3<>0 then 'Passed' else 'Pending' end,null,$4,now()
-                from studio_media_assets a where a.job_id=$1 and a.approved_version_id is not null and a.asset_key like 'demo-full/%' and exists(select 1 from studio_asset_versions v where v.id=a.approved_version_id and v.note like 'Real CC0/public-domain photograph from Wikimedia Commons.%') on conflict do nothing
+                from studio_media_assets a where a.job_id=$1 and a.approved_version_id is not null and a.asset_key like 'demo-full/%' and exists(select 1 from studio_asset_versions v where v.id=a.approved_version_id and v.demo_source->>'demo'='true') on conflict do nothing
                 """,job,activity,status is "Ready for Client" or "Completed",actor);
 
             Sql("insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'ApprovedProductionBatch',$3,'Demo approved sources and production items linked to the existing QC activity.',now()) on conflict do nothing",DemoDataExpansion.Id(81,number),job,actor);

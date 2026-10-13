@@ -1,4 +1,5 @@
 using Common.Storage;
+using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
 
 namespace Aegis.Studio.Web.Workflow;
@@ -30,11 +31,21 @@ internal static class StudioFactoryReset
         IWebHostEnvironment environment, string? regenerateAs, CancellationToken cancellationToken)
     {
         ValidateStorage(storage, configuration);
+        if (regenerateAs is not null) DemoDataExpansion.PreparePhotos(null);
+        using var maintenance = DemoMaintenance.EnterReset(database);
         await Gate.WaitAsync(cancellationToken);
         try
         {
             ConnectedWorkflowDemo.ValidateReset(database);
-            long removed = await PurgeStorageAsync(storage, cancellationToken);
+            long removed;
+            try { removed = await PurgeStorageAsync(storage, cancellationToken); }
+            catch (Exception error)
+            {
+                // Storage deletion cannot be rolled back. Do not expose old rows pointing
+                // at partly deleted files; the failed Clear remains retryable for storage.
+                ConnectedWorkflowDemo.Reset(database);
+                throw new InvalidOperationException("Studio business records were cleared, but storage cleanup did not complete. Retry Clear before recreating data.", error);
+            }
 
             // Local delivery cache is derived from attachments, not user content.
             var cache = Path.Combine(environment.ContentRootPath, "Storage", ".delivery-cache");
