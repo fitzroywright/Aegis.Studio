@@ -2,14 +2,6 @@ let selectedWorkspace = null;
 let selectedConversation = null;
 let workspaceCache = [];
 
-const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    "'": '&#39;',
-    '"': '&quot;'
-}[character]));
-
 async function json(url, options) {
     const {onResponse,...requestOptions}=options||{};
     const response = await fetch(url, requestOptions);
