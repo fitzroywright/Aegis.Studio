@@ -21,8 +21,12 @@
   const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;card.querySelectorAll('.composer textarea,.smc-note-form textarea,.studio-message-composer textarea').forEach(fitEditor);});};
   card.addEventListener('input',event=>{if(event.target.matches('.composer textarea,.smc-note-form textarea,.studio-message-composer textarea'))fitEditor(event.target);});
   const mutations=new MutationObserver(schedule);mutations.observe(card,{childList:true,subtree:true});
-  const resize=new ResizeObserver(entries=>{const next=entries[0].contentRect.width;if(next!==width){width=next;schedule();}});
-  resize.observe(card);card.__studioEditorSizing={mutations,resize,schedule};schedule();
+  const resize=typeof ResizeObserver==='function'
+   ?new ResizeObserver(entries=>{const next=entries[0].contentRect.width;if(next!==width){width=next;schedule();}})
+   :null;
+  if(resize)resize.observe(card);
+  else window.addEventListener('resize',schedule);
+  card.__studioEditorSizing={mutations,resize,schedule};schedule();
  }
  function renderNotes(card,s){
   const host=card.querySelector('[data-smc-note-editor]');if(!host)return;
