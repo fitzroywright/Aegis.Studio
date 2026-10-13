@@ -12,13 +12,15 @@ internal static class DemoJobPhotoPopulation
     internal static void Seed(StudioDatabase database,IFileStorage storage,string login,Action<DemoSeedProgress>? report=null)
     {
         using var connection=database.OpenConnection();
-        var jobs=new List<Guid>();
-        using(var query=new NpgsqlCommand("select id from studio_jobs where id::text like 'de000000-%' or id::text like 'de100000-%' order by id",connection))
-        using(var reader=query.ExecuteReader())while(reader.Read())jobs.Add(reader.GetGuid(0));
+        var jobs=new List<(Guid Id,string Title,string Workspace)>();
+        using(var query=new NpgsqlCommand("select j.id,j.title,w.name from studio_jobs j join studio_workspaces w on w.id=j.workspace_id where j.id::text like 'de000000-%' or j.id::text like 'de100000-%' order by j.id",connection))
+        using(var reader=query.ExecuteReader())while(reader.Read())jobs.Add((reader.GetGuid(0),reader.GetString(1),reader.GetString(2)));
         var versions=new PrefixedFileStorage(storage,"VersionStore");
         for(int ordinal=0;ordinal<jobs.Count;ordinal++)
         {
-            Guid job=jobs[ordinal];
+            Guid job=jobs[ordinal].Id;
+            string category=DemoDataExpansion.PhotoCategory(jobs[ordinal].Title,jobs[ordinal].Workspace);
+            string[] sources=DemoDataExpansion.PhotoSources(category);
             // Each job is durable independently, so interrupted downloads can resume.
             using var transaction=connection.BeginTransaction();
             Execute(connection,transaction,"select set_config('studio.demo_seed','true',true); select pg_advisory_xact_lock(72709128)");
@@ -33,9 +35,9 @@ internal static class DemoJobPhotoPopulation
             int target=existing.Count(x=>x.StartsWith("demo-people/",StringComparison.Ordinal)) + Math.Max(0,40-existing.Count);
             for(int photo=0;photo<target;photo++)
             {
-                report?.Invoke(new(96+3*ordinal/Math.Max(1,jobs.Count),"Photos for every job",ordinal,jobs.Count,$"Job {ordinal+1}/{jobs.Count}: checking people photograph {photo+1}/{target}."));
+                report?.Invoke(new(96+3*ordinal/Math.Max(1,jobs.Count),"Photos for every job",ordinal,jobs.Count,$"Job {ordinal+1}/{jobs.Count}: checking photograph {photo+1}/{target}."));
                 string key=$"demo-people/{photo+1:000}";
-                DemoDataExpansion.AddImage(connection,transaction,versions,job,key,Id(job,key+"/version"),1,photo,null,login,sourceUrl:DemoPortraitCatalogue.Url(photo%40),searchTerm:"portrait");
+                DemoDataExpansion.AddImage(connection,transaction,versions,job,key,Id(job,key+"/version"),1,photo,null,login,sourceUrl:sources[photo%sources.Length],searchTerm:category);
                 Guid asset=Id(job,key+"/asset");
                 Execute(connection,transaction,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status) values($1,$2,$2,$3,'Needs Sorting') on conflict(job_id,asset_key) do nothing",asset,job,key);
                 Execute(connection,transaction,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,'Unclassified') on conflict do nothing",job,key);

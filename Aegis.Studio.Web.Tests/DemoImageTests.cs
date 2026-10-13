@@ -20,6 +20,37 @@ public sealed class DemoImageTests
         });
         Assert.Null(seed.GetMethod("CreateIllustration",BindingFlags.NonPublic|BindingFlags.Static));
     }
+
+    [Theory]
+    [InlineData("Wedding","Portraits and IDs","Wedding")]
+    [InlineData("Executive Headshots","Weddings and Events","Portrait")]
+    [InlineData("Product Photography","Commercial and Products","Product")]
+    [InlineData("Corporate Portrait","Commercial and Products","Portrait")]
+    [InlineData("Graduation Retakes","Graduations","Graduation")]
+    [InlineData("School Portraits","Schools and Corporate","School")]
+    [InlineData("Sports Team","Sports and Groups","Sports")]
+    [InlineData("Newborn","Portraits and IDs","Newborn")]
+    [InlineData("Family + Pets","Portraits and IDs","Family")]
+    [InlineData("Maternity","Portraits and IDs","Maternity")]
+    [InlineData("Birthday","Weddings and Events","Birthday")]
+    [InlineData("Corporate Event","Schools and Corporate","Event")]
+    [InlineData("Unclassified","Weddings and Events","Wedding")]
+    [InlineData("","Commercial and Products","Product")]
+    public void DemoPhotographsFollowJobTypeBeforeWorkspace(string jobType,string workspace,string expected)
+    {
+        Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoDataExpansion")!;
+        var category=seed.GetMethod("PhotoCategory",BindingFlags.NonPublic|BindingFlags.Static)!;
+        Assert.Equal(expected,category.Invoke(null,new object[]{jobType,workspace}));
+        var sources=seed.GetMethod("PhotoSources",BindingFlags.NonPublic|BindingFlags.Static)!;
+        string[] urls=(string[])sources.Invoke(null,new object[]{jobType,workspace})!;
+        Assert.NotEmpty(urls);
+        if(expected!="Portrait")
+        {
+            var portraits=DemoPortraitCatalogue.Photos.Select(photo=>photo.Url).ToHashSet();
+            Assert.All(urls,url=>Assert.DoesNotContain(url,portraits));
+        }
+    }
+
     [Fact]
     public void LargeWeddingAndGraduationMediaCannotOverwriteAdjacentJobs()
     {

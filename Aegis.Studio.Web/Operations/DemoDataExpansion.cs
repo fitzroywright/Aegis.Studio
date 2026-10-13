@@ -19,16 +19,74 @@ internal static partial class DemoDataExpansion
         return client;
     }
 
+
+    private static string CommonsPhoto(string file)=>"https://commons.wikimedia.org/wiki/Special:Redirect/file/"+file;
+    private static readonly string[] productPhotoUrls =
+    [
+        CommonsPhoto("Product_Photography_-_Pittsburg_Community_(51163419920).jpg")
+    ];
+    private static readonly string[] maternityPhotoUrls =
+    [
+        CommonsPhoto("Any_day_now_(Unsplash).jpg")
+    ];
+    private static readonly string[] eventPhotoUrls =
+    [
+        CommonsPhoto("Conference_people.jpg"),
+        CommonsPhoto("Person_speaking_at_the_conference.jpg")
+    ];
+    private static readonly string[] birthdayPhotoUrls =
+    [
+        CommonsPhoto("Birthday_pic.jpg"),
+        CommonsPhoto("A_girl_celebrating_her_birthday.jpg")
+    ];
+
+    internal static string PhotoCategory(string? jobType,string? workspace)
+    {
+        string type=jobType?.Trim()??"";
+        if(type.Length==0||type.Equals("Unclassified",StringComparison.OrdinalIgnoreCase)||type.Equals("Other",StringComparison.OrdinalIgnoreCase))
+            type=workspace??"";
+        bool Has(string value)=>type.Contains(value,StringComparison.OrdinalIgnoreCase);
+        // Specific job types take precedence over broad workspace names.
+        if(Has("Wedding")||Has("Engagement"))return "Wedding";
+        if(Has("Graduation"))return "Graduation";
+        if(Has("School")||Has("Class"))return "School";
+        if(Has("Product")||Has("Commercial")||Has("Campaign"))return "Product";
+        if(Has("Sports")||Has("Athlete")||Has("Team")||Has("Group"))return "Sports";
+        if(Has("Newborn")||Has("Baby"))return "Newborn";
+        if(Has("Maternity"))return "Maternity";
+        if(Has("Family")||Has("Pet"))return "Family";
+        if(Has("Birthday"))return "Birthday";
+        if(Has("Event")||Has("Conference")||Has("Awards")||Has("Anniversary"))return "Event";
+        if(Has("Portrait")||Has("Headshot")||Has("Passport")||Has("Visa")||Has("ID")||Has("Corporate")||Has("Senior"))return "Portrait";
+        return string.IsNullOrWhiteSpace(workspace) ? "Portrait" : PhotoCategory(workspace,null);
+    }
+
+    internal static string[] PhotoSources(string? jobType,string? workspace=null)=>PhotoCategory(jobType,workspace) switch
+    {
+        "Wedding"=>weddingPhotoUrls.Concat(realPhotoUrls.Skip(10).Take(2)).ToArray(),
+        "Graduation" or "School"=>realPhotoUrls.Take(4).ToArray(),
+        "Product"=>productPhotoUrls,
+        "Sports"=>[realPhotoUrls[8]],
+        "Newborn"=>[realPhotoUrls[7],realPhotoUrls[6]],
+        "Maternity"=>maternityPhotoUrls,
+        "Family"=>[realPhotoUrls[12],realPhotoUrls[6]],
+        "Birthday"=>birthdayPhotoUrls,
+        "Event"=>eventPhotoUrls,
+        _=>DemoPortraitCatalogue.Photos.Select(photo=>photo.Url).ToArray()
+    };
+
     private sealed record DemoPhotoCandidate(string Url,string Source,string License,string Page);
 
     private static HttpResponseMessage DownloadDemoPhoto(string preferredUrl,int variant,string? searchTerm=null)
     {
-        var cataloguePhoto=DemoPortraitCatalogue.Photos.FirstOrDefault(photo=>photo.Url==preferredUrl);
-        DemoPhotoCandidate[] candidates=
-        [
-            new(preferredUrl,"Wikimedia Commons",cataloguePhoto?.License??"Catalogue source",cataloguePhoto?.Page??preferredUrl),
-            new(DemoPortraitCatalogue.Url(Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count),"Wikimedia Commons","Catalogue licence",DemoPortraitCatalogue.Photos[Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count].Page)
-        ];
+        // A failed category source must never turn a wedding/product job into a headshot.
+        string[] alternatives=string.IsNullOrWhiteSpace(searchTerm)?[preferredUrl]:PhotoSources(searchTerm);
+        DemoPhotoCandidate[] candidates=new[]{preferredUrl}.Concat(alternatives).Distinct()
+            .Select(url=>
+            {
+                var photo=DemoPortraitCatalogue.Photos.FirstOrDefault(item=>item.Url==url);
+                return new DemoPhotoCandidate(url,"Wikimedia Commons",photo?.License??"CC0 / public domain catalogue source",photo?.Page??url);
+            }).ToArray();
 
         int start=0;
         Exception? lastError=null;
@@ -122,6 +180,15 @@ internal static partial class DemoDataExpansion
             report?.Invoke(new(10 + 20 * index / JobNumbers.Length, "Legacy demo jobs", index, JobNumbers.Length, "Preparing schedules, subjects and real photographs."));
             int number=JobNumbers[index],workspace=number<=2?1:number<=5?2:3;
             Guid job=Id(3,number);
+            string category;
+            using(var photoContext=new NpgsqlCommand("select j.title,w.name from studio_jobs j join studio_workspaces w on w.id=j.workspace_id where j.id=$1",connection,transaction))
+            {
+                photoContext.Parameters.AddWithValue(job);
+                using var reader=photoContext.ExecuteReader();
+                if(!reader.Read())throw new InvalidOperationException("Demo job image context is missing.");
+                category=PhotoCategory(reader.GetString(0),reader.GetString(1));
+            }
+            string[] sources=PhotoSources(category);
             for(int task=0;task<4;task++)
             {
                 int key=number*10+task;
@@ -187,11 +254,11 @@ internal static partial class DemoDataExpansion
                 Guid requestedOriginal=Id(26,number*100+asset);
                 Guid original=number==4
                     ? AddWeddingPhoto(connection,transaction,versionStorage,job,key,requestedOriginal,1,asset,null,login)
-                    : AddImage(connection,transaction,versionStorage,job,key,requestedOriginal,1,index*16+asset,null,login);
+                    : AddImage(connection,transaction,versionStorage,job,key,requestedOriginal,1,index*16+asset,null,login,sourceUrl:sources[asset%sources.Length],searchTerm:category);
                 if(asset==0)
                 {
                     if(number==4) AddWeddingPhoto(connection,transaction,versionStorage,job,key,Id(27,number),2,asset+1,original,login);
-                    else AddImage(connection,transaction,versionStorage,job,key,Id(27,number),2,index*16+asset+1,original,login);
+                    else AddImage(connection,transaction,versionStorage,job,key,Id(27,number),2,index*16+asset,original,login,sourceUrl:sources[asset%sources.Length],searchTerm:category);
                 }
                 string collection=number==4
                     ? asset<8?"Getting Ready":asset<22?"Ceremony":asset<38?"Portraits":"Reception"
