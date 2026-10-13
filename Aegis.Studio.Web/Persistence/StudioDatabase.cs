@@ -89,7 +89,7 @@ public sealed class StudioDatabase
                 job_lead text null
             );
             alter table studio_jobs add column if not exists job_lead text null;
-            update studio_jobs set job_lead=assigned_to where job_lead is null and assigned_to is not null;
+            update studio_jobs set job_lead=assigned_to where job_lead is null and assigned_to is not null and status not in ('Completed', 'Cancelled');
             create index if not exists ix_studio_jobs_workspace on studio_jobs(workspace_id, created_at_utc desc);
             create index if not exists ix_studio_jobs_lead on studio_jobs(lower(job_lead),status,created_at_utc desc);
             alter table studio_conversations drop constraint if exists fk_studio_conversations_job;
