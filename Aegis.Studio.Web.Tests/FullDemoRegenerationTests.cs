@@ -18,6 +18,24 @@ public class FullStudioDemoCollection { }
 [Collection("FullStudioDemo")]
 public class FullDemoRegenerationTests
 {
+    [StudioPostgresFact]
+    public void StatusReadMarksAnInterruptedRunFailedWithoutChangingBusinessData()
+    {
+        using var ctx=new IntegratedWorkflowTests.WorkflowContext();
+        var coordinator=new DemoSeedCoordinator(ctx.Database,new LocalFileStorage(ctx.Root),
+            NullLogger<DemoSeedCoordinator>.Instance,new ConfigurationBuilder().Build(),new TestEnvironment(ctx.Root));
+        Assert.Null(coordinator.Current);
+        Guid id=Guid.NewGuid();
+        Sql(ctx.Connection,"""
+            insert into studio_demo_seed_runs(run_id,status,percent,stage,message,started_at_utc,updated_at_utc)
+            values($1,'Running',42,'Studio photographs','Working',now(),now())
+            """,id);
+        var run=coordinator.Current!;
+        Assert.True(run.Failed);Assert.Equal("Interrupted",run.Stage);Assert.Equal(42,run.Percent);
+        Assert.True(coordinator.Get(id)!.Failed);
+        Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_jobs"));
+    }
+
     private static void Sql(NpgsqlConnection c,string sql,params object[] values){using var q=new NpgsqlCommand(sql,c);foreach(var v in values)q.Parameters.AddWithValue(v);q.ExecuteNonQuery();}
     private static object? Scalar(NpgsqlConnection c,string sql){using var q=new NpgsqlCommand(sql,c);return q.ExecuteScalar();}
     private static readonly Type DemoType=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoDataExpansion")!;

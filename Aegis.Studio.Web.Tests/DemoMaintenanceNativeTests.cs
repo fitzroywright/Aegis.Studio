@@ -6,6 +6,14 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class DemoMaintenanceNativeTests
 {
     [StudioPostgresFact,Trait("Database","Native")]
+    public void CompetingResetIsRejectedWithoutWaiting()
+    {
+        using var context=new IntegratedWorkflowTests.WorkflowContext();
+        using var reset=DemoMaintenance.ReserveReset(context.Database);
+        Assert.Throws<InvalidOperationException>(()=>DemoMaintenance.ReserveReset(context.Database));
+    }
+
+    [StudioPostgresFact,Trait("Database","Native")]
     public async Task IndependentRequestsAreBlockedDuringResetAndResumeWhenReleased()
     {
         using var context=new IntegratedWorkflowTests.WorkflowContext();

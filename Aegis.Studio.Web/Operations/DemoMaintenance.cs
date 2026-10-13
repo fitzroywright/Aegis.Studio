@@ -21,8 +21,9 @@ public static class DemoMaintenance
         var connection = database.OpenConnection();
         try
         {
-            using var command = new NpgsqlCommand("select pg_advisory_lock(hashtextextended('studio-demo-maintenance:'||current_schema(),0))", connection) { CommandTimeout = 600 };
-            command.ExecuteNonQuery();
+            using var command = new NpgsqlCommand("select pg_try_advisory_lock(hashtextextended('studio-demo-maintenance:'||current_schema(),0))", connection);
+            if (!(bool)command.ExecuteScalar()!)
+                throw new InvalidOperationException("Studio is busy or a demo reset is already running. Wait for it to finish before starting another.");
             return new Lease(connection, false, null);
         }
         catch { connection.Dispose(); throw; }

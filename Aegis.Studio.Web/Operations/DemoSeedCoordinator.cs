@@ -88,7 +88,9 @@ public sealed class DemoSeedCoordinator
             """, c);
         cmd.Parameters.AddWithValue(runId);
         using var r = cmd.ExecuteReader();
-        return r.Read() ? Read(r) : null;
+        var run = r.Read() ? Read(r) : null;
+        r.Close();
+        return RecoverInterrupted(run);
     }
 
     public DemoSeedRunStatus? Current
@@ -105,7 +107,29 @@ public sealed class DemoSeedCoordinator
                 limit 1
                 """, c);
             using var r = cmd.ExecuteReader();
-            return r.Read() ? Read(r) : null;
+            var run = r.Read() ? Read(r) : null;
+            r.Close();
+            return RecoverInterrupted(run);
+        }
+    }
+
+    private DemoSeedRunStatus? RecoverInterrupted(DemoSeedRunStatus? run)
+    {
+        if (run?.Status != "Running") return run;
+        lock (gate)
+        {
+            if (activeRunId == run.RunId && activeTask is { IsCompleted: false }) return run;
+            // Another process may own the active recreation; only an idle database
+            // permits declaring its persisted progress interrupted.
+            using var idle = DemoMaintenance.TryEnterOperation(database);
+            if (idle is null) return run;
+            MarkInterrupted(run.RunId);
+            return run with
+            {
+                Status = "Failed", Stage = "Interrupted",
+                Message = "The previous server process ended before this demo load completed. Clear and recreate the dataset.",
+                UpdatedAtUtc = DateTimeOffset.UtcNow, CompletedAtUtc = DateTimeOffset.UtcNow
+            };
         }
     }
 
@@ -259,4 +283,3 @@ public sealed class DemoSeedCoordinator
         r.GetString(6), r.GetFieldValue<DateTimeOffset>(7), r.GetFieldValue<DateTimeOffset>(8),
         r.IsDBNull(9) ? null : r.GetFieldValue<DateTimeOffset>(9));
 }
-

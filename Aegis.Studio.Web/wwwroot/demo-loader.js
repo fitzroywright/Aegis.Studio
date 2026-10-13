@@ -24,9 +24,15 @@
             headers:{Accept:'application/json','Content-Type':'application/json'},
             body:JSON.stringify({confirmation:'REMOVE STUDIO DEMO DATA'})
         });
-        if (!response.ok) throw await responseError(response, 'Demo loader');
-
-        let run = await response.json();
+        let run;
+        if (response.status === 409) {
+            const error = await responseError(response, 'Demo loader');
+            run = await window.studioGetCurrentDemoDataRun();
+            if (run?.status !== 'Running') throw error;
+        } else {
+            if (!response.ok) throw await responseError(response, 'Demo loader');
+            run = await response.json();
+        }
         if (!run?.runId) throw new Error('The server did not return a demo run identifier.');
 
         const statusUrl = '/api/admin/demo/seed/' + encodeURIComponent(run.runId);
@@ -54,4 +60,3 @@
         return await response.json();
     };
 })();
-

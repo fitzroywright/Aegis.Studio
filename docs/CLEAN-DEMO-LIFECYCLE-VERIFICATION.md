@@ -60,3 +60,14 @@ dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj --no-build --fi
 ```
 
 After deployment, explicitly Clear and Recreate through Studio Management. Validate completion against the configured storage/photo hosts, then restart Studio and confirm startup performs no data conversion. Normal operations must also be checked with an empty dataset after Clear.
+
+## Resume verification — October 13, 2026
+
+Recovered remote checkpoint 938c1cad and finished run recovery:
+- A second browser follows the current Running recreation after HTTP 409 instead of attempting another reset.
+- Status reads identify abandoned Running records as Failed/Interrupted when no worker or database maintenance reservation exists; they do not repair business data.
+- Competing reset reservations now reject immediately rather than queueing another destructive reset. Added a native PostgreSQL regression check.
+
+Current application/test sources compiled successfully against cached assemblies. The unit suite passed 311 tests, with 51 database-dependent tests skipped. The embedded lifecycle suite passed all 13 selected checks, including full recreation and the new interrupted-run check; run serially because the embedded service shares session state. All 14 focused UI checks passed, including reconnecting a second browser.
+
+Native PostgreSQL concurrency (including the new competing-reset check), complete NuGet restore/build, live S3/photo downloads, and Kratos deployment remain unverified. No deployment or live reset was performed.
