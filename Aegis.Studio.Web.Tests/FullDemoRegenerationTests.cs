@@ -81,7 +81,7 @@ public class FullDemoRegenerationTests
         try
         {
             // Reuse the genuine repository photo fixture to test the complete pipeline without network downloads.
-            foreach(var field in new[]{"realPhotoUrls","weddingPhotoUrls"})
+            foreach(var field in new[]{"realPhotoUrls","weddingPhotoUrls","productPhotoUrls","maternityPhotoUrls","eventPhotoUrls","birthdayPhotoUrls"})
             foreach(var url in (string[])DemoType.GetField(field,BindingFlags.Static|BindingFlags.NonPublic)!.GetValue(null)!)cache[url]=photo;
             foreach(var item in DemoPortraitCatalogue.Photos)cache[item.Url]=photo;
             var configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Storage:FactoryResetExclusiveRoot","true"}}).Build();
@@ -114,6 +114,17 @@ public class FullDemoRegenerationTests
             var population=typeof(WorkflowSchema).Assembly.GetType("Aegis.Studio.Web.Operations.DemoJobPhotoPopulation")!;
             population.GetMethod("Seed",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,[ctx.Database,storage,"Admin",null]);
             Assert.Equal(assetCount,Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_media_assets")));
+            foreach(var item in new[]{(201,"Wedding"),(401,"Graduation"),(501,"Product"),(601,"Sports")})
+            {
+                var sources=(string[])DemoType.GetMethod("PhotoSources",BindingFlags.Static|BindingFlags.NonPublic)!
+                    .Invoke(null,new object?[]{item.Item2,null})!;
+                using var q=new NpgsqlCommand("select demo_source->>'source' from studio_asset_versions where job_id=$1",ctx.Connection);
+                q.Parameters.AddWithValue(Guid.Parse($"de000000-0000-4000-0041-{item.Item1:000000000000}"));
+                using var reader=q.ExecuteReader();
+                int checkedPhotos=0;
+                while(reader.Read()){Assert.Contains(reader.GetString(0),sources);checkedPhotos++;}
+                Assert.True(checkedPhotos>=40);
+            }
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_photographers"))>=4);
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_frontdesk_requests"))>0);
         }
