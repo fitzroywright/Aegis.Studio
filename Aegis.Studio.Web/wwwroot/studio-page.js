@@ -56,5 +56,7 @@
         if (target) target.textContent = value;
     }
     window.StudioPage = {html, card, metrics, bind, begin, setCount, escape, invalidate(){++revision;}};
+    // Legacy page renderers share this explicit global instead of app.js lexical scope.
+    window.esc = escape;
 })();
 
