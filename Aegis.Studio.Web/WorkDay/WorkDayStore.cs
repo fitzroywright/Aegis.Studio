@@ -45,10 +45,6 @@ public sealed class WorkDayStore(StudioDatabase database)
           assignment_id uuid not null, user_name text not null, status text not null,
           version bigint not null, changed_at_utc timestamptz not null, last_operation_id uuid not null,
           primary key(assignment_id,user_name));
-        -- Attribute legacy evidence to its actual reporter, never every photographer.
-        insert into studio_workday_photographer_state
-          select assignment_id,lower(changed_by),status,version,changed_at_utc,last_operation_id
-          from studio_workday_assignment_state on conflict do nothing;
         alter table studio_workday_operations add column if not exists fingerprint text;
         alter table studio_workday_operations add column if not exists recorded_by text;
         alter table studio_workday_operations add column if not exists recording_reason text;

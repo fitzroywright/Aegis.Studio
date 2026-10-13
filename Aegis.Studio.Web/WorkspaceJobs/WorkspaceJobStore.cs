@@ -40,20 +40,6 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
             using var command = new NpgsqlCommand(sql, connection, transaction);
             command.ExecuteNonQuery();
         }
-        using (var jobs = new NpgsqlCommand("select id from studio_jobs", connection, transaction))
-        using (var reader = jobs.ExecuteReader())
-        {
-            List<Guid> jobIds = [];
-            while (reader.Read()) jobIds.Add(reader.GetGuid(0));
-            reader.Close();
-            foreach (Guid jobId in jobIds)
-            {
-                using var ensure = new NpgsqlCommand("insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by,collection_name,is_system) select $1,$2,'Unclassified','','','System','General',true where not exists(select 1 from studio_job_subjects where job_id=$2 and is_system and lower(name)='unclassified')", connection, transaction);
-                ensure.Parameters.AddWithValue(Guid.NewGuid());
-                ensure.Parameters.AddWithValue(jobId);
-                ensure.ExecuteNonQuery();
-            }
-        }
         transaction.Commit();
     }
 
