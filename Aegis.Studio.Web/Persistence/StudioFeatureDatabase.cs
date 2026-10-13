@@ -33,8 +33,6 @@ public sealed class StudioFeatureDatabase
             );
             alter table studio_workspaces add column if not exists default_job_lead text null;
             alter table studio_jobs add column if not exists job_lead text null;
-            -- Keep this backfill aligned with StudioDatabase: closed jobs retain their historical details.
-            update studio_jobs set job_lead=assigned_to where job_lead is null and assigned_to is not null and status not in ('Completed', 'Cancelled');
             create index if not exists ix_studio_jobs_lead on studio_jobs(lower(job_lead),status,created_at_utc desc);
 
             create index if not exists ix_studio_workspace_members_user on studio_workspace_members(lower(user_name),workspace_id);
@@ -82,19 +80,6 @@ public sealed class StudioFeatureDatabase
             create index if not exists ix_studio_job_activities_job on studio_job_activities(job_id,status,due_at_utc);
             create index if not exists ix_studio_job_activities_assigned on studio_job_activities(lower(assigned_to),status,due_at_utc);
 
-            do $$
-            begin
-                if to_regclass('public.studio_production_tasks') is not null then
-                    insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,due_at_utc,started_at_utc,completed_at_utc,created_by,created_at_utc,updated_at_utc)
-                    select id,job_id,'Other',title,description,
-                           case status when 'NotStarted' then 'NotStarted' when 'InProgress' then 'InProgress' when 'Blocked' then 'Blocked' when 'Completed' then 'Completed' else 'NotStarted' end,
-                           'Normal',assigned_to,due_at_utc,null,completed_at_utc,'production-task-migration',created_at_utc,coalesce(completed_at_utc,created_at_utc)
-                    from studio_production_tasks
-                    on conflict(id) do nothing;
-                    drop table studio_production_tasks;
-                end if;
-            end $$;
-
             alter table studio_job_activities add column if not exists collection_name text null;
 
             create table if not exists studio_photographers
@@ -113,14 +98,12 @@ public sealed class StudioFeatureDatabase
 
             create table if not exists studio_shoot_sessions
             (
-                id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,schedule_entry_id uuid null references studio_schedule_entries(id) on delete cascade,
+                id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,schedule_entry_id uuid not null references studio_schedule_entries(id) on delete cascade,
                 photographer_user_name text not null,assistant_user_name text null,call_time_utc timestamptz not null,planned_end_utc timestamptz not null,location text null,status text not null,
                 checked_in_at_utc timestamptz null,checked_out_at_utc timestamptz null,image_count integer not null default 0,backup_confirmed boolean not null default false,reshoot_required boolean not null default false,
                 coverage_notes text null,equipment_notes text null,handoff_status text not null default 'NotReady',handoff_to text null,created_at_utc timestamptz not null,updated_at_utc timestamptz not null,
                 check(planned_end_utc > call_time_utc)
             );
-            delete from studio_shoot_sessions where schedule_entry_id is null;
-            alter table studio_shoot_sessions alter column schedule_entry_id set not null;
             create index if not exists ix_studio_shoot_sessions_job on studio_shoot_sessions(job_id,call_time_utc);
             create index if not exists ix_studio_shoot_sessions_photographer on studio_shoot_sessions(lower(photographer_user_name),call_time_utc);
 

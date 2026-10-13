@@ -306,7 +306,6 @@ app.MapFrontDeskPosLaunch();
 app.MapJobLifecycle();
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
 Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(app.Services.GetRequiredService<StudioDatabase>());
-new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).MigratePendingJobs();
 app.MapFrontDeskBookingRequests();
 app.MapConnectedWorkflow();
 Aegis.Studio.Web.Finance.FinanceReleaseStore.MapStudioFinance(app);

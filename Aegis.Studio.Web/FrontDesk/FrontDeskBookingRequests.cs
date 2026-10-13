@@ -168,27 +168,6 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         Execute(connection,tx,"update studio_frontdesk_requests set status='AwaitingConfirmation' where id=$1",id);
         tx.Commit();return GetAll().Single(x=>x.Id==id);
     }
-    public void MigratePendingJobs()
-    {
-        using var c=database.OpenConnection();using var tx=c.BeginTransaction();
-        Execute(c,tx,"select pg_advisory_xact_lock(hashtextextended('studio-pending-jobs-migration',0))");
-        var rows=new List<FrontDeskRequest>();
-        using(var q=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,0::numeric,r.created_at_utc from studio_frontdesk_requests r where job_id is null order by created_at_utc for update",c,tx))
-        using(var r=q.ExecuteReader()){while(r.Read())rows.Add(Read(r));}
-        foreach(var row in rows)
-        {
-            var request=row.Request;
-            using(var w=new NpgsqlCommand("select exists(select 1 from studio_workspaces where id=$1 and is_enabled)",c,tx)){w.Parameters.AddWithValue(request.WorkspaceId);if(!(bool)w.ExecuteScalar()!)request=request with{WorkspaceId=WorkflowRules.UnassignedWorkspaceId};}
-            Guid job=CreatePendingJob(c,tx,request,"Migration");
-            Execute(c,tx,"update studio_jobs set stage_entered_at_utc=null,created_at_utc=$2 where id=$1",job,row.CreatedAtUtc);
-            Execute(c,tx,"update studio_workflow_history set entered_at_utc=null where job_id=$1",job);
-            Execute(c,tx,"update studio_frontdesk_requests set job_id=$2,workspace_id=$3,payload=$4::jsonb where id=$1",row.Id,job,request.WorkspaceId,JsonSerializer.Serialize(request,JsonOptions));
-            Execute(c,tx,"insert into studio_financial_events(id,job_id,kind,amount,note,recorded_by,created_at_utc) select id,$2,'Deposit',amount,currency||' / '||provider||' / '||reference,recorded_by,created_at_utc from studio_frontdesk_deposits where request_id=$1 on conflict(id) do nothing",row.Id,job);
-            Execute(c,tx,"delete from studio_notifications where reference_type='Job' and reference_id=$1 and workflow_event_key is not null",job.ToString());
-            Execute(c,tx,"delete from studio_workflow_delivery_failures where job_id=$1",job);
-        }
-        tx.Commit();
-    }
     private static Guid CreatePendingJob(NpgsqlConnection c,NpgsqlTransaction tx,PendingBookingRequest r,string user)
     {
         Guid conversation=r.ConversationId??Guid.NewGuid();
