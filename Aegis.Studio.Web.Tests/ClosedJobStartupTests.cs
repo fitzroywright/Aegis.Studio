@@ -1,3 +1,5 @@
+using Aegis.Studio.Web.Media;
+using Aegis.Studio.Web.WorkspaceJobs;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Workflow;
 using Npgsql;
@@ -51,6 +53,8 @@ public sealed class ClosedJobStartupTests
         {
             await database.InitializeAsync();
             await features.InitializeAsync();
+            new WorkspaceJobStore(database).EnsureSchema();
+            MediaProductionStore.Migrate(database);
         }
         foreach (var job in jobs)
         {
@@ -60,6 +64,17 @@ public sealed class ClosedJobStartupTests
             Assert.True(reader.Read());
             Assert.Equal(job.Key, reader.GetString(0));
             Assert.True(reader.IsDBNull(1));
+            // Restart must not generate media galleries or Unclassified subjects.
+
+        }
+        foreach (var job in jobs.Values)
+        {
+            using var count = new NpgsqlCommand("""
+                select (select count(*) from studio_job_subjects where job_id=$1)
+                     + (select count(*) from studio_media_galleries where id=$1)
+                """, context.Connection);
+            count.Parameters.AddWithValue(job);
+            Assert.Equal(0L, (long)count.ExecuteScalar()!);
         }
         foreach (string status in new[] { "Completed", "Cancelled" })
         {
