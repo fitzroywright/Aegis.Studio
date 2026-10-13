@@ -61,6 +61,8 @@ public sealed class PublicWebhookWorker(StudioDatabase db, IConfiguration config
         {
             try
             {
+                using var operation = Aegis.Studio.Web.Operations.DemoMaintenance.TryEnterOperation(db);
+                if (operation is null) { await Task.Delay(1000, token); continue; }
                 var targets = configuration.GetSection("PublicApi:Webhooks:Targets").GetChildren().ToArray();
                 if (targets.Length > 0)
                 {

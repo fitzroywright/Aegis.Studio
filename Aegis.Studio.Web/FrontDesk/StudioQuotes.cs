@@ -46,7 +46,8 @@ public sealed class StudioQuoteStore(StudioDatabase db)
         ClientQuoteRequest quote;string name,email;using(var r=cmd.ExecuteReader()){if(!r.Read())throw new KeyNotFoundException();if(!r.IsDBNull(2))return r.GetGuid(2);if(r.GetString(1)!="Accepted")throw new ArgumentException("Record acceptance before converting the quote.");quote=JsonSerializer.Deserialize<ClientQuoteRequest>(r.GetString(0),JsonOptions)!;name=r.GetString(3);email=r.IsDBNull(4)?"":r.GetString(4);}
         if(MediaProductionStore.Scalar(c,tx,"select id from studio_workspaces where id=$1 and is_enabled for share",quote.WorkspaceId) is null)throw new ArgumentException("Workspace is archived.");
         var request=new PendingBookingRequest(quote.WorkspaceId,name,email,quote.Title,quote.EventDate,quote.RequiredDeposit,"JMD",quote.Instructions,ClientId:quote.ClientId);FrontDeskRequestRules.Validate(request);
-        Guid booking=Guid.NewGuid();MediaProductionStore.Execute(c,tx,"insert into studio_frontdesk_requests(id,workspace_id,payload,created_by) values($1,$2,$3::jsonb,$4)",booking,quote.WorkspaceId,JsonSerializer.Serialize(request,JsonOptions),user);
+        Guid job=FrontDeskBookingRequestStore.CreatePendingJob(c,tx,request,user);
+        Guid booking=Guid.NewGuid();MediaProductionStore.Execute(c,tx,"insert into studio_frontdesk_requests(id,workspace_id,payload,created_by,job_id) values($1,$2,$3::jsonb,$4,$5)",booking,quote.WorkspaceId,JsonSerializer.Serialize(request,JsonOptions),user,job);
         MediaProductionStore.Execute(c,tx,"update studio_client_quotes set status='Converted',request_id=$2 where id=$1",id,booking);tx.Commit();return booking;
     }
 }

@@ -3,6 +3,7 @@ using Aegis.Studio.Web.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
 using Common.Storage;
+using Aegis.Studio.Web.Workflow;
 
 namespace Aegis.Studio.Web.Operations;
 
@@ -10,7 +11,7 @@ public static class DemoDataEndpoints
 {
     public static void MapStudioDemoData(this WebApplication app)
     {
-        app.MapPost("/api/admin/demo/seed", (HttpContext context, IWebHostEnvironment environment, DemoSeedCoordinator coordinator) =>
+        app.MapPost("/api/admin/demo/seed", (HttpContext context, DemoResetConfirmation request, IWebHostEnvironment environment, DemoSeedCoordinator coordinator) =>
         {
             bool demoDataEnabled = environment.IsDevelopment()
                 || app.Configuration.GetValue("DemoData:Enabled", false);
@@ -21,6 +22,7 @@ public static class DemoDataEndpoints
             if (string.IsNullOrWhiteSpace(login))
                 return Results.BadRequest(new { error = "A login identifier is required." });
 
+            if(request.Confirmation!="REMOVE STUDIO DEMO DATA") return Results.BadRequest(new { error="Confirm clearing and recreating demo data." });
             DemoSeedRunStatus run = coordinator.Start(login);
             return Results.Accepted($"/api/admin/demo/seed/{run.RunId}", run);
         }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
@@ -50,6 +52,12 @@ public static class DemoDataEndpoints
     {
         report?.Invoke(new(0, "Preparing", 0, 0, "Connecting to the database."));
 
+        using (var empty = database.OpenConnection())
+        using (var check = new NpgsqlCommand("select exists(select 1 from studio_jobs)", empty))
+            if ((bool)check.ExecuteScalar()!) throw new InvalidOperationException("Clear the demo dataset before recreating it. In-place demo repair is not supported.");
+
+        DemoDataExpansion.PreparePhotos(report);
+
         // Phase 1: create the high-volume operational workload in small, durable batches.
         // Each batch owns only deterministic DEMO ids, so retries are safe and do not
         // duplicate data. A later media/network failure cannot roll this work back.
@@ -65,7 +73,7 @@ public static class DemoDataEndpoints
             batchTransaction.Commit();
         }
 
-        // Phase 2: keep the richer historical/media demonstration, but isolate it from
+        // Phase 2: keep the richer media demonstration, but isolate it from
         // the operational batches above. If a public photo host or storage provider is
         // unavailable, rerunning the loader preserves and resumes the durable workload.
         using var connection = database.OpenConnection();
@@ -73,24 +81,8 @@ public static class DemoDataEndpoints
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = "select set_config('studio.demo_seed','true',true); select pg_advisory_xact_lock(72709128)";
-        report?.Invoke(new(26, "Rich demo data", 0, 0, "Loading historical workflows and media separately from the operational schedule."));
+        report?.Invoke(new(26, "Rich demo data", 0, 0, "Loading demo scenarios and media separately from the operational schedule."));
         command.ExecuteNonQuery();
-
-        bool loaded;
-        using(var current=new NpgsqlCommand("select exists(select 1 from studio_state where key='demo-data-v6-full-studio')",connection,transaction))
-            loaded=(bool)current.ExecuteScalar()!;
-        if(loaded)
-        {
-            report?.Invoke(new(28,"Checking storage",0,0,"Checking existing demo photographs without resetting job edits."));
-            int restored=DemoDataExpansion.RepairMedia(connection,transaction,login,storage,report)
-                +DemoFullStudioData.RepairMedia(connection,transaction,login,storage,report);
-            DemoIntegratedWorkflow.Seed(connection,transaction,login,storage,report);
-        DemoJobWorkflowGraphs.Seed(connection,transaction,login);
-            report?.Invoke(new(96,"Committing repairs",0,0,"Saving repaired demo photo references."));
-            transaction.Commit();
-            DemoJobPhotoPopulation.Seed(database,storage,login,report);
-            return $"Operational demo ready with {denseJobs} jobs covering {DemoDenseScheduleData.Days} days across all six workspaces. Full Studio demo verified; restored {restored} missing seeded photo versions and preserved existing edits.";
-        }
 
         int statementNumber = 0;
         foreach (string statement in SeedStatements)
@@ -104,10 +96,10 @@ public static class DemoDataEndpoints
             if (statement.Contains("$1", StringComparison.Ordinal)) seedCommand.Parameters.AddWithValue(login);
             seedCommand.ExecuteNonQuery();
             statementNumber++;
-            report?.Invoke(new(28 + 2 * statementNumber / SeedStatements.Length, "Base records", statementNumber, SeedStatements.Length, "Creating historical workspaces, conversations and jobs."));
+            report?.Invoke(new(28 + 2 * statementNumber / SeedStatements.Length, "Base records", statementNumber, SeedStatements.Length, "Creating demo workspaces, conversations and jobs."));
         }
 
-        RepairDemoWorkspaces(connection, transaction, login);
+        CreateDemoWorkspaces(connection, transaction, login);
         bool expanded = DemoDataExpansion.Seed(connection, transaction, login, storage, report);
         report?.Invoke(new(30, "Presentation records", 0, 0, "Linking wedding people, tasks and announcements."));
         bool presentationExpanded = DemoPresentationData.Seed(connection, transaction, login);
@@ -117,6 +109,7 @@ public static class DemoDataEndpoints
         report?.Invoke(new(96, "Committing rich demo", 0, 0, "Saving historical workflow and media data."));
         transaction.Commit();
         DemoJobPhotoPopulation.Seed(database,storage,login,report);
+        DemoDatasetFinalizer.Complete(database,storage,login,report);
 
         return fullStudioExpanded
             ? $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days across all six workspaces, plus the full Studio media demonstration."
@@ -127,7 +120,7 @@ public static class DemoDataEndpoints
                     : $"Operational demo ready with {denseJobs} jobs over {DemoDenseScheduleData.Days} days; existing rich demo data is already up to date.";
     }
 
-    private static void RepairDemoWorkspaces(NpgsqlConnection connection, NpgsqlTransaction transaction, string login)
+    private static void CreateDemoWorkspaces(NpgsqlConnection connection, NpgsqlTransaction transaction, string login)
     {
         const string workspaceSql = """
             insert into studio_workspaces(id,name,email_address,route_key,is_enabled,sort_order,created_at_utc,updated_at_utc)
@@ -185,14 +178,14 @@ public static class DemoDataEndpoints
         """insert into studio_workspace_members(workspace_id,user_name,display_name,is_active,access_workspace,can_view,reply_requester,view_attachments,add_attachments,create_job,edit_job,manage_schedule,manage_production,notify_members,edit_workspace,manage_members,admin_workspace,send_as_self,created_at_utc,updated_at_utc) values('de000000-0000-4000-0001-000000000003',$1,$1,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,now(),now());""",
         """insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values('de000000-0000-4000-0002-000000000001','de000000-0000-4000-0001-000000000001','DEMO - Family portrait enquiry','Morgan Family','demo-client-1@example.invalid','Manual',false,now()-interval '1 days');""",
         """insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values('de000000-0000-4000-0004-000000000001','de000000-0000-4000-0002-000000000001','Morgan Family','External','Fictional demo enquiry: Family portrait enquiry. Please confirm availability, package options and delivery dates.',now()-interval '1 days');""",
-        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to) values('de000000-0000-4000-0003-000000000001','de000000-0000-4000-0001-000000000001','de000000-0000-4000-0002-000000000001','DEMO - Family portrait enquiry','Morgan Family','New',current_date+-3,now()-interval '1 days',$1);""",
+        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead) values('de000000-0000-4000-0003-000000000001','de000000-0000-4000-0001-000000000001','de000000-0000-4000-0002-000000000001','DEMO - Family portrait enquiry','Morgan Family','New',current_date+-3,now()-interval '1 days',$1,$1);""",
         """update studio_conversations set job_id='de000000-0000-4000-0003-000000000001' where id='de000000-0000-4000-0002-000000000001';""",
         """insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) values('de000000-0000-4000-0005-000000000001','de000000-0000-4000-0003-000000000001','Deposit',2500,'DEMO ONLY - fictional deposit, no payment processed',now());""",
         """insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values('de000000-0000-4000-0006-000000000001','de000000-0000-4000-0003-000000000001','DEMO - Family portrait enquiry',date_trunc('day',now())+interval '-3 days 15 hours',date_trunc('day',now())+interval '-3 days 17 hours','Demo studio','Scheduled','Fictional demo appointment',now());""",
         """insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,due_at_utc,started_at_utc,completed_at_utc,created_by,created_at_utc,updated_at_utc) values('de000000-0000-4000-0007-000000000001','de000000-0000-4000-0003-000000000001','Other','DEMO - Edit and prepare delivery','Select images, retouch and prepare client delivery.','NotStarted','Normal',$1,now()+interval '-3 days',null,null,$1,now(),now());""",
         """insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values('de000000-0000-4000-0002-000000000002','de000000-0000-4000-0001-000000000001','DEMO - Passport photo session','Taylor Passport','demo-client-2@example.invalid','Manual',false,now()-interval '2 days');""",
         """insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values('de000000-0000-4000-0004-000000000002','de000000-0000-4000-0002-000000000002','Taylor Passport','External','Fictional demo enquiry: Passport photo session. Please confirm availability, package options and delivery dates.',now()-interval '2 days');""",
-        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to) values('de000000-0000-4000-0003-000000000002','de000000-0000-4000-0001-000000000001','de000000-0000-4000-0002-000000000002','DEMO - Passport photo session','Taylor Passport','Scheduled',current_date+-2,now()-interval '2 days',$1);""",
+        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead) values('de000000-0000-4000-0003-000000000002','de000000-0000-4000-0001-000000000001','de000000-0000-4000-0002-000000000002','DEMO - Passport photo session','Taylor Passport','Scheduled',current_date+-2,now()-interval '2 days',$1,$1);""",
         """update studio_conversations set job_id='de000000-0000-4000-0003-000000000002' where id='de000000-0000-4000-0002-000000000002';""",
         """insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) values('de000000-0000-4000-0005-000000000002','de000000-0000-4000-0003-000000000002','Deposit',5000,'DEMO ONLY - fictional deposit, no payment processed',now());""",
         """insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values('de000000-0000-4000-0006-000000000002','de000000-0000-4000-0003-000000000002','DEMO - Passport photo session',date_trunc('day',now())+interval '-2 days 15 hours',date_trunc('day',now())+interval '-2 days 17 hours','Demo studio','Scheduled','Fictional demo appointment',now());""",
@@ -201,14 +194,14 @@ public static class DemoDataEndpoints
         """insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values('de000000-0000-4000-0004-000000000003','de000000-0000-4000-0002-000000000003','Jordan Graduation','External','Fictional demo enquiry: Graduation portraits. Please confirm availability, package options and delivery dates.',now()-interval '3 days');""",
         """insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values('de000000-0000-4000-0002-000000000004','de000000-0000-4000-0001-000000000002','DEMO - Wedding coverage','Campbell Wedding','demo-client-4@example.invalid','Manual',false,now()-interval '4 days');""",
         """insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values('de000000-0000-4000-0004-000000000004','de000000-0000-4000-0002-000000000004','Campbell Wedding','External','Fictional demo enquiry: Wedding coverage. Please confirm availability, package options and delivery dates.',now()-interval '4 days');""",
-        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to) values('de000000-0000-4000-0003-000000000004','de000000-0000-4000-0001-000000000002','de000000-0000-4000-0002-000000000004','DEMO - Wedding coverage','Campbell Wedding','Photography',current_date+0,now()-interval '4 days',$1);""",
+        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead) values('de000000-0000-4000-0003-000000000004','de000000-0000-4000-0001-000000000002','de000000-0000-4000-0002-000000000004','DEMO - Wedding coverage','Campbell Wedding','Photography',current_date+0,now()-interval '4 days',$1,$1);""",
         """update studio_conversations set job_id='de000000-0000-4000-0003-000000000004' where id='de000000-0000-4000-0002-000000000004';""",
         """insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) values('de000000-0000-4000-0005-000000000004','de000000-0000-4000-0003-000000000004','Deposit',10000,'DEMO ONLY - fictional deposit, no payment processed',now());""",
         """insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values('de000000-0000-4000-0006-000000000004','de000000-0000-4000-0003-000000000004','DEMO - Wedding coverage',date_trunc('day',now())+interval '0 days 15 hours',date_trunc('day',now())+interval '0 days 17 hours','Demo studio','Scheduled','Fictional demo appointment',now());""",
         """insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,due_at_utc,started_at_utc,completed_at_utc,created_by,created_at_utc,updated_at_utc) values('de000000-0000-4000-0007-000000000004','de000000-0000-4000-0003-000000000004','Other','DEMO - Edit and prepare delivery','Select images, retouch and prepare client delivery.','NotStarted','Normal',$1,now()+interval '0 days',null,null,$1,now(),now());""",
         """insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values('de000000-0000-4000-0002-000000000005','de000000-0000-4000-0001-000000000002','DEMO - Conference photography','Harbour Conference','demo-client-5@example.invalid','Manual',false,now()-interval '5 days');""",
         """insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values('de000000-0000-4000-0004-000000000005','de000000-0000-4000-0002-000000000005','Harbour Conference','External','Fictional demo enquiry: Conference photography. Please confirm availability, package options and delivery dates.',now()-interval '5 days');""",
-        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to) values('de000000-0000-4000-0003-000000000005','de000000-0000-4000-0001-000000000002','de000000-0000-4000-0002-000000000005','DEMO - Conference photography','Harbour Conference','Production',current_date+1,now()-interval '5 days',$1);""",
+        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead) values('de000000-0000-4000-0003-000000000005','de000000-0000-4000-0001-000000000002','de000000-0000-4000-0002-000000000005','DEMO - Conference photography','Harbour Conference','Production',current_date+1,now()-interval '5 days',$1,$1);""",
         """update studio_conversations set job_id='de000000-0000-4000-0003-000000000005' where id='de000000-0000-4000-0002-000000000005';""",
         """insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) values('de000000-0000-4000-0005-000000000005','de000000-0000-4000-0003-000000000005','Deposit',12500,'DEMO ONLY - fictional deposit, no payment processed',now());""",
         """insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values('de000000-0000-4000-0006-000000000005','de000000-0000-4000-0003-000000000005','DEMO - Conference photography',date_trunc('day',now())+interval '1 days 15 hours',date_trunc('day',now())+interval '1 days 17 hours','Demo studio','Scheduled','Fictional demo appointment',now());""",
@@ -217,14 +210,14 @@ public static class DemoDataEndpoints
         """insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values('de000000-0000-4000-0004-000000000006','de000000-0000-4000-0002-000000000006','Reid Anniversary','External','Fictional demo enquiry: Anniversary album enquiry. Please confirm availability, package options and delivery dates.',now()-interval '6 days');""",
         """insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values('de000000-0000-4000-0002-000000000007','de000000-0000-4000-0001-000000000003','DEMO - School photo day','Hillview School','demo-client-7@example.invalid','Manual',false,now()-interval '7 days');""",
         """insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values('de000000-0000-4000-0004-000000000007','de000000-0000-4000-0002-000000000007','Hillview School','External','Fictional demo enquiry: School photo day. Please confirm availability, package options and delivery dates.',now()-interval '7 days');""",
-        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to) values('de000000-0000-4000-0003-000000000007','de000000-0000-4000-0001-000000000003','de000000-0000-4000-0002-000000000007','DEMO - School photo day','Hillview School','Ready for Client',current_date+3,now()-interval '7 days',$1);""",
+        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead) values('de000000-0000-4000-0003-000000000007','de000000-0000-4000-0001-000000000003','de000000-0000-4000-0002-000000000007','DEMO - School photo day','Hillview School','Ready for Client',current_date+3,now()-interval '7 days',$1,$1);""",
         """update studio_conversations set job_id='de000000-0000-4000-0003-000000000007' where id='de000000-0000-4000-0002-000000000007';""",
         """insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) values('de000000-0000-4000-0005-000000000007','de000000-0000-4000-0003-000000000007','Deposit',17500,'DEMO ONLY - fictional deposit, no payment processed',now());""",
         """insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values('de000000-0000-4000-0006-000000000007','de000000-0000-4000-0003-000000000007','DEMO - School photo day',date_trunc('day',now())+interval '3 days 15 hours',date_trunc('day',now())+interval '3 days 17 hours','Demo studio','Scheduled','Fictional demo appointment',now());""",
         """insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,due_at_utc,started_at_utc,completed_at_utc,created_by,created_at_utc,updated_at_utc) values('de000000-0000-4000-0007-000000000007','de000000-0000-4000-0003-000000000007','Other','DEMO - Edit and prepare delivery','Select images, retouch and prepare client delivery.','NotStarted','Normal',$1,now()+interval '3 days',null,null,$1,now(),now());""",
         """insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values('de000000-0000-4000-0002-000000000008','de000000-0000-4000-0001-000000000003','DEMO - Corporate headshots','Cedar Team','demo-client-8@example.invalid','Manual',false,now()-interval '8 days');""",
         """insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values('de000000-0000-4000-0004-000000000008','de000000-0000-4000-0002-000000000008','Cedar Team','External','Fictional demo enquiry: Corporate headshots. Please confirm availability, package options and delivery dates.',now()-interval '8 days');""",
-        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to) values('de000000-0000-4000-0003-000000000008','de000000-0000-4000-0001-000000000003','de000000-0000-4000-0002-000000000008','DEMO - Corporate headshots','Cedar Team','Completed',current_date+4,now()-interval '8 days',$1);""",
+        """insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead) values('de000000-0000-4000-0003-000000000008','de000000-0000-4000-0001-000000000003','de000000-0000-4000-0002-000000000008','DEMO - Corporate headshots','Cedar Team','Completed',current_date+4,now()-interval '8 days',$1,$1);""",
         """update studio_conversations set job_id='de000000-0000-4000-0003-000000000008' where id='de000000-0000-4000-0002-000000000008';""",
         """insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc) values('de000000-0000-4000-0005-000000000008','de000000-0000-4000-0003-000000000008','Deposit',20000,'DEMO ONLY - fictional deposit, no payment processed',now());""",
         """insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values('de000000-0000-4000-0006-000000000008','de000000-0000-4000-0003-000000000008','DEMO - Corporate headshots',date_trunc('day',now())+interval '4 days 15 hours',date_trunc('day',now())+interval '4 days 17 hours','Demo studio','Scheduled','Fictional demo appointment',now());""",

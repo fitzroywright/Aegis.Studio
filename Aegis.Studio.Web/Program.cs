@@ -264,6 +264,23 @@ app.Use(async(context,next)=>
         else await context.Response.WriteAsJsonAsync(new{error=error is ArgumentException?error.Message:error is Npgsql.PostgresException {SqlState:"55000"}?"This Job is closed. Obtain Operations Manager reopening before editing operational records.":"This action could not be completed. Your saved data is retained; refresh and retry."});
     }
 });
+app.Use(async (context, next) =>
+{
+    bool status = context.Request.Path.StartsWithSegments("/api/admin/demo")
+        || context.Request.Path.StartsWithSegments("/api/admin/connected-workflow/demo-data")
+        || context.Request.Path.StartsWithSegments("/api/auth")
+        || !context.Request.Path.StartsWithSegments("/api");
+    if (status) { await next(); return; }
+    using var operation = DemoMaintenance.TryEnterOperation(context.RequestServices.GetRequiredService<StudioDatabase>());
+    if (operation is null)
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.Headers.RetryAfter = "2";
+        await context.Response.WriteAsJsonAsync(new { error = "Studio data is being cleared and recreated. Please wait for completion." });
+        return;
+    }
+    await next();
+});
 app.UseMiddleware<StorageFailureMiddleware>();
 app.UseMiddleware<TodayStartupTimingMiddleware>();
 app.UseAuthentication();
@@ -306,7 +323,6 @@ app.MapFrontDeskPosLaunch();
 app.MapJobLifecycle();
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
 Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(app.Services.GetRequiredService<StudioDatabase>());
-new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).MigratePendingJobs();
 app.MapFrontDeskBookingRequests();
 app.MapConnectedWorkflow();
 Aegis.Studio.Web.Finance.FinanceReleaseStore.MapStudioFinance(app);

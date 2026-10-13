@@ -253,24 +253,6 @@ internal static class DemoFullStudioData
         return Math.Max(MinimumDemoImagesPerJob, requested);
     }
 
-    internal static int RepairMedia(NpgsqlConnection c,NpgsqlTransaction tx,string login,IFileStorage storage,Action<DemoSeedProgress>? report)
-    {
-        int restored=0,ordinal=0;var versions=new PrefixedFileStorage(storage,"VersionStore");
-        foreach(var job in Jobs)
-        {
-            ordinal++;int count=MediaCount(job),sourceCount=PhysicalSourceCount(job);Guid jobId=Id(41,job.Number);
-            using(var old=new NpgsqlCommand("select coalesce(max(substring(asset_key from 'asset-([0-9]+)$')::int),0) from studio_asset_versions where job_id=$1 and asset_key like $2",c,tx)){old.Parameters.AddWithValue(jobId);old.Parameters.AddWithValue($"demo-full/{job.Number}/asset-%");count=Math.Max(count,Convert.ToInt32(old.ExecuteScalar()));}
-            for(int asset=0;asset<count;asset++)
-            {
-                report?.Invoke(new(32+(int)(63*(ordinal-1+(double)asset/count)/Jobs.Length),"Checking demo photographs",asset,count,$"{job.Title}: checking photo {asset+1}/{count}."));
-                string key=$"demo-full/{job.Number}/asset-{asset+1:000}";
-                Guid original=DemoDataExpansion.AddImage(c,tx,versions,jobId,key,MediaId(64,job.Number,asset),1,SelectPhotoVariant(job,asset%sourceCount),null,login,true,()=>restored++,PortraitSource(job,asset));
-                if(asset%50==0 && original!=Guid.Empty)DemoDataExpansion.AddImage(c,tx,versions,jobId,key,MediaId(66,job.Number,asset),2,SelectPhotoVariant(job,asset%sourceCount),original,login,true,()=>restored++,PortraitSource(job,asset));
-            }
-        }
-        return restored;
-    }
-
     private static int DemoSubjectCount(DemoJob job)
     {
         return job.Number switch

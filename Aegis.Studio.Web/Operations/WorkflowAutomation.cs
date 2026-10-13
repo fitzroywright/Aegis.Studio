@@ -80,7 +80,8 @@ public static class WorkflowAutomationEndpoints
             {
                 try
                 {
-                    engine.ResumeDueRuns();
+                    using var operation = DemoMaintenance.TryEnterOperation(database);
+                    if (operation is not null) engine.ResumeDueRuns();
                 }
                 catch (Exception exception)
                 {

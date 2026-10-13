@@ -127,18 +127,20 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         this.ownedHttpClients = clients.ToArray();
         this.deliveryStore = new PostgreSqlExternalDeliveryStore(connectionString, deliveryOptions, QueueName);
         ExternalDeliveryDispatcher dispatcher = new(this.externalChannels, deliveryOptions, idempotencyStore: this.deliveryStore);
-        this.processor = new ExternalDeliveryProcessor(this.deliveryStore, dispatcher, deliveryOptions);
+        this.processor = new ExternalDeliveryProcessor(this.deliveryStore, new Aegis.Studio.Web.Operations.DemoSafeDeliveryDispatcher(database, dispatcher), deliveryOptions);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Task processorTask = this.processor.RunAsync(stoppingToken);
+        Task processorTask = RunProcessor(stoppingToken);
         try
         {
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
+                    using var operation = Aegis.Studio.Web.Operations.DemoMaintenance.TryEnterOperation(database);
+                    if (operation is null) { await Task.Delay(1000, stoppingToken); continue; }
                     ReconcileDeliveryState();
                     foreach (PendingNotification item in GetPending()) await QueueAsync(item, stoppingToken);
                 }
@@ -158,6 +160,17 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
         {
             try { await processorTask; }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        }
+    }
+
+    private async Task RunProcessor(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            try { await processor.RunAsync(token); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
+            catch (Exception error) { logger.LogError(error, "Notification processor failed; Studio remains available. Clear invalid demo data before recreating it."); }
+            await Task.Delay(TimeSpan.FromSeconds(10), token);
         }
     }
 
@@ -260,6 +273,11 @@ public sealed class NotificationDeliveryWorker : BackgroundService, IAsyncDispos
             !string.IsNullOrWhiteSpace(item.ReferenceId)
                 ? item.ReferenceId.Trim()
                 : item.Id.ToString("D");
+
+        using (var epochConnection = database.OpenConnection())
+        using (var epoch = new NpgsqlCommand("select value from studio_state where key='studio-dataset-epoch'", epochConnection))
+            if (epoch.ExecuteScalar() is string generation)
+            { metadata ??= new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase); metadata["StudioDatasetEpoch"] = generation; }
 
         if (!string.IsNullOrWhiteSpace(item.ReferenceType))
         {

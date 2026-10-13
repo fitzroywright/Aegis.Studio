@@ -42,33 +42,38 @@ public sealed class DemoSeedCoordinator
         this.environment = environment;
     }
 
-    public DemoSeedRunStatus Start(string login, bool reset = false)
+    public DemoSeedRunStatus Start(string login)
     {
         EnsureSchema();
         lock (gate)
         {
-            if (activeTask is { IsCompleted: false } && activeRunId is Guid running)
+            if (activeTask is { IsCompleted: false } && activeRunId is not null)
             {
-                if(reset) throw new InvalidOperationException("A demo load is already running. Wait for it to finish before resetting.");
-                return Get(running) ?? throw new InvalidOperationException("The active demo load could not be read.");
+                throw new InvalidOperationException("A demo recreation is already running. Wait for it to finish before starting another.");
             }
-            if(reset) StudioFactoryReset.ValidateStorage(storage, configuration);
+            StudioFactoryReset.ValidateStorage(storage, configuration);
 
-            DemoSeedRunStatus? existing = ReadLatestRunning();
-            if (existing is not null)
+            var reservation = DemoMaintenance.ReserveReset(database);
+            try
             {
-                // A process restart can leave a persisted Running row with no worker.
-                // Mark it interrupted and start a fresh idempotent run.
-                MarkInterrupted(existing.RunId);
-            }
+                DemoSeedRunStatus? existing = ReadLatestRunning();
+                if (existing is not null)
+                {
+                    // A process restart can leave a persisted Running row with no worker.
+                    // Mark it interrupted; the next run clears and recreates the dataset.
+                    MarkInterrupted(existing.RunId);
+                }
 
-            Guid id = Guid.NewGuid();
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            Write(new DemoSeedRunStatus(id, "Running", 0, "Preparing", 0, 0,
-                "Demo loading has started on the server.", now, now));
-            activeRunId = id;
-            activeTask = Task.Run(() => Run(id, login, reset));
-            return Get(id)!;
+                Guid id = Guid.NewGuid();
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                var initial = new DemoSeedRunStatus(id, "Running", 0, "Preparing", 0, 0,
+                    "Demo recreation has started on the server.", now, now);
+                Write(initial);
+                activeRunId = id;
+                activeTask = Task.Run(() => Run(id, login, now, reservation));
+                return initial;
+            }
+            catch { reservation.Dispose(); throw; }
         }
     }
 
@@ -83,7 +88,9 @@ public sealed class DemoSeedCoordinator
             """, c);
         cmd.Parameters.AddWithValue(runId);
         using var r = cmd.ExecuteReader();
-        return r.Read() ? Read(r) : null;
+        var run = r.Read() ? Read(r) : null;
+        r.Close();
+        return RecoverInterrupted(run);
     }
 
     public DemoSeedRunStatus? Current
@@ -100,20 +107,46 @@ public sealed class DemoSeedCoordinator
                 limit 1
                 """, c);
             using var r = cmd.ExecuteReader();
-            return r.Read() ? Read(r) : null;
+            var run = r.Read() ? Read(r) : null;
+            r.Close();
+            return RecoverInterrupted(run);
         }
     }
 
-    private async Task Run(Guid id, string login, bool reset)
+    private DemoSeedRunStatus? RecoverInterrupted(DemoSeedRunStatus? run)
     {
-        DateTimeOffset started = Get(id)?.StartedAtUtc ?? DateTimeOffset.UtcNow;
+        if (run?.Status != "Running") return run;
+        lock (gate)
+        {
+            if (activeRunId == run.RunId && activeTask is { IsCompleted: false }) return run;
+            // Another process may own the active recreation; only an idle database
+            // permits declaring its persisted progress interrupted.
+            using var idle = DemoMaintenance.TryEnterOperation(database);
+            if (idle is null) return run;
+            MarkInterrupted(run.RunId);
+            return run with
+            {
+                Status = "Failed", Stage = "Interrupted",
+                Message = "The previous server process ended before this demo load completed. Clear and recreate the dataset.",
+                UpdatedAtUtc = DateTimeOffset.UtcNow, CompletedAtUtc = DateTimeOffset.UtcNow
+            };
+        }
+    }
+
+    private async Task Run(Guid id, string login, DateTimeOffset started, IDisposable reservation)
+    {
+        using var reserved = reservation;
+        using var resetContext = DemoMaintenance.UseResetContext(database);
+        bool cleared = false;
         try
         {
-            if(reset)
+            DemoDataExpansion.PreparePhotos(progress => Write(new DemoSeedRunStatus(id,"Running",progress.Percent,progress.Stage,progress.Current,progress.Total,progress.Message,started,DateTimeOffset.UtcNow)));
+            using var maintenance = DemoMaintenance.EnterReset(database);
             {
                 Write(new DemoSeedRunStatus(id,"Running",0,"Resetting",0,0,
                     "Removing Studio business records and files before rebuilding the full demo.",started,DateTimeOffset.UtcNow));
                 await StudioFactoryReset.ExecuteAsync(database,storage,configuration,environment,null,CancellationToken.None);
+                cleared = true;
             }
             string result = DemoDataEndpoints.Seed(database, storage, login, progress =>
             {
@@ -122,15 +155,34 @@ public sealed class DemoSeedCoordinator
                     started, DateTimeOffset.UtcNow));
             });
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            // Completed means the validated dataset is available to normal requests.
+            reserved.Dispose();
+            resetContext.Dispose();
             Write(new DemoSeedRunStatus(id, "Completed", 100, "Complete", 0, 0, result,
                 started, now, now));
         }
         catch (Exception error)
         {
             logger.LogError(error, "Demo seed failed RunId={RunId}", id);
+            string cleanup = "";
+            if (cleared)
+            {
+                try
+                {
+                    await StudioFactoryReset.ExecuteAsync(database,storage,configuration,environment,null,CancellationToken.None);
+                    cleanup = " Incomplete demo records and files were cleared.";
+                }
+                catch (Exception cleanupError)
+                {
+                    logger.LogError(cleanupError, "Incomplete demo storage cleanup failed RunId={RunId}", id);
+                    ConnectedWorkflowDemo.Reset(database);
+                    cleanup = " Incomplete business records were cleared; retry Clear to finish storage cleanup.";
+                }
+            }
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            Write(new DemoSeedRunStatus(id, "Failed", 0, "Failed", 0, 0,
-                "Demo data could not be loaded: " + error.Message,
+            var last = Get(id);
+            Write(new DemoSeedRunStatus(id, "Failed", last?.Percent ?? 0, last?.Stage ?? "Failed", last?.Current ?? 0, last?.Total ?? 0,
+                "Demo recreation failed. Clear and recreate again: " + error.Message + cleanup,
                 started, now, now));
         }
         finally
@@ -167,7 +219,7 @@ public sealed class DemoSeedCoordinator
         using var cmd = new NpgsqlCommand("""
             update studio_demo_seed_runs
             set status='Failed',stage='Interrupted',
-                message='The previous server process ended before this demo load completed. Retry resumes the idempotent seed.',
+                message='The previous server process ended before this demo load completed. Retry clears the incomplete dataset and recreates it.',
                 updated_at_utc=now(),completed_at_utc=now()
             where run_id=$1 and status='Running'
             """, c);
@@ -231,4 +283,3 @@ public sealed class DemoSeedCoordinator
         r.GetString(6), r.GetFieldValue<DateTimeOffset>(7), r.GetFieldValue<DateTimeOffset>(8),
         r.IsDBNull(9) ? null : r.GetFieldValue<DateTimeOffset>(9));
 }
-

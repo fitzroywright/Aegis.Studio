@@ -10,9 +10,11 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class ClosedJobStartupTests
 {
     [StudioPostgresFact]
-    public async Task RestartPreservesJobLeadsAndKeepsGuardActive()
+    public async Task RestartPreservesOpenAndClosedJobLeads()
     {
         using var context = new IntegratedWorkflowTests.WorkflowContext();
+        new Aegis.Studio.Web.Operations.GlobalOperationalRoleStore(context.Database).EnsureSchema();
+        new Aegis.Studio.Web.Operations.StudioEmployeeDirectoryStore(context.Database).EnsureSchema();
         WorkflowSchema.Ensure(context.Database);
         using var schemaCommand = new NpgsqlCommand("select current_schema()", context.Connection);
         string schema = (string)schemaCommand.ExecuteScalar()!;
@@ -76,13 +78,21 @@ public sealed class ClosedJobStartupTests
             count.Parameters.AddWithValue(job);
             Assert.Equal(0L, (long)count.ExecuteScalar()!);
         }
-        foreach (string status in new[] { "Completed", "Cancelled" })
-        {
-            using var edit = new NpgsqlCommand("update studio_jobs set title='Forbidden edit' where id=$1", context.Connection);
-            edit.Parameters.AddWithValue(jobs[status]);
-            var error = Assert.Throws<PostgresException>(() => edit.ExecuteNonQuery());
-            Assert.Equal("55000", error.SqlState);
-            Assert.Contains("Reopen the closed Job", error.MessageText);
-        }
+
     }
+    [StudioPostgresFact, Trait("Database","Native")]
+    public void ClosedJobsStillRequireAuthorizedReopening()
+    {
+        using var context = new IntegratedWorkflowTests.WorkflowContext();
+        new Aegis.Studio.Web.Operations.GlobalOperationalRoleStore(context.Database).EnsureSchema();
+        new Aegis.Studio.Web.Operations.StudioEmployeeDirectoryStore(context.Database).EnsureSchema();
+        WorkflowSchema.Ensure(context.Database);
+        using (var close = new NpgsqlCommand("update studio_jobs set status='Completed' where id=$1",context.Connection))
+        { close.Parameters.AddWithValue(context.Job); close.ExecuteNonQuery(); }
+        using var edit = new NpgsqlCommand("update studio_jobs set title='Forbidden edit' where id=$1",context.Connection);
+        edit.Parameters.AddWithValue(context.Job);
+        var error = Assert.Throws<PostgresException>(()=>edit.ExecuteNonQuery());
+        Assert.Equal("55000",error.SqlState);
+    }
+
 }

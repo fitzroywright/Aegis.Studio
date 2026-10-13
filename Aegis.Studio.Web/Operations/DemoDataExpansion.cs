@@ -7,7 +7,7 @@ using Common.Storage;
 namespace Aegis.Studio.Web.Operations;
 
 // Only deterministic DEMO identifiers are used; no real jobs or files are changed.
-internal static class DemoDataExpansion
+internal static partial class DemoDataExpansion
 {
     private static readonly HttpClient demoPhotoClient = CreateDemoPhotoClient();
 
@@ -23,14 +23,14 @@ internal static class DemoDataExpansion
 
     private static HttpResponseMessage DownloadDemoPhoto(string preferredUrl,int variant,string? searchTerm=null)
     {
-        string gender=(variant&1)==0?"women":"men";
+        var cataloguePhoto=DemoPortraitCatalogue.Photos.FirstOrDefault(photo=>photo.Url==preferredUrl);
         DemoPhotoCandidate[] candidates=
         [
-            new(preferredUrl,"Wikimedia Commons","Public domain/CC0 as catalogued",preferredUrl),
-            new($"https://randomuser.me/api/portraits/{gender}/{Math.Abs(variant)%100}.jpg","RandomUser","Profile image supplied for application testing by RandomUser",$"https://randomuser.me/photos")
+            new(preferredUrl,"Wikimedia Commons",cataloguePhoto?.License??"Catalogue source",cataloguePhoto?.Page??preferredUrl),
+            new(DemoPortraitCatalogue.Url(Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count),"Wikimedia Commons","Catalogue licence",DemoPortraitCatalogue.Photos[Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count].Page)
         ];
 
-        int start=Random.Shared.Next(candidates.Length);
+        int start=0;
         Exception? lastError=null;
         for(int offset=0;offset<candidates.Length;offset++)
         {
@@ -232,54 +232,8 @@ internal static class DemoDataExpansion
         return true;
     }
 
-    // Retrying a seed checks bytes, not only its database marker or sidecar metadata.
-    private static Guid? ReusableVersion(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,Guid job,string key,int version,ref Guid id,bool repairOnly)
+    private static Guid AddWeddingPhoto(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int photoIndex,Guid? source,string login)
     {
-        Guid existingId;string path;string? note;
-        using(var command=new NpgsqlCommand("select id,stored_path,note from studio_asset_versions where job_id=$1 and asset_key=$2 and version_number=$3",c,tx))
-        {
-            command.Parameters.AddWithValue(job);command.Parameters.AddWithValue(key);command.Parameters.AddWithValue(version);
-            using var reader=command.ExecuteReader();
-            if(!reader.Read())return repairOnly?Guid.Empty:null;
-            existingId=reader.GetGuid(0);path=reader.GetString(1);note=reader.IsDBNull(2)?null:reader.GetString(2);
-        }
-        // A later user upload at the same tuple is not ours to replace.
-        bool owned=existingId==id
-            || (note?.StartsWith("CC0 wedding photograph from Wikimedia Commons, seeded for Studio demonstration data.",StringComparison.Ordinal)==true)
-            || (note?.StartsWith("Real CC0/public-domain photograph from Wikimedia Commons.",StringComparison.Ordinal)==true)
-            || (note?.StartsWith("Demo photograph from ",StringComparison.Ordinal)==true);
-        if(!owned)return existingId;
-        id=existingId;
-        try { using Stream file=storage.OpenReadAsync(path).GetAwaiter().GetResult();return existingId; }
-        catch(StorageException error) when(error.Code=="STORAGE-MISSING-001") { return null; }
-    }
-
-    internal static int RepairMedia(NpgsqlConnection c,NpgsqlTransaction tx,string login,IFileStorage storage,Action<DemoSeedProgress>? report)
-    {
-        int restored=0;var versions=new PrefixedFileStorage(storage,"VersionStore");
-        for(int index=0;index<JobNumbers.Length;index++)
-        {
-            int number=JobNumbers[index],count=number==4?50:4;Guid job=Id(3,number);
-            for(int asset=0;asset<count;asset++)
-            {
-                report?.Invoke(new(10+(int)(20*(index+(double)asset/count)/JobNumbers.Length),"Checking demo photographs",asset,count,$"Legacy job {index+1}/{JobNumbers.Length}: checking photo {asset+1}/{count}."));
-                string key=$"demo-{number}-{asset}";Guid original=number==4
-                    ?AddWeddingPhoto(c,tx,versions,job,key,Id(26,number*100+asset),1,asset,null,login,true,()=>restored++)
-                    :AddImage(c,tx,versions,job,key,Id(26,number*100+asset),1,index*16+asset,null,login,true,()=>restored++);
-                if(asset==0 && original!=Guid.Empty)
-                {
-                    if(number==4)AddWeddingPhoto(c,tx,versions,job,key,Id(27,number),2,asset+1,original,login,true,()=>restored++);
-                    else AddImage(c,tx,versions,job,key,Id(27,number),2,index*16+asset+1,original,login,true,()=>restored++);
-                }
-            }
-        }
-        return restored;
-    }
-
-    private static Guid AddWeddingPhoto(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int photoIndex,Guid? source,string login,bool repairOnly=false,Action? restored=null)
-    {
-        Guid? reusable=ReusableVersion(connection,transaction,storage,job,key,version,ref id,repairOnly);
-        if(reusable.HasValue)return reusable.Value;
         byte[]? bytes=null;
         string? selectedUrl=null;
         Exception? lastError=null;
@@ -288,22 +242,7 @@ internal static class DemoDataExpansion
             string url=weddingPhotoUrls[(photoIndex+attempt)%weddingPhotoUrls.Length];
             try
             {
-                if(!weddingPhotoCache.TryGetValue(url,out bytes))
-                {
-                    using HttpResponseMessage response=DownloadDemoPhoto(url,photoIndex,"wedding");
-                    byte[] sourceBytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-                    selectedUrl=response.RequestMessage?.RequestUri?.ToString()??url;
-                    demoPhotoSourceCache[url]=selectedUrl;
-                    demoPhotoSourceNameCache[url]=Header(response,"X-Aegis-Demo-Source","Wikimedia Commons");
-                    demoPhotoLicenseCache[url]=Header(response,"X-Aegis-Demo-License","Public domain/CC0 as catalogued");
-                    demoPhotoPageCache[url]=Header(response,"X-Aegis-Demo-Page",url);
-                    using var sourceStream=new MemoryStream(sourceBytes,writable:false);
-                    using var photograph=StudioImageProcessor.DecodeOriented(sourceStream);
-                    using var resized=StudioImageProcessor.ResizeMax(photograph,1200);
-                    bytes=StudioImageProcessor.EncodeJpeg(resized,85);
-                    if(weddingPhotoCache.Count>=64)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
-                    weddingPhotoCache[url]=bytes;
-                }
+                bytes=PhotoBytes(url,photoIndex,"wedding");
                 selectedUrl=demoPhotoSourceCache.GetValueOrDefault(url,url);
                 break;
             }
@@ -365,58 +304,20 @@ internal static class DemoDataExpansion
         ];
         foreach(object value in values)command.Parameters.AddWithValue(value);
         Guid result=(Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo wedding media upsert did not return an id."));
-        restored?.Invoke();
         return result;
     }
 
-    internal static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login,bool repairOnly=false,Action? restored=null,string? sourceUrl=null,string? searchTerm=null)
+    internal static Guid AddImage(NpgsqlConnection connection,NpgsqlTransaction transaction,IFileStorage storage,Guid job,string key,Guid id,int version,int variant,Guid? source,string login,string? sourceUrl=null,string? searchTerm=null)
     {
-        Guid? reusable=ReusableVersion(connection,transaction,storage,job,key,version,ref id,repairOnly);
-        if(reusable.HasValue)return reusable.Value;
-        if(repairOnly)
-        {
-            using var lookup=new NpgsqlCommand("select stored_path from studio_asset_versions where id=$1",connection,transaction);lookup.Parameters.AddWithValue(id);
-            if(lookup.ExecuteScalar() is string previousPath)
-            {
-                var metadata=storage.GetMetadataAsync(previousPath).GetAwaiter().GetResult();
-                if(metadata?.Metadata.TryGetValue("DemoSourceUrl",out string? previousUrl)==true&&!string.IsNullOrWhiteSpace(previousUrl))sourceUrl=previousUrl;
-            }
-        }
         byte[]? bytes=null;
         string? selectedUrl=null;
-        string orphan=$"{job:N}/demo/{id:N}.jpg";
-        var orphanInfo=storage.GetMetadataAsync(orphan).GetAwaiter().GetResult();
-        if(orphanInfo?.Metadata.GetValueOrDefault("Demo")=="true"&&orphanInfo.Metadata.GetValueOrDefault("AssetKey")==key&&orphanInfo.Length<=100_000_000)
-        {
-            string? oldUrl=orphanInfo.Metadata.GetValueOrDefault("DemoSourceUrl");
-            if(!string.IsNullOrWhiteSpace(oldUrl)&&(sourceUrl is null||oldUrl==sourceUrl))
-            {
-                try{using var previous=storage.OpenReadAsync(orphan).GetAwaiter().GetResult();using var restoredBytes=new MemoryStream();previous.CopyTo(restoredBytes);var candidate=restoredBytes.ToArray();if(Convert.ToHexString(SHA256.HashData(candidate)).Equals(orphanInfo.Sha256,StringComparison.OrdinalIgnoreCase)){bytes=candidate;selectedUrl=oldUrl;}}
-                catch(StorageException){/* Missing bytes with surviving metadata are redownloaded below. */}
-            }
-        }
         Exception? lastError=null;
         for(int attempt=0;bytes is null&&attempt<(sourceUrl is null?realPhotoUrls.Length:1);attempt++)
         {
             string url=sourceUrl??realPhotoUrls[(variant+attempt)%realPhotoUrls.Length];
             try
             {
-                if(!weddingPhotoCache.TryGetValue(url,out bytes))
-                {
-                    using HttpResponseMessage response=DownloadDemoPhoto(url,variant,searchTerm);
-                    byte[] sourceBytes=response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-                    selectedUrl=response.RequestMessage?.RequestUri?.ToString()??url;
-                    demoPhotoSourceCache[url]=selectedUrl;
-                    demoPhotoSourceNameCache[url]=Header(response,"X-Aegis-Demo-Source","Wikimedia Commons");
-                    demoPhotoLicenseCache[url]=Header(response,"X-Aegis-Demo-License","Public domain/CC0 as catalogued");
-                    demoPhotoPageCache[url]=Header(response,"X-Aegis-Demo-Page",url);
-                    using var sourceStream=new MemoryStream(sourceBytes,writable:false);
-                    using var photograph=StudioImageProcessor.DecodeOriented(sourceStream);
-                    using var resized=StudioImageProcessor.ResizeMax(photograph,1200);
-                    bytes=StudioImageProcessor.EncodeJpeg(resized,85);
-                    if(weddingPhotoCache.Count>=64)weddingPhotoCache.TryRemove(weddingPhotoCache.Keys.First(),out _);
-                    weddingPhotoCache[url]=bytes;
-                }
+                bytes=PhotoBytes(url,variant,searchTerm);
                 selectedUrl=demoPhotoSourceCache.GetValueOrDefault(url,url);
                 break;
             }
@@ -427,7 +328,7 @@ internal static class DemoDataExpansion
             }
         }
         if(bytes is null)
-            throw new InvalidOperationException("Unable to download any configured public-domain demo photograph.",lastError);
+            throw new InvalidOperationException("Unable to download a configured demo photograph.",lastError);
 
         string extension=".jpg";
         string contentType="image/jpeg";
@@ -458,8 +359,8 @@ internal static class DemoDataExpansion
                 throw new StorageException("STORAGE-INTEGRITY-001","Seeded photo verification failed.");
         const string sql="""
             insert into studio_asset_versions
-            (id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note)
-            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12)
+            (id,job_id,asset_key,version_number,file_name,content_type,size_bytes,sha256,stored_path,created_by,created_at_utc,source_version_id,note,demo_source)
+            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12,$13::jsonb)
             on conflict(job_id,asset_key,version_number) do update set
               file_name=excluded.file_name,
               content_type=excluded.content_type,
@@ -468,18 +369,19 @@ internal static class DemoDataExpansion
               stored_path=excluded.stored_path,
               created_by=excluded.created_by,
               source_version_id=excluded.source_version_id,
-              note=excluded.note
+              note=excluded.note,
+              demo_source=excluded.demo_source
             returning id
             """;
         using var command=new NpgsqlCommand(sql,connection,transaction);
         object[] values=[
             id,job,key,version,fileName,contentType,storedFile.Length,storedFile.Sha256,stored,login,
             (object?)source??DBNull.Value,
-            $"Demo photograph from {(sourceUrl is not null?demoPhotoSourceNameCache.GetValueOrDefault(sourceUrl,"configured source"):"configured source")}. Source URL retained in Common.Storage metadata."
+            $"Demo photograph from {(sourceUrl is not null?demoPhotoSourceNameCache.GetValueOrDefault(sourceUrl,"configured source"):"configured source")}. Source URL retained in Common.Storage metadata.",
+            System.Text.Json.JsonSerializer.Serialize(new { demo=true, source=selectedUrl, license=sourceUrl is not null?demoPhotoLicenseCache.GetValueOrDefault(sourceUrl,"Catalogue photograph"):"Catalogue photograph" })
         ];
         foreach(object value in values)command.Parameters.AddWithValue(value);
         Guid result=(Guid)(command.ExecuteScalar()??throw new InvalidOperationException("Demo photograph upsert did not return an id."));
-        restored?.Invoke();
         return result;
     }
 

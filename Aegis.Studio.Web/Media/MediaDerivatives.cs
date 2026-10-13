@@ -37,8 +37,10 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
         {
             try
             {
+                using var operation = Aegis.Studio.Web.Operations.DemoMaintenance.TryEnterOperation(database);
+                if (operation is null) { await Task.Delay(1000, stoppingToken); continue; }
                 var claim = await Claim(stoppingToken);
-                if (claim is null) { await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken); continue; }
+                if (claim is null) { operation.Dispose(); await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken); continue; }
                 await Generate(claim.Value.Id,claim.Value.Lease,stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
@@ -49,22 +51,9 @@ public sealed class MediaDerivativeWorker(StudioDatabase database, IFileStorage 
             }
         }
     }
-    private Guid? backfillAfter;
-    private bool backfillComplete;
     private async Task<(Guid Id,Guid Lease)?> Claim(CancellationToken token)
     {
         await using var c = database.OpenConnection();
-        // Backfill is incremental; it does not scan or decode images on a request.
-        if(!backfillComplete)
-        {
-            await using var backfill=new NpgsqlCommand("""
-                with page as (select id from studio_asset_versions where ($1::uuid is null or id>$1) order by id limit 100),
-                queued as (insert into studio_media_derivatives(version_id) select id from page on conflict do nothing returning version_id)
-                select max(id::text)::uuid from page
-                """,c);
-            backfill.Parameters.AddWithValue((object?)backfillAfter??DBNull.Value);
-            if(await backfill.ExecuteScalarAsync(token) is Guid cursor)backfillAfter=cursor;else backfillComplete=true;
-        }
         Guid lease=Guid.NewGuid();
         await using var cmd = new NpgsqlCommand("""
             update studio_media_derivatives d set status='Processing',attempts=attempts+1,lease_id=$1,
