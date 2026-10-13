@@ -13,17 +13,19 @@ for(const available of [false,true]){
   const w=dom.window,errors=[],requests=[];
   Object.assign(w,{
    json:async url=>{requests.push(url);return url==='/api/auth/me'?{user:{userName:'staff'}}:[];},
-   esc:value=>String(value??''),workspaceCache:[],loadWorkspaces:async()=>{},
+   workspaceCache:[],loadWorkspaces:async()=>{},
    console:{debug(){},info(){},warn(){},error(...args){errors.push(args.map(String).join(' '));}}
   });
   if(available)w.ResizeObserver=class{observe(){}disconnect(){}};
   else delete w.ResizeObserver;
   try{
-   for(const name of ['studio-status-order.js','subject-picker.js','studio-message-card.js','studio-navigation.js'])
+   for(const name of ['studio-status-order.js','subject-picker.js','studio-message-card.js','studio-page.js','studio-navigation.js'])
     w.eval(fs.readFileSync(path.join(root,name),'utf8'));
    await new Promise(resolve=>w.setTimeout(resolve,0));
    await w.studioTodayReady;
    assert.deepEqual(errors,[]);
+   assert.equal(w.esc('<script>"&'), '&lt;script&gt;&quot;&amp;');
+   assert.equal(w.esc, w.StudioPage.escape);
    assert.ok(w.document.querySelector('[data-mw-region="jobs"]'));
    assert.ok(w.document.querySelector('#todayMessageCard'));
    assert.equal(w.studioTodayDiagnostics.cancelled,false);
