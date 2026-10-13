@@ -14,11 +14,12 @@ internal static partial class DemoDataExpansion
     {
         // Downloaded source inputs are independent of application/demo records.
         // Resolve and decode them before opening scenario transactions or deleting the old dataset.
-        string[] urls = realPhotoUrls.Concat(weddingPhotoUrls).Concat(productPhotoUrls).Concat(maternityPhotoUrls).Concat(eventPhotoUrls).Concat(birthdayPhotoUrls).Concat(DemoPortraitCatalogue.Photos.Select(p => p.Url)).Distinct().ToArray();
-        for (int i = 0; i < urls.Length; i++)
+        string[] categories=["Wedding","Graduation","School","Product","Sports","Newborn","Maternity","Family","Birthday","Event","Portrait"];
+        var inputs=categories.SelectMany(category=>PhotoSources(category).Select(url=>(Category:category,Url:url))).ToArray();
+        for(int i=0;i<inputs.Length;i++)
         {
-            report?.Invoke(new(1, "Preparing photographs", i, urls.Length, $"Verifying photograph source {i+1}/{urls.Length} before recreating data."));
-            _ = PhotoBytes(urls[i], i, null);
+            report?.Invoke(new(1,"Preparing photographs",i,inputs.Length,$"Verifying {inputs[i].Category} photograph {i+1}/{inputs.Length} before recreating data."));
+            _=PhotoBytes(inputs[i].Url,i,inputs[i].Category);
         }
     }
 
