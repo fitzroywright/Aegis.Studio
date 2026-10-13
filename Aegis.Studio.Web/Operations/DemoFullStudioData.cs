@@ -213,7 +213,9 @@ internal static class DemoFullStudioData
             job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)?["Executives","Team","Selects","Unclassified"]:
             ["Selects","Proofs","Finals","Unclassified"];
 
-        int sourceCount=PhysicalSourceCount(job);
+        string workspace=Workspaces.Single(item=>item.Number==job.Workspace).Name;
+        string category=DemoDataExpansion.PhotoCategory(job.Type,workspace);
+        string[] sources=DemoDataExpansion.PhotoSources(job.Type,workspace);
         for(int i=0;i<count;i++)
         {
             report?.Invoke(new(32 + (int)(63 * (ordinal-1 + (double)i / count) / Jobs.Length), "Studio photographs", i, count, $"Job {ordinal}/{Jobs.Length}: {job.Title} — downloading and storing photo {i+1}/{count}."));
@@ -221,8 +223,8 @@ internal static class DemoFullStudioData
             Guid versionId=MediaId(64,job.Number,i);
             // Large portrait jobs use different real source photos for every asset.
             // Revisions preserve the same photograph and stable asset identity.
-            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount),null,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
-            if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,SelectPhotoVariant(job,i%sourceCount),original,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
+            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,i,null,login,sourceUrl:PhotoSource(job,i,sources,category),searchTerm:category);
+            if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,i,original,login,sourceUrl:PhotoSource(job,i,sources,category),searchTerm:category);
             Guid assetId=MediaId(65,job.Number,i);
             string status=statuses[(ordinal+i)%statuses.Length];
             assetId=ExecuteGuid(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status,assigned_to,capture_at_utc) values($1,$2,$2,$3,$4,$5,now()-($6 || ' hours')::interval) on conflict(job_id,asset_key) do update set production_status=excluded.production_status,assigned_to=excluded.assigned_to,capture_at_utc=excluded.capture_at_utc returning id",
@@ -278,38 +280,12 @@ internal static class DemoFullStudioData
         "Booking"=>"Needs Scheduling",
         _=>status
     };
-    private static bool IsPortraitCorpus(DemoJob job)=>job.Number is 106 or 301 or 303 or 401||
-        job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||
-        job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)||
-        job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase);
-    private static string? PortraitSource(DemoJob job,int asset)
+    private static string PhotoSource(DemoJob job,int asset,string[] sources,string category)
     {
-        if(!IsPortraitCorpus(job))return DemoPortraitCatalogue.Url(asset);
-        int offset=job.Number switch{106=>0,301=>180,303=>300,401=>400,_=>641+Array.FindIndex(Jobs.Where(j=>IsPortraitCorpus(j)&&j.Number is not(106 or 301 or 303 or 401)).ToArray(),j=>j.Number==job.Number)*8};
+        if(category!="Portrait")return sources[asset%sources.Length];
+        // Keep distinct portraits in high-volume ID and corporate jobs.
+        int offset=job.Number switch{106=>0,301=>180,_=>0};
         return DemoPortraitCatalogue.Url(offset+asset);
-    }
-
-    private static int PhysicalSourceCount(DemoJob job)
-    {
-        if(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return 2;
-        if(job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)) return 4;
-        if(job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)) return 2;
-        if(job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return 1;
-        return 1;
-    }
-
-    private static int SelectPhotoVariant(DemoJob job,int index)
-    {
-        // Indices map to the curated real-photo catalogue in DemoDataExpansion.
-        if(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return 10+(index%2);
-        if(job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)) return index%4;
-        if(job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("ID",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Corporate Portrait",StringComparison.OrdinalIgnoreCase)) return 4+(index%2);
-        if(job.Type.Contains("Product",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Campaign",StringComparison.OrdinalIgnoreCase)) return 9;
-        if(job.Type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)) return 8;
-        if(job.Type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)) return 7;
-        if(job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return 12;
-        if(job.Type.Contains("Portrait",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Senior",StringComparison.OrdinalIgnoreCase)) return 4+(index%2);
-        return 4+(index%2);
     }
 
     private static void SeedConversation(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,DemoClient client,Guid conversation,int ordinal)
