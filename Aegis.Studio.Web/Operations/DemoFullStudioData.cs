@@ -284,6 +284,13 @@ internal static class DemoFullStudioData
         job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase);
     private static string? PortraitSource(DemoJob job,int asset)
     {
+        // Use curated category photographs for these jobs rather than generic portraits.
+        if(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)||
+           job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)||
+           job.Type.Contains("Product",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)||
+           job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)||
+           job.Type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||
+           job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase))return null;
         if(!IsPortraitCorpus(job))return DemoPortraitCatalogue.Url(asset);
         int offset=job.Number switch{106=>0,301=>180,303=>300,401=>400,_=>641+Array.FindIndex(Jobs.Where(j=>IsPortraitCorpus(j)&&j.Number is not(106 or 301 or 303 or 401)).ToArray(),j=>j.Number==job.Number)*8};
         return DemoPortraitCatalogue.Url(offset+asset);
