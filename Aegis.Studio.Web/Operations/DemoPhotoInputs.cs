@@ -14,7 +14,7 @@ internal static partial class DemoDataExpansion
     {
         // Downloaded source inputs are independent of application/demo records.
         // Resolve and decode them before opening scenario transactions or deleting the old dataset.
-        string[] urls = realPhotoUrls.Concat(weddingPhotoUrls).Concat(DemoPortraitCatalogue.Photos.Select(p => p.Url)).Distinct().ToArray();
+        string[] urls = realPhotoUrls.Concat(weddingPhotoUrls).Concat(DemoPortraitCatalogue.Photos.Take(24).Select(p => p.Url)).Distinct().ToArray();
         for (int i = 0; i < urls.Length; i++)
         {
             report?.Invoke(new(1, "Preparing photographs", i, urls.Length, $"Verifying photograph source {i+1}/{urls.Length} before recreating data."));
@@ -41,7 +41,36 @@ internal static partial class DemoDataExpansion
             catch (Exception error) when (error is IOException or JsonException or ArgumentException or InvalidOperationException)
             { File.Delete(path); File.Delete(path + ".json"); }
         }
-        using var response = DownloadDemoPhoto(url, variant, searchTerm);
+        // When Commons rate-limits requests, reuse a previously validated portrait
+        // for general jobs. The curated category jobs must never cross categories.
+        HttpResponseMessage response;
+        try { response = DownloadDemoPhoto(url, variant, searchTerm); }
+        catch (HttpRequestException error) when (searchTerm is not null &&
+            !new[]{"Wedding","Engagement","Graduation","School","Product","Commercial","Family","Newborn","Sports","Athlete","Team"}
+                .Any(term => searchTerm.Contains(term, StringComparison.OrdinalIgnoreCase)) &&
+            error.ToString().Contains("429", StringComparison.Ordinal))
+        {
+            foreach (var photo in DemoPortraitCatalogue.Photos.Take(24))
+            {
+                string cached = Path.Combine(inputDirectory, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(photo.Url))) + ".jpg");
+                if (!File.Exists(cached) || !File.Exists(cached + ".json")) continue;
+                try
+                {
+                    bytes = File.ReadAllBytes(cached);
+                    using var decoded = StudioImageProcessor.DecodeOriented(new MemoryStream(bytes, false));
+                    input = JsonSerializer.Deserialize<PhotoInput>(File.ReadAllText(cached + ".json"))!;
+                    if (input is null) continue;
+                    File.WriteAllBytes(path, bytes);
+                    File.WriteAllText(path + ".json", JsonSerializer.Serialize(input));
+                    Remember(input);
+                    return bytes;
+                }
+                catch (Exception) { /* Try another validated cached photograph. */ }
+            }
+            throw;
+        }
+        using (response)
+        {
         byte[] source = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
         using var sourceStream = new MemoryStream(source, false);
         using var photograph = StudioImageProcessor.DecodeOriented(sourceStream);
@@ -59,6 +88,7 @@ internal static partial class DemoDataExpansion
             File.WriteAllText(alias + ".json", JsonSerializer.Serialize(input));
         }
         return bytes;
+        }
 
         void Remember(PhotoInput info)
         {
