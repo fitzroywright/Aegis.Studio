@@ -315,7 +315,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
                     workflow=view;const data=view.data;
                     window.StudioJobDetails.workflow(header.querySelector('.jd-workflow-track'),data,job,view,selector=>header.querySelector('[data-job-workflow]').onclick(selector),header.querySelector('.jd-flow-summary'));
                     const graphView=await json(`/api/jobs/${job.id}/workflow-graph`);
-                    if(current()&&graphView?.graph){const graphHost=header.querySelector('.jd-workflow-track');graphHost.style.height='230px';StudioGraph.canvas(graphHost,graphView.graph,{evaluation:graphView.evaluation,onSelect:()=>StudioJobGraph.open(job.id)});}
+                    if(current()&&graphView?.graph){const graphHost=header.querySelector('.jd-workflow-track');graphHost.style.height='230px';const route=StudioGraph.canvas(graphHost,graphView.graph,{evaluation:graphView.evaluation,actualPath:true,onSelect:()=>StudioJobGraph.open(job.id)});StudioGraph.summary(header.querySelector('.jd-flow-summary'),route);}
                     let graphButton=header.querySelector('[data-template-workflow]');
                     if(!graphButton){graphButton=document.createElement('button');graphButton.className='action';graphButton.dataset.templateWorkflow='';graphButton.textContent='Template Workflow';header.querySelector('[data-job-workflow]').insertAdjacentElement('afterend',graphButton);}
                     graphButton.onclick=()=>StudioJobGraph.open(job.id);
@@ -400,6 +400,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
 
     }
 })();
+
 
 
 

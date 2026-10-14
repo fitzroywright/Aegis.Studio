@@ -16,7 +16,7 @@
     const allowed=authority.canReview||authority.canManage||t.assignedTo?.toLowerCase()===authority.userName?.toLowerCase();
     return `<tr data-task-row="${t.id}"><td>${esc(t.title)}</td><td>${esc(t.assignedTo||'Unassigned')}<small>${esc(t.role||'')}</small></td><td>${esc(t.eligibility)}<small>${esc(t.reason||(t.dependencyLabels||t.dependencies).join(', '))}</small></td><td>${allowed&&['Available','InProgress','Blocked','WaitingOnCustomer','Partial','Failed','ReworkRequired','ReprintRequired','ReadyForDelivery'].includes(t.eligibility)?`${t.eligibility==='Available'?`<button data-status="InProgress" data-task="${t.id}">Start</button>`:''}<button data-status="Completed" data-task="${t.id}">Complete</button>${t.optional?`<button data-status="Cancelled" data-task="${t.id}">Skip</button>`:''}`:''}${(authority.canReview||authority.canManage)&&t.status!=='Completed'?`<button data-assign="${t.id}">Assign</button>`:''}</td></tr>`;
    }).join('')}</tbody></table>${view.history.length?`<details><summary>Preserved work from previous templates (${view.history.length})</summary>${view.history.map(h=>`<p>${esc(h.title)} · ${esc(h.status)} · ${esc(h.assignedTo||'Unassigned')}</p>`).join('')}</details>`:''}`;
-   StudioGraph.canvas(d.querySelector('[data-job-canvas]'),view.graph,{evaluation:view.evaluation,onSelect:id=>{const t=view.tasks.find(t=>t.nodeId===id);if(t)table.querySelector(`[data-task-row="${t.id}"]`)?.scrollIntoView({block:'nearest'});}});
+   StudioGraph.canvas(d.querySelector('[data-job-canvas]'),view.graph,{evaluation:view.evaluation,actualPath:true,onSelect:id=>{const t=view.tasks.find(t=>t.nodeId===id);if(t)table.querySelector(`[data-task-row="${t.id}"]`)?.scrollIntoView({block:'nearest'});}});
    table.querySelectorAll('[data-status]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const task=view.tasks.find(t=>t.id===b.dataset.task);if(task.activityType==='Delivery'&&b.dataset.status==='Completed'){const deliveryDialog=await root.StudioWorkflow.open(job,'[data-wf-action="deliver"]');deliveryDialog.addEventListener('close',()=>render().catch(error),{once:true});b.disabled=false;return;}await send(`/api/jobs/${job}/connected-workflow`,{action:'task-progress',taskId:b.dataset.task,status:b.dataset.status,operationId:crypto.randomUUID(),expectedRevision:view.revision});await render();document.dispatchEvent(new CustomEvent('studio-workflow-changed',{detail:{jobId:job}}));}catch(e){error(e);b.disabled=false;}});
    table.querySelectorAll('[data-assign]').forEach(b=>b.onclick=async()=>{try{
     const staff=await json('/api/studio-employees?assignable=true&limit=100'),t=view.tasks.find(t=>t.id===b.dataset.assign);
@@ -53,3 +53,4 @@
  }
  root.StudioJobGraph={open,change,services,production};
 })(window);
+

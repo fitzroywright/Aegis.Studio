@@ -35,6 +35,14 @@
  function canvas(host,graph,options={}){
   const expanded=options.expanded||new Set(),model=visible(graph,expanded),states=new Map((options.evaluation?.nodes||[]).map(n=>[n.id,n]));
   for(const n of model.nodes.filter(n=>n.kind==='Subflow')){const children=[...states.values()].filter(s=>s.id.startsWith(n.id+'/'));if(children.length)states.set(n.id,{status:children.every(s=>s.status==='Inactive')?'Inactive':children.every(s=>['Completed','Skipped','Inactive'].includes(s.status))?'Completed':children.some(s=>s.status==='InProgress')?'InProgress':children.some(s=>s.status==='Available')?'Available':'Blocked'});}
+  // Job views use the server's selected route, including pending required work.
+  // Keep started tasks if a later service change disables their incoming branch.
+  // Definition/editor canvases retain every possible path.
+  if(options.actualPath&&options.evaluation&&!options.editable){
+   model.nodes=model.nodes.filter(n=>states.get(n.id)?.status!=='Inactive');
+   const ids=new Set(model.nodes.map(n=>n.id));
+   model.edges=model.edges.filter(e=>options.evaluation.edges?.[e.id]!=='Inactive'&&ids.has(e.from)&&ids.has(e.to));
+  }
   const layout=new dagre.graphlib.Graph({multigraph:true}).setGraph({rankdir:'LR',nodesep:46,ranksep:80,marginx:24,marginy:28}).setDefaultEdgeLabel(()=>({}));
   for(const n of model.nodes)layout.setNode(n.id,{width:180,height:74});
   for(const e of model.edges)if(layout.hasNode(e.from)&&layout.hasNode(e.to))layout.setEdge(e.from,e.to,{width:e.label?Math.min(240,e.label.length*6):0,height:e.label?22:0},e.id);
@@ -81,8 +89,30 @@
   });
   host.querySelectorAll('[data-edge]').forEach(el=>{el.onclick=()=>options.onEdge?.(el.dataset.edge);el.onkeydown=e=>{if(e.key==='Enter')options.onEdge?.(el.dataset.edge);};});
   viewport.onkeydown=e=>{if(e.target!==viewport)return;const moves={ArrowLeft:[-40,0],ArrowRight:[40,0],ArrowUp:[0,-40],ArrowDown:[0,40]};if(moves[e.key]){e.preventDefault();box.x+=moves[e.key][0];box.y+=moves[e.key][1];update();}};
-  return {model,layout,expanded};
+  return {model,layout,expanded,states};
  }
- root.StudioGraph={canvas,visible,fromSteps,restoreEndpoints,esc};
+ function summary(host,route){
+  // Keep subflows as milestones. Parallel work shares one position in the
+  // main route; decisions, fork/join wiring and nested detail stay in the drawer.
+  const milestones=route.model.nodes.filter(n=>['Task','Subflow'].includes(n.kind)).sort((a,b)=>route.layout.node(a.id).x-route.layout.node(b.id).x||route.layout.node(a.id).y-route.layout.node(b.id).y);
+  if(!milestones.length)return;
+  const groups=[];
+  for(const n of milestones){
+   const rank=route.layout.node(n.id).x,last=groups.at(-1);
+   if(last&&Math.abs(last.rank-rank)<1)last.nodes.push(n);else groups.push({rank,nodes:[n]});
+  }
+  host.innerHTML=groups.map(({nodes})=>{
+   const statuses=nodes.map(n=>route.states.get(n.id)?.status||'Pending');
+   const complete=statuses.every(s=>['Completed','Skipped'].includes(s));
+   const exception=statuses.some(s=>['WaitingOnCustomer','ReworkRequired','Partial','Failed','ReprintRequired'].includes(s));
+   const current=statuses.some(s=>['Available','InProgress','ReadyForDelivery'].includes(s))||exception;
+   const state=complete?'complete':exception?'current exception':current?'current':'pending';
+   const label=nodes.map(n=>n.label).join(' / '),description=nodes.map((n,i)=>n.label+': '+statuses[i]).join('; ');
+   return `<li class="jd-flow-phase ${state}" data-flow-phase="${esc(label)}" title="${esc(description)}"><span class="jd-stage-light" aria-hidden="true">${complete?'✓':exception?'!':''}</span><span>${esc(label)}</span><span class="sr-only">${esc(description)}${nodes.length>1?' · Parallel work':''}</span></li>`;
+  }).join('');
+  host.setAttribute('aria-label','Main job flow');
+ }
+ root.StudioGraph={canvas,summary,visible,fromSteps,restoreEndpoints,esc};
 })(window);
+
 
