@@ -24,11 +24,17 @@ internal static partial class DemoDataExpansion
     private static HttpResponseMessage DownloadDemoPhoto(string preferredUrl,int variant,string? searchTerm=null)
     {
         var cataloguePhoto=DemoPortraitCatalogue.Photos.FirstOrDefault(photo=>photo.Url==preferredUrl);
-        DemoPhotoCandidate[] candidates=
-        [
-            new(preferredUrl,"Wikimedia Commons",cataloguePhoto?.License??"Catalogue source",cataloguePhoto?.Page??preferredUrl),
-            new(DemoPortraitCatalogue.Url(Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count),"Wikimedia Commons","Catalogue licence",DemoPortraitCatalogue.Photos[Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count].Page)
-        ];
+        // Never replace category-specific demo photographs with an unrelated portrait.
+        // A failed category download must be reported rather than silently mislabelled.
+        bool categorySpecific=searchTerm is not null &&
+            new[]{"Wedding","Engagement","Graduation","School","Product","Commercial","Family","Newborn","Sports","Athlete","Team"}
+                .Any(term=>searchTerm.Contains(term,StringComparison.OrdinalIgnoreCase));
+        DemoPhotoCandidate[] candidates=categorySpecific
+            ? [new(preferredUrl,"Wikimedia Commons",cataloguePhoto?.License??"Catalogue source",cataloguePhoto?.Page??preferredUrl)]
+            : [
+                new(preferredUrl,"Wikimedia Commons",cataloguePhoto?.License??"Catalogue source",cataloguePhoto?.Page??preferredUrl),
+                new(DemoPortraitCatalogue.Url(Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count),"Wikimedia Commons","Catalogue licence",DemoPortraitCatalogue.Photos[Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count].Page)
+            ];
 
         int start=0;
         Exception? lastError=null;
