@@ -29,12 +29,22 @@ internal static partial class DemoDataExpansion
         bool categorySpecific=searchTerm is not null &&
             new[]{"Wedding","Engagement","Graduation","School","Product","Commercial","Family","Newborn","Sports","Athlete","Team"}
                 .Any(term=>searchTerm.Contains(term,StringComparison.OrdinalIgnoreCase));
-        DemoPhotoCandidate[] candidates=categorySpecific
-            ? [new(preferredUrl,"Wikimedia Commons",cataloguePhoto?.License??"Catalogue source",cataloguePhoto?.Page??preferredUrl)]
-            : [
-                new(preferredUrl,"Wikimedia Commons",cataloguePhoto?.License??"Catalogue source",cataloguePhoto?.Page??preferredUrl),
-                new(DemoPortraitCatalogue.Url(Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count),"Wikimedia Commons","Catalogue licence",DemoPortraitCatalogue.Photos[Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count].Page)
-            ];
+        int[] matchingVariants=searchTerm is null ? [] :
+            searchTerm.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("Engagement",StringComparison.OrdinalIgnoreCase)?[10,11]:
+            searchTerm.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("School",StringComparison.OrdinalIgnoreCase)?[0,1,2,3]:
+            searchTerm.Contains("Family",StringComparison.OrdinalIgnoreCase)?[12,6]:
+            searchTerm.Contains("Newborn",StringComparison.OrdinalIgnoreCase)?[7,6]:
+            searchTerm.Contains("Sports",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("Team",StringComparison.OrdinalIgnoreCase)?[8]:
+            searchTerm.Contains("Product",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("Commercial",StringComparison.OrdinalIgnoreCase)?[9]:
+            [];
+        string[] urls=categorySpecific
+            ? new[]{preferredUrl}.Concat(matchingVariants.Select(index=>realPhotoUrls[index])).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+            : [preferredUrl,DemoPortraitCatalogue.Url(Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count)];
+        DemoPhotoCandidate[] candidates=urls.Select(url=>
+        {
+            var photo=DemoPortraitCatalogue.Photos.FirstOrDefault(item=>item.Url==url);
+            return new DemoPhotoCandidate(url,"Wikimedia Commons",photo?.License??"Catalogue source",photo?.Page??url);
+        }).ToArray();
 
         int start=0;
         Exception? lastError=null;
@@ -71,7 +81,7 @@ internal static partial class DemoDataExpansion
                 }
             }
         }
-        throw new HttpRequestException("All configured demo image sources failed.",lastError);
+        throw new HttpRequestException($"All {candidates.Length} demo image sources failed for category {searchTerm??"General"}. Last error: {lastError?.Message}",lastError);
     }
 
     private static string Header(HttpResponseMessage response,string name,string fallback)
