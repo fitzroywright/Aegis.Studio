@@ -221,8 +221,8 @@ internal static class DemoFullStudioData
             Guid versionId=MediaId(64,job.Number,i);
             // Large portrait jobs use different real source photos for every asset.
             // Revisions preserve the same photograph and stable asset identity.
-            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount),null,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
-            if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,SelectPhotoVariant(job,i%sourceCount),original,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
+            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount)+i*32,null,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
+            if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,SelectPhotoVariant(job,i%sourceCount)+i*32,original,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
             Guid assetId=MediaId(65,job.Number,i);
             string status=statuses[(ordinal+i)%statuses.Length];
             assetId=ExecuteGuid(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status,assigned_to,capture_at_utc) values($1,$2,$2,$3,$4,$5,now()-($6 || ' hours')::interval) on conflict(job_id,asset_key) do update set production_status=excluded.production_status,assigned_to=excluded.assigned_to,capture_at_utc=excluded.capture_at_utc returning id",
