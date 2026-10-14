@@ -53,7 +53,13 @@ internal static partial class DemoDataExpansion
     {
         // Downloaded source inputs are independent of application/demo records.
         // Resolve and decode them before opening scenario transactions or deleting the old dataset.
-        if (Directory.Exists(aiPhotoRoot) && Directory.EnumerateFiles(aiPhotoRoot,"*",SearchOption.AllDirectories).Any()) return;
+        string[] required = ["wedding","graduation","corporate","family","newborn","sports","product","id","portrait"];
+        if (required.All(category =>
+        {
+            string folder=Path.Combine(aiPhotoRoot,category);
+            return Directory.Exists(folder) && Directory.EnumerateFiles(folder)
+                .Any(file => new[]{".png",".jpg",".jpeg",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase));
+        })) return;
         string[] urls = realPhotoUrls.Concat(weddingPhotoUrls).Concat(DemoPortraitCatalogue.Photos.Take(24).Select(p => p.Url)).Distinct().ToArray();
         for (int i = 0; i < urls.Length; i++)
         {
