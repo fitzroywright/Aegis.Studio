@@ -10,10 +10,50 @@ internal static partial class DemoDataExpansion
     private sealed record PhotoInput(string Url, string Source, string License, string Page);
     private static readonly string inputDirectory = Path.Combine(Path.GetTempPath(), "aegis-studio-photo-inputs");
 
+    private static readonly string aiPhotoRoot = Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_AI_PHOTOS") ?? "/var/lib/aegis-studio/demo-ai-photos";
+    private static string PhotoCategory(string? type)
+    {
+        type ??= "";
+        if (type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return "wedding";
+        if (type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||type.Contains("School",StringComparison.OrdinalIgnoreCase)) return "graduation";
+        if (type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)) return "newborn";
+        if (type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return "family";
+        if (type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||type.Contains("Team",StringComparison.OrdinalIgnoreCase)) return "sports";
+        if (type.Contains("Product",StringComparison.OrdinalIgnoreCase)||type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)) return "product";
+        if (type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)) return "corporate";
+        if (type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||type.Contains("ID",StringComparison.OrdinalIgnoreCase)) return "id";
+        return "portrait";
+    }
+    private static bool TryAiPhoto(string? type,int variant,out byte[] bytes,out PhotoInput? input)
+    {
+        bytes=[];
+        input=null;
+        string directory=Path.Combine(aiPhotoRoot,PhotoCategory(type));
+        if (!Directory.Exists(directory)) return false;
+        string[] files=Directory.EnumerateFiles(directory)
+            .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
+            .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray();
+        for(int offset=0;offset<files.Length;offset++)
+        {
+            string file=files[(int)(Math.Abs((long)variant+offset)%files.Length)];
+            try
+            {
+                using var decoded=StudioImageProcessor.DecodeOriented(File.OpenRead(file));
+                using var resized=StudioImageProcessor.ResizeMax(decoded,4096);
+                bytes=StudioImageProcessor.EncodeJpeg(resized,95);
+                input=new PhotoInput(new Uri(Path.GetFullPath(file)).AbsoluteUri,"AI generated","AI-generated demo image",file);
+                return true;
+            }
+            catch(Exception error) when(error is IOException or ArgumentException or InvalidOperationException) {}
+        }
+        return false;
+    }
+
     internal static void PreparePhotos(Action<DemoSeedProgress>? report)
     {
         // Downloaded source inputs are independent of application/demo records.
         // Resolve and decode them before opening scenario transactions or deleting the old dataset.
+        if (Directory.Exists(aiPhotoRoot) && Directory.EnumerateFiles(aiPhotoRoot,"*",SearchOption.AllDirectories).Any()) return;
         string[] urls = realPhotoUrls.Concat(weddingPhotoUrls).Concat(DemoPortraitCatalogue.Photos.Take(24).Select(p => p.Url)).Distinct().ToArray();
         for (int i = 0; i < urls.Length; i++)
         {
@@ -24,6 +64,14 @@ internal static partial class DemoDataExpansion
 
     private static byte[] PhotoBytes(string url, int variant, string? searchTerm)
     {
+        if (TryAiPhoto(searchTerm,variant,out var aiBytes,out var aiInput))
+        {
+            demoPhotoSourceCache[url]=aiInput!.Url;
+            demoPhotoSourceNameCache[url]=aiInput.Source;
+            demoPhotoLicenseCache[url]=aiInput.License;
+            demoPhotoPageCache[url]=aiInput.Page;
+            return aiBytes;
+        }
         if (weddingPhotoCache.TryGetValue(url, out var bytes)) return bytes;
         Directory.CreateDirectory(inputDirectory);
         string path = Path.Combine(inputDirectory, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(url))) + ".jpg");
