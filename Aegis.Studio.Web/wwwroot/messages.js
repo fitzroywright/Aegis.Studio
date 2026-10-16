@@ -47,7 +47,7 @@
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
         genericView.innerHTML = StudioPage.html({title:'Messages',className:'st-messages-content',showHeader:false,showMessagesCard:false,summaryTitle:'Conversation Context',summary:'<div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div>',attention:'<p>External delivery outcomes appear in each conversation. Held deliveries need review before retrying.</p>',content:`
-            <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New</button></div></header>
+            <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New Message</button></div></header>
             <div class="st-inbox">
                 <section class="studio-inbox-center">
 
@@ -208,14 +208,27 @@
         const [conversation,identities,files]=await Promise.all([json('/api/conversations/'+id),json('/api/conversations/'+id+'/sending-identities').catch(()=>null),json('/api/conversations/'+id+'/attachments').catch(()=>[])]);
         const pane=document.getElementById('messageConversationPane');if(!pane||pane!==target||revision!==threadRevision)return;
         setConversationContext(conversation.subject,'Customer conversation',identities?.identities?.find(i=>i.isDefault)?.label||'Workspace',conversation.contactName);
-        pane.innerHTML=`<div class="message-conversation-header"><div><h2>${esc(conversation.subject)}</h2><p>${esc(conversation.contactName)} · ${esc(conversation.contactAddress)}</p></div><button class="st-link" id="openConversationWorkspace">Open conversation</button></div><div class="studio-message-history">${conversation.messages.map(m=>renderMessage({id:m.id,senderUserName:m.author,body:m.body,createdAtUtc:m.createdAt},[])).join('')}${files.length?`<div class="studio-message-files">${files.map(f=>`<a href="/api/attachments/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.fileName)}</a>`).join('')}</div>`:''}</div>
-            <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><select name="sendingIdentity" aria-label="Sender identity">${(identities?.identities||[{type:'Workspace',label:'Workspace'}]).map(i=>`<option value="${esc(i.type)}">${esc(i.label)}</option>`).join('')}</select><label><input name="internal" type="checkbox">Internal note</label><button class="primary" type="submit">Send</button></div></form>`;
-        document.getElementById('openConversationWorkspace').onclick=async()=>{await selectWorkspace(conversation.workspaceId);await openConversation(id);};
+        const senders=(identities?.identities||[]).filter(identity=>['Workspace','Self'].includes(identity.type));
+        const replyChoices=senders.length?senders:[{type:'Workspace',label:'Reply'}];
+        const defaultSender=senders.find(identity=>identity.type===identities?.defaultIdentity)?.type||senders.find(identity=>identity.isDefault)?.type||senders[0]?.type||'Workspace';
+        pane.innerHTML=`<div class="message-conversation-header"><div><h2>${esc(conversation.subject)}</h2><p>${esc(conversation.contactName)} · ${esc(conversation.contactAddress)}</p></div></div><div class="studio-message-history">${conversation.messages.map(m=>renderMessage({id:m.id,senderUserName:m.author,body:m.body,createdAtUtc:m.createdAt},[])).join('')}${files.length?`<div class="studio-message-files">${files.map(f=>`<a href="/api/attachments/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.fileName)}</a>`).join('')}</div>`:''}</div>
+            <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><span class="studio-send-split" role="group" aria-label="Send reply or add internal note"><button class="primary" type="submit">Send</button><select name="replyMode" aria-label="Reply sender or internal note">${replyChoices.map(identity=>`<option value="${esc(identity.type)}" ${identity.type===defaultSender?'selected':''}>${esc(identity.label)}</option>`).join('')}<option value="Internal">Internal note</option></select></span></div></form>`;
         StudioMessageCard.bindEditors(pane);
-        document.getElementById('legacyMessageComposer').onsubmit=async event=>{
-            event.preventDefault();const form=event.target,button=form.querySelector('[type=submit]');button.disabled=true;
-            try{await json('/api/conversations/'+id+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:form.elements.body.value,isInternal:form.elements.internal.checked,sendingIdentity:form.elements.sendingIdentity.value})});await openLegacyConversation(id);await loadInbox(false);}
-            catch(error){document.getElementById('legacySendFeedback').textContent=error.message;}finally{button.disabled=false;}
+        const replyForm=document.getElementById('legacyMessageComposer');
+        const replyMode=replyForm.elements.replyMode;
+        const sendButton=replyForm.querySelector('[type=submit]');
+        const updateReplyMode=()=>{
+            const internal=replyMode.value==='Internal';
+            const identity=senders.find(identity=>identity.type===replyMode.value);
+            sendButton.textContent=internal?'Add internal note':identity?'Send as '+(identity.type==='Self'?'Myself':'Workspace'):'Send';
+            sendButton.title=internal?'Add an internal note':identity?.label||'Send reply';
+            replyMode.title=replyMode.selectedOptions[0]?.textContent||'Choose reply action';
+        };
+        replyMode.onchange=updateReplyMode;updateReplyMode();
+        replyForm.onsubmit=async event=>{
+            event.preventDefault();const form=event.target,button=form.querySelector('[type=submit]');button.disabled=true;replyMode.disabled=true;
+            try{await json('/api/conversations/'+id+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:form.elements.body.value,isInternal:replyMode.value==='Internal',sendingIdentity:replyMode.value==='Self'?'Self':'Workspace'})});await openLegacyConversation(id);await loadInbox(false);}
+            catch(error){document.getElementById('legacySendFeedback').textContent=error.message;}finally{button.disabled=false;replyMode.disabled=false;}
         };
     }
 
