@@ -7409,7 +7409,7 @@ body[data-studio-view="today"] .mw-today-toolbar-actions [data-assign-job-lead]:
 }
 .mw-today-job-columns {
   display: grid;
-  grid-template-columns: minmax(180px,2.2fr) minmax(95px,1.1fr) minmax(90px,1fr) minmax(85px,1fr) minmax(75px,.8fr) 18px;
+  grid-template-columns: minmax(180px,2.2fr) minmax(155px,1.3fr) minmax(80px,.8fr) minmax(120px,1fr) minmax(85px,.8fr) 18px;
   align-items: center;
   gap: 9px;
   padding: 11px 14px;
@@ -7425,7 +7425,7 @@ body[data-studio-view="today"] .mw-today-toolbar-actions [data-assign-job-lead]:
 }
 .mw-today-job-row {
   display: grid;
-  grid-template-columns: minmax(180px,2.2fr) minmax(95px,1.1fr) minmax(90px,1fr) minmax(85px,1fr) minmax(75px,.8fr) 18px;
+  grid-template-columns: minmax(180px,2.2fr) minmax(155px,1.3fr) minmax(80px,.8fr) minmax(120px,1fr) minmax(85px,.8fr) 18px;
   align-items: center;
   gap: 9px;
   padding: 11px 14px;
@@ -8380,7 +8380,9 @@ body[data-studio-view="today"] .studio-status-pill {
   font-size: .71rem;
   font-weight: 700;
   line-height: 1.15;
-  white-space: nowrap;
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 body[data-studio-view="today"] .studio-status-dot {
   width: 7px;
@@ -10128,3 +10130,4 @@ body .topbar { padding-left: 0 !important; column-gap: 0 !important; }
 body .topbar .studio-script-brand { padding: 0 !important; margin: 0 !important; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
 body .topbar .studio-script-brand .studio-bryans-brand-image { display: block; width: 216px; height: 56px; object-fit: contain; }
 body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left: 0 !important; border-left: 0 !important; }
+
