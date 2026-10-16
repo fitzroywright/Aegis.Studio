@@ -10,3 +10,10 @@
 .st-messages-content .action{background:var(--theme-surface-2);color:var(--theme-text);border-color:var(--studio-control-border)}
 .st-messages-content .message-attachment-control{padding:5px 7px;border-radius:4px;background:var(--theme-surface-2);color:var(--theme-text)}
 
+
+/* Reply identity and Internal note live in the arrow segment of Send. */
+.studio-send-split{display:inline-flex;align-items:stretch;max-width:100%;flex:none}
+.studio-send-split>button{border-radius:5px 0 0 5px;min-width:0}
+.studio-send-split>select{appearance:none;flex:none;width:30px;min-width:30px;max-width:30px;padding:0;border:1px solid var(--studio-control-border,#bacbd8);border-left:0;border-radius:0 5px 5px 0;background:var(--theme-surface-2,#f5f7fb) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='m2 4 4 4 4-4z'/%3E%3C/svg%3E") no-repeat center;color:transparent;cursor:pointer}
+.studio-send-split>select option{color:var(--theme-text,#233e57);background:var(--theme-surface,#fff)}
+.studio-send-split>select:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
