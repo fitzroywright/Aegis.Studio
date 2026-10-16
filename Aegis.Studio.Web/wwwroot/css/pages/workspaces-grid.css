@@ -23,3 +23,7 @@ body[data-theme="fluent-dark"] .workspace-list-page .workspace-wow-email.workspa
 /* Keep the Workspaces heading in the global banner; grid starts with its column header. */
 .workspace-list-page .workspace-center-panel{min-height:0}
 .workspace-list-page .workspace-column-header>span:nth-child(8){white-space:nowrap}
+
+
+/* The two remaining right-rail cards share the available height evenly. */
+.workspace-list-page .workspace-right-rail>.smc-card{min-height:0}

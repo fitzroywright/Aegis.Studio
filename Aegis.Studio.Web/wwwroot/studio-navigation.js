@@ -736,14 +736,7 @@
                         </section>
 
 
-                        <section class="mw-list-panel workspace-help-panel">
-                            <header><h2><span class="mw-title-icon links">↗</span> Navigation</h2></header>
-                            <div class="mw-action-list">
-                                <button type="button" data-nav-quick="today"><span>‹</span><span>Back to Today</span><b>›</b></button>
-                                <button type="button" data-nav-quick="pipeline"><span>▥</span><span>View Pipeline</span><b>›</b></button>
-                            </div>
-                        </section>
-                        ${StudioMessageCard.html({id:'workspaceMessageCard',title:'Announcements',body:announcements.map(a=>`<article class="smc-row"><span aria-hidden="true">📣</span><span class="smc-copy"><strong>${esc(a.title)}</strong><small>${esc(a.body)}</small><small>${esc(a.workspaceName)} · ${esc(a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):'')}</small></span></article>`).join('')||'<p>No workspace announcements.</p>',footer:'<button type="button" data-nav-quick="messages">✉ Send Message →</button>'})}
+                        ${StudioMessageCard.html({id:'workspaceMessageCard',title:'Messages',body:announcements.map(a=>`<article class="smc-row"><span aria-hidden="true">📣</span><span class="smc-copy"><strong>${esc(a.title)}</strong><small>${esc(a.body)}</small><small>${esc(a.workspaceName)} · ${esc(a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):'')}</small></span></article>`).join('')||'<p>No workspace announcements.</p>',footer:'<button type="button" data-nav-quick="messages">✉ Send Message →</button>'})}
                     </aside>
                 </div>
             </section>`;
