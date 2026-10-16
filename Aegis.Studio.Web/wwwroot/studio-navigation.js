@@ -707,19 +707,23 @@
             <section class="workspace-list-page mw-list-page">
                 <div class="mw-list-layout workspace-list-layout">
                     <section class="mw-list-panel workspace-center-panel">
+                        <div class="workspace-grid-scroll" tabindex="0" role="region" aria-label="Workspace grid">
+                        <div class="workspace-grid-table">
                         <div class="workspace-column-header" role="row" aria-label="Workspace columns">
                             <span class="workspace-column-thumbnail" aria-hidden="true"></span>
                             <label class="workspace-column-name"><span>Workspace</span><input type="search" placeholder="Search workspaces…" aria-label="Search workspaces" data-workspace-search></label>
                             <span>Email Address</span>
-                            <span>Active Jobs</span>
-                            <span>Completed Jobs</span>
-                            <span>Upcoming Shoots</span>
+                            <span>Active<br> Jobs</span>
+                            <span>Completed<br> Jobs</span>
+                            <span>Upcoming<br> Shoots</span>
                             <span>Status / Activity</span>
-                            <span>Media</span>
+                            <span title="Photo previews from workspace jobs">Media</span>
                             <span aria-hidden="true"></span>
                         </div>
 
-                        <div class="workspace-wow-list workspace-list-rows" data-workspace-list>${renderRows(workspaceData)}</div>
+                        <div class="workspace-list-body" data-workspace-list>${renderRows(workspaceData)}</div>
+                        </div>
+                        </div>
                     </section>
 
                     <aside class="mw-list-right workspace-right-rail">
@@ -736,14 +740,7 @@
                         </section>
 
 
-                        <section class="mw-list-panel workspace-help-panel">
-                            <header><h2><span class="mw-title-icon links">↗</span> Navigation</h2></header>
-                            <div class="mw-action-list">
-                                <button type="button" data-nav-quick="today"><span>‹</span><span>Back to Today</span><b>›</b></button>
-                                <button type="button" data-nav-quick="pipeline"><span>▥</span><span>View Pipeline</span><b>›</b></button>
-                            </div>
-                        </section>
-                        ${StudioMessageCard.html({id:'workspaceMessageCard',title:'Announcements',body:announcements.map(a=>`<article class="smc-row"><span aria-hidden="true">📣</span><span class="smc-copy"><strong>${esc(a.title)}</strong><small>${esc(a.body)}</small><small>${esc(a.workspaceName)} · ${esc(a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):'')}</small></span></article>`).join('')||'<p>No workspace announcements.</p>',footer:'<button type="button" data-nav-quick="messages">✉ Send Message →</button>'})}
+                        ${StudioMessageCard.html({id:'workspaceMessageCard',title:'Messages',body:announcements.map(a=>`<article class="smc-row"><span aria-hidden="true">📣</span><span class="smc-copy"><strong>${esc(a.title)}</strong><small>${esc(a.body)}</small><small>${esc(a.workspaceName)} · ${esc(a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):'')}</small></span></article>`).join('')||'<p>No workspace announcements.</p>',footer:'<button type="button" data-nav-quick="messages">✉ Send Message →</button>'})}
                     </aside>
                 </div>
             </section>`;
