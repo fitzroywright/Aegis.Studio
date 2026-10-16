@@ -38,7 +38,7 @@
    const isInvolved=job=>isLead(job)||Boolean(user)&&[job.assignedTo,job.jobOwner,job.photographerUserName,owner(job)].some(value=>normalized(value)===user)||job.isCrewMember===true||tasks.some(task=>String(task.jobId)===String(job.id)&&normalized(task.assignedTo)===user)||(array(job.crew).some(member=>normalized(member.userName||member)===user));
    let saved={};try{saved=JSON.parse(sessionStorage.getItem('studio-jobs-view')||'{}');}catch{}
    let view=['led','involved','all'].includes(saved.view)?saved.view:'involved';
-   let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',calendarView=['day','week','month'].includes(saved.calendarView)?saved.calendarView:'day',calendarDate=date(saved.calendarDate)||new Date(),calendarEnabled=saved.calendarEnabled===true,attention='',includeClosed=false,page=1;
+   let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',calendarView=['day','week','month'].includes(saved.calendarView)?saved.calendarView:'day',calendarDate=date(saved.calendarDate)||new Date(),calendarEnabled=saved.calendarEnabled!==false,attention='',includeClosed=false,page=1;
    const stages=StudioStatusOrder.sort(jobs.map(status));if(!stages.includes(stage))stage='';
    const card=(title,body,cls='')=>`<section class="sj-card ${cls}"><header><h2>${title}</h2></header>${body}</section>`;
    host.innerHTML=`<section class="sj-page" aria-label="Jobs"><section class="sj-board">
@@ -47,7 +47,7 @@
     <div class="sj-error" role="alert" data-sj-error hidden></div>
     <div class="sj-table-scroll"><table class="sj-table"><thead><tr><th><label class="sj-column-filter sj-column-filter-inline"><span>Workspace</span><select data-sj-workspace aria-label="Filter by workspace"><option value="">All workspaces</option>${workspaces.map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select></label></th><th><div class="sj-job-header"><span>Job / Client</span><input type="search" data-sj-search aria-label="Search jobs, clients or references" placeholder="Search jobs…" autocomplete="off"></div></th><th><label class="sj-column-filter sj-column-filter-inline"><span>Event date</span><select data-sj-sort aria-label="Sort by event date"><option value="date-desc">Newest first ↓</option><option value="date-asc">Oldest first ↑</option></select></label></th><th>Job Owner</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Status</span><select data-sj-status aria-label="Filter by status"><option value="">All Open Jobs</option>${stages.map(s=>`<option>${esc(s)}</option>`).join('')}</select></label></th><th>Next Action</th></tr></thead><tbody></tbody></table></div>
     <footer class="sj-pagination"><span data-sj-range></span><div><button type="button" data-sj-prev aria-label="Previous page">‹</button><span data-sj-page></span><button type="button" data-sj-next aria-label="Next page">›</button></div></footer>
-   </section><aside class="sj-right" aria-label="Job information">${card('Job Status','<div class="sj-card-body" data-sj-statuses></div>')}${card('Needs Attention','<div class="sj-card-body" data-sj-attention></div>','sj-attention-card')}${StudioMessageCard.html({id:'jobsMessageCard',body:'<div data-sj-messages><p>Loading messages…</p></div>',footer:'<button type="button" data-sj-message>✉ Send Message →</button>'})}</aside></section>`;
+   </section><aside class="sj-right" aria-label="Job information">${card('Job Status','<div class="sj-card-body" data-sj-statuses></div>')}${card('Needs Attention','<div class="sj-card-body" data-sj-attention></div>','sj-attention-card')}${StudioMessageCard.html({id:'jobsMessageCard',title:'Messages',body:'<div data-sj-messages><p>Loading messages…</p></div>',footer:'<button type="button" data-sj-message>✉ Send Message →</button>'})}</aside></section>`;
    const find=s=>host.querySelector(s);
    StudioMessageCard.bind(find('.smc-card'));
    find('[data-sj-search]').value=term;find('[data-sj-workspace]').value=workspace;find('[data-sj-status]').value=stage;find('[data-sj-sort]').value=sort;
@@ -59,10 +59,11 @@
     if(!current())return;if(reset)page=1;
     const base=jobs.filter(j=>(view==='all'||(view==='led'?isLead(j):isInvolved(j)))&&belongs(j,workspace)&&(stage ? status(j)===stage : !StudioSubjectPicker.isClosed({...j,stage:status(j)})));
     host.querySelectorAll('[data-sj-view]').forEach(button=>{const selected=button.dataset.sjView===view;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
-    host.querySelectorAll('[data-sj-calendar-view]').forEach(button=>{const selected=button.dataset.sjCalendarView===calendarView;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
+    host.querySelectorAll('[data-sj-calendar-view]').forEach(button=>{const selected=calendarEnabled&&button.dataset.sjCalendarView===calendarView;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
     const isoDate=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
     find('[data-sj-calendar-date]').value=isoDate(calendarDate);
-    find('[data-sj-calendar-clear]').hidden=!calendarEnabled;
+    find('[data-sj-calendar-clear]').setAttribute('aria-pressed',String(!calendarEnabled));
+    find('[data-sj-calendar-clear]').classList.toggle('active',!calendarEnabled);
     const inCalendar=job=>{if(!calendarEnabled)return true;const event=date(job.eventDate);if(!event)return false;const start=new Date(calendarDate.getFullYear(),calendarDate.getMonth(),calendarDate.getDate());const end=new Date(start);if(calendarView==='month'){start.setDate(1);end.setMonth(end.getMonth()+1,1);}else if(calendarView==='week'){start.setDate(start.getDate()-((start.getDay()+6)%7));end.setTime(start.getTime());end.setDate(end.getDate()+7);}else end.setDate(end.getDate()+1);return event>=start&&event<end;};
     const filtered=base.filter(j=>inCalendar(j)&&(!stage||status(j)===stage)&&(!attention||need(j,attention))&&[j.title,j.clientName,j.reference,j.jobNumber,workspacesById.get(String(j.workspaceId))?.name,ownerLabel(j)].join(' ').toLowerCase().includes(term.toLowerCase().trim()));
     filtered.sort((a,b)=>{const ad=date(a.eventDate),bd=date(b.eventDate);return !ad&&!bd?String(a.id).localeCompare(String(b.id)):!ad?1:!bd?-1:(+ad-+bd)*(sort==='date-asc'?1:-1)||String(a.id).localeCompare(String(b.id));});
@@ -81,7 +82,7 @@
     try{sessionStorage.setItem('studio-jobs-view',JSON.stringify({term,stage,sort,view,calendarView,calendarDate:isoDate(calendarDate),calendarEnabled}));}catch{}
    }
    host.querySelectorAll('[data-sj-calendar-view]').forEach(button=>button.onclick=()=>{calendarView=button.dataset.sjCalendarView;calendarEnabled=true;apply();});
-   host.querySelectorAll('[data-sj-calendar-step]').forEach(button=>button.onclick=()=>{const n=Number(button.dataset.sjCalendarStep);const next=new Date(calendarDate);if(calendarView==='month')next.setMonth(next.getMonth()+n);else next.setDate(next.getDate()+n*(calendarView==='week'?7:1));calendarDate=next;calendarEnabled=true;apply();});
+   host.querySelectorAll('[data-sj-calendar-step]').forEach(button=>button.onclick=()=>{const n=Number(button.dataset.sjCalendarStep);const next=new Date(calendarDate);if(calendarView==='month'){const day=next.getDate();next.setDate(1);next.setMonth(next.getMonth()+n);next.setDate(Math.min(day,new Date(next.getFullYear(),next.getMonth()+1,0).getDate()));}else next.setDate(next.getDate()+n*(calendarView==='week'?7:1));calendarDate=next;calendarEnabled=true;apply();});
    find('[data-sj-calendar-today]').onclick=()=>{calendarDate=new Date();calendarEnabled=true;apply();};
    find('[data-sj-calendar-date]').onchange=e=>{const chosen=date(e.target.value);if(chosen){calendarDate=chosen;calendarEnabled=true;apply();}};
    find('[data-sj-calendar-clear]').onclick=()=>{calendarEnabled=false;apply();};
@@ -108,3 +109,4 @@
  }
  window.StudioJobsPage={render,dispose(){active?.dispose();active=null;}};
 })();
+
