@@ -11,8 +11,8 @@
         const matches = () => !document.body.dataset.studioView || document.body.dataset.studioView === view || (view === 'management' && document.body.dataset.studioView === 'reports') || (view === 'pipeline' && document.body.dataset.studioView === 'schedule');
         return () => version === revision && matches();
     }
-    function html({title, tools = '', content = '', summary = '', attention = '', className = '', scroll = false, showMessagesCard = true, summaryTitle = 'Overview'}) {
-        return `<section class="st-page ${className}" aria-label="${escape(title)}"><section class="st-board"><header class="st-toolbar"><h1>${escape(title)}</h1><div class="st-tools">${tools}</div></header><div class="st-content${scroll ? ' st-card-scroll' : ''}">${content}</div></section><aside class="st-right" aria-label="Page information">${card(summaryTitle,summary || '<p>No summary available.</p>')}${card('Needs Attention',attention || '<p>No attention items reported.</p>','st-attention')}${showMessagesCard ? StudioMessageCard.html({id:'pageMessageCard',body:'<div data-page-messages role="status">Loading messages…</div>',footer:'<button type="button" data-page-send>✉ Send Message →</button>'}) : ''}</aside></section>`;
+    function html({title, tools = '', content = '', summary = '', attention = '', className = '', scroll = false, showMessagesCard = true, showHeader = true, summaryTitle = 'Overview'}) {
+        return `<section class="st-page ${className}" aria-label="${escape(title)}"><section class="st-board">${showHeader ? `<header class="st-toolbar"><h1>${escape(title)}</h1><div class="st-tools">${tools}</div></header>` : ''}<div class="st-content${scroll ? ' st-card-scroll' : ''}">${content}</div></section><aside class="st-right" aria-label="Page information">${card(summaryTitle,summary || '<p>No summary available.</p>')}${card('Needs Attention',attention || '<p>No attention items reported.</p>','st-attention')}${showMessagesCard ? StudioMessageCard.html({id:'pageMessageCard',body:'<div data-page-messages role="status">Loading messages…</div>',footer:'<button type="button" data-page-send>✉ Send Message →</button>'}) : ''}</aside></section>`;
     }
     function metrics(items) {
         return items.map(([label, value]) => `<div class="st-stat"><span>${escape(label)}</span><strong>${escape(value)}</strong></div>`).join('');
@@ -59,4 +59,5 @@
     // Legacy page renderers share this explicit global instead of app.js lexical scope.
     window.esc = escape;
 })();
+
 
