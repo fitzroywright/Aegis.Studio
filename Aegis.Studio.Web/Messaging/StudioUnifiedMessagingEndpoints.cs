@@ -12,11 +12,81 @@ namespace Aegis.Studio.Web.Messaging;
 public sealed record StudioInboxThread(Guid Id, string ScopeType, Guid? ScopeId, string Title, string Kind);
 public sealed record StudioInboxRow(StudioInboxThread Thread, StudioInAppMessage Message);
 public sealed record StudioInboxPage(IReadOnlyList<StudioInboxRow> Items, long Total, int Offset, int Limit);
+public sealed record StudioMessageAttentionItem(Guid ConversationId, string Kind, string Title, string Recipient,
+    string Summary, string NextStep, bool RequiresSupport);
+public sealed record StudioMessageAttentionPage(IReadOnlyList<StudioMessageAttentionItem> Items, bool HasMore);
+public sealed record StudioMessageAttentionGuidance(string Summary, string NextStep, bool RequiresSupport);
+
+public static class StudioMessageAttentionRules
+{
+    public static StudioMessageAttentionGuidance Describe(string status, string? detail, string transport)
+    {
+        if (detail?.StartsWith("ProviderOutcomeUncertain", StringComparison.Ordinal) == true)
+            return new("Delivery could not be confirmed.", "Ask support to confirm delivery before sending again.", true);
+        if (transport == "Routing" || status == "Attention")
+            return new("Your reply is held for review.", "Open the conversation. Support must resolve the delivery hold before you resend.", true);
+        return new("Your reply was not delivered.", "Open the conversation to check the recipient and review the delivery before retrying.", false);
+    }
+}
+
 public sealed record CreateMessagingContact(string DisplayName, string EmailAddress);
 public sealed record RetryStudioDelivery(bool ReconciledNotSent = false);
 
 public sealed class StudioUnifiedInbox(StudioDatabase database, WorkspaceAccessService workspaceAccess, JobAccessService jobAccess)
 {
+    public StudioMessageAttentionPage GetAttention(ClaimsPrincipal user)
+    {
+        string current = CurrentUser(user);
+        Guid[] workspaces = workspaceAccess.GetAccessibleWorkspaceIds(user)
+            .Where(id => workspaceAccess.HasPermission(user, id, "View")).ToArray();
+        var permissions = jobAccess.GetPermissionMap(user);
+        Guid[] jobs = permissions.Where(p => p.Value.ViewJob).Select(p => p.Key).ToArray();
+        Guid[] conversations = permissions.Where(p => p.Value.ViewConversation).Select(p => p.Key).ToArray();
+        using var c = database.OpenConnection();
+        using var q = new NpgsqlCommand("""
+            with visible_threads as (
+                select t.id,t.title from studio_message_threads t
+                where (t.scope_type='Direct' and exists(
+                    select 1 from studio_message_thread_members tm
+                    where tm.thread_id=t.id and lower(tm.user_name)=lower($1)))
+                   or (t.scope_type='Workspace' and t.scope_id=any($2))
+                   or (t.scope_type='Job' and t.scope_id=any($3))
+            ), attention as (
+                select t.id as conversation_id,'Thread'::text as kind,t.title,d.recipient,
+                       coalesce(e.status,d.status) as status,coalesce(e.last_error,d.detail) as detail,
+                       d.transport,m.created_at_utc
+                from studio_message_deliveries d
+                join studio_inapp_messages m on m.id=d.message_id
+                join visible_threads t on t.id=m.thread_id
+                left join studio_outbound_email e on e.studio_message_id=m.id
+                    and lower(e.to_address)=lower(d.recipient) and d.transport='Email'
+                where lower(m.sender_user_name)=lower($1)
+                  and coalesce(e.status,d.status) in ('Failed','Attention')
+                union all
+                select c.id,'Conversation',c.subject,e.to_address,e.status,e.last_error,
+                       e.delivery_channel,e.created_at_utc
+                from studio_outbound_email e
+                join studio_conversations c on c.id=e.conversation_id
+                where lower(e.sent_by_user_name)=lower($1) and e.status in ('Failed','Attention')
+                  and (c.workspace_id=any($2) or c.job_id=any($4))
+            )
+            select conversation_id,kind,title,recipient,status,detail,transport
+            from attention order by created_at_utc desc,conversation_id,recipient limit 51
+            """, c);
+        Add(q, current, workspaces, jobs, conversations);
+        using var r = q.ExecuteReader();
+        List<StudioMessageAttentionItem> rows = [];
+        while (r.Read())
+        {
+            var guidance = StudioMessageAttentionRules.Describe(r.GetString(4), r.IsDBNull(5) ? null : r.GetString(5), r.GetString(6));
+            // Routing ledger recipients can be internal destination IDs, not contact addresses.
+            string recipient = r.GetString(6) == "Routing" ? "" : r.GetString(3);
+            rows.Add(new(r.GetGuid(0), r.GetString(1), r.GetString(2), recipient,
+                guidance.Summary, guidance.NextStep, guidance.RequiresSupport));
+        }
+        return new(rows.Take(50).ToArray(), rows.Count > 50);
+    }
+
     public StudioInboxPage Get(ClaimsPrincipal user, int offset, int limit, string? query, Guid? jobId)
     {
         offset=Math.Max(0,offset);limit=Math.Clamp(limit,1,200);
@@ -66,6 +136,7 @@ public static class StudioUnifiedMessagingEndpoints
         group.MapPost("/contacts",(CreateMessagingContact request,ClaimsPrincipal user,StudioAddressBook book)=>Execute(()=>Results.Ok(book.Get(book.GetOrCreateExternal(request.DisplayName,request.EmailAddress).Id,user))));
         group.MapGet("/identity",(ClaimsPrincipal user,StudioAddressBook book)=>Results.Ok(book.GetAll(user).FirstOrDefault(e=>string.Equals(e.UserName,CurrentUser(user),StringComparison.OrdinalIgnoreCase))));
         group.MapGet("/inbox",(int? offset,int? limit,string? query,Guid? jobId,ClaimsPrincipal user,StudioUnifiedInbox inbox)=>Results.Ok(inbox.Get(user,offset??0,limit??100,query,jobId)));
+        group.MapGet("/attention", (ClaimsPrincipal user, StudioUnifiedInbox inbox) => Results.Ok(inbox.GetAttention(user)));
         group.MapGet("/threads/{threadId:guid}/deliveries",(Guid threadId,ClaimsPrincipal user,StudioUnifiedMessaging router)=>Execute(()=>Results.Ok(router.GetDeliveries(threadId,user))));
         group.MapGet("/threads/{threadId:guid}/recipients",(Guid threadId,ClaimsPrincipal user,StudioInAppMessageStore messages,StudioAddressBook book,StudioDatabase db)=>Execute(()=>
         {
@@ -132,3 +203,4 @@ public static class StudioUnifiedMessagingEndpoints
         catch(PostgresException ex) when(ex.SqlState=="23505"){return Results.Conflict(new{error="This address is already registered. Refresh the address book."});}
     }
 }
+
