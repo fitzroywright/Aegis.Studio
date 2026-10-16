@@ -64,7 +64,7 @@
             const {from,to}=scheduleRange(date,view);
             return '/api/today/schedule?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
         };
-        const urls={tasks:'/api/today/tasks',schedule:scheduleUrl(state.selectedDate,state.calendarView),jobs:'/api/today/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/today/media-summary'};
+        const urls={tasks:'/api/today/tasks',schedule:scheduleUrl(new Date(),'day'),jobs:'/api/today/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/today/media-summary'};
         let inFlight=0;const waiting=[];
         async function load(key){
             while(inFlight>=2)await new Promise(resolve=>waiting.push(resolve));
@@ -116,21 +116,13 @@
         state.selectDay=date=>{
             state.selectedDate=new Date(date.getFullYear(),date.getMonth(),date.getDate());
             state.calendarMonth=new Date(date.getFullYear(),date.getMonth(),1);
-            urls.schedule=scheduleUrl(state.selectedDate,state.calendarView);
-            state.schedule=[];
-            state.status.schedule='loading';
             paintToday(state);
-            load('schedule');
         };
         state.setCalendarView=view=>{
             if(!['month','week','day'].includes(view)||view===state.calendarView)return;
             state.calendarView=view;
             state.calendarMonth=new Date(state.selectedDate.getFullYear(),state.selectedDate.getMonth(),1);
-            urls.schedule=scheduleUrl(state.selectedDate,state.calendarView);
-            state.schedule=[];
-            state.status.schedule='loading';
             paintToday(state);
-            load('schedule');
         };
         state.stepCalendar=direction=>{
             const current=new Date(state.selectedDate||new Date());
@@ -178,8 +170,9 @@
             ? '<span aria-hidden="true">›</span><button type="button" class="workspace-current" data-current-workspace>'+esc(state.workspaceName)+'</button>'
             : '';
         const now=new Date(),selectedDate=state.selectedDate||now;
-        const activeScheduleRange=state.scheduleRange?state.scheduleRange(selectedDate,state.calendarView):{from:new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()),to:new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+1)};
-        const startOfDay=activeScheduleRange.from,endOfDay=activeScheduleRange.to;
+        const activeJobRange=state.scheduleRange?state.scheduleRange(selectedDate,state.calendarView):{from:new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()),to:new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+1)};
+        const startOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+        const endOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
         const phase=(key,content)=>state.status[key]==='ready'?content:state.status[key]==='error'?'<div class="mw-empty" role="alert">'+esc(state.errors[key])+' <button data-mw-retry="'+key+'">Retry</button></div>':'<div class="mw-empty" role="status">Loading…</div>';
         const metric=(key,value)=>state.status[key]==='ready'?value:'…';
         const me=auth.user||auth,user=String(me.userName||me.loginName||'').toLowerCase();
@@ -206,11 +199,20 @@
         const roleForJob=job=>isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
         const statusOptions=StudioStatusOrder.sort(viewJobs.map(job=>String(job.status||'Unknown')));
         const roleOptions=[...new Set(viewJobs.map(roleForJob))].sort((a,b)=>a.localeCompare(b));
-        const filteredJobs=searchedJobs.filter(job=>(!state.jobStatusFilter||String(job.status||'Unknown')===state.jobStatusFilter)&&(!state.jobRoleFilter||roleForJob(job)===state.jobRoleFilter));
-        const sortedJobs=[...filteredJobs].sort((a,b)=>new Date(b.createdAtUtc||0)-new Date(a.createdAtUtc||0));
+        // EventDate is a calendar date: do not parse YYYY-MM-DD as UTC midnight.
+        const eventDate=job=>{
+            const match=/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(String(job.eventDate||''));
+            return match?new Date(Number(match[1]),Number(match[2])-1,Number(match[3])):null;
+        };
+        const datedJobs=searchedJobs.filter(job=>{
+            const date=eventDate(job);
+            return date&&date>=activeJobRange.from&&date<activeJobRange.to;
+        });
+        const filteredJobs=datedJobs.filter(job=>(!state.jobStatusFilter||String(job.status||'Unknown')===state.jobStatusFilter)&&(!state.jobRoleFilter||roleForJob(job)===state.jobRoleFilter));
+        const sortedJobs=[...filteredJobs].sort((a,b)=>eventDate(a)-eventDate(b)||String(a.title||'').localeCompare(String(b.title||''))||String(a.id).localeCompare(String(b.id)));
         const footerCount=document.getElementById('studioFooterRate');
         if(footerCount)footerCount.textContent=sortedJobs.length+' Jobs';
-        const emptyJobText=(state.jobSearch||state.jobStatusFilter||state.jobRoleFilter)?'No jobs match your filters':state.jobView==='led'?'You are not the Lead on any Jobs':state.jobView==='involved'?'You are not involved in any jobs':'No jobs found';
+        const emptyJobText=!viewJobs.length?(state.jobView==='led'?'You are not the lead on any jobs.':state.jobView==='involved'?'You are not involved in any jobs.':'No jobs found.'):'No jobs match the selected date range and filters.';
         const media=Array.isArray(state.media)?state.media:[];
         const announcements=Array.isArray(state.announcements)?state.announcements:[];
         const mediaByJob=new Map(media.map(row=>[String(row.jobId),row]));
@@ -251,7 +253,7 @@
                 <span class="mw-state-pill ${stateLabel==='In Progress'?'in-progress':''}">${stateLabel}</span>
                 <span class="mw-today-open-job" aria-hidden="true" title="Open job">↗</span>
             </button>`;
-        }).join('')||'<div class="mw-empty">No sessions scheduled in this '+esc(state.calendarView||'day')+'.</div>';
+        }).join('')||'<div class="mw-empty">No sessions scheduled today.</div>';
 
         const taskRows=myTasks.slice(0,8).map(task=>{
             const job=jobById(task.jobId)||{};
@@ -317,7 +319,7 @@
         }).join('')||'<div class="mw-today-jobs-empty" role="status">'+esc(emptyJobText)+'</div>';
         const overdueTasks=myTasks.filter(t=>t.dueAtUtc&&new Date(t.dueAtUtc)<now).length;
         const blockedTasks=myTasks.filter(t=>/blocked|rework|required|failed/i.test(String(t.status||''))).length;
-        const schedulingJobs=leadJobs.filter(j=>/needs scheduling/i.test(String(j.status||''))).length;
+        const schedulingJobs=leadJobs.filter(j=>['confirmed','needs scheduling','awaiting scheduling','needs assignment','unassigned','needs photographer assignment'].includes(normalized(j.status))).length;
         const uploadJobs=leadJobs.filter(j=>/awaiting upload/i.test(String(j.status||''))).length;
         const exceptionJobs=leadJobs.filter(j=>/blocked|overdue|exception/i.test(String(j.status||''))).length;
         const attentionJobs=schedulingJobs+uploadJobs+exceptionJobs;
@@ -352,10 +354,10 @@
                         <section class="mw-list-panel" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button data-nav="schedule">Calendar →</button></header><div class="mw-section-rows">${phase('schedule',sessionRows)}</div></section>
                         <section class="mw-list-panel" data-mw-region="attention"><header><h2><span class="studio-card-icon" aria-hidden="true">⚑</span> Needs Attention</h2><button data-nav="tasks">View All →</button></header><div class="mw-status-list">
                             <button class="mw-status-row warning" data-nav="tasks"><span class="studio-attention-label"><span aria-hidden="true">◷</span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
-                            <button class="mw-status-row warning" data-nav="schedule"><span class="studio-attention-label"><span aria-hidden="true">▦</span>Needs scheduling</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
-                            <button class="mw-status-row warning" data-nav="production"><span class="studio-attention-label"><span aria-hidden="true">⇧</span>Awaiting upload</span><strong>${metric('jobs',uploadJobs)}</strong></button>
+                            <button class="mw-status-row warning" data-nav="schedule"><span class="studio-attention-label"><span aria-hidden="true">▦</span>Needs scheduling (led by me)</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
+                            <button class="mw-status-row warning" data-nav="production"><span class="studio-attention-label"><span aria-hidden="true">⇧</span>Awaiting upload (led by me)</span><strong>${metric('jobs',uploadJobs)}</strong></button>
                         </div></section>
-                        ${StudioMessageCard.html({id:'todayMessageCard',body:phase('notifications',messageRows),actions:'<button type="button" data-nav="messages">View All →</button>',footer:'<button type="button" data-nav="messages">✉ Send Message →</button>',attributes:'data-mw-region="messages"'})}
+                        ${StudioMessageCard.html({id:'todayMessageCard',title:'Messages',body:phase('notifications',messageRows),actions:'<button type="button" data-nav="messages">View All →</button>',footer:'<button type="button" data-nav="messages">✉ Send Message →</button>',attributes:'data-mw-region="messages"'})}
                     </aside>
                 </div>
             </section>`;
@@ -1067,4 +1069,5 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 
