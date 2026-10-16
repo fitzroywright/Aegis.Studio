@@ -46,7 +46,7 @@
         ++inboxRevision;selectedThread=null;selectedRecipients=[];sendRequestId=null;
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML = StudioPage.html({title:'Conversations',className:'st-messages-content',showMessagesCard:true,summaryTitle:'Conversation Context',summary:'<div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div>',attention:'<p>External delivery outcomes appear in each conversation. Held deliveries need review before retrying.</p>',content:`
+        genericView.innerHTML = StudioPage.html({title:'Conversations',className:'st-messages-content',showMessagesCard:false,summaryTitle:'Conversation Context',summary:'<div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div>',attention:'<p>External delivery outcomes appear in each conversation. Held deliveries need review before retrying.</p>',content:`
             <div class="st-inbox">
                 <section class="studio-inbox-center">
                     <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New</button></div></header>
@@ -616,3 +616,4 @@
     // Give authentication and the initial shell a moment to settle, then show the digest once.
     setTimeout(() => showAwayDigestOnce(), 450);
 })();
+
