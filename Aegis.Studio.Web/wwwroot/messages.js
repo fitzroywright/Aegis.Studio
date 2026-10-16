@@ -32,6 +32,8 @@
     let selectedRecipients = [];
     let sendRequestId = null;
     let selectedSubject = 'Studio message';
+    let attentionRevision = 0;
+    let attentionItems = [];
     let inboxLastLoad = 0;
     let inboxRevision = 0;
     let threadRevision = 0;
@@ -46,7 +48,7 @@
         ++inboxRevision;selectedThread=null;selectedRecipients=[];sendRequestId=null;
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML = StudioPage.html({title:'Messages',className:'st-messages-content',showHeader:false,showMessagesCard:false,summaryTitle:'Conversation Context',summary:'<div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div>',attention:'<p>External delivery outcomes appear in each conversation. Held deliveries need review before retrying.</p>',content:`
+        genericView.innerHTML = StudioPage.html({title:'Messages',className:'st-messages-content',showHeader:false,showMessagesCard:false,summaryTitle:'Conversation Context',summary:'<div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div>',attention:'<div id="studioMessageAttention" aria-live="polite"><p>Checking your replies…</p></div>',content:`
             <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New Message</button></div></header>
             <div class="st-inbox">
                 <section class="studio-inbox-center">
@@ -67,8 +69,38 @@
         await loadInbox(true);
         if(current())startRefresh();
     }
+    async function loadMessageAttention() {
+        const panel=document.getElementById('studioMessageAttention');
+        if(!panel)return;
+        const revision=++attentionRevision;
+        try {
+            const result=await json('/api/messages/attention');
+            if(revision!==attentionRevision||document.getElementById('studioMessageAttention')!==panel)return;
+            if(!result||!Array.isArray(result.items))throw new Error('Attention status unavailable');
+            attentionItems=result.items;
+            panel.innerHTML='<p class="studio-attention-scope">Replies you sent</p>'+(attentionItems.length
+                ? attentionItems.map((item,index)=>`<button type="button" class="studio-attention-item" data-message-attention="${index}"><strong>${esc(item.title||'Conversation')}</strong>${item.recipient?'<span>'+esc(item.recipient)+'</span>':''}<span>${esc(item.summary)}</span><small>${esc(item.nextStep)}</small><b>${item.requiresSupport?'Open message · support needed':'Open message'}</b></button>`).join('')
+                : '<p>No replies you sent need attention.</p>')+(result.hasMore?'<p>Showing the 50 most recent delivery issues.</p>':'')+'<button type="button" class="st-link" data-attention-refresh>Refresh delivery status</button>';
+            panel.querySelector('[data-attention-refresh]').onclick=()=>loadMessageAttention();
+            panel.querySelectorAll('[data-message-attention]').forEach(button=>button.onclick=async()=>{
+                const item=attentionItems[Number(button.dataset.messageAttention)];if(!item)return;
+                button.disabled=true;
+                try {
+                    if(item.kind==='Conversation')await openLegacyConversation(item.conversationId);
+                    else await openThread(item.conversationId);
+                }catch {if(panel.isConnected){let error=panel.querySelector('[data-attention-error]');if(!error){error=document.createElement('p');error.dataset.attentionError='';error.setAttribute('role','alert');panel.append(error);}error.textContent='The conversation could not be opened. Refresh and try again.';}}
+                finally{if(button.isConnected)button.disabled=false;}
+            });
+        } catch {
+            if(revision!==attentionRevision||document.getElementById('studioMessageAttention')!==panel)return;
+            panel.innerHTML='<p role="alert">We could not check your delivery status. This does not mean your replies were delivered.</p><button type="button" class="st-link">Try again</button>';
+            panel.querySelector('button').onclick=()=>loadMessageAttention();
+        }
+    }
+
     async function loadInbox(force) {
         const revision=++inboxRevision;
+        void loadMessageAttention();
         const body=document.getElementById('studioInboxRows');
         if(!body)return;
         if(force)body.innerHTML='<div class="studio-inbox-loading">Loading messages…</div>';
@@ -110,7 +142,7 @@
     }
 
     window.showStudioMessages = showMessages;
-    window.StudioMessages={invalidate(){++inboxRevision;++threadRevision;}};
+    window.StudioMessages={invalidate(){++inboxRevision;++threadRevision;++attentionRevision;}};
 
     async function loadThreads() {
         const threads = await json('/api/messages/threads');
