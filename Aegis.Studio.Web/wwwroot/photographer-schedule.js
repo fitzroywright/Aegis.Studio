@@ -1,6 +1,6 @@
 /* Read the shared Schedule/WorkDay records; changes remain in the existing workflow. */
 window.StudioPhotographerSchedule=(()=>{
-    let revision=0;
+    let revision=0,controller=null;
     const state={date:new Date(),view:'week',photographer:'',workspace:'',term:'',inactive:false};
     const dayStart=value=>new Date(value.getFullYear(),value.getMonth(),value.getDate());
     const addDays=(value,n)=>new Date(value.getFullYear(),value.getMonth(),value.getDate()+n);
@@ -11,9 +11,11 @@ window.StudioPhotographerSchedule=(()=>{
     const valid=e=>Number.isFinite(+new Date(e.startsAtUtc))&&new Date(e.endsAtUtc)>new Date(e.startsAtUtc);
     const time=value=>new Date(value).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     const shortDate=value=>value.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
-    const jsonArray=async url=>{const data=await json(url);if(!Array.isArray(data))throw Error('Unexpected schedule response. Please refresh.');return data;};
     async function render(options={}){
-        const token=++revision,esc=StudioPage.escape;
+        controller?.abort();controller=new AbortController();const signal=controller.signal;
+        const started=performance.now(),token=++revision,esc=StudioPage.escape;
+        const diagnostics={requests:[],conflictCalculations:0};window.studioScheduleDiagnostics=diagnostics;
+        async function read(url,expectArray=false){const at=performance.now();try{const result=await json(url,{signal});if(expectArray&&!Array.isArray(result))throw Error('Unexpected schedule response. Please refresh.');return result;}finally{diagnostics.requests.push({url,milliseconds:Math.round(performance.now()-at)});}}
         const live=()=>token===revision&&document.body.dataset.studioView==='schedule';
         if(Object.prototype.hasOwnProperty.call(options,'photographer'))state.photographer=options.photographer||'';
         if(options.resourceId)state.photographer='resource:'+options.resourceId;
@@ -23,22 +25,35 @@ window.StudioPhotographerSchedule=(()=>{
         genericView.innerHTML='<p role="status">Loading photographer schedules…</p>';
         const from=state.view==='day'?dayStart(state.date):startOfWeek(state.date),days=state.view==='day'?1:7,to=addDays(from,days);
         let photographers,entries,jobs,workspaces;
-        try{[photographers,entries,jobs,workspaces]=await Promise.all([jsonArray('/api/photographers'),jsonArray('/api/schedule/entries?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString())),jsonArray('/api/jobs'),jsonArray('/api/workspaces')]);}
+        const range='?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
+        const availabilityResult=read('/api/schedule/photographer-availability'+range,true).then(data=>({data}),error=>({error}));
+        try{const [data,spaces]=await Promise.all([read('/api/schedule/photographer-data'+range+'&includeInactive='+state.inactive),read('/api/workspaces',true)]);if(!data||!['photographers','entries','jobs'].every(k=>Array.isArray(data[k])))throw Error('Unexpected calendar response. Please refresh.');({photographers,entries,jobs}=data);workspaces=spaces;}
         catch(e){if(live()){genericView.innerHTML='<section class="mw-list-panel ps-error"><h2>Schedule could not load</h2><p role="alert">'+esc(e.message)+'</p><button class="action" data-ps-retry>Retry</button></section>';genericView.querySelector('[data-ps-retry]').onclick=()=>render();}return;}
         if(!live())return;
         if(state.photographer.startsWith('resource:')){const p=photographers.find(p=>p.scheduleResourceId===state.photographer.slice(9));state.photographer=p?.userName||'';}
         const jobMap=new Map(jobs.map(j=>[j.id,j]));
         const rawEntries=entries.filter(e=>valid(e)&&e.status!=='Cancelled'&&new Date(e.startsAtUtc)<to&&new Date(e.endsAtUtc)>from);
-        const roster=photographers.filter(p=>state.inactive||p.isActive||rawEntries.some(e=>(e.resourceIds||[]).includes(p.scheduleResourceId)));
-        const availability=new Map(),failures=new Set();let next=0;
-        const query='?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
-        async function worker(){while(next<roster.length){if(!live())return;const p=roster[next++];try{availability.set(p.userName,(await jsonArray('/api/photographers/'+encodeURIComponent(p.userName)+'/availability'+query)).filter(valid).filter(a=>new Date(a.startsAtUtc)<to&&new Date(a.endsAtUtc)>from));}catch{availability.set(p.userName,[]);failures.add(p.userName);}}}
+        const assignedResources=new Set(rawEntries.flatMap(e=>e.resourceIds||[]));
+        const roster=photographers.filter(p=>state.inactive||p.isActive||assignedResources.has(p.scheduleResourceId));
+        const availability=new Map(),failures=new Set(),eventsByResource=new Map(),conflictCache=new Map(),visibleCache=new Map();
+        for(const e of rawEntries)for(const id of e.resourceIds||[]){if(!eventsByResource.has(id))eventsByResource.set(id,[]);eventsByResource.get(id).push(e);}
+        async function loadAvailability(){const result=await availabilityResult;if(!live())return;if(result.error){for(const p of roster){availability.set(p.userName,[]);failures.add(p.userName);}}else{const grouped=new Map();for(const a of result.data.filter(valid)){const name=String(a.userName).toLowerCase();if(!grouped.has(name))grouped.set(name,[]);grouped.get(name).push(a);}for(const p of roster)availability.set(p.userName,grouped.get(p.userName.toLowerCase())||[]);}conflictCache.clear();availabilityDone=true;paint();diagnostics.availabilityReadyMs=Math.round(performance.now()-started);}
         // The calendar can paint before availability loads; never imply the missing data is free time.
         roster.forEach(p=>availability.set(p.userName,null));
         let availabilityDone=false;
-        function eventsFor(p){return rawEntries.filter(e=>(e.resourceIds||[]).includes(p.scheduleResourceId));}
-        function flagsFor(p){const events=eventsFor(p),blocks=(availability.get(p.userName)||[]).filter(isBlocked),flags=new Set();for(let i=0;i<events.length;i++){if(blocks.some(a=>overlap(events[i],a)))flags.add(events[i].id);for(let j=i+1;j<events.length;j++)if(overlap(events[i],events[j])){flags.add(events[i].id);flags.add(events[j].id);}}return flags;}
-        function visibleEntries(p){return eventsFor(p).filter(e=>{const j=jobMap.get(e.jobId);return (!state.workspace||j?.workspaceId===state.workspace||(j?.participatingWorkspaceIds||[]).includes(state.workspace))&&[e.title,e.location,j?.title,j?.clientName,p.displayName].join(' ').toLowerCase().includes(state.term.toLowerCase());});}
+        function eventsFor(p){return eventsByResource.get(p.scheduleResourceId)||[];}
+        function flagsFor(p){
+            if(conflictCache.has(p.userName))return conflictCache.get(p.userName);
+            diagnostics.conflictCalculations++;
+            const events=eventsFor(p).map(e=>({id:e.id,start:+new Date(e.startsAtUtc),end:+new Date(e.endsAtUtc)})).sort((a,b)=>a.start-b.start),flags=new Set();
+            let latestEnd=-Infinity,latestId=null;
+            for(const e of events){if(e.start<latestEnd){flags.add(e.id);flags.add(latestId);}if(e.end>latestEnd){latestEnd=e.end;latestId=e.id;}}
+            const blocks=(availability.get(p.userName)||[]).filter(isBlocked).map(a=>({start:+new Date(a.startsAtUtc),end:+new Date(a.endsAtUtc)})).sort((a,b)=>a.start-b.start),merged=[];
+            for(const block of blocks){const last=merged.at(-1);if(last&&block.start<=last.end)last.end=Math.max(last.end,block.end);else merged.push({...block});}
+            let i=0;for(const e of events){while(i<merged.length&&merged[i].end<=e.start)i++;if(i<merged.length&&merged[i].start<e.end)flags.add(e.id);}
+            conflictCache.set(p.userName,flags);return flags;
+        }
+        function visibleEntries(p){if(visibleCache.has(p.userName))return visibleCache.get(p.userName);const values=eventsFor(p).filter(e=>{const j=jobMap.get(e.jobId);return (!state.workspace||j?.workspaceId===state.workspace||(j?.participatingWorkspaceIds||[]).includes(state.workspace))&&[e.title,e.location,j?.title,j?.clientName,p.displayName].join(' ').toLowerCase().includes(state.term.toLowerCase());});visibleCache.set(p.userName,values);return values;}
         function visiblePeople(){return roster.filter(p=>!state.photographer||p.userName===state.photographer).filter(p=>!state.workspace&&!state.term||visibleEntries(p).length||String(p.displayName||p.userName).toLowerCase().includes(state.term.toLowerCase())&&!state.workspace);}
         function eventLabel(e,day){const start=new Date(e.startsAtUtc),end=new Date(e.endsAtUtc),next=addDays(day,1);return (start<day?'← ':time(start))+' – '+(end>next?'continues →':time(end));}
         function eventHtml(e,p,day,flags,position=''){
@@ -53,7 +68,7 @@ window.StudioPhotographerSchedule=(()=>{
             return `<div class="ps-day-row" role="row">${personCell(p,events)}<div class="ps-hours-track" role="cell" style="height:${Math.max(112,laneEnds.length*93+20)}px">${cards}${!all.length?'<span class="ps-track-empty">'+(availability.get(p.userName)===null?'Availability loading…':failures.has(p.userName)?'Availability unavailable':'No visible bookings')+'</span>':''}</div></div>`;
         }
         function paint(){
-            if(!live())return;
+            if(!live())return;visibleCache.clear();
             const priorCalendar=genericView.querySelector('.ps-calendar');const scroll={left:priorCalendar?.scrollLeft||0,top:priorCalendar?.scrollTop||0};
             const people=visiblePeople(),count=people.reduce((n,p)=>n+visibleEntries(p).length,0),flagged=people.flatMap(p=>visibleEntries(p).filter(e=>flagsFor(p).has(e.id)).map(e=>({p,e}))),uniqueConflicts=new Set(flagged.map(x=>x.e.id));
             const zone=Intl.DateTimeFormat().resolvedOptions().timeZone||'Local time';
@@ -80,8 +95,8 @@ window.StudioPhotographerSchedule=(()=>{
             d.querySelector('[data-ps-open-job]')?.addEventListener('click',()=>{d.close();openWorkspaceJob(e.jobId).catch(error=>alert(error.message));});
             if(e.jobId)try{const view=await json('/api/jobs/'+e.jobId+'/connected-workflow');if(!d.isConnected)return;if(view.canManage){const session=(view.data?.sessions||[]).find(s=>s.shoot?.schedule_entry_id===e.id),host=d.querySelector('[data-ps-manage]');host.innerHTML='<button class="action" data-ps-manage-assignment>Assignments & schedule</button>';host.querySelector('button').onclick=async()=>{d.close();try{const panel=await StudioWorkflow.open(e.jobId,session?'[data-wf-session="'+session.id+'"]':null);panel?.addEventListener('close',()=>{if(live())render();},{once:true});}catch(error){alert(error.message);}};}}catch(error){if(d.isConnected)d.querySelector('[data-ps-detail-status]').textContent='Assignment controls unavailable: '+error.message;}
         }
-        paint();await Promise.all([worker(),worker(),worker()]);availabilityDone=true;paint();
+        paint();diagnostics.firstRenderMs=Math.round(performance.now()-started);diagnostics.photographers=roster.length;diagnostics.assignments=rawEntries.length;void loadAvailability();
     }
-    return {render,options(){return {photographer:state.photographer,date:dayKey(state.date),mode:state.view};},invalidate(){++revision;},overlap,dayKey,startOfWeek};
+    return {render,options(){return {photographer:state.photographer,date:dayKey(state.date),mode:state.view};},invalidate(){++revision;controller?.abort();},overlap,dayKey,startOfWeek};
 })();
 
