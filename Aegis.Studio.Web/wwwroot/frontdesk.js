@@ -145,7 +145,7 @@ function renderFrontDesk(){
         
       </div><div class="fd-secondary">
         <section class="mw-list-panel fd-overview">
-            <header><h2><span class="mw-title-icon attention">▤</span> Overview</h2><small>Front Desk totals</small></header>
+            <header><h2><span class="mw-title-icon attention">▤</span> Overview</h2><button type="button" class="fd-card-link" data-fd-view-all>View All →</button></header>
             <div class="mw-status-list">
                 ${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}
                 ${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}
@@ -162,7 +162,7 @@ function renderFrontDesk(){
         ${StudioMessageCard.html({id:'frontDeskMessageCard',body:'<div id="fdCommunicationFeed"><p>Loading messages…</p></div>',actions:'<button type="button" data-messages-all>View All →</button>',footer:'<button type="button" data-message-compose>✉ Send Message →</button>',attributes:'data-mw-region="messages" data-fd-communications'})}
       </div></div></div>`;
     if(preservedMessageCard)genericView.querySelector('#frontDeskMessageCard').replaceWith(preservedMessageCard);
-    if(searchNode){genericView.querySelector('#frontDeskSearch').replaceWith(searchNode);searchNode.value=frontDeskTerm;if(searchFocused){searchNode.focus({preventScroll:true});searchNode.setSelectionRange(...searchSelection);}}
+    if(searchNode&&genericView.querySelector('#frontDeskSearch')){genericView.querySelector('#frontDeskSearch').replaceWith(searchNode);searchNode.value=frontDeskTerm;if(searchFocused){searchNode.focus({preventScroll:true});searchNode.setSelectionRange(...searchSelection);}}
     // The shared shell footer owns the visible filtered row count.
     const shellCount=document.getElementById('studioFooterRate');
     if(shellCount){
@@ -174,12 +174,20 @@ function renderFrontDesk(){
     }
     genericView.querySelectorAll('[data-fd-metric]').forEach(button=>button.onclick=()=>{
         const key=button.dataset.fdMetric;
-        frontDeskMetricView=frontDeskMetricView===key?'':key;
+        // Selecting the current Overview entry keeps its view active.
+        frontDeskMetricView=key;
         frontDeskTab=frontDeskMetricView==='unassigned'?'unassigned':'today';
         frontDeskTerm='';
         frontDeskColumnFilters={type:'',status:'',source:''};
         renderFrontDesk();
     });
+    genericView.querySelector('[data-fd-view-all]').onclick=()=>{
+        frontDeskMetricView='';
+        frontDeskTab='today';
+        frontDeskTerm='';
+        frontDeskColumnFilters={type:'',status:'',source:''};
+        renderFrontDesk();
+    };
     genericView.querySelectorAll('[data-fd-filter]').forEach(select=>select.onchange=()=>{
         frontDeskColumnFilters[select.dataset.fdFilter]=select.value;
         if(select.dataset.fdFilter==='status'){frontDeskTab='today';frontDeskMetricView='';if(['Pickup / Delivery','Completed'].includes(select.value)){frontDeskColumnFilters.type='';frontDeskColumnFilters.source='';}}
@@ -199,7 +207,8 @@ function renderFrontDesk(){
     genericView.querySelector('[data-message-compose]').onclick=()=>openFrontDeskMessagePicker();
     StudioMessageCard.bind(genericView.querySelector('#frontDeskMessageCard'));
     loadFrontDeskCommunications();
-    genericView.querySelector('#frontDeskSearch').oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();genericView.querySelector('#frontDeskSearch')?.focus();};
+    const searchInput=genericView.querySelector('#frontDeskSearch');
+    if(searchInput)searchInput.oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();genericView.querySelector('#frontDeskSearch')?.focus();};
     genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openWorkspaceJob(b.dataset.frontdeskJob));
     genericView.querySelectorAll('[data-frontdesk-fulfill]').forEach(button=>button.onclick=()=>recordFrontDeskFulfillment(button.dataset.frontdeskFulfill).catch(error=>alert(error.message)));
     genericView.querySelectorAll('[data-fd-row-open]').forEach(row=>{
@@ -503,6 +512,7 @@ async function recordFrontDeskFulfillment(jobId){
  const dialog=frontDeskDialog('Confirm collection / delivery',`<p>${esc(job?.title||'Job')} · ${esc(job?.clientName||'')}</p><label>Method<select name="method"><option value="Collected">Customer collected</option><option value="Delivered">Delivered to customer</option></select></label><label>Received by<input name="recipient" required maxlength="200"></label>`);
  dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{await json(`/api/frontdesk/jobs/${jobId}/fulfillment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId,expectedRevision:workflow.data.revision,method:form.elements.method.value,recipient:form.elements.recipient.value})});dialog.close();await showFrontDesk();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
+
 
 
 
