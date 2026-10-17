@@ -1,7 +1,7 @@
 let frontDeskPosWindow=null;
 const frontDeskPosWindows=new Set();
 async function launchFrontDeskPos(action,context={}){
-    if(!['today','frontdesk'].includes(document.body.dataset.studioView))throw Error('Financial actions are available from Today or Front Desk.');
+    if(document.body.dataset.studioView!=='frontdesk')throw Error('Financial actions are available from Front Desk.');
     const reusable=frontDeskPosWindow&&!frontDeskPosWindow.closed&&!frontDeskPosWindow.studioPosDirty;
     const target=reusable?frontDeskPosWindow:window.open('about:blank',`StudioPos-${crypto.randomUUID()}`,`popup=yes,width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`);
     if(!target)throw Error('Allow popups for Studio to open this financial operation.');
@@ -9,19 +9,14 @@ async function launchFrontDeskPos(action,context={}){
     catch(error){if(!reusable)target.close();throw error;}
 }
 async function pickFrontDeskFinancialAction(action){
-    if(!['today','frontdesk'].includes(document.body.dataset.studioView))return alert('Use Today or Front Desk for financial actions.');
-    const fromToday=document.body.dataset.studioView==='today';
-    const jobsForAction=fromToday&&action!=='RecordDeposit'?await json('/api/jobs'):frontDeskJobs;
-    const bookingsForAction=fromToday&&action==='RecordDeposit'?await json('/api/frontdesk/booking-requests'):frontDeskRequests;
-    // A user may navigate away while the picker data is loading.
-    if(fromToday&&document.body.dataset.studioView!=='today')return;
+    if(document.body.dataset.studioView!=='frontdesk')return alert('Use Front Desk for financial actions.');
     if(action==='CloseRegister')return launchFrontDeskPos(action);
     if(action==='RecordDeposit'){
-        const bookings=bookingsForAction.filter(b=>!['Confirmed','Cancelled'].includes(b.status));
+        const bookings=frontDeskRequests.filter(b=>!['Confirmed','Cancelled'].includes(b.status));
         const d=studioDialog('Record Deposit',bookings.map(b=>`<button class="action" data-booking="${b.id}">${esc(b.request.clientName)} · ${esc(b.request.title)}</button>`).join('')||'<p>No pending bookings.</p>');
         d.querySelectorAll('[data-booking]').forEach(b=>b.onclick=async()=>{await launchFrontDeskPos(action,{bookingId:b.dataset.booking});d.close();});return;
     }
-    const jobs=jobsForAction.filter(j=>fromToday||!frontDeskSelectedClientId||j.clientId===frontDeskSelectedClientId);
+    const jobs=frontDeskJobs.filter(j=>!frontDeskSelectedClientId||j.clientId===frontDeskSelectedClientId);
     const d=studioDialog(action==='TakePayment'?'Take Payment':action==='IssueRefund'?'Issue Refund':'New Sale',`<form class="subject-form"><p>Choose the customer Job for this ${action==='TakePayment'?'payment':'sale'}.</p><label>Job / Customer<select data-job-picker name="jobId" required><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><button class="primary">Continue</button><p role="alert"></p></form>`);
     const form=d.querySelector('form');form.onsubmit=async e=>{e.preventDefault();const id=form.elements.jobId.value;if(!id)return;const button=form.querySelector('.primary');button.disabled=true;try{if(['IssueRefund','ViewReceipt'].includes(action)){await pickFrontDeskSale(action,id);}else{await launchFrontDeskPos(action,{jobId:id});}d.close();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
@@ -30,9 +25,7 @@ async function pickFrontDeskSale(action,jobId){
     d.querySelectorAll('[data-sale]').forEach(b=>b.onclick=async()=>{await launchFrontDeskPos(action,{jobId,saleId:b.dataset.sale});d.close();});
 }
 window.addEventListener('message',async event=>{
-    if(event.origin!==location.origin||!frontDeskPosWindows.has(event.source)||event.data?.type!=='studio-pos-completed'||!['today','frontdesk'].includes(document.body.dataset.studioView))return;
-    if(document.body.dataset.studioView==='today')return;
+    if(event.origin!==location.origin||!frontDeskPosWindows.has(event.source)||event.data?.type!=='studio-pos-completed'||document.body.dataset.studioView!=='frontdesk')return;
     const positions=[...genericView.querySelectorAll('*')].filter(el=>el.scrollTop||el.scrollLeft).map(el=>({id:el.id,cls:el.className,top:el.scrollTop,left:el.scrollLeft}));
     try{const [jobs,requests]=await Promise.all([json('/api/jobs'),json('/api/frontdesk/booking-requests')]);frontDeskJobs=jobs;frontDeskRequests=requests;renderFrontDesk();for(const p of positions){const el=p.id?document.getElementById(p.id):[...genericView.querySelectorAll('*')].find(e=>e.className===p.cls);if(el){el.scrollTop=p.top;el.scrollLeft=p.left;}}}catch(error){console.error('Front Desk update failed',error);}
 });
-
