@@ -965,7 +965,7 @@
         notifications:()=>showNotifications(),
         customers:()=>window.StudioCustomers.render({customerId:window.history.state?.studioCustomerId}),
         messages:()=>window.showStudioMessages(),
-        schedule:()=>window.history.state?.studioSchedulePanel==='pipeline'?showPipeline():window.StudioPhotographerSchedule.render({photographer:window.history.state?.studioPhotographer||'',date:window.history.state?.studioScheduleDate||'',view:window.history.state?.studioScheduleView||'',resourceId:window.history.state?.studioScheduleResource||''}),
+        schedule:()=>window.history.state?.studioSchedulePanel==='pipeline'?showPipeline():window.history.state?.studioSchedulePanel==='production'?showCatalogProduction():window.StudioPhotographerSchedule.render({photographer:window.history.state?.studioPhotographer||'',date:window.history.state?.studioScheduleDate||'',view:window.history.state?.studioScheduleView||'',resourceId:window.history.state?.studioScheduleResource||''}),
         tasks:renderToday,
         workspaces:renderWorkspaces,
         jobs:renderJobs,
@@ -988,12 +988,12 @@
     const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',customers:'Customers',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
-        return {studioView:view,studioSchedulePanel:view==='schedule'?(options.panel==='pipeline'?'pipeline':'photographers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioCustomerId:view==='customers'?String(options.customerId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
+        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'photographers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioCustomerId:view==='customers'?String(options.customerId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
     }
     function recordNavigation(view,options={}){
         const next=navigationContext(view,options),previous=window.history.state;
         const params=new URLSearchParams({studio:view});
-        if(next.studioSchedulePanel==='pipeline')params.set('panel','pipeline');
+        if(['pipeline','production'].includes(next.studioSchedulePanel))params.set('panel',next.studioSchedulePanel);
         if(next.studioPhotographer)params.set('photographer',next.studioPhotographer);
         if(next.studioScheduleResource)params.set('resource',next.studioScheduleResource);
         if(next.studioScheduleDate)params.set('date',next.studioScheduleDate);
