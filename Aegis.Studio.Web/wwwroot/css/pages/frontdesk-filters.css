@@ -7,3 +7,16 @@ body[data-studio-view="frontdesk"] .fd-customer-header>span{flex:0 0 auto}
 body[data-studio-view="frontdesk"] .fd-customer-header input{flex:1 1 100px;min-width:100px;width:100%;max-width:310px;height:26px;box-sizing:border-box;padding:3px 7px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:4px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;font-weight:400}
 body[data-studio-view="frontdesk"] .fd-customer-header input:focus-visible,body[data-studio-view="frontdesk"] .fd-column-controls select:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
 body[data-studio-view="frontdesk"] .fd-table{min-width:960px}
+
+/* Reuse the Workspaces Overview card and summary rows. */
+.fd-overview { display:flex; flex-direction:column; flex:1 1 0; min-height:0; }
+.fd-overview .mw-status-list { overflow:auto; min-height:0; }
+.fd-overview .fd-overview-link {
+  appearance:none; border:0; border-radius:0; background:transparent;
+  padding:0; min-height:0; color:inherit; font:inherit; text-align:left;
+  cursor:pointer; box-shadow:none;
+}
+.fd-overview .fd-overview-link:hover { text-decoration:underline; }
+.fd-overview .fd-overview-link[aria-pressed="true"] { font-weight:800; }
+.fd-overview .fd-overview-link:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+
