@@ -108,11 +108,11 @@
                     <button type="button" data-studio-side="today"><span>⌂</span><span>Today</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
                     <button type="button" data-studio-side="customers"><span>♧</span><span>Customers</span></button>
-                    <button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations</span></button>
-                    <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
                     <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
-                    <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
+                    <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
+                    <button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations</span></button>
+                    <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                     <button type="button" data-studio-side="messages"><span>✉</span><span>Messages</span></button>
                 </div>
             </section>
