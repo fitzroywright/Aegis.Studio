@@ -30,6 +30,17 @@ public static class CommercialEndpoints
             var store = new CommercialTemplateStore(database); var original = store.Get(id) ?? throw new KeyNotFoundException();
             return Results.Ok(store.Save(null, original.Kind, original.Definition with { Name = original.Definition.Name + " (copy)" }, 0, false, WorkflowStore.Name(user)));
         }));
+        app.MapGet("/api/jobs/{jobId:guid}/media/publications", (Guid jobId, ClaimsPrincipal user, JobAccessService access, StudioDatabase database) =>
+        {
+            if (!access.HasPermission(user, jobId, "ViewJob")) return Results.Forbid();
+            using var c = database.OpenConnection(); using var q = Command(c, null, """
+                select coalesce(jsonb_agg(row),'[]')::text from (
+                  select id,submission_id as "submissionId",provider,actor,created_at_utc as "createdAtUtc"
+                  from studio_workflow_publications where job_id=$1 order by created_at_utc desc,id desc
+                ) row
+                """, jobId);
+            return Results.Content((string)q.ExecuteScalar()!, "application/json");
+        }).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/publication",(Guid jobId,WorkflowCommand request,ClaimsPrincipal user,WorkflowStore workflow)=>Run(()=>
         {
             if(request.Action!="publish")throw new ArgumentException("Choose publication.");
