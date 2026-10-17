@@ -962,6 +962,7 @@
 
     const routes={
         today:renderToday,
+        notifications:()=>showNotifications(),
         messages:()=>window.showStudioMessages(),
         schedule:()=>showPipeline(),
         tasks:renderToday,
@@ -1066,5 +1067,6 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 
 
