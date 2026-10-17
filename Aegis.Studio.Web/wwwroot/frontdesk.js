@@ -154,7 +154,6 @@ function renderFrontDesk(){
             </div>
             <footer class="fd-overview-toolbar" role="toolbar" aria-label="Overview actions">
                 <button type="button" data-new-booking><span aria-hidden="true">＋</span> Create Manual Booking</button>
-                <button type="button" data-find-client><span aria-hidden="true">⌕</span> Find Customer</button>
                 <button type="button" data-view-receipt><span aria-hidden="true">▤</span> View Receipt</button>
             </footer>
         </section>
@@ -192,7 +191,6 @@ function renderFrontDesk(){
     });
     const newBooking=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
     genericView.querySelectorAll('[data-new-booking]').forEach(b=>b.onclick=newBooking);
-    genericView.querySelector('[data-find-client]').onclick=()=>showFrontDeskClients();
     genericView.querySelector('[data-view-receipt]').onclick=()=>pickFrontDeskFinancialAction('ViewReceipt').catch(error=>alert(error.message));
     genericView.querySelector('[data-calendar]').onclick=()=>studioNavigate('pipeline');
     genericView.querySelector('[data-messages-all]').onclick=()=>studioNavigate('messages');
