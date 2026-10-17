@@ -1,9 +1,9 @@
-// Both planning views share an explicit switch and the Schedule route.
+// Schedule views link to the existing dedicated Production destination.
 function studioScheduleViewSwitch(active){
     return '<div class="studio-schedule-switch" role="group" aria-label="Schedule view">'+[['photographers','Photographer Schedule'],['pipeline','Job Pipeline'],['production','Production Pipeline']].map(([key,label])=>'<button type="button" data-studio-schedule-panel="'+key+'" aria-pressed="'+(active===key)+'">'+label+'</button>').join('')+'</div>';
 }
 function bindStudioScheduleSwitch(host){
-    host.querySelectorAll('[data-studio-schedule-panel]').forEach(button=>button.onclick=()=>window.studioNavigate('schedule',{...window.StudioPhotographerSchedule?.options(),panel:button.dataset.studioSchedulePanel}));
+    host.querySelectorAll('[data-studio-schedule-panel]').forEach(button=>button.onclick=()=>button.dataset.studioSchedulePanel==='production'?window.studioNavigate('production'):window.studioNavigate('schedule',{...window.StudioPhotographerSchedule?.options(),panel:button.dataset.studioSchedulePanel}));
 }
 // Pipeline is the planning home: stage groups, schedule entries and job tasks share one page.
 const pipelineStages = [
