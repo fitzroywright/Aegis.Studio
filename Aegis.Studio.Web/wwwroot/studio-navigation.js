@@ -965,7 +965,7 @@
         notifications:()=>showNotifications(),
         customers:()=>window.StudioCustomers.render({customerId:window.history.state?.studioCustomerId}),
         messages:()=>window.showStudioMessages(),
-        schedule:()=>showPipeline(),
+        schedule:()=>window.StudioPhotographerSchedule.render({photographer:window.history.state?.studioPhotographer||'',date:window.history.state?.studioScheduleDate||'',view:window.history.state?.studioScheduleView||'',resourceId:window.history.state?.studioScheduleResource||''}),
         tasks:renderToday,
         workspaces:renderWorkspaces,
         jobs:renderJobs,
@@ -985,18 +985,22 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',customers:'Customers',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Pipeline'};
+    const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',customers:'Customers',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
-        return {studioView:view,studioCustomerId:view==='customers'?String(options.customerId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
+        return {studioView:view,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioCustomerId:view==='customers'?String(options.customerId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
     }
     function recordNavigation(view,options={}){
         const next=navigationContext(view,options),previous=window.history.state;
         const params=new URLSearchParams({studio:view});
+        if(next.studioPhotographer)params.set('photographer',next.studioPhotographer);
+        if(next.studioScheduleResource)params.set('resource',next.studioScheduleResource);
+        if(next.studioScheduleDate)params.set('date',next.studioScheduleDate);
+        if(next.studioScheduleView)params.set('view',next.studioScheduleView);
         if(next.studioCustomerId)params.set('customer',next.studioCustomerId);
         if(next.studioWorkspaceId)params.set('workspace',next.studioWorkspaceId);
         if(next.studioJobId)params.set('job',next.studioJobId);
-        const same=previous?.studioView===next.studioView&&(previous.studioCustomerId||null)===(next.studioCustomerId||null)&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId;
+        const same=previous?.studioView===next.studioView&&['studioPhotographer','studioScheduleResource','studioScheduleDate','studioScheduleView'].every(key=>(previous[key]||'')===(next[key]||''))&&(previous.studioCustomerId||null)===(next.studioCustomerId||null)&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId;
         if(options.replaceHistory)window.history.replaceState(next,'','#'+params);
         else if(!options.browserHistory&&options.history!==false&&!same)window.history.pushState(next,'','#'+params);
         currentNavigationView=view;
@@ -1005,6 +1009,7 @@
     }
     function beginNavigation(view,options){
         const context=recordNavigation(view,options),revision=++navigationRevision;
+        window.StudioPhotographerSchedule?.invalidate();
         window.StudioCustomers?.invalidate();
         window.StudioJobsPage?.dispose();
         window.StudioPage?.invalidate();
@@ -1046,7 +1051,7 @@
     function destinationFromLocation(state){
         const params=new URLSearchParams(window.location.hash.replace(/^#/,''));
         const view=state?.studioView&&routes[state.studioView]?state.studioView:params.get('studio');
-        return {view:view&&routes[view]?view:'today',customerId:state?.studioView?(state.studioCustomerId||''):(params.get('customer')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
+        return {view:view&&routes[view]?view:'today',photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),customerId:state?.studioView?(state.studioCustomerId||''):(params.get('customer')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
     }
     window.addEventListener('popstate',event=>{
         const destination=destinationFromLocation(event.state);
@@ -1070,6 +1075,7 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 
 
 
