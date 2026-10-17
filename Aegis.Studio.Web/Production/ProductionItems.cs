@@ -23,6 +23,7 @@ public static class ProductionItems
         """;
     public static void MapProductionItems(this WebApplication app)
     {
+        app.MapWorkloadOverview();
         using(var c=app.Services.GetRequiredService<StudioDatabase>().OpenConnection())
         using(var cmd=new NpgsqlCommand(Schema,c))cmd.ExecuteNonQuery();
         app.MapGet("/api/production/items-summary",(ClaimsPrincipal user,JobAccessService access,StudioDatabase db)=>

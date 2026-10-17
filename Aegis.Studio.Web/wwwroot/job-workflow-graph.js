@@ -1,7 +1,7 @@
 (function(root){
  'use strict';
  const esc=StudioGraph.esc,send=(url,body,method='POST')=>json(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- async function open(job){
+ async function open(job,focusTask=null){
   const authority=await json(`/api/jobs/${job}/connected-workflow`),canChange=authority.canManage||authority.canFrontDesk;
   const d=studioDialog('Job workflow',`<div class="sg-job-toolbar"><button data-refresh>Refresh</button>${canChange?'<button class="action" data-template>Apply or Change Template</button><button class="action" data-services>Review services</button>':''}<span data-version></span></div><div data-job-canvas></div><div class="sg-task-list" data-task-list></div><p role="alert"></p>`);d.classList.add('sg-job-dialog');
   d.addEventListener('close',()=>document.dispatchEvent(new CustomEvent('studio-workflow-changed',{detail:{jobId:job}})));
@@ -27,7 +27,7 @@
   d.querySelector('[data-refresh]').onclick=()=>render().catch(error);
   d.querySelector('[data-template]')?.addEventListener('click',()=>change(job,render).catch(error));
   d.querySelector('[data-services]')?.addEventListener('click',()=>services(job,view,render).catch(error));
-  await render();return d;
+  await render();if(focusTask){const row=[...d.querySelectorAll('[data-task-row]')].find(r=>r.dataset.taskRow===focusTask);if(row){row.tabIndex=-1;row.focus();row.scrollIntoView({block:'nearest'});}}return d;
  }
  function allSubflows(graph,prefix=''){return graph.nodes.flatMap(n=>n.kind==='Subflow'?[prefix+n.id,...allSubflows(n.subflow,prefix+n.id+'/')]:[]);}
  async function change(job,refresh){
