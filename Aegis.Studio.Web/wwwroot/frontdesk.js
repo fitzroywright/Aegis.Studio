@@ -150,9 +150,9 @@ function renderFrontDesk(){
                 ${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}
                 ${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}
                 ${metric('confirmation','Needs Confirmation',pending.length,'Review and confirm')}
+                ${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}
             </div>
             <footer class="fd-overview-toolbar" role="toolbar" aria-label="Overview actions">
-                <button type="button" data-fd-metric="unassigned" aria-pressed="${frontDeskMetricView==='unassigned'}" title="Jobs requiring assignment"><span aria-hidden="true">▣</span> Unassigned <strong>${unassigned.length}</strong></button>
                 <button type="button" data-new-booking><span aria-hidden="true">＋</span> Create Manual Booking</button>
                 <button type="button" data-find-client><span aria-hidden="true">⌕</span> Find Customer</button>
                 <button type="button" data-view-receipt><span aria-hidden="true">▤</span> View Receipt</button>
