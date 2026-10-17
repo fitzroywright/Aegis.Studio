@@ -13,6 +13,48 @@ public static class ScheduleEndpoints
     public static void MapStudioScheduling(this WebApplication app)
     {
         app.Services.GetRequiredService<ScheduleStore>().EnsureOperationalSchema();
+        // Calendar payloads deliberately omit full Job aggregates, media and financial ledgers.
+        app.MapGet("/api/schedule/photographer-data", (DateTimeOffset from, DateTimeOffset to, bool? includeInactive, ClaimsPrincipal user, ScheduleStore store, JobAccessService access, StudioDatabase database) =>
+        {
+            if (to <= from || (to - from).TotalDays > 31) return Results.BadRequest(new { error = "Choose a calendar period of at most 31 days." });
+            IReadOnlyList<ScheduleEntry> values = store.GetEntries(from, to);
+            HashSet<Guid>? allowed = user.IsInRole("Administrator") ? null : access.GetAccessibleJobIds(user).ToHashSet();
+            var visible = values.Where(e => allowed is null || (e.JobId.HasValue && allowed.Contains(e.JobId.Value))).ToArray();
+            var resources = visible.SelectMany(e => e.ResourceIds).ToHashSet();
+            var photographers = new PhotographerStore(database).GetAll(true).Where(p => includeInactive == true || p.IsActive || resources.Contains(p.ScheduleResourceId)).ToArray();
+            var ids = visible.Where(e => e.JobId.HasValue).Select(e => e.JobId!.Value).Distinct().ToArray();
+            var jobs = new List<object>();
+            using var connection = database.OpenConnection();
+            using var command = new NpgsqlCommand("""
+                select j.id,j.title,j.client_name,j.workspace_id,
+                  array(select l.workspace_id from studio_job_workspace_links l where l.job_id=j.id)
+                from studio_jobs j where j.id=any($1)
+                """, connection);
+            command.Parameters.AddWithValue(ids);
+            using var reader = command.ExecuteReader();
+            while (reader.Read()) jobs.Add(new { id = reader.GetGuid(0), title = reader.GetString(1), clientName = reader.GetString(2), workspaceId = reader.GetGuid(3), participatingWorkspaceIds = reader.GetFieldValue<Guid[]>(4) });
+            return Results.Ok(new { photographers, entries = visible, jobs });
+        }).RequireAuthorization();
+
+        app.MapGet("/api/schedule/photographer-availability", (DateTimeOffset from, DateTimeOffset to, StudioDatabase database) =>
+        {
+            if (to <= from || (to - from).TotalDays > 31) return Results.BadRequest(new { error = "Choose a calendar period of at most 31 days." });
+            using var connection = database.OpenConnection();
+            using var command = new NpgsqlCommand("""
+                select a.id,a.user_name,a.starts_at_utc,a.ends_at_utc,a.availability_type
+                from studio_photographer_availability a
+                where a.ends_at_utc>$1 and a.starts_at_utc<$2
+                  and exists(select 1 from studio_photographers p where lower(p.user_name)=lower(a.user_name))
+                order by a.user_name,a.starts_at_utc
+                """, connection);
+            command.Parameters.AddWithValue(from.ToUniversalTime());
+            command.Parameters.AddWithValue(to.ToUniversalTime());
+            using var reader = command.ExecuteReader();
+            var rows = new List<object>();
+            while (reader.Read()) rows.Add(new { id = reader.GetGuid(0), userName = reader.GetString(1), startsAtUtc = reader.GetFieldValue<DateTimeOffset>(2), endsAtUtc = reader.GetFieldValue<DateTimeOffset>(3), availabilityType = reader.GetString(4) });
+            return Results.Ok(rows);
+        }).RequireAuthorization();
+
         app.MapGet("/api/schedule/resources", (ScheduleStore store, bool? includeInactive) => Results.Ok(store.GetResources(includeInactive == true))).RequireAuthorization();
         app.MapPost("/api/schedule/resources", (ScheduleResourceRequest request, ClaimsPrincipal user, ScheduleStore store) =>
         {
@@ -252,4 +294,5 @@ public static class ScheduleEndpoints
 }
 
 public sealed record ScheduleReassignmentRequest(IReadOnlyList<Guid>? ResourceIds,string? Reason);
+
 
