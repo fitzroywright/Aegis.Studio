@@ -150,11 +150,13 @@ function renderFrontDesk(){
                 ${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}
                 ${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}
                 ${metric('confirmation','Needs Confirmation',pending.length,'Review and confirm')}
-                ${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}
-                <div class="workspace-summary-row"><span>＋</span><button type="button" class="fd-overview-link" data-new-booking>Create Manual Booking</button><span></span></div>
-                <div class="workspace-summary-row"><span>⌕</span><button type="button" class="fd-overview-link" data-find-client>Find Customer</button><span></span></div>
-                <div class="workspace-summary-row"><span>▤</span><button type="button" class="fd-overview-link" data-view-receipt>View Receipt</button><span></span></div>
             </div>
+            <footer class="fd-overview-toolbar" role="toolbar" aria-label="Overview actions">
+                <button type="button" data-fd-metric="unassigned" aria-pressed="${frontDeskMetricView==='unassigned'}" title="Jobs requiring assignment"><span aria-hidden="true">▣</span> Unassigned <strong>${unassigned.length}</strong></button>
+                <button type="button" data-new-booking><span aria-hidden="true">＋</span> Create Manual Booking</button>
+                <button type="button" data-find-client><span aria-hidden="true">⌕</span> Find Customer</button>
+                <button type="button" data-view-receipt><span aria-hidden="true">▤</span> View Receipt</button>
+            </footer>
         </section>
         <section class="op-card fd-schedule"><header><h2>Today's Schedule</h2><button type="button" class="fd-card-link" data-calendar>View Calendar →</button></header><div class="fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="fd-session"><time>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</time><span><strong>${esc(s.title)}</strong><small>${esc(s.location||s.status||'')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
         ${StudioMessageCard.html({id:'frontDeskMessageCard',body:'<div id="fdCommunicationFeed"><p>Loading messages…</p></div>',actions:'<button type="button" data-messages-all>View All →</button>',footer:'<button type="button" data-message-compose>✉ Send Message →</button>',attributes:'data-mw-region="messages" data-fd-communications'})}
