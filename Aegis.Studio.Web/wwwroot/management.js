@@ -295,8 +295,10 @@ function showPhotographerWorkload(resourceId, displayName) {
     const context=window.managementWorkloadContext||{jobs:[],entries:[]};
     const now=new Date();
     const work=context.entries.filter(e=>(e.resourceIds||[]).includes(resourceId)&&new Date(e.endsAtUtc)>=now).sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
-    const dialog=studioDialog(displayName+' — scheduled work',`<div class="management-person-work">${work.map(entry=>{const job=context.jobs.find(j=>j.id===entry.jobId);return `<article class="front-desk-row"><div><strong>${esc(entry.title)}</strong><small>${esc(new Date(entry.startsAtUtc).toLocaleString())} – ${esc(new Date(entry.endsAtUtc).toLocaleString())} · ${esc(entry.location||'Location not set')}</small></div>${job?`<button type="button" class="action" data-management-job="${job.id}">Open job</button>`:''}</article>`;}).join('')||'<p class="muted">No upcoming scheduled work.</p>'}</div>`);
+    const dialog=studioDialog(displayName+' — scheduled work',`<button type="button" class="primary" data-management-photographer-schedule>View Schedule</button><div class="management-person-work">${work.map(entry=>{const job=context.jobs.find(j=>j.id===entry.jobId);return `<article class="front-desk-row"><div><strong>${esc(entry.title)}</strong><small>${esc(new Date(entry.startsAtUtc).toLocaleString())} – ${esc(new Date(entry.endsAtUtc).toLocaleString())} · ${esc(entry.location||'Location not set')}</small></div>${job?`<button type="button" class="action" data-management-job="${job.id}">Open job</button>`:''}</article>`;}).join('')||'<p class="muted">No upcoming scheduled work.</p>'}</div>`);
+    dialog.querySelector('[data-management-photographer-schedule]')?.addEventListener('click',()=>{dialog.close();window.studioNavigate('schedule',{resourceId});});
     dialog.querySelectorAll('[data-management-job]').forEach(button=>button.onclick=()=>{dialog.close();openWorkspaceJob(button.dataset.managementJob);});
 }
+
 
 

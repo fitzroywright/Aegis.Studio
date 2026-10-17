@@ -240,5 +240,6 @@ async function createScheduleResource() {
     await json('/api/schedule/resources', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, resourceType:genericView.querySelector('#scheduleResourceType').value, isActive:true, notes:null }) });
     await showPipeline();
 }
-// Older calls and bookmarks now open the same planning surface.
-async function showSchedule() { return showPipeline(); }
+// Older Schedule calls now open the dedicated photographer calendar.
+async function showSchedule() { return window.studioNavigate('schedule'); }
+
