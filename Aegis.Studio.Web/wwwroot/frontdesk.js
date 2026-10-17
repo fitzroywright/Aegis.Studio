@@ -141,7 +141,7 @@ function renderFrontDesk(){
           </section>
         <div class="fd-metrics">${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}${metric('confirmation','Needs Confirmation',pending.length,'Review and confirm')}${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}</div>
       </div><div class="fd-secondary">
-        <section class="op-card fd-actions"><header><h2>Front Desk Services</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-new-client>＋ New Customer</button><button data-find-client>Find Customer</button><button onclick="pickFrontDeskFinancialAction('ViewReceipt')">View Receipt</button><button onclick="launchFrontDeskPos('CloseRegister')">Close Register</button><button data-pickups>Pickup / Delivery</button><button type="button" data-completed>Completed</button></div></section>
+        <section class="op-card fd-actions"><header><h2>Front Desk Services</h2></header><div class="fd-action-grid"><button class="primary" data-new-booking>＋ Create Manual Booking</button><button data-find-client>Find Customer</button><button onclick="pickFrontDeskFinancialAction('ViewReceipt')">View Receipt</button><button onclick="launchFrontDeskPos('CloseRegister')">Close Register</button><button data-pickups>Pickup / Delivery</button><button type="button" data-completed>Completed</button></div></section>
         <section class="op-card fd-schedule"><header><h2>Today's Schedule</h2><button type="button" class="fd-card-link" data-calendar>View Calendar →</button></header><div class="fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="fd-session"><time>${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</time><span><strong>${esc(s.title)}</strong><small>${esc(s.location||s.status||'')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
         ${StudioMessageCard.html({id:'frontDeskMessageCard',body:'<div id="fdCommunicationFeed"><p>Loading messages…</p></div>',actions:'<button type="button" data-messages-all>View All →</button>',footer:'<button type="button" data-message-compose>✉ Send Message →</button>',attributes:'data-mw-region="messages" data-fd-communications'})}
       </div></div></div>`;
@@ -174,7 +174,6 @@ function renderFrontDesk(){
     });
     const newBooking=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
     genericView.querySelectorAll('[data-new-booking]').forEach(b=>b.onclick=newBooking);
-    genericView.querySelectorAll('[data-new-client]').forEach(b=>b.onclick=async()=>{await showFrontDeskClients();document.querySelector('dialog[open] [data-new]')?.click();});
     genericView.querySelector('[data-find-client]').onclick=()=>showFrontDeskClients();
     genericView.querySelector('[data-pickups]').onclick=()=>{frontDeskTab='delivery';renderFrontDesk();};
     genericView.querySelector('[data-completed]').onclick=()=>{frontDeskTab='completed';renderFrontDesk();};
@@ -352,7 +351,7 @@ async function notifyFrontDeskTeam(jobId) {
 
 loadFrontDeskRole();
 
-async function showFrontDeskClients(){
+async function showFrontDeskClients(openNew=false){
  const clients=await json('/api/frontdesk/clients');
  const dialog=studioDialog('Clients','<div class="front-desk-tools"><input type="search" aria-label="Find client" placeholder="Find client"><button class="action" data-new>New client</button></div><div data-clients></div>');
  const render=()=>{const term=dialog.querySelector('input').value.toLowerCase();dialog.querySelector('[data-clients]').innerHTML=clients.filter(c=>[c.displayName,c.email,c.phone].join(' ').toLowerCase().includes(term)).map(c=>`<article class="task-card"><strong>${esc(c.displayName)}</strong><small>${esc(c.email||'')} · ${esc(c.phone||'')}</small><button class="action" data-client="${c.id}">Details / history</button></article>`).join('')||'<p>No clients found.</p>';dialog.querySelectorAll('[data-client]').forEach(b=>b.onclick=()=>editClient(clients.find(c=>c.id===b.dataset.client)));};
@@ -362,6 +361,7 @@ async function showFrontDeskClients(){
   editor.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;try{await json('/api/frontdesk/clients'+(client?'/'+client.id:''),{method:client?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName:f.elements.displayName.value,email:f.elements.email.value,phone:f.elements.phone.value})});editor.close();dialog.close();await showFrontDeskClients();}catch(error){f.querySelector('[role=alert]').textContent=error.message;}};
  }
  dialog.querySelector('input').oninput=render;dialog.querySelector('[data-new]').onclick=()=>editClient(null);render();
+ if(openNew)await editClient(null);
 }
 async function linkFrontDeskClient(jobId){
  const clients=await json('/api/frontdesk/clients'),job=frontDeskJobs.find(j=>j.id===jobId);

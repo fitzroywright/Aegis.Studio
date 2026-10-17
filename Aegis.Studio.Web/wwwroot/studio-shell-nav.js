@@ -116,7 +116,7 @@
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
-                    ${actionItems}${financialActions}
+                    ${actionItems}${financialActions}${document.body.dataset.studioView==='frontdesk'?'<button type="button" data-studio-new-customer><span>＋</span><span>New Customer</span></button>':''}
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card" data-rail-card="workspaces">
@@ -124,6 +124,7 @@
                 <div class="mw-today-rail-links">${workspaceItems || '<p class="mw-empty">No workspaces available.</p>'}</div>
             </section>
 `;
+        rail.querySelector('[data-studio-new-customer]')?.addEventListener('click',()=>showFrontDeskClients(true).catch(error=>alert(error.message)));
         rail.querySelectorAll('[data-studio-financial-action]').forEach(button=>button.onclick=()=>pickFrontDeskFinancialAction(button.dataset.studioFinancialAction).catch(error=>alert(error.message)));
         rail.querySelector('[data-studio-view-all-workspaces]')?.addEventListener('click',()=>window.studioNavigate?.('workspaces'));
         rail.querySelector('[data-studio-new-booking]')?.addEventListener('click',()=>window.studioLaunchNewBooking?.());
