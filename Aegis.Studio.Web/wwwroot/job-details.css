@@ -240,3 +240,5 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-flow-summary .jd-workflow-dot,.jd-dot-subflow .jd-workflow-dot{position:relative;z-index:2}
 .jd-dot-subflow>.jd-dot-levels::before,.jd-dot-subflow>.jd-dot-levels::after,.jd-dot-subflow>.jd-dot-levels>.jd-dot-level:not(:last-child)::after{display:none}
 .jd-dot-subflow .jd-dot-levels{width:100%;justify-content:space-around}
+
+.jd-subflow-routes path{stroke-linecap:round;stroke-linejoin:round}
