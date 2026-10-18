@@ -48,14 +48,23 @@ window.StudioClientReminders=(()=>{
   host.innerHTML='<p>Off by default. One reminder per event; at most three automatic reminders of each type per job in seven days. Template edits apply to future reminders.</p>'+view.templates.filter(t=>t.kind!=='FollowUp').map(t=>{const r=view.rules.find(r=>r.kind===t.kind)||{...t,enabled:false,channel:'Email'};return `<details><summary>${esc(t.label)} · ${r.enabled?'On':'Off'}</summary><form data-rem-rule="${esc(t.kind)}"><label><input name="enabled" type="checkbox" ${r.enabled?'checked':''}> Enable automatically</label><label>Channel<select name="channel"><option ${r.channel==='Email'?'selected':''}>Email</option><option ${r.channel==='WhatsApp'?'selected':''}>WhatsApp</option></select></label><label>Hours ${t.kind==='Shoot'?'before shoot':'after event'}<input name="hours" type="number" min="0" max="720" required value="${Math.abs(r.offsetHours)}"></label><label>Subject<input name="subject" maxlength="200" required value="${esc(r.subject)}"></label><label>Message<textarea name="body" maxlength="4000" required rows="3">${esc(r.body)}</textarea></label><p>Placeholders: {client}, {job}, {detail}, {location}</p><button type="submit" class="action">Save rule</button><p role="alert"></p></form></details>`;}).join('');
   host.querySelectorAll('form').forEach(form=>form.onsubmit=async e=>{e.preventDefault();try{await api(base(job)+'/rules','PUT',{kind:form.dataset.remRule,enabled:form.elements.enabled.checked,channel:form.elements.channel.value,offsetHours:Number(form.elements.hours.value)*(form.dataset.remRule==='Shoot'?-1:1),subject:form.elements.subject.value,body:form.elements.body.value});await refresh();}catch(error){form.querySelector('[role=alert]').textContent=error.message;}});
  }
- let pageRevision=0;
- async function render(){const token=++pageRevision;conversationView.classList.add('hidden');genericView.classList.remove('hidden');genericView.innerHTML='<p role="status">Loading reminders…</p>';try{
-  const items=await api('/api/client-reminders');if(token!==pageRevision||document.body.dataset.studioView!=='reminders')return;
-  genericView.innerHTML=`<section class="st-page"><section class="st-board"><header class="st-toolbar"><h1>Client Reminders</h1><button type="button" class="action" data-rem-new>New reminder</button><button type="button" class="action" data-rem-refresh>Refresh</button></header><div class="st-tools"><label>Search<input type="search" data-rem-search></label><label>Status<select data-rem-filter><option value="">All</option><option>Scheduled</option><option>Queued</option><option>Submitted</option><option>Sending</option><option>Failed</option><option>Cancelled</option><option>Attention</option></select></label></div>${table(items)}</section><aside class="st-right"><section class="sj-card"><header><h2>Overview</h2></header><div class="sj-card-body"><p>${items.filter(r=>r.status==='Scheduled').length} scheduled</p><p>${items.filter(r=>r.status==='Failed'||r.deliveryStatus==='Attention').length} need attention</p><p>Provider acceptance is not a delivery receipt. Uncertain outcomes require messaging administrator review before retrying.</p></div></section></aside></section>`;
-  StudioPage.setCount(items.length+' reminders');bind(genericView,items,render);genericView.querySelector('[data-rem-refresh]').onclick=render;
-  function filter(){const term=genericView.querySelector('[data-rem-search]').value.toLowerCase(),status=genericView.querySelector('[data-rem-filter]').value;genericView.querySelectorAll('[data-rem-row]').forEach((row,i)=>row.hidden=!row.textContent.toLowerCase().includes(term)||!!status&&items[i].status!==status&&items[i].deliveryStatus!==status);}
-  genericView.querySelector('[data-rem-search]').oninput=filter;genericView.querySelector('[data-rem-filter]').onchange=filter;
-  genericView.querySelector('[data-rem-new]').onclick=async()=>{try{const jobs=await api('/api/jobs');if(token!==pageRevision||document.body.dataset.studioView!=='reminders')return;const d=studioDialog('Choose a job',`<form><label>Job<select name="job">${jobs.map(j=>`<option value="${esc(j.id)}">${esc(j.title)} · ${esc(j.clientName)}</option>`).join('')}</select></label><button type="submit" class="primary">Open reminders</button></form>`);d.querySelector('form').onsubmit=e=>{e.preventDefault();const job=e.currentTarget.elements.job.value;if(job){d.close();open(job);}};}catch(e){genericView.querySelector('[data-rem-error]').textContent=e.message;}};
- }catch(e){if(token===pageRevision&&document.body.dataset.studioView==='reminders')genericView.innerHTML='<p role="alert">'+esc(e.message)+'</p><button type="button" class="action" data-rem-refresh>Retry</button>';genericView.querySelector('[data-rem-refresh]')?.addEventListener('click',render);}}
- return {open,render};
+ async function mountClient(host,jobs,isCurrent=()=>true){
+  const live=()=>host.isConnected&&isCurrent();
+  async function refresh(){
+   if(!live())return;
+   host.innerHTML='<p role="status">Loading client reminders…</p>';
+   const results=new Array(jobs.length);let next=0;
+   async function worker(){while(next<jobs.length){if(!live())return;const index=next++;try{results[index]={job:jobs[index],view:await api(base(jobs[index].id))};}catch(error){results[index]={job:jobs[index],error:error.message};}}}
+   await Promise.all([worker(),worker(),worker()]);if(!live())return;
+   const available=results.filter(r=>r?.view),items=available.flatMap(r=>r.view.items);
+   items.sort((a,b)=>new Date(a.scheduledAtUtc)-new Date(b.scheduledAtUtc));
+   host.innerHTML=(jobs.length?'<div class="st-tools"><label>Job<select data-rem-client-job><option value="">Choose a job…</option>'+available.map(r=>'<option value="'+esc(r.job.id)+'">'+esc(r.job.title)+'</option>').join('')+'</select></label><button type="button" class="action" data-rem-client-open>Manage reminders</button></div>':'<p>Create a job for this client to schedule reminders.</p>')+results.filter(r=>r?.error).map(r=>'<p role="alert">Reminders unavailable for '+esc(r.job.title)+': '+esc(r.error)+'</p>').join('')+table(items)+'<button type="button" class="action" data-rem-client-refresh>Refresh reminders</button>';
+   bind(host,items,refresh);
+   host.querySelector('[data-rem-client-refresh]').onclick=refresh;
+   const button=host.querySelector('[data-rem-client-open]');
+   if(button)button.onclick=async()=>{const job=host.querySelector('[data-rem-client-job]').value;if(!job)return;const d=await open(job);d.addEventListener('close',()=>{if(live())void refresh();},{once:true});};
+  }
+  await refresh();
+ }
+ return {open,mountClient};
 })();

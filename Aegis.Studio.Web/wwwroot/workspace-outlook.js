@@ -295,6 +295,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(action==='edit')await openJobDetailsEditor(job);
                     if(action==='workflow')await openAssignments();
                     if(action==='template-workflow')await StudioJobGraph.open(job.id);
+                    if(action==='reminders')await window.StudioClientReminders.open(job.id);
                 }catch(error){alert(error.message||String(error));}
             };
             window.addEventListener('studio-job-action',handleAction);
@@ -400,6 +401,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
 
     }
 })();
+
 
 
 
