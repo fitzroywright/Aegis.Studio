@@ -31,7 +31,7 @@ public sealed class OutboundEmailStore
     public OutboundEmail? QueueAcknowledgement(StudioConversation conversation, string workspaceName)
     {
         if (ExistsAcknowledgement(conversation.Id)) return null;
-        string jobReference = "AEGIS-" + conversation.Id.ToString("N")[..8].ToUpperInvariant();
+        string jobReference = StudioEmailRouting.PublicReference(conversation.Id);
         string body = $"Hello {conversation.ContactName},\n\nWe received your message and it has been accepted into the {workspaceName} workspace. Our team will handle it from here.\n\nReference: {jobReference}\nPlease keep this reference in the subject when starting a separate email about the same request.\n\nBryan's Studio";
         string subject = $"[{jobReference}] We received your message - {conversation.Subject}";
         return QueueMessage(conversation, body, subject, "Acknowledgement");
@@ -155,11 +155,23 @@ public sealed class OutboundEmailStore
         if(q.ExecuteNonQuery()!=1)throw new InvalidOperationException("The delivery lease was lost before sending.");
     }
 
-    public void MarkAttention(Guid id, Guid leaseId, string reason)
+    public void RecordVerifiedInternetId(Guid id,Guid? leaseId,VerifiedGraphEmail verified)
     {
-        using var c=database.OpenConnection();using var q=new NpgsqlCommand("update studio_outbound_email set status='Attention',last_error=$3,next_attempt_at_utc=null,lease_id=null,lease_until_utc=null where id=$1 and lease_id=$2",c);
-        q.Parameters.AddWithValue(id);q.Parameters.AddWithValue(leaseId);q.Parameters.AddWithValue(reason);q.ExecuteNonQuery();
+        using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        using var q=new NpgsqlCommand("update studio_outbound_email set rfc_message_id=$3,rfc_message_id_verified=true,provider_message_id=$4,status=case when $2::uuid is null then 'ProviderAccepted' else status end,last_error=case when $2::uuid is null then null else last_error end,provider_accepted_at_utc=case when $2::uuid is null then coalesce(provider_accepted_at_utc,now()) else provider_accepted_at_utc end where id=$1 and (($2::uuid is not null and lease_id=$2) or ($2::uuid is null and status in ('ProviderAccepted','Attention')))",c,tx);
+        q.Parameters.AddWithValue(id);q.Parameters.AddWithValue((object?)leaseId??DBNull.Value);q.Parameters.AddWithValue(verified.InternetMessageId);q.Parameters.AddWithValue(verified.ProviderId);
+        if(q.ExecuteNonQuery()!=1)throw new InvalidOperationException("Delivery lease expired during provider verification.");
+        using var history=new NpgsqlCommand("insert into studio_outbound_message_ids(delivery_id,internet_message_id) values($1,$2) on conflict do nothing",c,tx);
+        history.Parameters.AddWithValue(id);history.Parameters.AddWithValue(verified.InternetMessageId);history.ExecuteNonQuery();tx.Commit();
     }
+
+    public void MarkAttention(Guid id, Guid leaseId, string reason,bool providerAccepted=false)
+    {
+        using var c=database.OpenConnection();using var q=new NpgsqlCommand("update studio_outbound_email set status='Attention',last_error=$3,provider_accepted_at_utc=case when $4 then now() else provider_accepted_at_utc end,next_attempt_at_utc=null,lease_id=null,lease_until_utc=null where id=$1 and lease_id=$2",c);
+        q.Parameters.AddWithValue(id);q.Parameters.AddWithValue(leaseId);q.Parameters.AddWithValue(reason);q.Parameters.AddWithValue(providerAccepted);q.ExecuteNonQuery();
+    }
+
+    public OutboundEmail? GetDelivery(Guid id)=>Get(id);
 
     private OutboundEmail? Get(Guid id)
     {
@@ -189,8 +201,8 @@ public sealed class OutboundEmailStore
             conversation.Id,
             identity.FromAddress,
             conversation.ContactAddress,
-            subject,
-            body.Trim(),
+            $"[{StudioEmailRouting.PublicReference(conversation.Id)}] " + System.Text.RegularExpressions.Regex.Replace(subject,@"\[AEGIS-[A-Za-z0-9]+\]\s*", ""),
+            body.Trim()+$"\n\nFor a new email about this request, include {StudioEmailRouting.PublicReference(conversation.Id)} in the subject.",
             conversation.ExternalThreadId,
             "Pending",
             DateTimeOffset.UtcNow,
@@ -205,10 +217,18 @@ public sealed class OutboundEmailStore
 
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
+        var metadata=new Dictionary<string,string>();
+        using(var reply=new NpgsqlCommand("select external_message_id from studio_messages where conversation_id=$1 and external_message_id is not null order by created_at_utc desc limit 1",connection))
+        {
+            reply.Parameters.AddWithValue(conversation.Id);
+            if(reply.ExecuteScalar() is string previous && StudioEmailRouting.MessageIds(previous).FirstOrDefault() is string reference)
+            {metadata["Email.InReplyTo"]=reference;metadata["Email.References"]=reference;}
+        }
+        message=message with {DeliveryMetadata=System.Text.Json.JsonSerializer.Serialize(metadata)};
         command.CommandText = """
             insert into studio_outbound_email
-            (id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type)
-            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            (id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,delivery_metadata)
+            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb)
             """;
         object?[] values =
         [
@@ -224,7 +244,8 @@ public sealed class OutboundEmailStore
             (object?)message.ProviderMessageId ?? DBNull.Value,
             message.Kind,
             (object?)message.SentByUserName ?? DBNull.Value,
-            message.SendingIdentityType
+            message.SendingIdentityType,
+            message.DeliveryMetadata
         ];
         foreach (object? value in values) command.Parameters.AddWithValue(value ?? DBNull.Value);
         command.ExecuteNonQuery();
@@ -277,4 +298,5 @@ public sealed record OutboundEmailAuditRecord(
     Guid WorkspaceId,string DeliveryChannel="Email");
 
 public sealed record MarkOutboundSentRequest(string? ProviderMessageId);
+
 

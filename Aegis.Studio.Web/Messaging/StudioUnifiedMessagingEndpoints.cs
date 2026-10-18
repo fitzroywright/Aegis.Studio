@@ -183,12 +183,12 @@ public static class StudioUnifiedMessagingEndpoints
         var admin=app.MapGroup("/api/admin/messaging").RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
         admin.MapGet("/address-book",(StudioAddressBook book)=>Results.Ok(book.GetAll()));
         admin.MapGet("/unresolved",(Aegis.Studio.Web.Email.UnroutedEmailStore store)=>Results.Ok(store.GetOpen()));
-        admin.MapPost("/unresolved/{id:guid}/reprocess",async(Guid id,StudioUnifiedInbound inbound,Aegis.Studio.Web.Email.UnroutedEmailStore store,StudioDatabase db,CancellationToken token)=>
+        admin.MapPost("/unresolved/{id:guid}/reprocess",async(Guid id,Aegis.Studio.Web.Email.StudioEmailIntake inbound,Aegis.Studio.Web.Email.UnroutedEmailStore store,StudioDatabase db,CancellationToken token)=>
         {
             var item=store.Get(id);if(item is null)return Results.NotFound();
             try
             {
-                if(!await inbound.TryImportAsync(item.ToInboundEmail(),token))return Results.UnprocessableEntity(new{error="No registered Studio destination or verified reply correlation matched. Correct routing configuration first."});
+                if(!(await inbound.ReceiveAsync(item.ToInboundEmail(),token)).Routed)return Results.UnprocessableEntity(new{error="No registered Studio destination or verified reply correlation matched. Correct routing configuration first."});
                 using var c=db.OpenConnection();using var q=new NpgsqlCommand("update studio_unrouted_email set resolved_at_utc=now() where id=$1",c);Add(q,id);q.ExecuteNonQuery();return Results.Ok(new{resolved=true});
             }
             catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
@@ -203,4 +203,5 @@ public static class StudioUnifiedMessagingEndpoints
         catch(PostgresException ex) when(ex.SqlState=="23505"){return Results.Conflict(new{error="This address is already registered. Refresh the address book."});}
     }
 }
+
 

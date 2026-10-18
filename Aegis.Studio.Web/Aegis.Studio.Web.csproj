@@ -26,6 +26,7 @@
     <EmbeddedResource Include="Workflow/WorkflowSchema.sql" />
     <EmbeddedResource Include="Reminders/ClientReminders.sql" />
     <EmbeddedResource Include="Messaging/UnifiedMessagingSchema.sql" />
+    <EmbeddedResource Include="Email/EmailAssociations.sql" />
     <EmbeddedResource Include="PublicApi/public-v1.openapi.json" />
     <Content Update="PublicApi/public-v1.openapi.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
@@ -77,5 +78,6 @@
            Text="Authentication plugin was not staged to $(PublishDir)plugins." />
   </Target>
 </Project>
+
 
 

@@ -40,8 +40,12 @@ public sealed class ClientReminderStore(StudioDatabase database,IConfiguration c
     {using var c=database.OpenConnection();Exec(c,null,"insert into studio_client_reminder_preferences(job_id,email_allowed,whatsapp_allowed,updated_by) values($1,$2,$3,$4) on conflict(job_id) do update set email_allowed=$2,whatsapp_allowed=$3,updated_by=$4,updated_at_utc=now()",job,p.EmailAllowed,p.WhatsAppAllowed,actor);}
     public ReminderRuleRequest[] Rules(Guid job)
     {
-        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select kind,enabled,channel,offset_hours,subject,body from studio_client_reminder_rules where job_id=$1",c);q.Parameters.AddWithValue(job);using var r=q.ExecuteReader();var list=new List<object>();while(r.Read()){if(r.GetString(3)=="Deposit"&&!access.HasPermission(user,r.GetGuid(1),"ViewFinancials"))continue;list.Add(new{kind=r.GetString(0),enabled=r.GetBoolean(1),channel=r.GetString(2),offsetHours=r.GetInt32(3),subject=r.GetString(4),body=r.GetString(5)});return list.ToArray();
+        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select kind,enabled,channel,offset_hours,subject,body from studio_client_reminder_rules where job_id=$1",c);
+        q.Parameters.AddWithValue(job);using var r=q.ExecuteReader();var list=new List<ReminderRuleRequest>();
+        while(r.Read())list.Add(new(r.GetString(0),r.GetBoolean(1),r.GetString(2),r.GetInt32(3),r.GetString(4),r.GetString(5)));
+        return list.ToArray();
     }
+
     public void SaveRule(Guid job,ReminderRuleRequest rule,string actor)
     {
         ClientReminderRules.Validate(rule.Kind,rule.Channel,rule.Subject,rule.Body);
@@ -188,3 +192,4 @@ public sealed class ClientReminderStore(StudioDatabase database,IConfiguration c
         Exec(c,tx,"update studio_client_reminders set status='Queued',message_id=$1,updated_at_utc=now() where id=$1",id);
     }
 }
+
