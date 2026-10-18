@@ -160,25 +160,21 @@ function mergeJobMessages(teamMessages, customerMessages) {
             header.innerHTML=`<div class="job-detail-title"><h1 title="${esc(job.title)}">${esc(job.title)}</h1><span class="jd-client-name" title="${esc(clientName)}"><span>Client</span><strong>${esc(clientName)}</strong></span></div>
                 <div class="jd-job-status"><div class="jd-status-meta"><span data-job-owner>Owner: ${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</span><span data-stage-age></span></div><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show flow details">${esc(job.status)}</button><small>${esc(job.jobCode||job.code||'')}</small></div>
                 <dl class="job-detail-facts" aria-label="Job information">${facts.map(([name,value])=>`<div><dt>${esc(name)}</dt><dd title="${esc(value)}"${name==='Location'?' data-job-location':name==='Photographer'?' data-job-photographer':''}>${esc(value)}</dd></div>`).join('')}</dl>
-                <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol><div class="jd-flow-actions"><button type="button" class="jd-link jd-flow-toggle" data-toggle-flow-details aria-expanded="false" aria-controls="jobFlowDrawer" aria-label="Expand flow details" title="Expand flow details"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button><button type="button" class="jd-link" data-close-job-flow hidden>Close ↑</button></div></div>
+                <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol></div>
                 <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow details" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-workflow-track" aria-live="polite"></div></div></section>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
-            const flowToggle=header.querySelector('.jd-status-pill'),detailsToggle=header.querySelector('[data-toggle-flow-details]'),flowDrawer=header.querySelector('.jd-flow-drawer');
+            const flowToggle=header.querySelector('.jd-status-pill'),flowDrawer=header.querySelector('.jd-flow-drawer');
             let flowTrigger=flowToggle;
             const setFlowOpen=(open,restoreFocus=false)=>{
                 flowToggle.setAttribute('aria-expanded',String(open));
                 flowToggle.title=open?'Hide flow details':'Show flow details';
-                detailsToggle.setAttribute('aria-expanded',String(open));
-                header.querySelector('[data-close-job-flow]').hidden=!open;
-                detailsToggle.setAttribute('aria-label',open?'Collapse flow details':'Expand flow details');
-                detailsToggle.title=open?'Collapse flow details':'Expand flow details';
                 flowDrawer.classList.toggle('is-open',open);
                 flowDrawer.setAttribute('aria-hidden',String(!open));
                 flowDrawer.toggleAttribute('inert',!open);
                 if(restoreFocus)flowTrigger.focus();
             };
-            flowToggle.onclick=detailsToggle.onclick=event=>{flowTrigger=event.currentTarget;setFlowOpen(flowToggle.getAttribute('aria-expanded')!=='true');};
-            header.querySelector('[data-close-job-flow]').onclick=()=>setFlowOpen(false,true);
+            flowToggle.onclick=event=>{flowTrigger=event.currentTarget;setFlowOpen(flowToggle.getAttribute('aria-expanded')!=='true');};
+            header.querySelector('.jd-flow-summary').addEventListener('click',event=>{const icon=event.target.closest('[data-workflow-node],[data-flow-phase]');if(icon){flowTrigger=icon;setFlowOpen(true);}},true);
             header.addEventListener('keydown',event=>{
                 if(event.key==='Escape'&&flowToggle.getAttribute('aria-expanded')==='true'){
                     event.preventDefault();event.stopPropagation();setFlowOpen(false,true);
