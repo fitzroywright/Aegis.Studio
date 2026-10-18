@@ -4,10 +4,10 @@ function messageFirstName(author, people, fallback = 'Team member', loginOnly = 
     const match = people.find(p => [p.userName, p.displayName].some(n => String(n || '').toLowerCase() === value.toLowerCase()));
     return studioFirstName(match || value);
 }
-function mergeJobMessages(teamMessages, customerMessages) {
+function mergeJobMessages(teamMessages, clientMessages) {
     return [
-        ...teamMessages.map(m => ({ id: 'team-' + m.id, sourceId:m.id, sourceKind:'JobMessage', author: m.senderUserName, body: m.body, at: m.createdAtUtc, customer: false, loginOnly: true })),
-        ...customerMessages.map(m => ({ id: 'customer-' + m.id, sourceId:m.id, sourceKind:'ConversationMessage', author: m.author, body: m.body, at: m.createdAt, customer: m.visibility.toLowerCase() !== 'internal' }))
+        ...teamMessages.map(m => ({ id: 'team-' + m.id, sourceId:m.id, sourceKind:'JobMessage', author: m.senderUserName, body: m.body, at: m.createdAtUtc, client: false, loginOnly: true })),
+        ...clientMessages.map(m => ({ id: 'client-' + m.id, sourceId:m.id, sourceKind:'ConversationMessage', author: m.author, body: m.body, at: m.createdAt, client: m.visibility.toLowerCase() !== 'internal' }))
     ].sort((a, b) => new Date(a.at) - new Date(b.at) || a.id.localeCompare(b.id));
 }
 // Workspace -> job -> messages. Workspace discussions and membership stay in context.
@@ -105,7 +105,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
         if (version !== revision || (job && !currentJobOpening(version))) return;
         const messages = await json(`/api/messages/threads/${value.id}?count=500`);
         if (version !== revision || (job && !currentJobOpening(version))) return;
-        let conversation = null, identities = [], customerNotice = '';
+        let conversation = null, identities = [], clientNotice = '';
         if (job) {
             const response = await fetch('/api/conversations/' + job.conversationId);
             if (response.ok) {
@@ -113,9 +113,9 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 if (String(conversation.channel).toLowerCase() === 'email') {
                     const senderResponse = await fetch(`/api/conversations/${job.conversationId}/sending-identities`);
                     if (senderResponse.ok) identities = (await senderResponse.json()).identities || [];
-                    else customerNotice = 'Sending identities unavailable. You can still post internal messages.';
+                    else clientNotice = 'Sending identities unavailable. You can still post internal messages.';
                 }
-            } else customerNotice = response.status === 403 ? 'Client messages are restricted by your permissions.' : 'Client messages could not be loaded. Refresh to retry.';
+            } else clientNotice = response.status === 403 ? 'Client messages are restricted by your permissions.' : 'Client messages could not be loaded. Refresh to retry.';
         }
         if (version !== revision || (job && !currentJobOpening(version))) return;
         const people = [];
@@ -132,10 +132,10 @@ function mergeJobMessages(teamMessages, customerMessages) {
         disposeJobView();disposeJobView=()=>{};
         detailPane.classList.remove('empty');
         detailPane.removeAttribute('aria-busy');
-        detailPane.innerHTML = `<div class="detail-header"><div><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and client correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><div class="reply-textbox-shell"><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? `<label class="reply-paperclip" title="Attach document" aria-label="Attach document"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8l9.2-9.2"/></svg><input type="file" data-message-file hidden></label>` : ``}</div><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(customerNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
+        detailPane.innerHTML = `<div class="detail-header"><div><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and client correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><div class="reply-textbox-shell"><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? `<label class="reply-paperclip" title="Attach document" aria-label="Attach document"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8l9.2-9.2"/></svg><input type="file" data-message-file hidden></label>` : ``}</div><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(clientNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
         const renderMessages = () => {
             const visible = combined;
-            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.customer ? 'customer-exchange' : 'internal-discussion'}" data-message-id="${esc(m.sourceId||'')}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.customer ? "Client" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><strong>${esc(messageFirstName(m.author, people, m.customer ? 'Client' : 'Team member', m.loginOnly))}</strong> <time datetime="${esc(m.at)}" title="${esc(new Date(m.at).toLocaleString())}">${esc(new Date(m.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))}</time>${m.customer ? '<span class="message-kind">Client</span>' : ''}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
+            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.client ? 'client-exchange' : 'internal-discussion'}" data-message-id="${esc(m.sourceId||'')}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.client ? "Client" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><strong>${esc(messageFirstName(m.author, people, m.client ? 'Client' : 'Team member', m.loginOnly))}</strong> <time datetime="${esc(m.at)}" title="${esc(new Date(m.at).toLocaleString())}">${esc(new Date(m.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))}</time>${m.client ? '<span class="message-kind">Client</span>' : ''}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
         const sender = document.getElementById('jobSendingIdentity');

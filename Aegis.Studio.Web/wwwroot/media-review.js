@@ -42,7 +42,7 @@
     const search=root.querySelector('#studioMediaJobSearch'),matches=root.querySelector('#studioMediaJobMatches'),tree=root.querySelector('#studioMediaTree'),path=root.querySelector('#studioMediaPath');
     root.querySelector('#studioMediaJobStatus').onchange=renderTree;
     const workspaceNames=new Map(workspaces.map(w=>[String(w.id),w.name||w.title||'Workspace']));
-    const describe=j=>[j.jobNumber||j.reference||'',j.title||j.name||'Job',j.clientName||j.customerName||''].filter(Boolean).join(' · ');
+    const describe=j=>[j.jobNumber||j.reference||'',j.title||j.name||'Job',j.clientName||j.clientName||''].filter(Boolean).join(' · ');
     const expanded=new Set(['workspaces']),cache=new Map();
     let activeTab='',selectedAssetId='';
     let selection='';

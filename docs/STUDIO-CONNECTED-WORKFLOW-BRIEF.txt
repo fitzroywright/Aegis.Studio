@@ -61,7 +61,7 @@ AEGIS STUDIO
 │   ├── Overview
 │   ├── Pending Jobs
 │   ├── Unassigned Jobs
-│   ├── Customer Communications
+│   ├── Client Communications
 │   ├── Payment Follow-up
 │   └── Needs Attention
 │
@@ -146,7 +146,7 @@ Use the existing Studio navigation framework. Preserve existing Clients, Messagi
 
 # 3. Booking and pending jobs
 
-A customer submits a booking through Brian's website.
+A client submits a booking through Brian's website.
 
 The booking creates a real Studio Job immediately.
 
@@ -160,7 +160,7 @@ Create the authoritative Pending Job immediately. Retain any existing booking/re
 
 Capture:
 
-- Customer
+- Client
 - Contact information
 - Requested service
 - Preferred date and time
@@ -213,7 +213,7 @@ FrontDesk employees must be able to:
 2. Claim a job for processing.
 3. Review booking details.
 4. Assign or correct the workspace.
-5. Contact the customer.
+5. Contact the client.
 6. Check scheduling availability.
 7. Review deposit requirements.
 8. Confirm eligible bookings.
@@ -245,9 +245,9 @@ An override must not incorrectly mark the deposit as paid.
 
 Maintain separate payment and job workflow states.
 
-**Deferred:** Customer credit arrangements and pay-later account privileges.
+**Deferred:** Client credit arrangements and pay-later account privileges.
 
-Do not implement customer credit policy during this phase.
+Do not implement client credit policy during this phase.
 
 ### Confirmation outcome
 
@@ -428,7 +428,7 @@ Assigned photographers access their jobs through Today.
 
 The Job page provides:
 
-- Customer information
+- Client information
 - Job instructions
 - Scheduled time
 - Location
@@ -501,7 +501,7 @@ Production must be able to:
 
 Assigned tasks must appear in Today.
 
-Replace the current operational approval flow with the process in this brief. Source-media acceptance starts Active Production; finished-work approval is a separate stage after production execution. Reuse existing permission configuration, quality checks, approved asset versions, publishing adapters, and customer delivery capabilities. Do not add mandatory customer sign-off, payment clearance, or a new approval hierarchy. Section 21.5 defines the complete process.
+Replace the current operational approval flow with the process in this brief. Source-media acceptance starts Active Production; finished-work approval is a separate stage after production execution. Reuse existing permission configuration, quality checks, approved asset versions, publishing adapters, and client delivery capabilities. Do not add mandatory client sign-off, payment clearance, or a new approval hierarchy. Section 21.5 defines the complete process.
 
 ---
 
@@ -521,7 +521,7 @@ Each job must display:
 
 ### Example Jobs grid
 
-| Job | Customer | Current Stage | Time in Stage | Status |
+| Job | Client | Current Stage | Time in Stage | Status |
 |---|---|---|---|---|
 | J-1042 | Morgan Wedding | Photographer Assignment | 2 hours | 🟢 |
 | J-1043 | Taylor Portrait | Awaiting Production | 9 hours | 🟡 |
@@ -641,7 +641,7 @@ The Jobs page must support filtering and sorting by:
 - Production responsibility
 - Time in current state
 - Scheduled date
-- Customer
+- Client
 
 Provide an **Overdue First** sorting option.
 
@@ -849,7 +849,7 @@ The implementation is not complete until the following scenarios pass.
 
 ### Scenario A — Normal booking
 
-1. Customer submits booking.
+1. Client submits booking.
 2. Studio creates pending job.
 3. Workspace is selected from destination email.
 4. FrontDesk reviews booking.
@@ -862,7 +862,7 @@ The implementation is not complete until the following scenarios pass.
 
 ### Scenario B — Unassigned booking
 
-1. Customer submits booking.
+1. Client submits booking.
 2. Destination email has no workspace mapping.
 3. Job enters Unassigned queue.
 4. FrontDesk assigns workspace.
@@ -998,7 +998,7 @@ Do not report an untested feature as verified.
 
 # 20. Final implementation objective
 
-The completed Studio workflow must allow the business to follow a job from its initial customer booking through photographer assignment and Production without losing operational visibility.
+The completed Studio workflow must allow the business to follow a job from its initial client booking through photographer assignment and Production without losing operational visibility.
 
 At any point, a manager should be able to answer five questions:
 
@@ -1035,7 +1035,7 @@ This section integrates the additional approved decisions. Apply it throughout S
 
 - Seed exactly one permanent system Workspace named Unassigned under an immutable system key. Use a unique constraint and repeat-safe initialization. It must have a real Workspace ID, not a null ID, placeholder GUID, or transient queue-only record.
 - FrontDesk owns access to its Pending Jobs. Ordinary workspace members must not gain access to this cross-business intake queue merely by belonging to another workspace. Administrators retain existing access.
-- Existing enabled workspace email mappings route new bookings. An unknown, disabled, or ambiguous mapping routes to Unassigned and records the routing reason. Normalize addresses consistently with the existing router. Do not create workspaces from customer input.
+- Existing enabled workspace email mappings route new bookings. An unknown, disabled, or ambiguous mapping routes to Unassigned and records the routing reason. Normalize addresses consistently with the existing router. Do not create workspaces from client input.
 - A website submission atomically creates or returns its Pending Job and linked intake provenance. Scope the external booking identifier by source/provider and enforce uniqueness. The same identifier and booking facts return the same Job; conflicting reuse returns a clear error. A separate booking/request record may remain for existing integrations, but it always links to this Job.
 - A confirmed Job cannot remain in Unassigned. FrontDesk must route it to an enabled business workspace before confirmation. Unknown service or deposit requirements must not prevent capture of the Pending Job.
 - Migrate old pending booking/request records without a Job to one Pending Job. Preserve already linked Jobs and their IDs, conversations, clients, media, schedules, and deposit references. Payment callbacks and legacy routes must resolve that same Job and must no longer create another one.
@@ -1058,7 +1058,7 @@ One stored Job workflow stage is authoritative. Readiness substates, payment, ta
 | Active Production | Accepted source material; assigned production tasks and quality checks underway | Production Lead and task assignees | Submit finished work → Awaiting Approval |
 | Awaiting Approval | Finished output and required tasks ready for final internal approval | Existing authorized Production approver | Approve output → Ready for Delivery; request production corrections → Changes Requested |
 | Changes Requested | Specific correction request with source or production target | Job Owner for source corrections; Production Lead for production corrections | Source resubmission → Awaiting Production Review; production rework → Active Production |
-| Ready for Delivery | Approved output ready for existing gallery publishing / customer delivery | FrontDesk and Job Owner | Record actual delivery → Delivered |
+| Ready for Delivery | Approved output ready for existing gallery publishing / client delivery | FrontDesk and Job Owner | Record actual delivery → Delivered |
 | Delivered | Delivery recorded; final operational closure pending | Job Owner or Workspace Manager | Close after required work is resolved → Completed |
 | Completed | Operational work closed | Workspace Manager | Authorized reopening only, with reason and selected applicable stage |
 | Cancelled | Job cancelled with reason | Cancelling authorized role | Authorized reopening only, with reason and selected applicable stage |
@@ -1089,7 +1089,7 @@ Migrate unambiguous legacy statuses (for example Needs Scheduling, Awaiting Uplo
 
 | Role / relationship | Permitted operational actions |
 |---|---|
-| FrontDesk | Review and claim Pending Jobs; contact customers; route Pending Jobs; record deposits under existing billing permissions; confirm eligible bookings; cancel Pending Jobs with reason |
+| FrontDesk | Review and claim Pending Jobs; contact clients; route Pending Jobs; record deposits under existing billing permissions; confirm eligible bookings; cancel Pending Jobs with reason |
 | Workspace Manager | Assign/reassign Job Owner, crew and tasks within managed workspace; schedule; resolve assignment requests; transfer eligible Jobs; oversee exceptions, cancellation and closure |
 | Job Owner | Coordinate own Jobs; assign/reassign crew and tasks; schedule; review photographer readiness; submit source media for Production Review; respond to source corrections; close delivered Jobs |
 | Assigned photographer | View relevant Job instructions, sessions, tasks and messages; upload media; record own session execution/readiness through existing capabilities; request assignment |
@@ -1114,7 +1114,7 @@ Mock-auth Studio administrator accounts must expose and execute ordinary Job Own
 3. Production creates and assigns required tasks; those tasks appear in Today.
 4. Finished work can enter Awaiting Approval only after required production tasks are Completed or explicitly Cancelled/waived by an authorized lead and current output versions satisfy existing quality checks. Unrelated administrative tasks do not automatically block production submission.
 5. An existing authorized approver approves the exact submitted finished-output versions or requests corrections. Do not invent a requirement for a different approver unless current policy already requires it.
-6. Final approval enters Ready for Delivery. Publishing uses approved versions and the existing provider-neutral adapter; customer delivery records method, timestamp, actor, and a reference/receipt where available. A successful publication alone does not falsely attest to other physical deliverables.
+6. Final approval enters Ready for Delivery. Publishing uses approved versions and the existing provider-neutral adapter; client delivery records method, timestamp, actor, and a reference/receipt where available. A successful publication alone does not falsely attest to other physical deliverables.
 7. Required deliverables must be recorded as delivered before Delivered. Completed requires required operational tasks to be resolved. Do not introduce deferred deposit-clearance or credit gates at these stages.
 
 Retain existing immutable media/version history, quality control, publication receipts, delivery integrations, and authorization where compatible. Replace the old state-changing routes or adapt them to these exact semantics. Update the UI labels, automation triggers, tests, and documentation together.
@@ -1165,7 +1165,7 @@ For this phase, any authorized recorded positive deposit makes a Pending Job eli
 
 Without a recorded positive deposit, the existing brief's Operations Manager override path permits confirmation. Record manager identity, timestamp, reason and original requirement, and preserve unpaid balances. Permit zero or unknown required-deposit metadata at intake; do not create a new zero-deposit automatic-confirmation path. Such bookings can proceed through a recorded deposit or an explicit override for now.
 
-Do not implement minimum deposit calculation, provider verification, partial-payment eligibility rules, credit privileges, customer account terms, refund policy, automated chargebacks, or retroactive override revocation. Keep existing financial behavior available; cancellation directs any financial follow-up to existing FrontDesk/Billing processes. Keep this simplified rule explicit and replaceable later. Replayed receipts do not create duplicate financial entries; a receipt reused with conflicting facts returns an error.
+Do not implement minimum deposit calculation, provider verification, partial-payment eligibility rules, credit privileges, client account terms, refund policy, automated chargebacks, or retroactive override revocation. Keep existing financial behavior available; cancellation directs any financial follow-up to existing FrontDesk/Billing processes. Keep this simplified rule explicit and replaceable later. Replayed receipts do not create duplicate financial entries; a receipt reused with conflicting facts returns an error.
 
 ## 21.9. Exception and transfer rules
 
@@ -1173,7 +1173,7 @@ Do not implement minimum deposit calculation, provider verification, partial-pay
 - No-show: record a session exception and notify the Job Owner/manager; do not automatically complete, cancel, or refund the Job. Management chooses rescheduling or cancellation.
 - Reshoot: add a required linked session with a reason. Before Production submission, aggregate readiness reflects the new required session. After submission, explicitly withdraw/reopen the affected review under authorized correction controls before changing downstream readiness.
 - Removing a lead or cancelling a required session before execution forces a crew/schedule readiness recheck. Do not allow a finalized session with no lead. Replace a required session or waive that requirement with a reason; cancellation alone is not proof the photography obligation was fulfilled.
-- Job cancellation: FrontDesk may cancel Pending Jobs; Workspace Manager or Operations Manager may cancel confirmed active Jobs. Audit the reason, release unstarted reservations, cancel/suspend relevant open tasks, remove the Job from active queues, notify affected employees, and retain all historical media, payments and completed work. Do not erase or silently unpublish an existing customer gallery; flag its existing unpublish action for the authorized operator.
+- Job cancellation: FrontDesk may cancel Pending Jobs; Workspace Manager or Operations Manager may cancel confirmed active Jobs. Audit the reason, release unstarted reservations, cancel/suspend relevant open tasks, remove the Job from active queues, notify affected employees, and retain all historical media, payments and completed work. Do not erase or silently unpublish an existing client gallery; flag its existing unpublish action for the authorized operator.
 - Blocked work: record a reason and responsible party; show the flag in Jobs and Today. The regular clock keeps running. Avoid a separate timer-pausing On Hold stage in this phase.
 - Workspace transfer: FrontDesk routes Pending Jobs; confirmed Jobs require Operations Manager authority or both source and destination managers' recorded approval. Lock/version-check the Job, record transfer, and notify both sides. The destination manager becomes accountable. Retain explicit Job Owner and crew assignments and Job-specific grants unless deliberately reassigned; inherited workspace access follows the destination. Recheck readiness, request routing and permissions. Transfer changes the stage only if prerequisites genuinely become unmet.
 - Reopening: only Workspace Manager or Operations Manager may reopen a closed Job, with a reason and an applicable valid stage. Start a new stage occurrence without deleting prior closure, delivery, payment, approval, or publication history.
@@ -1239,6 +1239,6 @@ Record a positive deposit below the configured requirement; explicit FrontDesk c
 
 The final implementation report must include the original Section 19 items plus the canonical status mapping, migration reconciliation report, route mapping, responsibility/permission mapping, crew/session compatibility changes, notification retry behavior, and results for scenarios A–T. Clearly separate implemented, executed-and-passed, unexecuted, and deferred items.
 
-Deferred improvements: business-hours/holiday calendars; pause-adjusted service clocks; advanced deposit verification and minimum amounts; customer credit/pay-later privileges; new refund/chargeback or override-revocation policy; expanded WorkDay acceptance; partial Job production handoffs. Do not expand this phase to implement them. Preserve current working capabilities where they already exist.
+Deferred improvements: business-hours/holiday calendars; pause-adjusted service clocks; advanced deposit verification and minimum amounts; client credit/pay-later privileges; new refund/chargeback or override-revocation policy; expanded WorkDay acceptance; partial Job production handoffs. Do not expand this phase to implement them. Preserve current working capabilities where they already exist.
 
 Implement the complete revised workflow in logical commits on an implementation branch. Preserve Today styling and existing Common integrations. Prioritize Job assignment, multiple session crews, shared workflow history, connected navigation and Jobs status lights. This document authorizes the routine decisions specified here; it does not authorize claiming unexecuted tests passed or merging incomplete work.

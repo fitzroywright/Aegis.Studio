@@ -33,7 +33,7 @@ internal static class DemoIntegratedWorkflow
             Guid activity=DemoDataExpansion.Id(80,number);
             Sql("""
                 insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,created_by,created_at_utc,updated_at_utc)
-                select $2,id,'QC','Approved production batch — quality control','Use only the pinned approved source; inspect, reject with a reason, rework and pass before customer handoff.',
+                select $2,id,'QC','Approved production batch — quality control','Use only the pinned approved source; inspect, reject with a reason, rework and pass before client handoff.',
                   case when status in ('Ready for Client','Completed') then 'Completed' else 'InProgress' end,'Normal',$3,$3,now(),now()
                 from studio_jobs where id=$1 on conflict do nothing
                 """,job,activity,actor);
@@ -58,7 +58,7 @@ internal static class DemoIntegratedWorkflow
         using(var exists=new NpgsqlCommand("select exists(select 1 from studio_jobs where id=$1)",c,tx)){exists.Parameters.AddWithValue(jobId);if(!(bool)exists.ExecuteScalar()!){Sql("insert into studio_state(key,value,updated_at_utc) values('demo-data-v7-integrated-workflow',$1,now()) on conflict do nothing",actor);return;}}
         Sql("insert into studio_pos_sale_lines(id,sale_id,code,description,unit_price,quantity) values($1,$2,'PRINT-5X7','5x7 approved portrait print',1500,3) on conflict do nothing",line,sale);
         Sql("insert into studio_pos_tenders(id,sale_id,kind,amount,reference) values($1,$2,0,4500,'DEMO verified cash receipt') on conflict do nothing",DemoDataExpansion.Id(85,101),sale);
-        Sql("insert into studio_pos_refunds(id,sale_id,reason,created_at_utc) values($1,$2,'One extra print cancelled by customer',now()-interval '1 day') on conflict do nothing",refund,sale);
+        Sql("insert into studio_pos_refunds(id,sale_id,reason,created_at_utc) values($1,$2,'One extra print cancelled by client',now()-interval '1 day') on conflict do nothing",refund,sale);
         Sql("insert into studio_pos_refund_lines(id,refund_id,sale_line_id,unit_price,quantity) values($1,$2,$3,1500,1) on conflict do nothing",DemoDataExpansion.Id(87,101),refund,line);
         Sql("insert into studio_pos_refund_tenders(id,refund_id,kind,amount,reference) values($1,$2,0,1500,'DEMO cash refund') on conflict do nothing",DemoDataExpansion.Id(88,101),refund);
         Sql("insert into studio_financial_events(id,job_id,kind,amount,note,created_at_utc,payment_method,recorded_by) values($1,$2,'POS Sale',4500,$3,now()-interval '2 days','Cash',$4),($5,$2,'POS Refund',-1500,$6,now()-interval '1 day','Cash',$4) on conflict do nothing",sale,jobId,$"Sale {sale}: Cash 4500",actor,refund,$"Refund {refund}: Cash 1500");

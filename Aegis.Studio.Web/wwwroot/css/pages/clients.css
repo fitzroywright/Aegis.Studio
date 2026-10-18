@@ -1,0 +1,64 @@
+/* Client surfaces reuse the Today frame and Workspaces cards. */
+.clients-page .clients-board{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:hidden;background:transparent;border:0;box-shadow:none}
+.clients-page .client-directory{display:flex;flex-direction:column;flex:0 1 30%;min-height:130px}
+.clients-page .client-directory:only-child{flex:1}
+.client-search{display:block;padding:10px 12px}
+.client-search input,.client-job-filters input,.client-job-filters select{width:100%;min-height:30px;padding:6px 9px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:6px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font:inherit;font-size:12px;box-sizing:border-box}
+.client-directory-rows{overflow:auto;min-height:0;flex:1}
+.client-directory-row{display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(120px,1.2fr) minmax(95px,.8fr) 15px;gap:10px;align-items:center;width:100%;padding:10px 14px;border:0;border-bottom:1px solid var(--studio-control-border,#e2e8ef);background:transparent;color:inherit;text-align:left;cursor:pointer;font-size:12px}
+.client-directory-row>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.client-directory-row.is-selected,.client-directory-row:hover{background:var(--studio-control-surface,#e9f1fb)}
+.clients-page .client-record{display:flex;flex-direction:column;flex:1 1 0;min-height:0}
+.clients-page .client-record-heading{flex-wrap:wrap;min-height:70px}.client-record-heading h2{font-size:21px!important}.client-record-heading p{font-size:12px;opacity:.75;margin:6px 0 0}
+.client-tabs{display:flex;gap:4px;padding:0 12px;border-bottom:1px solid var(--studio-control-border,#dce4ec);flex-wrap:wrap;flex:0 0 auto}
+.client-tabs button{padding:12px 9px 10px;background:transparent;color:inherit;border:0;border-bottom:3px solid transparent;border-radius:0;font-size:12px;cursor:pointer;font-weight:600}
+.client-tabs button[aria-pressed=true]{border-bottom-color:var(--theme-accent,#cf792a);color:var(--studio-control-text,#163d66);font-weight:800}
+.client-tab-content{overflow:auto;min-height:0;flex:1;padding:10px 12px}
+.client-text-link{appearance:none;background:transparent!important;border:0!important;box-shadow:none!important;padding:2px!important;font:inherit;color:var(--studio-control-text,#164879)!important;text-align:left;font-weight:700;cursor:pointer}
+.client-text-link:hover{text-decoration:underline}.client-table{width:100%;border-collapse:collapse;font-size:12px}.client-table th,.client-table td{padding:10px 8px;border-bottom:1px solid var(--studio-control-border,#e2e8ef);text-align:left}.client-table th{font-size:11px}.client-table small{display:block;margin-top:4px;opacity:.7}
+.client-status{display:inline-block;border-radius:99px;padding:4px 9px;font-size:10px;font-weight:700;background:var(--studio-control-surface,#edf3f8);color:var(--studio-control-text,#244464)}
+.client-tools{display:flex;flex-wrap:wrap;gap:8px;padding:12px}.client-workspaces{overflow:auto;font-size:12px}.client-workspaces>p{padding:12px;margin:0;line-height:1.5}
+.client-note{font-size:11px;line-height:1.5;opacity:.8;margin:4px 0 12px}.client-empty{padding:22px 12px;font-size:12px;line-height:1.6}
+.client-job-filters{display:flex;gap:8px;margin-bottom:10px}.client-job-filters input{flex:1}.client-job-filters select{width:auto;max-width:45%}
+.client-gallery-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--studio-control-border,#e2e8ef)}
+.client-gallery-image{width:76px;height:56px;flex:0 0 76px;border-radius:6px;overflow:hidden;display:grid;place-items:center;background:var(--studio-control-surface,#edf3f8);font-size:28px;color:var(--studio-control-text,#244464)}
+.client-gallery-image img{width:100%;height:100%;object-fit:cover}.client-gallery-copy{flex:1;min-width:160px}.client-gallery-copy h3{margin:0 0 5px;font-size:14px}.client-gallery-copy p{margin:0 0 5px;font-size:11px;opacity:.75}.client-gallery-row small{display:block;font-size:10px;opacity:.75;margin-top:5px}.client-gallery-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.client-gallery-actions button{font-size:11px}
+.client-statement-heading{display:flex;justify-content:space-between;align-items:center;gap:8px}.client-statement-heading h3{font-size:16px;margin:0}.client-statement-heading p{font-size:11px}.client-statement h4{font-size:13px;margin:20px 0 6px}.client-activity{padding:12px 0;border-bottom:1px solid var(--studio-control-border,#e2e8ef)}.client-activity h3{font-size:13px;margin:5px 0}.client-activity p{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.client-welcome{display:grid;place-content:center;text-align:center;padding:28px;flex:1}.client-welcome>span{font-size:35px;color:#c77828}.client-welcome h2{font-size:20px}.client-welcome p{font-size:13px;max-width:420px;line-height:1.7}
+.clients-page button:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:2px}.client-load-error{padding:24px}
+.client-media-preview{min-height:400px;height:min(70vh,700px)}
+@media(max-width:900px){.client-directory-row{grid-template-columns:1fr 1fr 15px}.client-directory-row>span:nth-child(3){display:none}.client-gallery-actions{width:100%}}
+.client-attention>header{border-left:3px solid #c34c35}.client-attention-body{display:flex;flex-direction:column;gap:9px;padding:12px;font-size:12px}
+.clients-page .client-messages{display:flex;flex-direction:column;flex:1;min-height:0}.client-messages-body{overflow:auto;min-height:0;padding:0 12px;font-size:12px}.client-message{width:100%;display:flex;flex-direction:column;gap:5px;padding:12px 0;border:0;border-bottom:1px solid var(--studio-control-border,#e2e8ef);background:transparent;color:inherit;text-align:left;cursor:pointer}.client-message span{font-size:11px;overflow-wrap:anywhere}.client-message small{opacity:.65}.client-messages footer{padding:9px 12px;border-top:1px solid var(--studio-control-border,#dce4ec);font-size:11px}
+.client-directory-tools{display:flex;align-items:center;gap:10px;font-size:11px}.client-directory-tools .action{font-size:11px;min-height:26px}
+
+
+/* Use the canonical Jobs grid and rail components within the client frame. */
+.clients-page .client-directory-table{min-width:480px}
+.clients-page .client-directory-table th:first-child{width:34%}
+.clients-page .client-directory-table th:nth-child(2){width:40%}
+.clients-page .client-directory-table th:nth-child(3){width:26%}
+.client-directory-table tr[data-c-id]{cursor:pointer}
+.client-directory-table tr[data-c-id]:hover,.client-directory-table tr[data-c-id]:focus-visible{background:var(--theme-surface-alt,#edf3f8);box-shadow:inset 3px 0 var(--theme-accent,#d97722);outline:0}
+.clients-page .client-jobs-table{min-width:600px}
+.clients-page .client-jobs-table th:first-child{width:40%}
+.clients-page .client-jobs-table th:nth-child(2){width:22%}
+.clients-page .client-jobs-table th:nth-child(3){width:20%}
+.clients-page .client-jobs-table th:nth-child(4){width:18%}
+.clients-page .client-right{gap:8px}
+
+.client-column-search{display:flex;align-items:center;gap:10px;min-width:0}
+.client-column-search input{flex:1;min-width:0;width:100%;max-width:220px;height:23px;box-sizing:border-box;padding:2px 6px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:10px;font-weight:500}
+.client-column-search input::placeholder{color:#e2ebf6;opacity:1}
+.client-column-search input:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
+
+/* Keep the client identity in the directory; selection persists beyond hover. */
+.clients-page .client-directory-table tr.is-selected>td{background:color-mix(in srgb,var(--theme-accent,#d97722) 22%,var(--studio-control-surface,#fff));color:var(--studio-control-text,#233e57);font-weight:600}
+.clients-page .client-directory-table tr.is-selected>td:first-child{box-shadow:inset 4px 0 var(--theme-accent,#d97722)}
+.client-tabs .client-edit-details{margin-left:auto;align-self:center;padding:6px 9px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;font-size:11px}
+
+/* Keep each header above scrolling rows, including selected-row backgrounds. */
+.clients-page :is(.client-directory-table,.client-jobs-table){border-collapse:separate;border-spacing:0}
+.clients-page :is(.client-directory-table,.client-jobs-table) thead{position:sticky;top:0;z-index:2}
+.clients-page :is(.client-directory-table,.client-jobs-table) thead th{position:static;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8)}
+

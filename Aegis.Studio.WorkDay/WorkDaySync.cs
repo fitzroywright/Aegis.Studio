@@ -209,7 +209,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
         {
             Id=x.Id,JobId=x.JobId,BookingId=x.BookingId,WorkspaceId=x.WorkspaceId,ConversationId=x.ConversationId,
             Title=x.Title,StartsAtUtc=x.StartsAtUtc,EndsAtUtc=x.EndsAtUtc,Location=x.Location,Status=x.Status,Instructions=x.Instructions,
-            CustomerName=x.CustomerName,CustomerEmail=x.CustomerEmail,CustomerPhone=x.CustomerPhone,Version=x.Version,
+            ClientName=x.ClientName,ClientEmail=x.ClientEmail,ClientPhone=x.ClientPhone,Version=x.Version,
             FieldTargetsJson=CachedFieldTargets(bootstrap,x.Id),IsCurrent=true,CachedAtUtc=DateTimeOffset.UtcNow
         }),authoritative:true);
     }
@@ -233,7 +233,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
 }
 
 public sealed record WorkDayBootstrapDto(string UserName,string DisplayName,DateTimeOffset ServerTimeUtc,IReadOnlyList<AssignmentDto> Today,IReadOnlyList<AssignmentDto> Upcoming,WorkSessionDto? ActiveWorkSession,bool LocationTrackingEnabled,string LocationTrackingMode,DateTimeOffset GeneratedAtUtc,IReadOnlyDictionary<Guid,IReadOnlyList<FieldTargetDto>>? FieldTargets=null);
-public sealed record AssignmentDto(Guid Id,Guid? JobId,Guid? BookingId,string Title,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? Location,string Status,string? Instructions,Guid? WorkspaceId,Guid? ConversationId,string? CustomerName,string? CustomerEmail,string? CustomerPhone,long Version);
+public sealed record AssignmentDto(Guid Id,Guid? JobId,Guid? BookingId,string Title,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? Location,string Status,string? Instructions,Guid? WorkspaceId,Guid? ConversationId,string? ClientName,string? ClientEmail,string? ClientPhone,long Version);
 public sealed record WorkSessionDto(Guid Id,string UserName,DateTimeOffset StartedAtUtc,DateTimeOffset? EndedAtUtc,string DeviceId,bool StartedOffline,bool? EndedOffline,string Source,DateTimeOffset UpdatedAtUtc);
 public sealed record OperationResultDto(Guid OperationId,string State,DateTimeOffset AcknowledgedAtUtc,string? Message,long? ServerVersion);
 public sealed record MessageThreadDto(Guid Id,string ScopeType,Guid? ScopeId,string Title,string CreatedBy,DateTimeOffset CreatedAtUtc,DateTimeOffset? LastMessageAtUtc,long UnreadCount);

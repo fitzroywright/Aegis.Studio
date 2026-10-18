@@ -10,7 +10,7 @@
 | `WorkflowStore` / `OperationalWorkStore` | Existing staff assignment, revisions, activity progress and review/delivery gates; enforce prerequisites, approved-image requirements and final QC. In-house templates can omit photography scheduling. |
 | `ProductionOrderLinker` | Per-sale-line, per-catalog-product work orders using frozen template versions; legacy product handling retained for older catalog items. |
 | WorkDay and employee directory | Existing scheduling/availability and assignment mechanisms retained; default assignees must be active and assignable. |
-| Media Upload, Job Gallery, Messages and Customer Gallery | Existing intake/import/storage and read-only publication mechanisms retained. Work orders pin approved asset versions. Explicit publication is available through Job Gallery and is blocked by incomplete production/QC. No gallery implementation was deleted. |
+| Media Upload, Job Gallery, Messages and Client Gallery | Existing intake/import/storage and read-only publication mechanisms retained. Work orders pin approved asset versions. Explicit publication is available through Job Gallery and is blocked by incomplete production/QC. No gallery implementation was deleted. |
 
 ## Implemented behavior
 
@@ -32,7 +32,7 @@ Two existing fresh-start issues found by the real-app check were fixed: workspac
 - Full UI suite: **33 passed, 13 failed, 46 total**. The same 13 failures were reproduced on untouched main before these changes. They concern the existing shared shell, Today startup/navigation, workspace/Jobs rails, original Production collection fixture and Front Desk search fixture. No new failing test was introduced.
 - Real application HTTP check: fresh migration/startup and mock login, management APIs, launch issuance/resolution, missing-launch/case-variant write rejection and generic-launch rejection passed. A catalog product and both templates were created, a Front Desk booking instantiated its Job, and a contextual sale/completion retry produced exactly one work order for three products. Approved-source API also returned a bounded result.
 - Existing database integration class on PGlite: 7 passed; `WorkDayReschedulePreservesIdsAndRollsBackConflicts` timed out while its transaction accessed another connection. This is unresolved on native PostgreSQL; PGlite protocol checks do not prove native concurrent-session behavior.
-- Chromium could not be downloaded in this environment. Visual browser QA and a complete native PostgreSQL/WorkDay regression run remain validation limits. External Customer Gallery publishing was not exercised.
+- Chromium could not be downloaded in this environment. Visual browser QA and a complete native PostgreSQL/WorkDay regression run remain validation limits. External Client Gallery publishing was not exercised.
 
 ## Connected acceptance scenario
 

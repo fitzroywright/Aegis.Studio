@@ -82,7 +82,7 @@ Then deploy the latest Studio code and run **Reset and Regenerate** in the test 
 ## Operational boundaries
 
 - AI images represent fictional people and should be identified as such in demo materials.
-- Do not put real customer photographs or sensitive personal data in prompts.
+- Do not put real client photographs or sensitive personal data in prompts.
 - Generation is not part of startup, build, tests, deployment, or demo reset.
 - The library contains up to 200 unique source images, but a job with 40–50 media records can reuse sources if its category has fewer unique images. This is not 40–50 distinct images per job.
 - The existing code selects AI photos when available. Do not interpret a successful demo reset as proof that all generated images were visually reviewed or that each asset is unique.

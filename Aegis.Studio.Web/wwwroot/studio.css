@@ -1095,7 +1095,7 @@ dialog::backdrop {
   flex: 1;
   min-width: 0;
 }
-.message.customer .bubble {
+.message.client .bubble {
   background: #faf5ed;
   padding: 10px;
   border-radius: 7px;

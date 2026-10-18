@@ -12,8 +12,8 @@ public sealed class FinanceAndProductionAuthorityTests
     [InlineData(100, 200, true, true, false)]
     [InlineData(100, 200, false, false, false)]
     [InlineData(0, 200, false, true, false)]
-    public void FinanceAuthorityMustCoverTheActualReceivable(decimal balance, decimal amount, bool revoked, bool sameCustomer, bool expected)
-        => Assert.Equal(expected, FinanceReleaseRules.Covers(balance, amount, revoked, sameCustomer));
+    public void FinanceAuthorityMustCoverTheActualReceivable(decimal balance, decimal amount, bool revoked, bool sameClient, bool expected)
+        => Assert.Equal(expected, FinanceReleaseRules.Covers(balance, amount, revoked, sameClient));
 
     [Fact]
     public void CreditRequiresDueDateTermsAndContractWithoutCreatingPayment()

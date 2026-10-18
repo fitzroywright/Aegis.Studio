@@ -19,7 +19,7 @@ public sealed class AssignmentPage:ContentPage
         this.assignment=assignment;this.store=store;this.sync=sync;this.device=device;Title=assignment.Title;
         Content=new ScrollView{Content=new VerticalStackLayout{Padding=18,Spacing=12,Children={
             new Label{Text=assignment.Title,FontSize=25,FontAttributes=FontAttributes.Bold},
-            new Label{Text=assignment.CustomerName??""},
+            new Label{Text=assignment.ClientName??""},
             new Label{Text=$"{assignment.StartsAtUtc.ToLocalTime():f} — {assignment.EndsAtUtc.ToLocalTime():t}"},
             new Label{Text=assignment.Location??"Location not set"},new Label{Text=assignment.Instructions??"No special instructions."},status,syncStatus,
             Action("SYNC NOW",async()=>{await sync.SynchronizeAsync();await RefreshStatusAsync();}),
@@ -119,7 +119,7 @@ public sealed class AssignmentPage:ContentPage
     }
     private async Task ContactAsync()
     {
-        string[] choices=[..new[]{assignment.CustomerPhone,assignment.CustomerEmail}.Where(x=>!string.IsNullOrWhiteSpace(x)).Select(x=>x!)];
+        string[] choices=[..new[]{assignment.ClientPhone,assignment.ClientEmail}.Where(x=>!string.IsNullOrWhiteSpace(x)).Select(x=>x!)];
         if(choices.Length==0)throw new InvalidOperationException("No permitted contact information is available.");
         string selected=await DisplayActionSheetAsync("Contact client","Cancel",null,choices);
         if(selected=="Cancel"||string.IsNullOrWhiteSpace(selected))return;

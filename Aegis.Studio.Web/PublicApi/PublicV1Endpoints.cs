@@ -94,7 +94,7 @@ public static class PublicV1Endpoints
             var content = await storage.OpenReadAsync("VersionStore/" + asset.StoredPath, context.RequestAborted);
             if (variant == "download")
             {
-                WorkflowStore.Sql(c, tx, "insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'CustomerFinalDownload','Customer',$3,now())", Guid.NewGuid(), reference, "Approved version " + version);
+                WorkflowStore.Sql(c, tx, "insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'ClientFinalDownload','Client',$3,now())", Guid.NewGuid(), reference, "Approved version " + version);
                 tx.Commit();
                 return Results.Stream(content, asset.ContentType, fileDownloadName: Path.GetFileName(asset.FileName), enableRangeProcessing: false);
             }
@@ -137,8 +137,8 @@ public static class PublicV1Endpoints
                 """)!));
         }).RequireAuthorization();
         group.Map("/{**path}",(HttpContext context)=>Error(context,404,"not_found","Unknown V1 resource."));
-        // Management can review the same exact versions chosen by the customer.
-        app.MapGet("/api/jobs/{job:guid}/customer-selections", (Guid job, System.Security.Claims.ClaimsPrincipal user, JobAccessService access) =>
+        // Management can review the same exact versions chosen by the client.
+        app.MapGet("/api/jobs/{job:guid}/client-selections", (Guid job, System.Security.Claims.ClaimsPrincipal user, JobAccessService access) =>
         {
             if (!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
             using var c = db.OpenConnection();

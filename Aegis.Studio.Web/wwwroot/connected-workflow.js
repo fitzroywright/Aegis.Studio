@@ -98,8 +98,8 @@
   // Move the real, permission-checked action so every entry point uses the same handler.
   const primary=next.selector?host.querySelector(next.selector):null;
   if(primary){primary.className='primary';primary.textContent=next.label;host.querySelector('[data-wf-next-action]').append(primary);host.querySelector('[data-wf-next-title]').hidden=true;}
-  const customerSelections=host.querySelector('[data-wf-selections]');
-  try{const selections=await send('/api/jobs/'+jobId+'/customer-selections');if(!isCurrent())return;customerSelections.innerHTML=selections.map(s=>`<p>${esc(new Date(s.submittedAt).toLocaleString())} · ${(s.versionIds||[]).map(id=>`<a href="/api/jobs/${jobId}/versions/by-id/${esc(id)}/preview" target="_blank" rel="noopener">${esc(id)}</a>`).join(', ')}</p>`).join('')||'<p>No client selections submitted.</p>';}catch{customerSelections.textContent='Client selections unavailable. Refresh to retry.';}
+  const clientSelections=host.querySelector('[data-wf-selections]');
+  try{const selections=await send('/api/jobs/'+jobId+'/client-selections');if(!isCurrent())return;clientSelections.innerHTML=selections.map(s=>`<p>${esc(new Date(s.submittedAt).toLocaleString())} · ${(s.versionIds||[]).map(id=>`<a href="/api/jobs/${jobId}/versions/by-id/${esc(id)}/preview" target="_blank" rel="noopener">${esc(id)}</a>`).join(', ')}</p>`).join('')||'<p>No client selections submitted.</p>';}catch{clientSelections.textContent='Client selections unavailable. Refresh to retry.';}
   const clock=host.querySelector('[data-wf-clock]');
   if(clock){
    const tick=()=>{

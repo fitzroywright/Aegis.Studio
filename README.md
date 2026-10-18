@@ -8,7 +8,7 @@ The core model is deliberately **not email-first**. External systems and channel
 
 `Channel -> Workspace -> Contact -> Conversation -> optional Job -> Production -> Financials -> Delivery/Gallery`
 
-A conversation is never destroyed when a job is created. It remains the communication history and is linked to the job. Jobs can also be created directly for walk-ins, telephone work, repeat customers, and internal work.
+A conversation is never destroyed when a job is created. It remains the communication history and is linked to the job. Jobs can also be created directly for walk-ins, telephone work, repeat clients, and internal work.
 
 ## Department lenses
 

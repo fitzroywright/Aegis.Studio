@@ -963,7 +963,7 @@
     const routes={
         today:renderToday,
         notifications:()=>showNotifications(),
-        customers:()=>window.StudioCustomers.render({customerId:window.history.state?.studioCustomerId}),
+        clients:()=>window.StudioClients.render({clientId:window.history.state?.studioClientId}),
         messages:()=>window.showStudioMessages(),
         schedule:()=>window.history.state?.studioSchedulePanel==='pipeline'?showPipeline():window.history.state?.studioSchedulePanel==='production'?window.StudioProductionPlanning.render():window.StudioPhotographerSchedule.render({photographer:window.history.state?.studioPhotographer||'',date:window.history.state?.studioScheduleDate||'',view:window.history.state?.studioScheduleView||'',resourceId:window.history.state?.studioScheduleResource||''}),
         tasks:renderToday,
@@ -985,10 +985,10 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',customers:'Clients',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Schedule'};
+    const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Clients',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',tasks:'Today',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
-        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'photographers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioCustomerId:view==='customers'?String(options.customerId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
+        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'photographers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
     }
     function recordNavigation(view,options={}){
         const next=navigationContext(view,options),previous=window.history.state;
@@ -998,10 +998,10 @@
         if(next.studioScheduleResource)params.set('resource',next.studioScheduleResource);
         if(next.studioScheduleDate)params.set('date',next.studioScheduleDate);
         if(next.studioScheduleView)params.set('view',next.studioScheduleView);
-        if(next.studioCustomerId)params.set('customer',next.studioCustomerId);
+        if(next.studioClientId)params.set('client',next.studioClientId);
         if(next.studioWorkspaceId)params.set('workspace',next.studioWorkspaceId);
         if(next.studioJobId)params.set('job',next.studioJobId);
-        const same=previous?.studioView===next.studioView&&['studioSchedulePanel','studioPhotographer','studioScheduleResource','studioScheduleDate','studioScheduleView'].every(key=>(previous[key]||'')===(next[key]||''))&&(previous.studioCustomerId||null)===(next.studioCustomerId||null)&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId;
+        const same=previous?.studioView===next.studioView&&['studioSchedulePanel','studioPhotographer','studioScheduleResource','studioScheduleDate','studioScheduleView'].every(key=>(previous[key]||'')===(next[key]||''))&&(previous.studioClientId||null)===(next.studioClientId||null)&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId;
         if(options.replaceHistory)window.history.replaceState(next,'','#'+params);
         else if(!options.browserHistory&&options.history!==false&&!same)window.history.pushState(next,'','#'+params);
         currentNavigationView=view;
@@ -1012,7 +1012,7 @@
         const context=recordNavigation(view,options),revision=++navigationRevision;
         window.StudioProductionPlanning?.invalidate();
         window.StudioPhotographerSchedule?.invalidate();
-        window.StudioCustomers?.invalidate();
+        window.StudioClients?.invalidate();
         window.StudioJobsPage?.dispose();
         window.StudioPage?.invalidate();
         window.StudioMessages?.invalidate();
@@ -1053,7 +1053,7 @@
     function destinationFromLocation(state){
         const params=new URLSearchParams(window.location.hash.replace(/^#/,''));
         const view=state?.studioView&&routes[state.studioView]?state.studioView:params.get('studio');
-        return {view:view&&routes[view]?view:'today',panel:state?.studioView?(state.studioSchedulePanel||'photographers'):(params.get('panel')||'photographers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),customerId:state?.studioView?(state.studioCustomerId||''):(params.get('customer')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
+        return {view:view&&routes[view]?view:'today',panel:state?.studioView?(state.studioSchedulePanel||'photographers'):(params.get('panel')||'photographers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
     }
     window.addEventListener('popstate',event=>{
         const destination=destinationFromLocation(event.state);

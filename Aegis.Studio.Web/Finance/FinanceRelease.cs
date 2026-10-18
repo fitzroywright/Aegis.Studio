@@ -12,8 +12,8 @@ public sealed record FinanceReleaseDecision(decimal Balance, bool Authorized, Gu
 
 public static class FinanceReleaseRules
 {
-    public static bool Covers(decimal balance, decimal amount, bool revoked, bool sameCustomer)
-        => balance > 0 && amount >= balance && !revoked && sameCustomer;
+    public static bool Covers(decimal balance, decimal amount, bool revoked, bool sameClient)
+        => balance > 0 && amount >= balance && !revoked && sameClient;
 
     public static void Validate(FinanceAuthorizationRequest request, DateOnly today)
     {
@@ -108,10 +108,10 @@ public static class FinanceReleaseStore
         {
             if (!workflow.IsFinance(user)) throw new UnauthorizedAccessException();
             using var c = db.OpenConnection();
-            var jobs = new List<(Guid Id, string Title, string Customer, string Stage)>();
+            var jobs = new List<(Guid Id, string Title, string Client, string Stage)>();
             using (var q = WorkflowStore.Command(c, null, "select id,title,client_name,status from studio_jobs order by created_at_utc desc"))
             using (var r = q.ExecuteReader()) while (r.Read()) jobs.Add((r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3)));
-            return Results.Ok(jobs.Select(j => new { jobId = j.Id, j.Title, j.Customer, j.Stage, decision = Decision(c, null, j.Id), authorizations = History(c, j.Id) }).Where(j => j.decision.Balance > 0).ToArray());
+            return Results.Ok(jobs.Select(j => new { jobId = j.Id, j.Title, j.Client, j.Stage, decision = Decision(c, null, j.Id), authorizations = History(c, j.Id) }).Where(j => j.decision.Balance > 0).ToArray());
         })).RequireAuthorization();
     }
 

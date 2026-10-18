@@ -158,7 +158,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
                 {if(!reader.Read())throw new KeyNotFoundException();assignee=reader.IsDBNull(0)?null:reader.GetString(0);taskKind=reader.GetString(1);}
                 if(stage!="Delivered"||taskKind!="Archive")EnsureMutable(stage);
                 if(!ProductionAuthorityRules.CanReport(review,manage,string.Equals(assignee,actor,StringComparison.OrdinalIgnoreCase),taskKind))throw new UnauthorizedAccessException();
-                if(request.Status is not ("NotStarted" or "Scheduled" or "InProgress" or "Blocked" or "Completed" or "Cancelled" or "WaitingOnCustomer" or "ReworkRequired" or "Partial" or "Failed" or "ReprintRequired" or "ReadyForDelivery" or "Archived"))throw new ArgumentException("Choose a supported task status.");
+                if(request.Status is not ("NotStarted" or "Scheduled" or "InProgress" or "Blocked" or "Completed" or "Cancelled" or "WaitingOnClient" or "ReworkRequired" or "Partial" or "Failed" or "ReprintRequired" or "ReadyForDelivery" or "Archived"))throw new ArgumentException("Choose a supported task status.");
                 if(request.Status=="Blocked"&&string.IsNullOrWhiteSpace(request.BlockedReason))throw new ArgumentException("Record the blocked reason.");
                 if(request.Status=="Completed"&&!review&&(taskKind=="QC"||Exists(c,tx,"select exists(select 1 from studio_job_activities where id=$1 and quality_control_required)",progressTask)))
                     throw new UnauthorizedAccessException("Production Manager authority is required for a technical quality decision.");

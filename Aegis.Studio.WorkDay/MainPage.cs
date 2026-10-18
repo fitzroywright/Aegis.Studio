@@ -93,7 +93,7 @@ public sealed class MainPage:ContentPage
         todayList.Children.Clear();upcomingList.Children.Clear();
         string query=search.Text?.Trim()??"";
         foreach(LocalAssignment a in values.Where(x=>query.Length==0||x.Title.Contains(query,StringComparison.OrdinalIgnoreCase)||
-            (x.CustomerName?.Contains(query,StringComparison.OrdinalIgnoreCase)??false)).OrderBy(x=>x.StartsAtUtc))
+            (x.ClientName?.Contains(query,StringComparison.OrdinalIgnoreCase)??false)).OrderBy(x=>x.StartsAtUtc))
         {
             Button open=new(){Text=$"{a.StartsAtUtc.ToLocalTime():ddd MMM dd HH:mm}  {a.Title}\n{a.Location??"Location not set"} · {a.Status}{(a.IsCurrent?"":" · Historical / review reports")}",HeightRequest=80};
             open.Clicked+=async(_,_)=>await Navigation.PushAsync(ActivatorUtilities.CreateInstance<AssignmentPage>(services,a));

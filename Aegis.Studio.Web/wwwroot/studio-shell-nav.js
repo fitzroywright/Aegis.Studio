@@ -10,7 +10,7 @@
         ['pipeline', 'Pipeline', '⇥'],
         ['production', 'Production', '◆'],
         ['frontdesk', 'Front Desk', '▣'],
-        ['customers', 'Clients', '♧'],
+        ['clients', 'Clients', '♧'],
         ['finance', 'Finance', '$'],
         ['messages', 'Messages', '✉']
     ];
@@ -31,7 +31,7 @@
         today: 'Review your jobs, upcoming sessions and items needing attention.',
         jobs: 'Find, filter and manage jobs across Studio workspaces.',
         workspaces: 'Manage workspace jobs, messaging, media and activity.',
-        customers: 'Manage client jobs, galleries, statements and activity.',
+        clients: 'Manage client jobs, galleries, statements and activity.',
         frontdesk: 'Review client inquiries, prepare bookings and manage arrivals.',
         messages: 'Read, reply to and organize conversations with clients and colleagues.',
         media: 'Upload, review and organize images by workspace, job and collection.',
@@ -107,7 +107,7 @@
                 <div class="mw-today-rail-links">
                     <button type="button" data-studio-side="today"><span>⌂</span><span>Today</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
-                    <button type="button" data-studio-side="customers"><span>♧</span><span>Clients</span></button>
+                    <button type="button" data-studio-side="clients"><span>♧</span><span>Clients</span></button>
                     <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
@@ -119,7 +119,7 @@
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
-                    ${actionItems}${document.body.dataset.studioView==='customers'?'<button type="button" data-customers-new><span>＋</span><span>New Client</span></button>':''}${financialActions}${document.body.dataset.studioView==='frontdesk'?'<button type="button" data-studio-new-customer><span>＋</span><span>New Client</span></button><button type="button" data-studio-close-register><span>▤</span><span>Close Register</span></button>':''}
+                    ${actionItems}${document.body.dataset.studioView==='clients'?'<button type="button" data-clients-new><span>＋</span><span>New Client</span></button>':''}${financialActions}${document.body.dataset.studioView==='frontdesk'?'<button type="button" data-studio-new-client><span>＋</span><span>New Client</span></button><button type="button" data-studio-close-register><span>▤</span><span>Close Register</span></button>':''}
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card" data-rail-card="workspaces">
@@ -128,11 +128,11 @@
             </section>
 `;
         rail.querySelector('[data-studio-close-register]')?.addEventListener('click',()=>launchFrontDeskPos('CloseRegister').catch(error=>alert(error.message)));
-        rail.querySelector('[data-studio-new-customer]')?.addEventListener('click',()=>showFrontDeskClients(true).catch(error=>alert(error.message)));
+        rail.querySelector('[data-studio-new-client]')?.addEventListener('click',()=>showFrontDeskClients(true).catch(error=>alert(error.message)));
         rail.querySelectorAll('[data-studio-financial-action]').forEach(button=>button.onclick=()=>pickFrontDeskFinancialAction(button.dataset.studioFinancialAction).catch(error=>alert(error.message)));
         rail.querySelector('[data-studio-view-all-workspaces]')?.addEventListener('click',()=>window.studioNavigate?.('workspaces'));
-        rail.querySelector('[data-studio-new-booking]')?.addEventListener('click',()=>document.body.dataset.studioView==='customers'?window.StudioCustomers?.newBooking():window.studioLaunchNewBooking?.());
-        rail.querySelector('[data-customers-new]')?.addEventListener('click',()=>window.StudioCustomers?.newCustomer());
+        rail.querySelector('[data-studio-new-booking]')?.addEventListener('click',()=>document.body.dataset.studioView==='clients'?window.StudioClients?.newBooking():window.studioLaunchNewBooking?.());
+        rail.querySelector('[data-clients-new]')?.addEventListener('click',()=>window.StudioClients?.newClient());
         rail.querySelector('[data-studio-assign-job-lead]')?.addEventListener('click',()=>document.getElementById('genericView')?.dispatchEvent(new CustomEvent('studio-assign-job-lead')));
         rail.querySelectorAll('[data-job-action]').forEach(button => button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
         rail.querySelectorAll('[data-studio-side]').forEach(button => {

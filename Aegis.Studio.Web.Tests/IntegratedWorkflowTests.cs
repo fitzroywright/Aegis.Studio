@@ -211,7 +211,7 @@ public sealed class IntegratedWorkflowTests
         Assert.Single(job.FinancialEvents!,e=>e.Id==sale.Id);
         Assert.Equal(7500m,job.FinancialEvents!.Where(e=>e.Kind=="Charge").Sum(e=>e.Amount)-job.FinancialEvents!.Where(e=>e.Kind is "Payment" or "Refund").Sum(e=>e.Amount));
         var operation=Guid.NewGuid();
-        var refund=new RefundStudioSaleRequest([new(sale.Lines.Single().Id,2500m,1)],[new(TenderKind.Cash,2500m,"Refund")],"Customer cancelled",operation);
+        var refund=new RefundStudioSaleRequest([new(sale.Lines.Single().Id,2500m,1)],[new(TenderKind.Cash,2500m,"Refund")],"Client cancelled",operation);
         pos.Refund(sale.Id,refund,studio,"Cashier");pos.Refund(sale.Id,refund,studio,"Cashier");
         job=studio.GetJob(context.Job)!;
         Assert.Single(job.FinancialEvents!,e=>e.Id==operation);

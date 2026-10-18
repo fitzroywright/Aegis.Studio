@@ -60,7 +60,7 @@ function renderShootRow(shoot,canManage=true) {
 }
 
 function renderActivityRow(activity) {
-    const eligible=!activity.workflowEligibility||['Available','InProgress','Blocked','WaitingOnCustomer','Partial','Failed','ReworkRequired','ReprintRequired','ReadyForDelivery'].includes(activity.workflowEligibility);
+    const eligible=!activity.workflowEligibility||['Available','InProgress','Blocked','WaitingOnClient','Partial','Failed','ReworkRequired','ReprintRequired','ReadyForDelivery'].includes(activity.workflowEligibility);
     const disabled=eligible?'':'disabled';
     const job = operationalJobs.get(activity.jobId);
     return `<div class="job-row"><div><b>${esc(activity.activityType)} · ${esc(activity.title)}</b><div class="meta">${esc(job?.title || 'Job')} · ${esc(activity.assignedTo ? studioFirstName(activity.assignedTo) : 'Unassigned')} · ${esc(activity.priority)} · ${esc(activity.workflowEligibility||activity.status)}${activity.dueAtUtc ? ' · due '+new Date(activity.dueAtUtc).toLocaleString() : ''}${activity.blockedReason ? ' · '+esc(activity.blockedReason) : ''}</div></div><div class="job-actions"><button class="action" ${disabled} onclick="setOperationalActivityStatus('${activity.id}','InProgress')">Start</button><button class="action" onclick="blockOperationalActivity('${activity.id}')">Block</button><button class="action" ${disabled} onclick="setOperationalActivityStatus('${activity.id}','Completed')">Complete</button><button class="action" onclick="openJobOperations('${activity.jobId}')">Job</button></div></div>`;

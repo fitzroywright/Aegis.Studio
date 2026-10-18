@@ -5,7 +5,7 @@ Updated: 2026-09-19
 ## Baseline inspection
 - COMPLETE — Existing Aegis.Studio solution inspected.
 - COMPLETE — Existing MAUI Aegis.Studio.Photographer client identified as an online-only precursor.
-- COMPLETE — Existing customer/booking/job/workspace/gallery/storage/messaging/notification/auth/authorization/scheduling infrastructure reused.
+- COMPLETE — Existing client/booking/job/workspace/gallery/storage/messaging/notification/auth/authorization/scheduling infrastructure reused.
 - COMPLETE — Existing authoritative Studio PostgreSQL database retained.
 - COMPLETE — Pre-existing build/test baseline recorded independently.
 
@@ -31,7 +31,7 @@ Updated: 2026-09-19
 
 ## Offline / synchronization
 - COMPLETE — Durable SQLite local store.
-- COMPLETE — Sensitive cached assignment/customer data, queued note text and precise location coordinates protected with AES-GCM key held in SecureStorage.
+- COMPLETE — Sensitive cached assignment/client data, queued note text and precise location coordinates protected with AES-GCM key held in SecureStorage.
 - COMPLETE — Local SQLite schema versioning and non-destructive migration from pre-release sensitive-field layout.
 - COMPLETE — Durable operation outbox with stable IDs.
 - COMPLETE — Retry/restart recovery.
@@ -51,7 +51,7 @@ Updated: 2026-09-19
 
 ## Messaging / galleries / notifications
 - COMPLETE — Existing Studio in-app messaging reused.
-- COMPLETE — Existing customer conversation reply path reused.
+- COMPLETE — Existing client conversation reply path reused.
 - COMPLETE — Workspace identity is selected by default.
 - COMPLETE — Reply as Myself appears only when existing SendAsSelf authorization and approved email identity allow it.
 - COMPLETE — Existing Studio outbound audit remains authoritative.

@@ -476,7 +476,7 @@ public static class WorkDayEndpoints
 
     private static WorkDayAssignment MapAssignment(ScheduleEntry e,StudioDatabase db,WorkDayStore store,string userName)
     {
-        string? customer=null,email=null,phone=null;
+        string? client=null,email=null,phone=null;
         Guid? workspace=null,conversation=null;
         if(e.BookingId is Guid bookingId)
         {
@@ -487,7 +487,7 @@ public static class WorkDayEndpoints
             using Npgsql.NpgsqlDataReader r=q.ExecuteReader();
             if(r.Read())
             {
-                customer=r.GetString(0);
+                client=r.GetString(0);
                 email=r.GetString(1);
                 phone=r.IsDBNull(2)?null:r.GetString(2);
                 workspace=r.GetGuid(3);
@@ -506,7 +506,7 @@ public static class WorkDayEndpoints
             q.CommandText="select workspace_id,conversation_id,client_name from studio_jobs where id=$1";
             q.Parameters.AddWithValue(jobId);
             using Npgsql.NpgsqlDataReader r=q.ExecuteReader();
-            if(r.Read()){workspace=r.GetGuid(0);conversation=r.GetGuid(1);customer=r.GetString(2);}
+            if(r.Read()){workspace=r.GetGuid(0);conversation=r.GetGuid(1);client=r.GetString(2);}
         }
 
         Guid? effectiveJobId=ResolveAssignmentJobId(e,db);
@@ -519,7 +519,7 @@ public static class WorkDayEndpoints
         var state=store.GetAssignmentState(e.Id,userName);
         return new(
             e.Id,effectiveJobId,e.BookingId,title,e.StartsAtUtc,e.EndsAtUtc,e.Location,
-            state?.Status??WorkDaySemantics.InitialStatus(e.Status),e.Notes,workspace,conversation,customer,email,phone,state?.Version??0);
+            state?.Status??WorkDaySemantics.InitialStatus(e.Status),e.Notes,workspace,conversation,client,email,phone,state?.Version??0);
     }
 
     private static WorkDayLocationTrackingMode ParseTrackingMode(string? value)=>

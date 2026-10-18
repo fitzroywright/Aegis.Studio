@@ -2,9 +2,9 @@
 
 ## Implemented in this change
 
-FrontDesk now has separate Booking requests, Enquiries, Active jobs, Delivery / balance, and Completed queues. Search updates only the rows, preserving keyboard focus. Pending requests contain the destination workspace, customer, event date, required deposit and recorded deposit total. Financial detail remains in FrontDesk.
+FrontDesk now has separate Booking requests, Enquiries, Active jobs, Delivery / balance, and Completed queues. Search updates only the rows, preserving keyboard focus. Pending requests contain the destination workspace, client, event date, required deposit and recorded deposit total. Financial detail remains in FrontDesk.
 
-Use **New booking request**, or **Prepare booking request** on an unassigned enquiry. Creating the request does not create a job or reserve a schedule slot. **Mark deposit requested** records that staff already contacted the customer; it sends no message. **Record verified deposit** records money staff have already received and checked; it does not charge a card or verify a gateway transaction. The current deposit ledger supports JMD.
+Use **New booking request**, or **Prepare booking request** on an unassigned enquiry. Creating the request does not create a job or reserve a schedule slot. **Mark deposit requested** records that staff already contacted the client; it sends no message. **Record verified deposit** records money staff have already received and checked; it does not charge a card or verify a gateway transaction. The current deposit ledger supports JMD.
 
 Partial deposits keep the request awaiting deposit. Once the threshold is met, one database transaction creates the conversation (or reuses the enquiry), job, internal handoff note and deposit financial events, and marks the request Confirmed. The job starts at **Needs Scheduling**. Same provider/reference/amount/currency retries return the existing result; conflicting reuse is rejected. Request row locks serialize different deposits; receipt locks serialize receipt replay across requests. After confirmation, further payments go through existing job Billing / POS. Promotion of a conversation with a pending request is blocked on the ordinary create-job endpoint.
 
@@ -21,7 +21,7 @@ Job pages retain the conversation and Gallery, Subjects, Tasks / Calendar, Activ
 | Pipeline → Needs Scheduling | New confirmed requests create jobs with that exact status, already included in the Pipeline board. |
 | Manager checks WorkDay availability and assigns photographer | New job scheduling action uses existing WorkDay availability records and conflict checks. The saved shoot reserves the photographer resource, updates the job and uses existing assignment access/notification code. |
 | Photographer sees work | My Work includes WorkDay bootstrap assignments; WorkDay already reads shared schedule/resource records. |
-| Customer confirmation | Existing schedule notifications are requested by the scheduling endpoint. Their actual delivery still depends on configured providers/preferences. This is not a Hub delivery guarantee. |
+| Client confirmation | Existing schedule notifications are requested by the scheduling endpoint. Their actual delivery still depends on configured providers/preferences. This is not a Hub delivery guarantee. |
 | Finish shoot → Awaiting Upload timer | Shoot checkout exists, and WorkDay has its own operation state. A unified finish-shoot event and durable upload-to-review timer remain pending. No fabricated elapsed timer is displayed. |
 | Upload → wedding collections → versions | Job gallery versions, source notes and named collections already work. WorkDay uploads currently enter conversation attachments; promoting these to curated job assets remains pending. |
 | Submit prepared versions for review → stop timer | A durable submission manifest containing exact version IDs, designated reviewers, timer stop and notification delivery remains pending. |

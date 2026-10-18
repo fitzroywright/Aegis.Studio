@@ -56,7 +56,7 @@ public class CommercialProductionTests
         var catalog=new PosCatalogStore(db);var product=catalog.Save(new("FRAME-8X10","Framed photograph","Frames",1000,EstimatedCost:300,RequiresProduction:true,WorkOrderTemplateId:original.Id));
         var jobTemplate=templates.Save(null,"Job",new("Printing Only","In-house framing",[new("review","Review order")],[new(product.Id,3,"8×10 / wood")]),0,true,"Admin");
         var bookingStore=new FrontDeskBookingRequestStore(db);bookingStore.EnsureSchema();
-        var booking=bookingStore.Create(new(context.Workspace,"Customer","client@example.test","Framed portraits",DateOnly.FromDateTime(DateTime.Today.AddDays(1)),0,"JMD",null,JobTemplateId:jobTemplate.Id),"Admin");
+        var booking=bookingStore.Create(new(context.Workspace,"Client","client@example.test","Framed portraits",DateOnly.FromDateTime(DateTime.Today.AddDays(1)),0,"JMD",null,JobTemplateId:jobTemplate.Id),"Admin");
         Guid job=booking.JobId!.Value;
         Assert.Equal(1,Scalar(c,"select count(*)::int from studio_job_activities where job_id=$1",job));
         templates.Save(jobTemplate.Id,"Job",jobTemplate.Definition with{Name="Changed future jobs",Steps=[new("future","Future task")]},jobTemplate.Version,true,"Admin");

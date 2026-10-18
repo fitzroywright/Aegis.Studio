@@ -324,7 +324,7 @@ internal static class DemoFullStudioData
         Execute(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'External',$4,now()-interval '2 days') on conflict(id) do update set body=excluded.body",
             Id(45,job.Number),conversation,client.Name,$"Request for {job.Type}. Please confirm schedule, package details and delivery timing.");
         Execute(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,'Bryans Studio','Internal',$3,now()-interval '1 day') on conflict(id) do update set body=excluded.body",
-            Id(46,job.Number),conversation,$"Team note: {job.Title} is currently {job.Status}. Confirm next action and customer communication.");
+            Id(46,job.Number),conversation,$"Team note: {job.Title} is currently {job.Status}. Confirm next action and client communication.");
         if(ordinal%3==0)
             Execute(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'External','Can you confirm the latest status and whether anything is needed from us?',now()-interval '4 hours') on conflict(id) do nothing",
                 Id(47,job.Number),conversation,client.Name);
@@ -383,9 +383,9 @@ internal static class DemoFullStudioData
         {
             string stage=stages[(ordinal+i)%stages.Length];
             string collection=job.Type=="Wedding"?new[]{"Ceremony","Portraits","Reception"}[i]:job.Type.Contains("Graduation")||job.Type.Contains("School")?new[]{"Roster","Stage","Groups"}[i]:job.Type.Contains("Corporate")||job.Type.Contains("Headshot")?new[]{"Executives","Team","Selects"}[i]:new[]{"Selects","Proofs","Finals"}[i];
-            string[] workStates=["NotStarted","InProgress","Blocked","WaitingOnCustomer","ReworkRequired","Partial","Failed","ReprintRequired","ReadyForDelivery","Completed","Archived"];
+            string[] workStates=["NotStarted","InProgress","Blocked","WaitingOnClient","ReworkRequired","Partial","Failed","ReprintRequired","ReadyForDelivery","Completed","Archived"];
             string status=job.Status=="Completed"?"Completed":workStates[(ordinal+i)%workStates.Length];
-            string? blocker=status is "Blocked" or "WaitingOnCustomer"?"Waiting on customer selection":status is "Failed" or "ReprintRequired"?"Output failed; check the printer and approve a reprint":status=="ReworkRequired"?"QC requested another retouch pass":null;
+            string? blocker=status is "Blocked" or "WaitingOnClient"?"Waiting on client selection":status is "Failed" or "ReprintRequired"?"Output failed; check the printer and approve a reprint":status=="ReworkRequired"?"QC requested another retouch pass":null;
             Execute(c,tx,"insert into studio_job_activities(id,job_id,activity_type,title,description,status,priority,assigned_to,scheduled_at_utc,due_at_utc,started_at_utc,completed_at_utc,location,blocked_reason,handoff_to,created_by,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,now()+($9 || ' hours')::interval,now()+($10 || ' days')::interval,$11,$12,$13,$14,null,'demo-seed',now(),now()) on conflict(id) do update set activity_type=excluded.activity_type,title=excluded.title,status=excluded.status,priority=excluded.priority,assigned_to=excluded.assigned_to,due_at_utc=excluded.due_at_utc,blocked_reason=excluded.blocked_reason,updated_at_utc=now()",
                 Id(53,job.Number*10+i),jobId,stage,$"{stage}: {job.Title}",$"Production work for {job.Type}",status,ordinal%7==0?"High":ordinal%4==0?"Low":"Normal",i==1?login:job.Photographer,(i*4).ToString(),(job.DayOffset+i+1).ToString(),
                 status=="InProgress"?DateTimeOffset.UtcNow:DBNull.Value,status=="Completed"?DateTimeOffset.UtcNow.AddHours(-2):DBNull.Value,job.Location,(object?)blocker??DBNull.Value);

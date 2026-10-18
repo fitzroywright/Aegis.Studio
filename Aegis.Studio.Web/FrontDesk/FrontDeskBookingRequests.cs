@@ -122,8 +122,8 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         {
             metadata["WhatsAppTemplateName"]=configuration["Messaging:WhatsApp:DepositTemplateName"]!;
             metadata["WhatsAppTemplateLanguage"]=configuration["Messaging:WhatsApp:DepositTemplateLanguage"]??"en_US";
-            metadata["WhatsAppTemplateParameters"]=(configuration["Messaging:WhatsApp:DepositTemplateParameters"]??"{customer}|{job}|{amount}|{reference}")
-                .Replace("{customer}",request.ClientName.Replace('|',' ')).Replace("{job}",request.Title.Replace('|',' ')).Replace("{amount}",$"{request.Currency} {request.RequiredDeposit:0.00}").Replace("{reference}",id.ToString("D"));
+            metadata["WhatsAppTemplateParameters"]=(configuration["Messaging:WhatsApp:DepositTemplateParameters"]??"{client}|{job}|{amount}|{reference}")
+                .Replace("{client}",request.ClientName.Replace('|',' ')).Replace("{job}",request.Title.Replace('|',' ')).Replace("{amount}",$"{request.Currency} {request.RequiredDeposit:0.00}").Replace("{reference}",id.ToString("D"));
         }
         Execute(c,tx,"insert into studio_outbound_email(id,conversation_id,from_address,to_address,subject,body,status,created_at_utc,kind,sent_by_user_name,sending_identity_type,delivery_channel,delivery_metadata) values($1,$2,$3,$4,$5,$6,'Pending',now(),'DepositRequest',$7,$8,$9,$10::jsonb)",message,conversation,channel=="Email"?from!:"Configured WhatsApp provider",recipient,"Deposit request — "+request.Title,body,actor,channel=="Email"?"Workspace":"Provider",channel,JsonSerializer.Serialize(metadata));
         Execute(c,tx,"update studio_frontdesk_requests set status='AwaitingDeposit',deposit_requested_at_utc=now(),deposit_message_id=$2 where id=$1",id,message);

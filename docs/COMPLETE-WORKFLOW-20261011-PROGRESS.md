@@ -26,7 +26,7 @@ All 364 text/source files inventoried; workflow, front desk, scheduling, mobile 
 
 ## Checkpoint 1
 
-Dedicated remote branch created. Authoritative brief and audit checkpoint saved. No implementation merged or deployed. No database/customer/payment data modified.
+Dedicated remote branch created. Authoritative brief and audit checkpoint saved. No implementation merged or deployed. No database/client/payment data modified.
 
 Build environment: no preinstalled .NET SDK; attempting local SDK installation. Common sibling dependencies are not present. MAUI mobile/platform tools and physical devices are not available. Existing historical reports do not establish current acceptance.
 
@@ -49,7 +49,7 @@ Remaining / not accepted: PostgreSQL integration tests (disposable server could 
 
 ## Checkpoint 3 — connected deposit requests and Operations decisions
 
-- Deposit-request action now transactionally inserts an email in the existing outbound queue and records the message ID. Repeat clicks reuse that message. It requires a configured Microsoft email channel, workspace sender identity, customer email and positive required deposit. Delivery-status endpoint/UI exposes queue state, attempts, failure and provider acceptance; never claims recipient delivery without a receipt. No live message was sent during implementation.
+- Deposit-request action now transactionally inserts an email in the existing outbound queue and records the message ID. Repeat clicks reuse that message. It requires a configured Microsoft email channel, workspace sender identity, client email and positive required deposit. Delivery-status endpoint/UI exposes queue state, attempts, failure and provider acceptance; never claims recipient delivery without a receipt. No live message was sent during implementation.
 - Added a dedicated Operations Management page using StudioPage/Today structure, permission-gated navigation, pending override decisions, history, unassigned/overdue/blocked work and direct Job links. Front Desk requests overrides from Pending Job Details. Only an Operations Manager other than the requester may decide. Decisions record actor/reason/time; approval does not record payment or automatically confirm. Confirmation checks either the required deposit or an approved override covering the current required amount.
 - Job Details now displays photographer reporting history and booking decision history. Reopening button follows the same Operations authorization as the server.
 - WorkDay device tokens take precedence over lingering login cookies and fail closed when invalid; they cannot become general Studio/production/upload sessions. Added eight boundary tests. Offline cache account enrollment is bound to one server/account; revoked credentials do not silently fall back to online authentication. Existing queued data is preserved.
@@ -67,7 +67,7 @@ Final native Web/Core suite: **216 passed, 13 database tests skipped, 0 failed**
 ## Resumed implementation — Finance and production boundaries
 
 - Added explicit Finance Manager and Production Manager operational roles (including directory-group resolution). Finance authorization is independent of Operations override and administrator-wide billing access.
-- Added auditable JMD final-release authorization with amount, customer snapshot, terms, due date, contract reference, approver and revocation. It preserves actual financial events and receivables, including operationally completed Jobs.
+- Added auditable JMD final-release authorization with amount, client snapshot, terms, due date, contract reference, approver and revocation. It preserves actual financial events and receivables, including operationally completed Jobs.
 - Delivery and Front Desk fulfillment now use the connected workflow and require actual settlement or sufficient Finance authorization. Front Desk records delivery; Job closure remains a separate workflow decision.
 - Production task dispatch/reassignment and final technical approval require Production Manager authority. Job Owner can report progress only on assigned production work. Existing media assignment changes also check the explicit role.
 - Legacy workspace gallery public endpoints now serve reduced, visibly watermarked proofs only. Those galleries lack a pinned Job approval/receivable identity; their originals cannot safely qualify for final release. Job-scoped V1 final delivery is the next implementation step.
@@ -76,7 +76,7 @@ Final native Web/Core suite: **216 passed, 13 database tests skipped, 0 failed**
 ## Resumed implementation — Public V1, webhooks and reference website
 
 - Implemented signed/scoped V1 booking submission/status and idempotency on existing Pending Job intake.
-- Added Job-scoped published-version gallery pages, watermarked proofs, customer selections/submission and server-gated final attachments. Existing client access issues a reusable V1 customer capability; no private storage URL is exposed.
+- Added Job-scoped published-version gallery pages, watermarked proofs, client selections/submission and server-gated final attachments. Existing client access issues a reusable V1 client capability; no private storage URL is exposed.
 - Added OpenAPI and frozen compatibility baseline; standardized V1 errors, bounded JSON, pagination and persisted public rate limits.
 - Added durable webhook event/delivery tables, transaction-time booking/publication events, Finance-aware availability scan, HTTPS HMAC delivery with leases and bounded retries. Operations can see endpoint acceptance/retry history.
 - Added reference website/BFF using only V1 and durable signed webhook receiver with duplicate suppression. Node tests verify proxy route restrictions, server-only secrets/signatures and duplicate receipt handling.
@@ -107,7 +107,7 @@ User direction: builds and test execution will occur locally. No builds or tests
 
 ## Resumed checkpoint: delivery channels and actual upload receipts
 
-- Added configured WhatsApp deposit requests through the existing messaging transport, explicit international destination validation, recorded delivery channel/template metadata, and durable leased delivery claims. Email uses the recorded workspace/person sender. Provider acceptance remains distinct from customer delivery confirmation.
+- Added configured WhatsApp deposit requests through the existing messaging transport, explicit international destination validation, recorded delivery channel/template metadata, and durable leased delivery claims. Email uses the recorded workspace/person sender. Provider acceptance remains distinct from client delivery confirmation.
 - Added upload declarations with stable batch/file IDs and per-file receipts committed with immutable version metadata. Retried identical bytes reuse the receipt; changed bytes cannot reuse an ID. Unmatched editing returns remain visible until resolved.
 - Add / Upload declares files before sending, retains original IDs for retries, and offers resume of interrupted batches by reselecting the original files. Upload classification no longer clears an existing production assignee.
 - Session upload verification derives counts from stored receipts instead of accepting typed counts. Source submission blocks unresolved declared uploads and requires actual batch backup verification. Photographer readiness checks that photographer's session receipts.

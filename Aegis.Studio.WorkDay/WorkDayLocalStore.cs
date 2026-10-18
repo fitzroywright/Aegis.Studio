@@ -16,9 +16,9 @@ public sealed class LocalAssignment
     public string? Location { get; set; }
     public string Status { get; set; }="";
     public string? Instructions { get; set; }
-    public string? CustomerName { get; set; }
-    public string? CustomerEmail { get; set; }
-    public string? CustomerPhone { get; set; }
+    public string? ClientName { get; set; }
+    public string? ClientEmail { get; set; }
+    public string? ClientPhone { get; set; }
     public bool IsCurrent { get; set; }=true;
     [Ignore] public string? FieldTargetsJson { get; set; }
     public string? FieldTargetsCiphertext { get; set; }
@@ -287,8 +287,8 @@ public sealed class WorkDayLocalStore
                 Id=value.Id,JobId=value.JobId,BookingId=value.BookingId,WorkspaceId=value.WorkspaceId,ConversationId=value.ConversationId,
                 Title=await protector.ProtectAsync(value.Title)??"",StartsAtUtc=value.StartsAtUtc,EndsAtUtc=value.EndsAtUtc,
                 Location=await protector.ProtectAsync(value.Location),Status=value.Status,Instructions=await protector.ProtectAsync(value.Instructions),
-                CustomerName=await protector.ProtectAsync(value.CustomerName),CustomerEmail=await protector.ProtectAsync(value.CustomerEmail),
-                FieldTargetsCiphertext=await protector.ProtectAsync(value.FieldTargetsJson),CustomerPhone=await protector.ProtectAsync(value.CustomerPhone),IsCurrent=value.IsCurrent,Version=value.Version,CachedAtUtc=value.CachedAtUtc
+                ClientName=await protector.ProtectAsync(value.ClientName),ClientEmail=await protector.ProtectAsync(value.ClientEmail),
+                FieldTargetsCiphertext=await protector.ProtectAsync(value.FieldTargetsJson),ClientPhone=await protector.ProtectAsync(value.ClientPhone),IsCurrent=value.IsCurrent,Version=value.Version,CachedAtUtc=value.CachedAtUtc
             };
             prepared.Add(v);
         }
@@ -482,8 +482,8 @@ public sealed class WorkDayLocalStore
         v.Title=await protector.UnprotectAsync(v.Title)??"";
         v.Location=await protector.UnprotectAsync(v.Location);
         v.Instructions=await protector.UnprotectAsync(v.Instructions);
-        v.CustomerName=await protector.UnprotectAsync(v.CustomerName);
-        v.CustomerEmail=await protector.UnprotectAsync(v.CustomerEmail);
-        v.CustomerPhone=await protector.UnprotectAsync(v.CustomerPhone);
+        v.ClientName=await protector.UnprotectAsync(v.ClientName);
+        v.ClientEmail=await protector.UnprotectAsync(v.ClientEmail);
+        v.ClientPhone=await protector.UnprotectAsync(v.ClientPhone);
     }
 }

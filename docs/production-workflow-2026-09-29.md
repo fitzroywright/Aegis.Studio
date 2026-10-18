@@ -5,7 +5,7 @@
 | Area | Existing implementation reused | Changes |
 |---|---|---|
 | Workspace | WorkspaceStore, WorkspaceAccessService, existing member editor | Settings dialog, icon/accent/archive controls, contextual avatars; permanent workspace navigation retained |
-| Job conversation | Existing thread and customer conversation endpoints | Reply identity preserved; email-only Files card supports selection, preview and download; right inset retained |
+| Job conversation | Existing thread and client conversation endpoints | Reply identity preserved; email-only Files card supports selection, preview and download; right inset retained |
 | Media | StudioVersionStore, WorkspaceJobStore subjects/collection labels | One production gallery per job, immutable asset IDs, Images/Subjects/Collections lenses, settings/default lens, multiple subject associations, status and metadata |
 | Import | Existing immutable local version storage | CSV roster upsert by job-scoped Subject ID; custom columns retained; file/folder picker and drag/drop dialog |
 | External editing | Existing immutable version history | Bulk ZIP exports, retained manifests, JPEG XMP export identity, duplicate-return protection, stale/unrecognized return queue and explicit matching |
@@ -23,7 +23,7 @@ Startup applies additive, idempotent PostgreSQL schema changes. Existing connect
 - `studio_media_migrations` records the media schema version. New gallery, asset, subject association, editing batch/item, return and unmatched tables augment the existing version store.
 - Existing subjects gain gallery, production state and custom attributes. Existing asset keys are mapped to stable asset IDs on first access. Versions/files are not replaced.
 - Workspace icon/accent columns are additive. The default accent preserves the existing workspace color bands.
-- `studio_clients` and nullable `studio_jobs.client_id` preserve legacy customer name snapshots. Historical clients are not guessed or merged by name/email.
+- `studio_clients` and nullable `studio_jobs.client_id` preserve legacy client name snapshots. Historical clients are not guessed or merged by name/email.
 - `studio_account_invoice_jobs` backfills existing single-job invoices; combined invoices require all jobs to share the same linked client.
 - `studio_client_quotes` retains estimate payloads, acceptance references, notification IDs and pending-booking links.
 - Version metadata and production workflow updates enlist in one database transaction. Stored file bytes remain immutable.
@@ -47,7 +47,7 @@ New routes require authentication. Media reads use ViewAttachments; production m
 - Automatic embedded identity currently supports JPEG XMP. Other formats or stripped metadata require explicit matching. Filenames never determine asset identity. No Lightroom/Photoshop plugin is claimed.
 - CSV is supported; native XLSX import is not. Export is limited to 200 files / 500 MB, uploads to 100 MB per file. Bulk uploads are queued sequentially by the browser.
 - One gallery per job is exposed. Collections reuse existing logical labels; subjects are independent and many-to-many with assets. Capture time is editable UTC metadata; automatic EXIF capture-time extraction is not implemented.
-- Quote sending requires the existing Common.Messaging email provider to be configured. Queued is not Delivered; actual delivery status/errors are shown. Live customer email delivery was not exercised.
+- Quote sending requires the existing Common.Messaging email provider to be configured. Queued is not Delivered; actual delivery status/errors are shown. Live client email delivery was not exercised.
 - Existing public booking/Hub, curated publishing, accounting and production-dispatch integrations are preserved; this change does not certify their full live external lifecycle. Media states do not automatically dispatch physical production or publish client galleries.
 - The Activity flyout uses the existing operational audit stream. It is not a complete merged archive of every messaging provider event.
 

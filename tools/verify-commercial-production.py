@@ -44,7 +44,7 @@ try:
  template=ok('/api/admin/commercial/templates/WorkOrder',{'definition':{'name':'Acceptance frame','description':'Print frame and inspect','steps':[{'key':'print','title':'Print frame','activityType':'Print','area':'Printing'},{'key':'qc','title':'Inspect frame','activityType':'QC','area':'Quality Control','dependsOn':['print'],'qualityControl':True}]}})
  product=ok('/api/admin/pos/catalog/',{'code':'ACCEPT-FRAME','name':'Acceptance frame','category':'Frames','unitPrice':100,'estimatedCost':30,'requiresProduction':True,'workOrderTemplateId':template['id']})
  jobtemplate=ok('/api/admin/commercial/templates/Job',{'definition':{'name':'Acceptance printing','description':'In house','steps':[{'key':'review','title':'Review order'}],'products':[{'catalogItemId':product['id'],'quantity':3,'specifications':'8x10 wood'}]}})
- booking=ok('/api/frontdesk/booking-requests',{'workspaceId':workspace['id'],'clientName':'Acceptance Customer','clientEmail':'acceptance@example.test','title':'Three frames','eventDate':'2026-10-11','requiredDeposit':0,'currency':'JMD','notes':None,'jobTemplateId':jobtemplate['id']})
+ booking=ok('/api/frontdesk/booking-requests',{'workspaceId':workspace['id'],'clientName':'Acceptance Client','clientEmail':'acceptance@example.test','title':'Three frames','eventDate':'2026-10-11','requiredDeposit':0,'currency':'JMD','notes':None,'jobTemplateId':jobtemplate['id']})
  job=booking['jobId'];assert job
  launch=ok('/api/frontdesk/pos/launch',{'action':'NewSale','jobId':job});token=launch['token']
  import uuid
