@@ -16,7 +16,7 @@
    const ids=new Set(selected.map(a=>a.id)),selectedMap=new Map(selected.map(a=>[a.id,a]));
    const physical={ready:0,progress:0,waiting:0,unknown:0,awaitingQc:0,rework:0,refundedProduced:0},other={quantity:0},images={records:0};
    for(const item of data.items||[]){const a=selectedMap.get(item.activityId);if(!a)continue;
-    if(item.kind==='Physical outputs'){const b=bucket(a);physical.refundedProduced+=n(item.refundedProduced);if(b!=='complete'){if(b in physical)physical[b]+=n(item.remaining);physical.awaitingQc+=n(item.awaitingQc);physical.rework+=n(item.rework);}}
+    if(item.kind==='Physical outputs'){const b=bucket(a);physical.refundedProduced+=n(item.refundedProduced);if(b!=='complete'){if(b in physical)physical[b]+=n(item.remaining);}if(!closed.has(jobMap.get(a.jobId)?.status)&&a.status!=='Cancelled'&&a.status!=='Archived'){physical.awaitingQc+=n(item.awaitingQc);physical.rework+=n(item.rework);}}
     else if(item.kind==='Approved images/items')images.records+=n(item.itemRecords);else other.quantity+=n(item.quantity);
    }
    const orders=(data.orders||[]).filter(o=>o.activityIds?.some(id=>ids.has(id))),units=orders.reduce((sum,o)=>sum+n(o.quantity),0);

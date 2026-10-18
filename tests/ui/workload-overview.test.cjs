@@ -109,3 +109,25 @@ test('workflow dots use green ticks, amber executable work, red problems and gra
  host.querySelectorAll('[data-workflow-node]').forEach((b,i)=>assert.equal(b.dataset.flowTone,tones[i]));
  assert.equal(host.querySelector('[data-flow-tone=green] .jd-stage-light').textContent,'✓');
 });
+
+test('completed activities retain unresolved physical QC and rework without remaining production',t=>{
+ const w=setup(t),m=w.StudioWorkload.model({productionJobIds:['job'],activities:[task('printed','Completed')],items:[{activityId:'printed',kind:'Physical outputs',remaining:0,awaitingQc:5,rework:2}],orders:[]},[job]);
+ const summary=m.summary(m.activities);assert.equal(summary.physical.awaitingQc,5);assert.equal(summary.physical.rework,2);assert.equal(summary.physical.progress,0);
+});
+test('Operations staff bottlenecks count only selected staff activities',async t=>{
+ const w=setup(t);w.document.body.innerHTML='<main id="genericView"></main><div id="conversationView"></div>';Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),esc:w.StudioGraph.esc,studioFirstName:x=>x,requestAnimationFrame:fn=>w.setTimeout(fn,0),ResizeObserver:class{observe(){}disconnect(){}}});
+ for(const f of ['studio-message-card.js','studio-page.js','management.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+ const jobs=[{id:'job',status:'Active Production',title:'Job',workspaceId:'ws'}];
+ w.json=async u=>u==='/api/operations-management'?{jobs:[{jobId:'job',workspaceId:'ws',stage:'Active Production',owner:'lead',timing:{light:'green'}}],overrideRequests:[],canDecideOverrides:false}:u==='/api/jobs'?jobs:u==='/api/workspaces'?[{id:'ws',name:'Studio'}]:u==='/api/production/workload'?{activities:[task('alice','Blocked',{assignedTo:'alice',blockedReason:'Review'}),task('bob','Blocked',{assignedTo:'bob',blockedReason:'Review'})],items:[],orders:[] }:[];
+ await w.showOperationsManagement();const select=w.document.querySelector('[data-operations-assignee]');select.value='alice';select.dispatchEvent(new w.Event('change'));
+ assert.equal(w.document.querySelector('[data-bottleneck="Print"]').textContent,'Print: 1');
+ assert.equal(w.document.querySelector('[data-staff-workload="bob"]'),null);
+});
+
+test('Production QC filter retains completed activities with unresolved item QC',async t=>{
+ const w=setup(t);w.document.body.innerHTML='<main id="genericView"></main><div id="conversationView"></div><span id="studioFooterRate"></span>';Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),esc:w.StudioGraph.esc,studioFirstName:x=>x,alert:message=>{throw Error(message);}});w.requestAnimationFrame=fn=>w.setTimeout(fn,0);w.ResizeObserver=class{observe(){}disconnect(){}};for(const f of ['studio-message-card.js','studio-page.js','commercial.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+ const workload={jobs:[{...job,workspaceId:'w',workspaceName:'Weddings'}],productionJobIds:['job'],activities:[task('print','Completed',{assignedTo:'staff',productionArea:'Printing',workOrderId:'order'}),task('blocked','Blocked',{workOrderId:'blocked-order',productionArea:'Printing',blockedReason:'Approved source required'})],orders:[{id:'order',jobId:'job',quantity:30,activityIds:['print']},{id:'blocked-order',jobId:'job',quantity:12,activityIds:['blocked']}],items:[{activityId:'print',kind:'Physical outputs',awaitingQc:3,remaining:0}]};const requests=[];
+ w.json=async u=>{requests.push(u);if(u==='/api/production/workload')return workload;if(u.startsWith('/api/production/work-orders')){const ids=new URL(u,'https://studio.test').searchParams.get('orderIds').split(',');return workload.orders.filter(o=>ids.includes(o.id)).map(o=>({...o,product:'Prints',jobTitle:'Wedding',tasks:workload.activities.filter(a=>o.activityIds.includes(a.id))}));}throw Error(u);};
+ await w.showCatalogProduction();assert.equal(w.document.querySelectorAll('[data-order-row]').length,2);assert.match(w.genericView.textContent,/42 catalog ordered units across 2 work orders/);assert.match(w.genericView.textContent,/1 work orders have unknown partial output progress/);
+ const selector=w.document.querySelector('[data-workload-filter-select]');selector.value='qc';await selector.onchange({target:selector});await new Promise(r=>setTimeout(r,20));assert.equal(w.document.querySelectorAll('[data-order-row]').length,1);assert.ok(w.document.querySelector('[data-order-row="order"]'));assert.equal(w.studioWorkloadSelection.filter,'qc');assert.ok(requests.every(u=>!u.includes('/media')));assert.ok(requests.filter(u=>u.includes('orderIds=')).every(u=>u.includes('offset=0')));
+});
