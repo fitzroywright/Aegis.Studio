@@ -308,7 +308,7 @@ function mergeJobMessages(teamMessages, customerMessages) {
             const updateAge=()=>{
                 if(['Completed','Cancelled'].includes(workflow?.data?.stage)){header.querySelector('[data-stage-age]').textContent=workflow.data.stage;return;}
                 const start=Date.parse(workflow?.data?.enteredAt||'');
-                header.querySelector('[data-stage-age]').textContent=Number.isFinite(start)?'In stage: '+(window.StudioWorkflow?.elapsed?.(Math.max(0,(Date.now()-start)/3600000))||Math.floor(Math.max(0,Date.now()-start)/3600000)+' hours'):'Timing unavailable';
+                header.querySelector('[data-stage-age]').textContent=Number.isFinite(start)?(window.StudioWorkflow?.elapsed?.(Math.max(0,(Date.now()-start)/3600000))||Math.floor(Math.max(0,Date.now()-start)/3600000)+' hours'):'Timing unavailable';
             };
             const refreshWorkflow=async()=>{
                 try{
