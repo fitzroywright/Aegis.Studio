@@ -219,7 +219,7 @@ internal static class DemoFullStudioData
             report?.Invoke(new(32 + (int)(63 * (ordinal-1 + (double)i / count) / Jobs.Length), "Studio photographs", i, count, $"Job {ordinal}/{Jobs.Length}: {job.Title} — downloading and storing photo {i+1}/{count}."));
             string key=$"demo-full/{job.Number}/asset-{i+1:000}";
             Guid versionId=MediaId(64,job.Number,i);
-            // Large portrait jobs use different real source photos for every asset.
+            // Stable asset IDs and counts are independent of the smaller reviewed photograph set.
             // Revisions preserve the same photograph and stable asset identity.
             Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount)+i*32,null,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
             if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,SelectPhotoVariant(job,i%sourceCount)+i*32,original,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
@@ -291,9 +291,9 @@ internal static class DemoFullStudioData
            job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)||
            job.Type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||
            job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase))return null;
-        if(!IsPortraitCorpus(job))return DemoPortraitCatalogue.Url(asset);
+        if(!IsPortraitCorpus(job))return DemoPortraitCatalogue.Url(asset%DemoPortraitCatalogue.Photos.Count);
         int offset=job.Number switch{106=>0,301=>180,303=>300,401=>400,_=>641+Array.FindIndex(Jobs.Where(j=>IsPortraitCorpus(j)&&j.Number is not(106 or 301 or 303 or 401)).ToArray(),j=>j.Number==job.Number)*8};
-        return DemoPortraitCatalogue.Url(offset+asset);
+        return DemoPortraitCatalogue.Url((offset+asset)%DemoPortraitCatalogue.Photos.Count);
     }
 
     private static int PhysicalSourceCount(DemoJob job)
@@ -508,5 +508,6 @@ internal static class DemoFullStudioData
         command.ExecuteNonQuery();
     }
 }
+
 
 

@@ -52,3 +52,13 @@ test('client directory uses the canonical route and stored client identity',asyn
  assert.ok(fixture.calls.some(c=>c.url==='/api/frontdesk/clients'));
 });
 
+
+test('client and linked-job searches preserve caret and selection while typing',async t=>{
+ const {dom,w}=setup();t.after(()=>dom.window.close());await w.StudioClients.render({clientId:'a'});await settle();
+ for(const selector of ['[data-c-search]','[data-c-job-search]']){
+  let input=w.document.querySelector(selector);input.focus();input.value='andrea';input.setSelectionRange(3,3);input.dispatchEvent(new w.Event('input',{bubbles:true}));
+  input=w.document.querySelector(selector);assert.equal(w.document.activeElement,input);assert.equal(input.selectionStart,3);assert.equal(input.selectionEnd,3);
+  input.value='andXrea';input.setSelectionRange(4,4);input.dispatchEvent(new w.Event('input',{bubbles:true}));input=w.document.querySelector(selector);assert.equal(input.value,'andXrea');assert.equal(input.selectionStart,4);assert.equal(input.selectionEnd,4);
+  input.value='';input.setSelectionRange(0,0);input.dispatchEvent(new w.Event('input',{bubbles:true}));
+ }
+});

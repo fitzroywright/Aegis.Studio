@@ -78,12 +78,12 @@ public sealed class IntegratedWorkflowTests
         using var history=new NpgsqlCommand("select body from studio_job_note_revisions where note_id=$1 and revision=1",context.Connection);
         history.Parameters.AddWithValue(id);Assert.Equal(note.Body,history.ExecuteScalar());
     }
-    [Fact] public void PhotoCatalogueCannotFabricateScaleByRepeatingSources()
+    [Fact] public void PhotoCatalogueRetainsReviewedSourcesAndLicensing()
     {
         var photos=DemoPortraitCatalogue.Photos;
-        Assert.True(photos.Count>=700);
-        Assert.Equal(photos.Count,photos.Select(p=>p.SourceSha1).Distinct().Count());
-        Assert.All(photos,p=>{Assert.Equal("Public domain",p.License);Assert.StartsWith("https://",p.Url);Assert.StartsWith("https://commons.wikimedia.org/wiki/File:",p.Page);});
+        Assert.Equal(2,photos.Count);
+        Assert.Equal(photos.Count,photos.Select(p=>p.Url).Distinct().Count());
+        Assert.All(photos,p=>{Assert.Contains(p.License,new[]{"Public domain","CC0 1.0"});Assert.False(string.IsNullOrWhiteSpace(p.Credit));Assert.StartsWith("https://",p.Url);Assert.StartsWith("https://commons.wikimedia.org/wiki/File:",p.Page);});
         Assert.Throws<ArgumentOutOfRangeException>(()=>DemoPortraitCatalogue.Url(photos.Count));
     }
     [Fact] public void InvalidBulkAndQcInputsAreRejected()
@@ -275,6 +275,7 @@ public sealed class IntegratedWorkflowTests
     }
     private static void Sql(NpgsqlConnection c,string sql,params object[] values){using var cmd=new NpgsqlCommand(sql,c){CommandTimeout=120};if(values.Length>0&&sql.Contains(';')){foreach(string statement in sql.Split(';',StringSplitOptions.RemoveEmptyEntries))Sql(c,statement,values);return;}foreach(var value in values)cmd.Parameters.AddWithValue(value);cmd.ExecuteNonQuery();}
 }
+
 
 
 

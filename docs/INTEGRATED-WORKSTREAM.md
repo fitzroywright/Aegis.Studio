@@ -21,7 +21,7 @@ Built on main `cc881bc97040e2122d816a122f6b106ce8d7bea3` against the supplied Co
 
 ## Connected demo and photography
 
-The existing 27-Job universe remains shared across screens. New seeds use a catalogue of 747 distinct public-domain source files from Wikimedia Commons; title, file page, license and source SHA-1 are embedded in `Demo/portrait-catalogue.json`. Source URL/page/license are retained in storage metadata. Large libraries use a different real photograph for each asset; revisions retain that asset's photograph. No generated photographs were used. The portrait corpus illustrates fictional subjects, not the people named in the Job roster.
+The existing 27-Job universe remains shared across screens. Demo portrait sources are a reviewed, flag-free civilian sample from Wikimedia Commons. Title, file page, license and credit are embedded in `Demo/portrait-catalogue.json`. Source URL/page/license are retained in storage metadata. Large libraries retain their asset counts and stable identifiers while reusing the smaller source set; these asset counts do not represent distinct source photographs. Revisions retain the asset photograph. No generated photographs are used. The portrait sample illustrates fictional subjects, not the people named in the Job roster.
 
 Campion Graduation includes 327 subjects and 241 real photographs with traceable production/QC units. Jobs also show subjects awaiting capture, retakes, completed work and client handoff. The v7 additive upgrade links participating workspaces, pinned approval batches, actual POS sales/partial refunds and completed collection records. An approval example has v3 pinned before a later v4 upload. Older healthy v6 demo photos remain retained, including historically repeated photos, to preserve existing histories and edits; fresh loads use the expanded catalogue.
 
@@ -43,3 +43,4 @@ npm --prefix tests/ui test
 To include transactional tests locally, set `STUDIO_TEST_POSTGRES` to a disposable PostgreSQL test database before `dotnet test`; each test creates/drops its own schema. Never point it at an operational database.
 
 Your local runtime cycle still needs the real Studio configuration: directory sign-in/roles, storage permissions/provider, optional messaging/gallery/device adapters, live first-time photo downloads and visual inspection in your browser. No external delivery, payment-device or production-ingestion throughput result is claimed from the isolated tests.
+
