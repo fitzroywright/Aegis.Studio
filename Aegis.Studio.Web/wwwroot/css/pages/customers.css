@@ -39,7 +39,7 @@
 .customers-page .customer-directory-table th:nth-child(2){width:40%}
 .customers-page .customer-directory-table th:nth-child(3){width:26%}
 .customer-directory-table tr[data-c-id]{cursor:pointer}
-.customer-directory-table tr[data-c-id]:hover,.customer-directory-table tr[data-c-id]:focus-visible,.customer-directory-table tr.is-selected{background:var(--theme-surface-alt,#edf3f8);box-shadow:inset 3px 0 var(--theme-accent,#d97722);outline:0}
+.customer-directory-table tr[data-c-id]:hover,.customer-directory-table tr[data-c-id]:focus-visible{background:var(--theme-surface-alt,#edf3f8);box-shadow:inset 3px 0 var(--theme-accent,#d97722);outline:0}
 .customers-page .customer-jobs-table{min-width:600px}
 .customers-page .customer-jobs-table th:first-child{width:40%}
 .customers-page .customer-jobs-table th:nth-child(2){width:22%}
@@ -51,3 +51,8 @@
 .customer-column-search input{flex:1;min-width:0;width:100%;max-width:220px;height:23px;box-sizing:border-box;padding:2px 6px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:10px;font-weight:500}
 .customer-column-search input::placeholder{color:#e2ebf6;opacity:1}
 .customer-column-search input:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
+
+/* Keep the customer identity in the directory; selection persists beyond hover. */
+.customers-page .customer-directory-table tr.is-selected>td{background:color-mix(in srgb,var(--theme-accent,#d97722) 22%,var(--studio-control-surface,#fff));color:var(--studio-control-text,#233e57);font-weight:600}
+.customers-page .customer-directory-table tr.is-selected>td:first-child{box-shadow:inset 4px 0 var(--theme-accent,#d97722)}
+.customer-tabs .customer-edit-details{margin-left:auto;align-self:center;padding:6px 9px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;font-size:11px}
