@@ -186,3 +186,23 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 
 
 
+
+/* Compact job projection, independent of the full template designer. */
+.jd-compact-workflow{max-height:320px;overflow:auto;padding:6px;min-width:0}
+.jd-dot-levels{display:flex;align-items:flex-start;gap:10px;min-width:0;overflow:auto;padding:4px}
+.jd-dot-level{display:flex;flex-direction:column;gap:8px;flex:1;min-width:100px}
+.jd-dot-stage{min-width:0;text-align:center}.jd-dot-stage.is-expanded{min-width:260px;max-width:560px}
+.jd-workflow-dot{display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;border:0;background:transparent;color:inherit;padding:3px;cursor:pointer;font-size:11px}
+.jd-workflow-dot>span{display:grid;place-items:center;width:22px;height:22px;border:2px solid currentColor;border-radius:50%;font-weight:700}
+.jd-workflow-dot small{font-size:10px;line-height:1.3}.jd-workflow-dot strong{font-size:11px;overflow-wrap:anywhere}
+.jd-workflow-dot.completed{color:var(--success,#287749)}.jd-workflow-dot.inprogress,.jd-workflow-dot.available{color:var(--accent,#b75a13)}.jd-workflow-dot.blocked,.jd-workflow-dot.failed,.jd-workflow-dot.reworkrequired{color:var(--danger,#bf374a)}
+.jd-workflow-dot:focus-visible,.jd-dot-expansion button:focus-visible,.jd-dot-details button:focus-visible{outline:3px solid var(--focus,#d88719);outline-offset:2px}
+.jd-workflow-dot.is-component>span{width:17px;height:17px}.jd-dot-endpoints{display:flex;align-items:center;gap:6px;font-size:10px;white-space:nowrap}.jd-dot-dash{flex:1;border-top:2px dashed currentColor;opacity:.6}
+.jd-dot-expansion{padding:6px;border:1px solid currentColor;border-radius:6px;animation:jd-dot-reveal .18s ease-out}.jd-dot-expansion .jd-dot-levels{padding-top:9px}.jd-dot-details{text-align:left;padding:8px;border:1px solid currentColor;border-radius:6px}.jd-dot-details p,.jd-dot-key{font-size:11px;margin:4px 0}.jd-dot-key{opacity:.85}
+.jd-flow-summary:has(.jd-workflow-dot){align-items:flex-start;gap:4px;overflow:auto}.jd-flow-summary:has(.jd-workflow-dot)>li{min-width:85px;flex:1}.jd-flow-summary:has(.jd-workflow-dot)>li::before,.jd-flow-summary:has(.jd-workflow-dot)>li::after{display:none}
+@keyframes jd-dot-reveal{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.jd-dot-expansion{animation:none}}
+@media(max-width:800px){.jd-compact-workflow{max-height:360px}.jd-dot-level{min-width:85px}.jd-dot-stage.is-expanded{min-width:250px}.jd-flow-summary .jd-workflow-dot small{display:none}}
+body[data-theme="fluent-dark"] .jd-workflow-dot.completed{color:#82dda7}
+body[data-theme="fluent-dark"] .jd-workflow-dot.inprogress,body[data-theme="fluent-dark"] .jd-workflow-dot.available{color:#ffbd79}
+body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-dark"] .jd-workflow-dot.failed,body[data-theme="fluent-dark"] .jd-workflow-dot.reworkrequired{color:#ffa5b0}

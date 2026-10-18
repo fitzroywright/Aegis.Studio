@@ -41,5 +41,5 @@ window.StudioProductionPlanning=(()=>{
         function details(t){const{start,due}=interval(t),d=studioDialog(t.title,`<p><strong>${esc(t.order.jobTitle)}</strong> · ${esc(t.order.product)}</p><p>Area: ${esc(t.area||'Production')}<br>Assigned: ${esc(t.assignedTo||'Unassigned')}<br>Status: ${esc(t.status)}<br>Priority: ${esc(t.priority||'Normal')}</p><p>Scheduled start: ${esc(start?start.toLocaleString():'Not recorded')}<br>Due: ${esc(due?due.toLocaleString():'Not recorded')}</p><p>${esc(t.blockedReason||'No recorded blocker')}</p><button class="primary" data-pp-detail-order>Open existing work order</button>`);d.querySelector('[data-pp-detail-order]').onclick=()=>{d.close();openExisting(t.order).catch(e=>alert(e.message));};}
         paint();
     }
-    return{render,invalidate(){++revision;}};
+    return{render,setContext(context){for(const key of ['workspace','assignee','area'])if(Object.prototype.hasOwnProperty.call(context,key))state[key]=context[key]||'';state.offset=0;},invalidate(){++revision;}};
 })();

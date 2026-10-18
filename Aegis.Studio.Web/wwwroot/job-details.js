@@ -220,3 +220,74 @@
  }
  root.StudioJobDetails={workflow,phaseIndex,media};
 })(window);
+
+// Job-only compact projection. The template designer retains the complete editable canvas.
+(function(root){
+ 'use strict';
+ function compact(host,view,job,summaryHost,authority={}){
+  const esc=root.StudioGraph.esc,states=new Map(view.evaluation.nodes.map(n=>[n.id,n])),tasks=new Map(view.tasks.map(t=>[t.nodeId,t]));
+  let expanded=null,selected=null;
+  const terminal=new Set(['Completed','Skipped','Inactive']);
+  function leaves(node,id){return node.kind==='Subflow'&&node.subflow?node.subflow.nodes.flatMap(n=>leaves(n,id+'/'+n.id)):[{node,id}];}
+  function state(node,id){
+   if(node.kind!=='Subflow'){const evaluated=states.get(id),task=tasks.get(id);return evaluated?.status==='Blocked'&&['NotStarted','Scheduled'].includes(task?.status)&&task?.reason==='Waiting for active prerequisites'?'Pending':evaluated?.status||'Unknown';}
+   const children=leaves(node,id),work=children.filter(x=>x.node.kind==='Task'),end=node.subflow.nodes.find(n=>n.kind==='End');
+   if(children.every(x=>states.get(x.id)?.status==='Inactive'))return 'Inactive';
+   if(end&&states.get(id+'/'+end.id)?.status==='Completed'&&work.every(x=>terminal.has(states.get(x.id)?.status)))return 'Completed';
+   const values=work.map(x=>state(x.node,x.id));
+   if(values.some(s=>['InProgress','Partial','ReadyForDelivery'].includes(s)))return 'InProgress';
+   if(values.includes('Available'))return 'Available';
+   return values.some(s=>['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnCustomer'].includes(s))?'Blocked':'Pending';
+  }
+  function summary(node,id){
+   const work=leaves(node,id).filter(x=>x.node.kind==='Task'&&states.get(x.id)?.status!=='Inactive');
+   if(node.kind!=='Subflow')return state(node,id)+(tasks.get(id)?.optional?' · Optional':'');
+   const complete=work.filter(x=>['Completed','Skipped'].includes(states.get(x.id)?.status)).length;
+   const blockers=work.filter(x=>['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnCustomer'].includes(states.get(x.id)?.status));
+   return `${complete} of ${work.length} steps complete${blockers.length?' · '+blockers.length+' blocked / waiting':''}`;
+  }
+  function ranks(graph){
+   const rank=new Map(graph.nodes.map(n=>[n.id,0]));
+   // Definitions are server validated DAGs; ignore inactive connections in the job projection.
+   const edges=graph.edges.filter(e=>view.evaluation.edges[e.id]!=='Inactive');
+   for(let i=0;i<graph.nodes.length;i++){let changed=false;for(const e of edges)if(rank.has(e.from)&&rank.has(e.to)&&rank.get(e.to)<=rank.get(e.from)){rank.set(e.to,rank.get(e.from)+1);changed=true;}if(!changed)break;}
+   return rank;
+  }
+  function dot(node,id,small=false){
+   const status=state(node,id),icon=status==='Completed'?'✓':status==='Skipped'||status==='Inactive'?'–':status==='Available'?'▶':status==='InProgress'?'◉':status==='Blocked'||/Failed|Rework|Reprint|Waiting/.test(status)?'!':'○';
+   return `<button type="button" class="jd-workflow-dot ${small?'is-component':''} ${esc(status.toLowerCase())}" data-workflow-node="${esc(id)}" ${node.kind==='Subflow'?`aria-expanded="${expanded===id||expanded?.startsWith(id+'/')}"`:''} aria-label="${esc(node.label+': '+summary(node,id))}"><span aria-hidden="true">${icon}</span><strong>${esc(node.label)}</strong><small>${esc(summary(node,id))}</small></button>`;
+  }
+  function flow(graph,prefix='',small=false){
+   const model={nodes:graph.nodes.map(n=>({...n,id:prefix+n.id})),edges:graph.edges.map(e=>({...e,id:prefix+e.id,from:prefix+e.from,to:prefix+e.to}))},rank=ranks(model);
+   const nodes=graph.nodes.filter(n=>n.kind!=='Start'&&n.kind!=='End'&&state(n,prefix+n.id)!=='Inactive');
+   const levels=[...new Set(nodes.map(n=>rank.get(prefix+n.id)))].sort((a,b)=>a-b);
+   return `<div class="jd-dot-levels" aria-label="Workflow dependency groups; steps in a column may run in parallel">${levels.map(level=>`<div class="jd-dot-level">${nodes.filter(n=>rank.get(prefix+n.id)===level).map(n=>{
+    const id=prefix+n.id,open=n.kind==='Subflow'&&(expanded===id||expanded?.startsWith(id+'/'));
+    return `<section class="jd-dot-stage ${open?'is-expanded':''}">${dot(n,id,small)}${open?`<div class="jd-dot-expansion"><div class="jd-dot-endpoints"><span>○ Stage Start</span><span class="jd-dot-dash" aria-hidden="true"></span><span>${state(n,id)==='Completed'?'✓':'○'} Stage Complete</span></div>${flow(n.subflow,id+'/',true)}<button type="button" class="jd-link" data-workflow-collapse="${esc(id)}">Collapse ${esc(n.label)} ↑</button></div>`:''}</section>`;
+   }).join('')}</div>`).join('')}</div>`;
+  }
+  function find(graph,id,prefix=''){for(const n of graph.nodes){if(prefix+n.id===id)return n;if(n.subflow){const found=find(n.subflow,id,prefix+n.id+'/');if(found)return found;}}}
+  function draw(focus){
+   host.style.height='auto';host.classList.add('jd-compact-workflow');
+   host.innerHTML=flow(view.graph)+'<p class="jd-dot-key">✓ Complete · ◉ Active · ▶ Ready · ○ Pending · ! Blocked / waiting · – Skipped. Parallel steps share a column.</p><div data-workflow-details aria-live="polite"></div>';
+   host.querySelectorAll('[data-workflow-node]').forEach(button=>button.onclick=()=>{
+    const id=button.dataset.workflowNode,node=find(view.graph,id);
+    if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw(id);}else{selected=id;details(node,id);}
+   });
+   host.querySelectorAll('[data-workflow-collapse]').forEach(button=>button.onclick=()=>{const id=expanded;expanded=id.includes('/')?id.slice(0,id.lastIndexOf('/')):null;selected=null;draw(id);});
+   if(focus)[...host.querySelectorAll('[data-workflow-node]')].find(b=>b.dataset.workflowNode===focus)?.focus();
+   if(summaryHost){summaryHost.innerHTML=view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>`<li>${dot(n,n.id)}</li>`).join('');summaryHost.querySelectorAll('[data-workflow-node]').forEach(b=>b.onclick=()=>{const toggle=host.closest('.job-detail-heading')?.querySelector('[data-toggle-flow-details]');if(toggle?.getAttribute('aria-expanded')==='false')toggle.click();const target=[...host.querySelectorAll('[data-workflow-node]')].find(x=>x.dataset.workflowNode===b.dataset.workflowNode);target?.click();target?.focus();});}
+  }
+  function details(node,id){
+   const task=tasks.get(id),evaluation=states.get(id),reason=task?.reason||evaluation?.reason,next=root.StudioWorkflow?.nextAction?.(authority.data?authority:{...authority,data:{}}),canAssign=task&&!task.assignedTo&&(authority.canManage||authority.canReview);
+   const hostDetails=host.querySelector('[data-workflow-details]');
+   hostDetails.innerHTML=`<section class="jd-dot-details"><strong>${esc(node.label)} · ${esc(state(node,id))}</strong><p>${esc(reason||(['Available','Completed','Skipped'].includes(state(node,id))?'No outstanding prerequisite reported.':'No specific blocker recorded; review workflow requirements.'))}</p><p>Responsible: ${esc(task?.assignedTo||'Unassigned')}${task?.role?' · Team / role: '+esc(task.role):''}${task?.optional?' · Optional step':''}</p><p>Depends on: ${esc((task?.dependencyLabels||evaluation?.dependencies||[]).join(', ')||'Workflow start')}</p><button type="button" data-existing-task>Review requirements, assignment and available actions →</button>${canAssign?'<button type="button" data-step-assign>Assign responsible person →</button>':''}${next?.selector?`<button type="button" data-step-next>${esc(next.label)} →</button>`:''}<button type="button" class="jd-link" data-close-step>Close details</button></section>`;
+   hostDetails.querySelector('[data-existing-task]').onclick=()=>root.StudioJobGraph.open(job.id,task?.id).catch(e=>alert(e.message));
+   hostDetails.querySelector('[data-step-assign]')?.addEventListener('click',async()=>{try{const dialog=await root.StudioJobGraph.open(job.id,task.id);[...dialog.querySelectorAll('[data-assign]')].find(b=>b.dataset.assign===task.id)?.click();}catch(e){alert(e.message);}});
+   hostDetails.querySelector('[data-step-next]')?.addEventListener('click',()=>root.StudioWorkflow.open(job.id,next.selector).catch(e=>alert(e.message)));
+   hostDetails.querySelector('[data-close-step]').onclick=()=>{selected=null;hostDetails.innerHTML='';[...host.querySelectorAll('[data-workflow-node]')].find(b=>b.dataset.workflowNode===id)?.focus();};
+  }
+  draw();return {get expanded(){return expanded;},get selected(){return selected;}};
+ }
+ root.StudioJobDetails.compact=compact;
+})(window);

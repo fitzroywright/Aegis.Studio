@@ -63,9 +63,11 @@ public static class CommercialEndpoints
                 """, jobId);
             return Results.Content((string)q.ExecuteScalar()!, "application/json");
         }).RequireAuthorization();
-        app.MapGet("/api/production/work-orders", (string? area, Guid? jobId, int? offset, int? limit, bool? includeCompleted, ClaimsPrincipal user, JobAccessService access, StudioDatabase database) => Run(() =>
+        app.MapGet("/api/production/work-orders", (string? area, Guid? jobId, string? orderIds, int? offset, int? limit, bool? includeCompleted, ClaimsPrincipal user, JobAccessService access, StudioDatabase database) => Run(() =>
         {
             int take = Math.Clamp(limit ?? 50, 1, 100), skip = Math.Max(offset ?? 0, 0);
+            Guid[]? selected = orderIds is null ? null : orderIds.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(value => Guid.TryParse(value, out var id) ? id : throw new ArgumentException("Invalid work order ID.")).Take(51).ToArray();
+            if (selected?.Length > 50) throw new ArgumentException("Request at most 50 work orders at a time.");
             Guid[] allowed = access.GetAccessibleJobIds(user).Where(id => !jobId.HasValue || id == jobId).ToArray();
             using var c = database.OpenConnection(); using var q = Command(c, null, """
                 select coalesce(jsonb_agg(row),'[]')::text from (
@@ -79,10 +81,10 @@ public static class CommercialEndpoints
                        'qualityControl',a.quality_control_required,'optional',a.optional_step,'step',a.step_definition,'revision',j.workflow_revision) order by a.step_order)
                      from studio_job_activities a where a.work_order_id=w.id) as tasks
                   from studio_catalog_work_orders w join studio_jobs j on j.id=w.job_id
-                  where w.job_id=any($1) and ($5 or w.exception_reason is not null or exists(select 1 from studio_job_activities pending where pending.work_order_id=w.id and pending.status not in ('Completed','Cancelled'))) and ($2::text is null or exists(select 1 from studio_job_activities a where a.work_order_id=w.id and a.production_area=$2))
+                  where w.job_id=any($1) and ($6::uuid[] is null or w.id=any($6)) and ($5 or w.exception_reason is not null or exists(select 1 from studio_job_activities pending where pending.work_order_id=w.id and pending.status not in ('Completed','Cancelled'))) and ($2::text is null or exists(select 1 from studio_job_activities a where a.work_order_id=w.id and a.production_area=$2))
                   order by w.created_at,w.id limit $3 offset $4
                 ) row
-                """, allowed, string.IsNullOrWhiteSpace(area) ? null : area, take, skip, includeCompleted==true);
+                """, allowed, string.IsNullOrWhiteSpace(area) ? null : area, take, skip, includeCompleted==true, selected);
             return Results.Content((string)q.ExecuteScalar()!, "application/json");
         })).RequireAuthorization();
         app.MapGet("/api/jobs/{jobId:guid}/commercial/approved-sources",(Guid jobId,string? term,Guid? after,ClaimsPrincipal user,JobAccessService access,StudioDatabase database)=>
