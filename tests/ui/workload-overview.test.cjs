@@ -55,3 +55,18 @@ test('Operations separates delivery overdue, explainable concern and unknown dat
 test('a recorded due date, not a blank or invalid timestamp, is required to call work overdue',t=>{
  const w=setup(t),m=w.StudioWorkload.model({activities:[task('none'),task('invalid','NotStarted',{dueAtUtc:'not-a-date'}),task('cancelled','Cancelled',{dueAtUtc:'2000-01-01'})]},[job]);assert.ok(m.activities.every(a=>!m.overdue(a)));
 });
+
+test('main icons toggle drawer on second click and subflows place endpoint icons around component path',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),summary=w.document.getElementById('summary'),events=[];
+ host.addEventListener('studio-flow-details-toggle',e=>events.push(e.detail.open));
+ w.StudioJobDetails.compact(host,workflow(),job,summary);
+ summary.querySelector('[data-workflow-node="produce"]').click();
+ assert.equal(events.at(-1),true);
+ assert.equal(host.querySelectorAll('.jd-dot-subflow>.jd-subflow-endpoint').length,2);
+ assert.ok(host.querySelector('.jd-dot-subflow>.jd-dot-levels [data-workflow-node="produce/edit"]'));
+ summary.querySelector('[data-workflow-node="produce"]').click();
+ assert.equal(events.at(-1),false);assert.equal(host.querySelector('.jd-dot-subflow'),null);
+ summary.querySelector('[data-workflow-node="delivery"]').click();assert.equal(events.at(-1),true);
+ summary.querySelector('[data-workflow-node="delivery"]').click();assert.equal(events.at(-1),false);
+ assert.equal(host.querySelector('.jd-dot-details'),null);
+});
