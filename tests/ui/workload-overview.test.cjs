@@ -100,3 +100,12 @@ test('workflow labels are short while tooltips preserve full step descriptions',
  assert.match(button.title,/Quality control and final inspection/);
  assert.match(button.title,/Inspect colour and finish before packaging/);
 });
+
+test('workflow dots use green ticks, amber executable work, red problems and gray future tasks',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),statuses=['Completed','Available','InProgress','Partial','ReadyForDelivery','Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnCustomer','Pending','Scheduled','Unknown'];
+ const nodes=statuses.map((status,i)=>({id:'n'+i,label:status,kind:'Task'}));
+ w.StudioJobDetails.compact(host,{graph:{nodes,edges:[]},evaluation:{nodes:nodes.map((n,i)=>({id:n.id,status:statuses[i]})),edges:{}},tasks:[]},job);
+ const tones=['green','amber','amber','amber','amber','red','red','red','red','red','gray','gray','gray'];
+ host.querySelectorAll('[data-workflow-node]').forEach((b,i)=>assert.equal(b.dataset.flowTone,tones[i]));
+ assert.equal(host.querySelector('[data-flow-tone=green] .jd-stage-light').textContent,'✓');
+});

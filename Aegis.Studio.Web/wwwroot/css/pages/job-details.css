@@ -260,3 +260,10 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-flow-summary .jd-workflow-dot,.jd-dot-subflow .jd-workflow-dot{flex-direction:column;align-items:center;gap:5px}
 .jd-flow-summary .jd-workflow-dot strong,.jd-dot-subflow .jd-workflow-dot strong{white-space:nowrap;font-weight:500}
 @media(max-width:900px){.jd-flow-summary .jd-workflow-dot strong,.jd-dot-subflow .jd-workflow-dot strong{transform:rotate(18deg);transform-origin:top center}.jd-dot-subflow{padding-bottom:28px}.jd-flow-summary{padding-bottom:16px}}
+
+/* One status palette for main steps and subflow components. */
+.jd-workflow-dot[data-flow-tone]>.jd-stage-light{color:#fff}
+.jd-workflow-dot[data-flow-tone=green]>.jd-stage-light{background:#318348;border-color:#318348}
+.jd-workflow-dot[data-flow-tone=amber]>.jd-stage-light{background:#d99416;border-color:#d99416;color:#241a05}
+.jd-workflow-dot[data-flow-tone=red]>.jd-stage-light{background:#bd3040;border-color:#bd3040}
+.jd-workflow-dot[data-flow-tone=gray]>.jd-stage-light{background:#a4acb6;border-color:#a4acb6;color:#17202b}
