@@ -19,7 +19,7 @@ window.StudioProductionPlanning=(()=>{
         const tasks=new Map(activities.map(t=>[t.id,t])),jobMap=new Map(jobs.map(j=>[j.id,j]));
         const from=dayStart(state.anchor),to=addDays(from,state.days);
         const done=t=>['Completed','Cancelled'].includes(t.status);
-        function enrich(order){return(order.tasks||[]).map(t=>({...tasks.get(t.id),...t,scheduledAtUtc:tasks.get(t.id)?.scheduledAtUtc||null,jobId:order.jobId,order}));}
+        function enrich(order){return(order.tasks||[]).map(t=>({...tasks.get(t.id),...t,scheduledAtUtc:tasks.get(t.id)?.scheduledAtUtc||t.scheduledAtUtc||null,dueAtUtc:t.dueAtUtc||tasks.get(t.id)?.dueAtUtc||null,blockedReason:t.blockedReason||tasks.get(t.id)?.blockedReason||null,jobId:order.jobId,order}));}
         const allTasks=orders.flatMap(enrich);
         const assignees=[...new Set(allTasks.map(t=>t.assignedTo).filter(Boolean))].sort();
         function matches(t){const j=jobMap.get(t.jobId);return (!state.area||t.area===state.area)&&(!state.assignee||(state.assignee==='__unassigned'?!t.assignedTo:t.assignedTo===state.assignee))&&(!state.workspace||j?.workspaceId===state.workspace||(j?.participatingWorkspaceIds||[]).includes(state.workspace))&&(!state.search||[t.title,t.order.product,t.order.jobTitle,j?.clientName,t.assignedTo].join(' ').toLowerCase().includes(state.search.toLowerCase()))&&(state.includeCompleted||!done(t));}
