@@ -198,7 +198,7 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-workflow-dot.completed{color:var(--success,#287749)}.jd-workflow-dot.inprogress,.jd-workflow-dot.available{color:var(--accent,#b75a13)}.jd-workflow-dot.blocked,.jd-workflow-dot.failed,.jd-workflow-dot.reworkrequired{color:var(--danger,#bf374a)}
 .jd-workflow-dot:focus-visible,.jd-dot-expansion button:focus-visible,.jd-dot-details button:focus-visible{outline:3px solid var(--focus,#d88719);outline-offset:2px}
 .jd-workflow-dot.is-component>span{width:17px;height:17px}.jd-dot-endpoints{display:flex;align-items:center;gap:6px;font-size:10px;white-space:nowrap}.jd-dot-dash{flex:1;border-top:2px dashed currentColor;opacity:.6}
-.jd-dot-expansion{padding:6px;border:1px solid currentColor;border-radius:6px;animation:jd-dot-reveal .18s ease-out}.jd-dot-expansion .jd-dot-levels{padding-top:9px}.jd-dot-details{text-align:left;padding:8px;border:1px solid currentColor;border-radius:6px}.jd-dot-details p,.jd-dot-key{font-size:11px;margin:4px 0}.jd-dot-key{opacity:.85}
+.jd-dot-expansion{padding:6px;border:0;border-radius:0;animation:jd-dot-reveal .18s ease-out}.jd-dot-expansion .jd-dot-levels{padding-top:9px}.jd-dot-details{text-align:left;padding:8px;border:1px solid currentColor;border-radius:6px}.jd-dot-details p,.jd-dot-key{font-size:11px;margin:4px 0}.jd-dot-key{opacity:.85}
 .jd-flow-summary:has(.jd-workflow-dot){align-items:flex-start;gap:4px;overflow:auto}.jd-flow-summary:has(.jd-workflow-dot)>li{min-width:85px;flex:1}
 @keyframes jd-dot-reveal{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.jd-dot-expansion{animation:none}}
