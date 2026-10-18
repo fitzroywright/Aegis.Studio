@@ -26,7 +26,8 @@ public sealed class ClientReminderTests
         Run($"create schema {schema}; set local search_path to {schema};");
         Run(Fixture);
         using var input=typeof(ClientReminderStore).Assembly.GetManifestResourceStream("Aegis.Studio.Web.Reminders.ClientReminders.sql")!;
-        using var reader=new StreamReader(input);Run(reader.ReadToEnd());
+        using var reader=new StreamReader(input);string migration=reader.ReadToEnd();
+        Run(migration);Run(migration); // Startup must work on a fresh database and on restart.
         Run("""
           insert into studio_jobs values('11111111-1111-1111-1111-111111111111','Scheduled',now(),now(),null,'22222222-2222-2222-2222-222222222222','Portrait');
           insert into studio_conversations values('22222222-2222-2222-2222-222222222222','andrea@example.test');
@@ -66,3 +67,4 @@ public sealed class ClientReminderTests
       create table studio_conversations(id uuid,contact_address text);
       """;
 }
+
