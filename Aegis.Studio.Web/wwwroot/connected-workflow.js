@@ -36,6 +36,7 @@
  function nextAction(view){
   const d=view.data||{},active=!['Completed','Cancelled'].includes(d.stage);
   if(!active)return {label:'Review workflow',selector:null};
+  if(d.blockedReason)return {label:view.canManage?'Resolve blocker':'Job blocked',selector:view.canManage?'[data-wf-block]':null};
   const a=d.ownerAssignment,own=a&&String(d.owner||'').toLowerCase()===String(a.assigned_to||'').toLowerCase()&&String(a.assigned_to||'').toLowerCase()===String(view.userName||'').toLowerCase();
   if(a?.status==='Assigned')return own?{label:'Accept ownership',selector:'[data-wf-owner-response="accept-owner"]'}:{label:'Awaiting owner acceptance',selector:null};
   if(d.stage==='Pending')return {label:'Confirm booking',selector:view.canFrontDesk?'[data-wf-action="confirm"]':null};
@@ -184,5 +185,6 @@
  root.StudioWorkflow={nextAction,open,render,command,productionTask,canReportTask,elapsed,crewPayload,escape:esc};
  if(typeof module!=='undefined')module.exports=root.StudioWorkflow;
 })(typeof window!=='undefined'?window:globalThis);
+
 
 
