@@ -71,7 +71,7 @@
   const button=(attribute,label)=>`<button type="button" class="action" ${attribute}>${esc(label)}</button>`;
   const explanation=ownerStatus==='Assigned'?`Waiting for ${data.owner||'the assigned owner'} to accept responsibility.`:data.stage==='Pending'?'Confirm after the deposit requirement or an approved override is satisfied.':!data.owner||['Unassigned','Declined','Superseded'].includes(ownerStatus)?'Assign a Job Owner to move this job forward.':data.stage==='Needs Photographer Assignment'?'Choose the photography crew for this job.':data.stage==='Awaiting Scheduling'?'Set the session time and location.':['Scheduled','Photography In Progress'].includes(data.stage)?'Record attendance and progress for the assigned photography crew.':active?'Review the current work before advancing the job.':'This job is '+data.stage.toLowerCase()+'.';
   host.innerHTML=`<section class="workflow-panel">
-   <header class="workflow-heading"><span class="studio-status-pill">${esc(data.stage)}</span><small data-wf-clock data-start="${esc(data.enteredAt||'')}">Timing unavailable</small></header>
+   <button type="button" class="action" data-wf-reminders>Client reminders</button><header class="workflow-heading"><span class="studio-status-pill">${esc(data.stage)}</span><small data-wf-clock data-start="${esc(data.enteredAt||'')}">Timing unavailable</small></header>
    ${data.blockedReason?`<div class="workflow-blocker" role="status"><strong>Blocked</strong><span>${esc(data.blockedReason)}</span></div>`:''}
    <div class="workflow-next"><div><small>Next step</small><h3 data-wf-next-title>${esc(next.label)}</h3><p>${esc(explanation)}</p></div><div data-wf-next-action></div></div>
    <article class="workflow-owner"><div><small>Job Owner</small><strong>${esc(data.owner||'Unassigned')}</strong><span>${esc(ownerStatus)}</span></div><div class="workflow-actions">${ownAssignment&&ownerStatus==='Assigned'?button('data-wf-owner-response="accept-owner"','Accept ownership'):''}${view.canAssignOwner&&active?button('data-wf-owner',data.owner?'Reassign owner':'Assign owner'):''}</div></article>
@@ -101,6 +101,7 @@
   if(primary){primary.className='primary';primary.textContent=next.label;host.querySelector('[data-wf-next-action]').append(primary);host.querySelector('[data-wf-next-title]').hidden=true;}
   const clientSelections=host.querySelector('[data-wf-selections]');
   try{const selections=await send('/api/jobs/'+jobId+'/client-selections');if(!isCurrent())return;clientSelections.innerHTML=selections.map(s=>`<p>${esc(new Date(s.submittedAt).toLocaleString())} · ${(s.versionIds||[]).map(id=>`<a href="/api/jobs/${jobId}/versions/by-id/${esc(id)}/preview" target="_blank" rel="noopener">${esc(id)}</a>`).join(', ')}</p>`).join('')||'<p>No client selections submitted.</p>';}catch{clientSelections.textContent='Client selections unavailable. Refresh to retry.';}
+  host.querySelector('[data-wf-reminders]')?.addEventListener('click',()=>window.StudioClientReminders.open(jobId));
   const clock=host.querySelector('[data-wf-clock]');
   if(clock){
    const tick=()=>{
@@ -184,5 +185,6 @@
  root.StudioWorkflow={nextAction,open,render,command,productionTask,canReportTask,elapsed,crewPayload,escape:esc};
  if(typeof module!=='undefined')module.exports=root.StudioWorkflow;
 })(typeof window!=='undefined'?window:globalThis);
+
 
 
