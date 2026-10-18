@@ -46,3 +46,7 @@
 .customers-page .customer-jobs-table th:nth-child(3){width:20%}
 .customers-page .customer-jobs-table th:nth-child(4){width:18%}
 .customers-page .customer-right{gap:8px}
+
+.customer-column-search{display:flex;align-items:center;gap:10px;min-width:0}
+.customer-column-search input{flex:1;min-width:0;width:100%;max-width:220px;height:24px;box-sizing:border-box;padding:2px 7px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:4px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;font-weight:400}
+.customer-column-search input:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
