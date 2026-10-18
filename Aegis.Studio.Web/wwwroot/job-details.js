@@ -257,20 +257,23 @@
    const status=state(node,id),icon=status==='Completed'?'✓':status==='Skipped'||status==='Inactive'?'–':status==='Available'?'▶':status==='InProgress'?'◉':status==='Blocked'||/Failed|Rework|Reprint|Waiting/.test(status)?'!':'○';
    return `<button type="button" class="jd-workflow-dot ${small?'is-component':''} ${esc(status.toLowerCase())}" data-workflow-node="${esc(id)}" ${node.kind==='Subflow'?`aria-expanded="${expanded===id||expanded?.startsWith(id+'/')}"`:''} title="${esc(node.label+': '+summary(node,id)+(tasks.get(id)?' · Responsible: '+(tasks.get(id).assignedTo||'Unassigned')+(tasks.get(id).reason?' · '+tasks.get(id).reason:''):''))}" aria-label="${esc(node.label+': '+summary(node,id))}"><span class="jd-stage-light" aria-hidden="true">${icon}</span><strong>${esc(node.label)}</strong></button>`;
   }
+  function expansion(node,id){
+   return `<div class="jd-dot-subflow" role="group" aria-label="${esc(node.label)} subflow">${summaryHost?'':`<span class="jd-subflow-endpoint" title="Start of ${esc(node.label)}"><span class="jd-stage-light" aria-hidden="true">○</span><strong>Stage Start</strong></span>`}${flow(node.subflow,id+'/',true)}${summaryHost?'':`<span class="jd-subflow-endpoint" title="${esc(node.label)}: ${esc(state(node,id))}"><span class="jd-stage-light" aria-hidden="true">${state(node,id)==='Completed'?'✓':'○'}</span><strong>Stage Complete</strong></span>`}</div>`;
+  }
   function flow(graph,prefix='',small=false){
    const model={nodes:graph.nodes.map(n=>({...n,id:prefix+n.id})),edges:graph.edges.map(e=>({...e,id:prefix+e.id,from:prefix+e.from,to:prefix+e.to}))},rank=ranks(model);
    const nodes=graph.nodes.filter(n=>n.kind!=='Start'&&n.kind!=='End'&&state(n,prefix+n.id)!=='Inactive');
    const levels=[...new Set(nodes.map(n=>rank.get(prefix+n.id)))].sort((a,b)=>a-b);
    return `<div class="jd-dot-levels" aria-label="Workflow dependency groups; steps in a column may run in parallel">${levels.map(level=>`<div class="jd-dot-level">${nodes.filter(n=>rank.get(prefix+n.id)===level).map(n=>{
     const id=prefix+n.id,open=n.kind==='Subflow'&&(expanded===id||expanded?.startsWith(id+'/'));
-    return `<section class="jd-dot-stage ${open?'is-expanded':''}">${dot(n,id,small)}${open?`<div class="jd-dot-expansion"><div class="jd-dot-endpoints"><span>○ Stage Start</span><span class="jd-dot-dash" aria-hidden="true"></span><span>${state(n,id)==='Completed'?'✓':'○'} Stage Complete</span></div>${flow(n.subflow,id+'/',true)}<button type="button" class="jd-link" data-workflow-collapse="${esc(id)}">Collapse ${esc(n.label)} ↑</button></div>`:''}</section>`;
+    return `<section class="jd-dot-stage ${open?'is-expanded':''}">${dot(n,id,small)}${open?`<div class="jd-dot-expansion">${expansion(n,id)}<button type="button" class="jd-link" data-workflow-collapse="${esc(id)}">Collapse ${esc(n.label)} ↑</button></div>`:''}</section>`;
    }).join('')}</div>`).join('')}</div>`;
   }
   function find(graph,id,prefix=''){for(const n of graph.nodes){if(prefix+n.id===id)return n;if(n.subflow){const found=find(n.subflow,id,prefix+n.id+'/');if(found)return found;}}}
   function draw(focus){
    host.style.height='auto';host.classList.add('jd-compact-workflow');
    const expandedNode=expanded?find(view.graph,expanded):null;
-   const content=summaryHost?(expandedNode?`<section class="jd-dot-stage is-expanded"><h3>${esc(expandedNode.label)}</h3><div class="jd-dot-expansion"><div class="jd-dot-endpoints"><span>○ Stage Start</span><span class="jd-dot-dash" aria-hidden="true"></span><span>${state(expandedNode,expanded)==='Completed'?'✓':'○'} Stage Complete</span></div>${flow(expandedNode.subflow,expanded+'/',true)}<button type="button" class="jd-link" data-workflow-collapse="${esc(expanded)}">Collapse ${esc(expandedNode.label)} ↑</button></div></section>`:''):flow(view.graph);
+   const content=summaryHost?(expandedNode?`<section class="jd-dot-stage is-expanded"><h3>${esc(expandedNode.label)}</h3><div class="jd-dot-expansion">${expansion(expandedNode,expanded)}<button type="button" class="jd-link" data-workflow-collapse="${esc(expanded)}">Collapse ${esc(expandedNode.label)} ↑</button></div></section>`:''):flow(view.graph);
    host.innerHTML=content+'<div data-workflow-details aria-live="polite"></div>';
    host.querySelectorAll('[data-workflow-node]').forEach(button=>button.onclick=()=>{
     const id=button.dataset.workflowNode,node=find(view.graph,id);
@@ -278,8 +281,41 @@
    });
    host.querySelectorAll('[data-workflow-collapse]').forEach(button=>button.onclick=()=>{const id=expanded;expanded=id.includes('/')?id.slice(0,id.lastIndexOf('/')):null;selected=null;draw(id);});
    if(focus)[...host.querySelectorAll('[data-workflow-node]')].find(b=>b.dataset.workflowNode===focus)?.focus();
-   if(summaryHost){summaryHost.innerHTML=view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>`<li>${dot(n,n.id)}</li>`).join('');summaryHost.querySelectorAll('[data-workflow-node]').forEach(b=>b.onclick=()=>{const id=b.dataset.workflowNode,node=find(view.graph,id);if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw();}else{expanded=null;selected=id;draw();details(node,id);}summaryHost.querySelectorAll('[data-workflow-node]').forEach(button=>{if(button.dataset.workflowNode===id)button.focus();});});}
+   if(summaryHost){summaryHost.innerHTML=view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>{const open=n.kind==='Subflow'&&(expanded===n.id||expanded?.startsWith(n.id+'/'));return `<li class="${open?'jd-main-expanded':''}">${open?`<div class="jd-main-endpoints" data-main-expanded="${esc(n.id)}">${dot(n,n.id).replace('class="jd-workflow-dot ','data-main-start class="jd-workflow-dot ').replace(`<strong>${esc(n.label)}</strong>`,`<strong>${esc(n.label)} Start</strong>`)}<span class="jd-main-dashed" aria-hidden="true"></span>${dot(n,n.id).replace('class="jd-workflow-dot ','data-main-complete class="jd-workflow-dot ').replace(`<strong>${esc(n.label)}</strong>`,`<strong>${esc(n.label)} Complete</strong>`)}</div>`:dot(n,n.id)}</li>`;}).join('');summaryHost.querySelectorAll('[data-workflow-node]').forEach(b=>b.onclick=()=>{const id=b.dataset.workflowNode,node=find(view.graph,id);if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw();}else{const close=selected===id;expanded=null;selected=close?null:id;draw();if(!close)details(node,id);}summaryHost.querySelectorAll('[data-workflow-node]').forEach(button=>{if(button.dataset.workflowNode===id)button.focus();});});}
+   if(summaryHost){notifyDrawer();scheduleRoutes();}
   }
+  let routeFrame=0;
+  function scheduleRoutes(){
+   const scope=host.closest('.job-detail-heading')||host.parentElement;
+   scope?.querySelector('[data-subflow-routes]')?.remove();
+   if(!summaryHost||!expanded||!root.requestAnimationFrame)return;
+   root.cancelAnimationFrame?.(routeFrame);
+   routeFrame=root.requestAnimationFrame(()=>{
+    if(!host.isConnected)return;
+    const pair=summaryHost.querySelector('[data-main-expanded]'),pathNode=find(view.graph,expanded);
+    if(!pair||!pathNode?.subflow)return;
+    const a=pair.querySelector('[data-main-start] .jd-stage-light'),b=pair.querySelector('[data-main-complete] .jd-stage-light');
+    const bounds=scope.getBoundingClientRect();
+    const point=element=>{const r=element.getBoundingClientRect();return{x:r.left+r.width/2-bounds.left,y:r.top+r.height/2-bounds.top};};
+    if(!a||!b||!bounds.width)return;
+    const begin=point(a),end=point(b),positions=new Map();
+    for(const n of pathNode.subflow.nodes){
+     if(n.kind==='Start')positions.set(n.id,begin);
+     else if(n.kind==='End')positions.set(n.id,end);
+     else{const button=[...host.querySelectorAll('[data-workflow-node]')].find(el=>el.dataset.workflowNode===expanded+'/'+n.id);if(button)positions.set(n.id,point(button.querySelector('.jd-stage-light')));}
+    }
+    const paths=pathNode.subflow.edges.flatMap(edge=>{
+     const from=positions.get(edge.from),to=positions.get(edge.to);if(!from||!to||view.evaluation.edges[expanded+'/'+edge.id]==='Inactive')return [];
+     const start=pathNode.subflow.nodes.find(n=>n.id===edge.from)?.kind==='Start',finish=pathNode.subflow.nodes.find(n=>n.id===edge.to)?.kind==='End';
+     const d=start?`M ${from.x} ${from.y} V ${to.y} H ${to.x}`:finish?`M ${from.x} ${from.y} H ${to.x} V ${to.y}`:`M ${from.x} ${from.y} H ${(from.x+to.x)/2} V ${to.y} H ${to.x}`;
+     return [`<path d="${d}"/>`];
+    });
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.dataset.subflowRoutes='';svg.classList.add('jd-subflow-routes');svg.setAttribute('aria-hidden','true');svg.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);svg.innerHTML=paths.join('');scope.prepend(svg);
+   });
+  }
+  host.__workflowRouteObserver?.disconnect();
+  if(root.ResizeObserver){host.__workflowRouteObserver=new ResizeObserver(scheduleRoutes);host.__workflowRouteObserver.observe(host);if(summaryHost)host.__workflowRouteObserver.observe(summaryHost);}
+  function notifyDrawer(){host.dispatchEvent(new CustomEvent('studio-flow-details-toggle',{bubbles:true,detail:{open:!!(expanded||selected)}}));}
   function details(node,id){
    const task=tasks.get(id),evaluation=states.get(id),reason=task?.reason||evaluation?.reason,next=root.StudioWorkflow?.nextAction?.(authority.data?authority:{...authority,data:{}}),canAssign=task&&!task.assignedTo&&(authority.canManage||authority.canReview);
    const hostDetails=host.querySelector('[data-workflow-details]');
@@ -287,7 +323,7 @@
    hostDetails.querySelector('[data-existing-task]').onclick=()=>root.StudioJobGraph.open(job.id,task?.id).catch(e=>alert(e.message));
    hostDetails.querySelector('[data-step-assign]')?.addEventListener('click',async()=>{try{const dialog=await root.StudioJobGraph.open(job.id,task.id);[...dialog.querySelectorAll('[data-assign]')].find(b=>b.dataset.assign===task.id)?.click();}catch(e){alert(e.message);}});
    hostDetails.querySelector('[data-step-next]')?.addEventListener('click',()=>root.StudioWorkflow.open(job.id,next.selector).catch(e=>alert(e.message)));
-   hostDetails.querySelector('[data-close-step]').onclick=()=>{selected=null;hostDetails.innerHTML='';[...host.querySelectorAll('[data-workflow-node]'),...(summaryHost?.querySelectorAll('[data-workflow-node]')||[])].find(b=>b.dataset.workflowNode===id)?.focus();};
+   hostDetails.querySelector('[data-close-step]').onclick=()=>{selected=null;hostDetails.innerHTML='';notifyDrawer();[...host.querySelectorAll('[data-workflow-node]'),...(summaryHost?.querySelectorAll('[data-workflow-node]')||[])].find(b=>b.dataset.workflowNode===id)?.focus();};
   }
   draw();return {get expanded(){return expanded;},get selected(){return selected;}};
  }

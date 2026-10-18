@@ -219,3 +219,24 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-flow-summary:has(.jd-workflow-dot)>li{display:flex;align-items:center;min-width:88px;flex:1}
 .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after{content:"";flex:1;height:2px;min-width:8px;margin:0 6px;background:#c5cad3}
 .jd-flow-summary .jd-workflow-dot{width:auto;flex-shrink:0}
+
+/* Subflow endpoints and dependency groups share one dashed path. */
+.jd-dot-subflow{display:flex;align-items:center;gap:12px;overflow:auto;min-width:0;padding:8px}
+.jd-subflow-endpoint{display:flex;align-items:center;gap:5px;flex:none;font-size:10px;white-space:nowrap}
+.jd-subflow-endpoint .jd-stage-light{display:grid;place-items:center;width:17px;height:17px;border:1px solid currentColor;border-radius:50%;font-size:10px}
+.jd-dot-subflow>.jd-dot-levels{flex:1;align-items:center;overflow:visible;gap:12px;padding:0!important}
+.jd-dot-subflow>.jd-dot-levels::before,.jd-dot-subflow>.jd-dot-levels::after,.jd-dot-subflow>.jd-dot-levels>.jd-dot-level:not(:last-child)::after{content:"";flex:1;min-width:18px;border-top:2px dashed currentColor;opacity:.6}
+.jd-dot-subflow>.jd-dot-levels>.jd-dot-level{position:relative;flex:none;min-width:90px}
+.jd-dot-subflow>.jd-dot-levels>.jd-dot-level:not(:last-child)::after{position:absolute;left:100%;top:50%;width:12px;min-width:12px}
+
+/* An expanded stage replaces its main dot with endpoints; actual edges return below. */
+.job-detail-heading{position:relative;isolation:isolate}
+.jd-flow-summary:has(.jd-workflow-dot)>li.jd-main-expanded{flex:2;min-width:220px}
+.jd-main-endpoints{display:flex;align-items:center;gap:8px;width:100%}
+.jd-main-dashed{flex:1;min-width:24px;border-top:2px dashed currentColor;opacity:.6}
+.jd-main-endpoints .jd-workflow-dot{flex-direction:column;gap:4px;max-width:110px;text-align:center}
+.jd-subflow-routes{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:1;color:var(--theme-accent,#b87929)}
+.jd-subflow-routes path{fill:none;stroke:currentColor;stroke-width:2;vector-effect:non-scaling-stroke}
+.jd-flow-summary .jd-workflow-dot,.jd-dot-subflow .jd-workflow-dot{position:relative;z-index:2}
+.jd-dot-subflow>.jd-dot-levels::before,.jd-dot-subflow>.jd-dot-levels::after,.jd-dot-subflow>.jd-dot-levels>.jd-dot-level:not(:last-child)::after{display:none}
+.jd-dot-subflow .jd-dot-levels{width:100%;justify-content:space-around}

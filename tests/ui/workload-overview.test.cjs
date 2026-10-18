@@ -25,7 +25,7 @@ function workflow(){
 test('expanding a stage exposes endpoints and parallel dots, retains context and makes no state-changing request',t=>{
  const w=setup(t),view=workflow(),before=JSON.stringify(view),host=w.document.getElementById('host');let requests=0;w.json=async()=>{requests++;throw Error('Unexpected write');};
  w.StudioJobDetails.compact(host,view,job,w.document.getElementById('summary'));assert.equal(host.querySelectorAll('[data-workflow-node]').length,0);assert.equal(w.document.querySelectorAll('#summary [data-workflow-node="produce"]').length,1);
- w.document.querySelector('#summary [data-workflow-node="produce"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.match(host.textContent,/Stage Start/);assert.match(host.textContent,/Stage Complete/);assert.equal(host.querySelector('[data-workflow-node="shoot"]'),null);assert.ok(w.document.querySelector('#summary [data-workflow-node="shoot"]'));const edit=host.querySelector('[data-workflow-node="produce/edit"]'),qc=host.querySelector('[data-workflow-node="produce/qc"]');assert.equal(edit.closest('.jd-dot-level'),qc.closest('.jd-dot-level'));
+ w.document.querySelector('#summary [data-workflow-node="produce"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.match(w.document.getElementById('summary').textContent,/Production Start/);assert.match(w.document.getElementById('summary').textContent,/Production Complete/);assert.equal(host.querySelector('[data-workflow-node="shoot"]'),null);assert.ok(w.document.querySelector('#summary [data-workflow-node="shoot"]'));const edit=host.querySelector('[data-workflow-node="produce/edit"]'),qc=host.querySelector('[data-workflow-node="produce/qc"]');assert.equal(edit.closest('.jd-dot-level'),qc.closest('.jd-dot-level'));
  w.document.querySelector('#summary [data-workflow-node="shoot"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.equal(host.querySelector('[data-workflow-node="produce/edit"]'),null);host.querySelector('[data-workflow-collapse]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,0);assert.equal(requests,0);assert.equal(JSON.stringify(view),before);
 });
 test('step details expose exact blockers, unassigned responsibility and navigate to the existing command screen',async t=>{
@@ -54,4 +54,19 @@ test('Operations separates delivery overdue, explainable concern and unknown dat
 });
 test('a recorded due date, not a blank or invalid timestamp, is required to call work overdue',t=>{
  const w=setup(t),m=w.StudioWorkload.model({activities:[task('none'),task('invalid','NotStarted',{dueAtUtc:'not-a-date'}),task('cancelled','Cancelled',{dueAtUtc:'2000-01-01'})]},[job]);assert.ok(m.activities.every(a=>!m.overdue(a)));
+});
+
+test('main icons toggle drawer on second click and subflows place endpoint icons around component path',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),summary=w.document.getElementById('summary'),events=[];
+ host.addEventListener('studio-flow-details-toggle',e=>events.push(e.detail.open));
+ w.StudioJobDetails.compact(host,workflow(),job,summary);
+ summary.querySelector('[data-workflow-node="produce"]').click();
+ assert.equal(events.at(-1),true);
+ assert.equal(summary.querySelectorAll('[data-main-expanded] [data-workflow-node]').length,2);assert.equal(host.querySelectorAll('.jd-subflow-endpoint').length,0);assert.ok(summary.querySelector('.jd-main-dashed'));
+ assert.ok(host.querySelector('.jd-dot-subflow>.jd-dot-levels [data-workflow-node="produce/edit"]'));
+ summary.querySelector('[data-workflow-node="produce"]').click();
+ assert.equal(events.at(-1),false);assert.equal(host.querySelector('.jd-dot-subflow'),null);assert.equal(summary.querySelector('[data-main-expanded]'),null);assert.equal(summary.querySelectorAll('[data-workflow-node="produce"]').length,1);
+ summary.querySelector('[data-workflow-node="delivery"]').click();assert.equal(events.at(-1),true);
+ summary.querySelector('[data-workflow-node="delivery"]').click();assert.equal(events.at(-1),false);
+ assert.equal(host.querySelector('.jd-dot-details'),null);
 });
