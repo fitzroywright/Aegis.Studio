@@ -270,20 +270,19 @@
    const levels=[...new Set(nodes.map(n=>rank.get(prefix+n.id)))].sort((a,b)=>a-b);
    return `<div class="jd-dot-levels" aria-label="Workflow dependency groups; steps in a column may run in parallel">${levels.map(level=>`<div class="jd-dot-level">${nodes.filter(n=>rank.get(prefix+n.id)===level).map(n=>{
     const id=prefix+n.id,open=n.kind==='Subflow'&&(expanded===id||expanded?.startsWith(id+'/'));
-    return `<section class="jd-dot-stage ${open?'is-expanded':''}">${dot(n,id,small)}${open?`<div class="jd-dot-expansion">${expansion(n,id)}<button type="button" class="jd-link" data-workflow-collapse="${esc(id)}">Collapse ${esc(n.label)} ↑</button></div>`:''}</section>`;
+    return `<section class="jd-dot-stage ${open?'is-expanded':''}">${dot(n,id,small)}${open?`<div class="jd-dot-expansion">${expansion(n,id)}</div>`:''}</section>`;
    }).join('')}</div>`).join('')}</div>`;
   }
   function find(graph,id,prefix=''){for(const n of graph.nodes){if(prefix+n.id===id)return n;if(n.subflow){const found=find(n.subflow,id,prefix+n.id+'/');if(found)return found;}}}
   function draw(focus){
    host.style.height='auto';host.classList.add('jd-compact-workflow');
    const expandedNode=expanded?find(view.graph,expanded):null;
-   const content=summaryHost?(expandedNode?`<section class="jd-dot-stage is-expanded"><h3>${esc(expandedNode.label)}</h3><div class="jd-dot-expansion">${expansion(expandedNode,expanded)}<button type="button" class="jd-link" data-workflow-collapse="${esc(expanded)}">Collapse ${esc(expandedNode.label)} ↑</button></div></section>`:''):flow(view.graph);
+   const content=summaryHost?(expandedNode?`<section class="jd-dot-stage is-expanded"><h3>${esc(expandedNode.label)}</h3><div class="jd-dot-expansion">${expansion(expandedNode,expanded)}</div></section>`:''):flow(view.graph);
    host.innerHTML=content+'<div data-workflow-details aria-live="polite"></div>';
    host.querySelectorAll('[data-workflow-node]').forEach(button=>button.onclick=()=>{
     const id=button.dataset.workflowNode,node=find(view.graph,id);
     if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw(id);}else{selected=id;details(node,id);}
    });
-   host.querySelectorAll('[data-workflow-collapse]').forEach(button=>button.onclick=()=>{const id=expanded;expanded=id.includes('/')?id.slice(0,id.lastIndexOf('/')):null;selected=null;draw(id);});
    if(focus)[...host.querySelectorAll('[data-workflow-node]')].find(b=>b.dataset.workflowNode===focus)?.focus();
    if(summaryHost){summaryHost.innerHTML=view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>{const open=n.kind==='Subflow'&&(expanded===n.id||expanded?.startsWith(n.id+'/'));return `<li class="${open?'jd-main-expanded':''}">${open?`<div class="jd-main-endpoints" data-main-expanded="${esc(n.id)}">${dot(n,n.id).replace('class="jd-workflow-dot ','data-main-start class="jd-workflow-dot ').replace(`<strong>${esc(shortLabel(n.label))}</strong>`,'<strong>Start</strong>')}<span class="jd-main-dashed" aria-hidden="true"></span>${dot(n,n.id).replace('class="jd-workflow-dot ','data-main-complete class="jd-workflow-dot ').replace(`<strong>${esc(shortLabel(n.label))}</strong>`,'<strong>Complete</strong>')}</div>`:dot(n,n.id)}</li>`;}).join('');summaryHost.querySelectorAll('[data-workflow-node]').forEach(b=>b.onclick=()=>{const id=b.dataset.workflowNode,node=find(view.graph,id);if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw();}else{const close=selected===id;expanded=null;selected=close?null:id;draw();if(!close)details(node,id);}summaryHost.querySelectorAll('[data-workflow-node]').forEach(button=>{if(button.dataset.workflowNode===id)button.focus();});});}
    if(summaryHost){notifyDrawer();scheduleRoutes();}
