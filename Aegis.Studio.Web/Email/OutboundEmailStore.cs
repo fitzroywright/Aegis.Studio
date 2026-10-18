@@ -60,6 +60,7 @@ public sealed class OutboundEmailStore
         using var q=new NpgsqlCommand("""
             with candidate as (select id from studio_outbound_email
               where delivery_channel=any($1) and attempts<10 and
+                (kind<>'ClientReminder' or (studio_client_reminder_dispatchable(id) and extract(hour from now() at time zone coalesce(delivery_metadata->>'ReminderTimeZone','America/Jamaica')) between 9 and 17)) and
                 ((status in ('Pending','Retry') and (next_attempt_at_utc is null or next_attempt_at_utc<=now()))
                   or false)
               order by created_at_utc for update skip locked limit 1)
@@ -276,3 +277,4 @@ public sealed record OutboundEmailAuditRecord(
     Guid WorkspaceId,string DeliveryChannel="Email");
 
 public sealed record MarkOutboundSentRequest(string? ProviderMessageId);
+
