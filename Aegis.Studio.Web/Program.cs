@@ -200,6 +200,8 @@ builder.Services.AddSingleton<StudioUnifiedInbound>();
 builder.Services.AddHttpClient<global::Common.Messaging.IEmailRecipientDirectory,global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphRecipientDirectory>();
 builder.Services.AddSingleton<StudioRecipientResolver>();
 builder.Services.AddSingleton<NotificationService>();
+builder.Services.AddSingleton<Aegis.Studio.Web.Reminders.ClientReminderStore>();
+builder.Services.AddHostedService<Aegis.Studio.Web.Reminders.ClientReminderWorker>();
 builder.Services.AddSingleton<WorkspaceTimelineService>();
 builder.Services.AddSingleton<JobEventNotifier>();
 builder.Services.AddSingleton<ScheduleStore>();
@@ -329,6 +331,7 @@ Aegis.Studio.Web.Finance.FinanceReleaseStore.MapStudioFinance(app);
 app.MapStudioClients();
 app.MapStudioUnifiedMessaging();
 app.MapStudioFulfillment();
+Aegis.Studio.Web.Reminders.ClientReminderEndpoints.MapClientReminders(app);
 app.MapStudioQuotes();
 app.MapJobAccess();
 app.MapStudioServiceStatus();
@@ -715,4 +718,5 @@ app.MapGet("/api/attachments/{id:guid}", (Guid id, ClaimsPrincipal user, Attachm
 app.MapGet("/api/accounts/summary", (StudioStore store) => Results.Ok(store.GetAccountsSummary()));
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
+
 

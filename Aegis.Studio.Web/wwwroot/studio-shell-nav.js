@@ -11,6 +11,7 @@
         ['production', 'Production', '◆'],
         ['frontdesk', 'Front Desk', '▣'],
         ['clients', 'Clients', '♧'],
+        ['reminders', 'Client Reminders', '◷'],
         ['finance', 'Finance', '$'],
         ['messages', 'Messages', '✉']
     ];
@@ -108,6 +109,7 @@
                     <button type="button" data-studio-side="today"><span>⌂</span><span>Today</span></button>
                     <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
                     <button type="button" data-studio-side="clients"><span>♧</span><span>Clients</span></button>
+                    <button type="button" data-studio-side="reminders"><span>◷</span><span>Client Reminders</span></button>
                     <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
@@ -304,6 +306,7 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })();
+
 
 
 
