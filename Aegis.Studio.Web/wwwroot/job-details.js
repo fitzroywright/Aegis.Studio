@@ -296,7 +296,7 @@
     if(!pair||!pathNode?.subflow)return;
     const a=pair.querySelector('[data-main-start] .jd-stage-light'),b=pair.querySelector('[data-main-complete] .jd-stage-light');
     const bounds=scope.getBoundingClientRect();
-    const point=element=>{const r=element.getBoundingClientRect();return{x:r.left+r.width/2-bounds.left,y:r.top+r.height/2-bounds.top};};
+    const point=element=>{const r=element.getBoundingClientRect();return{x:r.left+r.width/2-bounds.left-scope.clientLeft,y:r.top+r.height/2-bounds.top-scope.clientTop,rx:r.width/2,ry:r.height/2};};
     if(!a||!b||!bounds.width)return;
     const begin=point(a),end=point(b),positions=new Map();
     for(const n of pathNode.subflow.nodes){
@@ -307,13 +307,23 @@
     const paths=pathNode.subflow.edges.flatMap(edge=>{
      const from=positions.get(edge.from),to=positions.get(edge.to);if(!from||!to||view.evaluation.edges[expanded+'/'+edge.id]==='Inactive')return [];
      const start=pathNode.subflow.nodes.find(n=>n.id===edge.from)?.kind==='Start',finish=pathNode.subflow.nodes.find(n=>n.id===edge.to)?.kind==='End';
-     const d=start?`M ${from.x} ${from.y} V ${to.y} H ${to.x}`:finish?`M ${from.x} ${from.y} H ${to.x} V ${to.y}`:`M ${from.x} ${from.y} H ${(from.x+to.x)/2} V ${to.y} H ${to.x}`;
+     // Attach to the circle's rim, with Git-style curves into and out of branch lanes.
+     const direction=to.x>=from.x?1:-1;
+     const x1=start?from.x:from.x+direction*from.rx,y1=start?from.y+from.ry:from.y;
+     const x2=finish?to.x:to.x-direction*to.rx,y2=finish?to.y+to.ry:to.y;
+     const bend=Math.max(32,Math.abs(x2-x1)*.75),drop=Math.max(32,Math.abs(y2-y1)*.75);
+     const d=start?`M ${x1} ${y1} C ${x1} ${y1+drop}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`:finish?`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2} ${y2+drop}, ${x2} ${y2}`:`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`;
      return [`<path d="${d}"/>`];
     });
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.dataset.subflowRoutes='';svg.classList.add('jd-subflow-routes');svg.setAttribute('aria-hidden','true');svg.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);svg.innerHTML=paths.join('');scope.prepend(svg);
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.dataset.subflowRoutes='';svg.classList.add('jd-subflow-routes');svg.setAttribute('aria-hidden','true');svg.setAttribute('viewBox',`0 0 ${scope.clientWidth||bounds.width} ${scope.clientHeight||bounds.height}`);svg.setAttribute('preserveAspectRatio','none');svg.innerHTML=paths.join('');scope.prepend(svg);
    });
   }
+  host.__workflowRouteCleanup?.();
   host.__workflowRouteObserver?.disconnect();
+  const routeScope=host.closest('.job-detail-heading')||host.parentElement;
+  routeScope?.addEventListener('transitionend',scheduleRoutes);
+  routeScope?.addEventListener('scroll',scheduleRoutes,true);
+  host.__workflowRouteCleanup=()=>{routeScope?.removeEventListener('transitionend',scheduleRoutes);routeScope?.removeEventListener('scroll',scheduleRoutes,true);root.cancelAnimationFrame?.(routeFrame);routeScope?.querySelector('[data-subflow-routes]')?.remove();};
   if(root.ResizeObserver){host.__workflowRouteObserver=new ResizeObserver(scheduleRoutes);host.__workflowRouteObserver.observe(host);if(summaryHost)host.__workflowRouteObserver.observe(summaryHost);}
   function notifyDrawer(){host.dispatchEvent(new CustomEvent('studio-flow-details-toggle',{bubbles:true,detail:{open:!!(expanded||selected)}}));}
   function details(node,id){
