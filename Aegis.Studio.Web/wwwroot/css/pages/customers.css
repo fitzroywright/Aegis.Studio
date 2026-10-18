@@ -31,3 +31,18 @@
 .customer-attention>header{border-left:3px solid #c34c35}.customer-attention-body{display:flex;flex-direction:column;gap:9px;padding:12px;font-size:12px}
 .customers-page .customer-messages{display:flex;flex-direction:column;flex:1;min-height:0}.customer-messages-body{overflow:auto;min-height:0;padding:0 12px;font-size:12px}.customer-message{width:100%;display:flex;flex-direction:column;gap:5px;padding:12px 0;border:0;border-bottom:1px solid var(--studio-control-border,#e2e8ef);background:transparent;color:inherit;text-align:left;cursor:pointer}.customer-message span{font-size:11px;overflow-wrap:anywhere}.customer-message small{opacity:.65}.customer-messages footer{padding:9px 12px;border-top:1px solid var(--studio-control-border,#dce4ec);font-size:11px}
 .customer-directory-tools{display:flex;align-items:center;gap:10px;font-size:11px}.customer-directory-tools .action{font-size:11px;min-height:26px}
+
+
+/* Use the canonical Jobs grid and rail components within the customer frame. */
+.customers-page .customer-directory-table{min-width:480px}
+.customers-page .customer-directory-table th:first-child{width:34%}
+.customers-page .customer-directory-table th:nth-child(2){width:40%}
+.customers-page .customer-directory-table th:nth-child(3){width:26%}
+.customer-directory-table tr[data-c-id]{cursor:pointer}
+.customer-directory-table tr[data-c-id]:hover,.customer-directory-table tr[data-c-id]:focus-visible,.customer-directory-table tr.is-selected{background:var(--theme-surface-alt,#edf3f8);box-shadow:inset 3px 0 var(--theme-accent,#d97722);outline:0}
+.customers-page .customer-jobs-table{min-width:600px}
+.customers-page .customer-jobs-table th:first-child{width:40%}
+.customers-page .customer-jobs-table th:nth-child(2){width:22%}
+.customers-page .customer-jobs-table th:nth-child(3){width:20%}
+.customers-page .customer-jobs-table th:nth-child(4){width:18%}
+.customers-page .customer-right{gap:8px}
