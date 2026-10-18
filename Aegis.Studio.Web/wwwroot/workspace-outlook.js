@@ -174,7 +174,8 @@ function mergeJobMessages(teamMessages, customerMessages) {
                 if(restoreFocus)flowTrigger.focus();
             };
             flowToggle.onclick=event=>{flowTrigger=event.currentTarget;setFlowOpen(flowToggle.getAttribute('aria-expanded')!=='true');};
-            header.querySelector('.jd-flow-summary').addEventListener('click',event=>{const icon=event.target.closest('[data-workflow-node],[data-flow-phase]');if(icon){flowTrigger=icon;setFlowOpen(true);}},true);
+            header.querySelector('.jd-flow-summary').addEventListener('click',event=>{const icon=event.target.closest('[data-flow-phase]');if(icon){flowTrigger=icon;setFlowOpen(true);}},true);
+            header.addEventListener('studio-flow-details-toggle',event=>setFlowOpen(event.detail.open));
             header.addEventListener('keydown',event=>{
                 if(event.key==='Escape'&&flowToggle.getAttribute('aria-expanded')==='true'){
                     event.preventDefault();event.stopPropagation();setFlowOpen(false,true);
