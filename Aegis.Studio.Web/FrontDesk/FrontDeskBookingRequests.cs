@@ -17,8 +17,8 @@ public static class FrontDeskRequestRules
     public static void Validate(PendingBookingRequest request)
     {
         if(request.WorkspaceId==Guid.Empty || string.IsNullOrWhiteSpace(request.Title) || request.Title.Length>200 || string.IsNullOrWhiteSpace(request.ClientName) || request.ClientName.Length>200)
-            throw new ArgumentException("Workspace, customer and job title are required (maximum 200 characters).");
-        if(!System.Net.Mail.MailAddress.TryCreate(request.ClientEmail,out _) || request.ClientEmail.Length>320) throw new ArgumentException("A valid customer email is required.");
+            throw new ArgumentException("Workspace, client and job title are required (maximum 200 characters).");
+        if(!System.Net.Mail.MailAddress.TryCreate(request.ClientEmail,out _) || request.ClientEmail.Length>320) throw new ArgumentException("A valid client email is required.");
         if(request.EventDate==default || (request.Notes?.Length ?? 0)>4000) throw new ArgumentException("Event date is required and notes must be at most 4000 characters.");
         if((request.ExternalBookingId?.Length??0)>200 || (request.Location?.Length??0)>500 || (request.ClientPhone?.Length??0)>80)throw new ArgumentException("Booking reference or location is too long.");
         if(request.StartsAtUtc.HasValue != request.EndsAtUtc.HasValue || (request.StartsAtUtc.HasValue && request.EndsAtUtc<=request.StartsAtUtc))throw new ArgumentException("Choose a valid booking time range.");
@@ -112,7 +112,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         if(status is "Confirmed" or "Cancelled")throw new ArgumentException("This booking is no longer pending.");
         if(prior is Guid previous)return new{messageId=previous,state="AlreadyQueued",deliveryReceiptAvailable=false};
         if(channel=="Email"&&string.IsNullOrWhiteSpace(from))throw new ArgumentException("Configure an outbound workspace email identity before requesting a deposit.");
-        if(channel=="Email"&&string.IsNullOrWhiteSpace(request.ClientEmail))throw new ArgumentException("A customer email address is required for email deposit requests.");
+        if(channel=="Email"&&string.IsNullOrWhiteSpace(request.ClientEmail))throw new ArgumentException("A client email address is required for email deposit requests.");
         if(request.RequiredDeposit<=0)throw new ArgumentException("No deposit is required for this booking.");
         string recipient=channel=="Email"?request.ClientEmail:DepositDeliveryRules.Mobile(phone);
         Guid message=Guid.NewGuid();
@@ -249,4 +249,5 @@ public static class FrontDeskBookingRequestEndpoints
     private static IResult Run(Func<IResult> action)
     {try{return action();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}}
 }
+
 

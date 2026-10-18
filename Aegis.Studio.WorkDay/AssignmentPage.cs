@@ -121,8 +121,9 @@ public sealed class AssignmentPage:ContentPage
     {
         string[] choices=[..new[]{assignment.CustomerPhone,assignment.CustomerEmail}.Where(x=>!string.IsNullOrWhiteSpace(x)).Select(x=>x!)];
         if(choices.Length==0)throw new InvalidOperationException("No permitted contact information is available.");
-        string selected=await DisplayActionSheetAsync("Contact customer","Cancel",null,choices);
+        string selected=await DisplayActionSheetAsync("Contact client","Cancel",null,choices);
         if(selected=="Cancel"||string.IsNullOrWhiteSpace(selected))return;
         await Launcher.Default.OpenAsync($"{(selected.Contains('@')?"mailto":"tel")}:{Uri.EscapeDataString(selected)}");
     }
 }
+

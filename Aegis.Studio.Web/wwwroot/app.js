@@ -76,7 +76,7 @@ async function openConversation(id) {
                 ? `<button class="action" onclick="openJob('${conversation.jobId}')">Open Job</button>`
                 : '<button class="primary" onclick="createJob()">Create Job</button>'}</div>
         </div>
-        ${conversation.jobId ? '<div class="job-banner">This conversation is linked to a job. The conversation remains intact as customer history.</div>' : ''}
+        ${conversation.jobId ? '<div class="job-banner">This conversation is linked to a job. The conversation remains intact as client history.</div>' : ''}
         <div class="messages">
             ${conversation.messages.map(message => `
                 <article class="message ${message.visibility.toLowerCase()}">
@@ -87,7 +87,7 @@ async function openConversation(id) {
         <div class="composer">
             <textarea id="messageBody" placeholder="Write a reply or internal note..."></textarea>
             <div class="composer-row">
-                <label class="toggle"><input id="internalToggle" type="checkbox"> Internal note — customer will not see this</label>
+                <label class="toggle"><input id="internalToggle" type="checkbox"> Internal note — client will not see this</label>
                 ${identityPicker}
             </div>
         </div>`;
@@ -205,6 +205,7 @@ newRequestForm.onsubmit = async event => {
     await loadConversations();
     await openConversation(created.id);
 };
+
 
 
 

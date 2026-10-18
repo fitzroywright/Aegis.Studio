@@ -15,7 +15,7 @@ public sealed class MainPage:ContentPage
     private readonly Label pending=new();
     private readonly Label lastSync=new(){Text="Last synchronization: Never"};
     private readonly Label attention=new();
-    private readonly SearchBar search=new(){Placeholder="Search customer or session"};
+    private readonly SearchBar search=new(){Placeholder="Search client or session"};
     private readonly VerticalStackLayout todayList=new(){Spacing=8};
     private readonly VerticalStackLayout upcomingList=new(){Spacing=8};
     private bool refreshing;
@@ -120,3 +120,4 @@ public sealed class MainPage:ContentPage
         Application.Current!.Windows[0].Page=new NavigationPage(services.GetRequiredService<LoginPage>());
     }
 }
+

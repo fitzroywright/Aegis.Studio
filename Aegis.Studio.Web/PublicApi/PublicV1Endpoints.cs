@@ -119,8 +119,8 @@ public static class PublicV1Endpoints
             WorkflowStore.Scalar(c, tx, "select id from studio_jobs where id=$1 for update", reference);
             Guid publication = PublicV1Store.Publication(c, tx, reference);
             var submission = PublicV1Store.SubmitSelections(c, tx, publication, PublicV1Security.IdempotencyKey(context));
-            WorkflowStore.Notify(c, tx, reference, "public-selection:" + submission.Reference, "Owner", "Customer selections submitted");
-            WorkflowStore.Notify(c, tx, reference, "public-selection:" + submission.Reference, "Production Manager", "Customer selections submitted");
+            WorkflowStore.Notify(c, tx, reference, "public-selection:" + submission.Reference, "Owner", "Client selections submitted");
+            WorkflowStore.Notify(c, tx, reference, "public-selection:" + submission.Reference, "Production Manager", "Client selections submitted");
             tx.Commit(); return Results.Ok(submission);
         });
         app.MapGet("/api/operations-management/webhooks", (System.Security.Claims.ClaimsPrincipal user, WorkflowStore workflow) =>
@@ -149,7 +149,7 @@ public static class PublicV1Endpoints
     {
         string header = context.Request.Headers.Authorization.ToString();
         if (!header.StartsWith("Bearer ", StringComparison.Ordinal) || portal.Validate(header[7..]) is not { } access || access.JobId != job)
-            throw new PublicApiException(401, "invalid_gallery_access", "A valid customer gallery access token for this Job is required.");
+            throw new PublicApiException(401, "invalid_gallery_access", "A valid client gallery access token for this Job is required.");
     }
     private static IResult Error(HttpContext context, int status, string code, string message)
         => Results.Json(new PublicV1Error(code, message, context.TraceIdentifier), statusCode: status);
@@ -166,3 +166,4 @@ public static class PublicV1Endpoints
         return buffer.ToArray();
     }
 }
+

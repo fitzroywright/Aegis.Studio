@@ -125,6 +125,7 @@ public sealed class CommercialTemplateStore(StudioDatabase database)
               (not exists(select 1 from studio_job_activities a where a.work_order_id=w.id and a.quality_control_required and a.status='Completed') or
                exists(select 1 from studio_job_activities a where a.work_order_id=w.id and not a.optional_step and a.status<>'Completed')))))
             """, job);
-        if ((bool)q.ExecuteScalar()!) throw new ArgumentException("Complete all work orders and final quality control before delivery or Customer Gallery publication.");
+        if ((bool)q.ExecuteScalar()!) throw new ArgumentException("Complete all work orders and final quality control before delivery or Client Gallery publication.");
     }
 }
+
