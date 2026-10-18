@@ -242,3 +242,10 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-dot-subflow .jd-dot-levels{width:100%;justify-content:space-around}
 
 .jd-subflow-routes path{stroke-linecap:round;stroke-linejoin:round}
+
+/* Give the main endpoints room for broad quarter-circle branch arcs. */
+.jd-flow-summary:has(.jd-workflow-dot)>li.jd-main-expanded{flex:3;min-width:320px}
+.jd-main-endpoints{justify-content:space-between;gap:24px}
+.jd-main-dashed{min-width:100px}
+.jd-dot-subflow{padding:18px 16% 18px}
+@media(max-width:700px){.jd-flow-summary:has(.jd-workflow-dot)>li.jd-main-expanded{min-width:250px}.jd-main-endpoints{gap:14px}.jd-main-dashed{min-width:60px}.jd-dot-subflow{padding-left:10%;padding-right:10%}}
