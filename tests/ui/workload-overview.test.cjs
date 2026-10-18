@@ -70,3 +70,24 @@ test('main icons toggle drawer on second click and subflows place endpoint icons
  summary.querySelector('[data-workflow-node="delivery"]').click();assert.equal(events.at(-1),false);
  assert.equal(host.querySelector('.jd-dot-details'),null);
 });
+
+test('curved connectors attach at dot rims and refresh after drawer transitions',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),summary=w.document.getElementById('summary');let frame;
+ w.requestAnimationFrame=fn=>{frame=fn;return 1;};w.cancelAnimationFrame=()=>{};
+ w.HTMLElement.prototype.getBoundingClientRect=function(){
+  if(this===w.document.body)return{left:0,top:0,width:600,height:300};
+  const button=this.closest?.('[data-workflow-node]'),id=button?.dataset.workflowNode;
+  const left=button?.hasAttribute('data-main-start')?20:button?.hasAttribute('data-main-complete')?400:id==='produce/edit'?100:220;
+  return{left,top:id?.includes('/')?150:20,width:12,height:12};
+ };
+ w.StudioJobDetails.compact(host,workflow(),job,summary);
+ summary.querySelector('[data-workflow-node="produce"]').click();frame();
+ const paths=[...w.document.querySelectorAll('[data-subflow-routes] path')];
+ assert.equal(paths.length,4);assert.match(paths[0].getAttribute('d'),/^M 26 32 C /);
+ assert.match(paths[0].getAttribute('d'),/, 100 156$/);
+ assert.ok(paths.every(p=>p.getAttribute('d').includes(' C ')));
+ w.document.body.dispatchEvent(new w.Event('transitionend'));frame();
+ assert.equal(w.document.querySelectorAll('[data-subflow-routes]').length,1);
+ summary.querySelector('[data-workflow-node="produce"]').click();
+ assert.equal(w.document.querySelector('[data-subflow-routes]'),null);
+});
