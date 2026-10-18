@@ -298,6 +298,16 @@
     const bounds=scope.getBoundingClientRect();
     const point=element=>{const r=element.getBoundingClientRect();return{x:r.left+r.width/2-bounds.left-scope.clientLeft,y:r.top+r.height/2-bounds.top-scope.clientTop,rx:r.width/2,ry:r.height/2};};
     if(!a||!b||!bounds.width)return;
+    // Constrain component dots to the horizontal interval of the main endpoints.
+    const subflow=host.querySelector('.jd-dot-subflow'),startRect=a.getBoundingClientRect(),endRect=b.getBoundingClientRect();
+    if(subflow){
+     const parent=subflow.parentElement.getBoundingClientRect(),left=Math.min(startRect.left+startRect.width/2,endRect.left+endRect.width/2),right=Math.max(startRect.left+startRect.width/2,endRect.left+endRect.width/2);
+     const inset=Math.min(32,(right-left)*.12);
+     subflow.style.marginLeft=Math.max(0,left-parent.left+inset)+'px';
+     subflow.style.marginRight=Math.max(0,parent.right-right+inset)+'px';
+     subflow.style.paddingLeft='0';subflow.style.paddingRight='0';
+     subflow.classList.add('jd-subflow-between-endpoints');
+    }
     const begin=point(a),end=point(b),positions=new Map();
     for(const n of pathNode.subflow.nodes){
      if(n.kind==='Start')positions.set(n.id,begin);
@@ -311,7 +321,7 @@
      const direction=to.x>=from.x?1:-1;
      const x1=start?from.x:from.x+direction*from.rx,y1=start?from.y+from.ry:from.y;
      const x2=finish?to.x:to.x-direction*to.rx,y2=finish?to.y+to.ry:to.y;
-     const bend=Math.max(32,Math.abs(x2-x1)*.75),drop=Math.max(32,Math.abs(y2-y1)*.75);
+     const bend=Math.abs(x2-x1)*0.55228475,drop=Math.abs(y2-y1)*0.55228475;
      const d=start?`M ${x1} ${y1} C ${x1} ${y1+drop}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`:finish?`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2} ${y2+drop}, ${x2} ${y2}`:`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`;
      return [`<path d="${d}"/>`];
     });
