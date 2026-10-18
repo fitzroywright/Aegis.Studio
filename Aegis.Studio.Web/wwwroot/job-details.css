@@ -219,3 +219,12 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-flow-summary:has(.jd-workflow-dot)>li{display:flex;align-items:center;min-width:88px;flex:1}
 .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after{content:"";flex:1;height:2px;min-width:8px;margin:0 6px;background:#c5cad3}
 .jd-flow-summary .jd-workflow-dot{width:auto;flex-shrink:0}
+
+/* Subflow endpoints and dependency groups share one dashed path. */
+.jd-dot-subflow{display:flex;align-items:center;gap:12px;overflow:auto;min-width:0;padding:8px}
+.jd-subflow-endpoint{display:flex;align-items:center;gap:5px;flex:none;font-size:10px;white-space:nowrap}
+.jd-subflow-endpoint .jd-stage-light{display:grid;place-items:center;width:17px;height:17px;border:1px solid currentColor;border-radius:50%;font-size:10px}
+.jd-dot-subflow>.jd-dot-levels{flex:1;align-items:center;overflow:visible;gap:12px;padding:0!important}
+.jd-dot-subflow>.jd-dot-levels::before,.jd-dot-subflow>.jd-dot-levels::after,.jd-dot-subflow>.jd-dot-levels>.jd-dot-level:not(:last-child)::after{content:"";flex:1;min-width:18px;border-top:2px dashed currentColor;opacity:.6}
+.jd-dot-subflow>.jd-dot-levels>.jd-dot-level{position:relative;flex:none;min-width:90px}
+.jd-dot-subflow>.jd-dot-levels>.jd-dot-level:not(:last-child)::after{position:absolute;left:100%;top:50%;width:12px;min-width:12px}
