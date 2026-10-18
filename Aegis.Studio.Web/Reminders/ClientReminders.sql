@@ -22,7 +22,7 @@ create index if not exists ix_client_reminders_due on studio_client_reminders(sc
 create or replace view studio_client_reminder_sources as
  select s.job_id,'Shoot'::text kind,s.id source_id,s.call_time_utc anchor_at_utc,
  concat(to_char(s.call_time_utc at time zone 'America/Jamaica','DD Mon YYYY HH24:MI'),' Jamaica time') detail,
- coalesce(s.location,'') location from studio_shoot_sessions s
+ coalesce(s.location,'') AS location from studio_shoot_sessions s
  where s.status not in ('Cancelled','ShootComplete','Completed') and s.call_time_utc>now()
  union all
  select r.job_id,'Deposit',r.id,r.created_at_utc,
@@ -73,3 +73,4 @@ create or replace function studio_client_reminder_audit() returns trigger langua
  end $$;
 drop trigger if exists client_reminder_audit on studio_client_reminders;
 create trigger client_reminder_audit after insert or update on studio_client_reminders for each row execute function studio_client_reminder_audit();
+
