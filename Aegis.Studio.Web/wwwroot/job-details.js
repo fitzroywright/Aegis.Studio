@@ -255,7 +255,7 @@
   }
   function dot(node,id,small=false){
    const status=state(node,id),icon=status==='Completed'?'✓':status==='Skipped'||status==='Inactive'?'–':status==='Available'?'▶':status==='InProgress'?'◉':status==='Blocked'||/Failed|Rework|Reprint|Waiting/.test(status)?'!':'○';
-   return `<button type="button" class="jd-workflow-dot ${small?'is-component':''} ${esc(status.toLowerCase())}" data-workflow-node="${esc(id)}" ${node.kind==='Subflow'?`aria-expanded="${expanded===id||expanded?.startsWith(id+'/')}"`:''} aria-label="${esc(node.label+': '+summary(node,id))}"><span aria-hidden="true">${icon}</span><strong>${esc(node.label)}</strong><small>${esc(summary(node,id))}</small></button>`;
+   return `<button type="button" class="jd-workflow-dot ${small?'is-component':''} ${esc(status.toLowerCase())}" data-workflow-node="${esc(id)}" ${node.kind==='Subflow'?`aria-expanded="${expanded===id||expanded?.startsWith(id+'/')}"`:''} title="${esc(node.label+': '+summary(node,id)+(tasks.get(id)?' · Responsible: '+(tasks.get(id).assignedTo||'Unassigned')+(tasks.get(id).reason?' · '+tasks.get(id).reason:''):''))}" aria-label="${esc(node.label+': '+summary(node,id))}"><span class="jd-stage-light" aria-hidden="true">${icon}</span><strong>${esc(node.label)}</strong></button>`;
   }
   function flow(graph,prefix='',small=false){
    const model={nodes:graph.nodes.map(n=>({...n,id:prefix+n.id})),edges:graph.edges.map(e=>({...e,id:prefix+e.id,from:prefix+e.from,to:prefix+e.to}))},rank=ranks(model);
@@ -269,7 +269,7 @@
   function find(graph,id,prefix=''){for(const n of graph.nodes){if(prefix+n.id===id)return n;if(n.subflow){const found=find(n.subflow,id,prefix+n.id+'/');if(found)return found;}}}
   function draw(focus){
    host.style.height='auto';host.classList.add('jd-compact-workflow');
-   host.innerHTML=flow(view.graph)+'<p class="jd-dot-key">✓ Complete · ◉ Active · ▶ Ready · ○ Pending · ! Blocked / waiting · – Skipped. Parallel steps share a column.</p><div data-workflow-details aria-live="polite"></div>';
+   host.innerHTML=flow(view.graph)+'<div data-workflow-details aria-live="polite"></div>';
    host.querySelectorAll('[data-workflow-node]').forEach(button=>button.onclick=()=>{
     const id=button.dataset.workflowNode,node=find(view.graph,id);
     if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw(id);}else{selected=id;details(node,id);}
