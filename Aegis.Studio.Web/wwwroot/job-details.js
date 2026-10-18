@@ -311,7 +311,7 @@
      const direction=to.x>=from.x?1:-1;
      const x1=start?from.x:from.x+direction*from.rx,y1=start?from.y+from.ry:from.y;
      const x2=finish?to.x:to.x-direction*to.rx,y2=finish?to.y+to.ry:to.y;
-     const bend=Math.max(32,Math.abs(x2-x1)*.75),drop=Math.max(32,Math.abs(y2-y1)*.75);
+     const bend=Math.abs(x2-x1)*0.55228475,drop=Math.abs(y2-y1)*0.55228475;
      const d=start?`M ${x1} ${y1} C ${x1} ${y1+drop}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`:finish?`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2} ${y2+drop}, ${x2} ${y2}`:`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`;
      return [`<path d="${d}"/>`];
     });
