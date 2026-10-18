@@ -326,7 +326,8 @@
      const x1=start?from.x:from.x+direction*from.rx,y1=start?from.y+from.ry:from.y;
      const x2=finish?to.x:to.x-direction*to.rx,y2=finish?to.y+to.ry:to.y;
      const bend=Math.abs(x2-x1)*0.55228475,drop=Math.abs(y2-y1)*0.55228475;
-     const d=start?`M ${x1} ${y1} C ${x1} ${y1+drop}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`:finish?`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2} ${y2+drop}, ${x2} ${y2}`:`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`;
+     const stem=Math.min(24,Math.abs(y2-y1)*.3),leaveY=y1+stem,returnY=y2+stem;
+     const d=start?`M ${x1} ${y1} V ${leaveY} C ${x1} ${leaveY+Math.abs(y2-leaveY)*.55228475}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`:finish?`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2} ${returnY+Math.abs(y1-returnY)*.55228475}, ${x2} ${returnY} V ${y2}`:`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`;
      return [`<path d="${d}"/>`];
     });
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.dataset.subflowRoutes='';svg.classList.add('jd-subflow-routes');svg.setAttribute('aria-hidden','true');svg.setAttribute('viewBox',`0 0 ${scope.clientWidth||bounds.width} ${scope.clientHeight||bounds.height}`);svg.setAttribute('preserveAspectRatio','none');svg.innerHTML=paths.join('');scope.prepend(svg);
