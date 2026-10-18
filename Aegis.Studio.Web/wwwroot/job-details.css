@@ -255,3 +255,8 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-subflow-between-endpoints>.jd-dot-levels>.jd-dot-level{flex:1;min-width:0}
 .jd-subflow-between-endpoints .jd-dot-stage{min-width:0}
 .jd-subflow-between-endpoints .jd-workflow-dot{justify-content:center;flex-wrap:wrap;min-width:0}
+
+/* Short labels sit below the indicator; full descriptions remain on the control. */
+.jd-flow-summary .jd-workflow-dot,.jd-dot-subflow .jd-workflow-dot{flex-direction:column;align-items:center;gap:5px}
+.jd-flow-summary .jd-workflow-dot strong,.jd-dot-subflow .jd-workflow-dot strong{white-space:nowrap;font-weight:500}
+@media(max-width:900px){.jd-flow-summary .jd-workflow-dot strong,.jd-dot-subflow .jd-workflow-dot strong{transform:rotate(18deg);transform-origin:top center}.jd-dot-subflow{padding-bottom:28px}.jd-flow-summary{padding-bottom:16px}}
