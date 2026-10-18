@@ -249,3 +249,9 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-main-dashed{min-width:100px}
 .jd-dot-subflow{padding:18px 16% 18px}
 @media(max-width:700px){.jd-flow-summary:has(.jd-workflow-dot)>li.jd-main-expanded{min-width:250px}.jd-main-endpoints{gap:14px}.jd-main-dashed{min-width:60px}.jd-dot-subflow{padding-left:10%;padding-right:10%}}
+
+.jd-subflow-between-endpoints{min-width:0;overflow:visible}
+.jd-subflow-between-endpoints>.jd-dot-levels{min-width:0;gap:8px;justify-content:space-between}
+.jd-subflow-between-endpoints>.jd-dot-levels>.jd-dot-level{flex:1;min-width:0}
+.jd-subflow-between-endpoints .jd-dot-stage{min-width:0}
+.jd-subflow-between-endpoints .jd-workflow-dot{justify-content:center;flex-wrap:wrap;min-width:0}
