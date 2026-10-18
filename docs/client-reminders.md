@@ -1,6 +1,6 @@
 # Client reminders
 
-Client Reminders is available in navigation and from the job's Assignments & Workflow panel. Users need View Conversation to read reminders, Reply Requester to manage them, and View Financials for deposit reminders.
+Reminders is a tab on a selected Client and a Client Reminders action in Job Details. The Client tab shows history only for jobs linked by that client's stored ID and lets staff choose one of those jobs to manage reminders. There is no standalone reminders page or navigation entry. The existing job workflow panel entry also opens the same job-scoped controls. Users need View Conversation to read reminders, Reply Requester to manage them, and View Financials for deposit reminders.
 
 For a job, confirm the client's channel preferences, then schedule an editable reminder or enable an automatic rule. Both channels and all automatic rules start disabled. Templates support `{client}`, `{job}`, `{detail}` and `{location}`. Manual messages show an editable rendered preview. Automatic template edits apply to future reminders; existing scheduled messages can be edited, postponed or cancelled separately.
 
@@ -26,3 +26,4 @@ The queue shows scheduled, queued, sending, submitted, failed, attention and can
 Change history retains reminder snapshots, timestamps and the staff/system actor. Provider progress remains linked through the outbox. Incoming replies use the existing channel routing; this feature does not add a new inbound transport or promise read receipts.
 
 Validation: targeted browser-unit tests cover opt-in defaults, editable previews, stable retry IDs, unavailable events, read-only controls, escaping and queue filters. The SQL migration and business-state predicates are also exercised against a PostgreSQL-compatible local engine. The repository includes .NET unit and isolated PostgreSQL regression tests; full application/provider testing is still required before deployment.
+

@@ -62,3 +62,13 @@ test('client and linked-job searches preserve caret and selection while typing',
   input.value='';input.setSelectionRange(0,0);input.dispatchEvent(new w.Event('input',{bubbles:true}));
  }
 });
+
+
+test('Client Reminders tab passes only jobs associated with the selected client',async()=>{
+ const {w,fixture}=setup();try{
+ let loaded;w.StudioClientReminders={mountClient:async(host,jobs,current)=>{loaded=jobs;assert.equal(current(),true);host.textContent='Client reminders';}};
+ await w.StudioClients.render({clientId:'a'});
+ w.document.querySelector('[data-c-tab="reminders"]').click();await settle();
+ assert.deepEqual(Array.from(loaded,j=>j.id),['j1']);assert.match(w.genericView.textContent,/Client reminders/);
+ }finally{w.close();}
+});

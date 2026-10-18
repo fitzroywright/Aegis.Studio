@@ -9062,7 +9062,7 @@ body .topbar #studioBreadcrumb .breadcrumb-label {
 }
 .fd-layout {
   display: grid;
-  grid-template-columns: minmax(0,2.5fr) minmax(285px,1fr);
+  grid-template-columns: minmax(0,1fr) 290px;
   gap: 14px;
   min-height: 0;
   flex: 1;
@@ -9261,7 +9261,7 @@ flex:1;}
   font-size: 11px;
   color: #81776e;
 }
-@media (max-width:1050px) {
+@media (max-width:800px) {
   .fd-layout {
     grid-template-columns: 1fr;
     overflow: auto;
@@ -9986,7 +9986,8 @@ body[data-studio-view="frontdesk"] .fd-queue .fd-table thead th {
   white-space: nowrap;
 }
 body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody td {
-  padding: 11px 14px;
+  white-space: nowrap;
+  padding: 9px 10px;
   border: 0;
   border-top: 1px solid var(--border,#edf0f2);
   vertical-align: middle;
@@ -10130,4 +10131,5 @@ body .topbar { padding-left: 0 !important; column-gap: 0 !important; }
 body .topbar .studio-script-brand { padding: 0 !important; margin: 0 !important; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
 body .topbar .studio-script-brand .studio-bryans-brand-image { display: block; width: 216px; height: 56px; object-fit: contain; }
 body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left: 0 !important; border-left: 0 !important; }
+
 
