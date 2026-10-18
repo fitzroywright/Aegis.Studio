@@ -197,6 +197,10 @@ builder.Services.AddSingleton<StudioDeliveryPlanner>();
 builder.Services.AddSingleton<StudioUnifiedMessaging>();
 builder.Services.AddSingleton<StudioUnifiedInbox>();
 builder.Services.AddSingleton<StudioUnifiedInbound>();
+builder.Services.AddSingleton<StudioEmailRouting>();
+builder.Services.AddHttpClient<StudioGraphSentMessageVerifier>();
+builder.Services.AddSingleton<StudioEmailIntake>();
+builder.Services.AddSingleton<StudioInquiryAssociations>();
 builder.Services.AddHttpClient<global::Common.Messaging.IEmailRecipientDirectory,global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphRecipientDirectory>();
 builder.Services.AddSingleton<StudioRecipientResolver>();
 builder.Services.AddSingleton<NotificationService>();
@@ -330,6 +334,7 @@ app.MapConnectedWorkflow();
 Aegis.Studio.Web.Finance.FinanceReleaseStore.MapStudioFinance(app);
 app.MapStudioClients();
 app.MapStudioUnifiedMessaging();
+app.MapStudioEmailAssociations();
 app.MapStudioFulfillment();
 Aegis.Studio.Web.Reminders.ClientReminderEndpoints.MapClientReminders(app);
 app.MapStudioQuotes();
@@ -412,29 +417,14 @@ app.MapPost("/api/interactions", (IncomingInteractionRequest request, ClaimsPrin
     try { StudioConversation conversation = store.ReceiveInteraction(request); notifications.PublishToAll("WorkspaceMessage", $"New request: {conversation.Subject}", $"{conversation.ContactName} sent a new {conversation.Channel} request.", "Conversation", conversation.Id.ToString("D")); return Results.Created("/api/conversations", conversation); }
     catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
 });
-app.MapPost("/api/email/inbound", async (InboundEmail email, StudioUnifiedInbound unified, CancellationToken token, IInboundEmailRouter router, StudioStore store, UnroutedEmailStore unrouted, NotificationService notifications, StudioOperationsFlowPublisher operationsFlows) =>
+app.MapPost("/api/email/inbound", async (InboundEmail email, StudioEmailIntake intake, CancellationToken token) =>
 {
-    bool evidence = email.ToAddresses.Count > 0 || email.CcAddresses.Count > 0 || email.InternetHeaders.ContainsKey("X-Aegis-Route");
-    if (string.IsNullOrWhiteSpace(email.MessageId) || string.IsNullOrWhiteSpace(email.FromAddress) || !evidence || string.IsNullOrWhiteSpace(email.Subject) || string.IsNullOrWhiteSpace(email.Body)) return Results.BadRequest(new { error = "Message id, sender, routing evidence, subject and body are required." });
-    if(await unified.TryImportAsync(email,token))return Results.Ok(new{routed=true});
-    EmailRouteResult route = unified.FindLegacyRoute(email) ?? router.Route(email);
-    string correlationId = email.MessageId;
-    if (!route.IsRouted)
+    try
     {
-        UnroutedEmail item = unrouted.Capture(email, route.FailureReason ?? "No route was resolved.");
-        operationsFlows.TryEnqueueInbound(correlationId, "Router", businessId: item.Id.ToString("D"), detail: route.FailureReason, failed: true);
-        return Results.UnprocessableEntity(new { routed = false, reviewId = item.Id, route.FailureReason });
+        var result=await intake.ReceiveAsync(email,token);
+        return result.Routed ? Results.Ok(result) : Results.UnprocessableEntity(result);
     }
-    operationsFlows.TryEnqueueInbound(correlationId, "Router", businessId: route.WorkspaceId?.ToString("D"));
-    EmailIngestResult result = store.ReceiveEmail(email, route);
-    operationsFlows.TryEnqueueInbound(correlationId, "Workspace", businessId: result.Conversation.Id.ToString("D"));
-    operationsFlows.TryEnqueueInbound(correlationId, "Conversation", businessId: result.Conversation.Id.ToString("D"));
-    if (!result.WasDuplicate)
-    {
-        notifications.PublishToAll("WorkspaceMessage", $"Email: {email.Subject}", $"New email from {email.FromName} routed to {route.WorkspaceName}.", "Conversation", result.Conversation.Id.ToString("D"));
-        operationsFlows.TryEnqueueInbound(correlationId, "Notification", businessId: result.Conversation.Id.ToString("D"));
-    }
-    return Results.Ok(new { routed = true, workspaceId = route.WorkspaceId, conversationId = result.Conversation.Id, result.CreatedConversation, result.WasDuplicate });
+    catch(InvalidOperationException ex){return Results.BadRequest(new{error=ex.Message});}
 }).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
 app.MapGet("/api/email/unrouted", (UnroutedEmailStore store) => Results.Ok(store.GetOpen())).RequireAuthorization(new AuthorizeAttribute { Roles = "Administrator" });
 app.MapGet("/api/email/outbox", (ClaimsPrincipal user, OutboundEmailStore outbox, StudioStore store, WorkspaceAccessService access) =>
@@ -718,5 +708,6 @@ app.MapGet("/api/attachments/{id:guid}", (Guid id, ClaimsPrincipal user, Attachm
 app.MapGet("/api/accounts/summary", (StudioStore store) => Results.Ok(store.GetAccountsSummary()));
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
+
 
 

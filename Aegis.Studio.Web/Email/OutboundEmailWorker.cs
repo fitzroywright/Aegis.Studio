@@ -62,13 +62,31 @@ public sealed class OutboundEmailWorker : BackgroundService
                             rfcId=message.RfcMessageId??$"<studio.{message.Id:N}@{message.FromAddress.Split('@').Last()}>";
                             outbox.SetRfcMessageId(message.Id,lease,rfcId);
                             metadata["Email.MessageId"]=rfcId;metadata["Email.From"]=message.FromAddress;
-                            if(!metadata.ContainsKey("Email.ReplyTo"))metadata["Email.ReplyTo"]=configuration["Messaging:MicrosoftGraph:Email:SenderUpn"]??message.FromAddress;
+                            if(!metadata.ContainsKey("Email.ReplyTo"))metadata["Email.ReplyTo"]=configuration["Messaging:MicrosoftGraph:Email:SenderUpn"]??"";
                         }
                         var files=message.StudioMessageId.HasValue?attachments.GetForThread(message.ConversationId).Where(a=>a.MessageId==message.StudioMessageId.Value).Select(a=>new MessageAttachment(a.FileName,a.ContentType,File.ReadAllBytes(attachments.GetPhysicalPath(a)))).ToArray():Array.Empty<MessageAttachment>();
-                        var request=new MessageRequest{RecipientIds=[message.ToAddress],Title=message.Subject,Body=message.Body,BodyIsHtml=false,Channels=channel,Source="Aegis.Studio",CorrelationId=message.Id.ToString("D"),Attachments=files,Metadata=metadata};
+                        if(channel==MessageChannel.MsEmail && string.IsNullOrWhiteSpace(metadata.GetValueOrDefault("Email.ReplyTo")))throw new InvalidOperationException("A monitored Reply-To is required.");
+                        string subject=message.Subject,body=message.Body;
+                        if(channel==MessageChannel.MsEmail)
+                        {
+                            string reference=StudioEmailRouting.PublicReference(message.ConversationId,message.StudioMessageId.HasValue);
+                            subject=$"[{reference}] "+System.Text.RegularExpressions.Regex.Replace(subject,@"\[AEGIS-[A-Za-z0-9]+\]\s*", "");
+                            if(!body.Contains(reference,StringComparison.OrdinalIgnoreCase))body+=$"\n\nFor a new email about this request, include {reference} in the subject.";
+                        }
+                        var request=new MessageRequest{RecipientIds=[message.ToAddress],Title=subject,Body=body,BodyIsHtml=false,Channels=channel,Source="Aegis.Studio",CorrelationId=message.Id.ToString("D"),Attachments=files,Metadata=metadata};
+                        DateTimeOffset sendingAt=DateTimeOffset.UtcNow.AddMinutes(-1);
                         await transport.SendAsync(recipient,request,message.Id,stoppingToken);
                         providerAccepted=true;
-                        if(outbox.MarkProviderAccepted(message.Id,rfcId,lease) is not null)
+                        string? providerId=null;
+                        if(channel==MessageChannel.MsEmail)
+                        {
+                            if(transport is not MicrosoftGraphEmailMessageChannel)
+                                throw new InvalidOperationException("This email transport cannot verify its actual Internet Message-ID.");
+                            var verifier=new StudioGraphSentMessageVerifier(http,configuration,secrets);
+                            var verified=await verifier.VerifyAsync(message,metadata.GetValueOrDefault("Studio.MessageId",message.Id.ToString("D")),metadata["Email.ReplyTo"],sendingAt,stoppingToken);
+                            outbox.RecordVerifiedInternetId(message.Id,lease,verified);providerId=verified.ProviderId;
+                        }
+                        if(outbox.MarkProviderAccepted(message.Id,providerId,lease) is not null)
                         {
                             flows.TryEnqueueOutbound(message.ConversationId.ToString("D"),"Provider",businessId:message.Id.ToString("D"),detail:"ProviderAccepted");
                             flows.TryEnqueueOutboundUnknown(message.ConversationId.ToString("D"),"Recipient",businessId:message.Id.ToString("D"),detail:"DeliveryReceiptUnavailable");
@@ -78,7 +96,7 @@ public sealed class OutboundEmailWorker : BackgroundService
                     {
                         outbox.MarkAttention(message.Id,lease,"ProviderOutcomeUncertain: reconcile sent items or message trace before resending.");
                     }
-                    catch(HttpRequestException ex) when(ex.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.NotFound)
+                    catch(HttpRequestException ex) when(!providerAccepted && (ex.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.NotFound))
                     {
                         outbox.MarkAttention(message.Id,lease,"ProviderRejected:"+(int)ex.StatusCode.Value);
                     }
@@ -87,7 +105,7 @@ public sealed class OutboundEmailWorker : BackgroundService
                     {
                         if(providerAccepted)
                         {
-                            outbox.MarkAttention(message.Id,lease,"ProviderOutcomeUncertain: provider accepted but recording the result failed.");
+                            outbox.MarkAttention(message.Id,lease,"ProviderOutcomeUncertain: provider accepted but Internet Message-ID or delivery recording requires reconciliation.",true);
                             logger.LogError(ex,"Provider accepted message {MessageId}; reconciliation is required",message.Id);
                             continue;
                         }
@@ -104,3 +122,4 @@ public sealed class OutboundEmailWorker : BackgroundService
     }
     public override void Dispose(){http.Dispose();base.Dispose();}
 }
+

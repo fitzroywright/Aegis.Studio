@@ -12,21 +12,21 @@ using static Aegis.Studio.Web.Messaging.StudioUnifiedMessaging;
 namespace Aegis.Studio.Web.Messaging;
 
 public sealed class StudioUnifiedInbound(StudioDatabase database, StudioAddressBook addresses, StudioMessageAttachmentStore attachments,
-    UnroutedEmailStore unresolved, IConfiguration configuration, IHubContext<StudioMessageHub> hub, StudioInAppMessageStore messages)
+    IConfiguration configuration, IHubContext<StudioMessageHub> hub, StudioInAppMessageStore messages)
 {
     private string ProviderIdentity => "Microsoft365:" + StudioAddressBook.Normalize(configuration["Messaging:MicrosoftGraph:Email:SenderUpn"]);
 
-    public async Task<bool> TryImportAsync(InboundEmail email, CancellationToken token)
+    public async Task<bool> TryImportAsync(InboundEmail email, CancellationToken token, Guid? associatedThread = null)
     {
         if (IsOwnOutbound(email)) return true;
-        Guid? replyThread = FindReplyThread(email, legacy: false);
+        Guid? replyThread = associatedThread;
         List<(Guid ThreadId, string DestinationKey)> targets = [];
         if (replyThread.HasValue) targets.Add((replyThread.Value, "reply:" + replyThread.Value.ToString("D")));
         else
         {
             var resolved = email.ToAddresses.Concat(email.CcAddresses).Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(addresses.Resolve).Where(e => e is not null).Cast<StudioAddressEntry>()
-                .Where(e => e.DeliveryMode != "ExternalOnly" && (e.InboxType == "Microsoft365" || e.StudioManagedGroup)).DistinctBy(e => e.Id).ToArray();
+                .Where(e => e.ContactType is not "Workspace" and not "Job" && e.DeliveryMode != "ExternalOnly" && (e.InboxType == "Microsoft365" || e.StudioManagedGroup)).DistinctBy(e => e.Id).ToArray();
             if (resolved.Length == 0) return false;
             foreach (var destination in resolved)
             {
@@ -77,25 +77,6 @@ public sealed class StudioUnifiedInbound(StudioDatabase database, StudioAddressB
         return true;
     }
 
-    public EmailRouteResult? FindLegacyRoute(InboundEmail email)
-    {
-        Guid? conversationId = FindReplyThread(email, legacy: true);
-        if (!conversationId.HasValue) return null;
-        using var c = database.OpenConnection(); using var q = new NpgsqlCommand("select c.workspace_id,w.name,w.email_address from studio_conversations c join studio_workspaces w on w.id=c.workspace_id where c.id=$1", c);
-        Add(q, conversationId.Value); using var r = q.ExecuteReader();
-        return r.Read() ? new(true, r.GetGuid(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), null) : null;
-    }
-
-    private Guid? FindReplyThread(InboundEmail email, bool legacy)
-    {
-        string[] references = ReplyReferences(email.InternetHeaders);
-        if (references.Length == 0) return null;
-        using var c = database.OpenConnection(); using var q = new NpgsqlCommand($"select distinct {(legacy ? "conversation_id" : "studio_thread_id")} from studio_outbound_email where rfc_message_id=any($1) and lower(to_address)=lower($2) and {(legacy ? "conversation_id" : "studio_thread_id")} is not null", c);
-        Add(q, references, email.FromAddress.Trim()); using var r = q.ExecuteReader(); List<Guid> ids = []; while (r.Read()) ids.Add(r.GetGuid(0));
-        if (ids.Count > 1) { unresolved.Capture(email, "Reply headers matched multiple conversations; manual review is required."); throw new InvalidOperationException("Ambiguous reply headers."); }
-        return ids.Count == 1 ? ids[0] : null;
-    }
-
     public static string[] ReplyReferences(IReadOnlyDictionary<string, string> headers)
         => headers.Where(h => h.Key.Equals("In-Reply-To", StringComparison.OrdinalIgnoreCase) || h.Key.Equals("References", StringComparison.OrdinalIgnoreCase))
             .SelectMany(h => Regex.Matches(h.Value, @"<[^<>\s]+@[^<>\s]+>").Select(m => m.Value)).Distinct(StringComparer.Ordinal).ToArray();
@@ -109,7 +90,7 @@ public sealed class StudioUnifiedInbound(StudioDatabase database, StudioAddressB
     private Guid FindInboundThread(StudioAddressEntry destination, InboundEmail email)
     {
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
-        string key = $"inbound:{destination.Id:D}:{StudioAddressBook.Normalize(email.FromAddress)}";
+        string key = $"inbound:{destination.Id:D}:{email.MessageId}";
         LockRequest(c, tx, key);
         string scope = destination.ContactType is "Workspace" or "Job" ? destination.ContactType : "Direct";
         using var find = new NpgsqlCommand(scope == "Direct" ? "select id from studio_message_threads where direct_key=$1" : "select id from studio_message_threads where scope_type=$1 and scope_id=$2", c, tx);
@@ -124,3 +105,4 @@ public sealed class StudioUnifiedInbound(StudioDatabase database, StudioAddressB
         tx.Commit(); return id;
     }
 }
+

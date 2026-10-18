@@ -49,7 +49,7 @@
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
         genericView.innerHTML = StudioPage.html({title:'Messages',className:'st-messages-content',showHeader:false,showMessagesCard:false,summaryTitle:'Conversation Context',summary:'<div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div>',attention:'<div id="studioMessageAttention" aria-live="polite"><p>Checking your replies…</p></div>',content:`
-            <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New Message</button></div></header>
+            <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioEmailReview">Email routing review</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New Message</button></div></header>
             <div class="st-inbox">
                 <section class="studio-inbox-center">
 
@@ -63,6 +63,7 @@
         document.getElementById('studioAddressBook').onclick = () => showAddressBook();
         document.getElementById('studioInboxPrevious').onclick=()=>{inboxOffset=Math.max(0,inboxOffset-100);void loadInbox(true);};
         document.getElementById('studioInboxNext').onclick=()=>{inboxOffset+=100;void loadInbox(true);};
+        document.getElementById('studioEmailReview').onclick=()=>window.StudioInquiryAssociation.review();
         document.getElementById('studioInboxRefresh').onclick = () => loadInbox(true);
         document.getElementById('studioInboxSearch').oninput = event => { inboxQuery = event.target.value;inboxOffset=0;clearTimeout(inboxSearchTimer);inboxSearchTimer=setTimeout(()=>loadInbox(true),250); };
         document.getElementById('studioInboxJobSelect').onchange = event => { inboxFilter=event.target.value;inboxOffset=0;void loadInbox(true); };
@@ -246,6 +247,7 @@
         pane.innerHTML=`<div class="message-conversation-header"><div><h2>${esc(conversation.subject)}</h2><p>${esc(conversation.contactName)} · ${esc(conversation.contactAddress)}</p></div></div><div class="studio-message-history">${conversation.messages.map(m=>renderMessage({id:m.id,senderUserName:m.author,body:m.body,createdAtUtc:m.createdAt},[])).join('')}${files.length?`<div class="studio-message-files">${files.map(f=>`<a href="/api/attachments/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.fileName)}</a>`).join('')}</div>`:''}</div>
             <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><span class="studio-send-split" role="group" aria-label="Send reply or add internal note"><button class="primary" type="submit">Send</button><select name="replyMode" aria-label="Reply sender or internal note">${replyChoices.map(identity=>`<option value="${esc(identity.type)}" ${identity.type===defaultSender?'selected':''}>${esc(identity.label)}</option>`).join('')}<option value="Internal">Internal note</option></select></span></div></form>`;
         StudioMessageCard.bindEditors(pane);
+        await window.StudioInquiryAssociation?.mount(pane,id,conversation,()=>openLegacyConversation(id));
         const replyForm=document.getElementById('legacyMessageComposer');
         const replyMode=replyForm.elements.replyMode;
         const sendButton=replyForm.querySelector('[type=submit]');
@@ -662,5 +664,6 @@
     // Give authentication and the initial shell a moment to settle, then show the digest once.
     setTimeout(() => showAwayDigestOnce(), 450);
 })();
+
 
 

@@ -107,6 +107,7 @@ async function openConversation(id) {
     }
     applyConversationPermissions();
     await tightenConversationExperience(id);
+    await window.StudioInquiryAssociation?.mount(detailPane,id,conversation,()=>openConversation(id));
     await renderAttachments(id);
 }
 
@@ -205,6 +206,7 @@ newRequestForm.onsubmit = async event => {
     await loadConversations();
     await openConversation(created.id);
 };
+
 
 
 

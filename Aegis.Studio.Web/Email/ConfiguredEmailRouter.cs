@@ -50,8 +50,9 @@ public sealed class ConfiguredEmailRouter : IInboundEmailRouter
     }
 
     private static string NormalizeAddress(string? value)
-        => value?.Trim().Trim('<', '>').ToLowerInvariant() ?? string.Empty;
+        => StudioEmailRouting.NormalizeAddress(value);
 
     private static EmailRouteResult Routed(StudioWorkspaceDefinition workspace)
         => new(true, workspace.Id, workspace.Name, workspace.EmailAddress, null);
 }
+

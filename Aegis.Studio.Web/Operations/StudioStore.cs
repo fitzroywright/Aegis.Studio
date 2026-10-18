@@ -117,7 +117,7 @@ public sealed class StudioStore
         return GetConversation(conversationId)!;
     }
 
-    public EmailIngestResult ReceiveEmail(InboundEmail email, EmailRouteResult route)
+    public EmailIngestResult ReceiveEmail(InboundEmail email, EmailRouteResult route, Guid? associatedConversationId = null)
     {
         if (!route.IsRouted || !route.WorkspaceId.HasValue)
         {
@@ -131,7 +131,7 @@ public sealed class StudioStore
             return new EmailIngestResult(duplicate, false, true);
         }
 
-        StudioConversation? existing = FindConversationForEmail(email, route.WorkspaceId.Value);
+        StudioConversation? existing = associatedConversationId.HasValue ? GetConversation(associatedConversationId.Value) : null;
         StudioMessage message = new(Guid.NewGuid(), email.FromName.Trim(), "External", email.Body.Trim(), email.ReceivedAt.ToUniversalTime(), email.MessageId, email.FromAddress.Trim());
         if (existing is not null)
         {
@@ -181,12 +181,17 @@ public sealed class StudioStore
         Guid id = Guid.NewGuid();
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
+        using (var locked = new NpgsqlCommand("select job_id from studio_conversations where id=$1 for update",connection,transaction))
+        {
+            locked.Parameters.AddWithValue(conversationId);
+            if(locked.ExecuteScalar() is Guid linked) { transaction.Commit(); return GetJob(linked)!; }
+        }
         using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
             command.CommandText = """
-                insert into studio_jobs(id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, job_lead)
-                values ($1,$2,$3,$4,$5,'Pending',$6,$7,null,null)
+                insert into studio_jobs(id, workspace_id, conversation_id, title, client_name, status, event_date, created_at_utc, assigned_to, job_lead, client_id)
+                values ($1,$2,$3,$4,coalesce((select cl.display_name from studio_clients cl join studio_conversations cv on cv.client_id=cl.id where cv.id=$3),$5),'Pending',$6,$7,null,null,(select client_id from studio_conversations where id=$3))
                 """;
             command.Parameters.AddWithValue(id);
             command.Parameters.AddWithValue(conversation.WorkspaceId);
@@ -323,50 +328,6 @@ public sealed class StudioStore
         return value is Guid id ? GetConversation(id) : null;
     }
 
-    private StudioConversation? FindConversationForEmail(InboundEmail email, Guid workspaceId)
-    {
-        string? threadId = NormaliseThreadId(email.ThreadId);
-        using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlCommand command = connection.CreateCommand();
-        string[] references=Aegis.Studio.Web.Messaging.StudioUnifiedInbound.ReplyReferences(email.InternetHeaders);
-        if(references.Length>0)
-        {
-            command.CommandText="select distinct e.conversation_id from studio_outbound_email e join studio_conversations c on c.id=e.conversation_id where e.rfc_message_id=any($1) and lower(e.to_address)=lower($2) and c.workspace_id=$3";
-            command.Parameters.AddWithValue(references);command.Parameters.AddWithValue(email.FromAddress.Trim());command.Parameters.AddWithValue(workspaceId);
-            using var referenceReader=command.ExecuteReader();List<Guid> ids=[];while(referenceReader.Read())ids.Add(referenceReader.GetGuid(0));referenceReader.Close();command.Parameters.Clear();
-            if(ids.Count==1)return GetConversation(ids[0]);
-            if(ids.Count>1)throw new InvalidOperationException("Reply headers match multiple conversations.");
-        }
-        if (threadId is not null)
-        {
-            command.CommandText = "select id from studio_conversations where workspace_id=$1 and external_thread_id=$2 order by created_at_utc desc limit 1";
-            command.Parameters.AddWithValue(workspaceId);
-            command.Parameters.AddWithValue(threadId);
-            object? threaded = command.ExecuteScalar();
-            if (threaded is Guid threadedId)
-            {
-                return GetConversation(threadedId);
-            }
-            command.Parameters.Clear();
-        }
-
-        command.CommandText = "select id, subject from studio_conversations where workspace_id=$1 and lower(contact_address)=lower($2) order by created_at_utc desc";
-        command.Parameters.AddWithValue(workspaceId);
-        command.Parameters.AddWithValue(email.FromAddress.Trim());
-        using NpgsqlDataReader reader = command.ExecuteReader();
-        string subject = NormaliseSubject(email.Subject);
-        while (reader.Read())
-        {
-            if (string.Equals(NormaliseSubject(reader.GetString(1)), subject, StringComparison.OrdinalIgnoreCase))
-            {
-                Guid id = reader.GetGuid(0);
-                reader.Close();
-                return GetConversation(id);
-            }
-        }
-        return null;
-    }
-
     private StudioConversation ReadConversation(NpgsqlDataReader reader)
     {
         Guid id = reader.GetGuid(0);
@@ -444,7 +405,6 @@ public sealed class StudioStore
 
     private static string NormaliseChannel(string? channel) => string.IsNullOrWhiteSpace(channel) ? "Manual" : channel.Trim();
     private static string? NormaliseThreadId(string? id) => string.IsNullOrWhiteSpace(id) ? null : id.Trim();
-    private static string NormaliseSubject(string subject) { string value = subject.Trim(); while (value.StartsWith("RE:", StringComparison.OrdinalIgnoreCase) || value.StartsWith("FW:", StringComparison.OrdinalIgnoreCase) || value.StartsWith("FWD:", StringComparison.OrdinalIgnoreCase)) { value = value[(value.IndexOf(':') + 1)..].Trim(); } return value; }
 }
 
 public sealed record StudioWorkspace(Guid Id, string Name, string Address, int OpenCount);
@@ -460,4 +420,5 @@ public sealed record UpdateJobRequest(string? Status, string? AssignedTo, DateOn
 public sealed record PipelineJobTransitionRequest(string? Status, Guid? WorkspaceId, string? Reason,long ExpectedRevision=0,Guid OperationId=default);
 public sealed record AddFinancialEventRequest(string Kind, decimal Amount, string? Note,string? PaymentMethod=null);
 public sealed record AccountsSummary(decimal RecordedAmount, int JobsWithFinancialActivity, int TotalJobs);
+
 

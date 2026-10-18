@@ -19,7 +19,7 @@ public static class LegacyMailboxImportEndpoints
             HttpContext context,
             WorkspaceAccessService access,
             WorkspaceStore workspaces,
-            StudioStore studio,
+            StudioEmailIntake intake,
             AttachmentStore attachments,
             CancellationToken cancellationToken) =>
         {
@@ -28,8 +28,8 @@ public static class LegacyMailboxImportEndpoints
             if (workspace is null) return Results.NotFound();
             try
             {
-                LegacyMailboxImporter importer = new(studio, attachments);
-                LegacyMailboxImportResult result = await importer.ImportAsync(workspace, request, cancellationToken);
+                LegacyMailboxImporter importer = new(attachments, intake);
+                LegacyMailboxImportResult result = await importer.ImportAsync(workspace, request, cancellationToken, context.User);
                 return Results.Ok(result);
             }
             catch (Exception exception)
@@ -42,16 +42,16 @@ public static class LegacyMailboxImportEndpoints
 
 public sealed class LegacyMailboxImporter
 {
-    private readonly StudioStore studio;
+    private readonly StudioEmailIntake intake;
     private readonly AttachmentStore attachments;
 
-    public LegacyMailboxImporter(StudioStore studio, AttachmentStore attachments)
+    public LegacyMailboxImporter(AttachmentStore attachments, StudioEmailIntake intake)
     {
-        this.studio = studio;
+        this.intake = intake;
         this.attachments = attachments;
     }
 
-    public async Task<LegacyMailboxImportResult> ImportAsync(StudioWorkspaceDefinition workspace, LegacyMailboxImportRequest request, CancellationToken cancellationToken)
+    public async Task<LegacyMailboxImportResult> ImportAsync(StudioWorkspaceDefinition workspace, LegacyMailboxImportRequest request, CancellationToken cancellationToken, System.Security.Claims.ClaimsPrincipal? user = null)
     {
         ProviderSettings provider = ProviderSettings.Resolve(request.Provider);
         if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Secret)) throw new InvalidOperationException("Mailbox user name and credential are required.");
@@ -105,7 +105,8 @@ public sealed class LegacyMailboxImporter
                 string senderAddress = sender?.Address ?? userName;
                 string? senderDisplayName = sender?.Name;
                 string senderName = string.IsNullOrWhiteSpace(senderDisplayName) ? senderAddress : senderDisplayName;
-                string messageId = string.IsNullOrWhiteSpace(message.MessageId) ? $"legacy-{provider.Name}-{id.Id}@import.local" : message.MessageId;
+                string sourceProviderId="imap:"+System.Text.Json.JsonSerializer.Serialize(new{provider=provider.Name,mailbox=StudioEmailRouting.NormalizeAddress(userName),folder=folder.FullName,uidValidity=folder.UidValidity,uid=id.Id});
+                string messageId = string.IsNullOrWhiteSpace(message.MessageId) ? $"legacy-{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(sourceProviderId)))}@import.local" : message.MessageId;
                 string body = message.TextBody ?? message.HtmlBody ?? string.Empty;
                 IReadOnlyDictionary<string, string> headers = message.Headers
                     .Where(header => !string.IsNullOrWhiteSpace(header.Field))
@@ -122,17 +123,9 @@ public sealed class LegacyMailboxImporter
                     headers,
                     message.Subject ?? "Imported message",
                     body,
-                    message.Date == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : message.Date.ToUniversalTime());
+                    message.Date == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : message.Date.ToUniversalTime(),ProviderMessageId:sourceProviderId);
 
-                EmailRouteResult route = new(true, workspace.Id, workspace.Name, userName, null);
-                EmailIngestResult ingest = studio.ReceiveEmail(inbound, route);
-                if (ingest.WasDuplicate)
-                {
-                    duplicates++;
-                    continue;
-                }
-
-                imported++;
+                List<InboundEmailAttachment> files=[];
                 foreach (MimeEntity entity in message.Attachments)
                 {
                     if (entity is MimePart part)
@@ -148,7 +141,7 @@ public sealed class LegacyMailboxImporter
                         if (stream.Length > 0 && stream.Length <= attachments.MaximumBytes)
                         {
                             string contentType = part.ContentType?.MimeType ?? "application/octet-stream";
-                            await attachments.AddBytesAsync(ingest.Conversation.Id, part.FileName ?? "attachment.bin", contentType, stream.ToArray(), "External", $"Mailbox import: {userName}", cancellationToken);
+                            files.Add(new(part.FileName ?? "attachment.bin",contentType,stream.ToArray()));
                             attachmentCount++;
                         }
                     }
@@ -165,11 +158,15 @@ public sealed class LegacyMailboxImporter
                         if (stream.Length > 0 && stream.Length <= attachments.MaximumBytes)
                         {
                             string fileName = attachedMessage.ContentDisposition?.FileName ?? attachedMessage.ContentType?.Name ?? "attached-message.eml";
-                            await attachments.AddBytesAsync(ingest.Conversation.Id, fileName, "message/rfc822", stream.ToArray(), "External", $"Mailbox import: {userName}", cancellationToken);
+                            files.Add(new(fileName,"message/rfc822",stream.ToArray()));
                             attachmentCount++;
                         }
                     }
                 }
+                inbound=inbound with {Attachments=files};
+                var result=await intake.ReceiveAsync(inbound,cancellationToken,new(true,workspace.Id,workspace.Name,userName,null),user:user);
+                if(!result.Routed)failed++;else if(result.WasDuplicate)duplicates++;else imported++;
+
             }
             catch
             {
@@ -195,3 +192,4 @@ internal sealed record ProviderSettings(string Name,string Host,int Port,string 
         _ => throw new InvalidOperationException("Provider must be Gmail, Hotmail/Outlook, or Yahoo.")
     };
 }
+
