@@ -199,10 +199,23 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-workflow-dot:focus-visible,.jd-dot-expansion button:focus-visible,.jd-dot-details button:focus-visible{outline:3px solid var(--focus,#d88719);outline-offset:2px}
 .jd-workflow-dot.is-component>span{width:17px;height:17px}.jd-dot-endpoints{display:flex;align-items:center;gap:6px;font-size:10px;white-space:nowrap}.jd-dot-dash{flex:1;border-top:2px dashed currentColor;opacity:.6}
 .jd-dot-expansion{padding:6px;border:1px solid currentColor;border-radius:6px;animation:jd-dot-reveal .18s ease-out}.jd-dot-expansion .jd-dot-levels{padding-top:9px}.jd-dot-details{text-align:left;padding:8px;border:1px solid currentColor;border-radius:6px}.jd-dot-details p,.jd-dot-key{font-size:11px;margin:4px 0}.jd-dot-key{opacity:.85}
-.jd-flow-summary:has(.jd-workflow-dot){align-items:flex-start;gap:4px;overflow:auto}.jd-flow-summary:has(.jd-workflow-dot)>li{min-width:85px;flex:1}.jd-flow-summary:has(.jd-workflow-dot)>li::before,.jd-flow-summary:has(.jd-workflow-dot)>li::after{display:none}
+.jd-flow-summary:has(.jd-workflow-dot){align-items:flex-start;gap:4px;overflow:auto}.jd-flow-summary:has(.jd-workflow-dot)>li{min-width:85px;flex:1}
 @keyframes jd-dot-reveal{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.jd-dot-expansion{animation:none}}
 @media(max-width:800px){.jd-compact-workflow{max-height:360px}.jd-dot-level{min-width:85px}.jd-dot-stage.is-expanded{min-width:250px}.jd-flow-summary .jd-workflow-dot small{display:none}}
 body[data-theme="fluent-dark"] .jd-workflow-dot.completed{color:#82dda7}
 body[data-theme="fluent-dark"] .jd-workflow-dot.inprogress,body[data-theme="fluent-dark"] .jd-workflow-dot.available{color:#ffbd79}
 body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-dark"] .jd-workflow-dot.failed,body[data-theme="fluent-dark"] .jd-workflow-dot.reworkrequired{color:#ffa5b0}
+
+/* Match the original inline milestone lights; detail lives in tooltips. */
+.jd-workflow-dot{flex-direction:row;justify-content:flex-start;gap:5px;font-size:10px;padding:0 2px;color:var(--theme-muted,#69758b)}
+.jd-workflow-dot strong{font-size:10px;font-weight:inherit}
+.jd-workflow-dot>.jd-stage-light{width:12px;height:12px;min-width:12px;border:1px solid #a7b2c1;background:#e8ecf1;color:#48576b;font-size:8px}
+.jd-workflow-dot.completed>.jd-stage-light{background:#318348;border-color:#318348;color:#fff}
+.jd-workflow-dot.inprogress>.jd-stage-light,.jd-workflow-dot.available>.jd-stage-light{background:#fb851c;border-color:#fb851c;color:#fff}
+.jd-workflow-dot:is(.blocked,.failed,.reworkrequired,.reprintrequired,.waitingoncustomer)>.jd-stage-light{background:#bd3040;border-color:#bd3040;color:#fff}
+.jd-workflow-dot:is(.completed,.inprogress,.available){color:var(--theme-text,#162b50);font-weight:750}
+.jd-flow-summary:has(.jd-workflow-dot){align-items:center;gap:0}
+.jd-flow-summary:has(.jd-workflow-dot)>li{display:flex;align-items:center;min-width:88px;flex:1}
+.jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after{content:"";flex:1;height:2px;min-width:8px;margin:0 6px;background:#c5cad3}
+.jd-flow-summary .jd-workflow-dot{width:auto;flex-shrink:0}
