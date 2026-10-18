@@ -160,6 +160,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             header.innerHTML=`<div class="job-detail-title"><h1 title="${esc(job.title)}">${esc(job.title)}</h1><span class="jd-client-name" title="${esc(clientName)}"><span>Client</span><strong>${esc(clientName)}</strong></span></div>
                 <div class="jd-job-status"><div class="jd-status-meta"><span data-job-owner>Owner: ${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</span><span data-stage-age></span></div><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show flow details">${esc(job.status)}</button><small>${esc(job.jobCode||job.code||'')}</small></div>
                 <dl class="job-detail-facts" aria-label="Job information">${facts.map(([name,value])=>`<div><dt>${esc(name)}</dt><dd title="${esc(value)}"${name==='Location'?' data-job-location':name==='Photographer'?' data-job-photographer':''}>${esc(value)}</dd></div>`).join('')}</dl>
+                <section class="jd-next-step" aria-label="Next job action" aria-live="polite"><p role="status">Loading next step…</p></section>
                 <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol></div>
                 <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow details" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-workflow-track" aria-live="polite"></div></div></section>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
@@ -301,19 +302,23 @@ function mergeJobMessages(teamMessages, clientMessages) {
             messageHeader.querySelector('[data-message-search]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
             messageHeader.querySelector('[data-message-more]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
 
-            let workflow=null;
+            let workflow=null,workflowRequest=0;
             const updateAge=()=>{
                 if(['Completed','Cancelled'].includes(workflow?.data?.stage)){header.querySelector('[data-stage-age]').textContent=workflow.data.stage;return;}
                 const start=Date.parse(workflow?.data?.enteredAt||'');
                 header.querySelector('[data-stage-age]').textContent=Number.isFinite(start)?(window.StudioWorkflow?.elapsed?.(Math.max(0,(Date.now()-start)/3600000))||Math.floor(Math.max(0,Date.now()-start)/3600000)+' hours'):'Timing unavailable';
             };
             const refreshWorkflow=async()=>{
+                const request=++workflowRequest;
+                const advance=header.querySelector('[data-next-step-action]');if(advance)advance.disabled=true;
                 try{
-                    const view=await json('/api/jobs/'+job.id+'/connected-workflow');if(!current())return;
+                    const view=await json('/api/jobs/'+job.id+'/connected-workflow');if(!current()||request!==workflowRequest)return;
                     workflow=view;const data=view.data;
+                    window.StudioJobDetails.nextStep(header.querySelector('.jd-next-step'),view,selector=>openAssignments(selector));
                     window.StudioJobDetails.workflow(header.querySelector('.jd-workflow-track'),data,job,view,selector=>openAssignments(selector),header.querySelector('.jd-flow-summary'));
-                    const graphView=await json(`/api/jobs/${job.id}/workflow-graph`);
-                    if(current()&&graphView?.graph)StudioJobDetails.compact(header.querySelector('.jd-workflow-track'),graphView,job,header.querySelector('.jd-flow-summary'),view);
+                    const graphView=await json(`/api/jobs/${job.id}/workflow-graph`).catch(()=>null);
+                    if(!current()||request!==workflowRequest)return;
+                    if(graphView?.graph)StudioJobDetails.compact(header.querySelector('.jd-workflow-track'),graphView,job,header.querySelector('.jd-flow-summary'),view);
                     header.querySelector('.jd-status-pill').textContent=data.stage;
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(data.owner?studioFirstName(data.owner):'Unassigned');
                     const crew=(data.sessions||[]).flatMap(session=>session.crew||[]);
@@ -325,7 +330,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     const next={'Pending':'Review and confirm booking','Needs Assignment':'Assign a job owner','Needs Photographer Assignment':'Assign photographers','Awaiting Scheduling':'Schedule required sessions','Scheduled':'Start photography','Photography In Progress':'Finish required sessions','Awaiting Upload':'Complete and submit source media','Awaiting Production Review':'Review source material','Active Production':'Complete production and submit finished work','Awaiting Approval':'Approve finished work','Changes Requested':'Resolve requested corrections','Ready for Delivery':'Publish gallery and record delivery','Delivered':'Complete job'}[data.stage];
                     attention.querySelector('.jd-attention-items').innerHTML=(data.blockedReason?'<p class="jd-blocked">'+esc(data.blockedReason)+'</p>':'')+(next?'<p>'+esc(next)+'</p>':'<p>No outstanding workflow action.</p>')+((data.fieldConflicts||[]).length?'<p>Sync conflicts recorded: '+data.fieldConflicts.length+' · Review conflict history</p>':'')+Object.entries(data.rosterCounts||{}).map(([state,n])=>'<p>'+esc(state)+': '+esc(n)+'</p>').join('')+((data.outstandingRoster||[]).length?'<p>Outstanding roster: '+data.outstandingRoster.length+'</p>':'');
                     const decision=window.StudioWorkflow.nextAction(view),button=attention.querySelector('[data-view-workflow]');button.textContent=decision.label+' →';button.onclick=()=>openAssignments(decision.selector);updateAge();
-                }catch(error){if(current()){header.querySelector('[data-stage-age]').textContent='Workflow unavailable';attention.querySelector('.jd-attention-items').textContent='Workflow could not be loaded. Open View workflow to retry.';}}
+                }catch(error){if(current()&&request===workflowRequest){window.StudioJobDetails.nextStep(header.querySelector('.jd-next-step'),null,()=>refreshWorkflow());header.querySelector('[data-stage-age]').textContent='Workflow unavailable';attention.querySelector('.jd-attention-items').textContent='Workflow could not be loaded. Open View workflow to retry.';}}
             };
             const openAssignments=async selector=>{
                 setFlowOpen(false);
@@ -395,6 +400,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
 
     }
 })();
+
 
 
 

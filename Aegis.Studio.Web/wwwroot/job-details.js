@@ -71,6 +71,17 @@
    button.onclick=()=>activate?activate(selector):root.StudioWorkflow?.open(job.id,selector);
   });
  }
+ function nextStep(host,view,activate){
+  if(!host)return;
+  if(!view){host.dataset.state='unavailable';host.innerHTML='<div><small>Next step</small><p>Workflow could not be loaded.</p></div><button type="button" class="action" data-next-step-action>Retry workflow</button>';host.querySelector('button').onclick=()=>activate(null);return;}
+  const data=view.data||{},decision=root.StudioWorkflow.nextAction(view),closed=['Completed','Cancelled'].includes(data.stage);
+  const owner=data.ownerAssignment,waiting=owner?.status==='Assigned'&&!decision.selector;
+  const descriptions={Pending:'Confirm the booking after the deposit requirement or an approved override is satisfied.','Needs Assignment':'Assign a Job Owner to take responsibility for the next stage.','Needs Photographer Assignment':'Assign the photography crew before scheduling.','Awaiting Scheduling':'Set the date, time and location for the required sessions.',Scheduled:'Record the photographer’s progress to move the job forward.','Photography In Progress':'Finish the required sessions and record their outcomes.','Awaiting Upload':'Complete the required contributions and submit source media for review.','Awaiting Production Review':'Review the uploaded source material before accepting it into production.','Active Production':'Complete the required production work, then submit it for approval.','Awaiting Approval':'Review and approve the finished work before delivery.','Changes Requested':'Resolve the requested corrections before resubmitting the work.','Ready for Delivery':'Check the approved deliverables and record delivery. Financial release checks still apply.',Delivered:'Complete the job after delivery.'};
+  const reason=closed?'This job is '+data.stage.toLowerCase()+'.':data.blockedReason?'Blocked: '+data.blockedReason:owner?.status==='Assigned'&&decision.selector?.includes('owner-response')?'Accept ownership of this job before continuing.':decision.selector==='[data-wf-owner]'?'Assign a Job Owner to take responsibility for the next stage.':waiting?'Waiting for '+(data.owner||'the assigned owner')+' to accept ownership.':!decision.selector?'Next required action: '+decision.label+'. An authorized member of staff must complete it.':descriptions[data.stage]||'Complete the required action to continue the job.';
+  host.dataset.state=closed?'closed':data.blockedReason?'blocked':decision.selector?'ready':'waiting';
+  host.innerHTML='<div><small>'+(closed?'Job status':'Next step')+'</small><p>'+escape(reason)+'</p></div>'+(!closed&&decision.selector?'<button type="button" class="primary" data-next-step-action>'+escape(decision.label)+' <span aria-hidden="true">→</span></button>':'<button type="button" class="action" data-next-step-action>Review workflow</button>');
+  host.querySelector('button').onclick=()=>activate(closed?null:decision.selector);
+ }
  async function media(job,host,selectedHost,isCurrent,onCounts){
   let disposed=false,request=0,selectedId='',data=null,canEdit=false,uploading=false,search='',list=false;
   let pendingBatch=null;
@@ -218,7 +229,7 @@
   host.studioJobMedia?.dispose();host.studioJobMedia=controller;
   await load();return controller;
  }
- root.StudioJobDetails={workflow,phaseIndex,media};
+ root.StudioJobDetails={workflow,phaseIndex,media,nextStep};
 })(window);
 
 // Job-only compact projection. The template designer retains the complete editable canvas.
@@ -353,3 +364,4 @@
  }
  root.StudioJobDetails.compact=compact;
 })(window);
+
