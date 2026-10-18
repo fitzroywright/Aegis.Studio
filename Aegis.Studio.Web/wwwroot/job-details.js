@@ -277,7 +277,7 @@
   function draw(focus){
    host.style.height='auto';host.classList.add('jd-compact-workflow');
    const expandedNode=expanded?find(view.graph,expanded):null;
-   const content=summaryHost?(expandedNode?`<section class="jd-dot-stage is-expanded"><h3>${esc(expandedNode.label)}</h3><div class="jd-dot-expansion">${expansion(expandedNode,expanded)}</div></section>`:''):flow(view.graph);
+   const content=summaryHost?(expandedNode?`<section class="jd-dot-stage is-expanded"><div class="jd-dot-expansion">${expansion(expandedNode,expanded)}</div></section>`:''):flow(view.graph);
    host.innerHTML=content+'<div data-workflow-details aria-live="polite"></div>';
    host.querySelectorAll('[data-workflow-node]').forEach(button=>button.onclick=()=>{
     const id=button.dataset.workflowNode,node=find(view.graph,id);
