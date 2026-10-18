@@ -25,7 +25,7 @@ function workflow(){
 test('expanding a stage exposes endpoints and parallel dots, retains context and makes no state-changing request',t=>{
  const w=setup(t),view=workflow(),before=JSON.stringify(view),host=w.document.getElementById('host');let requests=0;w.json=async()=>{requests++;throw Error('Unexpected write');};
  w.StudioJobDetails.compact(host,view,job,w.document.getElementById('summary'));assert.equal(host.querySelectorAll('[data-workflow-node]').length,0);assert.equal(w.document.querySelectorAll('#summary [data-workflow-node="produce"]').length,1);
- w.document.querySelector('#summary [data-workflow-node="produce"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.match(w.document.getElementById('summary').textContent,/Production Start/);assert.match(w.document.getElementById('summary').textContent,/Production Complete/);assert.equal(host.querySelector('[data-workflow-node="shoot"]'),null);assert.ok(w.document.querySelector('#summary [data-workflow-node="shoot"]'));const edit=host.querySelector('[data-workflow-node="produce/edit"]'),qc=host.querySelector('[data-workflow-node="produce/qc"]');assert.equal(edit.closest('.jd-dot-level'),qc.closest('.jd-dot-level'));
+ w.document.querySelector('#summary [data-workflow-node="produce"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.match(w.document.getElementById('summary').textContent,/Start/);assert.match(w.document.getElementById('summary').textContent,/Complete/);assert.equal(host.querySelector('[data-workflow-node="shoot"]'),null);assert.ok(w.document.querySelector('#summary [data-workflow-node="shoot"]'));const edit=host.querySelector('[data-workflow-node="produce/edit"]'),qc=host.querySelector('[data-workflow-node="produce/qc"]');assert.equal(edit.closest('.jd-dot-level'),qc.closest('.jd-dot-level'));
  w.document.querySelector('#summary [data-workflow-node="shoot"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.equal(host.querySelector('[data-workflow-node="produce/edit"]'),null);host.querySelector('[data-workflow-collapse]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,0);assert.equal(requests,0);assert.equal(JSON.stringify(view),before);
 });
 test('step details expose exact blockers, unassigned responsibility and navigate to the existing command screen',async t=>{
@@ -90,4 +90,13 @@ test('curved connectors attach at dot rims and refresh after drawer transitions'
  assert.equal(w.document.querySelectorAll('[data-subflow-routes]').length,1);
  summary.querySelector('[data-workflow-node="produce"]').click();
  assert.equal(w.document.querySelector('[data-subflow-routes]'),null);
+});
+
+test('workflow labels are short while tooltips preserve full step descriptions',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),view={graph:{nodes:[{id:'qc',label:'Quality control and final inspection',description:'Inspect colour and finish before packaging',kind:'Task'}],edges:[]},evaluation:{nodes:[{id:'qc',status:'Available'}],edges:{}},tasks:[]};
+ w.StudioJobDetails.compact(host,view,job);
+ const button=host.querySelector('[data-workflow-node]');
+ assert.equal(button.querySelector('strong').textContent,'QC');
+ assert.match(button.title,/Quality control and final inspection/);
+ assert.match(button.title,/Inspect colour and finish before packaging/);
 });
