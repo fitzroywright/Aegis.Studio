@@ -13,7 +13,7 @@ const pipelineStages = [
     ['Photography', ['Photography', 'Shoot Today', 'In Shoot', 'Shoot Complete', 'Shooting', 'Photography In Progress']],
     ['Awaiting upload', ['Awaiting Upload']],
     ['Production', ['Production', 'Culling', 'Editing', 'Retouching', 'QC', 'Printing', 'Awaiting Production Review', 'In Production', 'Active Production']],
-    ['Client review', ['Client Review', 'Ready for Client', 'Waiting on Customer', 'Waiting On Client', 'Awaiting Approval']],
+    ['Client review', ['Client Review', 'Ready for Client', 'Waiting on Client', 'Waiting On Client', 'Awaiting Approval']],
     ['Delivery', ['Ready for Delivery', 'Ready For Delivery']],
     ['Complete', ['Delivered', 'Completed', 'Complete', 'Closed', 'Archived']],
     ['Cancelled', ['Cancelled']]
@@ -250,5 +250,6 @@ async function createScheduleResource() {
 }
 // Older Schedule calls now open the dedicated photographer calendar.
 async function showSchedule() { return window.studioNavigate('schedule'); }
+
 
 

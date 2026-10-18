@@ -237,13 +237,13 @@
    const values=work.map(x=>state(x.node,x.id));
    if(values.some(s=>['InProgress','Partial','ReadyForDelivery'].includes(s)))return 'InProgress';
    if(values.includes('Available'))return 'Available';
-   return values.some(s=>['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnCustomer'].includes(s))?'Blocked':'Pending';
+   return values.some(s=>['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient'].includes(s))?'Blocked':'Pending';
   }
   function summary(node,id){
    const work=leaves(node,id).filter(x=>x.node.kind==='Task'&&states.get(x.id)?.status!=='Inactive');
    if(node.kind!=='Subflow')return state(node,id)+(tasks.get(id)?.optional?' · Optional':'');
    const complete=work.filter(x=>['Completed','Skipped'].includes(states.get(x.id)?.status)).length;
-   const blockers=work.filter(x=>['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnCustomer'].includes(states.get(x.id)?.status));
+   const blockers=work.filter(x=>['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient'].includes(states.get(x.id)?.status));
    return `${complete} of ${work.length} steps complete${blockers.length?' · '+blockers.length+' blocked / waiting':''}`;
   }
   function ranks(graph){
@@ -258,7 +258,7 @@
    return rules.find(([pattern])=>pattern.test(label))?.[1]||label.split(/\\s+/).filter(word=>! /^(the|a|an|to|for|and|of)$/i.test(word))[0]||'Step';
   }
   function dot(node,id,small=false){
-   const status=state(node,id),tone=status==='Completed'?'green':['Available','InProgress','Partial','ReadyForDelivery'].includes(status)?'amber':['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnCustomer'].includes(status)?'red':'gray',icon=tone==='green'?'✓':status==='Skipped'||status==='Inactive'?'–':status==='Available'?'▶':tone==='amber'?'◉':tone==='red'?'!':'○';
+   const status=state(node,id),tone=status==='Completed'?'green':['Available','InProgress','Partial','ReadyForDelivery'].includes(status)?'amber':['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient'].includes(status)?'red':'gray',icon=tone==='green'?'✓':status==='Skipped'||status==='Inactive'?'–':status==='Available'?'▶':tone==='amber'?'◉':tone==='red'?'!':'○';
    return `<button type="button" class="jd-workflow-dot ${small?'is-component':''} ${esc(status.toLowerCase())}" data-flow-tone="${tone}" data-workflow-node="${esc(id)}" ${node.kind==='Subflow'?`aria-expanded="${expanded===id||expanded?.startsWith(id+'/')}"`:''} title="${esc(node.label+(node.description||node.task?.description||tasks.get(id)?.description?' · '+(node.description||node.task?.description||tasks.get(id)?.description):'')+': '+summary(node,id)+(tasks.get(id)?' · Responsible: '+(tasks.get(id).assignedTo||'Unassigned')+(tasks.get(id).reason?' · '+tasks.get(id).reason:''):''))}" aria-label="${esc(node.label+': '+summary(node,id))}"><span class="jd-stage-light" aria-hidden="true">${icon}</span><strong>${esc(shortLabel(node.label))}</strong></button>`;
   }
   function expansion(node,id){

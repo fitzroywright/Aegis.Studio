@@ -24,7 +24,7 @@ test('status dropdown switches delivery and completed job queues and returns to 
  assert.equal(w.document.querySelector('.fd-actions'),null);
  assert.equal(w.document.querySelectorAll('.fd-overview [data-fd-metric]').length,4);
  assert.equal(w.document.querySelectorAll('.fd-overview .workspace-summary-row').length,3);
- assert.deepEqual([...w.document.querySelectorAll('.fd-overview footer[role="toolbar"] button')].map(e=>e.textContent.trim().replace(/^[^A-Za-z]+/,'').replace(/\s+\d+$/,'')),['Unassigned','Create Manual Booking','Find Customer','View Receipt']);
+ assert.deepEqual([...w.document.querySelectorAll('.fd-overview footer[role="toolbar"] button')].map(e=>e.textContent.trim().replace(/^[^A-Za-z]+/,'').replace(/\s+\d+$/,'')),['Unassigned','Create Manual Booking','Find Client','View Receipt']);
  select('Pickup / Delivery');
  assert.deepEqual(statusOptions(),allOptions);
  assert.deepEqual([...w.document.querySelectorAll('[data-fd-row-open]')].map(e=>e.dataset.fdRowOpen),['ready','published']);

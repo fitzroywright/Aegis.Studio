@@ -67,7 +67,7 @@ public sealed class WorkDayConversationPage:ContentPage
 {
     private readonly WorkDayApiClient api;private readonly Guid conversationId;
     private readonly Picker identity=new(){Title="Sending identity"};
-    private readonly Editor body=new(){Placeholder="Reply to customer",AutoSize=EditorAutoSizeOption.TextChanges};
+    private readonly Editor body=new(){Placeholder="Reply to client",AutoSize=EditorAutoSizeOption.TextChanges};
     private readonly Label identityState=new(){Text="Workspace is the safe default."};
     private List<SendingIdentityOptionDto> options=[];
 
@@ -75,7 +75,7 @@ public sealed class WorkDayConversationPage:ContentPage
     {
         this.api=api;this.conversationId=conversationId;Title=title;
         Button send=new(){Text="SEND REPLY",HeightRequest=56};send.Clicked+=Send;
-        Content=new ScrollView{Content=new VerticalStackLayout{Padding=18,Spacing=12,Children={new Label{Text="CUSTOMER COMMUNICATION",FontSize=22,FontAttributes=FontAttributes.Bold},identity,identityState,body,send}}};
+        Content=new ScrollView{Content=new VerticalStackLayout{Padding=18,Spacing=12,Children={new Label{Text="Client COMMUNICATION",FontSize=22,FontAttributes=FontAttributes.Bold},identity,identityState,body,send}}};
         identity.SelectedIndexChanged+=(_,_)=>UpdateIdentityLabel();
         Loaded+=async(_,_)=>await LoadIdentities();
     }
@@ -120,3 +120,4 @@ public sealed class WorkDayConversationPage:ContentPage
         catch(Exception ex){await DisplayAlertAsync("Not sent","Studio did not acknowledge the reply. "+ex.Message,"OK");}
     }
 }
+

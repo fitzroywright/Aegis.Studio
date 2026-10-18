@@ -8,7 +8,7 @@ Architecture: PASS (source/static review)
 Home / TodayDay: PASS (source/static review)
 Assignments: PASS (source/static review)
 Session Workflow: PASS (source/static review)
-Customer Details: PASS (source/static review)
+Client Details: PASS (source/static review)
 Navigation: PASS (source/static review)
 Notes: PASS (source/static review)
 Exceptions: PASS (source/static review)
@@ -44,7 +44,7 @@ Automated Tests: PASS (tests written; execution proof pending after final harden
 - TodayDay home;
 - Today / Upcoming / Needs Attention;
 - local authorized assignment search;
-- assignment/customer/instruction detail;
+- assignment/client/instruction detail;
 - navigation/contact handoff;
 - Accept/Confirm;
 - Arrived;
@@ -53,7 +53,7 @@ Automated Tests: PASS (tests written; execution proof pending after final harden
 - structured exceptions;
 - exception status;
 - file queue/upload;
-- customer/workspace messaging;
+- client/workspace messaging;
 - Workspace sender default;
 - permission-gated Reply as Myself;
 - gallery status;
@@ -64,7 +64,7 @@ Automated Tests: PASS (tests written; execution proof pending after final harden
 - durable SQLite local database;
 - schema versioning;
 - non-destructive pre-release migration;
-- protected cached customer/session information;
+- protected cached client/session information;
 - protected queued note text;
 - protected precise location coordinates;
 - stable operation IDs;
@@ -155,7 +155,7 @@ WorkDay reuses rather than duplicates:
 
 - Studio users/photographer schedule-resource mapping;
 - Studio schedule/booking/job data;
-- Workspace/customer conversations;
+- Workspace/client conversations;
 - existing sending identity resolver/audit;
 - Common.Messaging server-side infrastructure;
 - Common.Storage via Studio AttachmentStore;
@@ -330,7 +330,7 @@ Reassignment:
 
 Photographers are global Studio resources and can be assigned into any workspace. Assignment grants job-scoped access rather than standing workspace membership.
 
-Assigned JobStaff now has `ReplyRequester` for that job. Customer replies therefore work for cross-workspace photographers through the existing conversation API, whose safe default sender remains the owning workspace email identity. `SendAsSelf` remains separately workspace-controlled.
+Assigned JobStaff now has `ReplyRequester` for that job. Client replies therefore work for cross-workspace photographers through the existing conversation API, whose safe default sender remains the owning workspace email identity. `SendAsSelf` remains separately workspace-controlled.
 
 A first-class Operations flow named `JobFlow` is published for tracking-light visualization:
 

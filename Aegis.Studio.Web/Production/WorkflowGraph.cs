@@ -151,7 +151,7 @@ public static class WorkflowGraphEngine
             if (n.Kind == "Task" && tasks.TryGetValue(n.Id, out var taskStatus))
             {
                 // Started work remains applicable after a service removal until explicitly reconciled.
-                if (taskStatus is "Completed" or "InProgress" or "Blocked" or "WaitingOnCustomer" or "ReworkRequired" or "Partial" or "Failed" or "ReprintRequired" or "ReadyForDelivery") status = taskStatus;
+                if (taskStatus is "Completed" or "InProgress" or "Blocked" or "WaitingOnClient" or "ReworkRequired" or "Partial" or "Failed" or "ReprintRequired" or "ReadyForDelivery") status = taskStatus;
                 else if (taskStatus == "Cancelled" && n.Task?.Optional == true) status = inactive ? "Inactive" : ready || root ? "Skipped" : "Blocked";
             }
             states[n.Id] = new(n.Id, status, incoming.Select(e => e.From).ToArray(), !inactive && !ready && !root ? "Waiting for active prerequisites" : inactive ? "Service branch is inactive" : null);

@@ -114,7 +114,7 @@ Active branch: `recovery/studio-connected-workflow-safety-20261008`. Never merge
 
 ## Clean demo reset implementation checkpoint (2026-10-08)
 
-- Decision: all Studio customer and business data are disposable demo records. New Connected Workflow is the sole intended write path; no legacy migration required.
+- Decision: all Studio client and business data are disposable demo records. New Connected Workflow is the sole intended write path; no legacy migration required.
 - Removed historical demo Job migration block from WorkflowSchema.sql: e13c0f1.
 - Added Administrator-only GET /api/admin/connected-workflow/demo-data/preview to inventory Studio tables without deleting anything: 4a1ac9e.
 - IMPORTANT: Remove Demo Data and Generate Demo Data buttons, destructive cleanup service, workflow-native seeder and removal of legacy write routes remain unimplemented. Do not claim complete, merge, deploy or run destructive SQL. Local build/tests not run.

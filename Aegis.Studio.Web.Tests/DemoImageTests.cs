@@ -7,6 +7,25 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class DemoImageTests
 {
     [Fact]
+    public void EveryDemoGalleryFitsTheSmallerFlagFreeSourceCatalogue()
+    {
+        Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoFullStudioData")!;
+        var jobs=(System.Collections.IEnumerable)seed.GetField("Jobs",BindingFlags.NonPublic|BindingFlags.Static)!.GetValue(null)!;
+        var count=seed.GetMethod("MediaCount",BindingFlags.NonPublic|BindingFlags.Static)!;
+        var source=seed.GetMethod("PortraitSource",BindingFlags.NonPublic|BindingFlags.Static)!;
+        foreach(var job in jobs)
+        {
+            int assets=(int)count.Invoke(null,new[]{job})!;
+            Assert.True(assets>=40);
+            for(int i=0;i<assets;i++)
+            {
+                string? url=(string?)source.Invoke(null,new object[]{job,i});
+                if(url is not null)Assert.Contains(DemoPortraitCatalogue.Photos,p=>p.Url==url);
+            }
+        }
+    }
+
+    [Fact]
     public void DemoPhotoCatalogueUsesRealWikimediaSourcesAndHasNoSyntheticGenerator()
     {
         Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoDataExpansion")!;
@@ -33,4 +52,5 @@ public sealed class DemoImageTests
             Assert.True(ids.Add((Guid)allocate.Invoke(null,new object[]{group,job,asset})!));
     }
 }
+
 

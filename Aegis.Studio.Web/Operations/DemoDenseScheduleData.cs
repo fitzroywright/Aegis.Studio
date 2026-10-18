@@ -21,7 +21,7 @@ internal static class DemoDenseScheduleData
         "Sports and Groups"
     ];
 
-    private static readonly (string Name,string Email,string Phone)[] Customers =
+    private static readonly (string Name,string Email,string Phone)[] Clients =
     [
         ("Miller Family","miller.family@example.invalid","876-555-0201"),
         ("Campion College","campion@example.invalid","876-555-0202"),
@@ -68,7 +68,7 @@ internal static class DemoDenseScheduleData
 
     private static readonly string[] TaskTitles =
     [
-        "Confirm customer and job brief",
+        "Confirm client and job brief",
         "Confirm schedule, location and crew",
         "Ingest and verify files",
         "Cull and organize selects",
@@ -76,7 +76,7 @@ internal static class DemoDenseScheduleData
         "Retouch approved images",
         "Quality-control review",
         "Prepare production / print output",
-        "Prepare delivery and customer handoff"
+        "Prepare delivery and client handoff"
     ];
 
     internal static int SeedBatch(
@@ -133,27 +133,27 @@ internal static class DemoDenseScheduleData
                 workspaceId, login);
         }
 
-        for (int i = 0; i < Customers.Length; i++)
+        for (int i = 0; i < Clients.Length; i++)
         {
-            var customer = Customers[i];
+            var client = Clients[i];
             Execute(c, tx,
                 "insert into studio_clients(id,display_name,email,phone,updated_at_utc) values($1,$2,$3,$4,now()) on conflict(id) do update set display_name=excluded.display_name,email=excluded.email,phone=excluded.phone,updated_at_utc=now()",
-                Id(92, i + 1), customer.Name, customer.Email, customer.Phone);
+                Id(92, i + 1), client.Name, client.Email, client.Phone);
         }
     }
 
     private static void SeedJob(NpgsqlConnection c, NpgsqlTransaction tx, string login, int day, int workspace)
     {
         int sequence = day * JobsPerDay + workspace;
-        int customerIndex = (day * 7 + workspace * 3) % Customers.Length;
-        var customer = Customers[customerIndex];
+        int clientIndex = (day * 7 + workspace * 3) % Clients.Length;
+        var client = Clients[clientIndex];
         string type = JobType(workspace, day);
-        string title = $"{customer.Name} - {type}";
+        string title = $"{client.Name} - {type}";
         string status = JobStatuses[(day + workspace * 2) % JobStatuses.Length];
 
         Guid jobId = Id(93, sequence);
         Guid conversationId = Id(94, sequence);
-        Guid clientId = Id(92, customerIndex + 1);
+        Guid clientId = Id(92, clientIndex + 1);
         Guid workspaceId = ExistingWorkspaceId(workspace);
 
         int startHour = 8 + ((workspace - 1) * 2);
@@ -163,18 +163,18 @@ internal static class DemoDenseScheduleData
 
         Execute(c, tx,
             "insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values($1,$2,$3,$4,$5,$6,false,now()) on conflict(id) do update set subject=excluded.subject,contact_name=excluded.contact_name,contact_address=excluded.contact_address,channel=excluded.channel",
-            conversationId, workspaceId, title, customer.Name, customer.Email, sequence % 4 == 0 ? "Phone" : sequence % 3 == 0 ? "Portal" : "Email");
+            conversationId, workspaceId, title, client.Name, client.Email, sequence % 4 == 0 ? "Phone" : sequence % 3 == 0 ? "Portal" : "Email");
 
         Execute(c, tx,
             "insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead,client_id) values($1,$2,$3,$4,$5,$6,$7,now(),$8,$8,$9) on conflict(id) do update set workspace_id=excluded.workspace_id,conversation_id=excluded.conversation_id,title=excluded.title,client_name=excluded.client_name,status=excluded.status,event_date=excluded.event_date,assigned_to=excluded.assigned_to,job_lead=excluded.job_lead,client_id=excluded.client_id",
-            jobId, workspaceId, conversationId, title, customer.Name, status, DateOnly.FromDateTime(start.UtcDateTime), Photographer(sequence), clientId);
+            jobId, workspaceId, conversationId, title, client.Name, status, DateOnly.FromDateTime(start.UtcDateTime), Photographer(sequence), clientId);
 
         Execute(c, tx, "update studio_conversations set job_id=$2 where id=$1", conversationId, jobId);
         Execute(c, tx, "insert into studio_media_galleries(id,name,default_lens,default_collection) values($1,'Media','Auto','Unclassified') on conflict(id) do nothing", jobId);
 
         Execute(c, tx,
             "insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'External',$4,now()) on conflict(id) do update set body=excluded.body",
-            Id(90, sequence), conversationId, customer.Name, $"DEMO enquiry for {type}. Please confirm timing, deliverables and any preparation requirements.");
+            Id(90, sequence), conversationId, client.Name, $"DEMO enquiry for {type}. Please confirm timing, deliverables and any preparation requirements.");
 
         Execute(c, tx,
             "insert into studio_schedule_entries(id,job_id,title,starts_at_utc,ends_at_utc,location,status,notes,created_at_utc) values($1,$2,$3,$4,$5,$6,'Scheduled','Dense demo schedule - fictional data',now()) on conflict(id) do update set title=excluded.title,starts_at_utc=excluded.starts_at_utc,ends_at_utc=excluded.ends_at_utc,location=excluded.location,status=excluded.status,notes=excluded.notes",
@@ -203,7 +203,7 @@ internal static class DemoDenseScheduleData
                 taskStatus == "InProgress" ? DateTimeOffset.UtcNow : DBNull.Value,
                 taskStatus == "Completed" ? DateTimeOffset.UtcNow.AddHours(-1) : DBNull.Value,
                 location,
-                taskStatus == "Blocked" ? "Waiting on customer or upstream handoff" : DBNull.Value,
+                taskStatus == "Blocked" ? "Waiting on client or upstream handoff" : DBNull.Value,
                 task < TaskTitles.Length - 1 ? TaskOwners[task + 1] : DBNull.Value);
 
             Execute(c, tx, "update studio_job_activities set collection_name=$2 where id=$1",

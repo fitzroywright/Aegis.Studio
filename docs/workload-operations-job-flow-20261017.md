@@ -12,7 +12,7 @@ No AGENTS.md was present in the repository tree.
 The canonical Production route remains the existing catalog work-order queue. The separate operational
 activity queue and workflow-task screen remain available. Schedule keeps photographer calendars and
 job/production timing views. Template design retains its full canvas and publication/edit commands.
-Customers, gallery publication, statements, Front Desk, navigation order, financial writes, workflow
+Clients, gallery publication, statements, Front Desk, navigation order, financial writes, workflow
 transitions, approvals and audits were not replaced.
 
 ## Quantity semantics
@@ -81,7 +81,7 @@ not a proposed second resource registry, queue or workflow engine.
 
 ## Verification
 
-* 52 targeted UI regressions passed: workload/compact flow, graph/template editing, customer behavior,
+* 52 targeted UI regressions passed: workload/compact flow, graph/template editing, client behavior,
   photographer schedules and production planning. Ten tests directly cover this change, including
   partial quantities, refunds, QC rework, source/gate waiting, cancellation, missing quantity data,
   simple/substage/parallel/optional/completed workflows, navigation and Operations permission flags.

@@ -34,7 +34,7 @@ A lost/stolen device:
 
 ## Local data
 
-The local database is app-private SQLite. Customer/session display data, offline note text and precise location coordinates are AES-GCM protected with a random key held in platform SecureStorage. Queue/index fields remain queryable so WorkDay can recover synchronization state.
+The local database is app-private SQLite. Client/session display data, offline note text and precise location coordinates are AES-GCM protected with a random key held in platform SecureStorage. Queue/index fields remain queryable so WorkDay can recover synchronization state.
 
 The local schema is versioned. The pre-release plaintext queue/location layout is migrated in place: sensitive values are protected first, then legacy plaintext columns are scrubbed. Unsynchronized operations and uploads are never removed by age-based assignment retention.
 
@@ -188,7 +188,7 @@ Do not clear SQLite/app-private files during upgrade unless explicitly part of a
 ## Logs
 
 Server technical logs follow Aegis.Studio hosting/logging configuration.
-Mobile user-facing state should avoid sensitive customer details in diagnostic logging.
+Mobile user-facing state should avoid sensitive client details in diagnostic logging.
 Precise GPS coordinates are not emitted to general diagnostics.
 
 ## Acceptance - offline field failure

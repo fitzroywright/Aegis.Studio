@@ -213,7 +213,7 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-workflow-dot>.jd-stage-light{width:12px;height:12px;min-width:12px;border:1px solid #a7b2c1;background:#e8ecf1;color:#48576b;font-size:8px}
 .jd-workflow-dot.completed>.jd-stage-light{background:#318348;border-color:#318348;color:#fff}
 .jd-workflow-dot.inprogress>.jd-stage-light,.jd-workflow-dot.available>.jd-stage-light{background:#fb851c;border-color:#fb851c;color:#fff}
-.jd-workflow-dot:is(.blocked,.failed,.reworkrequired,.reprintrequired,.waitingoncustomer)>.jd-stage-light{background:#bd3040;border-color:#bd3040;color:#fff}
+.jd-workflow-dot:is(.blocked,.failed,.reworkrequired,.reprintrequired,.waitingonclient)>.jd-stage-light{background:#bd3040;border-color:#bd3040;color:#fff}
 .jd-workflow-dot:is(.completed,.inprogress,.available){color:var(--theme-text,#162b50);font-weight:750}
 .jd-flow-summary:has(.jd-workflow-dot){align-items:center;gap:0}
 .jd-flow-summary:has(.jd-workflow-dot)>li{display:flex;align-items:center;min-width:88px;flex:1}

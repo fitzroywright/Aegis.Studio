@@ -4,11 +4,11 @@
 
 Navigation: Today, Dashboard, Workspaces, Pipeline, Production, FrontDesk, WorkDay, Admin.
 
-Workspaces contain announcements and jobs. They are not general message queues. A job has its conversation above Gallery, Subjects, Tasks/Calendar, and Activity. Details is a small collapsible card. Subjects are the people being photographed, distinct from the purchasing customer; one subject renders as a card, multiple subjects as a roster. Tasks and Calendar are views of the same task records.
+Workspaces contain announcements and jobs. They are not general message queues. A job has its conversation above Gallery, Subjects, Tasks/Calendar, and Activity. Details is a small collapsible card. Subjects are the people being photographed, distinct from the purchasing client; one subject renders as a card, multiple subjects as a roster. Tasks and Calendar are views of the same task records.
 
 Gallery assets belong to jobs, grouped into collections, with immutable versions and provenance. Existing conversation attachments remain available separately. Client galleries are curated, explicitly published snapshots, never automatic views of every internal upload.
 
-FrontDesk owns customers, sales, bookings, deposits and payments. Site bookings arrive through Aegis Hub. Confirmed deposit payment triggers job creation exactly once. Pipeline manages work from needs scheduling through delivery, using WorkDay availability. Confirmation updates the customer and WorkDay. Production is a queue of dispatched work, not chat.
+FrontDesk owns clients, sales, bookings, deposits and payments. Site bookings arrive through Aegis Hub. Confirmed deposit payment triggers job creation exactly once. Pipeline manages work from needs scheduling through delivery, using WorkDay availability. Confirmation updates the client and WorkDay. Production is a queue of dispatched work, not chat.
 
 Finish shoot starts the upload timer. Submit for review stops it; first upload does not. Reviews can request changes, retaining version history and allowing resubmission. Job milestones and Hub communications appear in the job conversation. Publishing uses a provider-neutral API for Bryan's public site. Dashboard starts with insights from existing data and deepens as integrations arrive. Admin owns users, workspace membership and roles.
 
@@ -28,7 +28,7 @@ Finish shoot starts the upload timer. Submit for review stops it; first upload d
 
 ## Iteration 2: Pipeline and execution
 
-Introduce explicit stage transitions and migration from legacy status strings. Use WorkDay availability when scheduling, confirm customer and WorkDay consistently, and dispatch production work. Preserve existing scheduling and mobile capture code. Add a review state machine with requested changes, versioned review submissions and resubmission. Record finish-shoot and submit-for-review events; compute upload time only from those events. Append idempotent milestone entries to job conversations. Replace the broad current Production screen with the dispatched queue.
+Introduce explicit stage transitions and migration from legacy status strings. Use WorkDay availability when scheduling, confirm client and WorkDay consistently, and dispatch production work. Preserve existing scheduling and mobile capture code. Add a review state machine with requested changes, versioned review submissions and resubmission. Record finish-shoot and submit-for-review events; compute upload time only from those events. Append idempotent milestone entries to job conversations. Replace the broad current Production screen with the dispatched queue.
 
 ## Iteration 3: FrontDesk and Hub handoff
 

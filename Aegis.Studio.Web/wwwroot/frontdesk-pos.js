@@ -17,7 +17,7 @@ async function pickFrontDeskFinancialAction(action){
         d.querySelectorAll('[data-booking]').forEach(b=>b.onclick=async()=>{await launchFrontDeskPos(action,{bookingId:b.dataset.booking});d.close();});return;
     }
     const jobs=frontDeskJobs.filter(j=>!frontDeskSelectedClientId||j.clientId===frontDeskSelectedClientId);
-    const d=studioDialog(action==='TakePayment'?'Take Payment':action==='IssueRefund'?'Issue Refund':'New Sale',`<form class="subject-form"><p>Choose the customer Job for this ${action==='TakePayment'?'payment':'sale'}.</p><label>Job / Customer<select data-job-picker name="jobId" required><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><button class="primary">Continue</button><p role="alert"></p></form>`);
+    const d=studioDialog(action==='TakePayment'?'Take Payment':action==='IssueRefund'?'Issue Refund':'New Sale',`<form class="subject-form"><p>Choose the client Job for this ${action==='TakePayment'?'payment':'sale'}.</p><label>Job / Client<select data-job-picker name="jobId" required><option value="">Choose a job…</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><button class="primary">Continue</button><p role="alert"></p></form>`);
     const form=d.querySelector('form');form.onsubmit=async e=>{e.preventDefault();const id=form.elements.jobId.value;if(!id)return;const button=form.querySelector('.primary');button.disabled=true;try{if(['IssueRefund','ViewReceipt'].includes(action)){await pickFrontDeskSale(action,id);}else{await launchFrontDeskPos(action,{jobId:id});}d.close();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
 async function pickFrontDeskSale(action,jobId){
@@ -29,3 +29,4 @@ window.addEventListener('message',async event=>{
     const positions=[...genericView.querySelectorAll('*')].filter(el=>el.scrollTop||el.scrollLeft).map(el=>({id:el.id,cls:el.className,top:el.scrollTop,left:el.scrollLeft}));
     try{const [jobs,requests]=await Promise.all([json('/api/jobs'),json('/api/frontdesk/booking-requests')]);frontDeskJobs=jobs;frontDeskRequests=requests;renderFrontDesk();for(const p of positions){const el=p.id?document.getElementById(p.id):[...genericView.querySelectorAll('*')].find(e=>e.className===p.cls);if(el){el.scrollTop=p.top;el.scrollLeft=p.left;}}}catch(error){console.error('Front Desk update failed',error);}
 });
+

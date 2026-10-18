@@ -18,7 +18,7 @@ Inbound routing persists to the correct workspace; attachment storage is writabl
 ## Messaging Semantics
 A completed provider dispatch is ProviderAccepted unless delivery receipts prove Delivered. Do not label provider acceptance as recipient delivery.
 
-Outbound customer email uses an explicit sending identity. Workspace identity is the default. Reply as Myself is offered only when the user has the workspace SendAsSelf capability and a valid profile email on the workspace mail domain or another explicitly allowed personal-sender domain. The server resolves the From address; clients may select only the identity type.
+Outbound client email uses an explicit sending identity. Workspace identity is the default. Reply as Myself is offered only when the user has the workspace SendAsSelf capability and a valid profile email on the workspace mail domain or another explicitly allowed personal-sender domain. The server resolves the From address; clients may select only the identity type.
 
 Microsoft Graph must be permitted to send as the selected mailbox. A successful Graph send advances the Provider stage to ProviderAccepted; the Recipient stage remains unproven unless a delivery receipt is available.
 

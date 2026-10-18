@@ -25,3 +25,21 @@
 .studio-schedule-switch button:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:-2px}
 .ps-header-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .st-pipeline-content .st-tools,.st-commercial .st-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+
+/* Front Desk-style compact search/filter header. */
+.ps-toolbar .ps-period{flex:1;min-width:0;gap:6px}
+.ps-toolbar .ps-period input[type=date]{flex:0 0 132px;width:132px;min-width:0;max-width:132px;margin:0}
+.ps-toolbar .ps-period .action{flex:none;width:auto;min-height:29px;padding:4px 10px}
+.ps-page .ps-filters{flex:none;gap:12px;padding:8px 11px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border-bottom:2px solid var(--theme-accent,#cf792a)}
+.ps-page .ps-filters label{display:flex;align-items:center;gap:7px;margin:0;font-size:11px;font-weight:700;min-width:0}
+.ps-page .ps-header-filter{flex:0 1 240px}
+.ps-page .ps-header-search{flex:1 1 260px}
+.ps-page .ps-filters label>span{white-space:nowrap;flex:none}
+.ps-page .ps-filters select,.ps-page .ps-filters input[type=search]{flex:1;min-width:0;width:100%;max-width:none;height:28px;min-height:28px;margin:0;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
+.ps-page .ps-filters input[type=search]::placeholder{color:#e2ebf6;opacity:1}
+.ps-page .ps-filters .ps-header-inactive{flex:none;font-weight:500;white-space:nowrap}
+.ps-page .ps-filters input[type=checkbox]{width:auto;min-height:0;margin:0}
+.ps-page :is(.ps-calendar-head,.ps-day-head),.ps-page :is(.ps-calendar-head,.ps-day-head)>div:first-child{background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8)}
+.ps-page .ps-filters :is(input,select):focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
+@media(max-width:900px){.ps-page .ps-filters{gap:8px}.ps-page .ps-header-filter{flex:1 1 220px}.ps-page .ps-header-search{flex-basis:100%}.ps-period strong{flex:1 1 180px}}
+

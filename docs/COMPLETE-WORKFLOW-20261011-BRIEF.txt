@@ -4,7 +4,7 @@
 **Target branch:** `main`  
 **Target completion:** Sunday, October 11, 2026  
 **Deployment environment:** Kratos (demonstration/test environment)  
-**Customer:** Brian's
+**Client:** Brian's
 
 ## 1. Primary Objective
 
@@ -60,9 +60,9 @@ The Front Desk must be able to:
 - Open the associated Pending Job.
 - Review and correct booking details.
 - Select the appropriate Work Order Template.
-- Identify the customer and requested services.
+- Identify the client and requested services.
 - Review pricing and deposit requirements.
-- Send a deposit request to the customer.
+- Send a deposit request to the client.
 - See whether that request was sent, delivered or failed, where provider evidence is available.
 - Record and verify manually received deposits.
 - Request an Operations Manager override.
@@ -352,7 +352,7 @@ Only approved deliverables may proceed to final publishing.
 
 Implement controlled publication of client galleries.
 
-Customers may view proofs and select photographs before final payment.
+Clients may view proofs and select photographs before final payment.
 
 Proofs must use reduced-resolution images with visible watermarks.
 
@@ -361,10 +361,10 @@ Do not expose original-resolution files through proof endpoints.
 Support:
 
 - Gallery publication.
-- Customer access.
+- Client access.
 - Photo selection.
 - Selection submission.
-- Relevant customer approval.
+- Relevant client approval.
 - Controlled final delivery.
 - Expiring or revocable access where appropriate.
 
@@ -381,7 +381,7 @@ The Finance Manager, not the Operations Manager, owns credit authorization.
 
 Finance authorization must record:
 
-- Customer and job.
+- Client and job.
 - Approved credit terms.
 - Authorized amount or scope.
 - Payment due date.
@@ -390,7 +390,7 @@ Finance authorization must record:
 - Approval timestamp.
 - Audit history.
 
-A finance authorization does not mean the customer has paid.
+A finance authorization does not mean the client has paid.
 
 Outstanding receivables must remain visible to Finance after delivery.
 
@@ -434,7 +434,7 @@ The public API must support two primary integration areas:
 
 - Retrieve authorized published gallery information.
 - Display proof images.
-- Submit customer selections.
+- Submit client selections.
 - Retrieve permitted selection state.
 - Obtain authorized final delivery access.
 
@@ -485,9 +485,9 @@ It must:
 
 - Submit a booking.
 - Show a booking confirmation/reference.
-- Open an authorized customer gallery.
+- Open an authorized client gallery.
 - Display watermarked proofs.
-- Allow customer selections.
+- Allow client selections.
 - Demonstrate authorized final downloads.
 
 The reference website must use the public V1 API exclusively.
@@ -603,7 +603,7 @@ Verify that unauthorized users cannot bypass workflow rules through direct API c
 1. Use a dedicated implementation branch with regular checkpoint commits.
 2. Preserve existing working functionality.
 3. Do not perform destructive database resets.
-4. Do not modify production customer or payment records.
+4. Do not modify production client or payment records.
 5. Use the existing storage, security, messaging and deployment infrastructure.
 6. Prefer local restore, build, test and deployment verification.
 7. Do not use cloud build loops unnecessarily.
@@ -648,7 +648,7 @@ A photographer must be able to receive an assignment in WorkDay, respond, report
 
 Production must be able to complete its responsibilities entirely within Studio.
 
-The external reference website must be able to book jobs and interact with published customer galleries using only the stable V1 API.
+The external reference website must be able to book jobs and interact with published client galleries using only the stable V1 API.
 
 **WorkDay readiness is a mandatory Sunday objective, not a deferred enhancement.**
 

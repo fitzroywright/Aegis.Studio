@@ -23,14 +23,14 @@ No builds or automated tests were executed for the resumed changes. Only static 
 
 - Assign separate Front Desk, Workspace Manager, Job Owner, Photographer, Production Manager, production assignee, Finance Manager and Operations Manager accounts. Repeat critical denials with a person who holds multiple roles. Administrator alone must not substitute for the named Finance/Production roles.
 - Configure the existing storage provider and test originals, email identity and Microsoft Graph channel. Confirm the actual recorded workspace/person sender is used.
-- For WhatsApp, set `Messaging:WhatsApp:Enabled`, `GraphApiVersion`, `PhoneNumberId`, and the access-token secret name. If using an approved deposit template, configure `DepositTemplateName`, `DepositTemplateLanguage` and pipe-separated `DepositTemplateParameters`; supported placeholders are `{customer}`, `{job}`, `{amount}`, `{reference}`. Customer destinations require explicit international format beginning with `+`.
+- For WhatsApp, set `Messaging:WhatsApp:Enabled`, `GraphApiVersion`, `PhoneNumberId`, and the access-token secret name. If using an approved deposit template, configure `DepositTemplateName`, `DepositTemplateLanguage` and pipe-separated `DepositTemplateParameters`; supported placeholders are `{client}`, `{job}`, `{amount}`, `{reference}`. Client destinations require explicit international format beginning with `+`.
 - Configure Public V1 credentials/scopes, published-gallery access and webhook receiver using `PUBLIC-V1-INTEGRATION.md`. Keep API signing credentials in the reference server's environment.
 
 ## Connected acceptance scenarios
 
 | Area | Scenario and evidence |
 | --- | --- |
-| Booking | Create a Pending Job, request a deposit through each configured channel, inspect queue/provider acceptance separately from customer delivery, record a partial deposit, deny confirmation below the threshold, then confirm after payment or independent Operations approval. |
+| Booking | Create a Pending Job, request a deposit through each configured channel, inspect queue/provider acceptance separately from client delivery, record a partial deposit, deny confirmation below the threshold, then confirm after payment or independent Operations approval. |
 | Ownership | Assign an active Job Owner; accept and decline as that owner; deny another actor's response; reassign and reject the superseded response. Crew scheduling must wait for accepted responsibility. |
 | Scheduling | Schedule multiple sessions with a Lead and multiple Additional photographers, partial attendance and equipment. Try staff/resource overlaps, leave, inactive resources, stale edits and a legacy two-person reschedule of a larger crew. Verify assignments and original Job ownership remain intact. |
 | WorkDay | Accept/decline, arrive/start/complete, notes/problems and offline availability. Restart with queued reports; reconnect; simulate a lost acknowledgement and changed assignment generation; retain original conflicting reports in history and resolve with a reason. Never show an unacknowledged report as server success. |
@@ -39,8 +39,8 @@ No builds or automated tests were executed for the resumed changes. Only static 
 | Source handoff | Finish each required photographer contribution and ingest/backup tasks. Deny source submission with pending/failed/unmatched files, unverified backup or incomplete required sessions. Submit and review an exact version manifest; uploading a new version must invalidate prior verification and require renewed review. |
 | Production | Deny production dispatch/source pinning/QC decisions to an owner or ordinary staff member. Permit assigned staff progress; permit Production Manager dispatch and technical approval. Amend specifications, reconcile exceptions, request corrections, and prove earlier approved versions remain immutable. |
 | Previews | Verify bounded thumbnail/preview sizes and original preservation. Simulate decoder/storage failures, expired claims and explicit retries. An old claim must not overwrite the newer recorded derivative. |
-| Finance | Exercise payment/refund, linked invoices and shared receipts, revocation, insufficient authorization amount, customer changes and unpaid balances. Release only against current valid Finance authority; retain receivables after operational closure. |
-| Customer access | Demonstrate booking/status and published galleries through the reference website using Public V1 exclusively. Check reduced watermarked proofs, exact-version selections, revoked/expired access and Finance-gated final downloads. |
+| Finance | Exercise payment/refund, linked invoices and shared receipts, revocation, insufficient authorization amount, client changes and unpaid balances. Release only against current valid Finance authority; retain receivables after operational closure. |
+| Client access | Demonstrate booking/status and published galleries through the reference website using Public V1 exclusively. Check reduced watermarked proofs, exact-version selections, revoked/expired access and Finance-gated final downloads. |
 | Webhooks | Inspect signed payload/timestamp verification, durable receiver event IDs, retry/duplicate behavior and expired leases. Verify availability changes follow Finance changes. |
 | Closure and legacy paths | Complete delivery and close, deny operational changes through connected and legacy APIs, then reopen as Operations with a reason. Financial records/history remain usable. Legacy automation cannot bypass human state/ownership/scheduling/production decisions. |
 

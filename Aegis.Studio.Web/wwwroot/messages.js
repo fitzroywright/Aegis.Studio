@@ -239,7 +239,7 @@
         const target=document.getElementById('messageConversationPane');
         const [conversation,identities,files]=await Promise.all([json('/api/conversations/'+id),json('/api/conversations/'+id+'/sending-identities').catch(()=>null),json('/api/conversations/'+id+'/attachments').catch(()=>[])]);
         const pane=document.getElementById('messageConversationPane');if(!pane||pane!==target||revision!==threadRevision)return;
-        setConversationContext(conversation.subject,'Customer conversation',identities?.identities?.find(i=>i.isDefault)?.label||'Workspace',conversation.contactName);
+        setConversationContext(conversation.subject,'Client conversation',identities?.identities?.find(i=>i.isDefault)?.label||'Workspace',conversation.contactName);
         const senders=(identities?.identities||[]).filter(identity=>['Workspace','Self'].includes(identity.type));
         const replyChoices=senders.length?senders:[{type:'Workspace',label:'Reply'}];
         const defaultSender=senders.find(identity=>identity.type===identities?.defaultIdentity)?.type||senders.find(identity=>identity.isDefault)?.type||senders[0]?.type||'Workspace';
@@ -662,4 +662,5 @@
     // Give authentication and the initial shell a moment to settle, then show the digest once.
     setTimeout(() => showAwayDigestOnce(), 450);
 })();
+
 

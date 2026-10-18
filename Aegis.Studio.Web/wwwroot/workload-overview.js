@@ -7,7 +7,7 @@
   const activities=(data.activities||[]).map(a=>({...a,eligibility:eligibility.get(a.id)?.status,blockedReason:a.blockedReason||eligibility.get(a.id)?.reason}));
   const active=a=>!done(a)&&!['Inactive','Skipped'].includes(a.eligibility)&&!closed.has(jobMap.get(a.jobId)?.status);
   const gate=a=>['Pending','Needs Assignment','Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Awaiting Production Review','Awaiting Approval'].includes(jobMap.get(a.jobId)?.status)&&['Edit','Retouch','Print','QC','Delivery','Archive','Other'].includes(a.activityType);
-  const waiting=a=>active(a)&&(gate(a)||(!!a.blockedReason||['Blocked','WaitingOnCustomer','Failed','ReworkRequired','ReprintRequired'].includes(a.eligibility||a.status)||(!a.eligibility&&!['Active Production','Changes Requested'].includes(jobMap.get(a.jobId)?.status))));
+  const waiting=a=>active(a)&&(gate(a)||(!!a.blockedReason||['Blocked','WaitingOnClient','Failed','ReworkRequired','ReprintRequired'].includes(a.eligibility||a.status)||(!a.eligibility&&!['Active Production','Changes Requested'].includes(jobMap.get(a.jobId)?.status))));
   const overdue=a=>active(a)&&Number.isFinite(Date.parse(a.dueAtUtc))&&Date.parse(a.dueAtUtc)<now;
   const bucket=a=>!active(a)?'complete':waiting(a)?'waiting':['InProgress','Partial'].includes(a.eligibility||a.status)?'progress':a.eligibility==='Available'||['Active Production','Changes Requested'].includes(jobMap.get(a.jobId)?.status)?'ready':'unknown';
   const itemMap=new Map();for(const i of data.items||[])itemMap.set(i.activityId,[...(itemMap.get(i.activityId)||[]),i]);

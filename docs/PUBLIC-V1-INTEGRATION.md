@@ -56,7 +56,7 @@ The signature binds the method, complete path/query, payload and idempotency key
 
 ## Booking
 
-`POST /api/public/v1/bookings` requires `bookings.write`. The OpenAPI request fields are customer name/email, session type and start/end timestamps, with optional telephone/location/notes/destination. Destination is routed by configured workspace email/route, with unmatched requests going to permanent Unassigned.
+`POST /api/public/v1/bookings` requires `bookings.write`. The OpenAPI request fields are client name/email, session type and start/end timestamps, with optional telephone/location/notes/destination. Destination is routed by configured workspace email/route, with unmatched requests going to permanent Unassigned.
 
 A booking immediately enters Front Desk as a Pending Job. The response is HTTP 201 with `reference`, `status`, `requiredDeposit` and `currency`. It contains no internal workspace, staff assignments or management details. Reusing a key with different facts returns HTTP 409. Reusing the same key/facts returns the original receipt.
 
@@ -64,11 +64,11 @@ A booking immediately enters Front Desk as a Pending Job. The response is HTTP 2
 
 V1 does not expose payment-confirmation writes. Staff record verified manual receipts through Studio/POS. Sending a website request must never manufacture a payment.
 
-## Customer gallery
+## Client gallery
 
-Studio publishes an approved Finished submission from Job Gallery using the existing publication action. Issue customer access using the existing Job client-access action. The authorized response additionally supplies `publicV1.galleryReference`, `apiPath` and `accessToken`. Existing portal links remain supported. Customer tokens expire and can be rotated/revoked in Studio.
+Studio publishes an approved Finished submission from Job Gallery using the existing publication action. Issue client access using the existing Job client-access action. The authorized response additionally supplies `publicV1.galleryReference`, `apiPath` and `accessToken`. Existing portal links remain supported. Client tokens expire and can be rotated/revoked in Studio.
 
-Use `Authorization: Bearer CUSTOMER_TOKEN` on gallery requests. The token authorizes only its Job. Do not place it in proof URLs or expose an integration secret in browser code.
+Use `Authorization: Bearer CLIENT_TOKEN` on gallery requests. The token authorizes only its Job. Do not place it in proof URLs or expose an integration secret in browser code.
 
 | Operation | Path |
 | --- | --- |
@@ -83,7 +83,7 @@ Page size is 1–100. `nextCursor` is null on the last page. Check `publicationI
 
 Proofs are generated from the pinned published versions, reduced to at most 1200 pixels and visibly marked with repeated PROOF lettering. No original or private storage URL is included. Non-image originals remain preserved; unsupported image proofs report an error.
 
-Final downloads recheck published technical approval, Job state, customer access and settlement/Finance authorization on the server. Finance authority must cover the current balance and same customer; revocation, refund/increased balance or customer change can remove access. Recording delivery goes through the same gate. Credit does not mark a balance paid. Legacy workspace galleries are proof-only because they do not identify a pinned Job submission/receivable.
+Final downloads recheck published technical approval, Job state, client access and settlement/Finance authorization on the server. Finance authority must cover the current balance and same client; revocation, refund/increased balance or client change can remove access. Recording delivery goes through the same gate. Credit does not mark a balance paid. Legacy workspace galleries are proof-only because they do not identify a pinned Job submission/receivable.
 
 ## Errors and compatibility
 
@@ -109,7 +109,7 @@ Studio stores events and per-destination delivery attempts in PostgreSQL, leases
 
 ## Reference website
 
-`examples/public-v1-site` is a small Node server plus browser page. It uses V1 exclusively. The server signs booking requests; the browser uses customer capability tokens for gallery/proofs/selections/downloads. Its webhook receiver persists and deduplicates signed envelopes before acknowledging them.
+`examples/public-v1-site` is a small Node server plus browser page. It uses V1 exclusively. The server signs booking requests; the browser uses client capability tokens for gallery/proofs/selections/downloads. Its webhook receiver persists and deduplicates signed envelopes before acknowledging them.
 
 On the development machine, from the repository root:
 

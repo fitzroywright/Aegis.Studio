@@ -15,7 +15,7 @@ Original main: `4a1584bd8a943b216c817f737ae208207ab03224`.
 
 The code, tests, actual-app acceptance harness and detailed results are committed. Continue from main; the checkpoint branch retains the implementation recovery point. Read `docs/CATALOG-PRODUCTION-VERIFICATION.md` before changing the implementation.
 
-Outstanding validation: native PostgreSQL concurrent-session/WorkDay regression, browser visual QA, and configured external Customer Gallery publishing. The full UI suite has 13 baseline failures documented in the verification report. Do not describe these validations as completed.
+Outstanding validation: native PostgreSQL concurrent-session/WorkDay regression, browser visual QA, and configured external Client Gallery publishing. The full UI suite has 13 baseline failures documented in the verification report. Do not describe these validations as completed.
 
 Prior local workspace: `/workspace/scratch/24d145d84380/Aegis.Studio`, with Common sibling projects. SDK used: `/workspace/scratch/77eb8ffe420b/tools/dotnet/dotnet`, 10.0.401. Restore required `-m:1 -p:RestoreUseStaticGraphEvaluation=true`; normal recursive restore failed without useful diagnostics. Build used `--no-restore -m:1 -p:BuildInParallel=false`. A temporary PGlite socket provided disposable PostgreSQL-protocol checks. These runtime paths are session-specific; use the normal .NET/Common layout when resuming elsewhere.
 

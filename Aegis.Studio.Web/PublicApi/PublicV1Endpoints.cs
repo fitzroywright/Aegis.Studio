@@ -94,7 +94,7 @@ public static class PublicV1Endpoints
             var content = await storage.OpenReadAsync("VersionStore/" + asset.StoredPath, context.RequestAborted);
             if (variant == "download")
             {
-                WorkflowStore.Sql(c, tx, "insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'CustomerFinalDownload','Customer',$3,now())", Guid.NewGuid(), reference, "Approved version " + version);
+                WorkflowStore.Sql(c, tx, "insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'ClientFinalDownload','Client',$3,now())", Guid.NewGuid(), reference, "Approved version " + version);
                 tx.Commit();
                 return Results.Stream(content, asset.ContentType, fileDownloadName: Path.GetFileName(asset.FileName), enableRangeProcessing: false);
             }
@@ -119,8 +119,8 @@ public static class PublicV1Endpoints
             WorkflowStore.Scalar(c, tx, "select id from studio_jobs where id=$1 for update", reference);
             Guid publication = PublicV1Store.Publication(c, tx, reference);
             var submission = PublicV1Store.SubmitSelections(c, tx, publication, PublicV1Security.IdempotencyKey(context));
-            WorkflowStore.Notify(c, tx, reference, "public-selection:" + submission.Reference, "Owner", "Customer selections submitted");
-            WorkflowStore.Notify(c, tx, reference, "public-selection:" + submission.Reference, "Production Manager", "Customer selections submitted");
+            WorkflowStore.Notify(c, tx, reference, "public-selection:" + submission.Reference, "Owner", "Client selections submitted");
+            WorkflowStore.Notify(c, tx, reference, "public-selection:" + submission.Reference, "Production Manager", "Client selections submitted");
             tx.Commit(); return Results.Ok(submission);
         });
         app.MapGet("/api/operations-management/webhooks", (System.Security.Claims.ClaimsPrincipal user, WorkflowStore workflow) =>
@@ -137,8 +137,8 @@ public static class PublicV1Endpoints
                 """)!));
         }).RequireAuthorization();
         group.Map("/{**path}",(HttpContext context)=>Error(context,404,"not_found","Unknown V1 resource."));
-        // Management can review the same exact versions chosen by the customer.
-        app.MapGet("/api/jobs/{job:guid}/customer-selections", (Guid job, System.Security.Claims.ClaimsPrincipal user, JobAccessService access) =>
+        // Management can review the same exact versions chosen by the client.
+        app.MapGet("/api/jobs/{job:guid}/client-selections", (Guid job, System.Security.Claims.ClaimsPrincipal user, JobAccessService access) =>
         {
             if (!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
             using var c = db.OpenConnection();
@@ -149,7 +149,7 @@ public static class PublicV1Endpoints
     {
         string header = context.Request.Headers.Authorization.ToString();
         if (!header.StartsWith("Bearer ", StringComparison.Ordinal) || portal.Validate(header[7..]) is not { } access || access.JobId != job)
-            throw new PublicApiException(401, "invalid_gallery_access", "A valid customer gallery access token for this Job is required.");
+            throw new PublicApiException(401, "invalid_gallery_access", "A valid client gallery access token for this Job is required.");
     }
     private static IResult Error(HttpContext context, int status, string code, string message)
         => Results.Json(new PublicV1Error(code, message, context.TraceIdentifier), statusCode: status);
@@ -166,3 +166,4 @@ public static class PublicV1Endpoints
         return buffer.ToArray();
     }
 }
+

@@ -32,7 +32,7 @@ Record platform, commit, results and screenshots in local acceptance notes. Curr
 
 ## Photographer journey extension — 11 October 2026
 
-WorkDay remains the assigned photographer's mobile client. Bootstrap caches the Job title, customer contact allowed by the existing service, session time/location/instructions, collections and roster names, references, collection names and photo notes. Roster people are Job subjects; they are never sign-in accounts. Crew and ownership decisions use Studio employee account links and active photographer profiles. Pickers search the local Studio employee service with bounded results; scheduling and WorkDay administration no longer preload the messaging/AD user list. Studio-maintained employee activation and names are not reset by picker reads.
+WorkDay remains the assigned photographer's mobile client. Bootstrap caches the Job title, client contact allowed by the existing service, session time/location/instructions, collections and roster names, references, collection names and photo notes. Roster people are Job subjects; they are never sign-in accounts. Crew and ownership decisions use Studio employee account links and active photographer profiles. Pickers search the local Studio employee service with bounded results; scheduling and WorkDay administration no longer preload the messaging/AD user list. Studio-maintained employee activation and names are not reset by picker reads.
 
 ### Contracts and conflict rules
 

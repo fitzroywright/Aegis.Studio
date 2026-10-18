@@ -56,9 +56,9 @@ public sealed record WorkDayAssignment(
     string? Instructions,
     Guid? WorkspaceId,
     Guid? ConversationId,
-    string? CustomerName,
-    string? CustomerEmail,
-    string? CustomerPhone,
+    string? ClientName,
+    string? ClientEmail,
+    string? ClientPhone,
     long Version);
 
 public sealed record WorkDayBootstrap(

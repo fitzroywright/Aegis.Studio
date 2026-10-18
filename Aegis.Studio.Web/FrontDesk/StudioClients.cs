@@ -7,7 +7,7 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.FrontDesk;
 
-// Contacts are independent of workspaces. Existing job customer snapshots are preserved.
+// Contacts are independent of workspaces. Existing job client snapshots are preserved.
 public sealed class StudioClientStore(StudioDatabase database)
 {
     public void Migrate()

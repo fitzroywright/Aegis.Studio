@@ -37,7 +37,7 @@ public sealed class StudioQuoteStore(StudioDatabase db)
     }
     public void Accept(Guid id,string reference)
     {
-        if(string.IsNullOrWhiteSpace(reference)||reference.Length>500)throw new ArgumentException("Record the customer's acceptance reference (email, call or signed document).");
+        if(string.IsNullOrWhiteSpace(reference)||reference.Length>500)throw new ArgumentException("Record the client's acceptance reference (email, call or signed document).");
         using var c=db.OpenConnection();using var tx=c.BeginTransaction();if(MediaProductionStore.Execute(c,tx,"update studio_client_quotes set status='Accepted',acceptance_reference=$2 where id=$1 and status in ('Draft','Queued')",id,reference.Trim())!=1)throw new ArgumentException("Quote is missing, already accepted or converted.");tx.Commit();
     }
     public Guid ConvertToBooking(Guid id,string user)
@@ -65,3 +65,4 @@ public static class StudioQuoteEndpoints
     private static string Name(ClaimsPrincipal user)=>user.FindFirstValue("login_name")??user.Identity!.Name!;
     private static IResult Run(ClaimsPrincipal user,StudioDatabase db,Func<IResult> action){if(!user.IsInRole("Administrator")&&!(new GlobalOperationalRoleStore(db).HasPermission(user,"ViewAllJobs")&&new GlobalOperationalRoleStore(db).HasPermission(user,"Billing")))return Results.Forbid();try{return action();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}}
 }
+

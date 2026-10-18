@@ -3,7 +3,7 @@
   "info": {
     "title": "Brian\u2019s Studio Public API",
     "version": "1.0.0",
-    "description": "Backward compatible V1 contract. HTTPS only. Gallery access is an expiring/revocable customer capability. Final downloads always enforce approval and financial release on the server."
+    "description": "Backward compatible V1 contract. HTTPS only. Gallery access is an expiring/revocable client capability. Final downloads always enforce approval and financial release on the server."
   },
   "servers": [
     {
@@ -915,7 +915,7 @@
       "GalleryToken": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Customer access issued from the Studio Job; grants only that Job gallery."
+        "description": "Client access issued from the Studio Job; grants only that Job gallery."
       }
     },
     "schemas": {

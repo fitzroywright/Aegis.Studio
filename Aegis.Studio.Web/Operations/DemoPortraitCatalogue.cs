@@ -1,6 +1,6 @@
 using System.Text.Json;
 namespace Aegis.Studio.Web.Operations;
-// Commons metadata is checked at catalogue creation; no procedural or generated photos.
+// Curated civilian photographs without flag backgrounds; retain license and author credit.
 public static class DemoPortraitCatalogue
 {
     private static readonly Lazy<Photo[]> photos=new(()=>
@@ -9,10 +9,11 @@ public static class DemoPortraitCatalogue
         return JsonSerializer.Deserialize<Photo[]>(input,new JsonSerializerOptions{PropertyNameCaseInsensitive=true})!;
     });
     public static IReadOnlyList<Photo> Photos=>photos.Value;
-    public sealed record Photo(string Title,string Url,string Page,string License,string SourceSha1);
+    public sealed record Photo(string Title,string Url,string Page,string License,string Credit);
     public static string Url(int index)
     {
-        if(index<0||index>=Photos.Count)throw new ArgumentOutOfRangeException(nameof(index),"The licensed source catalogue is exhausted. Add genuine photographs rather than repeating them.");
+        if(index<0||index>=Photos.Count)throw new ArgumentOutOfRangeException(nameof(index),"The requested photograph is outside the reviewed source catalogue.");
         return Photos[index].Url;
     }
 }
+

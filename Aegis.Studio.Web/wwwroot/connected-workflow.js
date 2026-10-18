@@ -91,15 +91,15 @@
     </div><nav class="workflow-actions" aria-label="Related pages">${button('data-wf-nav="today"','Today')+button('data-wf-nav="jobs"','Jobs')+button('data-wf-workspace','Workspace')+button('data-wf-nav="production"','Production')}</nav></details>
     <details class="workflow-history"><summary>History & reports${(data.fieldConflicts||[]).length?` · ${(data.fieldConflicts||[]).length} sync conflicts`:''}</summary>
    <details><summary>Owner assignment history</summary>${(data.ownerAssignmentHistory||[]).map(a=>`<p>${esc(a.assigned_to)} · ${esc(a.status)} · Assigned by ${esc(a.assigned_by)} · ${esc(a.response_reason||'')}</p>`).join('')||'<p>No ownership responses recorded.</p>'}</details>
-   <details><summary>Customer selections</summary><div data-wf-selections></div></details>
+   <details><summary>Client selections</summary><div data-wf-selections></div></details>
    <details><summary>Sync conflict history (${(data.fieldConflicts||[]).length})</summary>${(data.fieldConflicts||[]).map(r=>`<p role="status"><strong>${esc(r.user_name)} · ${esc(r.target_id)}</strong> · ${esc(r.report?.Status||r.report?.status)} · ${esc(r.message)} · ${esc(new Date(r.received_at_utc).toLocaleString())}</p>`).join('')||'<p>No roster sync conflicts recorded.</p>'}<p>Review current Studio facts with the photographer before resolving retained device reports and submitting a new decision.</p></details>
    <details><summary>Photographer reports</summary>${(data.photographerReports||[]).map(r=>`<article><strong>${esc(r.user_name)} · ${esc(r.kind)}</strong><span class="studio-status-pill">${esc(r.state)}</span><p>${esc(new Date(r.occurred_at_utc).toLocaleString())} · ${esc(r.text_value||r.category||'')}</p></article>`).join('')||'<p>No WorkDay reports received for this Job.</p>'}</details>
    <details><summary>Booking override history</summary>${(data.bookingOverrides||[]).map(r=>`<p><strong>${esc(r.status)}</strong> · ${esc(r.requested_by)} · ${esc(r.reason)}${r.decided_by?` · Decision: ${esc(r.decided_by)} · ${esc(r.decision_reason)} · ${esc(new Date(r.decided_at_utc).toLocaleString())}`:""}</p>`).join('')||'<p>No booking overrides.</p>'}</details><details><summary>Workflow and assignment history</summary><ol>${data.history.map(h=>`<li><strong>${esc(h.new_stage)}</strong> · ${h.entered_at_utc?esc(new Date(h.entered_at_utc).toLocaleString()):'Historical timing unavailable'}${h.entered_at_utc?` · ${elapsed((+(h.exited_at_utc?new Date(h.exited_at_utc):new Date())- +new Date(h.entered_at_utc))/3600000)}`:''} · ${esc(h.actor)}${h.reason?' · '+esc(h.reason):''}</li>`).join('')}</ol><p>Review submissions: ${data.submissions.map(s=>esc(s.kind)+' #'+s.revision+' '+esc(s.status)).join('; ')||'None'}</p></details></details></div><p role="alert" data-wf-error></p></section>`;
   // Move the real, permission-checked action so every entry point uses the same handler.
   const primary=next.selector?host.querySelector(next.selector):null;
   if(primary){primary.className='primary';primary.textContent=next.label;host.querySelector('[data-wf-next-action]').append(primary);host.querySelector('[data-wf-next-title]').hidden=true;}
-  const customerSelections=host.querySelector('[data-wf-selections]');
-  try{const selections=await send('/api/jobs/'+jobId+'/customer-selections');if(!isCurrent())return;customerSelections.innerHTML=selections.map(s=>`<p>${esc(new Date(s.submittedAt).toLocaleString())} · ${(s.versionIds||[]).map(id=>`<a href="/api/jobs/${jobId}/versions/by-id/${esc(id)}/preview" target="_blank" rel="noopener">${esc(id)}</a>`).join(', ')}</p>`).join('')||'<p>No customer selections submitted.</p>';}catch{customerSelections.textContent='Customer selections unavailable. Refresh to retry.';}
+  const clientSelections=host.querySelector('[data-wf-selections]');
+  try{const selections=await send('/api/jobs/'+jobId+'/client-selections');if(!isCurrent())return;clientSelections.innerHTML=selections.map(s=>`<p>${esc(new Date(s.submittedAt).toLocaleString())} · ${(s.versionIds||[]).map(id=>`<a href="/api/jobs/${jobId}/versions/by-id/${esc(id)}/preview" target="_blank" rel="noopener">${esc(id)}</a>`).join(', ')}</p>`).join('')||'<p>No client selections submitted.</p>';}catch{clientSelections.textContent='Client selections unavailable. Refresh to retry.';}
   const clock=host.querySelector('[data-wf-clock]');
   if(clock){
    const tick=()=>{
@@ -183,3 +183,4 @@
  root.StudioWorkflow={nextAction,open,render,command,productionTask,canReportTask,elapsed,crewPayload,escape:esc};
  if(typeof module!=='undefined')module.exports=root.StudioWorkflow;
 })(typeof window!=='undefined'?window:globalThis);
+

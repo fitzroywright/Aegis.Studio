@@ -72,19 +72,19 @@ public sealed class MediaProductionPersistenceTests
             var clients=new StudioClientStore(db);clients.Migrate();var client=clients.Save(null,new("Shared client","client@example.invalid",null));clients.Link(job,client.Id,"frontdesk");clients.Link(wedding,client.Id,"frontdesk");Assert.Single(clients.List());clients.Link(job,null,"frontdesk");
             using(var c=db.OpenConnection()){
                 Sql(c,"alter table studio_workspaces add column is_enabled boolean default true");Sql(c,"insert into studio_workspaces(id) select workspace_id from studio_jobs");
-                Sql(c,"alter table studio_jobs add column client_name text default 'Customer'");Sql(c,"alter table studio_jobs add column conversation_id uuid");
+                Sql(c,"alter table studio_jobs add column client_name text default 'Client'");Sql(c,"alter table studio_jobs add column conversation_id uuid");
                 Sql(c,"create table studio_conversations(id uuid primary key,contact_address text)");Sql(c,"insert into studio_conversations select id,'client@example.invalid' from studio_jobs");Sql(c,"update studio_jobs set conversation_id=id");
                 Sql(c,"create table studio_notifications(id uuid primary key,user_name text,channel text,event_type text,subject text,body text,reference_type text,reference_id text,status text,destination text,attempts int,is_read boolean,created_at_utc timestamptz,last_error text)");
             }
             clients.Link(job,client.Id,"frontdesk");var accounts=new StudioAccountsStore(db);accounts.EnsureSchema();
             var estimate=new InvoiceRequest([new("Photography",1,500)],0,DateTimeOffset.UtcNow.AddDays(30));
             var invoice=accounts.CreateInvoice(job,estimate,"frontdesk",[wedding]);Assert.Equal(invoice.Id,accounts.GetInvoices(wedding).Single().Id);
-            var other=clients.Save(null,new("Different customer",null,null));clients.Link(wedding,other.Id,"frontdesk");Assert.Throws<InvalidOperationException>(()=>accounts.CreateInvoice(job,estimate,"frontdesk",[wedding]));
+            var other=clients.Save(null,new("Different client",null,null));clients.Link(wedding,other.Id,"frontdesk");Assert.Throws<InvalidOperationException>(()=>accounts.CreateInvoice(job,estimate,"frontdesk",[wedding]));
             new FrontDeskBookingRequestStore(db).EnsureSchema();var quotes=new StudioQuoteStore(db);quotes.Migrate();Guid workspace;
             using(var c=db.OpenConnection()){using var command=new NpgsqlCommand("select workspace_id from studio_jobs where id=$1",c);command.Parameters.AddWithValue(job);workspace=(Guid)command.ExecuteScalar()!;}
             var quote=quotes.Create(new(client.Id,workspace,"ID photos",DateOnly.FromDateTime(DateTime.Today.AddDays(10)),"Bring employee roster",estimate,100),"frontdesk");
             Assert.Throws<ArgumentException>(()=>quotes.ConvertToBooking(quote,"frontdesk"));quotes.Send(quote,"frontdesk");Assert.Equal("Pending",quotes.List(client.Id)[0].GetProperty("deliveryStatus").GetString());
-            Assert.Throws<ArgumentException>(()=>quotes.Send(quote,"frontdesk"));quotes.Accept(quote,"Customer email confirmation");Guid pending=quotes.ConvertToBooking(quote,"frontdesk");Assert.Equal(pending,quotes.ConvertToBooking(quote,"frontdesk"));Assert.Null(new FrontDeskBookingRequestStore(db).GetAll().Single().JobId);
+            Assert.Throws<ArgumentException>(()=>quotes.Send(quote,"frontdesk"));quotes.Accept(quote,"Client email confirmation");Guid pending=quotes.ConvertToBooking(quote,"frontdesk");Assert.Equal(pending,quotes.ConvertToBooking(quote,"frontdesk"));Assert.Null(new FrontDeskBookingRequestStore(db).GetAll().Single().JobId);
 
         }
         finally {source.Dispose();Sql(admin,$"drop schema {schema} cascade");if(Directory.Exists(root))Directory.Delete(root,true);}

@@ -111,7 +111,7 @@ body[data-theme="fluent-dark"] #studioContextRail [data-rail-card="workspaces"] 
 
 /* Controls stay dark and readable, including focused grid searches. */
 body[data-theme="fluent-dark"] :is(input,select,textarea,.theme-picker) {background:#1a2836;color:var(--theme-text);border-color:var(--studio-control-border)!important;accent-color:var(--theme-accent);}
-body[data-theme="fluent-dark"] :is(.mw-today-job-columns,.sj-job-header,.sj-column-filter,.operations-workspace-overview,.studio-media-gallery-tools,.workspace-column-header,.fd-column-controls,.fd-customer-header) :is(input,select),
+body[data-theme="fluent-dark"] :is(.mw-today-job-columns,.sj-job-header,.sj-column-filter,.operations-workspace-overview,.studio-media-gallery-tools,.workspace-column-header,.fd-column-controls,.fd-client-header) :is(input,select),
 body[data-theme="fluent-dark"] #frontDeskSearch {
   background:#1a2836!important;color:var(--theme-text)!important;border-color:var(--studio-control-border)!important;
 }
