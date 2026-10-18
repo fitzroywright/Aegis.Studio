@@ -47,7 +47,7 @@
   ];
   const terminal=['Cancelled','Blocked'].includes(data.stage)?data.stage:data.blockedReason?'Blocked':null;
   host.innerHTML=`<div class="jd-flow-compact" role="group" aria-label="Workflow milestones and rejoining exception routes">
-   <div class="jd-flow-mainline">${groupState.map((g,i)=>`<button type="button" class="jd-compact-stage ${g.done?'complete':g.active?'current':g.skipped?'skipped':''}" data-flow-stage="${escape(g.stage)}" title="${escape(g.title)}: ${g.done?'Complete':g.active?'Current':g.skipped?'Not required':'Pending'}"><span class="jd-compact-dot" aria-hidden="true">${g.done?'✓':i+1}</span><span>${escape(g.title)}</span></button>`).join('')}</div>
+   ${summaryHost?'':`<div class="jd-flow-mainline">${groupState.map((g,i)=>`<button type="button" class="jd-compact-stage ${g.done?'complete':g.active?'current':g.skipped?'skipped':''}" data-flow-stage="${escape(g.stage)}" title="${escape(g.title)}: ${g.done?'Complete':g.active?'Current':g.skipped?'Not required':'Pending'}"><span class="jd-compact-dot" aria-hidden="true">${g.done?'✓':i+1}</span><span>${escape(g.title)}</span></button>`).join('')}</div>`}
    ${branches.map(line=>`<div class="jd-flow-exception-lane ${line.active?'is-active':''}"><span class="jd-flow-lane-origin">${escape(line.from)}</span><span class="jd-flow-lane-rule" aria-hidden="true"></span><button type="button" class="jd-compact-exception ${line.active?'current':''}" data-flow-stage="${escape(line.label)}" title="View ${escape(line.label)} details">${escape(line.label)}</button><span class="jd-flow-lane-rule" aria-hidden="true"></span><span class="jd-flow-lane-return" title="Returns to main workflow">↗ ${escape(line.to)}</span></div>`).join('')}
    ${terminal?`<div class="jd-flow-terminal" role="status">⛔ ${escape(terminal)} · workflow stopped (does not rejoin)</div>`:''}
   </div>`;
@@ -269,14 +269,16 @@
   function find(graph,id,prefix=''){for(const n of graph.nodes){if(prefix+n.id===id)return n;if(n.subflow){const found=find(n.subflow,id,prefix+n.id+'/');if(found)return found;}}}
   function draw(focus){
    host.style.height='auto';host.classList.add('jd-compact-workflow');
-   host.innerHTML=flow(view.graph)+'<div data-workflow-details aria-live="polite"></div>';
+   const expandedNode=expanded?find(view.graph,expanded):null;
+   const content=summaryHost?(expandedNode?`<section class="jd-dot-stage is-expanded"><h3>${esc(expandedNode.label)}</h3><div class="jd-dot-expansion"><div class="jd-dot-endpoints"><span>○ Stage Start</span><span class="jd-dot-dash" aria-hidden="true"></span><span>${state(expandedNode,expanded)==='Completed'?'✓':'○'} Stage Complete</span></div>${flow(expandedNode.subflow,expanded+'/',true)}<button type="button" class="jd-link" data-workflow-collapse="${esc(expanded)}">Collapse ${esc(expandedNode.label)} ↑</button></div></section>`:''):flow(view.graph);
+   host.innerHTML=content+'<div data-workflow-details aria-live="polite"></div>';
    host.querySelectorAll('[data-workflow-node]').forEach(button=>button.onclick=()=>{
     const id=button.dataset.workflowNode,node=find(view.graph,id);
     if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw(id);}else{selected=id;details(node,id);}
    });
    host.querySelectorAll('[data-workflow-collapse]').forEach(button=>button.onclick=()=>{const id=expanded;expanded=id.includes('/')?id.slice(0,id.lastIndexOf('/')):null;selected=null;draw(id);});
    if(focus)[...host.querySelectorAll('[data-workflow-node]')].find(b=>b.dataset.workflowNode===focus)?.focus();
-   if(summaryHost){summaryHost.innerHTML=view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>`<li>${dot(n,n.id)}</li>`).join('');summaryHost.querySelectorAll('[data-workflow-node]').forEach(b=>b.onclick=()=>{const toggle=host.closest('.job-detail-heading')?.querySelector('[data-toggle-flow-details]');if(toggle?.getAttribute('aria-expanded')==='false')toggle.click();const target=[...host.querySelectorAll('[data-workflow-node]')].find(x=>x.dataset.workflowNode===b.dataset.workflowNode);target?.click();target?.focus();});}
+   if(summaryHost){summaryHost.innerHTML=view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>`<li>${dot(n,n.id)}</li>`).join('');summaryHost.querySelectorAll('[data-workflow-node]').forEach(b=>b.onclick=()=>{const id=b.dataset.workflowNode,node=find(view.graph,id);if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw();}else{expanded=null;selected=id;draw();details(node,id);}summaryHost.querySelectorAll('[data-workflow-node]').forEach(button=>{if(button.dataset.workflowNode===id)button.focus();});});}
   }
   function details(node,id){
    const task=tasks.get(id),evaluation=states.get(id),reason=task?.reason||evaluation?.reason,next=root.StudioWorkflow?.nextAction?.(authority.data?authority:{...authority,data:{}}),canAssign=task&&!task.assignedTo&&(authority.canManage||authority.canReview);
@@ -285,7 +287,7 @@
    hostDetails.querySelector('[data-existing-task]').onclick=()=>root.StudioJobGraph.open(job.id,task?.id).catch(e=>alert(e.message));
    hostDetails.querySelector('[data-step-assign]')?.addEventListener('click',async()=>{try{const dialog=await root.StudioJobGraph.open(job.id,task.id);[...dialog.querySelectorAll('[data-assign]')].find(b=>b.dataset.assign===task.id)?.click();}catch(e){alert(e.message);}});
    hostDetails.querySelector('[data-step-next]')?.addEventListener('click',()=>root.StudioWorkflow.open(job.id,next.selector).catch(e=>alert(e.message)));
-   hostDetails.querySelector('[data-close-step]').onclick=()=>{selected=null;hostDetails.innerHTML='';[...host.querySelectorAll('[data-workflow-node]')].find(b=>b.dataset.workflowNode===id)?.focus();};
+   hostDetails.querySelector('[data-close-step]').onclick=()=>{selected=null;hostDetails.innerHTML='';[...host.querySelectorAll('[data-workflow-node]'),...(summaryHost?.querySelectorAll('[data-workflow-node]')||[])].find(b=>b.dataset.workflowNode===id)?.focus();};
   }
   draw();return {get expanded(){return expanded;},get selected(){return selected;}};
  }
