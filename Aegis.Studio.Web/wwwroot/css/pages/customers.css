@@ -56,3 +56,8 @@
 .customers-page .customer-directory-table tr.is-selected>td{background:color-mix(in srgb,var(--theme-accent,#d97722) 22%,var(--studio-control-surface,#fff));color:var(--studio-control-text,#233e57);font-weight:600}
 .customers-page .customer-directory-table tr.is-selected>td:first-child{box-shadow:inset 4px 0 var(--theme-accent,#d97722)}
 .customer-tabs .customer-edit-details{margin-left:auto;align-self:center;padding:6px 9px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;font-size:11px}
+
+/* Keep each header above scrolling rows, including selected-row backgrounds. */
+.customers-page :is(.customer-directory-table,.customer-jobs-table){border-collapse:separate;border-spacing:0}
+.customers-page :is(.customer-directory-table,.customer-jobs-table) thead{position:sticky;top:0;z-index:2}
+.customers-page :is(.customer-directory-table,.customer-jobs-table) thead th{position:static;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8)}
