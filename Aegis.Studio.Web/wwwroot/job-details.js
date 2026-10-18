@@ -326,7 +326,8 @@
      const x1=start?from.x:from.x+direction*from.rx,y1=start?from.y+from.ry:from.y;
      const x2=finish?to.x:to.x-direction*to.rx,y2=finish?to.y+to.ry:to.y;
      const bend=Math.abs(x2-x1)*0.55228475,drop=Math.abs(y2-y1)*0.55228475;
-     const d=start?`M ${x1} ${y1} C ${x1} ${y1+drop}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`:finish?`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2} ${y2+drop}, ${x2} ${y2}`:`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`;
+     const radius=Math.min(12,Math.abs(y2-y1)/3,Math.abs(x2-x1)/3);
+     const d=start?`M ${x1} ${y1} V ${y2-radius} Q ${x1} ${y2}, ${x1+direction*radius} ${y2} H ${x2}`:finish?`M ${x1} ${y1} H ${x2-direction*radius} Q ${x2} ${y1}, ${x2} ${y1-radius} V ${y2}`:`M ${x1} ${y1} C ${x1+direction*bend} ${y1}, ${x2-direction*bend} ${y2}, ${x2} ${y2}`;
      return [`<path d="${d}"/>`];
     });
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.dataset.subflowRoutes='';svg.classList.add('jd-subflow-routes');svg.setAttribute('aria-hidden','true');svg.setAttribute('viewBox',`0 0 ${scope.clientWidth||bounds.width} ${scope.clientHeight||bounds.height}`);svg.setAttribute('preserveAspectRatio','none');svg.innerHTML=paths.join('');scope.prepend(svg);

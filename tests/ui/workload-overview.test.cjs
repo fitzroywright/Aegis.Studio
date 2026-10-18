@@ -83,9 +83,9 @@ test('curved connectors attach at dot rims and refresh after drawer transitions'
  w.StudioJobDetails.compact(host,workflow(),job,summary);
  summary.querySelector('[data-workflow-node="produce"]').click();frame();
  const paths=[...w.document.querySelectorAll('[data-subflow-routes] path')];
- assert.equal(paths.length,4);assert.match(paths[0].getAttribute('d'),/^M 26 32 C /);
- assert.match(paths[0].getAttribute('d'),/, 100 156$/);
- assert.ok(paths.every(p=>p.getAttribute('d').includes(' C ')));
+ assert.equal(paths.length,4);assert.match(paths[0].getAttribute('d'),/^M 26 32 V /);
+ assert.match(paths[0].getAttribute('d'),/ H 100$/);
+ assert.ok(paths.every(p=>/ [CQ] /.test(p.getAttribute('d'))));assert.match(paths.at(-1).getAttribute('d'),/ V 32$/);
  w.document.body.dispatchEvent(new w.Event('transitionend'));frame();
  assert.equal(w.document.querySelectorAll('[data-subflow-routes]').length,1);
  summary.querySelector('[data-workflow-node="produce"]').click();
