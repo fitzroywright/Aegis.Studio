@@ -117,3 +117,29 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 
 .st-card.production-overview-card>header .fd-card-link,.st-card.production-attention-card>header .fd-card-link{flex:0 0 auto;margin-left:auto;padding:0;border:0;background:transparent;color:var(--studio-rail-title,#253c54);font:inherit;font-weight:700;white-space:nowrap;cursor:pointer}
 .production-board-filters>input[type=search]::placeholder{color:#e2ebf6;opacity:1}
+
+/* Production board visual hierarchy and status pills. */
+.production-lane{background:color-mix(in srgb,var(--studio-card-surface) 96%,var(--studio-rail-accent,#f4f6f8));border-color:color-mix(in srgb,var(--studio-grid-border) 78%,#536a80)}
+.production-lane>header{background:color-mix(in srgb,var(--studio-rail-accent,#f4f6f8) 82%,#dce8f2)}
+.production-lane-attention>header{background:#fae8e5}
+.production-lane-ready>header{background:#e4eff8}
+.production-lane-progress>header{background:#fbf0dc}
+.production-lane-qc>header{background:#eee8f6}
+.production-lane-complete>header{background:#e5f2e9}
+.production-lane>header>span{border:1px solid var(--studio-grid-border);box-shadow:0 1px 2px #26334418}
+.production-order-card{transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
+.production-order-card:hover{transform:translateY(-1px);box-shadow:0 3px 9px #26334420;border-color:#9aabba}
+.production-order-tone-attention{border-left:3px solid #b44b42}
+.production-order-tone-ready{border-left:3px solid #4b83b4}
+.production-order-tone-progress{border-left:3px solid #d59025}
+.production-order-tone-qc{border-left:3px solid #8065b2}
+.production-order-tone-complete{border-left:3px solid #39835e}
+.production-priority.production-pill{padding:3px 8px;border:1px solid transparent;border-radius:999px;font-size:9px;line-height:1.2;font-weight:700}
+.production-pill[data-tone=attention]{background:#fae3e0;border-color:#e9b9b3;color:#92352e}
+.production-pill[data-tone=ready]{background:#e1edf7;border-color:#bfd3e5;color:#315d82}
+.production-pill[data-tone=progress]{background:#f8edda;border-color:#e9d1a5;color:#80520f}
+.production-pill[data-tone=qc]{background:#eee8f6;border-color:#d2c3e6;color:#5d4781}
+.production-pill[data-tone=complete]{background:#e4f1e8;border-color:#c1dcc9;color:#326749}
+.production-order-product{align-self:flex-start;padding:3px 7px;border-radius:4px;background:var(--studio-rail-accent,#f4f6f8)}
+.production-progress-track{background:#e5e9ee}
+.production-progress-track>span{border-radius:5px;background:linear-gradient(90deg,#4b83b4,#39835e)}
