@@ -36,13 +36,10 @@ test('Management workload follows the same schedule resource IDs as Pipeline',as
  const w=setup();endpoints(w);w.pipelineStages=[['Production',['Production']]];await w.showManagement();assert.equal(w.document.querySelectorAll('.st-dashboard-grid>.op-card').length,8);assert.match(w.genericView.textContent,/0 open tasks · 1 sessions/);
  let route;w.studioNavigate=v=>route=v;w.document.querySelector('[data-stage]').click();assert.equal(route,'pipeline');assert.equal(w.pipelineSelectedStage,'Production');
 });
-test('Production filters collections and persists completion through the existing API',async()=>{
- const w=setup(['management.js','production.js']);endpoints(w);const read=w.json,calls=[];let status='NotStarted';
- w.json=async(u,o)=>{if(o){calls.push({u,body:JSON.parse(o.body)});status=JSON.parse(o.body).status;return {};}
- if(u==='/api/operations/activities')return [{id:'task',jobId:'job',activityType:'Retouch',title:'Retouch Selects',collectionName:'Selects',assignedTo:'staff',status,priority:'Normal',createdAtUtc:date}];
- if(u.endsWith('/media'))return {assets:[{collection:'Selects'},{collection:'Proofs'}]};return read(u,o);};
- await w.showProduction();let row=w.document.querySelector('tbody tr');assert.match(row.children[4].textContent,/^0\/1/);assert.match(row.children[4].textContent,/1 approved/);assert.ok(row.querySelector('[data-work-complete]'));
- await w.setOperationalActivityStatus('task','Completed');assert.equal(calls[0].u,'/api/operations/activities/task');assert.equal(calls[0].body.status,'Completed');assert.equal(w.document.querySelector('[data-work-complete]'),null);
+test('Production navigation uses the canonical board and retires the legacy activity page',async()=>{
+ const w=setup(['management.js','production.js']);let route;w.studioNavigate=async view=>{route=view;};
+ await w.showProduction();assert.equal(route,'production');assert.equal(w.genericView.querySelector('tbody'),null);
+ const source=fs.readFileSync(path.join(root,'production.js'),'utf8');assert.doesNotMatch(source,/async function showProduction\s*\(/);
 });
 test('folder ingest drains repeated directory batches and ignores non-photo files',async()=>{
  const w=setup(['media-production.js']);const file=name=>({isFile:true,file:done=>done({name,type:'image/jpeg'})});const batches=[[file('one.jpg')],[file('two.png'),file('notes.txt')],[]];
