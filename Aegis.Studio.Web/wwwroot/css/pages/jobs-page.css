@@ -117,6 +117,6 @@ body[data-studio-view="jobs"] .sj-calendar input[data-sj-calendar-date]{position
 
 /* Let the Jobs grid scroll horizontally without clipping either aligned table. */
 body[data-studio-view="jobs"] .sj-table-frame{overflow-x:auto;overflow-y:hidden}
-body[data-studio-view="jobs"] .sj-table-head-clip{width:100%;min-width:1130px;flex:0 0 auto}
-body[data-studio-view="jobs"] .sj-table-scroll{width:100%;min-width:1130px;flex:1 1 auto}
+body[data-studio-view="jobs"] .sj-table-head-clip{width:100%;min-width:1140px;flex:0 0 auto}
+body[data-studio-view="jobs"] .sj-table-scroll{width:100%;min-width:1140px;flex:1 1 auto}
 body[data-studio-view="jobs"] .sj-table-frame .sj-table{width:100%;min-width:1120px;table-layout:fixed}
