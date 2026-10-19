@@ -29,7 +29,10 @@
 .st-task-empty{text-align:center;padding:28px!important;color:var(--studio-muted,#697582)}
 .st-tasks-rail{display:flex;flex-direction:column;gap:12px;overflow:auto}
 .st-tasks-rail>.mw-list-panel{flex:0 0 auto}
-.st-tasks-rail .mw-session-row{width:100%;text-align:left}
+.st-tasks-rail .mw-session-row{display:grid;width:100%;min-width:0;height:auto;min-height:46px;grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:8px;padding:6px 8px;text-align:left}
+.st-tasks-rail .mw-session-time{white-space:nowrap;font-size:.72rem;font-weight:400}
+.st-tasks-rail .mw-session-main{min-width:0;overflow:hidden}
+.st-tasks-rail .mw-session-main strong,.st-tasks-rail .mw-session-main span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .st-task-attention .mw-status-row{display:flex;justify-content:space-between;padding:8px 12px}
 .st-task-messages footer{padding:8px 12px;border-top:1px solid var(--studio-border,#d9dde3)}
 .st-task-messages footer button{font-weight:650}
