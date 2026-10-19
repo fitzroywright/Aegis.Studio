@@ -113,7 +113,7 @@ async function showCatalogProduction(){
     for(const activity of pageActivities)activitiesByLane.get(laneForActivity(activity)).push(activity);
     const laneTone=lane=>lane==='attention'?'attention':lane==='ready'?'ready':lane==='progress'?'progress':lane==='qc'?'qc':'complete';
     const statusTone=status=>{
-        const value=String(status||'Unknown').toLowerCase().replace(/[\\s_-]/g,'');
+        const value=String(status||'Unknown').toLowerCase().replace(/[\s_-]/g,'');
         if(/blocked|failed|reworkrequired|reprintrequired|waitingonclient|overdue/.test(value))return 'blocked';
         if(/qualitycontrol|awaitingqc|readyforqc/.test(value))return 'qc';
         if(value==='inprogress'||value==='partial')return 'progress';
