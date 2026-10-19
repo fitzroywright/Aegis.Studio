@@ -80,9 +80,16 @@ let frontDeskTab='today',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelect
 function frontDeskRequestStage(item){return item.status==='Confirmed'?'Confirmed':item.status==='Cancelled'?'Cancelled':item.recordedDeposit>0?'Ready for confirmation':item.status==='AwaitingDeposit'?'Awaiting deposit':'Pending Job';}
 function openFrontDeskJob(jobId){
     if(!jobId)return Promise.resolve();
-    const navigate=window.studioNavigate;
-    if(typeof navigate==='function')return Promise.resolve(navigate('workspaces',{jobId}));
-    if(typeof window.openWorkspaceJob==='function')return Promise.resolve(window.openWorkspaceJob(jobId));
+    const id=String(jobId);
+    // Front Desk already has the job id. Record the workspace destination first,
+    // then use the established job loader so its conversation/detail surface is
+    // made active before the request completes.
+    if(typeof window.openWorkspaceJob==='function'){
+        window.studioBeginJobNavigation?.(id,{history:true});
+        return Promise.resolve(window.openWorkspaceJob(id,{navigationRecorded:true,history:false}));
+    }
+    if(typeof window.studioNavigate==='function')
+        return Promise.resolve(window.studioNavigate('workspaces',{jobId:id}));
     return Promise.reject(new Error('Job navigation is unavailable.'));
 }
 
