@@ -22,7 +22,12 @@ public static class OperationalWorkEndpoints
             return Results.Ok(new OperationalSummary(shoots.Count(x => x.CallTimeUtc.Date == now.Date && x.Status != "Cancelled"),shoots.Count(x => x.Status == "InProgress"),shoots.Count(x => x.Status == "ShootComplete" && !x.BackupConfirmed),shoots.Count(x => x.ReshootRequired),activities.Count(x => x.Status != "Completed"),activities.Count(x => x.Status == "Blocked"),activities.Count(x => x.Status != "Completed" && x.DueAtUtc.HasValue && x.DueAtUtc.Value < now)));
         }).RequireAuthorization();
 
-        app.MapGet("/api/operations/activities", (Guid? jobId,string? status,string? assignedTo,bool? includeWorkflowDetails,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) => Results.Ok(new OperationalWorkStore(database).GetActivities(jobId,status,assignedTo,includeWorkflowDetails!=false).Where(x=>access.HasPermission(user,x.JobId,"ViewJob")).ToList())).RequireAuthorization();
+        app.MapGet("/api/operations/activities", (Guid? jobId,string? status,string? assignedTo,bool? includeWorkflowDetails,ClaimsPrincipal user,StudioDatabase database,JobAccessService access) =>
+        {
+            IReadOnlyList<JobActivity> activities=new OperationalWorkStore(database).GetActivities(jobId,status,assignedTo,includeWorkflowDetails!=false);
+            HashSet<Guid> viewable=access.GetPermissionMap(user).Where(x=>x.Value.ViewJob).Select(x=>x.Key).ToHashSet();
+            return Results.Ok(activities.Where(x=>viewable.Contains(x.JobId)).ToList());
+        }).RequireAuthorization();
 
         app.MapPost("/api/jobs/{jobId:guid}/operations/activities", (Guid jobId,JobActivityRequest request,ClaimsPrincipal user,WorkflowStore workflow,StudioDatabase database) => WorkflowEndpoints.Run(()=>
         {
