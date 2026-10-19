@@ -87,6 +87,13 @@ public static class CommercialEndpoints
                 """, allowed, string.IsNullOrWhiteSpace(area) ? null : area, take, skip, includeCompleted==true, selected);
             return Results.Content((string)q.ExecuteScalar()!, "application/json");
         })).RequireAuthorization();
+        app.MapGet("/api/production/work-orders/{id:guid}/access", (Guid id, ClaimsPrincipal user, WorkflowStore workflow, StudioDatabase database) => Run(() =>
+        {
+            using var c = database.OpenConnection();
+            using var q = Command(c, null, "select job_id from studio_catalog_work_orders where id=$1", id);
+            if (q.ExecuteScalar() is not Guid jobId) throw new KeyNotFoundException();
+            return Results.Ok(new { canManage = workflow.CanManage(user, jobId), canReview = workflow.IsProductionManager(user), userName = WorkflowStore.Name(user) });
+        })).RequireAuthorization();
         app.MapGet("/api/jobs/{jobId:guid}/commercial/approved-sources",(Guid jobId,string? term,Guid? after,ClaimsPrincipal user,JobAccessService access,StudioDatabase database)=>
         {
             if(!access.HasPermission(user,jobId,"ViewJob"))return Results.Forbid();
