@@ -12,7 +12,7 @@ public sealed class OperationalWorkStore
         this.database = database;
     }
 
-    public IReadOnlyList<JobActivity> GetActivities(Guid? jobId = null, string? status = null, string? assignedTo = null)
+    public IReadOnlyList<JobActivity> GetActivities(Guid? jobId = null, string? status = null, string? assignedTo = null, bool includeWorkflowDetails = true)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -31,6 +31,7 @@ public sealed class OperationalWorkStore
         List<JobActivity> values = [];
         while (reader.Read()) values.Add(ReadActivity(reader));
         reader.Close();
+        if(!includeWorkflowDetails)return values;
         var graphStore=new JobGraphStore(database);
         var eligibility=new Dictionary<Guid,GraphTask>();
         foreach(var job in values.Select(a=>a.JobId).Distinct())
