@@ -50,7 +50,7 @@
 /* Tasks uses the same board, tabs, table header filters and context rail as Jobs. */
 .st-tasks-page{height:100%;min-height:0;overflow:hidden}
 .st-tasks-panel{height:100%;min-width:0}
-.st-tasks-page .sj-summary{background:var(--studio-grid-header-bg,#fafafa)}
+.st-tasks-page .sj-summary{background:#fafafa;color:#67707b}
 .st-tasks-page .sj-summary>[data-task-add]{margin-left:auto;flex:0 0 auto}
 .st-tasks-page .st-task-table{min-width:900px}
 .st-tasks-page .st-task-table th:first-child{width:22%}
@@ -71,3 +71,14 @@
 .st-tasks-rail .mw-status-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e8ebee}
 .st-tasks-rail .st-task-messages footer{padding:8px 12px;border-top:1px solid #e8ebee}
 @media(max-width:900px){.st-tasks-page.sj-page{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 170px}.st-tasks-page .st-task-table{min-width:900px}}
+
+/* Keep the Tasks board inside the same available width as the Jobs board. */
+.st-tasks-page.sj-page{width:100%;box-sizing:border-box;grid-template-columns:minmax(0,1fr) 290px}
+.st-tasks-page .sj-summary .sj-view-tabs button{background:#fff;color:#596676}
+.st-tasks-page .sj-summary .sj-view-tabs button.active{background:#986c55;border-color:#986c55;color:#fff}
+.st-tasks-page .sj-table thead th{background:var(--studio-grid-header-bg,#536d86);color:var(--studio-grid-header-text,#fff)}
+.st-tasks-page .sj-table th{vertical-align:top}
+.st-tasks-page .sj-job-header input[data-task-search]{max-width:none}
+.st-tasks-page .sj-column-filter-inline select{height:24px}
+.st-tasks-page .sj-summary>[data-task-add]{border-radius:4px;padding:7px 11px;background:#986c55;color:#fff}
+@media(max-width:900px){.st-tasks-page.sj-page{grid-template-columns:minmax(0,1fr);}}
