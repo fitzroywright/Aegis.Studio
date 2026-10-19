@@ -128,7 +128,7 @@ async function openCommercialWorkOrder(order){
     if(!authority.canReview){d.querySelector('[data-source]')?.remove();d.querySelector('[data-resolve]')?.remove();}
     if(!authority.canManage&&!authority.canReview)d.querySelector('[data-amend]')?.remove();
     const error=err=>d.querySelector('[role=alert]').textContent=err.message;
-    d.querySelectorAll('[data-task]').forEach(row=>row.querySelector('[data-save]').onclick=async()=>{try{const task=order.tasks.find(t=>t.id===row.dataset.task),view=await json(`/api/jobs/${order.jobId}/connected-workflow`);const assigned=row.querySelector('[data-employee]').value||null,due=row.querySelector('[data-due]').value?new Date(row.querySelector('[data-due]').value).toISOString():null;
+    d.querySelectorAll('[data-task]').forEach(row=>row.querySelector('[data-save]').onclick=async()=>{try{const task=order.tasks.find(t=>t.id===row.dataset.task);const assigned=row.querySelector('[data-employee]').value||null,due=row.querySelector('[data-due]').value?new Date(row.querySelector('[data-due]').value).toISOString():null;
         if(authority.canReview&&(assigned!==task.assignedTo||due!==task.dueAtUtc)){await StudioWorkflow.command(order.jobId,{action:'task',taskId:task.id,title:task.title,userName:assigned,kind:task.step.activityType,location:task.area,dueAtUtc:due,priority:task.priority},row._dispatchHolder??={});task.assignedTo=assigned;task.dueAtUtc=due;}
         await StudioWorkflow.command(order.jobId,{action:'task-progress',taskId:task.id,status:row.querySelector('[data-status]').value,blockedReason:row.querySelector('[data-block]').value},row.querySelector('[data-save]'));d.close();await showCatalogProduction();
     }catch(err){error(err);}});
