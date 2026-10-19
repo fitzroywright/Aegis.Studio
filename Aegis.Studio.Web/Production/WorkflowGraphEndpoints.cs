@@ -41,7 +41,7 @@ public static class WorkflowGraphEndpoints
         app.MapGet("/api/production/workflow-tasks", (bool? mine, string? state, Guid? jobId, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
         {
             var store = new JobGraphStore(db); string actor = WorkflowStore.Name(user);
-            var rows = access.GetAccessibleJobIds(user).Where(id => !jobId.HasValue || id == jobId)
+            var rows = access.GetProductionJobIds(user).Where(id => !jobId.HasValue || id == jobId)
                 .Select(store.Get).Where(v => v is not null).SelectMany(v => v!.Tasks.Select(t => new { v.JobId, v.Revision, task = t }))
                 .Where(r => mine != true || string.Equals(r.task.AssignedTo, actor, StringComparison.OrdinalIgnoreCase))
                 .Where(r => string.IsNullOrWhiteSpace(state) || r.task.Eligibility == state).ToArray();

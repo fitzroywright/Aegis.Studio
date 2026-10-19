@@ -28,6 +28,14 @@ public sealed class JobAccessService
     public IReadOnlyList<Guid> GetAccessibleJobIds(ClaimsPrincipal user,bool requireAttachments=false)
         =>GetPermissionMap(user).Where(x=>x.Value.AccessJob&&(!requireAttachments||x.Value.ViewAttachments)).Select(x=>x.Key).ToArray();
 
+    // Production is readable to every signed-in Studio user; write endpoints enforce ManageProduction separately.
+    public IReadOnlyList<Guid> GetProductionJobIds(ClaimsPrincipal user)
+    {
+        if(user.Identity?.IsAuthenticated!=true)return Array.Empty<Guid>();
+        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select id from studio_jobs",c);
+        using var r=q.ExecuteReader();var ids=new List<Guid>();while(r.Read())ids.Add(r.GetGuid(0));return ids;
+    }
+
     // The same permission union as GetPermissions, fetched once for list screens.
     public IReadOnlyDictionary<Guid,JobPermissionSet> GetPermissionMap(ClaimsPrincipal user,Guid? jobId=null)
     {
@@ -59,7 +67,7 @@ public sealed class JobAccessService
             if(reader.GetBoolean(6))permissions=Union(permissions,JobPermissionSet.WorkflowOwner);
             else if(reader.GetBoolean(7)||reader.GetBoolean(8))permissions=Union(permissions,JobPermissionSet.WorkflowContributor);
             if(reader.GetBoolean(9))permissions=Union(permissions,JobPermissionSet.Viewer);
-            if(permissions.AccessJob||permissions.ViewJob)result[reader.GetGuid(0)]=permissions;
+            if(permissions.AccessJob||permissions.ViewJob||permissions.ManageProduction)result[reader.GetGuid(0)]=permissions;
         }
         return result;
     }
@@ -160,7 +168,7 @@ public sealed class JobAccessService
         bool addAttachments = globalRoles.HasPermission(user, "AddClientAttachments");
         bool productionManager = globalRoles.HasRole(user, StudioRoleNames.ProductionManager);
 
-        if (!viewAllJobs && !reply && !notify && !billing && !viewAttachments && !addAttachments)
+        if (!viewAllJobs && !reply && !notify && !billing && !viewAttachments && !addAttachments && !productionManager)
         {
             return JobPermissionSet.None;
         }
