@@ -10178,3 +10178,6 @@ body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-widt
  .mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr) 42px; }
  .mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:42px minmax(0,1fr); }
 }
+/* Expanded rail toggles live in the first card header; collapsed rails keep a compact edge control. */
+:is(#studioContextRail,.mw-today-left,.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) > :is(section,article) > header { position:relative; }
+.studio-rail-toggle-in-header { position:static; flex:0 0 26px; margin-inline-start:auto; }

@@ -171,13 +171,22 @@
         button.onclick = () => setRailState(side, !railState()[side]);
         return button;
     }
+    function placeRailToggle(rail, side, collapsed) {
+        let toggle = rail.querySelector('[data-rail-toggle="' + side + '"]');
+        if (!toggle) toggle = railButton(side, collapsed);
+        const firstSection = Array.from(rail.children).find(child => child !== toggle && child.querySelector(':scope > header'));
+        const header = firstSection?.querySelector(':scope > header');
+        toggle.classList.toggle('studio-rail-toggle-in-header', !collapsed && !!header);
+        if (collapsed || !header) rail.prepend(toggle);
+        else header.append(toggle);
+        return toggle;
+    }
     function applyRailState() {
         const state = railState();
         const leftTargets = [document.getElementById('studioContextRail'), document.querySelector('.mw-today-left')].filter(Boolean);
         leftTargets.forEach(rail => {
             rail.classList.toggle('studio-rail-collapsed-left', !!state.left);
-            let toggle = rail.querySelector(':scope > [data-rail-toggle="left"]');
-            if (!toggle) { toggle = railButton('left', !!state.left); rail.prepend(toggle); }
+            const toggle = placeRailToggle(rail, 'left', !!state.left);
             toggle.setAttribute('aria-expanded', String(!state.left));
             toggle.setAttribute('aria-label', (state.left ? 'Expand' : 'Collapse') + ' left rail');
             toggle.title = toggle.getAttribute('aria-label'); toggle.textContent = state.left ? '›' : '‹';
@@ -185,8 +194,7 @@
         const rightTargets = document.querySelectorAll('.mw-today-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail');
         rightTargets.forEach(rail => {
             rail.classList.toggle('studio-rail-collapsed-right', !!state.right);
-            let toggle = rail.querySelector(':scope > [data-rail-toggle="right"]');
-            if (!toggle) { toggle = railButton('right', !!state.right); rail.prepend(toggle); }
+            const toggle = placeRailToggle(rail, 'right', !!state.right);
             toggle.setAttribute('aria-expanded', String(!state.right));
             toggle.setAttribute('aria-label', (state.right ? 'Expand' : 'Collapse') + ' right rail');
             toggle.title = toggle.getAttribute('aria-label'); toggle.textContent = state.right ? '‹' : '›';
