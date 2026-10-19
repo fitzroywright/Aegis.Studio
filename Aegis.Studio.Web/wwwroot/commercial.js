@@ -126,7 +126,7 @@ async function showCatalogProduction(){
         if(/deliver|delivery|handoff/.test(text))return 'delivery';
         if(/print|frame|album/.test(text))return 'print';
         if(/edit|retouch/.test(text))return 'editing';
-        if(/review|inspect|proof|quality|\\bqc\\b/.test(text))return 'review';
+        if(/review|inspect|proof|quality|\bqc\b/.test(text))return 'review';
         if(/shoot|photograph|capture/.test(text))return 'capture';
         return 'other';
     };
