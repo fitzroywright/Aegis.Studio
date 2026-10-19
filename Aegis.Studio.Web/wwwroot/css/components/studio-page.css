@@ -168,3 +168,5 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 
 /* Collapsed right rail releases its grid track instead of leaving a blank column. */
 .st-page:has(> .st-right.studio-rail-collapsed-right){--studio-right-rail-width:42px}
+
+.st-page:has(> .st-right.studio-rail-collapsed-right){--studio-right-rail-width:42px}
