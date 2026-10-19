@@ -85,6 +85,7 @@
             shell.prepend(rail);
         }
         renderLeftRail();
+        applyRailState();
     }
 
     const railRole=title=>title==='Navigation'?'navigation':title==='My Workspaces'?'workspaces':'actions';
@@ -150,6 +151,49 @@
 
     }
 
+    const railStorage = 'aegis.studio.rail-collapse.v1';
+    function railState() {
+        try { return JSON.parse(localStorage.getItem(railStorage) || '{}'); } catch { return {}; }
+    }
+    function setRailState(side, collapsed) {
+        const state = railState(); state[side] = collapsed;
+        try { localStorage.setItem(railStorage, JSON.stringify(state)); } catch {}
+        applyRailState();
+    }
+    function railButton(side, collapsed) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'studio-rail-toggle';
+        button.dataset.railToggle = side;
+        button.setAttribute('aria-expanded', String(!collapsed));
+        button.setAttribute('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + side + ' rail');
+        button.title = button.getAttribute('aria-label');
+        button.textContent = side === 'left' ? (collapsed ? '›' : '‹') : (collapsed ? '‹' : '›');
+        button.onclick = () => setRailState(side, !railState()[side]);
+        return button;
+    }
+    function applyRailState() {
+        const state = railState();
+        const leftTargets = [document.getElementById('studioContextRail'), document.querySelector('.mw-today-left')].filter(Boolean);
+        leftTargets.forEach(rail => {
+            rail.classList.toggle('studio-rail-collapsed-left', !!state.left);
+            let toggle = rail.querySelector(':scope > [data-rail-toggle="left"]');
+            if (!toggle) { toggle = railButton('left', !!state.left); rail.prepend(toggle); }
+            toggle.setAttribute('aria-expanded', String(!state.left));
+            toggle.setAttribute('aria-label', (state.left ? 'Expand' : 'Collapse') + ' left rail');
+            toggle.title = toggle.getAttribute('aria-label'); toggle.textContent = state.left ? '›' : '‹';
+        });
+        const rightTargets = document.querySelectorAll('.mw-today-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail');
+        rightTargets.forEach(rail => {
+            rail.classList.toggle('studio-rail-collapsed-right', !!state.right);
+            let toggle = rail.querySelector(':scope > [data-rail-toggle="right"]');
+            if (!toggle) { toggle = railButton('right', !!state.right); rail.prepend(toggle); }
+            toggle.setAttribute('aria-expanded', String(!state.right));
+            toggle.setAttribute('aria-label', (state.right ? 'Expand' : 'Collapse') + ' right rail');
+            toggle.title = toggle.getAttribute('aria-label'); toggle.textContent = state.right ? '‹' : '›';
+        });
+        applyRailState();
+    }
+
     function ensureBreadcrumb() {
         if (!breadcrumb || breadcrumb.children.length) return;
         window.studioSetBreadcrumb?.([{ label: labelFor(currentView), view: currentView }]);
@@ -187,6 +231,7 @@
         ensureTools();
         ensureLeftRail();
         syncPageFrame();
+        applyRailState();
         syncGridFooterCount();
         if(view!=='today'&&!breadcrumb?.querySelector('[data-studio-crumb="today"]')&&!breadcrumb?.querySelector('[data-shell-nav="today"]')){
             window.studioSetBreadcrumb([{label:labelFor(view),view}]);
