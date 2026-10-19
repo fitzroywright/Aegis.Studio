@@ -78,6 +78,14 @@ async function showFrontDesk() {
 let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskClients=[],frontDeskSchedule=[],frontDeskInvoices=[];
 let frontDeskTab='today',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelectedClientId=null;
 function frontDeskRequestStage(item){return item.status==='Confirmed'?'Confirmed':item.status==='Cancelled'?'Cancelled':item.recordedDeposit>0?'Ready for confirmation':item.status==='AwaitingDeposit'?'Awaiting deposit':'Pending Job';}
+function openFrontDeskJob(jobId){
+    if(!jobId)return Promise.resolve();
+    const navigate=window.studioNavigate;
+    if(typeof navigate==='function')return Promise.resolve(navigate('workspaces',{jobId}));
+    if(typeof window.openWorkspaceJob==='function')return Promise.resolve(window.openWorkspaceJob(jobId));
+    return Promise.reject(new Error('Job navigation is unavailable.'));
+}
+
 function renderFrontDesk(){
     const preservedMessageCard=genericView.querySelector('#frontDeskMessageCard');
     const searchNode=genericView.querySelector('#frontDeskSearch');
@@ -191,20 +199,20 @@ function renderFrontDesk(){
     });
     const newBooking=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
     genericView.querySelectorAll('[data-new-booking]').forEach(b=>b.onclick=newBooking);
-    genericView.querySelector('[data-view-receipt]').onclick=()=>pickFrontDeskFinancialAction('ViewReceipt').catch(error=>alert(error.message));
-    genericView.querySelector('[data-calendar]').onclick=()=>studioNavigate('pipeline');
-    genericView.querySelector('[data-messages-all]').onclick=()=>studioNavigate('messages');
-    genericView.querySelector('[data-message-compose]').onclick=()=>openFrontDeskMessagePicker();
+    genericView.querySelector('[data-view-receipt]')?.addEventListener('click',()=>pickFrontDeskFinancialAction('ViewReceipt').catch(error=>alert(error.message)));
+    genericView.querySelector('[data-calendar]')?.addEventListener('click',()=>studioNavigate('pipeline'));
+    genericView.querySelector('[data-messages-all]')?.addEventListener('click',()=>studioNavigate('messages'));
+    genericView.querySelector('[data-message-compose]')?.addEventListener('click',()=>openFrontDeskMessagePicker());
     StudioMessageCard.bind(genericView.querySelector('#frontDeskMessageCard'));
     loadFrontDeskCommunications();
     const search=genericView.querySelector('#frontDeskSearch');
     if(search)search.oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();};
-    genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openWorkspaceJob(b.dataset.frontdeskJob));
+    genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openFrontDeskJob(b.dataset.frontdeskJob));
     genericView.querySelectorAll('[data-frontdesk-fulfill]').forEach(button=>button.onclick=()=>recordFrontDeskFulfillment(button.dataset.frontdeskFulfill).catch(error=>alert(error.message)));
     genericView.querySelectorAll('[data-fd-row-open]').forEach(row=>{
         const open=()=>{
             const e=entries.find(item=>String(item.id)===row.dataset.fdRowOpen);
-            if(e?.jobId)Promise.resolve().then(()=>openWorkspaceJob(e.jobId)).catch(error=>alert(error.message));
+            if(e?.jobId)Promise.resolve().then(()=>openFrontDeskJob(e.jobId)).catch(error=>alert(error.message));
             else if(e?.conversationId)openPendingBookingForm(frontDeskEnquiries.find(item=>item.id===e.conversationId));
         };
         row.addEventListener('click',event=>{
@@ -251,7 +259,7 @@ async function renderFrontDeskClientContext(){
     ${upcoming.length?`<h3>Upcoming</h3><div class="frontdesk-client-jobs">${upcoming.slice(0,8).map(entry=>`<article class="front-desk-row"><div><strong>${esc(entry.title)}</strong><small>${esc(new Date(entry.startsAtUtc).toLocaleString())} · ${esc(entry.location||'Location not set')}</small></div>${entry.jobId?`<button type="button" class="action" data-frontdesk-job="${entry.jobId}">Open job</button>`:''}</article>`).join('')}</div>`:''}
     ${quotes.length?`<h3>Quotes</h3><div class="frontdesk-client-jobs">${quotes.slice(0,5).map(q=>`<article class="front-desk-row"><div><strong>${esc(q.request?.title||'Quote')}</strong><small>${esc(q.status)} · ${money(q.total)}</small></div></article>`).join('')}</div>`:''}`;
     host.querySelectorAll('[data-confirm-booking]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const v=await json('/api/jobs/'+b.dataset.confirmBooking+'/connected-workflow');const reason='';if(reason===null){b.disabled=false;return;}await json('/api/jobs/'+b.dataset.confirmBooking+'/connected-workflow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'confirm',expectedRevision:v.data.revision,operationId:crypto.randomUUID(),reason})});await showFrontDesk();}catch(error){alert(error.message);b.disabled=false;}});
-    host.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.frontdeskJob));
+    host.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openFrontDeskJob(b.dataset.frontdeskJob));
 }
 async function createFrontDeskClientJob(clientId){
     const client=frontDeskClients.find(c=>c.id===clientId);if(!client)return;
@@ -281,11 +289,11 @@ function renderFrontDeskRows(){
         host.innerHTML=jobs.map(renderFrontDeskJob).join('')||'<p class="empty-state">No jobs in this queue.</p>';
     }
     host.querySelectorAll('[data-fd-job-row]').forEach(row=>{
-        const open=()=>Promise.resolve().then(()=>openWorkspaceJob(row.dataset.fdJobRow)).catch(error=>alert(error.message));
+        const open=()=>Promise.resolve().then(()=>openFrontDeskJob(row.dataset.fdJobRow)).catch(error=>alert(error.message));
         row.onclick=event=>{if(!event.target.closest('button,a,input,select,textarea'))open();};
         row.onkeydown=event=>{if(event.target===row&&['Enter',' '].includes(event.key)){event.preventDefault();open();}};
     });
-    host.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openWorkspaceJob(b.dataset.frontdeskJob));
+    host.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openFrontDeskJob(b.dataset.frontdeskJob));
     host.querySelectorAll('[data-frontdesk-fulfill]').forEach(b=>b.onclick=()=>recordFrontDeskFulfillment(b.dataset.frontdeskFulfill));
     host.querySelectorAll('[data-frontdesk-pos]').forEach(b=>b.onclick=()=>openPos(b.dataset.frontdeskPos));
     host.querySelectorAll('[data-convert-enquiry]').forEach(b=>b.onclick=()=>openPendingBookingForm(frontDeskEnquiries.find(e=>e.id===b.dataset.convertEnquiry)));
@@ -449,7 +457,7 @@ async function loadFrontDeskCommunications(){
         ].sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6);
         host.innerHTML=rows.map(({kind,item:n})=>`<button type="button" class="smc-row" data-fd-message-job="${esc(kind==='message'&&n.referenceType==='Job'?(n.referenceId||''):'')}" data-fd-announcement-workspace="${esc(kind==='announcement'?(n.workspaceId||''):'')}"><span class="smc-type" aria-hidden="true">${kind==='announcement'?'📣':'✉'}</span><span class="smc-copy"><strong>${esc(n.subject||n.title||(kind==='announcement'?'Announcement':'Message'))}</strong><small>${esc((kind==='announcement'&&n.workspaceName?n.workspaceName+' · ':'')+(n.body||n.eventType||'Studio message'))}</small></span><span class="smc-time">${esc(n.createdAtUtc?new Date(n.createdAtUtc).toLocaleDateString():'')}</span><span class="mw-chevron" aria-hidden="true">›</span></button>`).join('')||'<div class="mw-empty">No recent messages or announcements.</div>';
         host.querySelectorAll('[data-fd-message-job]').forEach(button=>button.onclick=()=>{
-            if(button.dataset.fdMessageJob)openWorkspaceJob(button.dataset.fdMessageJob);
+            if(button.dataset.fdMessageJob)openFrontDeskJob(button.dataset.fdMessageJob);
             else studioNavigate('messages');
         });
     }catch(error){
@@ -507,6 +515,7 @@ async function recordFrontDeskFulfillment(jobId){
  const dialog=frontDeskDialog('Confirm collection / delivery',`<p>${esc(job?.title||'Job')} · ${esc(job?.clientName||'')}</p><label>Method<select name="method"><option value="Collected">Client collected</option><option value="Delivered">Delivered to client</option></select></label><label>Received by<input name="recipient" required maxlength="200"></label>`);
  dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{await json(`/api/frontdesk/jobs/${jobId}/fulfillment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId,expectedRevision:workflow.data.revision,method:form.elements.method.value,recipient:form.elements.recipient.value})});dialog.close();await showFrontDesk();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
+
 
 
 
