@@ -1,11 +1,11 @@
 /* Standard uses a soft, warm-neutral palette for comfortable all-day viewing. */
 body[data-theme="studio-default"] {
   color-scheme:light;
-  --theme-bg:#efeee9;
-  --theme-surface:#f8f7f3;
-  --theme-surface-2:#efeee8;
-  --theme-surface-alt:#e8e6df;
-  --theme-border:#d5d2ca;
+  --theme-bg:#ebe9e3;
+  --theme-surface:#f6f5f1;
+  --theme-surface-2:#e7e5de;
+  --theme-surface-alt:#dfddd5;
+  --theme-border:#d0cdc4;
   --theme-text:#30343a;
   --theme-muted:#62666c;
   --theme-accent:#9b5a24;
@@ -23,15 +23,20 @@ body[data-theme="studio-default"] {
   --surface-muted:var(--theme-surface-2);
   --border:var(--theme-border);
   --muted:var(--theme-muted);
-  --studio-grid-body-bg:#faf9f6;
-  --studio-grid-row-alt-bg:#f1f0eb;
-  --studio-grid-border:#d9d6cf;
-  --studio-grid-header-bg:#e9e7e0;
+  --studio-grid-body-bg:#f7f6f2;
+  --studio-grid-row-alt-bg:#eeece6;
+  --studio-grid-border:#d2cfc6;
+  --studio-grid-header-bg:#e4e1d9;
   --studio-grid-header-text:#30343a;
-  --studio-grid-header-border:#cbc8c0;
-  --studio-card-surface:#f8f7f3;
-  --studio-card-title-surface:#efeee8;
-  --studio-control-surface:#faf9f6;
+  --studio-grid-header-border:#c5c1b8;
+  --studio-card-surface:#fffefa;
+  --studio-production-attention-surface:#f8e8e5;
+  --studio-production-ready-surface:#eaf1f7;
+  --studio-production-progress-surface:#f7efdf;
+  --studio-production-qc-surface:#eee9f4;
+  --studio-production-complete-surface:#e9f1eb;
+  --studio-card-title-surface:#e7e5de;
+  --studio-control-surface:#fbfaf7;
   --studio-control-text:#30343a;
   --studio-control-border:#c9c6be;
   --studio-page-search-bg:#faf9f6;
