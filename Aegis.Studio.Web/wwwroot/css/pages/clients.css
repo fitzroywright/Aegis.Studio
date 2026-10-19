@@ -46,6 +46,7 @@
 .clients-page .client-jobs-table th:nth-child(3){width:20%}
 .clients-page .client-jobs-table th:nth-child(4){width:18%}
 .clients-page .client-right{gap:8px}
+.clients-page .client-right>.sj-card:first-child .workspace-summary-row{padding-top:0;padding-bottom:0}
 
 .client-column-search{display:flex;align-items:center;gap:10px;min-width:0}
 .client-column-search input{flex:1;min-width:0;width:100%;max-width:220px;height:23px;box-sizing:border-box;padding:2px 6px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:10px;font-weight:500}
