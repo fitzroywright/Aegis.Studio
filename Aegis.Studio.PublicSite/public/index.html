@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f6f4ef"><title>Aegis Studio — Booking & Client Galleries</title>
+  <link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="Aegis Studio home"><span class="brand-mark">A</span><span>AEGIS <i>STUDIO</i></span></a>
+      <nav aria-label="Main navigation"><a href="#booking">Booking</a><a href="#galleries">Client Galleries</a></nav>
+      <a class="top-cta" href="#booking">Book a session <span>↗</span></a>
+    </header>
+
+    <main id="home">
+      <section class="hero">
+        <div class="hero-copy"><p class="eyebrow">PORTRAITS · WEDDINGS · STORIES</p><h1>Make room for<br><em>the moments</em><br>that matter.</h1><p class="hero-text">From the first hello to the photographs you’ll keep, we make every part feel considered.</p><a class="button button-dark" href="#booking">Explore booking <span>↓</span></a></div>
+        <div class="hero-art" aria-label="Abstract portrait artwork"><div class="sun"></div><div class="arch arch-back"></div><div class="arch arch-front"><div class="art-person"><span></span></div></div><span class="art-note">A LITTLE LIGHT<br>TO KEEP FOREVER</span><span class="art-number">NO. 024</span></div>
+        <div class="hero-index"><span>01</span><span class="index-line"></span><span>02</span><span class="index-line"></span><span>03</span></div>
+      </section>
+
+      <section id="booking" class="booking-section section-grid">
+        <div class="section-intro"><p class="eyebrow">01 / BOOKING</p><h2>Start with a<br><em>good feeling.</em></h2><p>Tell us what you’re imagining. Our Front Desk team will review your request and get back to you with the next steps.</p><div class="small-note"><span class="note-dot"></span> Every session starts with a conversation.</div></div>
+        <div class="form-card"><div class="card-heading"><div><p class="eyebrow">YOUR SESSION</p><h3>Request a booking</h3></div><span class="step-chip">01 — 02</span></div>
+          <form id="booking-form">
+            <div class="field-row"><label>Your name<input name="clientName" autocomplete="name" placeholder="First and last name" maxlength="200" required></label><label>Email address<input name="clientEmail" autocomplete="email" type="email" placeholder="you@example.com" required></label></div>
+            <div class="field-row"><label>What are we photographing?<select name="sessionType" required><option value="">Choose a session</option><option>Portrait session</option><option>Wedding</option><option>Graduation</option><option>Family story</option><option>Something else</option></select></label><label>Preferred date<input name="startsAt" type="date" required></label></div>
+            <div class="field-row"><label>Preferred time<input name="preferredTime" type="time" value="10:00"></label><label>Phone <span class="optional">OPTIONAL</span><input name="clientPhone" autocomplete="tel" placeholder="(876) 555-0100"></label></div>
+            <label>Tell us a little more <span class="optional">OPTIONAL</span><textarea name="notes" rows="3" placeholder="Location, people, ideas…"></textarea></label>
+            <p class="form-footnote">This is a request, not a confirmed appointment. We’ll follow up to confirm availability and any deposit required.</p>
+            <button class="button button-dark submit-button" type="submit">Send booking request <span>↗</span></button>
+          </form>
+          <div id="booking-result" class="result-box" role="status" hidden></div>
+          <form id="track-form" class="track-form" hidden><label>Already have a reference? <span><input name="reference" placeholder="Booking reference" required><button class="text-button">Check status →</button></span></label><div id="track-result" role="status"></div></form>
+        </div>
+      </section>
+
+      <section class="interlude"><p class="eyebrow">FROM SESSION TO STORY</p><p class="interlude-quote">“The best photographs don’t ask you to pose.<br><em>They let you be there.</em>”</p><span>— AEGIS STUDIO</span></section>
+
+      <section id="galleries" class="gallery-section section-grid">
+        <div class="section-intro"><p class="eyebrow">02 / CLIENT GALLERIES</p><h2>Your story,<br><em>beautifully kept.</em></h2><p>Come back to your photographs, choose your favourites, and revisit the day just as it felt.</p><div class="gallery-stamp"><span>PRIVATE</span><span>BY<br>DESIGN</span></div></div>
+        <div class="gallery-card">
+          <div id="signed-out" class="sign-in-panel"><div class="card-heading"><div><p class="eyebrow">A PLACE FOR YOU</p><h3>Step into your gallery</h3></div><span class="lock-icon">⌑</span></div><p class="muted">Sign in with the account connected to your session to see your private photographs.</p>
+            <button class="social-button" data-identity="maya"><span class="google-g">G</span><span>Continue with Google <small>Maya Chen · demo account</small></span><b>↗</b></button>
+            <button class="social-button" data-identity="jordan"><span class="facebook-f">f</span><span>Continue with Facebook <small>Jordan Lee · demo account</small></span><b>↗</b></button>
+            <p id="auth-note" class="privacy-note">Demo sign-in uses fictional accounts. Each account can access only its own sample gallery.</p>
+          </div>
+          <div id="signed-in" hidden>
+            <div class="gallery-welcome"><div><p class="eyebrow">YOUR PRIVATE SPACE</p><h3>Hello, <span id="client-name">friend</span>.</h3><p id="gallery-title" class="muted">Your photographs are ready when you are.</p></div><button id="sign-out" class="text-button">Sign out ×</button></div>
+            <div id="gallery-status" class="gallery-status" role="status"></div><div id="gallery-grid" class="proof-grid"></div>
+            <div class="gallery-actions"><button id="submit-selections" class="button button-dark" hidden>Send my favourites <span>↗</span></button><p id="selection-result" role="status"></p></div>
+          </div>
+        </div>
+      </section>
+      <section class="closing"><div class="closing-orbit">A</div><p class="eyebrow">WE’D LOVE TO HEAR YOUR STORY</p><h2>A good photograph<br>can <em>take you back.</em></h2><a href="#booking" class="button button-light">Let’s begin <span>↗</span></a></section>
+    </main>
+    <footer><a class="brand" href="#home"><span class="brand-mark">A</span><span>AEGIS <i>STUDIO</i></span></a><span>Thoughtfully captured. Beautifully remembered.</span><a href="#home">Back to top ↑</a></footer>
+  </div>
+</body>
+</html>

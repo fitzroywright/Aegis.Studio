@@ -1,0 +1,8 @@
+{
+  "name": "aegis-studio-public-site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": { "start": "node --env-file-if-exists=.env server.mjs", "test": "node --test" }
+}

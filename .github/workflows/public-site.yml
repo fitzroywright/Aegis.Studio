@@ -1,0 +1,26 @@
+name: Public Site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Aegis.Studio.PublicSite/**'
+      - '.github/workflows/public-site.yml'
+  pull_request:
+    paths:
+      - 'Aegis.Studio.PublicSite/**'
+      - '.github/workflows/public-site.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Aegis.Studio.PublicSite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
