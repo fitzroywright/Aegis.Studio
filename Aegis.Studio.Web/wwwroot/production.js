@@ -125,7 +125,9 @@ async function openJobOperations(jobId) {
 }
 
 async function applyProductionTemplate(jobId,templateName) { await json(`/api/jobs/${jobId}/operations/template/${encodeURIComponent(templateName)}`,{method:'POST'}); await showProduction(); }
-const productionNavigationButton=document.querySelector('.brand-button[data-view="production"]'); if(productionNavigationButton) productionNavigationButton.onclick=()=>showProduction();
+const productionNavigationButton=document.querySelector('.brand-button[data-view="production"]'); if(productionNavigationButton) productionNavigationButton.onclick=()=>window.studioNavigate('production');
+// The legacy activity queue is retired as a page; all Production navigation uses the canonical board.
+window.showProduction=()=>window.studioNavigate('production');
 
 
 
