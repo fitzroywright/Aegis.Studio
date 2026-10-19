@@ -3,7 +3,7 @@ function commercialPage(title,body,tools='',summary='') {
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
     genericView.innerHTML=StudioPage.html({title,tools,content:body,className:'st-commercial',summary:summary||'<p>Manage Studio services, templates and production.</p>',attention:'<p>Review inactive catalog items and retired templates before assigning new work.</p>'});
     StudioPage.bind(genericView);
-    window.studioSetBreadcrumb?.([{label:'Studio Management',view:'studio-management'},{label:title}]);
+    window.studioSetBreadcrumb?.(title==='Production'?[{label:'Production'}]:[{label:'Studio Management',view:'studio-management'},{label:title}]);
 }
 function studioManagementCatalogCards(){
     return `<section class="admin-card"><header class="admin-card-header"><h2>Products and services</h2></header><p>Manage catalog items, prices and production requirements.</p><button class="fd-card-link" onclick="studioNavigate('catalog')">Product &amp; Services Catalog →</button></section><section class="admin-card"><header class="admin-card-header"><h2>Job Templates</h2></header><p>Design job workflows, branches and service requirements.</p><button class="fd-card-link" onclick="studioNavigate('job-templates')">Manage Job Templates →</button></section><section class="admin-card"><header class="admin-card-header"><h2>Work Order Templates</h2></header><p>Define production steps and final quality control.</p><button class="fd-card-link" onclick="studioNavigate('work-order-templates')">Manage Work Order Templates →</button></section>`;
@@ -70,7 +70,16 @@ async function showCatalogProduction(){
         const job=jobMap.get(o.jobId)||{},activityText=(o.activityIds||[]).map(id=>workload.activities.find(a=>a.id===id)).filter(Boolean).map(a=>[a.title,a.activityType,a.productionArea,a.assignedTo].join(' ')).join(' ');
         return [o.id,o.exceptionReason,job.title,job.jobTitle,job.clientName,job.workspaceName,activityText].join(' ').toLowerCase().includes(term);
     });
-    const pageOrders=filteredOrders.slice(commercialQueueOffset,commercialQueueOffset+50);
+    const standaloneActivities=selectedTasks.filter(a=>!a.workOrderId).filter(a=>{
+        if(!term)return true;
+        const job=jobMap.get(a.jobId)||{};
+        return [a.id,a.title,a.activityType,a.status,a.productionArea,a.assignedTo,job.title,job.workspaceName].join(' ').toLowerCase().includes(term);
+    });
+    const workItems=[...filteredOrders.map(value=>({kind:'order',value})),...standaloneActivities.map(value=>({kind:'activity',value}))];
+    if(commercialQueueOffset>=workItems.length&&commercialQueueOffset>0){commercialQueueOffset=0;return showCatalogProduction();}
+    const pageItems=workItems.slice(commercialQueueOffset,commercialQueueOffset+50);
+    const pageOrders=pageItems.filter(x=>x.kind==='order').map(x=>x.value);
+    const pageActivities=pageItems.filter(x=>x.kind==='activity').map(x=>x.value);
     const rows=pageOrders.length?await json('/api/production/work-orders?limit=50&offset=0&area='+encodeURIComponent(commercialQueueArea)+'&orderIds='+pageOrders.map(o=>encodeURIComponent(o.id)).join(',')+'&includeCompleted=true'):[];
     const options=(values,value)=>'<option value="">All</option>'+values.map(([id,label])=>'<option value="'+esc(id)+'"'+(id===value?' selected':'')+'>'+esc(label)+'</option>').join('');
     const attentionActivities=selectedTasks.filter(a=>workload.active(a)&&(workload.waiting(a)||workload.overdue(a)));
@@ -89,21 +98,40 @@ async function showCatalogProduction(){
         if(active.some(t=>['InProgress','Partial'].includes(t.status)))return 'progress';
         return 'ready';
     };
+    const laneForActivity=a=>{
+        if(!workload.active(a))return 'complete';
+        if(workload.waiting(a)||workload.overdue(a))return 'attention';
+        if(['QC','Quality Control'].includes(a.activityType))return 'qc';
+        if(['InProgress','Partial'].includes(a.status))return 'progress';
+        return 'ready';
+    };
     const cardsByLane=new Map(laneNames.map(([key])=>[key,[]]));
-    for(const order of rows){cardsByLane.get(laneFor(order)).push(order);}
+    const activitiesByLane=new Map(laneNames.map(([key])=>[key,[]]));
+    for(const order of rows)cardsByLane.get(laneFor(order)).push(order);
+    for(const activity of pageActivities)activitiesByLane.get(laneForActivity(activity)).push(activity);
     const dueLabel=t=>t?.dueAtUtc?new Date(t.dueAtUtc).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'No due date';
-    const lanes=laneNames.map(([key,label])=>'<section class="production-lane production-lane-'+key+'" data-production-lane="'+key+'" aria-label="'+esc(label)+'"><header><h2>'+esc(label)+'</h2><span>'+cardsByLane.get(key).length+'</span></header><div class="production-lane-cards">'+(cardsByLane.get(key).map(w=>{
-        const tasks=w.tasks||[],done=tasks.filter(t=>['Completed','Cancelled','Archived'].includes(t.status)).length;
-        const task=tasks.find(t=>!['Completed','Cancelled','Archived','Skipped'].includes(t.status))||tasks.at(-1);
-        const blocker=w.exceptionReason||task?.blockedReason||'';
-        const percent=tasks.length?Math.round(done*100/tasks.length):0;
-        return '<article class="production-order-card" tabindex="0" data-order-row="'+esc(w.id)+'"><div class="production-order-top"><span>WO-'+esc(w.id.slice(0,8))+'</span><span class="production-priority">'+esc(task?.priority||'Normal')+'</span></div><button type="button" class="production-job-title" data-open-job="'+esc(w.jobId)+'">'+esc(w.jobTitle)+'</button><div class="production-order-product">'+esc(w.product)+' × '+esc(w.quantity)+'</div><div class="production-order-meta"><span>'+esc(task?.title||'Production work')+'</span><span>'+esc(task?.assignedTo?studioFirstName(task.assignedTo):'Unassigned')+'</span><span>'+esc(dueLabel(task))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'<div class="production-progress-label"><span>'+done+' of '+tasks.length+' steps complete</span><span>'+percent+'%</span></div><div class="production-progress-track" role="progressbar" aria-valuenow="'+percent+'" aria-valuemin="0" aria-valuemax="100"><span style="width:'+percent+'%"></span></div><button type="button" class="production-order-open" data-order="'+esc(w.id)+'">Open work order →</button></article>';
-    }).join('')||'<p class="production-lane-empty">No work orders</p>')+'</div></section>').join('');
-    const summary='<div class="production-board-metrics" aria-label="Production workload summary"><div><span>Open Work Orders</span><strong>'+openOrders+'</strong></div><div class="needs-attention"><span>Needs Attention</span><strong>'+attentionActivities.length+'</strong></div><div><span>Due Next 7 Days</span><strong>'+dueSoon.length+'</strong></div><div><span>Awaiting QC</span><strong>'+awaitingQc+'</strong></div></div>';
+    const activityCard=a=>{
+        const job=jobMap.get(a.jobId)||{},assigned=a.assignedTo?studioFirstName(a.assignedTo):'Unassigned';
+        const blocker=a.blockedReason||((workload.waiting(a))?'Waiting on prerequisite or job stage':'');
+        return '<article class="production-order-card production-activity-card" data-activity-row="'+esc(a.id)+'"><div class="production-order-top"><span>Production task</span><span class="production-priority">'+esc(a.status||'Unknown')+'</span></div><div class="production-job-title">'+esc(job.title||'Job')+'</div><div class="production-order-product">'+esc(a.title||a.activityType||'Production activity')+'</div><div class="production-order-meta"><span>'+esc(a.productionArea||a.activityType||'Production')+'</span><span>'+esc(assigned)+'</span><span>'+esc(dueLabel(a))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'</article>';
+    };
+    const lanes=laneNames.map(([key,label])=>{
+        const orderCards=cardsByLane.get(key),activityCards=activitiesByLane.get(key);
+        const cards=orderCards.map(w=>{
+            const tasks=w.tasks||[],done=tasks.filter(t=>['Completed','Cancelled','Archived'].includes(t.status)).length;
+            const task=tasks.find(t=>!['Completed','Cancelled','Archived','Skipped'].includes(t.status))||tasks.at(-1);
+            const blocker=w.exceptionReason||task?.blockedReason||'';
+            const percent=tasks.length?Math.round(done*100/tasks.length):0;
+            return '<article class="production-order-card" tabindex="0" data-order-row="'+esc(w.id)+'"><div class="production-order-top"><span>WO-'+esc(w.id.slice(0,8))+'</span><span class="production-priority">'+esc(task?.priority||'Normal')+'</span></div><button type="button" class="production-job-title" data-open-job="'+esc(w.jobId)+'">'+esc(w.jobTitle)+'</button><div class="production-order-product">'+esc(w.product)+' × '+esc(w.quantity)+'</div><div class="production-order-meta"><span>'+esc(task?.title||'Production work')+'</span><span>'+esc(task?.assignedTo?studioFirstName(task.assignedTo):'Unassigned')+'</span><span>'+esc(dueLabel(task))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'<div class="production-progress-label"><span>'+done+' of '+tasks.length+' steps complete</span><span>'+percent+'%</span></div><div class="production-progress-track" role="progressbar" aria-valuenow="'+percent+'" aria-valuemin="0" aria-valuemax="100"><span style="width:'+percent+'%"></span></div><button type="button" class="production-order-open" data-order="'+esc(w.id)+'">Open work order →</button></article>';
+        }).join('')+activityCards.map(activityCard).join('');
+        return '<section class="production-lane production-lane-'+key+'" data-production-lane="'+key+'" aria-label="'+esc(label)+'"><header><h2>'+esc(label)+'</h2><span>'+(orderCards.length+activityCards.length)+'</span></header><div class="production-lane-cards">'+(cards||'<p class="production-lane-empty">No production work</p>')+'</div></section>';
+    }).join('');
+    const openWorkItems=openOrders+standaloneActivities.filter(a=>workload.active(a)).length;
+    const summary='<div class="production-board-metrics" aria-label="Production workload summary"><div><span>Open Work Items</span><strong>'+openWorkItems+'</strong></div><div class="needs-attention"><span>Needs Attention</span><strong>'+attentionActivities.length+'</strong></div><div><span>Due Next 7 Days</span><strong>'+dueSoon.length+'</strong></div><div><span>Awaiting QC</span><strong>'+awaitingQc+'</strong></div></div>';
     const overview='<details class="production-workload-details"><summary>Workload detail and quantity totals</summary>'+StudioWorkload.cards(workload,baseTasks,esc)+'</details>';
     const filters='<div class="production-board-filters"><input type="search" data-production-search value="'+esc(selection.search||'')+'" placeholder="Search jobs, clients or work orders" aria-label="Search jobs, clients or work orders"><label>Workload<select data-workload-filter-select>'+options([['ready','Ready to execute'],['progress','In production'],['waiting','Blocked / waiting'],['overdue','Overdue'],['rework','Rework'],['qc','Recorded items awaiting QC'],['item-rework','Recorded QC rework'],['refunds','Produced units refunded'],['unassigned','Unassigned'],['handoffs','Handoffs'],['unknown','Due date unknown']],selection.filter)+'</select></label><label>Workspace<select data-workload-workspace>'+options([...new Set((workloadData.jobs||[]).map(j=>j.workspaceId))].map(id=>[id,(workloadData.jobs||[]).find(j=>j.id===id)?.workspaceName||id]),selection.workspace)+'</select></label><label>Assignee<select data-workload-assignee>'+options([['__unassigned','Unassigned'],...[...new Set(workload.activities.map(a=>a.assignedTo).filter(Boolean))].map(id=>[id,studioFirstName(id)])],selection.assignee)+'</select></label><label>Activity<select data-workload-stage>'+options([...new Set(workload.activities.map(a=>a.activityType))].map(id=>[id,id]),selection.stage)+'</select></label><label>Production area<select data-area><option value="">All areas</option>'+['Editing','Printing','Framing','Album Production','Assembly','Quality Control'].map(a=>'<option '+(a===commercialQueueArea?'selected':'')+'>'+a+'</option>').join('')+'</select></label><label class="production-completed-filter"><input type="checkbox" data-completed '+(commercialIncludeCompleted?'checked':'')+'> Include completed</label><button type="button" data-workload-reset>Reset filters</button></div>';
     if(!current())return;
-    commercialPage('Production','<div class="production-board-view">'+summary+filters+overview+'<div class="production-kanban" aria-label="Production work order board">'+lanes+'</div><footer class="commercial-pager production-board-pager"><button type="button" data-prev '+(commercialQueueOffset?'':'disabled')+'>Previous</button><span>'+(filteredOrders.length?commercialQueueOffset+1:0)+'–'+(commercialQueueOffset+rows.length)+' of '+filteredOrders.length+' work orders</span><button type="button" data-next '+(commercialQueueOffset+50<filteredOrders.length?'':'disabled')+'>Next</button><p role="alert"></p></footer><div class="production-board-links"><button type="button" class="fd-card-link" data-graph-tasks>Workflow tasks →</button><button type="button" class="fd-card-link" data-legacy>Other production tasks →</button></div></div>','<button type="button" class="action" data-open-production-plan>View Production Pipeline →</button>');
+    commercialPage('Production','<div class="production-board-view">'+summary+filters+overview+'<div class="production-kanban" aria-label="Production work order board">'+lanes+'</div><footer class="commercial-pager production-board-pager"><button type="button" data-prev '+(commercialQueueOffset?'':'disabled')+'>Previous</button><span>'+(workItems.length?commercialQueueOffset+1:0)+'–'+(commercialQueueOffset+pageItems.length)+' of '+workItems.length+' production items</span><button type="button" data-next '+(commercialQueueOffset+50<workItems.length?'':'disabled')+'>Next</button><p role="alert"></p></footer><div class="production-board-links"><button type="button" class="fd-card-link" data-graph-tasks>Workflow tasks →</button><button type="button" class="fd-card-link" data-legacy>Other production tasks →</button></div></div>','<button type="button" class="action" data-open-production-plan>View Production Pipeline →</button>');
     const reload=()=>showCatalogProduction().catch(e=>alert(e.message));
     genericView.querySelectorAll('[data-workload-filter]').forEach(b=>b.onclick=()=>{selection.filter=b.dataset.workloadFilter==='all'?'':b.dataset.workloadFilter;commercialQueueOffset=0;reload();});
     for(const [selector,key] of [['filter-select','filter'],['workspace','workspace'],['assignee','assignee'],['stage','stage']])genericView.querySelector('[data-workload-'+selector+']').onchange=e=>{selection[key]=e.target.value;commercialQueueOffset=0;reload();};
