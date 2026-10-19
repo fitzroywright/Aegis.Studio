@@ -107,11 +107,13 @@ Headers are `X-Studio-Timestamp`, `X-Studio-Event-Id`, `X-Studio-Signature`. Rej
 
 Studio stores events and per-destination delivery attempts in PostgreSQL, leases work across processes, retries with bounded exponential delay, and records endpoint acceptance/failure. Operations Management shows status and direct Job links. Endpoint acceptance means the receiver accepted the webhook; it does not prove a human read it. An availability event is advisory: always recheck final download authorization, which may have changed after the event was queued.
 
-## Reference website
+## Website projects
 
-`examples/public-v1-site` is a small Node server plus browser page. It uses V1 exclusively. The server signs booking requests; the browser uses client capability tokens for gallery/proofs/selections/downloads. Its webhook receiver persists and deduplicates signed envelopes before acknowledging them.
+`Aegis.Studio.PublicSite` is the standalone Node 24 Booking and Client Galleries application. It proxies Studio Public V1 requests from the server, holds integration credentials server-side, and does not share Studio database or media storage. Its demo Google/Facebook identities and fixture galleries are for previews only. Production social sign-in still requires provider OAuth/OIDC and a verified mapping from each provider subject to one Studio-issued gallery access token.
 
-On the development machine, from the repository root:
+Build and deployment steps are in [`docs/PUBLIC-SITE-DEPLOYMENT.md`](PUBLIC-SITE-DEPLOYMENT.md). The project README has local run and container commands.
+
+`examples/public-v1-site` remains a lightweight integration example. It demonstrates signed booking requests, gallery capability calls, and durable webhook receipt, but is not the polished public-site project. For local use from the repository root:
 
 ```sh
 export STUDIO_BASE_URL='https://your-studio-host'
@@ -121,6 +123,6 @@ export STUDIO_WEBHOOK_SECRET='set-through-your-secret-manager'
 node examples/public-v1-site/server.mjs
 ```
 
-Open `http://127.0.0.1:8080`. A deployed website requires HTTPS reverse proxying. The example binds loopback and is an integration demonstration; add the website's normal authentication/session policy, abuse protection and business presentation before using it as Brian's public production site. Environment secrets must never be committed.
+The example binds loopback and still requires an HTTPS reverse proxy, authentication/session policy, abuse protection, and the deployment controls described in the runbook before public use. Environment secrets must never be committed.
 
-Verification performed: native contract/signature/authority tests and Node proxy/receiver tests with a stubbed V1 upstream. Real booking-to-gallery, remote webhook retries, payment/refund races and real Common.Storage media need connected installation acceptance.
+Verification performed: native Public V1 contract and proxy tests. Real provider OAuth, real booking-to-gallery acceptance, payment/refund races, remote webhook delivery, and Common.Storage media need connected installation acceptance.
