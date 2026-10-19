@@ -1,6 +1,7 @@
 (() => {
     const themes = [
         ['standard', 'Standard'],
+        ['comfort', 'Comfort'],
         ['light', 'Light'],
         ['dark', 'Dark']
     ];
@@ -10,6 +11,7 @@
 
     function normalizeTheme(themeName) {
         const value = String(themeName || '').trim().toLowerCase();
+        if (value === 'comfort') return 'comfort';
         if (value === 'light' || value === 'office-light') return 'light';
         if (value === 'dark' || value === 'fluent-dark') return 'dark';
         return 'standard';
@@ -17,6 +19,7 @@
 
     function effectiveTheme(themeName) {
         const normalized = normalizeTheme(themeName);
+        if (normalized === 'comfort') return 'studio-comfort';
         if (normalized === 'light') return 'office-light';
         if (normalized === 'dark') return 'fluent-dark';
         return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'fluent-dark' : 'studio-default';
