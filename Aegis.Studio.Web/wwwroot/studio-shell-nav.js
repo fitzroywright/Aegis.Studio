@@ -30,6 +30,7 @@
     const pageTaglines = {
         today: 'Review your jobs, upcoming sessions and items needing attention.',
         jobs: 'Find, filter and manage jobs across Studio workspaces.',
+        tasks: 'Review assignments, deadlines and completed work across Studio.',
         workspaces: 'Manage workspace jobs, messaging, media and activity.',
         clients: 'Manage client jobs, galleries, statements and activity.',
         frontdesk: 'Review client inquiries, prepare bookings and manage arrivals.',
