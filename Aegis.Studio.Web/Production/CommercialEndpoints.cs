@@ -68,7 +68,7 @@ public static class CommercialEndpoints
             int take = Math.Clamp(limit ?? 50, 1, 100), skip = Math.Max(offset ?? 0, 0);
             Guid[]? selected = orderIds is null ? null : orderIds.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(value => Guid.TryParse(value, out var id) ? id : throw new ArgumentException("Invalid work order ID.")).Take(51).ToArray();
             if (selected?.Length > 50) throw new ArgumentException("Request at most 50 work orders at a time.");
-            Guid[] allowed = access.GetAccessibleJobIds(user).Where(id => !jobId.HasValue || id == jobId).ToArray();
+            Guid[] allowed = access.GetProductionJobIds(user).Where(id => !jobId.HasValue || id == jobId).ToArray();
             using var c = database.OpenConnection(); using var q = Command(c, null, """
                 select coalesce(jsonb_agg(row),'[]')::text from (
                   select w.id,w.job_id as "jobId",j.title as "jobTitle",w.product_name as product,w.quantity,w.original_quantity as "originalQuantity",
