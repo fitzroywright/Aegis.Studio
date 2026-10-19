@@ -9,6 +9,7 @@ public sealed class UserProfileStore
     private static readonly HashSet<string> AllowedThemes = new(StringComparer.OrdinalIgnoreCase)
     {
         "standard",
+        "comfort",
         "light",
         "dark"
     };
