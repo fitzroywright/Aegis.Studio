@@ -115,5 +115,5 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 @media(max-height:700px){.production-workload-details[open]{max-height:110px}}
 
 
-.st-card.production-overview-card>header .fd-card-link{flex:0 0 auto;margin-left:auto;padding:0;border:0;background:transparent;color:var(--studio-rail-title,#253c54);font:inherit;font-weight:700;white-space:nowrap;cursor:pointer}
+.st-card.production-overview-card>header .fd-card-link,.st-card.production-attention-card>header .fd-card-link{flex:0 0 auto;margin-left:auto;padding:0;border:0;background:transparent;color:var(--studio-rail-title,#253c54);font:inherit;font-weight:700;white-space:nowrap;cursor:pointer}
 .production-board-filters>input[type=search]::placeholder{color:#e2ebf6;opacity:1}
