@@ -95,3 +95,8 @@
 .st-tasks-page .sj-job-header{flex-direction:row;align-items:center;gap:8px}
 .st-tasks-page .sj-job-header>span{flex:0 0 auto;white-space:nowrap}
 .st-tasks-page .sj-job-header input[data-task-search]{flex:1 1 auto;width:auto;min-width:90px;max-width:none}
+
+/* Keep the due-date filter beside its column label. */
+.st-tasks-page .sj-column-filter-inline{flex-direction:row;align-items:center;gap:8px}
+.st-tasks-page .sj-column-filter-inline>span{flex:0 0 auto}
+.st-tasks-page .sj-column-filter-inline select{flex:1 1 auto;width:auto;min-width:86px}
