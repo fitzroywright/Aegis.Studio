@@ -16,7 +16,7 @@ public static class WorkloadOverview
         {
             var permissions = access.GetPermissionMap(user);
             // Production managers need the workload projection even when they do not also have ViewJob.
-            var allowed = permissions.Where(p => p.Value.ViewJob || p.Value.ManageProduction).Select(p => p.Key).ToArray();
+            var allowed = access.GetProductionJobIds(user).ToArray();
             var production = permissions.Where(p => p.Value.ManageProduction).Select(p => p.Key).ToArray();
             using var c = database.OpenConnection();
             using var tx = c.BeginTransaction(System.Data.IsolationLevel.RepeatableRead);
