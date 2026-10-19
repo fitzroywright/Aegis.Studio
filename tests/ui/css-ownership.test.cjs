@@ -29,3 +29,28 @@ test('grid row highlight and motion have one shared stylesheet owner',()=>{
  }
  const rules=fs.readFileSync(path.join(root,'css/components/studio-rows.css'),'utf8');assert.match(rules,/--studio-row-highlight:#fff6df/);assert.match(rules,/prefers-reduced-motion:reduce/);assert.match(rules,/transform:none/);
 });
+
+test('Production filter and Overview styles each have one owning declaration',()=>{
+ const ast=css.parse(fs.readFileSync(path.join(root,'css/components/studio-page.css'),'utf8'));
+ const expected=new Map([
+  ['.production-board-filters',['background','color','border','padding']],
+  ['.production-board-filters>input[type=search]',['background','color','height','font-size']],
+  ['.production-board-filters>select',['background','color','height','font-size']],
+  ['.production-overview-entries .workload-indicator',['height','font-size','font-weight','padding']],
+  ['.production-overview-entries .workload-indicator strong',['font-size','font-weight']]
+ ]);
+ const found=new Map([...expected.keys()].map(selector=>[selector,0]));
+ css.walk(ast,node=>{
+  if(node.type!=='Rule')return;
+  const selector=css.generate(node.prelude);
+  if(!expected.has(selector))return;
+  found.set(selector,found.get(selector)+1);
+  const declarations=new Map();
+  node.block.children.forEach(d=>{
+   if(d.type!=='Declaration'||!expected.get(selector).includes(d.property))return;
+   declarations.set(d.property,(declarations.get(d.property)||0)+1);
+  });
+  for(const property of expected.get(selector))assert.equal(declarations.get(property),1,selector+' must own one '+property+' declaration');
+ });
+ for(const [selector,count] of found)assert.equal(count,1,'Expected one owning rule for '+selector);
+});
