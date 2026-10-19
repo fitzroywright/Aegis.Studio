@@ -966,7 +966,7 @@
         clients:()=>window.StudioClients.render({clientId:window.history.state?.studioClientId}),
         messages:()=>window.showStudioMessages(),
         schedule:()=>window.history.state?.studioSchedulePanel==='pipeline'?showPipeline():window.history.state?.studioSchedulePanel==='production'?window.StudioProductionPlanning.render():window.StudioPhotographerSchedule.render({photographer:window.history.state?.studioPhotographer||'',date:window.history.state?.studioScheduleDate||'',view:window.history.state?.studioScheduleView||'',resourceId:window.history.state?.studioScheduleResource||''}),
-        tasks:renderToday,
+        tasks:()=>window.StudioTasks.render(),
         workspaces:renderWorkspaces,
         jobs:renderJobs,
         pipeline:()=>showPipeline(),
