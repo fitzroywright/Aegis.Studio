@@ -91,7 +91,7 @@
    host.querySelectorAll('[data-sj-calendar-view]').forEach(button=>button.onclick=()=>{calendarView=button.dataset.sjCalendarView;calendarEnabled=true;apply();});
    host.querySelectorAll('[data-sj-calendar-step]').forEach(button=>button.onclick=()=>{const n=Number(button.dataset.sjCalendarStep);const next=new Date(calendarDate);if(calendarView==='month'){const day=next.getDate();next.setDate(1);next.setMonth(next.getMonth()+n);next.setDate(Math.min(day,new Date(next.getFullYear(),next.getMonth()+1,0).getDate()));}else next.setDate(next.getDate()+n*(calendarView==='week'?7:1));calendarDate=next;calendarEnabled=true;apply();});
    find('[data-sj-calendar-today]').onclick=()=>{calendarDate=new Date();calendarEnabled=true;apply();};
-   find('[data-sj-calendar-date]').onchange=e=>{const chosen=date(e.target.value);if(chosen){calendarDate=chosen;calendarEnabled=true;apply();}};
+   find('[data-sj-calendar-date]').onchange=e=>{const chosen=date(e.target.value);if(chosen){calendarDate=chosen;calendarEnabled=true;e.target.blur();apply();}};
    find('[data-sj-calendar-toggle]').onclick=()=>{const input=find('[data-sj-calendar-date]');if(typeof input.showPicker==='function')input.showPicker();else input.click();};
    find('[data-sj-search]').oninput=e=>{term=e.target.value;apply();};
    find('[data-sj-workspace]').onchange=e=>{workspace=e.target.value;options.setWorkspaceFilter(workspace);apply();};
