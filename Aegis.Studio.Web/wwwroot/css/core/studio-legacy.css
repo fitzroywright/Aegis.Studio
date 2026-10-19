@@ -10170,9 +10170,10 @@ body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-widt
 #studioContextRail.studio-rail-collapsed-left,.mw-today-left.studio-rail-collapsed-left { width:0; min-width:0; overflow:visible; gap:0; }
 .mw-today-right.studio-rail-collapsed-right,.st-right.studio-rail-collapsed-right,.sj-right.studio-rail-collapsed-right,.fd-secondary.studio-rail-collapsed-right,.workspace-right-rail.studio-rail-collapsed-right { width:42px; min-width:42px; overflow:hidden; gap:4px; }
 :is(.studio-rail-collapsed-left,.studio-rail-collapsed-right) > :not([data-rail-toggle]) { display:none !important; }
-body .shell:has(> #studioContextRail.studio-rail-collapsed-left) { --studio-shell-left-width:0px; column-gap:0; }
-body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail { grid-column:1; grid-row:1; width:0; min-width:0; overflow:visible; z-index:5; }
-body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail > [data-rail-toggle="left"] { position:fixed; inset-inline-start:4px; inset-block-start:64px; z-index:1000; }
+body .shell:has(> #studioContextRail.studio-rail-collapsed-left) { grid-template-columns:minmax(0,1fr) !important; column-gap:0 !important; }
+body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail { position:fixed; inset-inline-start:0; top:56px; bottom:36px; grid-column:auto; grid-row:auto; width:0; min-width:0; overflow:visible; z-index:1000; }
+body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > main { grid-column:1 !important; grid-row:1; width:100% !important; min-width:0; }
+body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail > [data-rail-toggle="left"] { position:fixed; inset-inline-start:4px; inset-block-start:64px; z-index:1001; }
 .mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:0 minmax(0,1fr) minmax(245px,290px); column-gap:0; }
 .mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(175px,210px) minmax(0,1fr) 42px; }
 .mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:0 minmax(0,1fr) 42px; column-gap:0; }
