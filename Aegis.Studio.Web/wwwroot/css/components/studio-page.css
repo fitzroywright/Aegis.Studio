@@ -99,9 +99,9 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 .production-order-top{display:flex;align-items:center;justify-content:space-between;gap:6px;color:var(--theme-muted);font-size:10px;font-weight:700}
 .production-priority{padding:2px 6px;border-radius:10px;background:var(--studio-rail-accent,#f4f6f8);color:var(--theme-text)}
 .production-job-title{align-self:flex-start;padding:0;border:0;background:transparent;color:var(--theme-text);font-size:12px;font-weight:700;text-align:left;cursor:pointer}
-.production-order-product{align-self:flex-start;color:#a84300;font-size:11px;font-weight:700;background:#fff1df;border:1px solid #e7ad63;border-radius:4px;padding:3px 7px}
+.production-order-product{align-self:flex-start;color:var(--theme-text);font-size:11px;font-weight:700;background:var(--studio-rail-accent,#f4f6f8);border:1px solid var(--studio-grid-border);border-radius:4px;padding:3px 7px}
 .production-order-meta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 7px;color:var(--theme-muted);font-size:10px}
-.production-order-meta span:first-child{grid-column:1/-1;color:#a84300;font-size:11px;font-weight:700;background:#fff1df;border:1px solid #e7ad63;border-radius:4px;padding:3px 7px}
+.production-order-meta span:first-child{grid-column:1/-1;color:var(--theme-text);font-size:11px;font-weight:700;background:var(--studio-rail-accent,#f4f6f8);border:1px solid var(--studio-grid-border);border-radius:4px;padding:3px 7px}
 .production-blocker{margin:0;padding:4px 6px;border-left:2px solid #b44b42;color:#a53730;font-size:10px;overflow-wrap:anywhere}
 .production-progress-label{display:flex;justify-content:space-between;gap:6px;color:var(--theme-muted);font-size:10px}
 .production-progress-track{height:6px;overflow:hidden;border-radius:5px;background:var(--studio-grid-border)}
@@ -143,3 +143,10 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 .production-order-product{align-self:flex-start;padding:3px 7px;border-radius:4px;background:var(--studio-rail-accent,#f4f6f8)}
 .production-progress-track{background:#e5e9ee}
 .production-progress-track>span{border-radius:5px;background:linear-gradient(90deg,#4b83b4,#39835e)}
+
+/* Match activity chips to the production stage for quick, colorful scanning. */
+.production-order-tone-attention :is(.production-order-product,.production-order-meta span:first-child){color:#92352e;background:#fae3e0;border-color:#e9b9b3}
+.production-order-tone-ready :is(.production-order-product,.production-order-meta span:first-child){color:#315d82;background:#e1edf7;border-color:#bfd3e5}
+.production-order-tone-progress :is(.production-order-product,.production-order-meta span:first-child){color:#80520f;background:#f8edda;border-color:#e9d1a5}
+.production-order-tone-qc :is(.production-order-product,.production-order-meta span:first-child){color:#5d4781;background:#eee8f6;border-color:#d2c3e6}
+.production-order-tone-complete :is(.production-order-product,.production-order-meta span:first-child){color:#326749;background:#e4f1e8;border-color:#c1dcc9}
