@@ -1,116 +1,136 @@
-/* Owns the Today structure of the converted operational pages. */
-.st-page{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:8px;height:100%;min-height:0;min-width:0;color:var(--theme-text);font-size:12px}
-.st-board,.st-card{background:var(--studio-card-surface);border:1px solid var(--studio-grid-border);border-radius:5px;box-shadow:0 2px 5px #2633440c;min-width:0;min-height:0;overflow:hidden}
-.st-board{display:flex;flex-direction:column}
-.st-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid #e4e5e7;flex-wrap:wrap;flex-shrink:0}
-.st-toolbar h1{font-size:20px;margin:0;color:var(--theme-text)}
-.st-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}.st-tools input,.st-tools select,.st-tools button{min-width:0;max-width:100%;box-sizing:border-box}.st-tools :focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:2px}
-.st-content{display:flex;flex-direction:column;gap:8px;padding:8px;flex:1;min-height:0;min-width:0;overflow:hidden}
-.st-card-scroll{overflow:auto;overscroll-behavior:contain}
-.st-right{gap:8px;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
-.st-card{display:flex;flex-direction:column;flex:1 1 0;}
-.st-card>header{padding:7px 10px;background:var(--studio-rail-accent,#f4f6f8);border-bottom:1px solid var(--studio-rail-accent,#dce1e6);flex-shrink:0}
-.st-card h2{margin:0;font-size:12px;font-weight:var(--studio-rail-title-weight,700);color:var(--studio-rail-title,#253c54)}
-.st-card-body{padding:8px 10px;overflow:auto;min-height:0;flex:1;overscroll-behavior:contain}
-.st-card-body p{margin:0 0 8px;line-height:1.5;color:var(--theme-muted)}
-.st-stat{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #e9ecef}
-.st-attention{border-top:3px solid #b44b42}
-.st-attention>header{background:#fff3ef}
-.st-link{border:0;background:transparent;color:#98701c;font-weight:700;cursor:pointer}
-.st-tools button,.st-content input,.st-content select{font-size:12px;min-height:30px}
-.st-dashboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-height:0;flex:1;overflow:auto;overscroll-behavior:contain}
-.st-dashboard-grid>.op-card{min-height:180px;max-height:330px;display:flex;flex-direction:column}
-.st-dashboard-grid>.op-card>.op-body{overflow:auto;min-height:0;flex:1}
-.st-admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start}
-.st-pipeline-content .pipeline-planning-surface{flex:1;min-height:80px;overflow:auto}
-.st-pipeline-content .pipeline-stage-summary{flex-shrink:0}
-.st-production-content .production-main{display:flex;flex-direction:column;min-height:0;flex:1;overflow:hidden}
-.st-production-content .production-queue-card{min-height:0;max-height:none;flex:1;overflow:auto}
-@media(max-width:1100px){.st-page{grid-template-columns:minmax(0,1fr) 240px}.st-admin-grid{grid-template-columns:1fr}}
-@media(max-width:800px){.st-page{grid-template-columns:1fr;grid-template-rows:minmax(0,2fr) minmax(100px,1fr)}.st-right{display:flex;flex-direction:column;overflow:hidden;}.st-card-body{padding:6px}.st-dashboard-grid{grid-template-columns:1fr}}
-@media(max-width:480px){.st-toolbar{padding:6px}.st-tools{gap:4px}.st-right{display:flex;flex-direction:column;overflow:hidden;}.st-right>.st-card{flex:1 1 0}.st-admin-grid{grid-template-columns:1fr}}
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{JSDOM}=require('jsdom');
+const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
+function setup(t){const dom=new JSDOM('<div id="host"></div><ol id="summary"></ol>',{runScripts:'outside-only',url:'https://studio.test'}),w=dom.window;t.after(()=>w.close());for(const file of ['workflow-graph.js','job-details.js','workload-overview.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));return w;}
+const task=(id,status='NotStarted',extra={})=>({id,jobId:'job',activityType:'Print',title:id,status,...extra});
+const job={id:'job',status:'Active Production'};
+test('partial physical output, QC and refund quantities remain separate from activities and catalog stage counts',t=>{
+ const w=setup(t),a=task('print','InProgress'),b=task('qc','ReworkRequired');
+ const data={productionJobIds:['job'],activities:[a,b],items:[{activityId:'print',kind:'Physical outputs',quantity:10,remaining:6,awaitingQc:4,rework:0,refundedProduced:2},{activityId:'qc',kind:'Physical outputs',quantity:3,remaining:0,awaitingQc:0,rework:3},{activityId:'print',kind:'Approved images/items',itemRecords:4},{activityId:'print',kind:'Other purchased outputs',quantity:2}],orders:[{id:'order',quantity:20,activityIds:['print','qc']}]};
+ const m=w.StudioWorkload.model(data,[job]),s=m.summary(m.activities);assert.equal(s.activities,2);assert.equal(s.orderedUnits,20);assert.equal(s.orders,1);assert.equal(s.physical.progress,6);assert.equal(s.physical.awaitingQc,4);assert.equal(s.physical.rework,3);assert.equal(s.physical.refundedProduced,2);assert.equal(s.images.records,4);assert.equal(s.partialUnknown,1);assert.equal(m.matches(m.activities[0],'qc'),true);assert.equal(m.matches(m.activities[1],'item-rework'),true);
+});
+test('cancelled outputs, inactive branches and closed jobs never become ready work; missing quantities stay explicit',t=>{
+ const w=setup(t),data={activities:[task('cancel','Cancelled'),task('inactive'),task('no-quantity')],eligibility:[{activityId:'inactive',status:'Inactive'}],items:[],orders:[],productionJobIds:[]};
+ const m=w.StudioWorkload.model(data,[job]);assert.equal(m.bucket(m.activities[0]),'complete');assert.equal(m.bucket(m.activities[1]),'complete');assert.equal(m.summary(m.activities).missing,1);assert.equal(m.summary(m.activities).restricted,1);assert.match(w.StudioWorkload.cards(m,m.activities,w.StudioGraph.esc),/unavailable item quantities/);
+ const closed=w.StudioWorkload.model({activities:[task('closed','InProgress')]},[{...job,status:'Cancelled'}]);assert.equal(closed.active(closed.activities[0]),false);
+});
+test('workflow prerequisites and approval gates separate waiting from executable work, with independent overdue flags',t=>{
+ const w=setup(t),now=Date.now(),data={activities:[task('blocked','NotStarted',{dueAtUtc:new Date(now-1000).toISOString()}),task('ready'),task('client','WaitingOnClient')],eligibility:[{activityId:'blocked',status:'Blocked',reason:'Waiting for active prerequisites'},{activityId:'ready',status:'Available'}]};
+ const m=w.StudioWorkload.model(data,[job],now);assert.equal(m.bucket(m.activities[0]),'waiting');assert.equal(m.overdue(m.activities[0]),true);assert.equal(m.bucket(m.activities[1]),'ready');assert.equal(m.bucket(m.activities[2]),'waiting');
+ const gate=w.StudioWorkload.model({activities:[task('deposit')]},[{...job,status:'Pending'}]);assert.equal(gate.bucket(gate.activities[0]),'waiting');
+});
+function workflow(){
+ const sub={nodes:[{id:'start',label:'Start',kind:'Start'},{id:'edit',label:'Edit',kind:'Task'},{id:'qc',label:'QC',kind:'Task'},{id:'end',label:'Complete',kind:'End'}],edges:[{id:'a',from:'start',to:'edit'},{id:'b',from:'start',to:'qc'},{id:'c',from:'edit',to:'end'},{id:'d',from:'qc',to:'end'}]};
+ return {graph:{nodes:[{id:'start',label:'Start',kind:'Start'},{id:'produce',label:'Production',kind:'Subflow',subflow:sub},{id:'shoot',label:'Photography',kind:'Subflow',subflow:sub},{id:'delivery',label:'Delivery',kind:'Task'},{id:'end',label:'Complete',kind:'End'}],edges:[{id:'one',from:'start',to:'produce'},{id:'two',from:'start',to:'shoot'},{id:'three',from:'produce',to:'delivery'},{id:'four',from:'shoot',to:'delivery'},{id:'five',from:'delivery',to:'end'}]},evaluation:{completed:false,nodes:[{id:'produce/edit',status:'InProgress'},{id:'produce/qc',status:'Blocked',reason:'QC rejected'},{id:'produce/end',status:'Blocked'},{id:'shoot/edit',status:'Completed'},{id:'shoot/qc',status:'Skipped'},{id:'shoot/end',status:'Completed'},{id:'delivery',status:'Blocked'}],edges:{}},tasks:[{id:'qc-task',nodeId:'produce/qc',status:'Blocked',reason:'QC rejected: colour mismatch',assignedTo:null,role:'Production Manager',dependencyLabels:['Edit'],optional:false}]};
+}
+test('expanding a stage exposes endpoints and parallel dots, retains context and makes no state-changing request',t=>{
+ const w=setup(t),view=workflow(),before=JSON.stringify(view),host=w.document.getElementById('host');let requests=0;w.json=async()=>{requests++;throw Error('Unexpected write');};
+ w.StudioJobDetails.compact(host,view,job,w.document.getElementById('summary'));assert.equal(host.querySelectorAll('[data-workflow-node]').length,0);assert.equal(w.document.querySelectorAll('#summary [data-workflow-node="produce"]').length,1);
+ w.document.querySelector('#summary [data-workflow-node="produce"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.match(w.document.getElementById('summary').textContent,/Start/);assert.match(w.document.getElementById('summary').textContent,/Complete/);assert.equal(host.querySelector('[data-workflow-node="shoot"]'),null);assert.ok(w.document.querySelector('#summary [data-workflow-node="shoot"]'));const edit=host.querySelector('[data-workflow-node="produce/edit"]'),qc=host.querySelector('[data-workflow-node="produce/qc"]');assert.equal(edit.closest('.jd-dot-level'),qc.closest('.jd-dot-level'));
+ w.document.querySelector('#summary [data-workflow-node="shoot"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.equal(host.querySelector('[data-workflow-node="produce/edit"]'),null);w.document.querySelector('#summary [data-workflow-node="shoot"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,0);assert.equal(requests,0);assert.equal(JSON.stringify(view),before);
+});
+test('step details expose exact blockers, unassigned responsibility and navigate to the existing command screen',async t=>{
+ const w=setup(t),host=w.document.getElementById('host');let target;w.StudioJobGraph={open:async(...args)=>target=args};w.StudioJobDetails.compact(host,workflow(),job);host.querySelector('[data-workflow-node="produce"]').click();host.querySelector('[data-workflow-node="produce/qc"]').click();assert.match(host.textContent,/QC rejected: colour mismatch/);assert.match(host.textContent,/Responsible: Unassigned/);assert.match(host.textContent,/Production Manager/);await host.querySelector('[data-existing-task]').onclick();assert.deepEqual(target,['job','qc-task']);host.querySelector('[data-close-step]').click();assert.equal(w.document.activeElement.dataset.workflowNode,'produce/qc');
+});
+test('completed and optional substages follow evaluated completion; pending required work cannot be ticked by the UI',t=>{
+ const w=setup(t),view=workflow(),host=w.document.getElementById('host');w.StudioJobDetails.compact(host,view,job);assert.match(host.querySelector('[data-workflow-node="shoot"]').getAttribute('aria-label'),/2 of 2 steps complete/);assert.ok(host.querySelector('[data-workflow-node="shoot"]').classList.contains('completed'));assert.ok(!host.querySelector('[data-workflow-node="produce"]').classList.contains('completed'));
+ view.evaluation.nodes.find(x=>x.id==='shoot/qc').status='Blocked';w.StudioJobDetails.compact(host,view,job);assert.ok(!host.querySelector('[data-workflow-node="shoot"]').classList.contains('completed'));
+});
+test('single task workflows stay interactive and inactive service branches are excluded',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),view={graph:{nodes:[{id:'a',label:'Delivery',kind:'Task'},{id:'b',label:'Unused service',kind:'Task'}],edges:[]},evaluation:{nodes:[{id:'a',status:'Available'},{id:'b',status:'Inactive'}],edges:{}},tasks:[]};w.StudioJobDetails.compact(host,view,job);assert.equal(host.querySelectorAll('[data-workflow-node]').length,1);host.querySelector('button').click();assert.match(host.textContent,/Responsible: Unassigned/);assert.ok(host.querySelector('[data-existing-task]'));
+});
+test('canonical Production filters the existing work-order queue and preserves drilldown context',async t=>{
+ const w=setup(t);w.document.body.innerHTML='<main id="genericView"></main><div id="conversationView"></div><span id="studioFooterRate"></span>';Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),esc:w.StudioGraph.esc,studioFirstName:x=>x,alert:message=>{throw Error(message);}});w.requestAnimationFrame=fn=>w.setTimeout(fn,0);w.ResizeObserver=class{observe(){}disconnect(){}};for(const f of ['studio-message-card.js','studio-page.js','commercial.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+ const workload={jobs:[{...job,workspaceId:'w',workspaceName:'Weddings'}],productionJobIds:['job'],activities:[task('print','InProgress',{assignedTo:'staff',productionArea:'Printing',workOrderId:'order'}),task('blocked','Blocked',{workOrderId:'blocked-order',productionArea:'Printing',blockedReason:'Approved source required'}),task('retouch','InProgress',{productionArea:'Editing',title:'Retouch portraits'})],orders:[{id:'order',jobId:'job',quantity:30,activityIds:['print']},{id:'blocked-order',jobId:'job',quantity:12,activityIds:['blocked']}],items:[]};const requests=[];
+ w.json=async u=>{requests.push(u);if(u==='/api/production/workload')return workload;if(u==='/api/workspaces')return [{id:'w',name:'Weddings'}];if(u.startsWith('/api/production/work-orders')){const ids=new URL(u,'https://studio.test').searchParams.get('orderIds').split(',');return workload.orders.filter(o=>ids.includes(o.id)).map(o=>({...o,product:'Prints',jobTitle:'Wedding',tasks:workload.activities.filter(a=>o.activityIds.includes(a.id))}));}throw Error(u);};
+ let openedOrder;w.openCommercialWorkOrder=order=>{openedOrder=order;};
+ await w.showCatalogProduction();assert.equal(w.document.querySelectorAll('.st-right .production-overview-entries [data-workload-filter]').length,9);assert.deepEqual([...w.document.querySelectorAll('.st-right .workload-indicator span')].map(x=>x.textContent),['Jobs','Activities','Ready activities','Waiting activities','Overdue activities','Rework activities','Recorded physical units awaiting QC','Recorded physical units requiring rework','Produced units refunded']);assert.equal(w.document.querySelector('.production-workload-details'),null);assert.doesNotMatch(w.document.querySelector('.st-right').textContent,/Manage Studio services, templates and production/);assert.equal(w.document.querySelector('.production-board-metrics'),null);assert.equal(w.document.querySelector('[data-workload-workspace] option[value="w"]').textContent,'Weddings');assert.equal(w.document.querySelector('.production-board-filters > label').textContent.trim(),'Completed');assert.equal(w.document.querySelectorAll('[data-order-row]').length,2);assert.equal(w.document.querySelectorAll('[data-activity-row]').length,1);assert.match(w.genericView.textContent,/3 production items/);assert.equal(w.document.querySelectorAll('[data-production-lane]').length,5);assert.ok(w.document.querySelector('[data-production-lane="progress"] [data-order-row="order"]'));assert.ok(w.document.querySelector('[data-production-lane="attention"] [data-order-row="blocked-order"]'));assert.match(w.genericView.textContent,/42 catalog ordered units across 2 work orders/);assert.match(w.genericView.textContent,/2 work orders have unknown partial output progress/);
+ w.document.querySelector('[data-order-row="order"]').click();assert.equal(openedOrder.id,'order');
+ const search=w.document.querySelector('[data-production-search]');search.value='blocked-order';search.dispatchEvent(new w.Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,240));assert.equal(w.document.querySelectorAll('[data-order-row]').length,1);assert.ok(w.document.querySelector('[data-order-row="blocked-order"]'));
+ const selector=w.document.querySelector('[data-workload-filter-select]');selector.value='waiting';await selector.onchange({target:selector});await new Promise(r=>setTimeout(r,20));assert.equal(w.document.querySelectorAll('[data-order-row]').length,1);assert.ok(w.document.querySelector('[data-order-row="blocked-order"]'));assert.equal(w.studioWorkloadSelection.filter,'waiting');assert.ok(requests.every(u=>!u.includes('/media')));assert.ok(requests.filter(u=>u.includes('orderIds=')).every(u=>u.includes('offset=0')));
+});
+test('Operations separates delivery overdue, explainable concern and unknown dates, preserves filters and links to existing decisions',async t=>{
+ const w=setup(t);w.document.body.innerHTML='<main id="genericView"></main><div id="conversationView"></div>';Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),esc:w.StudioGraph.esc,studioFirstName:x=>x,requestAnimationFrame:fn=>w.setTimeout(fn,0),ResizeObserver:class{observe(){}disconnect(){}}});for(const f of ['studio-message-card.js','studio-page.js','management.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+ const jobs=['late','risk','unknown'].map(id=>({id,status:'Active Production',title:id,workspaceId:'ws'}));const activities=[{...task('delivery-late'),jobId:'late',activityType:'Delivery',dueAtUtc:new Date(Date.now()-86400000).toISOString()},{...task('delivery-risk'),jobId:'risk',activityType:'Delivery',dueAtUtc:new Date(Date.now()+86400000).toISOString()},{...task('waiting','Blocked'),jobId:'risk',blockedReason:'Client approval required'},{...task('unknown'),jobId:'unknown'}];
+ w.json=async u=>u==='/api/operations-management'?{jobs:jobs.map(j=>({jobId:j.id,workspaceId:'ws',stage:j.status,owner:'lead',timing:{light:'green'}})),overrideRequests:[],canDecideOverrides:false}:u==='/api/jobs'?jobs:u==='/api/workspaces'?[{id:'ws',name:'Weddings'}]:u==='/api/production/workload'?{activities,items:[],orders:[]}:[];
+ let opened;w.openWorkspaceJob=async id=>opened=id;await w.showOperationsManagement();assert.equal(w.document.querySelector('[data-situation="delivery-overdue"] strong').textContent,'1');assert.equal(w.document.querySelector('[data-situation="delivery-risk"] strong').textContent,'1');assert.equal(w.document.querySelector('[data-situation="delivery-unknown"] strong').textContent,'1');assert.equal(w.document.querySelector('[data-operations-panel="overrides"]'),null);
+ w.document.querySelector('[data-situation="delivery-risk"]').click();assert.equal(w.document.querySelectorAll('#operationsJobRows tr').length,1);await w.document.querySelector('#operationsJobRows [data-open-job]').onclick();assert.equal(opened,'risk');await w.showOperationsManagement();assert.equal(w.document.querySelector('#operationsAttentionFilter').value,'delivery-risk');assert.match(w.document.querySelector('#operationsJobRows').textContent,/risk/);assert.match(w.genericView.textContent,/equipment utilization: unknown/);
+});
+test('a recorded due date, not a blank or invalid timestamp, is required to call work overdue',t=>{
+ const w=setup(t),m=w.StudioWorkload.model({activities:[task('none'),task('invalid','NotStarted',{dueAtUtc:'not-a-date'}),task('cancelled','Cancelled',{dueAtUtc:'2000-01-01'})]},[job]);assert.ok(m.activities.every(a=>!m.overdue(a)));
+});
 
-.op-chart{display:block;width:100%;height:180px}.op-chart text{font-size:10px;fill:#667383}
-.op-composition{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.op-donut{width:120px;height:120px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}.op-donut>span{width:80px;height:80px;border-radius:50%;background:white;display:grid;place-content:center;text-align:center}.op-donut small{display:block}.op-legend{display:grid;gap:8px}.op-legend i{display:inline-block;width:9px;height:9px;margin-right:5px;border-radius:2px}
-.st-tools [data-period]{width:auto;max-width:180px}.st-content [data-finance-filter]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:8px}.st-content [data-finance-filter] p{grid-column:1/-1}.st-content [data-finance-filter] label{font-size:11px}
-.st-content .op-metric b,.st-content .op-metric small{display:block}.st-content .op-metric>span{min-width:0}
+test('main icons toggle drawer on second click and subflows place endpoint icons around component path',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),summary=w.document.getElementById('summary'),events=[];
+ host.addEventListener('studio-flow-details-toggle',e=>events.push(e.detail.open));
+ w.StudioJobDetails.compact(host,workflow(),job,summary);
+ summary.querySelector('[data-workflow-node="produce"]').click();
+ assert.equal(events.at(-1),true);
+ assert.equal(summary.querySelectorAll('[data-main-expanded] [data-workflow-node]').length,2);assert.equal(host.querySelectorAll('.jd-subflow-endpoint').length,0);assert.ok(summary.querySelector('.jd-main-dashed'));
+ assert.ok(host.querySelector('.jd-dot-subflow>.jd-dot-levels [data-workflow-node="produce/edit"]'));
+ summary.querySelector('[data-workflow-node="produce"]').click();
+ assert.equal(events.at(-1),false);assert.equal(host.querySelector('.jd-dot-subflow'),null);assert.equal(summary.querySelector('[data-main-expanded]'),null);assert.equal(summary.querySelectorAll('[data-workflow-node="produce"]').length,1);
+ summary.querySelector('[data-workflow-node="delivery"]').click();assert.equal(events.at(-1),true);
+ summary.querySelector('[data-workflow-node="delivery"]').click();assert.equal(events.at(-1),false);
+ assert.equal(host.querySelector('.jd-dot-details'),null);
+});
 
+test('curved connectors attach at dot rims and refresh after drawer transitions',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),summary=w.document.getElementById('summary');let frame;
+ w.requestAnimationFrame=fn=>{frame=fn;return 1;};w.cancelAnimationFrame=()=>{};
+ w.HTMLElement.prototype.getBoundingClientRect=function(){
+  if(this===w.document.body)return{left:0,top:0,width:600,height:300};
+  const button=this.closest?.('[data-workflow-node]'),id=button?.dataset.workflowNode;
+  const left=button?.hasAttribute('data-main-start')?20:button?.hasAttribute('data-main-complete')?400:id==='produce/edit'?100:220;
+  return{left,top:id?.includes('/')?150:20,width:12,height:12};
+ };
+ w.StudioJobDetails.compact(host,workflow(),job,summary);
+ summary.querySelector('[data-workflow-node="produce"]').click();frame();
+ const paths=[...w.document.querySelectorAll('[data-subflow-routes] path')];
+ assert.equal(paths.length,4);assert.match(paths[0].getAttribute('d'),/^M 26 32 V /);
+ assert.match(paths[0].getAttribute('d'),/ H 100$/);
+ assert.ok(paths.every(p=>/ [CQ] /.test(p.getAttribute('d'))));assert.match(paths.at(-1).getAttribute('d'),/ V 32$/);
+ w.document.body.dispatchEvent(new w.Event('transitionend'));frame();
+ assert.equal(w.document.querySelectorAll('[data-subflow-routes]').length,1);
+ summary.querySelector('[data-workflow-node="produce"]').click();
+ assert.equal(w.document.querySelector('[data-subflow-routes]'),null);
+});
 
-/* Shared Today-density layout: reduce outer gutters without changing grid internals. */
-body:is([data-studio-view="jobs"],[data-studio-view="workspaces"],[data-studio-view="frontdesk"]) .generic{padding:6px 8px!important}
-body:is([data-studio-view="jobs"],[data-studio-view="workspaces"],[data-studio-view="frontdesk"]) :is(.mw-list-page,.workspace-list-page,.fd-page){margin:0;padding:0;gap:8px}
-body:is([data-studio-view="jobs"],[data-studio-view="workspaces"],[data-studio-view="frontdesk"]) :is(.mw-list-layout,.workspace-list-layout,.fd-layout){gap:8px}
-body:is([data-studio-view="jobs"],[data-studio-view="workspaces"],[data-studio-view="frontdesk"]) :is(.mw-list-panel,.op-card){margin:0}
-body[data-studio-view="frontdesk"] .fd-page{padding:0!important;gap:8px}
-body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
+test('workflow labels are short while tooltips preserve full step descriptions',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),view={graph:{nodes:[{id:'qc',label:'Quality control and final inspection',description:'Inspect colour and finish before packaging',kind:'Task'}],edges:[]},evaluation:{nodes:[{id:'qc',status:'Available'}],edges:{}},tasks:[]};
+ w.StudioJobDetails.compact(host,view,job);
+ const button=host.querySelector('[data-workflow-node]');
+ assert.equal(button.querySelector('strong').textContent,'QC');
+ assert.match(button.title,/Quality control and final inspection/);
+ assert.match(button.title,/Inspect colour and finish before packaging/);
+});
 
-/* Workspaces card header: compact inline View All link. */
-.studio-context-card .studio-workspaces-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.studio-context-card .studio-workspaces-card-header h2{min-width:0;margin:0}
-.studio-context-card .studio-workspaces-view-all{appearance:none;background:transparent;border:0;box-shadow:none;padding:2px 0;color:var(--studio-card-header-text,#fff);font:inherit;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-.studio-context-card .studio-workspaces-view-all:hover{text-decoration-thickness:2px}
-.studio-context-card .studio-workspaces-view-all:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+test('workflow dots use green ticks, amber executable work, red problems and gray future tasks',t=>{
+ const w=setup(t),host=w.document.getElementById('host'),statuses=['Completed','Available','InProgress','Partial','ReadyForDelivery','Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient','Pending','Scheduled','Unknown'];
+ const nodes=statuses.map((status,i)=>({id:'n'+i,label:status,kind:'Task'}));
+ w.StudioJobDetails.compact(host,{graph:{nodes,edges:[]},evaluation:{nodes:nodes.map((n,i)=>({id:n.id,status:statuses[i]})),edges:{}},tasks:[]},job);
+ const tones=['green','amber','amber','amber','amber','red','red','red','red','red','gray','gray','gray'];
+ host.querySelectorAll('[data-workflow-node]').forEach((b,i)=>assert.equal(b.dataset.flowTone,tones[i]));
+ assert.equal(host.querySelector('[data-flow-tone=green] .jd-stage-light').textContent,'✓');
+});
 
-.studio-context-card .studio-workspaces-card-header .studio-workspaces-view-all{color:inherit!important;opacity:.95}
+test('completed activities retain unresolved physical QC and rework without remaining production',t=>{
+ const w=setup(t),m=w.StudioWorkload.model({productionJobIds:['job'],activities:[task('printed','Completed')],items:[{activityId:'printed',kind:'Physical outputs',remaining:0,awaitingQc:5,rework:2}],orders:[]},[job]);
+ const summary=m.summary(m.activities);assert.equal(summary.physical.awaitingQc,5);assert.equal(summary.physical.rework,2);assert.equal(summary.physical.progress,0);
+});
+test('Operations staff bottlenecks count only selected staff activities',async t=>{
+ const w=setup(t);w.document.body.innerHTML='<main id="genericView"></main><div id="conversationView"></div>';Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),esc:w.StudioGraph.esc,studioFirstName:x=>x,requestAnimationFrame:fn=>w.setTimeout(fn,0),ResizeObserver:class{observe(){}disconnect(){}}});
+ for(const f of ['studio-message-card.js','studio-page.js','management.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+ const jobs=[{id:'job',status:'Active Production',title:'Job',workspaceId:'ws'}];
+ w.json=async u=>u==='/api/operations-management'?{jobs:[{jobId:'job',workspaceId:'ws',stage:'Active Production',owner:'lead',timing:{light:'green'}}],overrideRequests:[],canDecideOverrides:false}:u==='/api/jobs'?jobs:u==='/api/workspaces'?[{id:'ws',name:'Studio'}]:u==='/api/production/workload'?{activities:[task('alice','Blocked',{assignedTo:'alice',blockedReason:'Review'}),task('bob','Blocked',{assignedTo:'bob',blockedReason:'Review'})],items:[],orders:[] }:[];
+ await w.showOperationsManagement();const select=w.document.querySelector('[data-operations-assignee]');select.value='alice';select.dispatchEvent(new w.Event('change'));
+ assert.equal(w.document.querySelector('[data-bottleneck="Print"]').textContent,'Print: 1');
+ assert.equal(w.document.querySelector('[data-staff-workload="bob"]'),null);
+});
 
-/* Consistent Today-style search fields in Jobs and Front Desk grid headers. */
-body[data-studio-view="jobs"] .sj-job-header input[data-sj-search],
-body[data-studio-view="frontdesk"] #frontDeskSearch{background:#2c537c!important;color:#fff!important;border:1px solid #6e96b8!important;border-radius:5px;font-weight:600}
-body[data-studio-view="jobs"] .sj-job-header input[data-sj-search]::placeholder,
-body[data-studio-view="frontdesk"] #frontDeskSearch::placeholder{color:#e5eef7!important;opacity:1}
-body[data-studio-view="jobs"] .sj-job-header input[data-sj-search]:focus,
-body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!important;color:#fff!important;outline:2px solid #cf792a;outline-offset:1px}
-
-
-/* Production workload board: replace the old table queue with real work-order stages. */
-.production-board-view{display:flex;flex-direction:column;gap:6px;height:100%;min-height:0;min-width:0;overflow:hidden}
-.production-overview-entries{display:flex;flex-direction:column;min-height:0;height:100%}
-.production-overview-entries .studio-workload-summary{min-height:0;max-height:100%;overflow:auto;padding:0}
-.production-overview-entries .workload-indicators{display:flex;flex-direction:column;gap:0}
-.production-overview-entries .workload-indicator{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:30px;padding:4px 12px;border:0;border-bottom:1px solid var(--studio-grid-border);border-radius:0;background:transparent;text-align:left}
-.production-overview-entries .workload-indicator strong{order:2;flex:0 0 auto}
-.production-overview-entries .workload-indicator span{flex:1;min-width:0}
-.production-overview-entries .studio-workload-summary>p{display:none}
-.production-board-filters{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;flex:0 0 auto;min-width:0;overflow-x:auto;overflow-y:hidden;padding-bottom:2px}
-.production-board-filters>input[type=search]{flex:1 1 180px;min-width:130px;width:180px}
-.production-board-filters>select{flex:0 1 auto;min-width:105px;max-width:160px}
-.production-board-filters :is(input,select,button){box-sizing:border-box;min-height:29px;font-size:11px}
-.production-board-filters .production-completed-filter{display:flex;align-items:center;gap:4px;flex:0 0 auto;white-space:nowrap;font-size:10px;color:var(--theme-muted)}
-.production-board-filters .production-completed-filter input{min-height:0}
-.production-board-filters>button{flex:0 0 auto;padding:4px 8px}
-.production-workload-details{flex:0 0 auto;max-height:34px;overflow:auto}
-.production-workload-details[open]{max-height:155px}
-.production-workload-details>summary{cursor:pointer;color:var(--theme-muted);font-size:11px;padding:4px 2px}
-.production-workload-details .studio-workload-summary{padding:6px;overflow:auto}
-.production-workload-details .workload-indicators{gap:4px}
-.production-kanban{display:flex;align-items:stretch;gap:8px;flex:1 1 auto;min-height:120px;min-width:0;overflow:auto;overscroll-behavior:contain;padding:1px 1px 6px}
-.production-lane{display:flex;flex:0 0 clamp(220px,23vw,270px);flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--studio-card-surface);border:1px solid var(--studio-grid-border);border-radius:5px}
-.production-lane>header{display:flex;align-items:center;justify-content:space-between;gap:6px;flex:0 0 auto;padding:7px 9px;background:var(--studio-rail-accent,#f4f6f8);border-bottom:1px solid var(--studio-grid-border)}
-.production-lane>header h2{margin:0;color:var(--theme-text);font-size:12px}
-.production-lane>header>span{display:grid;place-items:center;min-width:22px;height:22px;border-radius:50%;background:var(--studio-card-surface);color:var(--theme-text);font-size:11px;font-weight:700}
-.production-lane-attention{border-top:3px solid #b44b42}
-.production-lane-ready{border-top:3px solid #4b83b4}
-.production-lane-progress{border-top:3px solid #d59025}
-.production-lane-qc{border-top:3px solid #8065b2}
-.production-lane-complete{border-top:3px solid #39835e}
-.production-lane-cards{display:flex;flex-direction:column;gap:6px;min-height:0;overflow:auto;padding:6px;overscroll-behavior:contain}
-.production-order-card{display:flex;flex-direction:column;gap:5px;min-width:0;padding:8px;background:var(--studio-card-surface);border:1px solid var(--studio-grid-border);border-radius:5px;box-shadow:0 1px 3px #26334412}
-.production-order-card:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
-.production-order-top{display:flex;align-items:center;justify-content:space-between;gap:6px;color:var(--theme-muted);font-size:10px;font-weight:700}
-.production-priority{padding:2px 6px;border-radius:10px;background:var(--studio-rail-accent,#f4f6f8);color:var(--theme-text)}
-.production-job-title{align-self:flex-start;padding:0;border:0;background:transparent;color:var(--theme-text);font-size:12px;font-weight:700;text-align:left;cursor:pointer}
-.production-order-product{color:var(--theme-text);font-size:11px;font-weight:600}
-.production-order-meta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 7px;color:var(--theme-muted);font-size:10px}
-.production-order-meta span:first-child{grid-column:1/-1;color:var(--theme-text);font-size:11px}
-.production-blocker{margin:0;padding:4px 6px;border-left:2px solid #b44b42;color:#a53730;font-size:10px;overflow-wrap:anywhere}
-.production-progress-label{display:flex;justify-content:space-between;gap:6px;color:var(--theme-muted);font-size:10px}
-.production-progress-track{height:6px;overflow:hidden;border-radius:5px;background:var(--studio-grid-border)}
-.production-progress-track>span{display:block;height:100%;background:#4b83b4}
-.production-order-open{align-self:stretch;padding:5px 7px;border:1px solid var(--studio-grid-border);border-radius:4px;background:var(--studio-rail-accent,#f4f6f8);color:var(--theme-text);font:inherit;font-size:10px;font-weight:700;cursor:pointer}
-.production-order-open:hover,.production-job-title:hover{text-decoration:underline}
-.production-lane-empty{margin:auto;color:var(--theme-muted);font-size:11px}
-.production-board-pager{flex:0 0 auto}
-.production-board-links{display:flex;gap:10px;flex:0 0 auto}
-@media(max-width:800px){.production-lane{flex-basis:235px}.production-board-filters>input[type=search]{flex:0 0 150px}}
-@media(max-height:700px){.production-workload-details[open]{max-height:110px}}
-
+test('Production QC filter retains completed activities with unresolved item QC',async t=>{
+ const w=setup(t);w.document.body.innerHTML='<main id="genericView"></main><div id="conversationView"></div><span id="studioFooterRate"></span>';Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),esc:w.StudioGraph.esc,studioFirstName:x=>x,alert:message=>{throw Error(message);}});w.requestAnimationFrame=fn=>w.setTimeout(fn,0);w.ResizeObserver=class{observe(){}disconnect(){}};for(const f of ['studio-message-card.js','studio-page.js','commercial.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+ const workload={jobs:[{...job,workspaceId:'w',workspaceName:'Weddings'}],productionJobIds:['job'],activities:[task('print','Completed',{assignedTo:'staff',productionArea:'Printing',workOrderId:'order'}),task('blocked','Blocked',{workOrderId:'blocked-order',productionArea:'Printing',blockedReason:'Approved source required'})],orders:[{id:'order',jobId:'job',quantity:30,activityIds:['print']},{id:'blocked-order',jobId:'job',quantity:12,activityIds:['blocked']}],items:[{activityId:'print',kind:'Physical outputs',awaitingQc:3,remaining:0}]};const requests=[];
+ w.json=async u=>{requests.push(u);if(u==='/api/production/workload')return workload;if(u.startsWith('/api/production/work-orders')){const ids=new URL(u,'https://studio.test').searchParams.get('orderIds').split(',');return workload.orders.filter(o=>ids.includes(o.id)).map(o=>({...o,product:'Prints',jobTitle:'Wedding',tasks:workload.activities.filter(a=>o.activityIds.includes(a.id))}));}throw Error(u);};
+ await w.showCatalogProduction();assert.equal(w.document.querySelectorAll('[data-order-row]').length,2);assert.match(w.genericView.textContent,/42 catalog ordered units across 2 work orders/);assert.match(w.genericView.textContent,/1 work orders have unknown partial output progress/);
+ const selector=w.document.querySelector('[data-workload-filter-select]');selector.value='qc';await selector.onchange({target:selector});await new Promise(r=>setTimeout(r,20));assert.equal(w.document.querySelectorAll('[data-order-row]').length,1);assert.ok(w.document.querySelector('[data-order-row="order"]'));assert.equal(w.studioWorkloadSelection.filter,'qc');assert.ok(requests.every(u=>!u.includes('/media')));assert.ok(requests.filter(u=>u.includes('orderIds=')).every(u=>u.includes('offset=0')));
+});
