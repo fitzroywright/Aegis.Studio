@@ -1,5 +1,5 @@
 (() => {
-    const state = { filter: 'mine', due: 'any', search: '', focusDate: new Date() };
+    const state = { filter: 'mine', due: 'any', search: '', focusDate: new Date(), page: 1 };
     const escapeHtml = value => window.esc ? window.esc(value ?? '') : String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const sameDay = (a,b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
     const dayStart = value => new Date(value.getFullYear(),value.getMonth(),value.getDate());
@@ -21,18 +21,18 @@
         view.innerHTML='<section class="mw-page st-tasks-page"><div class="st-tasks-loading">Loading tasks…</div></section>';
         try {
             const today=dayStart(new Date()), from=today.toISOString(), to=new Date(today.getTime()+14*86400000).toISOString();
+            const schedulePromise=json('/api/today/schedule?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to)).catch(()=>[]);
+            const noticesPromise=json('/api/notifications?count=80').catch(()=>[]);
             const results=await Promise.all([
                 json('/api/auth/me'),
                 json('/api/operations/activities'),
-                json('/api/today/jobs').catch(()=>[]),
-                json('/api/today/schedule?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to)).catch(()=>[]),
-                json('/api/notifications?count=80').catch(()=>[])
+                json('/api/today/jobs').catch(()=>[])
             ]);
             const me=results[0]?.user||results[0]||{}, user=String(me.userName||me.username||me.email||'').toLowerCase();
             const activities=Array.isArray(results[1])?results[1]:[];
             const jobs=Array.isArray(results[2])?results[2]:[];
-            const sessions=Array.isArray(results[3])?results[3]:[];
-            const notices=Array.isArray(results[4])?results[4]:(results[4]?.items||[]);
+            const sessions=[];
+            const notices=[];
             const jobMap=new Map(jobs.map(job=>[String(job.id),job]));
             const open=activities.filter(task=>!['completed','cancelled'].includes(String(task.status||'').toLowerCase()));
             const overdue=open.filter(task=>task.dueAtUtc&&new Date(task.dueAtUtc)<new Date()).length;
@@ -41,7 +41,7 @@
             const todaySessions=sessions.filter(item=>sameDay(new Date(item.startsAtUtc),today)).slice(0,5);
             const messageRows=notices.slice(0,4).map(item=>'<button type="button" class="smc-row" data-task-message="'+escapeHtml(item.id)+'"><span class="smc-type" aria-hidden="true">✉</span><span class="smc-copy"><strong>'+escapeHtml(item.subject||item.title||'Studio message')+'</strong><small>'+escapeHtml(item.body||item.eventType||'Team update')+'</small></span><span class="mw-chevron">›</span></button>').join('')||'<div class="mw-empty">No new messages or announcements.</div>';
             const sessionRows=todaySessions.map(item=>'<button type="button" class="mw-session-row" data-task-job="'+escapeHtml(item.jobId||'')+'"><time>'+escapeHtml(new Date(item.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))+'</time><span class="mw-session-main"><strong>'+escapeHtml(jobMap.get(String(item.jobId))?.title||item.title||'Studio session')+'</strong><small>'+escapeHtml(jobMap.get(String(item.jobId))?.clientName||item.location||'Scheduled session')+'</small></span></button>').join('')||'<p class="muted">No sessions scheduled today.</p>';
-            view.innerHTML='<section class="mw-page sj-page st-tasks-page"><main class="sj-board st-tasks-panel"><div class="sj-summary"><div class="sj-view-tabs" role="group" aria-label="Task view"><button type="button" data-task-filter="mine">My Open Tasks <span data-task-count-for="mine"></span></button><button type="button" data-task-filter="all">All Open Tasks <span data-task-count-for="all"></span></button><button type="button" data-task-filter="completed">Completed <span data-task-count-for="completed"></span></button></div><button type="button" class="primary" data-task-add>＋ Add Task</button></div><div class="sj-table-scroll st-task-table-scroll"><table class="sj-table st-task-table"><thead><tr><th><label class="sj-job-header"><span>Task</span><input type="search" data-task-search placeholder="Search tasks…" value="'+escapeHtml(state.search)+'"></label></th><th>Job / Client</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Due</span><select data-task-due><option value="any">Any date</option><option value="today">Today</option><option value="overdue">Overdue</option><option value="upcoming">Upcoming</option><option value="none">Unscheduled</option></select></label></th><th>Priority</th><th>Status</th><th>Owner</th><th></th></tr></thead><tbody data-task-rows></tbody></table></div><footer class="st-task-count" data-task-count></footer></main><aside class="sj-right st-tasks-rail" aria-label="Task context"><section class="sj-card"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today’s Sessions</h2><button type="button" data-task-nav="schedule">View All →</button></header><div class="mw-section-rows">'+sessionRows+'</div></section><section class="sj-card st-task-attention"><header><h2><span class="studio-card-icon" aria-hidden="true">⚑</span> Needs Attention</h2></header><div class="mw-status-list"><div class="mw-status-row warning"><span>Overdue tasks</span><strong>'+overdue+'</strong></div><div class="mw-status-row warning"><span>Due today</span><strong>'+dueToday+'</strong></div><div class="mw-status-row warning"><span>Blocked tasks</span><strong>'+blocked+'</strong></div></div></section><section class="sj-card st-task-messages"><header><h2>Messages &amp; Announcements</h2><button type="button" data-task-nav="messages">View All →</button></header><div class="smc-feed">'+messageRows+'</div><footer><button type="button" data-task-nav="messages">✉ Send Message →</button></footer></section></aside></section>';
+            view.innerHTML='<section class="mw-page sj-page st-tasks-page"><main class="sj-board st-tasks-panel"><div class="sj-summary"><div class="sj-view-tabs" role="group" aria-label="Task view"><button type="button" data-task-filter="mine">My Open Tasks <span data-task-count-for="mine"></span></button><button type="button" data-task-filter="all">All Open Tasks <span data-task-count-for="all"></span></button><button type="button" data-task-filter="completed">Completed <span data-task-count-for="completed"></span></button></div><button type="button" class="primary" data-task-add>＋ Add Task</button></div><div class="sj-table-scroll st-task-table-scroll"><table class="sj-table st-task-table"><thead><tr><th><label class="sj-job-header"><span>Task</span><input type="search" data-task-search placeholder="Search tasks…" value="'+escapeHtml(state.search)+'"></label></th><th>Job / Client</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Due</span><select data-task-due><option value="any">Any date</option><option value="today">Today</option><option value="overdue">Overdue</option><option value="upcoming">Upcoming</option><option value="none">Unscheduled</option></select></label></th><th>Priority</th><th>Status</th><th>Owner</th><th></th></tr></thead><tbody data-task-rows></tbody></table></div><footer class="sj-pagination st-task-count" data-task-count></footer></main><aside class="sj-right st-tasks-rail" aria-label="Task context"><section class="sj-card"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today’s Sessions</h2><button type="button" data-task-nav="schedule">View All →</button></header><div class="mw-section-rows">'+sessionRows+'</div></section><section class="sj-card st-task-attention"><header><h2><span class="studio-card-icon" aria-hidden="true">⚑</span> Needs Attention</h2></header><div class="mw-status-list"><div class="mw-status-row warning"><span>Overdue tasks</span><strong>'+overdue+'</strong></div><div class="mw-status-row warning"><span>Due today</span><strong>'+dueToday+'</strong></div><div class="mw-status-row warning"><span>Blocked tasks</span><strong>'+blocked+'</strong></div></div></section><section class="sj-card st-task-messages"><header><h2>Messages &amp; Announcements</h2><button type="button" data-task-nav="messages">View All →</button></header><div class="smc-feed">'+messageRows+'</div><footer><button type="button" data-task-nav="messages">✉ Send Message →</button></footer></section></aside></section>';
             const body=view.querySelector('[data-task-rows]'), count=view.querySelector('[data-task-count]');
             const rows=[...activities].sort((a,b)=>{
                 const da=a.dueAtUtc?new Date(a.dueAtUtc).getTime():Number.MAX_SAFE_INTEGER;
@@ -64,13 +64,16 @@
                     const hay=[task.title,task.activityType,task.status,task.assignedTo,job.title,job.clientName,task.blockedReason].join(' ').toLowerCase();
                     return !needle||hay.includes(needle);
                 });
-                body.innerHTML=selected.map(task=>{
+                const pageSize=25, pageCount=Math.max(1,Math.ceil(selected.length/pageSize));
+                state.page=Math.min(Math.max(1,state.page),pageCount);
+                const visible=selected.slice((state.page-1)*pageSize,state.page*pageSize);
+                body.innerHTML=visible.map(task=>{
                     const job=jobMap.get(String(task.jobId))||{};
                     const owner=task.assignedTo?String(task.assignedTo).split(/[.@]/)[0]:'Unassigned';
                     return '<tr tabindex="0" role="link" class="st-task-row" data-task-job="'+escapeHtml(task.jobId||'')+'"><td><strong>'+escapeHtml(task.title||task.activityType||'Studio task')+'</strong><small>'+escapeHtml(task.activityType||'Task')+'</small></td><td><strong>'+escapeHtml(job.title||'Job')+'</strong><small>'+escapeHtml(job.clientName||job.clientDisplayName||'Client')+'</small></td><td>'+dueLabel(task.dueAtUtc,new Date())+'</td><td><span class="fd-data-pill fd-data-pill--'+priorityTone(task.priority)+'">'+escapeHtml(task.priority||'Normal')+'</span></td><td><span class="fd-data-pill fd-data-pill--'+statusTone(task.status)+'">'+escapeHtml(labelStatus(task.status))+'</span></td><td>'+escapeHtml(owner)+'</td><td class="fd-row-chevron" aria-hidden="true">›</td></tr>';
                 }).join('')||'<tr><td colspan="7" class="st-task-empty">'+(state.filter==='mine'?'No open tasks are assigned to you.':state.filter==='completed'?'No completed tasks found.':'No tasks match these filters.')+'</td></tr>';
-                count.textContent=selected.length+' '+(selected.length===1?'task':'tasks');
-                const footer=document.getElementById('studioFooterRate');if(footer)footer.textContent=count.textContent;
+                count.innerHTML='<span>Showing '+(selected.length?((state.page-1)*pageSize+1)+'–'+Math.min(state.page*pageSize,selected.length):'0')+' of '+selected.length+' tasks</span><div><button type="button" data-task-page="-1" aria-label="Previous page" '+(state.page<=1?'disabled':'')+'>‹</button><span>Page '+state.page+' of '+pageCount+'</span><button type="button" data-task-page="1" aria-label="Next page" '+(state.page>=pageCount?'disabled':'')+'>›</button></div>';
+                const footer=document.getElementById('studioFooterRate');if(footer)footer.textContent=selected.length+' tasks';
                 view.querySelectorAll('[data-task-filter]').forEach(button=>{button.classList.toggle('active',button.dataset.taskFilter===state.filter);button.setAttribute('aria-pressed',String(button.dataset.taskFilter===state.filter));});
                 const openCount=rows.filter(task=>!['completed','cancelled'].includes(String(task.status||'').toLowerCase())).length;
                 const mineCount=rows.filter(task=>!['completed','cancelled'].includes(String(task.status||'').toLowerCase())&&String(task.assignedTo||'').toLowerCase()===user).length;
@@ -81,14 +84,25 @@
                 
             };
             apply();
-            view.querySelector('[data-task-search]').oninput=event=>{state.search=event.target.value;apply();};
-            view.querySelector('[data-task-due]').onchange=event=>{state.due=event.target.value;apply();};
-            view.querySelectorAll('[data-task-filter]').forEach(button=>button.onclick=()=>{state.filter=button.dataset.taskFilter;apply();});
+            view.querySelector('[data-task-search]').oninput=event=>{state.search=event.target.value;state.page=1;apply();};
+            view.querySelector('[data-task-due]').onchange=event=>{state.due=event.target.value;state.page=1;apply();};
+            view.querySelectorAll('[data-task-filter]').forEach(button=>button.onclick=()=>{state.filter=button.dataset.taskFilter;state.page=1;apply();});
+            count.onclick=event=>{const button=event.target.closest('[data-task-page]');if(!button||button.disabled)return;state.page+=Number(button.dataset.taskPage);apply();view.querySelector('.st-task-table-scroll').scrollTop=0;};
             view.querySelector('[data-task-add]').onclick=()=>openAddTask(jobs);
             view.querySelectorAll('[data-task-job]').forEach(row=>row.addEventListener('click',()=>{if(row.dataset.taskJob)window.openWorkspaceJob?.(row.dataset.taskJob);}));
             view.querySelectorAll('[data-task-job]').forEach(row=>row.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&row.matches('tr')){event.preventDefault();if(row.dataset.taskJob)window.openWorkspaceJob?.(row.dataset.taskJob);}}));
             view.querySelectorAll('[data-task-nav]').forEach(button=>button.onclick=()=>window.studioNavigate?.(button.dataset.taskNav));
             window.studioSetBreadcrumb?.([{label:'Tasks',view:'tasks'}]);
+            Promise.all([schedulePromise,noticesPromise]).then(([sessionData,noticeData])=>{
+                if(!view.isConnected||!view.querySelector('[data-task-rows]'))return;
+                const freshSessions=Array.isArray(sessionData)?sessionData.filter(item=>sameDay(new Date(item.startsAtUtc),today)).slice(0,5):[];
+                const freshNotices=Array.isArray(noticeData)?noticeData:(noticeData?.items||[]);
+                const sessionTarget=view.querySelector('.st-tasks-rail .mw-section-rows');
+                const messageTarget=view.querySelector('.st-tasks-rail .smc-feed');
+                if(sessionTarget)sessionTarget.innerHTML=freshSessions.map(item=>'<button type="button" class="mw-session-row" data-task-job="'+escapeHtml(item.jobId||'')+'"><time>'+escapeHtml(new Date(item.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))+'</time><span class="mw-session-main"><strong>'+escapeHtml(jobMap.get(String(item.jobId))?.title||item.title||'Studio session')+'</strong><small>'+escapeHtml(jobMap.get(String(item.jobId))?.clientName||item.location||'Scheduled session')+'</small></span></button>').join('')||'<p class="muted">No sessions scheduled today.</p>';
+                if(messageTarget)messageTarget.innerHTML=freshNotices.slice(0,4).map(item=>'<button type="button" class="smc-row" data-task-message="'+escapeHtml(item.id)+'"><span class="smc-type" aria-hidden="true">✉</span><span class="smc-copy"><strong>'+escapeHtml(item.subject||item.title||'Studio message')+'</strong><small>'+escapeHtml(item.body||item.eventType||'Team update')+'</small></span><span class="mw-chevron">›</span></button>').join('')||'<div class="mw-empty">No new messages or announcements.</div>';
+                view.querySelectorAll('[data-task-job]').forEach(row=>row.addEventListener('click',()=>{if(row.dataset.taskJob)window.openWorkspaceJob?.(row.dataset.taskJob);}));
+            }).catch(()=>{});
         } catch(error) {
             view.innerHTML='<section class="mw-page st-tasks-page"><div class="studio-card"><h1>Tasks could not be loaded</h1><p role="alert">'+escapeHtml(error.message||error)+'</p><button type="button" class="action" data-task-retry>Retry</button></div></section>';
             view.querySelector('[data-task-retry]').onclick=()=>render();
