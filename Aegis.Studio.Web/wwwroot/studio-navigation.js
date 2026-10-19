@@ -251,9 +251,9 @@
             const stateLabel=end<now?'Finished':start<=now?'In Progress':'Upcoming';
             return `<button class="mw-session-row ${index===0?'active':''}" data-open-job="${entry.jobId||job.id||''}">
                 <div class="mw-session-thumb">${image?`<img loading="lazy" src="${image}" data-fallback-src="${fallbackImage}" alt="">`:'<span>📷</span>'}</div>
+                <div class="mw-session-time"><span>${formatTime(start)} – ${formatTime(end)}</span></div>
                 <div class="mw-session-main"><strong>${esc(job.title||entry.title||'Session')}</strong><span>${esc(job.clientName||entry.title||'Photography session')}</span></div>
                 <span class="mw-session-location">⌖ &nbsp;${esc(entry.location||'Location not set')}</span>
-                <div class="mw-session-time"><strong>${formatTime(start)} – ${formatTime(end)}</strong></div>
                 <span class="mw-state-pill ${stateLabel==='In Progress'?'in-progress':''}">${stateLabel}</span>
                 <span class="mw-today-open-job" aria-hidden="true" title="Open job">↗</span>
             </button>`;
