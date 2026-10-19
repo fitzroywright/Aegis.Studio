@@ -82,3 +82,11 @@
 .st-tasks-page .sj-column-filter-inline select{height:24px}
 .st-tasks-page .sj-summary>[data-task-add]{border-radius:4px;padding:7px 11px;background:#986c55;color:#fff}
 @media(max-width:900px){.st-tasks-page.sj-page{grid-template-columns:minmax(0,1fr);}}
+
+/* Match the Jobs grid's dark search control and compact pager. */
+.st-tasks-page .sj-job-header input[data-task-search]{background:#2c537c;color:#fff;border-color:#658bad}
+.st-tasks-page .sj-job-header input[data-task-search]::placeholder{color:#d6e2ef;opacity:1}
+.st-tasks-page .sj-pagination{flex:0 0 auto;min-height:38px}
+.st-tasks-page .sj-pagination>div{display:flex;align-items:center;gap:10px}
+.st-tasks-page .sj-pagination button{min-width:30px;height:27px;border:1px solid #d2d9e0;border-radius:4px;background:#fff;padding:3px 8px}
+.st-tasks-page .sj-pagination button:disabled{opacity:.4;cursor:default}
