@@ -7997,9 +7997,12 @@ body .shell>.studio-shell-footer {
   box-sizing: border-box;
   z-index: 10;
 }
-body:not([data-studio-view="today"]) .shell>main>.generic {
+body:not([data-studio-view="today"]):not([data-studio-view="production"]) .shell>main>.generic {
   padding: 86px 18px 12px !important;
   background: #f3f7fa;
+}
+body[data-studio-view="production"] .shell>main>.generic {
+  padding: 2px 4px !important;
 }
 body:not([data-studio-view="today"]) .shell>main>.generic>.mw-page {
   min-height: 0;
