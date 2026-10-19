@@ -120,3 +120,10 @@ body[data-studio-view="jobs"] .sj-table-frame{overflow-x:auto;overflow-y:hidden}
 body[data-studio-view="jobs"] .sj-table-head-clip{width:100%;min-width:1140px;flex:0 0 auto}
 body[data-studio-view="jobs"] .sj-table-scroll{width:100%;min-width:1140px;flex:1 1 auto}
 body[data-studio-view="jobs"] .sj-table-frame .sj-table{width:100%;min-width:1120px;table-layout:fixed}
+
+/* Five shared columns keep the split Jobs header and body on identical tracks. */
+body[data-studio-view="jobs"] .sj-table th:first-child{width:30%}
+body[data-studio-view="jobs"] .sj-table th:nth-child(2){width:17%}
+body[data-studio-view="jobs"] .sj-table th:nth-child(3){width:18%}
+body[data-studio-view="jobs"] .sj-table th:nth-child(4){width:18%}
+body[data-studio-view="jobs"] .sj-table th:nth-child(5){width:17%}
