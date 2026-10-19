@@ -228,7 +228,8 @@ function renderFrontDesk(){
     loadFrontDeskCommunications();
     const search=genericView.querySelector('#frontDeskSearch');
     if(search)search.oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();};
-    genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openFrontDeskJob(b.dataset.frontdeskJob));\n    bindFrontDeskJobClickDelegation();
+    genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openFrontDeskJob(b.dataset.frontdeskJob));
+    bindFrontDeskJobClickDelegation();
 
     genericView.querySelectorAll('[data-frontdesk-fulfill]').forEach(button=>button.onclick=()=>recordFrontDeskFulfillment(button.dataset.frontdeskFulfill).catch(error=>alert(error.message)));
     genericView.querySelectorAll('[data-fd-row-open]').forEach(row=>{
