@@ -67,7 +67,7 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 .production-overview-entries{display:flex;flex-direction:column;min-height:0;height:100%}
 .production-overview-entries .studio-workload-summary{min-height:0;max-height:100%;overflow:auto;padding:0}
 .production-overview-entries .workload-indicators{display:flex;flex-direction:column;gap:0}
-.production-overview-entries .workload-indicator{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;width:100%;height:auto;min-height:26px;padding:0 12px;border:0;border-bottom:1px solid var(--studio-grid-border);border-radius:0;background:transparent;text-align:left;font-size:11px;font-weight:400}
+.production-overview-entries .workload-indicator{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;width:100%;height:auto;min-height:26px;padding:0 12px;border:0;border-radius:0;background:transparent;box-shadow:none;text-align:left;font-size:11px;font-weight:400}
 .production-overview-entries .workload-indicator strong{order:2;flex:0 0 auto;font-size:12px;font-weight:400}
 .production-overview-entries .workload-indicator span{flex:1;min-width:0}
 .production-overview-entries .studio-workload-summary>p{display:none}
@@ -150,3 +150,8 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 .production-order-tone-progress :is(.production-order-product,.production-order-meta span:first-child){color:#80520f;background:#f8edda;border-color:#e9d1a5}
 .production-order-tone-qc :is(.production-order-product,.production-order-meta span:first-child){color:#5d4781;background:#eee8f6;border-color:#d2c3e6}
 .production-order-tone-complete :is(.production-order-product,.production-order-meta span:first-child){color:#326749;background:#e4f1e8;border-color:#c1dcc9}
+
+/* Remove redundant outer framing so Production uses the full center column. */
+.st-board.production-main-board{border:0;border-radius:0;box-shadow:none}
+.st-board.production-main-board>.st-content{gap:0;padding:0}
+.production-overview-entries,.production-overview-entries .studio-workload-summary,.production-overview-entries .workload-indicators{border:0;border-radius:0;background:transparent;box-shadow:none}
