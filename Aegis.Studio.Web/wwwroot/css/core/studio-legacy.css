@@ -6286,7 +6286,7 @@ body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .three-pane
 }
 @media (max-width:1050px) {
   body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell {
-    grid-template-columns: 190px minmax(0,1fr);
+    grid-template-columns: var(--studio-shell-left-width,190px) minmax(0,1fr);
     gap: 10px;
   }
 }
@@ -10167,18 +10167,22 @@ body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-widt
 /* Collapse controls are styled here because this is the shared stylesheet loaded by index.html. */
 :is(#studioContextRail,.mw-today-left,.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) { position:relative; }
 .studio-rail-toggle { position:absolute; inset-block-start:6px; inset-inline-end:6px; z-index:4; width:26px; height:26px; min-width:26px; padding:0; display:grid; place-items:center; border:1px solid var(--theme-border,#d7dee7); border-radius:7px; background:var(--theme-surface,#fff); color:var(--theme-text,#26384b); font-size:20px; line-height:1; }
-#studioContextRail.studio-rail-collapsed-left,.mw-today-left.studio-rail-collapsed-left,.mw-today-right.studio-rail-collapsed-right,.st-right.studio-rail-collapsed-right,.sj-right.studio-rail-collapsed-right,.fd-secondary.studio-rail-collapsed-right,.workspace-right-rail.studio-rail-collapsed-right { width:42px; min-width:42px; overflow:hidden; gap:4px; }
+#studioContextRail.studio-rail-collapsed-left,.mw-today-left.studio-rail-collapsed-left { width:0; min-width:0; overflow:visible; gap:0; }
+.mw-today-right.studio-rail-collapsed-right,.st-right.studio-rail-collapsed-right,.sj-right.studio-rail-collapsed-right,.fd-secondary.studio-rail-collapsed-right,.workspace-right-rail.studio-rail-collapsed-right { width:42px; min-width:42px; overflow:hidden; gap:4px; }
 :is(.studio-rail-collapsed-left,.studio-rail-collapsed-right) > :not([data-rail-toggle]) { display:none !important; }
-.shell:has(> #studioContextRail.studio-rail-collapsed-left) { --studio-shell-left-width:42px; }
-.mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:42px minmax(0,1fr) minmax(245px,290px); }
+.shell:has(> #studioContextRail.studio-rail-collapsed-left) { --studio-shell-left-width:0px; column-gap:0; }
+.mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:0 minmax(0,1fr) minmax(245px,290px); column-gap:0; }
 .mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(175px,210px) minmax(0,1fr) 42px; }
-.mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:42px minmax(0,1fr) 42px; }
+.mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:0 minmax(0,1fr) 42px; column-gap:0; }
 @media(max-width:850px) {
- .mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:42px minmax(0,1fr); }
+ .mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:0 minmax(0,1fr); column-gap:0; }
  .mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr) 42px; }
- .mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:42px minmax(0,1fr); }
+ .mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:0 minmax(0,1fr); column-gap:0; }
 }
 /* Expanded rail toggles live in the first card header; collapsed rails keep a compact edge control. */
 :is(#studioContextRail,.mw-today-left,.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) > :is(section,article) > header { position:relative; }
 .studio-rail-toggle-in-header { position:static; flex:0 0 18px; width:18px; height:18px; min-width:18px; padding:0; margin:0; border:0; border-radius:4px; background:transparent; font-size:15px; }
+.studio-rail-toggle-in-header[data-rail-toggle="left"] { position:absolute; inset-inline-start:8px; inset-inline-end:auto; top:50%; transform:translateY(-50%); }
+.studio-rail-toggle-in-header[data-rail-toggle="left"] + h2 { padding-inline-start:18px; }
+.studio-rail-collapsed-left > [data-rail-toggle="left"] { inset-inline-start:0; inset-inline-end:auto; top:8px; transform:none; }
 .studio-rail-toggle-in-header[data-rail-toggle="right"] { margin-inline-start:auto; }
