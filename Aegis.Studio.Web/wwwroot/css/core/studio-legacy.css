@@ -10188,4 +10188,4 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 .studio-rail-toggle-in-header[data-rail-toggle="left"] + h2 { padding-inline-start:18px; }
 .studio-rail-collapsed-left > [data-rail-toggle="left"] { inset-inline-start:0; inset-inline-end:auto; top:8px; transform:none; }
 .studio-rail-toggle-in-header[data-rail-toggle="right"] { position:absolute; inset-inline-start:auto; inset-inline-end:8px; top:50%; transform:translateY(-50%); margin:0; }
-.studio-rail-toggle-in-header[data-rail-toggle="right"] + h2 { padding-inline-end:18px; }
+:is(#studioContextRail,.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) > :is(section,article) > header:has(> .studio-rail-toggle-in-header[data-rail-toggle="right"]) { padding-inline-end:34px; }
