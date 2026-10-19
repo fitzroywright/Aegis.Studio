@@ -25,7 +25,7 @@
             const noticesPromise=json('/api/notifications?count=80').catch(()=>[]);
             const results=await Promise.all([
                 json('/api/auth/me'),
-                json('/api/operations/activities'),
+                json('/api/operations/activities?includeWorkflowDetails=false'),
                 json('/api/today/jobs').catch(()=>[])
             ]);
             const me=results[0]?.user||results[0]||{}, user=String(me.userName||me.username||me.email||'').toLowerCase();
