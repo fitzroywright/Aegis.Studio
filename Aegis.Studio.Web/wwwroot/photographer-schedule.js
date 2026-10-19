@@ -86,7 +86,7 @@ window.StudioPhotographerSchedule=(()=>{
             genericView.querySelector('[data-ps-inactive]').onchange=e=>{state.inactive=e.target.checked;render();};
             genericView.querySelector('[data-ps-pipeline]').onclick=()=>window.studioNavigate('schedule',{...window.StudioPhotographerSchedule.options(),panel:'pipeline'});
             genericView.querySelectorAll('[data-ps-only]').forEach(b=>b.onclick=()=>{state.photographer=b.dataset.psOnly;paint();});
-            genericView.querySelectorAll('[data-ps-entry]').forEach(b=>b.onclick=()=>entryDetails(rawEntries.find(e=>e.id===b.dataset.psEntry),roster.find(p=>p.userName===b.dataset.psPerson)));
+            genericView.querySelectorAll('[data-ps-entry]').forEach(b=>b.onclick=()=>{const entry=rawEntries.find(e=>e.id===b.dataset.psEntry);if(entry?.jobId){openWorkspaceJob(entry.jobId).catch(error=>alert(error.message));return;}entryDetails(entry,roster.find(p=>p.userName===b.dataset.psPerson));});
             genericView.querySelectorAll('[data-ps-profile]').forEach(b=>b.onclick=()=>profile(roster.find(p=>p.userName===b.dataset.psProfile)));
             genericView.querySelectorAll('[data-ps-availability]').forEach(b=>b.onclick=()=>{const a=(availability.get(b.dataset.psPerson)||[]).find(a=>a.id===b.dataset.psAvailability);if(a)studioDialog('Recorded availability',`<p><strong>${esc(roster.find(p=>p.userName===b.dataset.psPerson)?.displayName)}</strong></p><p>${esc(a.availabilityType)}</p><p>${esc(new Date(a.startsAtUtc).toLocaleString())} – ${esc(new Date(a.endsAtUtc).toLocaleString())}</p>`);});
         }
