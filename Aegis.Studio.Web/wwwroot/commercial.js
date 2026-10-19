@@ -59,7 +59,7 @@ function editCommercialTemplate(current,kind){
 let commercialQueueArea='',commercialQueueOffset=0;
 async function showCatalogProduction(){
     const current=StudioPage.begin('production');
-    const [workloadData,workspaceResult]=await Promise.all([json('/api/production/workload'),json('/api/workspaces')]);if(!current())return;
+    const [workloadData,workspaceResult]=await Promise.all([json('/api/production/workload'),json('/api/workspaces').catch(()=>[])]);if(!current())return;
     const workspaces=Array.isArray(workspaceResult)?workspaceResult:(workspaceResult?.workspaces||[]),workspaceNames=new Map(workspaces.map(w=>[w.id,w.name||w.title||w.displayName]));
     const selection=window.studioWorkloadSelection||={filter:'',workspace:'',assignee:'',stage:'',search:''};
     const workload=StudioWorkload.model(workloadData,workloadData.jobs||[]),jobMap=new Map((workloadData.jobs||[]).map(j=>[j.id,j]));
