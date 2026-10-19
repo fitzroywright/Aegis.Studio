@@ -78,6 +78,20 @@ async function showFrontDesk() {
 let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskClients=[],frontDeskSchedule=[],frontDeskInvoices=[];
 let frontDeskTab='today',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelectedClientId=null;
 function frontDeskRequestStage(item){return item.status==='Confirmed'?'Confirmed':item.status==='Cancelled'?'Cancelled':item.recordedDeposit>0?'Ready for confirmation':item.status==='AwaitingDeposit'?'Awaiting deposit':'Pending Job';}
+let frontDeskJobClickDelegationBound=false;
+function bindFrontDeskJobClickDelegation(){
+    if(frontDeskJobClickDelegationBound)return;
+    frontDeskJobClickDelegationBound=true;
+    document.addEventListener('click',event=>{
+        const target=event.target.closest?.('[data-frontdesk-job]');
+        if(!target||!genericView.contains(target))return;
+        const jobId=target.dataset.frontdeskJob;
+        if(!jobId)return;
+        event.preventDefault();
+        event.stopPropagation();
+        openFrontDeskJob(jobId).catch(error=>alert(error.message||String(error)));
+    },true);
+}
 function openFrontDeskJob(jobId){
     if(!jobId)return Promise.resolve();
     const id=String(jobId);
@@ -214,7 +228,8 @@ function renderFrontDesk(){
     loadFrontDeskCommunications();
     const search=genericView.querySelector('#frontDeskSearch');
     if(search)search.oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();};
-    genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openFrontDeskJob(b.dataset.frontdeskJob));
+    genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openFrontDeskJob(b.dataset.frontdeskJob));\n    bindFrontDeskJobClickDelegation();
+
     genericView.querySelectorAll('[data-frontdesk-fulfill]').forEach(button=>button.onclick=()=>recordFrontDeskFulfillment(button.dataset.frontdeskFulfill).catch(error=>alert(error.message)));
     genericView.querySelectorAll('[data-fd-row-open]').forEach(row=>{
         const open=()=>{
