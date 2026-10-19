@@ -13,9 +13,16 @@ test('all linked Studio stylesheets exist and have unique paths',()=>{
 test('all application CSS is loaded from the canonical CSS directory',()=>{
  for(const href of hrefs)assert.match(href,/^css\/(core|components|pages|themes)\//);
 });
-test('three theme stylesheets and shared theme surfaces are loaded',()=>{
- for(const name of ['standard','light','dark'])assert.ok(hrefs.includes('css/themes/'+name+'.css'));
+test('four theme stylesheets and shared theme surfaces are loaded',()=>{
+ for(const name of ['standard','comfort','light','dark'])assert.ok(hrefs.includes('css/themes/'+name+'.css'));
  assert.ok(hrefs.includes('css/components/theme-surfaces.css'));
+});
+
+test('Comfort is selectable and maps to its own theme scope',()=>{
+ const script=fs.readFileSync(path.join(root,'theme.js'),'utf8');
+ assert.match(script,/\['comfort',\s*'Comfort'\]/);
+ assert.match(script,/value === 'comfort'\) return 'comfort'/);
+ assert.match(script,/normalized === 'comfort'\) return 'studio-comfort'/);
 });
 
 test('attention component uses shared color variables',()=>{
