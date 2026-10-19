@@ -10138,3 +10138,10 @@ body .topbar .studio-script-brand .studio-bryans-brand-image { display: block; w
 body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left: 0 !important; border-left: 0 !important; }
 
 
+
+/* Front Desk keeps its booking column header above the independently scrolling rows. */
+body[data-studio-view="frontdesk"] .fd-table-frame{display:flex;flex:1 1 auto;flex-direction:column;min-width:0;min-height:0;overflow:auto}
+body[data-studio-view="frontdesk"] .fd-table-head-clip{flex:0 0 auto;overflow-y:scroll;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
+body[data-studio-view="frontdesk"] .fd-table-scroll{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;table-layout:fixed}
+body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:static}
