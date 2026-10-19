@@ -10180,4 +10180,5 @@ body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-widt
 }
 /* Expanded rail toggles live in the first card header; collapsed rails keep a compact edge control. */
 :is(#studioContextRail,.mw-today-left,.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) > :is(section,article) > header { position:relative; }
-.studio-rail-toggle-in-header { position:static; flex:0 0 26px; margin-inline-start:auto; }
+.studio-rail-toggle-in-header { position:static; flex:0 0 18px; width:18px; height:18px; min-width:18px; padding:0; margin:0; border:0; border-radius:4px; background:transparent; font-size:15px; }
+.studio-rail-toggle-in-header[data-rail-toggle="right"] { margin-inline-start:auto; }
