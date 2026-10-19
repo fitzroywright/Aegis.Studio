@@ -84,7 +84,7 @@ async function showCatalogProduction(){
         const activityIds=new Set(tasks.map(t=>t.id));
         const items=(workloadData.items||[]).filter(i=>activityIds.has(i.activityId)&&i.kind==='Physical outputs');
         if(order.exceptionReason||active.some(t=>t.blockedReason||['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient'].includes(t.status))||items.some(i=>(Number(i.rework)||0)>0))return 'attention';
-        if(tasks.some(t=>['QC','Quality Control'].includes(t.step?.activityType||t.activityType)&&!['Completed','Cancelled','Archived'].includes(t.status))||items.some(i=>(Number(i.awaitingQc)||0)>0))return 'qc';
+        if(tasks.some(t=>(t.qualityControl||t.step?.qualityControl||['QC','Quality Control'].includes(t.step?.activityType||t.activityType))&&!['Completed','Cancelled','Archived'].includes(t.status))||items.some(i=>(Number(i.awaitingQc)||0)>0))return 'qc';
         if(!active.length)return 'complete';
         if(active.some(t=>['InProgress','Partial'].includes(t.status)))return 'progress';
         return 'ready';
@@ -140,7 +140,6 @@ async function openCommercialWorkOrder(order){
     });
     d.querySelector('[data-resolve]')?.addEventListener('click',async()=>{try{await json(`/api/production/work-orders/${order.id}/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:d.querySelector('[data-note]').value})});d.close();await showCatalogProduction();}catch(err){error(err);}});
 }
-
 
 
 
