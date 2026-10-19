@@ -7525,9 +7525,15 @@ body[data-studio-view="today"] .mw-today-toolbar-actions [data-assign-job-lead]:
   min-width: 0;
   grid-template-columns: minmax(0,1fr) auto;
 }
+.mw-today-right .mw-session-row {
+  grid-template-columns: minmax(58px,.7fr) minmax(0,1.3fr);
+}
 .mw-today-right .mw-session-time {
   font-size: .72rem;
+  font-weight: 400;
 }
+.mw-today-right .mw-session-time span,
+.mw-today-right .mw-session-main span { font-weight:400; }
 @media (max-width:1150px) {
   .mw-today-layout {
     grid-template-columns: 175px minmax(0,1fr);
@@ -9472,7 +9478,7 @@ body .shell>.studio-shell-footer .studio-grid-item-count {
   body[data-studio-view="today"] .studio-dashboard-template__aside {
     display: grid !important;
     grid-template-columns: minmax(0,1fr) !important;
-    grid-template-rows: minmax(0,1fr) auto minmax(0,1fr) !important;
+    grid-template-rows: repeat(3,minmax(0,1fr)) !important;
     align-content: stretch;
     min-height: 0 !important;
     height: 100%;
