@@ -1654,9 +1654,6 @@ color:var(--studio-grid-header-text);}
   display: flex;
   align-items: center;
 }
-.production-queue-card {
-  max-height: calc(100dvh - 300px);
-}
 .production-resources {
   gap: 12px;
   flex-wrap: wrap;
