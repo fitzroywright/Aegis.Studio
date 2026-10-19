@@ -238,7 +238,11 @@
             return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/preview/fallback':'';
         };
 
-        const sessionRows=todaySchedule.slice(0,5).map((entry,index)=>{
+        const visibleTodaySchedule=todaySchedule.filter(entry=>{
+            const job=jobById(entry.jobId)||{};
+            return state.jobView==='all'||(state.jobView==='led'&&isLead(job))||(state.jobView==='involved'&&isInvolved(job));
+        });
+        const sessionRows=visibleTodaySchedule.slice(0,5).map((entry,index)=>{
             const job=scheduleJob(entry);
             const image=entry.jobId?imageForJob(entry.jobId):'';
             const fallbackImage=entry.jobId?fallbackImageForJob(entry.jobId):'';
