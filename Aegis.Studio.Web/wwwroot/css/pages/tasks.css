@@ -46,3 +46,28 @@
 @media(max-width:1100px){.st-tasks-grid{grid-template-columns:minmax(0,1fr) 280px;gap:10px}.st-task-table th,.st-task-table td{padding:8px}}
 @media(max-width:820px){.st-tasks-page{height:auto;overflow:visible}.st-tasks-grid{display:flex;flex-direction:column;height:auto}.st-tasks-panel{min-height:60vh}.st-tasks-rail{display:grid;grid-template-columns:1fr 1fr;overflow:visible}.st-task-messages{grid-column:1/-1}}
 @media(max-width:560px){.st-tasks-tools{align-items:stretch;flex-direction:column}.st-task-search{width:100%}.st-tasks-rail{display:flex}.st-task-table{min-width:760px}}
+
+/* Tasks uses the same board, tabs, table header filters and context rail as Jobs. */
+.st-tasks-page{height:100%;min-height:0;overflow:hidden}
+.st-tasks-panel{height:100%;min-width:0}
+.st-tasks-page .sj-summary{background:var(--studio-grid-header-bg,#fafafa)}
+.st-tasks-page .sj-summary>[data-task-add]{margin-left:auto;flex:0 0 auto}
+.st-tasks-page .st-task-table{min-width:900px}
+.st-tasks-page .st-task-table th:first-child{width:22%}
+.st-tasks-page .st-task-table th:nth-child(2){width:22%}
+.st-tasks-page .st-task-table th:nth-child(3){width:14%}
+.st-tasks-page .st-task-table th:nth-child(4){width:10%}
+.st-tasks-page .st-task-table th:nth-child(5){width:13%}
+.st-tasks-page .st-task-table th:nth-child(6){width:15%}
+.st-tasks-page .st-task-table th:last-child{width:4%}
+.st-tasks-page .st-task-table td:first-child strong,.st-tasks-page .st-task-table td:first-child small,.st-tasks-page .st-task-table td:nth-child(2) strong,.st-tasks-page .st-task-table td:nth-child(2) small{display:block}
+.st-tasks-page .st-task-table td small{margin-top:3px;color:#707c89;font-size:11px}
+.st-tasks-page .st-task-row:hover,.st-tasks-page .st-task-row:focus-visible{background:var(--theme-surface-alt,#edf3f8);box-shadow:inset 3px 0 var(--theme-accent,#d97722)}
+.st-tasks-page .st-task-count{flex:0 0 auto}
+.st-tasks-rail .sj-card{flex:1 1 0}
+.st-tasks-rail .sj-card header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.st-tasks-rail .sj-card header button{color:#98701c;font-weight:700;background:none;border:0;cursor:pointer}
+.st-tasks-rail .sj-card .mw-section-rows,.st-tasks-rail .sj-card .mw-status-list,.st-tasks-rail .sj-card .smc-feed{padding:8px 12px;overflow:auto;min-height:0;flex:1}
+.st-tasks-rail .mw-status-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e8ebee}
+.st-tasks-rail .st-task-messages footer{padding:8px 12px;border-top:1px solid #e8ebee}
+@media(max-width:900px){.st-tasks-page.sj-page{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 170px}.st-tasks-page .st-task-table{min-width:900px}}
