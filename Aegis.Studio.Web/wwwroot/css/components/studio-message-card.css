@@ -18,7 +18,7 @@
 .smc-copy strong{font-size:11px}
 .smc-copy small,.smc-time{font-size:9px;line-height:1.4}
 .smc-time{flex:0 1 auto;min-width:0;max-width:25%;white-space:normal;overflow-wrap:anywhere}
-.smc-footer{display:flex;align-items:center;justify-content:flex-end;flex:none;padding:3px 8px;border-top:1px solid #e6d17c;background:#fff1b2}
+.smc-footer{display:flex;align-items:center;justify-content:flex-end;flex:0 0 30px;min-height:30px;box-sizing:border-box;padding:0 8px;border-top:1px solid var(--smc-footer-border,#e6d17c);background:var(--smc-footer-background,#fff1b2)}
 .smc-footer>button{font-size:11px}
 .smc-feed>.messages{padding:0;overflow:visible}
 .smc-feed .message{margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid #e6d17c}
