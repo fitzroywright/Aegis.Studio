@@ -59,7 +59,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         Sql(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","workflow:"+request.OperationId);
         using(var prior=Command(c,tx,"select job_id,fingerprint from studio_workflow_commands where operation_id=$1",request.OperationId))using(var r=prior.ExecuteReader())
-        {if(r.Read()){if(r.GetGuid(0)!=job||r.GetString(1)!=fingerprint)throw new ArgumentException("This operation ID belongs to different facts.");r.Close();if(!access.HasPermission(user,job,"ViewJob")&&!(request.Action=="decide-transfer"&&request.AssignmentRequestId.HasValue&&CanReviewTransfer(c,tx,user,request.AssignmentRequestId.Value,job)))throw new UnauthorizedAccessException();return Snapshot(c,tx,job);}}
+        {if(r.Read()){if(r.GetGuid(0)!=job||r.GetString(1)!=fingerprint)throw new ArgumentException("This operation ID belongs to different facts.");r.Close();if(!access.HasPermission(user,job,"ViewJob")&&!(IsProductionManager(user)&&(request.Action is "task" or "task-progress"))&&!(request.Action=="decide-transfer"&&request.AssignmentRequestId.HasValue&&CanReviewTransfer(c,tx,user,request.AssignmentRequestId.Value,job)))throw new UnauthorizedAccessException();return Snapshot(c,tx,job);}}
         Guid workspace;string stage;string? owner,correction;
         using(var q=Command(c,tx,"select workspace_id,status,job_lead,workflow_revision,correction_kind from studio_jobs where id=$1 for update",job))using(var r=q.ExecuteReader())
         {if(!r.Read())throw new KeyNotFoundException();workspace=r.GetGuid(0);stage=r.GetString(1);owner=r.IsDBNull(2)?null:r.GetString(2);if(r.GetInt64(3)!=request.ExpectedRevision)throw new WorkflowConflictException();correction=r.IsDBNull(4)?null:r.GetString(4);}
@@ -69,7 +69,7 @@ public sealed class WorkflowStore(StudioDatabase database,JobAccessService acces
             Exists(c,tx,"select exists(select 1 from studio_workflow_transfer_requests r where r.id=$1 and r.job_id=$2 and r.status='Pending' and r.source_workspace_id=$3)",request.AssignmentRequestId,job,workspace)&&
             request.AssignmentRequestId.HasValue&&
             CanReviewTransfer(c,tx,user,request.AssignmentRequestId.Value,job);
-        if(!destinationTransferReviewer&&!access.HasPermission(user,job,"ViewJob"))throw new UnauthorizedAccessException();
+        if(!destinationTransferReviewer&&!access.HasPermission(user,job,"ViewJob")&&!(review&&(request.Action is "task" or "task-progress")))throw new UnauthorizedAccessException();
         Sql(c,tx,"select set_config('studio.connected_command','true',true)");
         Sql(c,tx,"select set_config('studio.actor',$1,true),set_config('studio.reason',$2,true)",actor,request.Reason??"");
         bool stateAction=false;
