@@ -90,3 +90,8 @@
 .st-tasks-page .sj-pagination>div{display:flex;align-items:center;gap:10px}
 .st-tasks-page .sj-pagination button{min-width:30px;height:27px;border:1px solid #d2d9e0;border-radius:4px;background:#fff;padding:3px 8px}
 .st-tasks-page .sj-pagination button:disabled{opacity:.4;cursor:default}
+
+/* Keep search on the same line as the Task column label, as in Jobs. */
+.st-tasks-page .sj-job-header{flex-direction:row;align-items:center;gap:8px}
+.st-tasks-page .sj-job-header>span{flex:0 0 auto;white-space:nowrap}
+.st-tasks-page .sj-job-header input[data-task-search]{flex:1 1 auto;width:auto;min-width:90px;max-width:none}
