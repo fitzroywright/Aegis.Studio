@@ -191,7 +191,6 @@
             toggle.setAttribute('aria-label', (state.right ? 'Expand' : 'Collapse') + ' right rail');
             toggle.title = toggle.getAttribute('aria-label'); toggle.textContent = state.right ? '‹' : '›';
         });
-        applyRailState();
     }
 
     function ensureBreadcrumb() {
