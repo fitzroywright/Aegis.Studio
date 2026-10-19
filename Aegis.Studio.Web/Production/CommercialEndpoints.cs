@@ -90,13 +90,16 @@ public static class CommercialEndpoints
         app.MapGet("/api/production/work-orders/{id:guid}/access", (Guid id, ClaimsPrincipal user, WorkflowStore workflow, StudioDatabase database) => Run(() =>
         {
             using var c = database.OpenConnection();
-            using var q = Command(c, null, "select job_id from studio_catalog_work_orders where id=$1", id);
-            if (q.ExecuteScalar() is not Guid jobId) throw new KeyNotFoundException();
-            return Results.Ok(new { canManage = workflow.CanManage(user, jobId), canReview = workflow.IsProductionManager(user), userName = WorkflowStore.Name(user) });
+            using var q = Command(c, null, "select j.id,j.workflow_revision from studio_catalog_work_orders w join studio_jobs j on j.id=w.job_id where w.id=$1", id);
+            using var r = q.ExecuteReader();
+            if (!r.Read()) throw new KeyNotFoundException();
+            Guid jobId = r.GetGuid(0);
+            long revision = r.GetInt64(1);
+            return Results.Ok(new { canManage = workflow.IsProductionManager(user), canReview = workflow.IsProductionManager(user), userName = WorkflowStore.Name(user), revision });
         })).RequireAuthorization();
         app.MapGet("/api/jobs/{jobId:guid}/commercial/approved-sources",(Guid jobId,string? term,Guid? after,ClaimsPrincipal user,JobAccessService access,StudioDatabase database)=>
         {
-            if(!access.HasPermission(user,jobId,"ViewJob"))return Results.Forbid();
+            if(!access.HasPermission(user,jobId,"ViewJob")&&!access.HasPermission(user,jobId,"ManageProduction"))return Results.Forbid();
             using var c=database.OpenConnection();using var q=Command(c,null,"""
                 select coalesce(jsonb_agg(row),'[]')::text from (
                   select a.id,a.asset_key as "assetKey",v.file_name as "fileName",a.approved_version_id as "approvedVersionId"
@@ -111,7 +114,7 @@ public static class CommercialEndpoints
         {
             using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
             Guid job = OrderJob(c, tx, id);
-            if (!workflow.IsProductionManager(user)||!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
+            if (!workflow.IsProductionManager(user)) return Results.Forbid();
             using (var guard = Command(c, tx, "select status from studio_jobs where id=$1 for update", job))
                 if (guard.ExecuteScalar() is "Completed" or "Cancelled" or "Delivered") throw new ArgumentException("Job is closed for production changes.");
             if (Execute(c, tx, """
@@ -125,7 +128,7 @@ public static class CommercialEndpoints
         {
             if(string.IsNullOrWhiteSpace(request.Reason)||request.Specifications.Length>4000)throw new ArgumentException("Provide revised specifications and a reason.");
             using var c=database.OpenConnection();using var tx=c.BeginTransaction();Guid job=OrderJob(c,tx,id);
-            if(!workflow.CanManage(user,job))return Results.Forbid();
+            if(!workflow.IsProductionManager(user))return Results.Forbid();
             using(var guard=Command(c,tx,"select status from studio_jobs where id=$1 for update",job))
                 if(guard.ExecuteScalar() is "Completed" or "Cancelled" or "Delivered" or "Ready for Delivery")throw new ArgumentException("The Job is closed for order amendments.");
             using(var check=Command(c,tx,"select specifications from studio_catalog_work_orders where id=$1",id))
