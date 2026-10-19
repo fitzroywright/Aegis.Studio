@@ -64,10 +64,13 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 
 /* Production workload board: replace the old table queue with real work-order stages. */
 .production-board-view{display:flex;flex-direction:column;gap:6px;height:100%;min-height:0;min-width:0;overflow:hidden}
-.production-overview-entries{display:grid;grid-template-columns:1fr;gap:0}
-.production-overview-entries .st-stat{min-height:32px;padding:4px 12px;border-bottom:1px solid var(--studio-grid-border)}
-.production-overview-entries .st-stat:last-child{border-bottom:0}
-.production-overview-entries .needs-attention strong{color:#b44b42}
+.production-overview-entries{display:flex;flex-direction:column;min-height:0;height:100%}
+.production-overview-entries .studio-workload-summary{min-height:0;max-height:100%;overflow:auto;padding:0}
+.production-overview-entries .workload-indicators{display:flex;flex-direction:column;gap:0}
+.production-overview-entries .workload-indicator{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:30px;padding:4px 12px;border:0;border-bottom:1px solid var(--studio-grid-border);border-radius:0;background:transparent;text-align:left}
+.production-overview-entries .workload-indicator strong{order:2;flex:0 0 auto}
+.production-overview-entries .workload-indicator span{flex:1;min-width:0}
+.production-overview-entries .studio-workload-summary>p{display:none}
 .production-board-filters{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;flex:0 0 auto;min-width:0;overflow-x:auto;overflow-y:hidden;padding-bottom:2px}
 .production-board-filters>input[type=search]{flex:1 1 180px;min-width:130px;width:180px}
 .production-board-filters>select{flex:0 1 auto;min-width:105px;max-width:160px}
