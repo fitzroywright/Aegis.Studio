@@ -174,7 +174,7 @@ function renderFrontDesk(){
         
       </div><aside class="fd-secondary mw-list-right" aria-label="Front Desk activity">
         <section class="mw-list-panel fd-overview">
-            <header><h2><span class="mw-title-icon attention">▤</span> Overview</h2><small>Front Desk totals</small></header>
+            <header><h2><span class="mw-title-icon attention">▤</span> Overview</h2></header>
             <div class="mw-status-list">
                 ${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}
                 ${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}
