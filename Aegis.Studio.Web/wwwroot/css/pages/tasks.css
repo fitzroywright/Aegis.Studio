@@ -1,0 +1,48 @@
+.st-tasks-page{height:100%;min-height:0;overflow:hidden}
+.st-tasks-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;height:100%;min-height:0}
+.st-tasks-main,.st-tasks-rail{min-width:0;min-height:0}
+.st-tasks-panel{height:100%;min-height:0;display:flex;flex-direction:column}
+.st-tasks-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px;border-bottom:1px solid var(--studio-border,#d9dde3)}
+.st-tasks-heading h1{margin:0;font-size:1.35rem;display:flex;align-items:center;gap:10px}
+.st-tasks-heading h1 span{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:#173047;color:#fff;font-size:1rem}
+.st-tasks-heading p{margin:4px 0 0;color:var(--studio-muted,#697582)}
+.st-tasks-tabs{display:flex;gap:4px;padding:10px 16px 0}
+.st-tasks-tabs button{flex:1;border:1px solid var(--studio-border,#d9dde3);background:var(--studio-surface,#fff);color:inherit;border-radius:7px 7px 0 0;padding:9px 12px;font-weight:650;cursor:pointer}
+.st-tasks-tabs button.active{background:#e9651b;border-color:#e9651b;color:#fff}
+.st-tasks-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px}
+.st-task-due-filter{display:flex;align-items:center;gap:8px;font-size:.85rem;font-weight:600}
+.st-task-due-filter select,.st-task-search input{min-height:36px;border:1px solid var(--studio-border,#d9dde3);border-radius:7px;background:var(--studio-surface,#fff);color:inherit;padding:6px 10px}
+.st-task-search{width:min(360px,55%)}
+.st-task-search input{width:100%}
+.st-task-table-scroll{flex:1;min-height:0;overflow:auto}
+.st-task-table{width:100%;border-collapse:collapse}
+.st-task-table th{position:sticky;top:0;z-index:1;background:var(--studio-surface-muted,#f4f5f6);text-align:left;padding:10px 12px;white-space:nowrap}
+.st-task-table td{padding:10px 12px;border-top:1px solid var(--studio-border,#e1e4e8);vertical-align:middle}
+.st-task-table td:first-child strong,.st-task-table td:first-child small,.st-task-table td:nth-child(2) strong,.st-task-table td:nth-child(2) small{display:block}
+.st-task-table td small{margin-top:3px;color:var(--studio-muted,#697582);font-size:.78rem}
+.st-task-row{cursor:pointer;outline:none}
+.st-task-row:hover,.st-task-row:focus{background:rgba(230,101,27,.07)}
+.mw-task-due{display:flex;flex-direction:column;white-space:nowrap}
+.mw-task-due small{margin-top:2px;color:var(--studio-muted,#697582)}
+.mw-task-due.is-overdue strong{color:#b42318}
+.st-task-count{padding:8px 14px;border-top:1px solid var(--studio-border,#d9dde3);font-size:.82rem;color:var(--studio-muted,#697582)}
+.st-task-empty{text-align:center;padding:28px!important;color:var(--studio-muted,#697582)}
+.st-tasks-rail{display:flex;flex-direction:column;gap:12px;overflow:auto}
+.st-tasks-rail>.mw-list-panel{flex:0 0 auto}
+.st-tasks-rail .mw-session-row{width:100%;text-align:left}
+.st-task-attention .mw-status-row{display:flex;justify-content:space-between;padding:8px 12px}
+.st-task-messages footer{padding:8px 12px;border-top:1px solid var(--studio-border,#d9dde3)}
+.st-task-messages footer button{font-weight:650}
+.st-tasks-loading{padding:24px}
+.st-task-dialog{width:min(560px,calc(100vw - 32px));border:0;border-radius:12px;padding:0;box-shadow:0 18px 64px #0005}
+.st-task-dialog::backdrop{background:#14233488}
+.st-task-form{display:grid;gap:14px;padding:20px}
+.st-task-form header,.st-task-form footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.st-task-form header h2{margin:0}
+.st-task-form label{display:grid;gap:6px;font-weight:600}
+.st-task-form input,.st-task-form select{min-height:38px;border:1px solid #cbd2d9;border-radius:6px;padding:7px 9px;font:inherit}
+.st-task-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.st-task-form [role=alert]{color:#b42318;margin:0;min-height:1.2em}
+@media(max-width:1100px){.st-tasks-grid{grid-template-columns:minmax(0,1fr) 280px;gap:10px}.st-task-table th,.st-task-table td{padding:8px}}
+@media(max-width:820px){.st-tasks-page{height:auto;overflow:visible}.st-tasks-grid{display:flex;flex-direction:column;height:auto}.st-tasks-panel{min-height:60vh}.st-tasks-rail{display:grid;grid-template-columns:1fr 1fr;overflow:visible}.st-task-messages{grid-column:1/-1}}
+@media(max-width:560px){.st-tasks-tools{align-items:stretch;flex-direction:column}.st-task-search{width:100%}.st-tasks-rail{display:flex}.st-task-table{min-width:760px}}
