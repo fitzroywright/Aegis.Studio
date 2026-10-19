@@ -112,11 +112,30 @@ async function showCatalogProduction(){
     for(const order of rows)cardsByLane.get(laneFor(order)).push(order);
     for(const activity of pageActivities)activitiesByLane.get(laneForActivity(activity)).push(activity);
     const laneTone=lane=>lane==='attention'?'attention':lane==='ready'?'ready':lane==='progress'?'progress':lane==='qc'?'qc':'complete';
+    const statusTone=status=>{
+        const value=String(status||'Unknown').toLowerCase().replace(/[\s_-]/g,'');
+        if(/blocked|failed|reworkrequired|reprintrequired|waitingonclient|overdue/.test(value))return 'blocked';
+        if(/qualitycontrol|awaitingqc|readyforqc/.test(value))return 'qc';
+        if(value==='inprogress'||value==='partial')return 'progress';
+        if(value==='completed'||value==='readyfordelivery')return 'complete';
+        if(['notstarted','pending','scheduled','available','ready','readytostart'].includes(value))return 'ready';
+        return 'neutral';
+    };
+    const functionTone=value=>{
+        const text=String(value||'').toLowerCase();
+        if(/deliver|delivery|handoff/.test(text))return 'delivery';
+        if(/print|frame|album/.test(text))return 'print';
+        if(/edit|retouch/.test(text))return 'editing';
+        if(/review|inspect|proof|quality|\bqc\b/.test(text))return 'review';
+        if(/shoot|photograph|capture/.test(text))return 'capture';
+        return 'other';
+    };
     const dueLabel=t=>t?.dueAtUtc?new Date(t.dueAtUtc).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'No due date';
     const activityCard=a=>{
         const job=jobMap.get(a.jobId)||{},assigned=a.assignedTo?studioFirstName(a.assignedTo):'Unassigned';
         const blocker=a.blockedReason||((workload.waiting(a))?'Waiting on prerequisite or job stage':'');
-        return '<article class="production-order-card production-activity-card production-order-tone-'+laneTone(laneForActivity(a))+'" data-activity-row="'+esc(a.id)+'"><div class="production-order-top"><span>Production task</span><span class="production-priority production-pill" data-tone="'+laneTone(laneForActivity(a))+'">'+esc(a.status||'Unknown')+'</span></div><div class="production-job-title">'+esc(job.title||'Job')+'</div><div class="production-order-product">'+esc(a.title||a.activityType||'Production activity')+'</div><div class="production-order-meta"><span>'+esc(a.productionArea||a.activityType||'Production')+'</span><span>'+esc(assigned)+'</span><span>'+esc(dueLabel(a))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'</article>';
+        const activityName=a.title||a.activityType||'Production activity';
+        return '<article class="production-order-card production-activity-card production-order-tone-'+laneTone(laneForActivity(a))+'" data-activity-row="'+esc(a.id)+'"><div class="production-order-top"><span>Production task</span><span class="production-priority production-pill" data-tone="'+statusTone(a.status)+'">'+esc(a.status||'Unknown')+'</span></div><div class="production-job-title">'+esc(job.title||'Job')+'</div><div class="production-order-taskline"><span class="production-function" data-function="'+functionTone(activityName)+'">'+esc(activityName)+'</span><span class="production-function" data-function="'+functionTone(a.productionArea||a.activityType)+'">'+esc(a.productionArea||a.activityType||'Production')+'</span></div><div class="production-order-meta"><span>'+esc(assigned)+'</span><span>'+esc(dueLabel(a))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'</article>';
     };
     const lanes=laneNames.map(([key,label])=>{
         const orderCards=cardsByLane.get(key),activityCards=activitiesByLane.get(key);
@@ -125,7 +144,10 @@ async function showCatalogProduction(){
             const task=tasks.find(t=>!['Completed','Cancelled','Archived','Skipped'].includes(t.status))||tasks.at(-1);
             const blocker=w.exceptionReason||task?.blockedReason||'';
             const percent=tasks.length?Math.round(done*100/tasks.length):0;
-            return '<article class="production-order-card production-order-tone-'+laneTone(laneFor(w))+'" tabindex="0" data-order-row="'+esc(w.id)+'"><div class="production-order-top"><span>WO-'+esc(w.id.slice(0,8))+'</span><span class="production-priority production-pill" data-tone="'+laneTone(laneFor(w))+'">'+esc(task?.priority||'Normal')+'</span></div><button type="button" class="production-job-title" data-open-job="'+esc(w.jobId)+'">'+esc(w.jobTitle)+'</button><div class="production-order-product">'+esc(w.product)+' × '+esc(w.quantity)+'</div><div class="production-order-meta"><span>'+esc(task?.title||'Production work')+'</span><span>'+esc(task?.assignedTo?studioFirstName(task.assignedTo):'Unassigned')+'</span><span>'+esc(dueLabel(task))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'<div class="production-progress-label"><span>'+done+' of '+tasks.length+' steps complete</span><span>'+percent+'%</span></div><div class="production-progress-track" role="progressbar" aria-valuenow="'+percent+'" aria-valuemin="0" aria-valuemax="100"><span style="width:'+percent+'%"></span></div><button type="button" class="production-order-open" data-order="'+esc(w.id)+'">Open work order →</button></article>';
+            const orderFunction=[task?.title,task?.activityType,task?.productionArea].filter(Boolean).join(' ');
+            const orderArea=task?.productionArea||task?.activityType||'Production';
+            const priority=task?.priority&&task.priority!=='Normal'?'<span class="production-type-chip production-priority-label">Priority · '+esc(task.priority)+'</span>':'';
+            return '<article class="production-order-card production-order-tone-'+laneTone(laneFor(w))+'" tabindex="0" data-order-row="'+esc(w.id)+'"><div class="production-order-top"><span>WO-'+esc(w.id.slice(0,8))+'</span><span class="production-priority production-pill" data-tone="'+statusTone(task?.status)+'">'+esc(task?.status||'Unknown')+'</span></div><button type="button" class="production-job-title" data-open-job="'+esc(w.jobId)+'">'+esc(w.jobTitle)+'</button><div class="production-order-taskline"><span class="production-quantity">'+esc(w.product)+' × '+esc(w.quantity)+'</span><span class="production-function" data-function="'+functionTone(orderFunction)+'">'+esc(task?.title||task?.activityType||'Production work')+'</span><span class="production-function" data-function="'+functionTone(orderArea)+'">'+esc(orderArea)+'</span>'+priority+'</div><div class="production-order-meta"><span>'+esc(task?.assignedTo?studioFirstName(task.assignedTo):'Unassigned')+'</span><span>'+esc(dueLabel(task))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'<div class="production-progress-label"><span>'+done+' of '+tasks.length+' steps complete</span><span>'+percent+'%</span></div><div class="production-progress-track" role="progressbar" aria-valuenow="'+percent+'" aria-valuemin="0" aria-valuemax="100"><span style="width:'+percent+'%"></span></div><button type="button" class="production-order-open" data-order="'+esc(w.id)+'">Open work order →</button></article>';
         }).join('')+activityCards.map(activityCard).join('');
         return '<section class="production-lane production-lane-'+key+'" data-production-lane="'+key+'" aria-label="'+esc(label)+'"><header><h2>'+esc(label)+'</h2><span>'+(orderCards.length+activityCards.length)+'</span></header><div class="production-lane-cards">'+(cards||'<p class="production-lane-empty">No production work</p>')+'</div></section>';
     }).join('');
