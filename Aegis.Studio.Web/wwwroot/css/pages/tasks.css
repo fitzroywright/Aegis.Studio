@@ -52,14 +52,13 @@
 .st-tasks-panel{height:100%;min-width:0}
 .st-tasks-page .sj-summary{background:#fafafa;color:#67707b}
 .st-tasks-page .sj-summary>[data-task-add]{margin-left:auto;flex:0 0 auto}
-.st-tasks-page .st-task-table{min-width:900px}
+.st-tasks-page .st-task-table{min-width:0;table-layout:fixed}
 .st-tasks-page .st-task-table th:first-child{width:22%}
-.st-tasks-page .st-task-table th:nth-child(2){width:22%}
-.st-tasks-page .st-task-table th:nth-child(3){width:14%}
-.st-tasks-page .st-task-table th:nth-child(4){width:10%}
+.st-tasks-page .st-task-table th:nth-child(2){width:23%}
+.st-tasks-page .st-task-table th:nth-child(3){width:16%}
+.st-tasks-page .st-task-table th:nth-child(4){width:12%}
 .st-tasks-page .st-task-table th:nth-child(5){width:13%}
-.st-tasks-page .st-task-table th:nth-child(6){width:15%}
-.st-tasks-page .st-task-table th:last-child{width:4%}
+.st-tasks-page .st-task-table th:nth-child(6){width:14%}
 .st-tasks-page .st-task-table td:first-child strong,.st-tasks-page .st-task-table td:first-child small,.st-tasks-page .st-task-table td:nth-child(2) strong,.st-tasks-page .st-task-table td:nth-child(2) small{display:block}
 .st-tasks-page .st-task-table td small{margin-top:3px;color:#707c89;font-size:11px}
 .st-tasks-page .st-task-row:hover,.st-tasks-page .st-task-row:focus-visible{background:var(--theme-surface-alt,#edf3f8);box-shadow:inset 3px 0 var(--theme-accent,#d97722)}
@@ -73,7 +72,7 @@
 @media(max-width:900px){.st-tasks-page.sj-page{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 170px}.st-tasks-page .st-task-table{min-width:900px}}
 
 /* Keep the Tasks board inside the same available width as the Jobs board. */
-.st-tasks-page.sj-page{width:100%;box-sizing:border-box;grid-template-columns:minmax(0,1fr) 290px}
+.st-tasks-page.sj-page{width:100%;box-sizing:border-box;grid-template-columns:minmax(0,1fr) 270px}
 .st-tasks-page .sj-summary .sj-view-tabs button{background:#fff;color:#596676}
 .st-tasks-page .sj-summary .sj-view-tabs button.active{background:#986c55;border-color:#986c55;color:#fff}
 .st-tasks-page .sj-table thead th{background:var(--studio-grid-header-bg,#536d86);color:var(--studio-grid-header-text,#fff)}
@@ -99,7 +98,10 @@
 /* Keep the due-date filter beside its column label. */
 .st-tasks-page .sj-column-filter-inline{flex-direction:row;align-items:center;gap:8px}
 .st-tasks-page .sj-column-filter-inline>span{flex:0 0 auto}
-.st-tasks-page .sj-column-filter-inline select{flex:1 1 auto;width:auto;min-width:86px}
+.st-tasks-page .sj-column-filter-inline select{flex:1 1 auto;width:auto;min-width:0;max-width:100%}
+.st-tasks-page .sj-job-header input[data-task-search],.st-tasks-page .sj-job-header input[data-task-job-search]{min-height:24px;padding-top:0;padding-bottom:0;min-width:0}
+.st-tasks-page .sj-table thead th{white-space:nowrap}
+.st-tasks-page .sj-job-header,.st-tasks-page .sj-column-filter-inline{gap:5px}
 
 /* Tasks right rail reuses Today's compact session and attention card treatment. */
 .st-tasks-rail{gap:7px}
