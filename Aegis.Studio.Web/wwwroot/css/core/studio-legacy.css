@@ -9245,7 +9245,7 @@ min-height:0;}
 flex:1;}
 .fd-session {
   display: grid;
-  grid-template-columns: 76px 1fr;
+  grid-template-columns: minmax(112px,auto) minmax(0,1fr);
   gap: 9px;
   width: 100%;
   padding: 10px 3px;
@@ -9254,9 +9254,11 @@ flex:1;}
   border: 0;
   border-bottom: 1px solid #eee9e3;
 }
-.fd-session time {
+.fd-session time,.fd-session-time {
   color: #6d6258;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
 }
 .fd-session strong {
   display: block;
