@@ -10,7 +10,7 @@ let productionView='queue';
 let productionQueueScope='mine',productionStageFilter='',productionWorkspaceFilter='',productionAssigneeFilter='',productionDueFilter='';
 async function showProduction(){
     const current=StudioPage.begin('production');
-    conversationView.classList.add('hidden');genericView.classList.remove('hidden');genericView.innerHTML='<section class="st-page st-production-content" aria-label="Production"><section class="st-board"><p role="status">Loading production…</p></section></section>';
+    conversationView.classList.add('hidden');genericView.classList.remove('hidden');
     const [activities,shoots,jobs,photographers,resources,auth,workspaces,capabilities]=await Promise.all([json('/api/operations/activities'),json('/api/operations/shoots'),json('/api/jobs'),json('/api/photographers'),json('/api/schedule/resources'),json('/api/auth/me'),json('/api/workspaces'),json('/api/workflow/capabilities')]);
     operationalActivityCache=new Map(activities.map(a=>[a.id,a]));shootCache=new Map(shoots.map(a=>[a.id,a]));operationalJobs=new Map(jobs.map(j=>[j.id,j]));photographerCache=photographers;scheduleResourceCache=resources;studioRememberPeople(photographers);
     const me=auth.user||auth,user=String(me.userName||me.loginName||'').toLowerCase(),manager=me.isAdministrator===true;
