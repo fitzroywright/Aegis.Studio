@@ -181,7 +181,7 @@ function renderFrontDesk(){
                 ${metric('confirmation','Needs Confirmation',pending.length,'Review and confirm')}
                 ${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}
             </div>
-            <footer class="fd-overview-toolbar" role="toolbar" aria-label="Overview actions">
+            <footer class="smc-footer fd-overview-toolbar" role="toolbar" aria-label="Overview actions">
                 <button type="button" class="fd-card-link" data-new-booking>＋ Create Manual Booking →</button>
             </footer>
         </section>
