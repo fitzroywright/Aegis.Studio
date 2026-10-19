@@ -28,9 +28,13 @@ public sealed class JobAccessService
     public IReadOnlyList<Guid> GetAccessibleJobIds(ClaimsPrincipal user,bool requireAttachments=false)
         =>GetPermissionMap(user).Where(x=>x.Value.AccessJob&&(!requireAttachments||x.Value.ViewAttachments)).Select(x=>x.Key).ToArray();
 
-    // Production managers can see production work across all jobs without a separate ViewJob grant.
+    // Production is readable to every signed-in Studio user; write endpoints enforce ManageProduction separately.
     public IReadOnlyList<Guid> GetProductionJobIds(ClaimsPrincipal user)
-        =>GetPermissionMap(user).Where(x=>x.Value.ViewJob||x.Value.ManageProduction).Select(x=>x.Key).ToArray();
+    {
+        if(user.Identity?.IsAuthenticated!=true)return Array.Empty<Guid>();
+        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select id from studio_jobs",c);
+        using var r=q.ExecuteReader();var ids=new List<Guid>();while(r.Read())ids.Add(r.GetGuid(0));return ids;
+    }
 
     // The same permission union as GetPermissions, fetched once for list screens.
     public IReadOnlyDictionary<Guid,JobPermissionSet> GetPermissionMap(ClaimsPrincipal user,Guid? jobId=null)
