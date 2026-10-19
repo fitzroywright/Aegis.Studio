@@ -10145,3 +10145,9 @@ body[data-studio-view="frontdesk"] .fd-table-head-clip{flex:0 0 auto;overflow-y:
 body[data-studio-view="frontdesk"] .fd-table-scroll{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;table-layout:fixed}
 body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:static}
+
+/* Front Desk can scroll wider booking grids horizontally while preserving the fixed header. */
+body[data-studio-view="frontdesk"] .fd-table-frame{overflow-x:auto;overflow-y:hidden}
+body[data-studio-view="frontdesk"] .fd-table-head-clip{width:100%;min-width:1110px;flex:0 0 auto}
+body[data-studio-view="frontdesk"] .fd-table-scroll{width:100%;min-width:1110px;flex:1 1 auto}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-width:1100px;table-layout:fixed}
