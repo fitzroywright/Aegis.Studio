@@ -46,7 +46,6 @@ public static class TodayEndpoints
             DateTimeOffset start=(from??DateTimeOffset.UtcNow.Date).ToUniversalTime();
             DateTimeOffset end=(to??start.AddDays(1)).ToUniversalTime();
             Stopwatch timer=Stopwatch.StartNew();
-            string user=Name(context.User);
             await using var connection=database.OpenConnection();
             await using var command=new NpgsqlCommand("""
                 select e.id,e.job_id,e.booking_id,e.title,e.starts_at_utc,e.ends_at_utc,e.location,e.status,e.notes,e.created_at_utc,
@@ -57,11 +56,10 @@ public static class TodayEndpoints
                 where e.starts_at_utc<$2 and e.ends_at_utc>$1
                   and e.status<>'Cancelled' and s.status<>'Cancelled'
                   and e.job_id=any($3)
-                  and exists(select 1 from studio_workflow_sessions ws join studio_workflow_crew wc on wc.session_id=ws.id where ws.shoot_id=s.id and lower(wc.user_name)=lower($4))
                 group by e.id
                 order by e.starts_at_utc
                 """,connection);
-            command.Parameters.AddWithValue(start);command.Parameters.AddWithValue(end);command.Parameters.AddWithValue(allowed);command.Parameters.AddWithValue(user);
+            command.Parameters.AddWithValue(start);command.Parameters.AddWithValue(end);command.Parameters.AddWithValue(allowed);
             await using var reader=await command.ExecuteReaderAsync(context.RequestAborted);
             List<ScheduleEntry> rows=[];
             while(await reader.ReadAsync(context.RequestAborted))
