@@ -11029,3 +11029,19 @@ body .topbar { padding-left: 0 !important; column-gap: 0 !important; }
 body .topbar .studio-script-brand { padding: 0 !important; margin: 0 !important; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
 body .topbar .studio-script-brand .studio-bryans-brand-image { display: block; width: 216px; height: 56px; object-fit: contain; }
 body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left: 0 !important; border-left: 0 !important; }
+
+/* Independent, persistent side rail controls. */
+.studio-rail-toggle { flex:0 0 34px; width:34px; height:34px; padding:0; display:grid; place-items:center; align-self:flex-end; border:1px solid var(--theme-border,#d7dee7); border-radius:7px; background:var(--theme-surface,#fff); color:var(--theme-text,#26384b); font-size:21px; line-height:1; z-index:2; }
+#studioContextRail > .studio-rail-toggle { align-self:flex-end; }
+.mw-today-left > .studio-rail-toggle,.mw-today-right > .studio-rail-toggle,.st-right > .studio-rail-toggle,.sj-right > .studio-rail-toggle,.fd-secondary > .studio-rail-toggle,.workspace-right-rail > .studio-rail-toggle { position:sticky; top:0; }
+#studioContextRail.studio-rail-collapsed-left,.mw-today-left.studio-rail-collapsed-left,.mw-today-right.studio-rail-collapsed-right,.st-right.studio-rail-collapsed-right,.sj-right.studio-rail-collapsed-right,.fd-secondary.studio-rail-collapsed-right,.workspace-right-rail.studio-rail-collapsed-right { width:42px; min-width:42px; overflow:hidden; gap:4px; }
+.studio-rail-collapsed-left > :not([data-rail-toggle]),.studio-rail-collapsed-right > :not([data-rail-toggle]) { display:none !important; }
+.studio-rail-collapsed-left > .studio-rail-toggle,.studio-rail-collapsed-right > .studio-rail-toggle { align-self:center; }
+.mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:42px minmax(0,1fr) minmax(245px,290px); }
+.mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(175px,210px) minmax(0,1fr) 42px; }
+.mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:42px minmax(0,1fr) 42px; }
+@media(max-width:850px) {
+ .mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:42px minmax(0,1fr); }
+ .mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr) 42px; }
+ .mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:42px minmax(0,1fr); }
+}
