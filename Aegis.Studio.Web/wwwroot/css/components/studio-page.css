@@ -114,3 +114,12 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 @media(max-width:800px){.production-lane{flex-basis:235px}.production-board-filters>input[type=search]{flex:0 0 150px}}
 @media(max-height:700px){.production-workload-details[open]{max-height:110px}}
 
+
+/* Production header controls and compact Overview rows. */
+.production-board-filters{background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border:1px solid var(--studio-grid-header-border,#8394a4);border-radius:4px;padding:5px 7px}
+.production-board-filters :is(input,select){background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);border:1px solid var(--studio-control-border,#bacbd8);border-radius:4px}
+.production-board-filters .production-completed-filter{color:inherit}
+.production-board-filters>button{background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);border:1px solid var(--studio-control-border,#bacbd8);border-radius:4px}
+.st-card.production-overview-card>header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.st-card.production-overview-card>header .fd-card-link{flex:0 0 auto;margin-left:auto;padding:0;border:0;background:transparent;color:var(--studio-rail-title,#253c54);font:inherit;font-weight:700;white-space:nowrap;cursor:pointer}
+.production-overview-entries .workload-indicator{flex:0 0 auto;height:auto;min-height:26px;padding-top:0;padding-bottom:0}
