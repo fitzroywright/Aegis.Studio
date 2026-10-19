@@ -178,6 +178,7 @@
         const header = firstSection?.querySelector(':scope > header');
         toggle.classList.toggle('studio-rail-toggle-in-header', !collapsed && !!header);
         if (collapsed || !header) rail.prepend(toggle);
+        else if (side === 'left') header.insertBefore(toggle, header.querySelector('h2') || header.firstChild);
         else header.append(toggle);
         return toggle;
     }
