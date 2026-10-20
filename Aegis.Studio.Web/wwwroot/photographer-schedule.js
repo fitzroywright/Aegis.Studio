@@ -27,7 +27,7 @@ window.StudioPhotographerSchedule=(()=>{
         let photographers,entries,jobs,workspaces;
         const range='?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
         const availabilityResult=read('/api/schedule/photographer-availability'+range,true).then(data=>({data}),error=>({error}));
-        try{const [data,spaces]=await Promise.all([read('/api/schedule/photographer-data'+range+'&includeInactive='+state.inactive),read('/api/workspaces',true)]);if(!data||!['photographers','entries','jobs'].every(k=>Array.isArray(data[k])))throw Error('Unexpected calendar response. Please refresh.');({photographers,entries,jobs}=data);workspaces=spaces;}
+        try{const [data,spaces]=await Promise.all([read('/api/schedule/photographer-data'+range+'&includeInactive='+state.inactive),loadWorkspaces()]);if(!data||!['photographers','entries','jobs'].every(k=>Array.isArray(data[k])))throw Error('Unexpected calendar response. Please refresh.');({photographers,entries,jobs}=data);workspaces=spaces;}
         catch(e){if(live()){genericView.innerHTML='<section class="mw-list-panel ps-error"><h2>Schedule could not load</h2><p role="alert">'+esc(e.message)+'</p><button class="action" data-ps-retry>Retry</button></section>';genericView.querySelector('[data-ps-retry]').onclick=()=>render();}return;}
         if(!live())return;
         state.workspace=window.StudioScheduleWorkspaceCard.initialize(state.workspace);
