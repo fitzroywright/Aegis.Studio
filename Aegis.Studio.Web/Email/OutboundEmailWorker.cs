@@ -36,6 +36,7 @@ public sealed class OutboundEmailWorker : BackgroundService
                 {
                     Guid lease=Guid.NewGuid();var message=outbox.ClaimNext(channels.Keys.ToArray(),lease);if(message is null)break;
                     bool providerAccepted=false;
+                    logger.LogInformation("Outbound delivery attempt started. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} Attempt={Attempt} Sender={Sender}", message.Id, message.DeliveryChannel, message.ToAddress, message.Attempts, message.FromAddress);
                     try
                     {
                         var transport=channels[message.DeliveryChannel];
@@ -75,8 +76,10 @@ public sealed class OutboundEmailWorker : BackgroundService
                         }
                         var request=new MessageRequest{RecipientIds=[message.ToAddress],Title=subject,Body=body,BodyIsHtml=false,Channels=channel,Source="Aegis.Studio",CorrelationId=message.Id.ToString("D"),Attachments=files,Metadata=metadata};
                         DateTimeOffset sendingAt=DateTimeOffset.UtcNow.AddMinutes(-1);
+                        logger.LogInformation("Submitting outbound delivery to provider. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} CorrelationId={CorrelationId}", message.Id, message.DeliveryChannel, message.ToAddress, request.CorrelationId);
                         await transport.SendAsync(recipient,request,message.Id,stoppingToken);
                         providerAccepted=true;
+                        logger.LogInformation("Outbound provider accepted delivery request. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient}", message.Id, message.DeliveryChannel, message.ToAddress);
                         string? providerId=null;
                         if(channel==MessageChannel.MsEmail)
                         {
@@ -88,17 +91,20 @@ public sealed class OutboundEmailWorker : BackgroundService
                         }
                         if(outbox.MarkProviderAccepted(message.Id,providerId,lease) is not null)
                         {
+                            logger.LogInformation("Outbound delivery recorded as provider accepted. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} ProviderMessageId={ProviderMessageId}", message.Id, message.DeliveryChannel, message.ToAddress, providerId);
                             flows.TryEnqueueOutbound(message.ConversationId.ToString("D"),"Provider",businessId:message.Id.ToString("D"),detail:"ProviderAccepted");
                             flows.TryEnqueueOutboundUnknown(message.ConversationId.ToString("D"),"Recipient",businessId:message.Id.ToString("D"),detail:"DeliveryReceiptUnavailable");
                         }
                     }
-                    catch(ExternalDeliveryOutcomeUnknownException)
+                    catch(ExternalDeliveryOutcomeUnknownException ex)
                     {
                         outbox.MarkAttention(message.Id,lease,"ProviderOutcomeUncertain: reconcile sent items or message trace before resending.");
+                        logger.LogError(ex,"Outbound provider outcome is uncertain. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient}", message.Id, message.DeliveryChannel, message.ToAddress);
                     }
                     catch(HttpRequestException ex) when(!providerAccepted && (ex.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.NotFound))
                     {
                         outbox.MarkAttention(message.Id,lease,"ProviderRejected:"+(int)ex.StatusCode.Value);
+                        logger.LogError(ex,"Outbound provider rejected delivery. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} HttpStatus={HttpStatus}", message.Id, message.DeliveryChannel, message.ToAddress, (int)ex.StatusCode.Value);
                     }
                     catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){throw;}
                     catch(Exception ex)
@@ -110,6 +116,7 @@ public sealed class OutboundEmailWorker : BackgroundService
                             continue;
                         }
                         var updated=outbox.MarkFailure(message.Id,ex.GetType().Name,DateTimeOffset.UtcNow.AddSeconds(Math.Min(300,5*Math.Pow(2,Math.Min(message.Attempts,6)))),lease);
+                        logger.LogError(ex,"Outbound delivery attempt failed before provider acceptance. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} RetryState={RetryState} Attempt={Attempt}", message.Id, message.DeliveryChannel, message.ToAddress, updated?.Status, message.Attempts);
                         flows.TryEnqueueOutbound(message.ConversationId.ToString("D"),"Provider",businessId:message.Id.ToString("D"),detail:updated?.Status=="Failed"?"RetryExhausted":ex.GetType().Name,failed:true);
                         logger.LogError(ex,"Outbound {Channel} message {MessageId} failed; queued retry state {State}",message.DeliveryChannel,message.Id,updated?.Status);
                     }
