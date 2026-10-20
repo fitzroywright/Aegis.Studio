@@ -180,6 +180,23 @@
     }
     const rightRailLayouts = new WeakMap();
     const rightChevronLane = 34;
+    function splitGridTracks(value) {
+        const tracks = [];
+        let depth = 0, start = 0;
+        for (let index = 0; index < value.length; index++) {
+            if (value[index] === '(') depth++;
+            else if (value[index] === ')') depth--;
+            else if (/\\s/.test(value[index]) && depth === 0) {
+                const track = value.slice(start, index).trim();
+                if (track) tracks.push(track);
+                start = index + 1;
+            }
+        }
+        const last = value.slice(start).trim();
+        if (last) tracks.push(last);
+        return tracks;
+    }
+
     function syncRightRailLayout(rail, collapsed) {
         const layout = rail.parentElement;
         if (!layout) return;
@@ -194,29 +211,25 @@
         layout.style.paddingInlineEnd = original.inlinePaddingEnd;
         if (!collapsed) return;
 
-        // Measure the page's expanded grid, then give the released rail width to
-        // the center track while keeping a small lane for the shell chevron.
+        // The collapsed rail leaves the grid. Keep only the chevron lane and let
+        // the adjacent center track grow naturally into all released space.
         rail.classList.remove('studio-rail-collapsed-right');
         const computed = getComputedStyle(layout);
+        const tracks = splitGridTracks(computed.gridTemplateColumns || '');
         const display = computed.display;
-        const columns = computed.gridTemplateColumns;
-        const computedPaddingEnd = computed.paddingInlineEnd;
+        const paddingEnd = computed.paddingInlineEnd;
         rail.classList.add('studio-rail-collapsed-right');
 
-        if (display === 'grid' || display === 'inline-grid') {
-            const tracks = Array.from(columns.matchAll(/([\d.]+)px/g), match => Number(match[1]));
-            if (tracks.length > 1) {
-                const centerIndex = tracks.length - 2;
-                const expandedCenter = Math.max(0, tracks[centerIndex] + tracks[centerIndex + 1] - rightChevronLane);
-                const nextTracks = tracks.slice(0, centerIndex).map(width => width + 'px');
-                nextTracks.push(expandedCenter + 'px', rightChevronLane + 'px');
-                layout.style.gridTemplateColumns = nextTracks.join(' ');
-                return;
-            }
+        if ((display === 'grid' || display === 'inline-grid') && tracks.length > 1) {
+            tracks.splice(-2, 2, 'minmax(0, 1fr)', rightChevronLane + 'px');
+            layout.style.gridTemplateColumns = tracks.join(' ');
+            return;
         }
 
-        const padding = Number.parseFloat(computedPaddingEnd) || 0;
-        layout.style.paddingInlineEnd = (padding + rightChevronLane) + 'px';
+        // Stacked layouts have no dedicated right-hand track. Preserve a narrow
+        // edge lane for the fixed shell chevron without shrinking the page grid.
+        const padding = Number.parseFloat(paddingEnd) || 0;
+        layout.style.paddingInlineEnd = Math.max(padding, rightChevronLane) + 'px';
     }
 
     function applyRailState() {
