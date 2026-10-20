@@ -202,6 +202,17 @@
         });
     }
 
+    const railObserver = new MutationObserver(() => {
+        const leftSelector = '#studioContextRail, .mw-today-left';
+        const rightSelector = '.mw-today-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail';
+        const missingLeft = Array.from(document.querySelectorAll(leftSelector))
+            .some(rail => !rail.querySelector('[data-rail-toggle="left"]'));
+        const missingRight = Array.from(document.querySelectorAll(rightSelector))
+            .some(rail => !rail.querySelector('[data-rail-toggle="right"]'));
+        if (missingLeft || missingRight) applyRailState();
+    });
+    railObserver.observe(document.body, { childList: true, subtree: true });
+
     function ensureBreadcrumb() {
         if (!breadcrumb || breadcrumb.children.length) return;
         window.studioSetBreadcrumb?.([{ label: labelFor(currentView), view: currentView }]);
