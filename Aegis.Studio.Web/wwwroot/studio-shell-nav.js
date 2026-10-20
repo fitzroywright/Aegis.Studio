@@ -349,37 +349,34 @@
     // The Today route is deliberately excluded from these structural changes.
     function syncPageFrame() {
         const view = document.body.dataset.studioView || currentView;
-        const jobTools=document.getElementById('studioFooterJobTools');
-        if(jobTools)jobTools.hidden=!(view==='workspaces'&&document.querySelector('#conversationView.has-open-job .job-detail-page'));
-        if (view === 'today') {
-            const title = document.getElementById('studioTodayBrandTitle');
-            if (title) {
-                const icon=title.querySelector('.mw-today-focus-icon');if(icon)icon.textContent='✦';
-                const heading = title.querySelector('strong');
-                if (heading) heading.innerHTML = 'Today <em>Your focus</em>';
-                const tagline = title.querySelector('small');
-                if (tagline) tagline.textContent = taglineFor('today');
-            }
-            return;
-        }
+        const isToday = view === 'today';
+        const jobTools = document.getElementById('studioFooterJobTools');
+        if (jobTools) jobTools.hidden = !(view === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page'));
+
         const main = shell?.querySelector('main');
         const masthead = document.querySelector('.topbar');
         const title = document.getElementById('studioTodayBrandTitle');
         const bell = document.getElementById('notificationButton');
         if (!main || !masthead || !bell) return;
 
-        // Retire the secondary page-heading row rather than hiding it with CSS.
+        // Every view, including Today, uses the same shared masthead and frame sync.
         document.getElementById('studioSharedPageHeading')?.remove();
         if (breadcrumb && breadcrumb.nextElementSibling !== bell) {
             masthead.insertBefore(breadcrumb, bell);
         }
         if (title) {
-            const jobOpen=view==='workspaces' && !document.getElementById('conversationView')?.classList.contains('hidden') && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
-            title.querySelector('strong')?.replaceChildren(document.createTextNode(jobOpen?'Job Details':labelFor(view)));
-            title.setAttribute('aria-label',jobOpen?'Job Details':labelFor(view));
-            const icon=title.querySelector('.mw-today-focus-icon');if(icon)icon.innerHTML=view==='jobs'?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16v14H4zM8 6V3h8v3M4 11h16M10 11v3h4v-3"/></svg>':jobOpen?'<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="13" r="4"/></svg>':'✦';
+            const jobOpen = view === 'workspaces' && !document.getElementById('conversationView')?.classList.contains('hidden') && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
+            const pageLabel = jobOpen ? 'Job Details' : labelFor(view);
+            const heading = title.querySelector('strong');
+            if (heading) {
+                if (isToday) heading.innerHTML = 'Today <em>Your focus</em>';
+                else heading.replaceChildren(document.createTextNode(pageLabel));
+            }
+            title.setAttribute('aria-label', pageLabel);
+            const icon = title.querySelector('.mw-today-focus-icon');
+            if (icon) icon.innerHTML = view === 'jobs' ? '<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16v14H4zM8 6V3h8v3M4 11h16M10 11v3h4v-3"/></svg>' : jobOpen ? '<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="13" r="4"/></svg>' : '✦';
             const tagline = title.querySelector('small');
-            if (tagline) tagline.textContent = jobOpen ? 'Review job details, assignments, workflow, media and conversations.' : taglineFor(view);
+            if (tagline) tagline.textContent = isToday ? taglineFor('today') : jobOpen ? 'Review job details, assignments, workflow, media and conversations.' : taglineFor(view);
         }
         main.classList.add('studio-standard-main');
     }
