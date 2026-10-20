@@ -46,3 +46,11 @@ alter table studio_email_intake_receipts add column if not exists payload_hash t
 alter table studio_unrouted_email add column if not exists source_provider_message_id text null;
 
 create unique index if not exists ux_studio_email_provider_receipt on studio_email_intake_receipts(provider_message_id) where provider_message_id is not null;
+
+
+-- Shared unread state for canonical incoming inquiry/job email messages.
+create table if not exists studio_shared_message_reads(
+    message_id uuid primary key,
+    reader_user_name text not null,
+    read_at_utc timestamptz not null default now()
+);
