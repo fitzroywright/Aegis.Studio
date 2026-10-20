@@ -128,17 +128,38 @@ function pipelineCalendar(items, resourceMap) {
     }).join('')}</div></div>`;
 }
 
+window.StudioScheduleWorkspaceCard=(()=>{
+    let activeWorkspace='';
+    let initialized=false;
+    const selected=()=>activeWorkspace;
+    function initialize(value=''){
+        if(!initialized){activeWorkspace=String(value||'');initialized=true;}
+        return activeWorkspace;
+    }
+    function select(value){activeWorkspace=String(value||'');initialized=true;return activeWorkspace;}
+    function render(workspaces,value,onSelect){
+        const card=document.querySelector('#studioContextRail [data-rail-card="workspaces"]');
+        const list=card?.querySelector('.mw-today-rail-links');
+        if(!list)return;
+        initialize(value);
+        const visible=(Array.isArray(workspaces)?workspaces:[]).filter(workspace=>workspace.permissions?.accessWorkspace!==false&&workspace.permissions?.view!==false);
+        const make=(id,name,icon)=>'<button type="button" data-schedule-workspace-filter="'+esc(id)+'" aria-pressed="'+String(activeWorkspace===String(id))+'" class="'+(activeWorkspace===String(id)?'is-active':'')+'"><span>'+icon+'</span><span>'+esc(name)+'</span></button>';
+        list.innerHTML=make('','All Workspaces','▦')+visible.map(workspace=>make(workspace.id,workspace.name,'▣')).join('');
+        list.querySelectorAll('[data-schedule-workspace-filter]').forEach(button=>button.addEventListener('click',()=>{
+            select(button.dataset.scheduleWorkspaceFilter);
+            render(visible,activeWorkspace,onSelect);
+            onSelect?.(activeWorkspace);
+        }));
+    }
+    return {render,initialize,select,selected};
+})();
 function renderPipelineWorkspaceFilters(workspaces){
-    const card=document.querySelector('#studioContextRail [data-rail-card="workspaces"]');
-    const list=card?.querySelector('.mw-today-rail-links');
-    if(!list)return;
-    const visible=workspaces.filter(workspace=>workspace.permissions?.accessWorkspace!==false&&workspace.permissions?.view!==false);
-    const item=(id,name,icon)=>'<button type="button" data-pipeline-workspace-filter="'+esc(id)+'" aria-pressed="'+String(pipelineSelectedWorkspace===String(id))+'" class="'+(pipelineSelectedWorkspace===String(id)?'is-active':'')+'"><span>'+icon+'</span><span>'+esc(name)+'</span></button>';
-    list.innerHTML=item('','All Workspaces','▦')+visible.map(workspace=>item(workspace.id,workspace.name,'▣')).join('')||'<p class="mw-empty">No workspaces available.</p>';
-    list.querySelectorAll('[data-pipeline-workspace-filter]').forEach(button=>button.addEventListener('click',()=>{
-        pipelineSelectedWorkspace=button.dataset.pipelineWorkspaceFilter;
+    const selected=window.StudioScheduleWorkspaceCard.initialize(pipelineSelectedWorkspace);
+    pipelineSelectedWorkspace=selected;
+    window.StudioScheduleWorkspaceCard.render(workspaces,selected,value=>{
+        pipelineSelectedWorkspace=value;
         showPipeline().catch(pipelineError);
-    }));
+    });
 }
 function pipelineJobGrid(jobs, tasks, workspaces) {
     const names=new Map(workspaces.map(w=>[String(w.id),w.name]));
@@ -166,6 +187,7 @@ async function showPipeline() {
         json('/api/workspaces')
     ]);
     if(!current())return;
+    pipelineSelectedWorkspace=window.StudioScheduleWorkspaceCard.initialize(pipelineSelectedWorkspace);
     studioRememberPeople(people);
     const candidates = jobs.filter(job => (pipelineSelectedStatus?job.status===pipelineSelectedStatus:!StudioSubjectPicker.isClosed(job)) && (!pipelineSelectedWorkspace||String(job.workspaceId)===pipelineSelectedWorkspace) && (!pipelineSearch||[job.title,job.clientName,job.jobNumber].join(' ').toLowerCase().includes(pipelineSearch.toLowerCase())));
     const selected = candidates.filter(job => !pipelineSelectedStage || pipelineStage(job) === pipelineSelectedStage);
