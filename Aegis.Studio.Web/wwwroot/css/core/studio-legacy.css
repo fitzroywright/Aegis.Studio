@@ -10198,3 +10198,7 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 .studio-rail-collapsed-left > [data-rail-toggle="left"] { inset-inline-start:0; inset-inline-end:auto; top:8px; transform:none; }
 .studio-rail-toggle-in-header[data-rail-toggle="right"] { position:absolute; inset-inline-start:auto; inset-inline-end:8px; top:50%; transform:translateY(-50%); margin:0; }
 :is(#studioContextRail,.mw-today-right,.mw-list-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) > :is(section,article) > header:has(> .studio-rail-toggle-in-header[data-rail-toggle="right"]) { padding-inline-end:34px; }
+
+/* Rail controls live in the shared shell so every page uses the same hit target and positioning. */
+.studio-shell-rail-toggle[data-rail-toggle="left"] { position:fixed; inset-inline-start:4px; inset-inline-end:auto; inset-block-start:64px; z-index:1100; transform:none; }
+.studio-shell-rail-toggle[data-rail-toggle="right"] { position:fixed; inset-inline-start:auto; inset-inline-end:4px; inset-block-start:64px; z-index:1100; transform:none; }
