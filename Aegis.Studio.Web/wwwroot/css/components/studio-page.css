@@ -174,7 +174,7 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 /* Shared right-rail collapse: remove the rail from flow and expand the content track. */
 :is(.mw-today-right,.mw-list-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail,.job-detail-right,.studio-media-detail).studio-rail-collapsed-right { position:fixed; inset-inline-end:0; top:56px; bottom:36px; z-index:1000; flex:none; width:0; min-width:0; max-width:0; overflow:visible; gap:0; }
 :is(.mw-today-right,.mw-list-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail,.job-detail-right,.studio-media-detail).studio-rail-collapsed-right > [data-rail-toggle="right"] { position:fixed; inset-inline-end:4px; inset-block-start:64px; z-index:1001; }
-body[data-studio-view] .shell :has(> .studio-rail-collapsed-right) { --studio-shell-grid-columns:minmax(0,1fr); display:grid; grid-template-columns:var(--studio-shell-grid-columns); width:100%; max-width:none; min-width:0; gap:0; padding-inline-end:30px; box-sizing:border-box; }
+body[data-studio-view] .shell :has(> .studio-rail-collapsed-right) { --studio-shell-grid-columns:minmax(0,1fr); grid-template-columns:var(--studio-shell-grid-columns); padding-inline-end:30px; box-sizing:border-box; }
 :is(.studio-rail-collapsed-left,.studio-rail-collapsed-right) > :not([data-rail-toggle]) { display:none !important; }
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) { grid-template-columns:minmax(0,1fr) !important; column-gap:0 !important; }
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail { position:fixed; inset-inline-start:0; top:56px; bottom:36px; grid-column:auto; grid-row:auto; width:0; min-width:0; overflow:visible; z-index:1000; }
