@@ -3,7 +3,7 @@ function studioScheduleViewSwitch(active){
     return '<div class="studio-schedule-switch" role="group" aria-label="Schedule view">'+[['photographers','Photographer'],['pipeline','Jobs'],['production','Production']].map(([key,label])=>'<button type="button" data-studio-schedule-panel="'+key+'" aria-pressed="'+(active===key)+'">'+label+'</button>').join('')+'</div>';
 }
 function bindStudioScheduleSwitch(host){
-    host.querySelectorAll('[data-studio-schedule-panel]').forEach(button=>button.onclick=()=>window.studioNavigate('schedule',{...window.StudioPhotographerSchedule?.options(),panel:button.dataset.studioSchedulePanel}));
+    host.querySelectorAll('[data-studio-schedule-panel]').forEach(button=>button.onclick=()=>{const navigation=window.studioNavigate('schedule',{...window.StudioPhotographerSchedule?.options(),panel:button.dataset.studioSchedulePanel});Promise.resolve(navigation).finally(()=>window.StudioShell?.sync('schedule'));});
 }
 window.StudioScheduleCalendarControls = (() => {
     const dayKey = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
