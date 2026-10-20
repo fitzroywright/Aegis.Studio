@@ -9718,7 +9718,7 @@ body .shell>.studio-context-rail {
   min-width: 0;
   min-height: 0;
   overflow: hidden !important;
-  padding: 7px 0 6px !important;
+  padding: 15px 0 6px !important;
 }
 body .shell>.studio-context-rail>.studio-context-card {
   border:var(--studio-rail-border);
