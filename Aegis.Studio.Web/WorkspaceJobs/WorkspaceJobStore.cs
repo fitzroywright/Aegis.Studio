@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Messaging;
 using Npgsql;
 
 namespace Aegis.Studio.Web.WorkspaceJobs;
@@ -145,6 +146,12 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
         string collection=string.IsNullOrWhiteSpace(request.Collection)?"General":request.Collection.Trim();
         RequireText(collection,100,"Collection");
         if ((request.Reference?.Length ?? 0)>200 || (request.Notes?.Length ?? 0)>4000 || (request.ScheduleLocation?.Length ?? 0)>300 || (request.ContactName?.Length ?? 0)>200 || (request.ContactEmail?.Length ?? 0)>320 || (request.ContactPhone?.Length ?? 0)>100 || (request.PhotoNotes?.Length ?? 0)>4000) throw new ArgumentException("Subject details are too long.");
+        string contactEmail = request.ContactEmail?.Trim() ?? "";
+        if (contactEmail.Length > 0)
+        {
+            try { contactEmail = StudioAddressBook.ValidateAddress(contactEmail); }
+            catch (InvalidOperationException ex) { throw new ArgumentException("Supply a valid email address for the subject.", ex); }
+        }
         using var connection = database.OpenConnection();
         if (!create)
         {
@@ -159,7 +166,7 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
             ? "insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by,collection_name,scheduled_at_utc,schedule_location,contact_name,contact_email,contact_phone,photo_notes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)"
             : "update studio_job_subjects set name=$3,reference=$4,notes=$5,updated_by=$6,collection_name=$7,scheduled_at_utc=$8,schedule_location=$9,contact_name=$10,contact_email=$11,contact_phone=$12,photo_notes=$13,updated_at_utc=now() where id=$1 and job_id=$2";
         using var command = new NpgsqlCommand(sql, connection);
-        object[] values={id,jobId,request.Name.Trim(),request.Reference?.Trim() ?? "",request.Notes?.Trim() ?? "",user,collection,(object?)request.ScheduledAtUtc?.ToUniversalTime()??DBNull.Value,request.ScheduleLocation?.Trim() ?? "",request.ContactName?.Trim() ?? "",request.ContactEmail?.Trim() ?? "",request.ContactPhone?.Trim() ?? "",request.PhotoNotes?.Trim() ?? ""};
+        object[] values={id,jobId,request.Name.Trim(),request.Reference?.Trim() ?? "",request.Notes?.Trim() ?? "",user,collection,(object?)request.ScheduledAtUtc?.ToUniversalTime()??DBNull.Value,request.ScheduleLocation?.Trim() ?? "",request.ContactName?.Trim() ?? "",contactEmail,request.ContactPhone?.Trim() ?? "",request.PhotoNotes?.Trim() ?? ""};
         foreach(object value in values) command.Parameters.AddWithValue(value);
         return command.ExecuteNonQuery()==1;
     }
