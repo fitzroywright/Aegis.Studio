@@ -64,13 +64,15 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 
 /* Production workload board: replace the old table queue with real work-order stages. */
 .production-board-view{display:flex;flex-direction:column;gap:6px;height:100%;min-height:0;min-width:0;overflow:hidden}
-.production-overview-entries{display:flex;flex-direction:column;min-height:0;height:100%}
-.production-overview-entries .studio-workload-summary{min-height:0;max-height:100%;overflow:auto;padding:0}
-.production-overview-entries .workload-indicators{display:flex;flex-direction:column;gap:0}
-.production-overview-entries .workload-indicator{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;width:100%;height:auto;min-height:26px;padding:0 12px;border:0;border-radius:0;background:transparent;box-shadow:none;text-align:left;font-size:11px;font-weight:400}
-.production-overview-entries .workload-indicator strong{order:2;flex:0 0 auto;font-size:12px;font-weight:400}
-.production-overview-entries .workload-indicator span{flex:1;min-width:0}
+.production-overview-entries,.production-attention-entries{display:flex;flex-direction:column;min-height:0;height:100%}
+:is(.production-overview-entries,.production-attention-entries) .studio-workload-summary{display:flex;flex-direction:column;min-height:0;max-height:100%;overflow:auto;padding:0}
+:is(.production-overview-entries,.production-attention-entries) .workload-indicators{display:flex;flex-direction:column;gap:0}
+:is(.production-overview-entries,.production-attention-entries) .workload-indicator{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;width:100%;height:auto;min-height:26px;padding:0 12px;border:0;border-radius:0;background:transparent;box-shadow:none;text-align:left;font-size:11px;font-weight:400}
+:is(.production-overview-entries,.production-attention-entries) .workload-indicator strong{order:2;flex:0 0 auto;font-size:12px;font-weight:400}
+:is(.production-overview-entries,.production-attention-entries) .workload-indicator span{flex:1;min-width:0}
 .production-overview-entries .studio-workload-summary>p{display:none}
+.production-attention-entries .workload-attention-notes{padding:4px 12px;border-top:1px solid var(--studio-control-border,#dce4ec)}
+.production-attention-entries .workload-attention-notes p{margin:4px 0;font-size:10px;line-height:1.35;color:var(--theme-muted,#64748b)}
 .production-board-filters{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;flex:0 0 auto;min-width:0;overflow-x:auto;overflow-y:hidden;padding:5px 7px 7px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border:1px solid var(--studio-grid-header-border,#8394a4);border-radius:4px}
 .production-board-filters>input[type=search]{flex:1 1 180px;min-width:130px;width:180px;height:23px;min-height:23px;padding:2px 6px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:10px;font-weight:500}
 .production-board-filters>select{flex:0 1 auto;min-width:105px;max-width:160px;height:23px;min-height:23px;padding:1px 17px 1px 5px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:10px;font-weight:600;cursor:pointer}
