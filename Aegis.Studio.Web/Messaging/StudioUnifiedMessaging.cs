@@ -57,7 +57,7 @@ public sealed class StudioUnifiedMessaging
         using(var scopeConnection=database.OpenConnection())using(var scopeQuery=new NpgsqlCommand("select scope_type,scope_id from studio_message_threads where id=$1",scopeConnection))
         {
             Add(scopeQuery,threadId);using var scopeReader=scopeQuery.ExecuteReader();scopeReader.Read();string scope=scopeReader.GetString(0);Guid? scopeId=scopeReader.IsDBNull(1)?null:scopeReader.GetGuid(1);
-            if(destinations.Any(d=>(d.ContactType is "Job" or "Workspace") && (d.ContactType!=scope||d.ScopeId!=scopeId)))
+            if(destinations.Any(d=>(d.ContactType is "Job" or "Workspace") && (d.ContactType!=scope||d.ScopeId!=scopeId) || d.ContactType=="Subject" && (scope!="Job"||d.ScopeId!=scopeId)))
                 throw new InvalidOperationException("The destination must match this conversation's job or workspace.");
         }
         List<string> contentHashes=[];
@@ -183,11 +183,14 @@ public sealed class StudioUnifiedMessaging
     {
         if (destinations.Any(d=>d.Status!="Active"))throw new InvalidOperationException("Choose active destinations; inactive entries require administrator review.");
         if (destinations.Count == 0) throw new InvalidOperationException("Choose at least one recipient.");
-        var scoped = destinations.Where(d => d.ContactType is "Job" or "Workspace").ToArray();
+        var scoped = destinations.Where(d => d.ContactType is "Job" or "Workspace" or "Subject").ToArray();
         if (scoped.Length > 0)
         {
-            if (scoped.Length != 1) throw new InvalidOperationException("Choose one job or workspace conversation at a time.");
-            return messages.GetOrCreateScoped(user, scoped[0].ContactType, scoped[0].ScopeId!.Value).Id;
+            string scopeType = scoped.Any(d => d.ContactType is "Job" or "Subject") ? "Job" : "Workspace";
+            Guid scopeId = scoped[0].ScopeId ?? throw new InvalidOperationException("A scoped recipient is missing its job or workspace.");
+            if (scoped.Any(d => d.ScopeId != scopeId || d.ContactType == "Workspace" && scopeType != "Workspace"))
+                throw new InvalidOperationException("Choose recipients from one job or workspace at a time.");
+            return messages.GetOrCreateScoped(user, scopeType, scopeId).Id;
         }
         string current = CurrentUser(user);
         var members = destinations.Where(d => d.ContactType == "Staff" && d.DeliveryMode != "ExternalOnly").Select(d => d.UserName!)
