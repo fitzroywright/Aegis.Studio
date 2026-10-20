@@ -178,6 +178,31 @@
         if (toggle.parentElement !== shell) shell.append(toggle);
         return toggle;
     }
+    const rightRailLayouts = new WeakMap();
+    function syncRightRailLayout(rail, collapsed) {
+        const layout = rail.parentElement;
+        if (!layout) return;
+        if (!rightRailLayouts.has(layout)) {
+            rightRailLayouts.set(layout, { inlineColumns: layout.style.gridTemplateColumns });
+        }
+        const original = rightRailLayouts.get(layout);
+        if (!collapsed) {
+            layout.style.gridTemplateColumns = original.inlineColumns;
+            return;
+        }
+
+        // Read the page's own expanded grid, then release the rail's final grid track.
+        layout.style.gridTemplateColumns = original.inlineColumns;
+        rail.classList.remove('studio-rail-collapsed-right');
+        const computed = getComputedStyle(layout);
+        const display = computed.display;
+        const columns = computed.gridTemplateColumns;
+        rail.classList.add('studio-rail-collapsed-right');
+        if (display !== 'grid' && display !== 'inline-grid') return;
+        const tracks = columns.match(/(?:minmax|fit-content|repeat|\w+\([^)]*\)|\d+(?:\.\d+)?px|\d+(?:\.\d+)?fr|auto|\w+)/g) || [];
+        if (tracks.length > 1) layout.style.gridTemplateColumns = tracks.slice(0, -1).join(' ');
+    }
+
     function applyRailState() {
         const state = railState();
         const leftTargets = [document.getElementById('studioContextRail'), document.querySelector('.mw-today-left')].filter(Boolean);
@@ -192,6 +217,7 @@
         const rightTargets = document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail');
         rightTargets.forEach(rail => {
             rail.classList.toggle('studio-rail-collapsed-right', !!state.right);
+            syncRightRailLayout(rail, !!state.right);
             rail.dataset.shellRailReadyRight = 'true';
             const toggle = placeRailToggle(rail, 'right', !!state.right);
             toggle.setAttribute('aria-expanded', String(!state.right));
@@ -210,6 +236,9 @@
         if (missingLeft || missingRight) applyRailState();
     });
     railObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', () => {
+        if (railState().right) document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail').forEach(rail => syncRightRailLayout(rail, true));
+    });
 
     function ensureBreadcrumb() {
         if (!breadcrumb || breadcrumb.children.length) return;
