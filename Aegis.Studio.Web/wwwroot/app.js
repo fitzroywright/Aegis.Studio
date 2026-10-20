@@ -92,11 +92,16 @@ async function openConversation(id) {
         ${conversation.jobId ? '<div class="job-banner">This conversation is linked to a job. The conversation remains intact as client history.</div>' : ''}
         <div class="messages">
             ${conversation.messages.map(message => `
-                <article class="message ${message.visibility.toLowerCase()}">
+                <article class="message ${message.visibility.toLowerCase()}" data-message-id="${esc(message.id)}">
                     <div class="message-head">${esc(message.visibility.toUpperCase())} · ${esc(message.author)} · ${new Date(message.createdAt).toLocaleString()}</div>
                     <p>${esc(message.body)}</p>
                 </article>`).join('')}
         </div>
+    if(selectedConversation===id){
+        const displayedIncoming=conversation.messages.filter(message=>message.externalMessageId
+            &&detailPane.querySelector('[data-message-id="'+CSS.escape(message.id)+'"]'));
+        await Promise.all(displayedIncoming.map(message=>json('/api/messages/conversations/'+id+'/messages/'+message.id+'/displayed',{method:'POST'}).catch(()=>null)));
+    }
         <div class="composer">
             <textarea id="messageBody" placeholder="Write a reply or internal note..."></textarea>
             <div class="composer-row">
