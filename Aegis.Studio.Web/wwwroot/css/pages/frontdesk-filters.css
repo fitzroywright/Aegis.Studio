@@ -12,6 +12,8 @@ body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:first-child,
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:first-child{width:104px;max-width:104px;box-sizing:border-box}
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(4),
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(4){width:118px;max-width:118px;box-sizing:border-box}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(3),
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(3){width:108px;max-width:108px;box-sizing:border-box}
 
 /* Reuse the Workspaces Overview card and summary rows. */
 .fd-overview { display:flex; flex-direction:column; flex:1 1 0; min-height:0; --smc-footer-background:var(--mw-card-soft,#f5f8fa); --smc-footer-border:color-mix(in srgb,var(--mw-card-color,#9aabba) 42%,white); }
