@@ -37,7 +37,7 @@
             <button type="button" class="studio-media-carousel-arrow" id="studioMediaNext" aria-label="Next images">›</button>
           </div>
 
-        </div></section>      </div><aside class="studio-media-panel studio-media-detail" id="studioMediaDetail"><h3>Selected Image</h3><p class="muted">Select an image to see its details.</p></aside></div></div>`;
+        </div></section>      </div><aside class="studio-media-panel studio-media-detail st-right" id="studioMediaDetail"><h3>Selected Image</h3><p class="muted">Select an image to see its details.</p></aside></div></div>`;
     const root=genericView.querySelector('.studio-media-page'),job=root.querySelector('#studioMediaJob'),collection=root.querySelector('#studioMediaCollection'),subject=root.querySelector('#studioMediaSubject'),files=root.querySelector('#studioMediaFiles'),progress=root.querySelector('#studioMediaProgress'),gallery=root.querySelector('#studioMediaGallery'),count=root.querySelector('#studioMediaCount'),notice=root.querySelector('#studioMediaDestinationNotice');
     const search=root.querySelector('#studioMediaJobSearch'),matches=root.querySelector('#studioMediaJobMatches'),tree=root.querySelector('#studioMediaTree'),path=root.querySelector('#studioMediaPath');
     root.querySelector('#studioMediaJobStatus').onchange=renderTree;
