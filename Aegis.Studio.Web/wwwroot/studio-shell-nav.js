@@ -186,7 +186,7 @@
         for (let index = 0; index < value.length; index++) {
             if (value[index] === '(') depth++;
             else if (value[index] === ')') depth--;
-            else if (/\\s/.test(value[index]) && depth === 0) {
+            else if (/\s/.test(value[index]) && depth === 0) {
                 const track = value.slice(start, index).trim();
                 if (track) tracks.push(track);
                 start = index + 1;
