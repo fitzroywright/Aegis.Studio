@@ -26,10 +26,31 @@
   }
   return {activities,active,waiting,overdue,bucket,matches,summary};
  }
- function cards(model,selected,esc){
+ function cards(model,selected,esc,section='all'){
   const summary=model.summary(selected),p=summary.physical;
   const button=(key,value,label)=>`<button type="button" class="workload-indicator" data-workload-filter="${key}"><strong>${esc(value)}</strong><span>${label}</span></button>`;
-  return `<section class="studio-workload-summary" aria-label="Workload for current filters"><div class="workload-indicators">${button('all',summary.jobs,'Jobs')}${button('all',summary.activities,'Activities')}${button('ready',selected.filter(a=>model.bucket(a)==='ready').length,'Ready activities')}${button('waiting',selected.filter(model.waiting).length,'Waiting activities')}${button('overdue',selected.filter(model.overdue).length,'Overdue activities')}${button('rework',selected.filter(a=>/Rework|Reprint|Failed/.test(a.status)).length,'Rework activities')}${button('qc',p.awaitingQc,'Recorded physical units awaiting QC')}${button('item-rework',p.rework,'Recorded physical units requiring rework')}${button('refunds',p.refundedProduced,'Produced units refunded')}</div><p><strong>Physical outputs in permitted item records:</strong> ${p.ready} units awaiting production · ${p.progress} units remaining in progress · ${p.waiting} units waiting · ${p.unknown} units with unknown readiness · ${p.awaitingQc} produced units awaiting QC · ${p.rework} units requiring rework.</p><p>${summary.images.records} approved image/item records · ${summary.other.quantity} other purchased output units · ${summary.orderedUnits} catalog ordered units across ${summary.orders} work orders (counted once per order).</p><p>${summary.partialUnknown} work orders have unknown partial output progress. ${summary.missing} open activities have no linked quantity records. ${p.refundedProduced} produced units refunded: review stock/waste in Items / QC. ${summary.restricted} jobs have unavailable item quantities for this account. Physical totals cover recorded print and ID outputs; catalog ordered units are separate.</p></section>`;
+  const all=[
+   button('all',summary.jobs,'Jobs'),
+   button('all',summary.activities,'Activities'),
+   button('ready',selected.filter(a=>model.bucket(a)==='ready').length,'Ready activities'),
+   button('waiting',selected.filter(model.waiting).length,'Waiting activities'),
+   button('overdue',selected.filter(model.overdue).length,'Overdue activities'),
+   button('rework',selected.filter(a=>/Rework|Reprint|Failed/.test(a.status)).length,'Rework activities'),
+   button('waiting',p.waiting,'Recorded physical units waiting'),
+   button('unknown',p.unknown,'Physical units with unknown readiness'),
+   button('qc',p.awaitingQc,'Produced units awaiting QC'),
+   button('item-rework',p.rework,'Physical units requiring rework'),
+   button('refunds',p.refundedProduced,'Produced units refunded')
+  ];
+  const overview=all.slice(0,3),attention=all.slice(3);
+  const notes=[
+   summary.partialUnknown?summary.partialUnknown+' work orders have unknown partial output progress.':'',
+   summary.missing?summary.missing+' open activities have no linked quantity records.':'',
+   summary.restricted?summary.restricted+' jobs have unavailable item quantities for this account.':'',
+   p.refundedProduced?'Review refunded produced units in Items / QC.':''
+  ].filter(Boolean);
+  const content=section==='overview'?overview:section==='attention'?attention:all;
+  return `<section class="studio-workload-summary" aria-label="${section==='attention'?'Production items needing attention':'Workload for current filters'}"><div class="workload-indicators">${content.join('')||'<p>No production exceptions in this view.</p>'}</div>${section==='attention'&&notes.length?'<div class="workload-attention-notes">'+notes.map(note=>'<p>'+esc(note)+'</p>').join('')+'</div>':''}</section>`;
  }
  function production(filter,workspace='',assignee='',stage='',jobIds=null){
   root.studioWorkloadSelection={filter:filter||'',workspace,assignee,stage,jobIds};commercialQueueOffset=0;
