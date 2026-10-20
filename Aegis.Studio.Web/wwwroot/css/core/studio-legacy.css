@@ -10165,11 +10165,11 @@ body[data-studio-view="frontdesk"] .fd-table-scroll{width:100%;min-width:1110px;
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-width:1100px;table-layout:fixed}
 
 /* Collapse controls are styled here because this is the shared stylesheet loaded by index.html. */
-:is(#studioContextRail,.mw-today-left,.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) { position:relative; }
+:is(#studioContextRail,.mw-today-left,.mw-today-right,.mw-list-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) { position:relative; }
 .studio-rail-toggle { position:absolute; inset-block-start:6px; inset-inline-end:6px; z-index:4; width:26px; height:26px; min-width:26px; padding:0; display:grid; place-items:center; border:1px solid var(--theme-border,#d7dee7); border-radius:7px; background:var(--theme-surface,#fff); color:var(--theme-text,#26384b); font-size:20px; line-height:1; }
 #studioContextRail.studio-rail-collapsed-left,.mw-today-left.studio-rail-collapsed-left { width:0; min-width:0; overflow:visible; gap:0; }
-.mw-today-right.studio-rail-collapsed-right,.st-right.studio-rail-collapsed-right,.sj-right.studio-rail-collapsed-right,.fd-secondary.studio-rail-collapsed-right,.workspace-right-rail.studio-rail-collapsed-right { position:fixed; inset-inline-end:0; top:56px; bottom:36px; z-index:1000; flex:none; width:0; min-width:0; max-width:0; overflow:visible; gap:0; }
-:is(.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail).studio-rail-collapsed-right > [data-rail-toggle="right"] { position:fixed; inset-inline-end:4px; inset-block-start:64px; z-index:1001; }
+.mw-today-right.studio-rail-collapsed-right,.mw-list-right.studio-rail-collapsed-right,.st-right.studio-rail-collapsed-right,.sj-right.studio-rail-collapsed-right,.fd-secondary.studio-rail-collapsed-right,.workspace-right-rail.studio-rail-collapsed-right { position:fixed; inset-inline-end:0; top:56px; bottom:36px; z-index:1000; flex:none; width:0; min-width:0; max-width:0; overflow:visible; gap:0; }
+:is(.mw-today-right,.mw-list-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail).studio-rail-collapsed-right > [data-rail-toggle="right"] { position:fixed; inset-inline-end:4px; inset-block-start:64px; z-index:1001; }
 :is(.studio-rail-collapsed-left,.studio-rail-collapsed-right) > :not([data-rail-toggle]) { display:none !important; }
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) { grid-template-columns:minmax(0,1fr) !important; column-gap:0 !important; }
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail { position:fixed; inset-inline-start:0; top:56px; bottom:36px; grid-column:auto; grid-row:auto; width:0; min-width:0; overflow:visible; z-index:1000; }
@@ -10183,6 +10183,13 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
  .mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr); }
  .mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:0 minmax(0,1fr); column-gap:0; }
 }
+
+/* Every shared page layout releases the collapsed right-rail track. */
+.mw-list-layout:has(> .mw-list-right.studio-rail-collapsed-right) { grid-template-columns:190px minmax(0,1fr) !important; }
+.workspace-list-layout:has(> .workspace-right-rail.studio-rail-collapsed-right) { grid-template-columns:250px minmax(0,1fr) !important; }
+.fd-layout:has(> .fd-secondary.studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr) !important; }
+.st-layout:has(> .st-right.studio-rail-collapsed-right),.sj-layout:has(> .sj-right.studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr) !important; }
+
 /* Expanded rail toggles live in the first card header; collapsed rails keep a compact edge control. */
 :is(#studioContextRail,.mw-today-left,.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) > :is(section,article) > header { position:relative; }
 .studio-rail-toggle-in-header { position:static; flex:0 0 18px; width:18px; height:18px; min-width:18px; padding:0; margin:0; border:0; border-radius:4px; background:transparent; font-size:15px; }
@@ -10190,4 +10197,4 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 .studio-rail-toggle-in-header[data-rail-toggle="left"] + h2 { padding-inline-start:18px; }
 .studio-rail-collapsed-left > [data-rail-toggle="left"] { inset-inline-start:0; inset-inline-end:auto; top:8px; transform:none; }
 .studio-rail-toggle-in-header[data-rail-toggle="right"] { position:absolute; inset-inline-start:auto; inset-inline-end:8px; top:50%; transform:translateY(-50%); margin:0; }
-:is(#studioContextRail,.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) > :is(section,article) > header:has(> .studio-rail-toggle-in-header[data-rail-toggle="right"]) { padding-inline-end:34px; }
+:is(#studioContextRail,.mw-today-right,.mw-list-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) > :is(section,article) > header:has(> .studio-rail-toggle-in-header[data-rail-toggle="right"]) { padding-inline-end:34px; }
