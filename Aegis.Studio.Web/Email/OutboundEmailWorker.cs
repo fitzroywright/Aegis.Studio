@@ -36,7 +36,7 @@ public sealed class OutboundEmailWorker : BackgroundService
                 {
                     Guid lease=Guid.NewGuid();var message=outbox.ClaimNext(channels.Keys.ToArray(),lease);if(message is null)break;
                     bool providerAccepted=false;
-                    logger.LogInformation("Outbound delivery attempt started. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} Attempt={Attempt} Sender={Sender}", message.Id, message.DeliveryChannel, message.ToAddress, message.Attempts, message.FromAddress);
+                    logger.LogInformation("Outgoing delivery attempt started. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} Attempt={Attempt} Sender={Sender}", message.Id, message.DeliveryChannel, message.ToAddress, message.Attempts, message.FromAddress);
                     try
                     {
                         var transport=channels[message.DeliveryChannel];
@@ -76,10 +76,10 @@ public sealed class OutboundEmailWorker : BackgroundService
                         }
                         var request=new MessageRequest{RecipientIds=[message.ToAddress],Title=subject,Body=body,BodyIsHtml=false,Channels=channel,Source="Aegis.Studio",CorrelationId=message.Id.ToString("D"),Attachments=files,Metadata=metadata};
                         DateTimeOffset sendingAt=DateTimeOffset.UtcNow.AddMinutes(-1);
-                        logger.LogInformation("Submitting outbound delivery to provider. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} CorrelationId={CorrelationId}", message.Id, message.DeliveryChannel, message.ToAddress, request.CorrelationId);
+                        logger.LogInformation("Submitting outgoing delivery to provider. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} CorrelationId={CorrelationId}", message.Id, message.DeliveryChannel, message.ToAddress, request.CorrelationId);
                         await transport.SendAsync(recipient,request,message.Id,stoppingToken);
                         providerAccepted=true;
-                        logger.LogInformation("Outbound provider accepted delivery request. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient}", message.Id, message.DeliveryChannel, message.ToAddress);
+                        logger.LogInformation("Outgoing provider accepted delivery request. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient}", message.Id, message.DeliveryChannel, message.ToAddress);
                         string? providerId=null;
                         if(channel==MessageChannel.MsEmail)
                         {
