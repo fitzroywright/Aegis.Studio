@@ -140,15 +140,8 @@
         body.querySelectorAll('[data-inbox-message]').forEach(row=>{
             const open=async()=>{inboxSelection=row.dataset.inboxMessage;renderInbox();const selected=inboxRows.find(item=>item.message.id===inboxSelection);
                 if(selected?.thread.kind==='Conversation'){
-                    await openLegacyConversation(selected.thread.id);
-                    const displayed=document.querySelector('#messageConversationPane .studio-message-history .studio-chat-message[data-message-id="'+CSS.escape(inboxSelection)+'"]');
-                    if(selected.isUnread&&displayed){
-                        try{
-                            await json('/api/messages/conversations/'+selected.thread.id+'/messages/'+selected.message.id+'/displayed',{method:'POST'});
-                            selected.isUnread=false;
-                            if(inboxUnreadOnly)void loadInbox(true);else renderInbox();
-                        }catch{}
-                    }
+                    const opened=await openLegacyConversation(selected.thread.id);
+                    if(opened)void loadInbox(true);
                 }else await openThread(row.dataset.inboxThread);
                 const msg=document.querySelector('#studioMessageHistory .studio-chat-message[data-message-id="'+CSS.escape(inboxSelection)+'"]');msg?.scrollIntoView({block:'nearest'});};
             row.onclick=open;row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void open();}};
@@ -252,7 +245,7 @@
         const revision=++threadRevision;selectedThread=null;
         const target=document.getElementById('messageConversationPane');
         const [conversation,identities,files]=await Promise.all([json('/api/conversations/'+id),json('/api/conversations/'+id+'/sending-identities').catch(()=>null),json('/api/conversations/'+id+'/attachments').catch(()=>[])]);
-        const pane=document.getElementById('messageConversationPane');if(!pane||pane!==target||revision!==threadRevision)return;
+        const pane=document.getElementById('messageConversationPane');if(!pane||pane!==target||revision!==threadRevision)return false;
         setConversationContext(conversation.subject,'Client conversation',identities?.identities?.find(i=>i.isDefault)?.label||'Workspace',conversation.contactName);
         const senders=(identities?.identities||[]).filter(identity=>['Workspace','Self'].includes(identity.type));
         const replyChoices=senders.length?senders:[{type:'Workspace',label:'Reply'}];
@@ -261,6 +254,9 @@
             <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><span class="studio-send-split" role="group" aria-label="Send reply or add internal note"><button class="primary" type="submit">Send</button><select name="replyMode" aria-label="Reply sender or internal note">${replyChoices.map(identity=>`<option value="${esc(identity.type)}" ${identity.type===defaultSender?'selected':''}>${esc(identity.label)}</option>`).join('')}<option value="Internal">Internal note</option></select></span></div></form>`;
         StudioMessageCard.bindEditors(pane);
         await window.StudioInquiryAssociation?.mount(pane,id,conversation,()=>openLegacyConversation(id));
+        const displayedIncoming=(conversation.messages||[]).filter(message=>message.externalMessageId
+            &&pane.querySelector('.studio-chat-message[data-message-id="'+CSS.escape(message.id)+'"]'));
+        await Promise.all(displayedIncoming.map(message=>json('/api/messages/conversations/'+id+'/messages/'+message.id+'/displayed',{method:'POST'}).catch(()=>null)));
         const replyForm=document.getElementById('legacyMessageComposer');
         const replyMode=replyForm.elements.replyMode;
         const sendButton=replyForm.querySelector('[type=submit]');
@@ -277,6 +273,7 @@
             try{await json('/api/conversations/'+id+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:form.elements.body.value,isInternal:replyMode.value==='Internal',sendingIdentity:replyMode.value==='Self'?'Self':'Workspace'})});await openLegacyConversation(id);await loadInbox(false);}
             catch(error){document.getElementById('legacySendFeedback').textContent=error.message;}finally{button.disabled=false;replyMode.disabled=false;}
         };
+        return true;
     }
 
     async function openWorkspaceThread() {
