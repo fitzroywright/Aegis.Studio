@@ -90,7 +90,12 @@ public sealed class StudioUnifiedInbound(StudioDatabase database, StudioAddressB
     private Guid FindInboundThread(StudioAddressEntry destination, InboundEmail email)
     {
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
-        string key = $"inbound:{destination.Id:D}:{email.MessageId}";
+        // Keep messages from the same provider conversation together in this destination's private inbox.
+        // Fall back to the message ID when the provider has no thread identifier.
+        string conversationKey = string.IsNullOrWhiteSpace(email.ThreadId)
+            ? email.MessageId.Trim()
+            : "thread:" + email.ThreadId.Trim();
+        string key = $"inbound:{destination.Id:D}:{conversationKey}";
         LockRequest(c, tx, key);
         string scope = destination.ContactType is "Workspace" or "Job" ? destination.ContactType : "Direct";
         using var find = new NpgsqlCommand(scope == "Direct" ? "select id from studio_message_threads where direct_key=$1" : "select id from studio_message_threads where scope_type=$1 and scope_id=$2", c, tx);

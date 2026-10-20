@@ -108,6 +108,31 @@ public sealed class UnifiedMessagingPersistenceTests
         Assert.Equal(1,f.Count("studio_inapp_messages"));
     }
     [StudioPostgresFact]
+    public async Task PersonalInboxKeepsProviderRepliesInOnePrivateThread()
+    {
+        using var f=await Fixture.Create();
+        var paul=f.Book.GetAll().Single(e=>e.UserName=="paul");
+        f.Book.Save(paul with { EmailAddress="paul@studio.test", InboxType="Microsoft365", StudioInboxId="paul" });
+        var first=new InboundEmail("<first@outside.test>","provider-thread-42","Client","client@outside.test",
+            ["paul@studio.test"],[],new Dictionary<string,string>(),"Project details","Initial message",DateTimeOffset.UtcNow,[]);
+        var second=first with { MessageId="<second@outside.test>", Body="Follow-up", ReceivedAt=DateTimeOffset.UtcNow.AddMinutes(1) };
+
+        Assert.True((await f.Intake.ReceiveAsync(first,default)).Routed);
+        Assert.True((await f.Intake.ReceiveAsync(second,default)).Routed);
+
+        using var c=f.Source.OpenConnection();
+        using var q=new NpgsqlCommand("""
+            select count(distinct thread_id),count(*)
+            from studio_inapp_messages
+            where external_message_id=any($1)
+            """,c);
+        q.Parameters.AddWithValue(new[] { first.MessageId, second.MessageId });
+        using var r=q.ExecuteReader();Assert.True(r.Read());
+        Assert.Equal(1L,r.GetInt64(0));
+        Assert.Equal(2L,r.GetInt64(1));
+    }
+
+    [StudioPostgresFact]
     public async Task SharedIncomingReadIsFirstReaderWinsAndNewRepliesReturnToUnread()
     {
         using var f=await Fixture.Create();
