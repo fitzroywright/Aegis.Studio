@@ -271,7 +271,7 @@
                 <span class="mw-task-bullet priority-${esc(priority)}" aria-hidden="true"></span>
                 <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(context)}</small></span>
                 <span class="mw-due">${due?'<b>'+esc(dueState==='overdue'?'Overdue':dueState==='today'?'Today':'Due')+'</b><small>'+esc(formatDay(task.dueAtUtc))+'</small>':'<b>Open</b>'}</span>
-                <span class="mw-chevron">›</span>
+                
             </button>`;
         }).join('')||'<div class="mw-empty">No open tasks assigned to you.</div>';
 
@@ -282,7 +282,7 @@
                     <span class="smc-type" title="Announcement" aria-label="Announcement">📣</span>
                     <span class="smc-copy"><strong>${esc(a.title||'Announcement')}</strong><small>${esc((a.workspaceName?a.workspaceName+' · ':'')+(a.body||''))}</small></span>
                     <span class="smc-time">${a.createdAtUtc?formatDay(a.createdAtUtc):''}</span>
-                    <span class="mw-chevron">›</span>
+                    
                 </button>`;
             }
             const n=entry.item;
@@ -290,7 +290,7 @@
                 <span class="smc-type" title="Message" aria-label="Message">✉</span>
                 <span class="smc-copy"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.eventType||'Studio message')}</small></span>
                 <span class="smc-time">${n.createdAtUtc?formatDay(n.createdAtUtc):''}</span>
-                <span class="mw-chevron">›</span>
+                
             </button>`;
         }).join('')||'<div class="mw-empty">No messages or announcements.</div>';
 
@@ -303,7 +303,7 @@
                 <span class="mw-two-line"><strong>${esc(job.title)}</strong><small>${esc(job.clientName||job.jobType||'Photography')} · ${count} photos</small></span>
                 <span class="mw-pipeline-status">${esc(status)}</span>
                 <span class="mw-pipeline-due">${job.dueAtUtc?'Due '+formatDay(job.dueAtUtc):''}</span>
-                <span class="mw-chevron">›</span>
+                
             </button>`;
         }).join('')||'<div class="mw-empty">No active jobs currently led by you.</div>';
 
@@ -318,7 +318,7 @@
                 <span class="mw-today-job-progress"><span class="mw-today-job-meter"><i style="width:${percent}%"></i></span>${percent}%</span>
                 <span class="mw-today-job-date">${esc(formatJobDate(job.eventDate))}</span>
                 <span class="mw-today-job-role"><span class="studio-role-pill" data-role="${esc(role.toLowerCase().replace(/[^a-z0-9]+/g,'-'))}"><span class="studio-role-dot" aria-hidden="true"></span>${esc(role)}</span></span>
-                <span class="mw-chevron">›</span>
+                
             </button>`;
         }).join('')||'<div class="mw-today-jobs-empty" role="status">'+esc(emptyJobText)+'</div>';
         const overdueTasks=myTasks.filter(t=>t.dueAtUtc&&new Date(t.dueAtUtc)<now).length;
