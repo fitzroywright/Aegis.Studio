@@ -230,7 +230,7 @@
             toggle.setAttribute('aria-label', (state.left ? 'Expand' : 'Collapse') + ' left rail');
             toggle.title = toggle.getAttribute('aria-label'); toggle.textContent = state.left ? '›' : '‹';
         });
-        const rightTargets = document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail');
+        const rightTargets = document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail, .job-detail-right, .studio-media-detail');
         rightTargets.forEach(rail => {
             rail.classList.toggle('studio-rail-collapsed-right', !!state.right);
             syncRightRailLayout(rail, !!state.right);
@@ -244,7 +244,7 @@
 
     const railObserver = new MutationObserver(() => {
         const leftSelector = '#studioContextRail, .mw-today-left';
-        const rightSelector = '.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail';
+        const rightSelector = '.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail, .job-detail-right, .studio-media-detail';
         const missingLeft = Array.from(document.querySelectorAll(leftSelector))
             .some(rail => rail.dataset.shellRailReadyLeft !== 'true');
         const missingRight = Array.from(document.querySelectorAll(rightSelector))
@@ -253,7 +253,7 @@
     });
     railObserver.observe(document.body, { childList: true, subtree: true });
     window.addEventListener('resize', () => {
-        if (railState().right) document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail').forEach(rail => syncRightRailLayout(rail, true));
+        if (railState().right) document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail, .job-detail-right, .studio-media-detail').forEach(rail => syncRightRailLayout(rail, true));
     });
 
     function ensureBreadcrumb() {
