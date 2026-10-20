@@ -9448,7 +9448,7 @@ body .shell>.studio-shell-footer .studio-grid-item-count {
   }
   body[data-studio-view="today"] .studio-dashboard-template__columns {
     display: grid !important;
-    grid-template-columns: minmax(0,1fr) minmax(245px,290px) !important;
+    grid-template-columns: var(--studio-shell-grid-columns,minmax(0,1fr) minmax(245px,290px)) !important;
     grid-template-rows: minmax(0,1fr) !important;
     align-items: stretch !important;
     flex: 1 1 auto;
