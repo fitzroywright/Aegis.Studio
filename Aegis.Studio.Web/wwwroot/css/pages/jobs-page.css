@@ -116,16 +116,22 @@ body[data-studio-view="jobs"] .sj-calendar input[data-sj-calendar-date]{position
 @media(max-width:1080px){body[data-studio-view="jobs"] .sj-summary .sj-calendar{margin-left:0}}
 
 /* Let the Jobs grid scroll horizontally without clipping either aligned table. */
-body[data-studio-view="jobs"] .sj-table-frame{overflow-x:auto;overflow-y:hidden}
-body[data-studio-view="jobs"] .sj-table-head-clip{width:100%;min-width:1140px;flex:0 0 auto}
-body[data-studio-view="jobs"] .sj-table-scroll{width:100%;min-width:1140px;flex:1 1 auto}
-body[data-studio-view="jobs"] .sj-table-frame .sj-table{width:100%;min-width:1120px;table-layout:fixed}
-
-/* Five shared columns keep the split Jobs header and body on identical tracks. */
-body[data-studio-view="jobs"] .sj-table th:first-child{width:30%}
-body[data-studio-view="jobs"] .sj-table th:nth-child(2){width:17%}
-body[data-studio-view="jobs"] .sj-table th:nth-child(3){width:18%}
-body[data-studio-view="jobs"] .sj-table th:nth-child(4){width:18%}
-body[data-studio-view="jobs"] .sj-table th:nth-child(5){width:17%}
+/* Five columns share the available width; only the rows scroll vertically. */
+body[data-studio-view="jobs"] .sj-table-frame{display:flex;flex:1 1 auto;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+body[data-studio-view="jobs"] .sj-table-head-clip{width:100%;min-width:0;flex:0 0 auto}
+body[data-studio-view="jobs"] .sj-table-scroll{width:100%;min-width:0;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:scroll}
+body[data-studio-view="jobs"] .sj-table-frame .sj-table{display:table;width:100%;min-width:0;table-layout:fixed}
+body[data-studio-view="jobs"] .sj-table-frame .sj-table th:nth-child(1),
+body[data-studio-view="jobs"] .sj-table-frame .sj-table td:nth-child(1){width:30%}
+body[data-studio-view="jobs"] .sj-table-frame .sj-table th:nth-child(2),
+body[data-studio-view="jobs"] .sj-table-frame .sj-table td:nth-child(2){width:16%}
+body[data-studio-view="jobs"] .sj-table-frame .sj-table th:nth-child(3),
+body[data-studio-view="jobs"] .sj-table-frame .sj-table td:nth-child(3){width:17%}
+body[data-studio-view="jobs"] .sj-table-frame .sj-table th:nth-child(4),
+body[data-studio-view="jobs"] .sj-table-frame .sj-table td:nth-child(4){width:18%}
+body[data-studio-view="jobs"] .sj-table-frame .sj-table th:nth-child(5),
+body[data-studio-view="jobs"] .sj-table-frame .sj-table td:nth-child(5){width:19%}
+body[data-studio-view="jobs"] .sj-table-frame .sj-table th{box-sizing:border-box;white-space:nowrap}
+body[data-studio-view="jobs"] .sj-table-frame .sj-table td{box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
 
 .sj-page:has(> .sj-right.studio-rail-collapsed-right){--studio-right-rail-width:42px}
