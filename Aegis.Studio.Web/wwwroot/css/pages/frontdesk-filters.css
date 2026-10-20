@@ -6,16 +6,29 @@ body[data-studio-view="frontdesk"] .fd-client-header{display:flex;align-items:ce
 body[data-studio-view="frontdesk"] .fd-client-header>span{flex:0 0 auto}
 body[data-studio-view="frontdesk"] .fd-client-header input{flex:1 1 100px;min-width:100px;width:100%;max-width:310px;height:26px;box-sizing:border-box;padding:3px 7px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:4px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;font-weight:400}
 body[data-studio-view="frontdesk"] .fd-client-header input:focus-visible,body[data-studio-view="frontdesk"] .fd-column-controls select:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
-body[data-studio-view="frontdesk"] .fd-table{min-width:1120px}
-/* Keep both date columns compact and aligned in the fixed header and scrollable rows. */
-body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:first-child,
-body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:first-child{width:104px;max-width:104px;box-sizing:border-box}
-body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(4),
-body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(4){width:118px;max-width:118px;box-sizing:border-box}
+/* Column widths are shared by the fixed header table and scrolling data table. */
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-width:0;table-layout:fixed}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th,
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td{box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(1),
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(1){width:10%}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(2),
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(2){width:32%}
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(3),
-body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(3){width:108px;max-width:108px;box-sizing:border-box}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(3){width:14%}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(4),
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(4){width:14%}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(5),
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(5){width:16%}
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(6),
-body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(6){width:112px;max-width:112px;box-sizing:border-box}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(6){width:14%}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(3),
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(4),
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(5),
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(6){white-space:normal}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table .fd-column-controls{gap:3px;min-width:0}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table .fd-column-controls button{min-width:0;overflow:hidden;text-overflow:ellipsis}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table .fd-column-controls select{flex:0 0 22px;min-width:22px;max-width:22px}
 
 /* Reuse the Workspaces Overview card and summary rows. */
 .fd-overview { display:flex; flex-direction:column; flex:1 1 0; min-height:0; --smc-footer-background:var(--mw-card-soft,#f5f8fa); --smc-footer-border:color-mix(in srgb,var(--mw-card-color,#9aabba) 42%,white); }
