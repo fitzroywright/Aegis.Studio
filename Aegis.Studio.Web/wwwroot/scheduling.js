@@ -56,6 +56,7 @@ const pipelineStages = [
     ['Cancelled', ['Cancelled']]
 ];
 let pipelineView = 'jobs';
+let pipelineCalendarPeriod = 'week';
 let pipelineAnchor = new Date();
 let pipelineSelectedJob = '';
 let pipelineSelectedStage = '';
@@ -96,10 +97,12 @@ function pipelineItemMarkup(item, resourceMap) {
     return `<button class="pipeline-event ${item.type}"${draggable} data-open-job="${esc(item.jobId || '')}" title="${esc(item.title)} · ${esc(staff || 'Unassigned')}${item.location ? ' · ' + esc(item.location) : ''}"><span class="pipeline-event-symbol">${item.type === 'task' ? '✓' : '◉'}</span><span class="pipeline-event-copy">${esc(item.title)}<small>${esc(staff || item.status || '')}</small></span></button>`;
 }
 function pipelineTimeline(jobs, items, resourceMap) {
-    const start = new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth(), pipelineAnchor.getDate());
-    const days = Array.from({ length: 14 }, (_, i) => pipelineDayAt(start, i));
+    const controls=window.StudioScheduleCalendarControls;
+    const start=pipelineCalendarPeriod==='month'?new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),1):pipelineCalendarPeriod==='week'?controls.startOfWeek(pipelineAnchor):new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),pipelineAnchor.getDate());
+    const dayCount=pipelineCalendarPeriod==='month'?new Date(start.getFullYear(),start.getMonth()+1,0).getDate():pipelineCalendarPeriod==='week'?7:1;
+    const days = Array.from({ length: dayCount }, (_, i) => pipelineDayAt(start, i));
     const today = pipelineLocalDay(new Date());
-    const head = `<div class="pipeline-timeline-head"><span>Job / stage</span>${days.map(day => `<span class="${day === today ? 'today' : ''}">${new Date(day + 'T12:00:00').toLocaleDateString(undefined, { weekday:'short', day:'numeric' })}</span>`).join('')}</div>`;
+    const head = `<div class="pipeline-timeline-head" style="grid-template-columns:220px repeat(${dayCount},minmax(90px,1fr))"><span>Job / stage</span>${days.map(day => `<span class="${day === today ? 'today' : ''}">${new Date(day + 'T12:00:00').toLocaleDateString(undefined, { weekday:'short', day:'numeric' })}</span>`).join('')}</div>`;
     const rows = [...pipelineStages.map(([name]) => name), 'Other'].map(stage => {
         const grouped = jobs.filter(job => pipelineStage(job) === stage);
         if (!grouped.length) return '';
@@ -111,13 +114,16 @@ function pipelineTimeline(jobs, items, resourceMap) {
     }).join('');
     const unlinked = items.filter(item => !item.jobId);
     const other = unlinked.length ? `<section class="pipeline-stage-lane"><h3>Unlinked schedule <small>${unlinked.length}</small></h3><div class="pipeline-timeline-row"><span class="pipeline-job-link"><strong>General bookings and resources</strong></span>${days.map(day => `<div class="pipeline-day-cell ${day === today ? 'today' : ''}" data-pipeline-day="${day}">${unlinked.filter(item => pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day).map(item => pipelineItemMarkup(item,resourceMap)).join('')}</div>`).join('')}</div></section>` : '';
-    return `<div class="pipeline-timeline-scroll"><div class="pipeline-timeline">${head}${rows || '<p>No jobs in this pipeline.</p>'}${other}</div></div>`;
+    return `<div class="pipeline-timeline-scroll"><div class="pipeline-timeline" style="--pipeline-days:${dayCount}">${head}${rows || '<p>No jobs in this pipeline.</p>'}${other}</div></div>`;
 }
 function pipelineCalendar(items, resourceMap) {
-    const first = new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth(), 1);
-    const offset = first.getDay();
-    const dates = Array.from({ length: Math.ceil((offset + new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()) / 7) * 7 }, (_, i) => new Date(first.getFullYear(), first.getMonth(), 1 - offset + i));
-    return `<div class="pipeline-calendar"><div class="pipeline-calendar-days">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x => `<span>${x}</span>`).join('')}</div><div class="pipeline-calendar-grid">${dates.map(date => {
+    const controls=window.StudioScheduleCalendarControls;
+    const first=pipelineCalendarPeriod==='month'?new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),1):pipelineCalendarPeriod==='week'?controls.startOfWeek(pipelineAnchor):new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),pipelineAnchor.getDate());
+    const offset=pipelineCalendarPeriod==='month'?first.getDay():0;
+    const count=pipelineCalendarPeriod==='month'?Math.ceil((offset+new Date(first.getFullYear(),first.getMonth()+1,0).getDate())/7)*7:pipelineCalendarPeriod==='week'?7:1;
+    const dates=Array.from({length:count},(_,i)=>new Date(first.getFullYear(),first.getMonth(),first.getDate()-offset+i));
+    const dayNames=pipelineCalendarPeriod==='day'?[first.toLocaleDateString(undefined,{weekday:'short'})]:pipelineCalendarPeriod==='week'?dates.map(date=>date.toLocaleDateString(undefined,{weekday:'short'})):['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    return `<div class="pipeline-calendar"><div class="pipeline-calendar-days" style="grid-template-columns:repeat(${dayNames.length},minmax(0,1fr))">${dayNames.map(x => `<span>${x}</span>`).join('')}</div><div class="pipeline-calendar-grid" style="grid-template-columns:repeat(${dayNames.length},minmax(0,1fr))">${dates.map(date => {
         const day = pipelineLocalDay(date);
         const events = items.filter(item => pipelineLocalDay(item.start) <= day && pipelineLocalDay(item.end) >= day);
         return `<section class="pipeline-calendar-day ${date.getMonth() !== first.getMonth() ? 'outside' : ''} ${day === pipelineLocalDay(new Date()) ? 'today' : ''}" data-pipeline-day="${day}"><time datetime="${day}">${date.getDate()}</time>${events.map(item => pipelineItemMarkup(item, resourceMap)).join('')}</section>`;
@@ -160,20 +166,20 @@ async function showPipeline() {
     const today = pipelineLocalDay(new Date());
     const nearby = items.filter(item => pipelineLocalDay(item.end) >= today && pipelineLocalDay(item.start) <= pipelineDayAt(new Date(), 7));
     const isAdmin = (profile.user || profile).isAdministrator === true;
-    genericView.innerHTML=StudioPage.html({title:'Job Pipeline',tools:studioScheduleViewSwitch('pipeline')+'<button class="primary" id="pipelineNewSchedule">＋ Schedule item</button>',className:'st-pipeline-content',summary:StudioPage.metrics([['Jobs',selected.length],['Resources',resources.length],['Next 7 days',nearby.length],['Tasks without dates',undated.length]])+'<div class="pipeline-stage-summary">'+stages.filter(stage=>candidates.some(job=>pipelineStage(job)===stage)||pipelineSelectedStage===stage).map(stage => `<button class="pipeline-stage-tile ${pipelineSelectedStage===stage?'active':''}" data-stage="${esc(stage)}" aria-pressed="${pipelineSelectedStage===stage}"><strong>${esc(stage)}</strong><span>${candidates.filter(job => pipelineStage(job) === stage).length}</span></button>`).join('')+'</div>',attention:'<p>No pipeline issues require attention.</p>',content:`        <div class="pipeline-planning-toolbar"><div class="pipeline-view-switch"><button data-pipeline-view="jobs" class="${pipelineView==='jobs'?'active':''}">Jobs</button><button data-pipeline-view="timeline" class="${pipelineView === 'timeline' ? 'active' : ''}">Timeline</button><button data-pipeline-view="calendar" class="${pipelineView === 'calendar' ? 'active' : ''}">Calendar</button></div><button class="action" data-pipeline-prev aria-label="Previous period">‹</button><button class="action" data-pipeline-today>Today</button><button class="action" data-pipeline-next aria-label="Next period">›</button><strong>${esc(pipelineView === 'calendar' ? pipelineAnchor.toLocaleDateString(undefined,{month:'long',year:'numeric'}) : pipelineAnchor.toLocaleDateString() + ' – ' + new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),pipelineAnchor.getDate()+13).toLocaleDateString())}</strong></div>
+    const scheduleItemButton='<button type="button" class="primary pipeline-schedule-item" id="pipelineNewSchedule"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="M12 13v5M9.5 15.5h5"/></svg><span>Schedule item</span></button>';
+    genericView.innerHTML=StudioPage.html({title:'Job Pipeline',className:'st-pipeline-content',showHeader:false,summary:StudioPage.metrics([['Jobs',selected.length],['Resources',resources.length],['Next 7 days',nearby.length],['Tasks without dates',undated.length]])+'<div class="pipeline-stage-summary">'+stages.filter(stage=>candidates.some(job=>pipelineStage(job)===stage)||pipelineSelectedStage===stage).map(stage => `<button class="pipeline-stage-tile ${pipelineSelectedStage===stage?'active':''}" data-stage="${esc(stage)}" aria-pressed="${pipelineSelectedStage===stage}"><strong>${esc(stage)}</strong><span>${candidates.filter(job => pipelineStage(job) === stage).length}</span></button>`).join('')+'</div>',attention:'<p>No pipeline issues require attention.</p>',content:`${window.StudioScheduleCalendarControls.html('pipeline',pipelineAnchor,pipelineCalendarPeriod,scheduleItemButton)}
+        <div class="pipeline-mode-row"><div class="pipeline-view-switch" role="group" aria-label="Job pipeline view"><button type="button" data-pipeline-view="jobs" class="${pipelineView==='jobs'?'active':''}" aria-pressed="${pipelineView==='jobs'}">Jobs</button><button type="button" data-pipeline-view="timeline" class="${pipelineView === 'timeline' ? 'active' : ''}" aria-pressed="${pipelineView==='timeline'}">Timeline</button><button type="button" data-pipeline-view="calendar" class="${pipelineView === 'calendar' ? 'active' : ''}" aria-pressed="${pipelineView==='calendar'}">Calendar</button></div></div>
         <div class="ps-filters pipeline-filters" role="group" aria-label="Job pipeline filters"><label class="ps-header-filter"><span>Status</span><select id="pipelineStatusFilter"><option value="">All Open Jobs</option>${StudioStatusOrder.sort(jobs.map(j=>j.status)).map(status=>`<option value="${esc(status)}" ${pipelineSelectedStatus===status?'selected':''}>${esc(status)}</option>`).join('')}</select></label><label class="ps-header-filter"><span>Workspace</span><select id="pipelineWorkspaceFilter"><option value="">All Workspaces</option>${workspaces.map(w=>`<option value="${esc(w.id)}" ${pipelineSelectedWorkspace===String(w.id)?'selected':''}>${esc(w.name)}</option>`).join('')}</select></label><label class="ps-header-search"><span>Job / Client</span><input type="search" id="pipelineSearch" value="${esc(pipelineSearch)}" placeholder="Search job or client…"></label><label class="ps-header-filter"><span>Job</span><select data-job-picker id="pipelineJobFilter"><option value="">All jobs</option>${StudioSubjectPicker.jobOptions(jobs,pipelineSelectedJob)}</select></label></div>
         <p class="pipeline-key"><span>◉ Scheduled work</span><span>✓ Task / deadline</span><span>${nearby.length} items in the next 7 days</span></p>
         <section class="pipeline-planning-surface">${pipelineView === 'jobs' ? pipelineJobGrid(selected,tasks,workspaces) : pipelineView === 'calendar' ? pipelineCalendar(items, resourceMap) : pipelineTimeline(selected, items, resourceMap)}</section>${undated.length?`<details class="pipeline-resource-panel"><summary>${undated.length} tasks without dates</summary>${undated.map(task=>`<article class="task-card"><button class="link-button" data-open-job="${task.jobId}">${esc(task.title)}</button><small>${esc(task.assignedTo?studioFirstName(task.assignedTo):'Unassigned')} · ${esc(task.status)}</small></article>`).join('')}</details>`:''}
         <details class="pipeline-resource-panel"><summary>Resources (${resources.length})</summary><div id="scheduleResources">${resources.map(resource => `<div class="job-row"><div><b>${esc(resource.name)}</b><small>${esc(resource.resourceType)} · ${resource.isActive ? 'Active' : 'Inactive'}</small></div></div>`).join('') || '<p>No resources configured.</p>'}</div>${isAdmin ? '<div class="pos-entry"><label>Name<input id="scheduleResourceName"></label><label>Type<select id="scheduleResourceType"><option>Staff</option><option>Room</option><option>Equipment</option><option>Vehicle</option></select></label><button class="action" id="scheduleAddResource">Add resource</button></div>' : ''}</details>
         <dialog id="scheduleEntryDialog"><form id="scheduleEntryForm" class="request-form"><h2>Schedule item</h2><label>Job<select data-job-picker id="scheduleJob"><option value="">No linked job (administrators only)</option>${StudioSubjectPicker.jobOptions(jobs)}</select></label><label>Title<input id="scheduleTitle" required></label><div class="row"><label>Starts<input id="scheduleStart" type="datetime-local" required></label><label>Ends<input id="scheduleEnd" type="datetime-local" required></label></div><label>Location<input id="scheduleLocation"></label><label>Resources<select id="scheduleResourceIds" multiple size="6">${resources.map(resource => `<option value="${resource.id}">${esc(resource.resourceType)} · ${esc(resource.name)}</option>`).join('')}</select></label><label>Notes<textarea id="scheduleNotes"></textarea></label><p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary">Save</button></div></form></dialog>`});
     bindStudioScheduleSwitch(genericView);
+    window.StudioScheduleCalendarControls.bind(genericView,{date:()=>pipelineAnchor,refresh:()=>showPipeline().catch(pipelineError),view:value=>{pipelineCalendarPeriod=value;showPipeline().catch(pipelineError);},shift:shiftPipeline,today:()=>{pipelineAnchor=new Date();showPipeline().catch(pipelineError);},dateSelected:date=>{pipelineAnchor=date;showPipeline().catch(pipelineError);}});
     StudioPage.bind(genericView,current);
     StudioPage.setCount(selected.length+' jobs');
     genericView.querySelectorAll('[data-open-job]').forEach(button => button.onclick = () => button.dataset.openJob && openWorkspaceJob(button.dataset.openJob).catch(error => alert(error.message)));
     genericView.querySelectorAll('[data-pipeline-view]').forEach(button => button.onclick = () => { pipelineView = button.dataset.pipelineView; showPipeline().catch(pipelineError); });
-    genericView.querySelector('[data-pipeline-prev]').onclick = () => shiftPipeline(-1);
-    genericView.querySelector('[data-pipeline-next]').onclick = () => shiftPipeline(1);
-    genericView.querySelector('[data-pipeline-today]').onclick = () => { pipelineAnchor = new Date(); showPipeline().catch(pipelineError); };
     genericView.querySelector('#pipelineStatusFilter').onchange=event=>{pipelineSelectedStatus=event.target.value;pipelineSelectedStage='';showPipeline().catch(pipelineError);};
     genericView.querySelector('#pipelineWorkspaceFilter').onchange=event=>{pipelineSelectedWorkspace=event.target.value;showPipeline().catch(pipelineError);};
     genericView.querySelector('#pipelineSearch').onchange=event=>{pipelineSearch=event.target.value;showPipeline().catch(pipelineError);};
@@ -246,9 +252,9 @@ async function reschedulePipelineTask(task,targetDay){
 
 function pipelineError(error) { genericView.innerHTML = `<h1>Pipeline could not be loaded</h1><p role="alert">${esc(error.message || error)}</p><button class="action" id="pipelineRetry">Retry</button>`; genericView.querySelector('#pipelineRetry').onclick = () => showPipeline().catch(pipelineError); }
 function shiftPipeline(direction) {
-    pipelineAnchor = pipelineView === 'calendar'
-        ? new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth() + direction, 1)
-        : new Date(pipelineAnchor.getFullYear(), pipelineAnchor.getMonth(), pipelineAnchor.getDate() + direction * 14);
+    if(pipelineCalendarPeriod==='month')pipelineAnchor=new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth()+direction,1);
+    else if(pipelineCalendarPeriod==='week')pipelineAnchor=new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),pipelineAnchor.getDate()+direction*7);
+    else pipelineAnchor=new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),pipelineAnchor.getDate()+direction);
     showPipeline().catch(pipelineError);
 }
 function openScheduleEntryForm(jobId) {
