@@ -28,29 +28,35 @@
  }
  function cards(model,selected,esc,section='all'){
   const summary=model.summary(selected),p=summary.physical;
-  const button=(key,value,label)=>`<button type="button" class="workload-indicator" data-workload-filter="${key}"><strong>${esc(value)}</strong><span>${label}</span></button>`;
-  const all=[
-   button('all',summary.jobs,'Jobs'),
-   button('all',summary.activities,'Activities'),
-   button('ready',selected.filter(a=>model.bucket(a)==='ready').length,'Ready activities'),
-   button('waiting',selected.filter(model.waiting).length,'Waiting activities'),
-   button('overdue',selected.filter(model.overdue).length,'Overdue activities'),
-   button('rework',selected.filter(a=>/Rework|Reprint|Failed/.test(a.status)).length,'Rework activities'),
-   button('waiting',p.waiting,'Recorded physical units waiting'),
-   button('unknown',p.unknown,'Physical units with unknown readiness'),
-   button('qc',p.awaitingQc,'Produced units awaiting QC'),
-   button('item-rework',p.rework,'Physical units requiring rework'),
-   button('refunds',p.refundedProduced,'Produced units refunded')
+  const row=(key,value,label)=>({value:Number(value)||0,html:`<button type="button" class="workload-indicator" data-workload-filter="${key}"><strong>${esc(value)}</strong><span>${label}</span></button>`});
+  const overview=[
+   row('all',summary.jobs,'Jobs'),
+   row('all',summary.activities,'Activities'),
+   row('ready',selected.filter(a=>model.bucket(a)==='ready').length,'Ready activities'),
+   row('ready',p.ready,'Physical units awaiting production'),
+   row('progress',p.progress,'Physical units in progress'),
+   row('all',summary.images.records,'Approved image/item records'),
+   row('all',summary.other.quantity,'Other purchased output units'),
+   row('all',summary.orderedUnits,'Catalog ordered units across '+summary.orders+' work orders')
   ];
-  const overview=all.slice(0,3),attention=all.slice(3);
+  const attention=[
+   row('waiting',selected.filter(model.waiting).length,'Waiting activities'),
+   row('overdue',selected.filter(model.overdue).length,'Overdue activities'),
+   row('rework',selected.filter(a=>/Rework|Reprint|Failed/.test(a.status)).length,'Rework activities'),
+   row('waiting',p.waiting,'Physical units waiting'),
+   row('unknown',p.unknown,'Physical units with unknown readiness'),
+   row('qc',p.awaitingQc,'Produced units awaiting QC'),
+   row('item-rework',p.rework,'Physical units requiring rework'),
+   row('refunds',p.refundedProduced,'Produced units refunded')
+  ];
   const notes=[
    summary.partialUnknown?summary.partialUnknown+' work orders have unknown partial output progress.':'',
    summary.missing?summary.missing+' open activities have no linked quantity records.':'',
-   summary.restricted?summary.restricted+' jobs have unavailable item quantities for this account.':'',
-   p.refundedProduced?'Review refunded produced units in Items / QC.':''
+   summary.restricted?summary.restricted+' jobs have unavailable item quantities for this account.':''
   ].filter(Boolean);
-  const content=section==='overview'?overview:section==='attention'?attention:all;
-  return `<section class="studio-workload-summary" aria-label="${section==='attention'?'Production items needing attention':'Workload for current filters'}"><div class="workload-indicators">${content.join('')||'<p>No production exceptions in this view.</p>'}</div>${section==='attention'&&notes.length?'<div class="workload-attention-notes">'+notes.map(note=>'<p>'+esc(note)+'</p>').join('')+'</div>':''}</section>`;
+  const entries=section==='overview'?overview:section==='attention'?attention.filter(x=>x.value>0):[...overview,...attention];
+  const empty=section==='attention'&&!entries.length&&!notes.length?'<p>No production exceptions in this view.</p>':'';
+  return `<section class="studio-workload-summary" aria-label="${section==='attention'?'Production items needing attention':'Workload for current filters'}"><div class="workload-indicators">${entries.map(x=>x.html).join('')}${empty}</div>${section==='attention'&&notes.length?'<div class="workload-attention-notes">'+notes.map(note=>'<p>'+esc(note)+'</p>').join('')+'</div>':''}</section>`;
  }
  function production(filter,workspace='',assignee='',stage='',jobIds=null){
   root.studioWorkloadSelection={filter:filter||'',workspace,assignee,stage,jobIds};commercialQueueOffset=0;
