@@ -7113,7 +7113,8 @@ body[data-studio-view="workspaces"] .generic {
   white-space: nowrap;
 }
 .production-queue-tabs button.active {
-  background: #a46d2a;
+  background: #986c55;
+  border-color: #986c55;
   color: #fff;
 }
 .production-filters {
@@ -9189,7 +9190,8 @@ body .topbar #studioBreadcrumb .breadcrumb-label {
   font-size: 12px;
 }
 .fd-tabs button.active {
-  background: #9d6b15;
+  background: #986c55;
+  border-color: #986c55;
   color: #fff;
 }
 .fd-filters input {
@@ -10400,7 +10402,9 @@ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active strong 
   cursor: pointer;
 }
 .studio-media-page .studio-media-status-tabs button.active {
-  border-bottom: 2px solid #aa751f;
+  background: #986c55;
+  border-color: #986c55;
+  color: #fff;
   font-weight: 700;
 }
 .studio-media-page .studio-media-asset-button {
