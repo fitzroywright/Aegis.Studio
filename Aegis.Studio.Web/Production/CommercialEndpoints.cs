@@ -75,7 +75,7 @@ public static class CommercialEndpoints
                     w.specifications,w.template_version as "templateVersion",w.exception_reason as "exceptionReason",w.asset_id as "assetId",w.source_version_id as "sourceVersionId",
                     count(*) over() as "totalRows",
                     (select jsonb_agg(jsonb_build_object('id',a.id,'title',a.title,'status',a.status,'area',a.production_area,'assignedTo',a.assigned_to,
-                       'priority',a.priority,'dueAtUtc',a.due_at_utc,'blockedReason',case when a.blocked_reason is not null then a.blocked_reason
+                       'priority',a.priority,'scheduledAtUtc',a.scheduled_at_utc,'dueAtUtc',a.due_at_utc,'blockedReason',case when a.blocked_reason is not null then a.blocked_reason
                        when a.approved_image_required and w.source_version_id is null then 'Approved Job Gallery image required'
                        when exists(select 1 from studio_activity_dependencies d join studio_job_activities p on p.id=d.depends_on_id where d.activity_id=a.id and p.status not in ('Completed','Cancelled')) then 'Waiting for prerequisite' end,
                        'qualityControl',a.quality_control_required,'optional',a.optional_step,'step',a.step_definition,'revision',j.workflow_revision) order by a.step_order)
