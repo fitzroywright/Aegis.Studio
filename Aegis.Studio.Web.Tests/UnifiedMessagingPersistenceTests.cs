@@ -107,6 +107,39 @@ public sealed class UnifiedMessagingPersistenceTests
         await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Router.SendAsync(request with{Body="Two"},new FormFileCollection(),f.Paul,default));
         Assert.Equal(1,f.Count("studio_inapp_messages"));
     }
+    [StudioPostgresFact]
+    public async Task SharedIncomingReadIsFirstReaderWinsAndNewRepliesReturnToUnread()
+    {
+        using var f=await Fixture.Create();
+        var db=new StudioDatabase(f.Source);
+        var workspace=new WorkspaceStore(db).Create(new("Weddings","weddings@studio.test","weddings",true,1));
+        var route=new EmailRouteResult(true,workspace.Id,workspace.Name,workspace.EmailAddress,null);
+        var firstEmail=new InboundEmail("<first@outside.test>",null,"Client","client@outside.test",
+            ["weddings@studio.test"],[],new Dictionary<string,string>(),"Booking","Initial message",DateTimeOffset.UtcNow,[]);
+        var conversation=f.Studio.ReceiveEmail(firstEmail,route).Conversation;
+        Guid messageId;
+        using(var c=f.Source.OpenConnection())
+        using(var q=new NpgsqlCommand("select id from studio_messages where conversation_id=$1 and external_message_id=$2",c))
+        {q.Parameters.AddWithValue(conversation.Id);q.Parameters.AddWithValue(firstEmail.MessageId);messageId=(Guid)q.ExecuteScalar()!;}
+        var inbox=new StudioUnifiedInbox(db,new WorkspaceAccessService(db),new JobAccessService(db));
+        ClaimsPrincipal Reader(string name)=>new(new ClaimsIdentity([
+            new Claim("login_name",name),new Claim(ClaimTypes.Name,name),new Claim(ClaimTypes.Role,"Administrator")],"test"));
+        var readerA=Reader("staff-a");var readerB=Reader("staff-b");
+
+        Assert.True(Assert.Single(inbox.Get(readerA,0,100,null,null).Items).IsUnread);
+        Assert.Single(inbox.Get(readerA,0,100,null,null,unreadOnly:true).Items);
+        var receipts=await Task.WhenAll(
+            Task.Run(()=>inbox.MarkIncomingDisplayed(conversation.Id,messageId,readerA)),
+            Task.Run(()=>inbox.MarkIncomingDisplayed(conversation.Id,messageId,readerB)));
+        Assert.Equal(receipts[0],receipts[1]);
+        Assert.Empty(inbox.Get(readerB,0,100,null,null,unreadOnly:true).Items);
+        Assert.False(Assert.Single(inbox.Get(readerB,0,100,null,null).Items).IsUnread);
+
+        var reply=firstEmail with {MessageId="<second@outside.test>",Subject="Re: Booking",Body="A new question",ReceivedAt=DateTimeOffset.UtcNow.AddSeconds(1)};
+        f.Studio.ReceiveEmail(reply,route,conversation.Id);
+        Assert.Single(inbox.Get(readerB,0,100,null,null,unreadOnly:true).Items);
+    }
+
     private static FormFileCollection Files(string name,string content)
     {
         var stream=new MemoryStream(Encoding.UTF8.GetBytes(content));return [new FormFile(stream,0,stream.Length,"files",name){Headers=new HeaderDictionary(),ContentType="text/plain"}];
