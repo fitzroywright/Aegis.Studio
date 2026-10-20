@@ -179,28 +179,44 @@
         return toggle;
     }
     const rightRailLayouts = new WeakMap();
+    const rightChevronLane = 34;
     function syncRightRailLayout(rail, collapsed) {
         const layout = rail.parentElement;
         if (!layout) return;
         if (!rightRailLayouts.has(layout)) {
-            rightRailLayouts.set(layout, { inlineColumns: layout.style.gridTemplateColumns });
+            rightRailLayouts.set(layout, {
+                inlineColumns: layout.style.gridTemplateColumns,
+                inlinePaddingEnd: layout.style.paddingInlineEnd
+            });
         }
         const original = rightRailLayouts.get(layout);
-        if (!collapsed) {
-            layout.style.gridTemplateColumns = original.inlineColumns;
-            return;
-        }
-
-        // Read the page's own expanded grid, then release the rail's final grid track.
         layout.style.gridTemplateColumns = original.inlineColumns;
+        layout.style.paddingInlineEnd = original.inlinePaddingEnd;
+        if (!collapsed) return;
+
+        // Measure the page's expanded grid, then give the released rail width to
+        // the center track while keeping a small lane for the shell chevron.
         rail.classList.remove('studio-rail-collapsed-right');
         const computed = getComputedStyle(layout);
         const display = computed.display;
         const columns = computed.gridTemplateColumns;
+        const computedPaddingEnd = computed.paddingInlineEnd;
         rail.classList.add('studio-rail-collapsed-right');
-        if (display !== 'grid' && display !== 'inline-grid') return;
-        const tracks = columns.match(/(?:minmax|fit-content|repeat|\w+\([^)]*\)|\d+(?:\.\d+)?px|\d+(?:\.\d+)?fr|auto|\w+)/g) || [];
-        if (tracks.length > 1) layout.style.gridTemplateColumns = tracks.slice(0, -1).join(' ');
+
+        if (display === 'grid' || display === 'inline-grid') {
+            const tracks = Array.from(columns.matchAll(/([\\d.]+)px/g), match => Number(match[1]));
+            if (tracks.length > 1) {
+                const centerIndex = tracks.length - 2;
+                const expandedCenter = Math.max(0, tracks[centerIndex] + tracks[centerIndex + 1] - rightChevronLane);
+                const nextTracks = tracks.slice(0, centerIndex).map(width => width + 'px');
+                nextTracks.push(expandedCenter + 'px', rightChevronLane + 'px');
+                layout.style.gridTemplateColumns = nextTracks.join(' ');
+                return;
+            }
+        }
+
+        const padding = Number.parseFloat(computedPaddingEnd) || 0;
+        layout.style.paddingInlineEnd = (padding + rightChevronLane) + 'px';
     }
 
     function applyRailState() {
