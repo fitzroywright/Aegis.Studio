@@ -13,7 +13,7 @@ window.StudioProductionPlanning=(()=>{
         const current=()=>turn===revision&&document.body.dataset.studioView==='schedule'&&window.history.state?.studioSchedulePanel==='production';
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');genericView.innerHTML='<p role="status">Loading production plan…</p>';
         let orders,activities,jobs,workspaces;
-        try{[orders,activities,jobs,workspaces]=await Promise.all([array('/api/production/work-orders?limit=50&offset='+state.offset+'&area='+encodeURIComponent(state.area)+'&includeCompleted='+state.includeCompleted),array('/api/operations/activities'),array('/api/jobs'),array('/api/workspaces')]);}
+        try{[orders,activities,jobs,workspaces]=await Promise.all([array('/api/production/work-orders?limit=50&offset='+state.offset+'&area='+encodeURIComponent(state.area)+'&includeCompleted='+state.includeCompleted),array('/api/operations/activities'),array('/api/jobs'),loadWorkspaces()]);}
         catch(error){if(current()){genericView.innerHTML='<section class="mw-list-panel pp-error"><h2>Production plan could not load</h2><p role="alert">'+esc(error.message)+'</p><button class="action" data-pp-retry>Retry</button></section>';genericView.querySelector('[data-pp-retry]').onclick=()=>render();}return;}
         if(!current())return;
         state.workspace=window.StudioScheduleWorkspaceCard.initialize(state.workspace);
