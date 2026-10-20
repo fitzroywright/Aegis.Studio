@@ -1,6 +1,6 @@
 .ps-page .ps-board{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .ps-page .st-toolbar p{margin:5px 0 0;font-size:11px;opacity:.75}
-.ps-toolbar,.ps-filters,.ps-legend{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ps-toolbar,.ps-filters,.ps-legend,.pipeline-filters,.pp-filters{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .ps-toolbar{justify-content:space-between;padding:10px 12px 6px}.ps-filters select,.ps-filters>input{min-height:29px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;padding:4px 7px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;box-sizing:border-box}
 .ps-filters{padding:6px 12px 10px}.ps-filters>input{flex:1;min-width:140px}.ps-filters select{max-width:180px}.ps-filters label{font-size:11px;display:flex;align-items:center;gap:5px}
 .ps-calendar-tools{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:auto}
@@ -38,16 +38,16 @@
 .st-pipeline-content .st-tools,.st-commercial .st-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 
 /* Front Desk-style compact search/filter header. */
-.ps-page .ps-filters{flex:none;gap:12px;padding:8px 11px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border-bottom:2px solid var(--theme-accent,#cf792a)}
-.ps-page .ps-filters label{display:flex;align-items:center;gap:7px;margin:0;font-size:11px;font-weight:700;min-width:0}
-.ps-page .ps-header-filter{flex:0 1 240px}
-.ps-page .ps-header-search{flex:1 1 260px}
-.ps-page .ps-filters label>span{white-space:nowrap;flex:none}
-.ps-page .ps-filters select,.ps-page .ps-filters input[type=search]{flex:1;min-width:0;width:100%;max-width:none;height:28px;min-height:28px;margin:0;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
-.ps-page .ps-filters input[type=search]::placeholder{color:#e2ebf6;opacity:1}
-.ps-page .ps-filters .ps-header-inactive{flex:none;font-weight:500;white-space:nowrap}
-.ps-page .ps-filters input[type=checkbox]{width:auto;min-height:0;margin:0}
+:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex:none;display:flex;align-items:center;flex-wrap:nowrap;gap:10px;min-width:0;padding:8px 11px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border-bottom:2px solid var(--theme-accent,#cf792a);box-sizing:border-box}
+:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) label{display:flex;align-items:center;gap:7px;margin:0;font-size:11px;font-weight:700;min-width:0}
+:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-filter{flex:0 1 200px}
+:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-search{flex:1 1 260px}
+:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) label>span{white-space:nowrap;flex:none}
+:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) select,:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) input[type=search]{flex:1;min-width:0;width:100%;max-width:none;height:28px;min-height:28px;margin:0;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
+:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) input[type=search]::placeholder{color:#e2ebf6;opacity:1}
+:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-inactive{flex:none;font-weight:500;white-space:nowrap}
+:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) input[type=checkbox]{width:auto;min-height:0;margin:0}
 .ps-page :is(.ps-calendar-head,.ps-day-head),.ps-page :is(.ps-calendar-head,.ps-day-head)>div:first-child{background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8)}
-.ps-page .ps-filters :is(input,select):focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
-@media(max-width:900px){.ps-page .ps-filters{gap:8px}.ps-page .ps-header-filter{flex:1 1 220px}.ps-page .ps-header-search{flex-basis:100%}}
+:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) :is(input,select):focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
+@media(max-width:1100px){:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex-wrap:wrap;gap:8px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-filter{flex:1 1 200px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-search{flex:1 1 260px}}
 
