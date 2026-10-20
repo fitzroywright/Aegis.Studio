@@ -23,6 +23,7 @@
     let pickerJobs = [];
     let inboxThreads = [];
     let inboxFilter = '';
+    let inboxUnreadOnly = false;
     let inboxQuery = '';
     let inboxSelection = null;
     let inboxOffset = 0;
@@ -49,7 +50,7 @@
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
         genericView.innerHTML = StudioPage.html({title:'Messages',className:'st-messages-content',showHeader:false,showMessagesCard:false,summaryTitle:'Conversation Context',summary:'<div id="studioMessageContext"><p>Select a message to view its job, recipients and delivery context.</p></div>',attention:'<div id="studioMessageAttention" aria-live="polite"><p>Checking your replies…</p></div>',content:`
-            <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioEmailReview">Email routing review</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New Message</button></div></header>
+            <header class="studio-inbox-toolbar"><div><h2>Unified Inbox</h2><small id="studioInboxCount">Loading messages…</small></div><div class="studio-inbox-tools"><select data-job-picker id="studioInboxJobSelect" aria-label="Filter by job"><option value="">All jobs</option></select><select id="studioInboxReadFilter" aria-label="Filter by read status"><option value="">All messages</option><option value="unread">Unread</option></select><input id="studioInboxSearch" type="search" placeholder="Search messages…" aria-label="Search messages"><button class="action" id="studioInboxRefresh">Refresh</button><button class="action" id="studioEmailReview">Email routing review</button><button class="action" id="studioAddressBook">Address Book</button><button class="primary" id="newDirectMessage">New Message</button></div></header>
             <div class="st-inbox">
                 <section class="studio-inbox-center">
 
@@ -67,6 +68,7 @@
         document.getElementById('studioInboxRefresh').onclick = () => loadInbox(true);
         document.getElementById('studioInboxSearch').oninput = event => { inboxQuery = event.target.value;inboxOffset=0;clearTimeout(inboxSearchTimer);inboxSearchTimer=setTimeout(()=>loadInbox(true),250); };
         document.getElementById('studioInboxJobSelect').onchange = event => { inboxFilter=event.target.value;inboxOffset=0;void loadInbox(true); };
+        document.getElementById('studioInboxReadFilter').onchange = event => { inboxUnreadOnly=event.target.value==='unread';inboxOffset=0;void loadInbox(true); };
         await loadInbox(true);
         if(current())startRefresh();
     }
@@ -108,6 +110,7 @@
         try {
             const params=new URLSearchParams({offset:String(inboxOffset),limit:'100',query:inboxQuery});
             if(inboxFilter)params.set('jobId',inboxFilter);
+            if(inboxUnreadOnly)params.set('unreadOnly','true');
             const page=await json('/api/messages/inbox?'+params);
             if(revision!==inboxRevision||document.getElementById('studioInboxRows')!==body)return;
             inboxRows=page.items;inboxTotal=page.total;inboxLastLoad=Date.now();
@@ -132,12 +135,15 @@
         document.getElementById('studioInboxPrevious').disabled=inboxOffset===0;
         document.getElementById('studioInboxNext').disabled=inboxOffset+rows.length>=inboxTotal;
         const groups=[{title:'Messages',items:rows}];
-        body.innerHTML=groups.map(group=>'<section class="studio-inbox-group"><div class="studio-inbox-group-heading"><span>⌄</span> '+esc(group.title)+': '+group.items.length+' item(s)</div>'+group.items.map(({thread,message})=>'<div role="listitem" tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="studio-inbox-message-row '+(inboxSelection===message.id?'selected':'')+'"><div class="studio-inbox-message-top"><strong class="studio-inbox-message-sender">'+esc(message.senderUserName||'Unknown')+'</strong><strong class="studio-inbox-message-subject">'+esc(inboxSubject(message))+'</strong><time>'+esc(inboxDate(message.createdAtUtc))+'</time></div><div class="studio-inbox-message-bottom"><span class="studio-inbox-message-job">'+esc(inboxJob(thread))+'</span><span class="studio-inbox-message-preview">'+esc(String(message.body||'').replace(/\s+/g,' ').slice(0,220))+'</span><span class="studio-inbox-message-recipient">To: '+esc(inboxRecipient(message,thread))+'</span></div></div>').join('')+'</section>').join('') || '<div class="studio-inbox-loading">No messages.</div>';
+        body.innerHTML=groups.map(group=>'<section class="studio-inbox-group"><div class="studio-inbox-group-heading"><span>⌄</span> '+esc(group.title)+': '+group.items.length+' item(s)</div>'+group.items.map(({thread,message,isUnread})=>'<div role="listitem" tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="studio-inbox-message-row '+(isUnread?'is-unread ':'')+(inboxSelection===message.id?'selected':'')+'"><div class="studio-inbox-message-top"><strong class="studio-inbox-message-sender">'+esc(message.senderUserName||'Unknown')+'</strong><strong class="studio-inbox-message-subject">'+esc(inboxSubject(message))+'</strong><time>'+esc(inboxDate(message.createdAtUtc))+'</time></div><div class="studio-inbox-message-bottom"><span class="studio-inbox-message-job">'+esc(inboxJob(thread))+'</span><span class="studio-inbox-message-preview">'+esc(String(message.body||'').replace(/\s+/g,' ').slice(0,220))+'</span><span class="studio-inbox-message-recipient">To: '+esc(inboxRecipient(message,thread))+'</span></div></div>').join('')+'</section>').join('') || '<div class="studio-inbox-loading">No messages.</div>';
         if(!rows.length)body.innerHTML='<div class="studio-inbox-loading">No messages match the selected filters.</div>';
         body.querySelectorAll('[data-inbox-message]').forEach(row=>{
             const open=async()=>{inboxSelection=row.dataset.inboxMessage;renderInbox();const selected=inboxRows.find(item=>item.message.id===inboxSelection);
-                if(selected?.thread.kind==='Conversation')await openLegacyConversation(selected.thread.id);
-                else await openThread(row.dataset.inboxThread);const msg=document.querySelector('#studioMessageHistory .studio-chat-message[data-message-id="'+CSS.escape(inboxSelection)+'"]');msg?.scrollIntoView({block:'nearest'});};
+                if(selected?.thread.kind==='Conversation'){
+                    const opened=await openLegacyConversation(selected.thread.id);
+                    if(opened)void loadInbox(true);
+                }else await openThread(row.dataset.inboxThread);
+                const msg=document.querySelector('#studioMessageHistory .studio-chat-message[data-message-id="'+CSS.escape(inboxSelection)+'"]');msg?.scrollIntoView({block:'nearest'});};
             row.onclick=open;row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void open();}};
         });
     }
@@ -239,7 +245,7 @@
         const revision=++threadRevision;selectedThread=null;
         const target=document.getElementById('messageConversationPane');
         const [conversation,identities,files]=await Promise.all([json('/api/conversations/'+id),json('/api/conversations/'+id+'/sending-identities').catch(()=>null),json('/api/conversations/'+id+'/attachments').catch(()=>[])]);
-        const pane=document.getElementById('messageConversationPane');if(!pane||pane!==target||revision!==threadRevision)return;
+        const pane=document.getElementById('messageConversationPane');if(!pane||pane!==target||revision!==threadRevision)return false;
         setConversationContext(conversation.subject,'Client conversation',identities?.identities?.find(i=>i.isDefault)?.label||'Workspace',conversation.contactName);
         const senders=(identities?.identities||[]).filter(identity=>['Workspace','Self'].includes(identity.type));
         const replyChoices=senders.length?senders:[{type:'Workspace',label:'Reply'}];
@@ -248,6 +254,9 @@
             <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><span class="studio-send-split" role="group" aria-label="Send reply or add internal note"><button class="primary" type="submit">Send</button><select name="replyMode" aria-label="Reply sender or internal note">${replyChoices.map(identity=>`<option value="${esc(identity.type)}" ${identity.type===defaultSender?'selected':''}>${esc(identity.label)}</option>`).join('')}<option value="Internal">Internal note</option></select></span></div></form>`;
         StudioMessageCard.bindEditors(pane);
         await window.StudioInquiryAssociation?.mount(pane,id,conversation,()=>openLegacyConversation(id));
+        const displayedIncoming=(conversation.messages||[]).filter(message=>message.externalMessageId
+            &&pane.querySelector('.studio-chat-message[data-message-id="'+CSS.escape(message.id)+'"]'));
+        await Promise.all(displayedIncoming.map(message=>json('/api/messages/conversations/'+id+'/messages/'+message.id+'/displayed',{method:'POST'}).catch(()=>null)));
         const replyForm=document.getElementById('legacyMessageComposer');
         const replyMode=replyForm.elements.replyMode;
         const sendButton=replyForm.querySelector('[type=submit]');
@@ -264,6 +273,7 @@
             try{await json('/api/conversations/'+id+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:form.elements.body.value,isInternal:replyMode.value==='Internal',sendingIdentity:replyMode.value==='Self'?'Self':'Workspace'})});await openLegacyConversation(id);await loadInbox(false);}
             catch(error){document.getElementById('legacySendFeedback').textContent=error.message;}finally{button.disabled=false;replyMode.disabled=false;}
         };
+        return true;
     }
 
     async function openWorkspaceThread() {

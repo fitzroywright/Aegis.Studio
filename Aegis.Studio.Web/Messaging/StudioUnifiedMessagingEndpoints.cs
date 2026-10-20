@@ -10,7 +10,8 @@ using static Aegis.Studio.Web.Messaging.StudioUnifiedMessaging;
 namespace Aegis.Studio.Web.Messaging;
 
 public sealed record StudioInboxThread(Guid Id, string ScopeType, Guid? ScopeId, string Title, string Kind);
-public sealed record StudioInboxRow(StudioInboxThread Thread, StudioInAppMessage Message);
+public sealed record StudioInboxRow(StudioInboxThread Thread, StudioInAppMessage Message, bool IsUnread=false, string? FirstReader=null, DateTimeOffset? FirstReadAtUtc=null);
+public sealed record StudioSharedReadReceipt(string ReaderUserName, DateTimeOffset ReadAtUtc);
 public sealed record StudioInboxPage(IReadOnlyList<StudioInboxRow> Items, long Total, int Offset, int Limit);
 public sealed record StudioMessageAttentionItem(Guid ConversationId, string Kind, string Title, string Recipient,
     string Summary, string NextStep, bool RequiresSupport);
@@ -87,7 +88,7 @@ public sealed class StudioUnifiedInbox(StudioDatabase database, WorkspaceAccessS
         return new(rows.Take(50).ToArray(), rows.Count > 50);
     }
 
-    public StudioInboxPage Get(ClaimsPrincipal user, int offset, int limit, string? query, Guid? jobId)
+    public StudioInboxPage Get(ClaimsPrincipal user, int offset, int limit, string? query, Guid? jobId, bool unreadOnly=false)
     {
         offset=Math.Max(0,offset);limit=Math.Clamp(limit,1,200);
         string current=CurrentUser(user);
@@ -98,31 +99,70 @@ public sealed class StudioUnifiedInbox(StudioDatabase database, WorkspaceAccessS
         using var c=database.OpenConnection();using var q=new NpgsqlCommand("""
             with inbox as (
                 select m.id,m.thread_id,m.sender_user_name,m.body,m.created_at_utc,m.subject,m.recipient_addresses,m.internet_message_id,
-                       t.scope_type,t.scope_id,t.title,'Thread'::text as kind
+                       t.scope_type,t.scope_id,t.title,'Thread'::text as kind,
+                       (m.created_at_utc>coalesce(read_state.last_read_at_utc,'epoch'::timestamptz)
+                           and lower(m.sender_user_name)<>lower($1)) as is_unread,
+                       null::text as first_reader,null::timestamptz as first_read_at
                 from studio_inapp_messages m join studio_message_threads t on t.id=m.thread_id
+                left join studio_message_reads read_state on read_state.thread_id=t.id and lower(read_state.user_name)=lower($1)
                 where (t.scope_type='Direct' and exists(select 1 from studio_message_thread_members tm where tm.thread_id=t.id and lower(tm.user_name)=lower($1)))
                    or (t.scope_type='Workspace' and t.scope_id=any($2)) or (t.scope_type='Job' and t.scope_id=any($3))
                 union all
                 select m.id,c.id,coalesce(m.author_user_name,m.author_display_name),m.body,m.created_at_utc,c.subject,
                        array[c.contact_address],m.external_message_id,case when c.job_id is null then 'Workspace' else 'Job' end,
-                       coalesce(c.job_id,c.workspace_id),coalesce(j.title,c.subject),'Conversation'
+                       coalesce(c.job_id,c.workspace_id),coalesce(j.title,c.subject),'Conversation',
+                       (m.external_message_id is not null and shared_read.message_id is null) as is_unread,
+                       shared_read.reader_user_name as first_reader,shared_read.read_at_utc as first_read_at
                 from studio_messages m join studio_conversations c on c.id=m.conversation_id left join studio_jobs j on j.id=c.job_id
-                where c.workspace_id=any($2) or (c.job_id=any($4) and m.visibility='External')
+                left join studio_shared_message_reads shared_read on shared_read.message_id=m.id
+                where (c.job_id is null and c.workspace_id=any($2)) or c.job_id=any($4)
             )
             select *,count(*) over() from inbox
             where ($5::uuid is null or (scope_type='Job' and scope_id=$5))
               and ($6='' or strpos(lower(subject||' '||body||' '||sender_user_name||' '||title||' '||array_to_string(recipient_addresses,' ')),$6)>0)
+              and (not $9::boolean or is_unread)
             order by created_at_utc desc,id desc limit $7 offset $8
             """,c);
-        Add(q,current,workspaces,jobs,conversations,jobId,query?.Trim().ToLowerInvariant()??"",limit,offset);
+        Add(q,current,workspaces,jobs,conversations,jobId,query?.Trim().ToLowerInvariant()??"",limit,offset,unreadOnly);
         using var r=q.ExecuteReader();List<StudioInboxRow> rows=[];long total=0;
         while(r.Read())
         {
             rows.Add(new(new(r.GetGuid(1),r.GetString(8),r.IsDBNull(9)?null:r.GetGuid(9),r.GetString(10),r.GetString(11)),
-                new(r.GetGuid(0),r.GetGuid(1),r.GetString(2),r.GetString(3),r.GetFieldValue<DateTimeOffset>(4),r.GetString(5),r.GetFieldValue<string[]>(6),r.IsDBNull(7)?null:r.GetString(7))));total=r.GetInt64(12);
+                new(r.GetGuid(0),r.GetGuid(1),r.GetString(2),r.GetString(3),r.GetFieldValue<DateTimeOffset>(4),r.GetString(5),r.GetFieldValue<string[]>(6),r.IsDBNull(7)?null:r.GetString(7)),
+                r.GetBoolean(12),r.IsDBNull(13)?null:r.GetString(13),r.IsDBNull(14)?null:r.GetFieldValue<DateTimeOffset>(14)));total=r.GetInt64(15);
         }
         return new(rows,total,offset,limit);
     }
+    public StudioSharedReadReceipt MarkIncomingDisplayed(Guid conversationId, Guid messageId, ClaimsPrincipal user)
+    {
+        string current=CurrentUser(user);
+        using var c=database.OpenConnection();
+        using(var find=new NpgsqlCommand("""
+            select c.workspace_id,c.job_id,m.external_message_id
+            from studio_messages m join studio_conversations c on c.id=m.conversation_id
+            where m.id=$1 and c.id=$2
+            """,c))
+        {
+            Add(find,messageId,conversationId);using var r=find.ExecuteReader();
+            if(!r.Read())throw new KeyNotFoundException();
+            Guid workspace=r.GetGuid(0);Guid? job=r.IsDBNull(1)?null:r.GetGuid(1);
+            bool incoming=!r.IsDBNull(2)&&!string.IsNullOrWhiteSpace(r.GetString(2));r.Close();
+            if(!incoming)throw new KeyNotFoundException();
+            if(job.HasValue)
+            {
+                if(!jobAccess.HasPermission(user,job.Value,"ViewConversation"))throw new UnauthorizedAccessException();
+            }
+            else if(!workspaceAccess.HasPermission(user,workspace,"View"))throw new UnauthorizedAccessException();
+        }
+        using(var insert=new NpgsqlCommand("""
+            insert into studio_shared_message_reads(message_id,reader_user_name,read_at_utc)
+            values($1,$2,now()) on conflict(message_id) do nothing
+            """,c)){Add(insert,messageId,current);insert.ExecuteNonQuery();}
+        using var read=new NpgsqlCommand("select reader_user_name,read_at_utc from studio_shared_message_reads where message_id=$1",c);
+        Add(read,messageId);using var state=read.ExecuteReader();state.Read();
+        return new(state.GetString(0),state.GetFieldValue<DateTimeOffset>(1));
+    }
+
 }
 
 public static class StudioUnifiedMessagingEndpoints
@@ -135,8 +175,10 @@ public static class StudioUnifiedMessagingEndpoints
         group.MapGet("/address-book",(ClaimsPrincipal user,StudioAddressBook book)=>Results.Ok(book.GetAll(user)));
         group.MapPost("/contacts",(CreateMessagingContact request,ClaimsPrincipal user,StudioAddressBook book)=>Execute(()=>Results.Ok(book.Get(book.GetOrCreateExternal(request.DisplayName,request.EmailAddress).Id,user))));
         group.MapGet("/identity",(ClaimsPrincipal user,StudioAddressBook book)=>Results.Ok(book.GetAll(user).FirstOrDefault(e=>string.Equals(e.UserName,CurrentUser(user),StringComparison.OrdinalIgnoreCase))));
-        group.MapGet("/inbox",(int? offset,int? limit,string? query,Guid? jobId,ClaimsPrincipal user,StudioUnifiedInbox inbox)=>Results.Ok(inbox.Get(user,offset??0,limit??100,query,jobId)));
+        group.MapGet("/inbox",(int? offset,int? limit,string? query,Guid? jobId,bool? unreadOnly,ClaimsPrincipal user,StudioUnifiedInbox inbox)=>Results.Ok(inbox.Get(user,offset??0,limit??100,query,jobId,unreadOnly??false)));
         group.MapGet("/attention", (ClaimsPrincipal user, StudioUnifiedInbox inbox) => Results.Ok(inbox.GetAttention(user)));
+        group.MapPost("/conversations/{conversationId:guid}/messages/{messageId:guid}/displayed",
+            (Guid conversationId,Guid messageId,ClaimsPrincipal user,StudioUnifiedInbox inbox)=>Execute(()=>Results.Ok(inbox.MarkIncomingDisplayed(conversationId,messageId,user))));
         group.MapGet("/threads/{threadId:guid}/deliveries",(Guid threadId,ClaimsPrincipal user,StudioUnifiedMessaging router)=>Execute(()=>Results.Ok(router.GetDeliveries(threadId,user))));
         group.MapGet("/threads/{threadId:guid}/recipients",(Guid threadId,ClaimsPrincipal user,StudioInAppMessageStore messages,StudioAddressBook book,StudioDatabase db)=>Execute(()=>
         {
