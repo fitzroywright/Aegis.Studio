@@ -179,7 +179,7 @@
         return toggle;
     }
     const rightRailLayouts = new WeakMap();
-    const rightChevronLane = 34;
+    const rightChevronLane = 30;
     function splitGridTracks(value) {
         const tracks = [];
         let depth = 0, start = 0;
@@ -217,19 +217,22 @@
         const computed = getComputedStyle(layout);
         const tracks = splitGridTracks(computed.gridTemplateColumns || '');
         const display = computed.display;
-        const paddingEnd = computed.paddingInlineEnd;
+        const columnGap = Number.parseFloat(computed.columnGap) || 0;
         rail.classList.add('studio-rail-collapsed-right');
 
         if ((display === 'grid' || display === 'inline-grid') && tracks.length > 1) {
-            tracks.splice(-2, 2, 'minmax(0, 1fr)', rightChevronLane + 'px');
+            // Include the existing grid gap inside the chevron lane so the
+            // center edge meets the toggle with no additional gutter.
+            const railTrack = Math.max(0, rightChevronLane - columnGap);
+            tracks.splice(-2, 2, 'minmax(0, 1fr)', railTrack + 'px');
+            layout.style.paddingInlineEnd = '0px';
             layout.style.gridTemplateColumns = tracks.join(' ');
             return;
         }
 
-        // Stacked layouts have no dedicated right-hand track. Preserve a narrow
-        // edge lane for the fixed shell chevron without shrinking the page grid.
-        const padding = Number.parseFloat(paddingEnd) || 0;
-        layout.style.paddingInlineEnd = Math.max(padding, rightChevronLane) + 'px';
+        // Stacked layouts have no dedicated right-hand track. Their single
+        // content track ends exactly at the fixed shell chevron.
+        layout.style.paddingInlineEnd = rightChevronLane + 'px';
     }
 
     function applyRailState() {
