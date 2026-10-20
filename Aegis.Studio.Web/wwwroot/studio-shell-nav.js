@@ -179,9 +179,6 @@
         return toggle;
     }
     function syncRightRailLayout(rail, collapsed) {
-        const layout = rail.parentElement;
-        if (!layout) return;
-        layout.classList.toggle('studio-shell-right-collapsed', collapsed);
         rail.classList.toggle('studio-rail-collapsed-right', collapsed);
     }
 
