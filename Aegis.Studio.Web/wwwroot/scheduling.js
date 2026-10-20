@@ -5,6 +5,43 @@ function studioScheduleViewSwitch(active){
 function bindStudioScheduleSwitch(host){
     host.querySelectorAll('[data-studio-schedule-panel]').forEach(button=>button.onclick=()=>window.studioNavigate('schedule',{...window.StudioPhotographerSchedule?.options(),panel:button.dataset.studioSchedulePanel}));
 }
+window.StudioScheduleCalendarControls = (() => {
+    const dayKey = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    const startOfWeek = date => new Date(date.getFullYear(),date.getMonth(),date.getDate()-((date.getDay()+6)%7));
+    const addDays = (date,days) => new Date(date.getFullYear(),date.getMonth(),date.getDate()+days);
+    const shortDate = date => date.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+    function label(date,view){
+        if(view==='month')return date.toLocaleDateString([],{month:'long',year:'numeric'});
+        if(view==='week'){const first=startOfWeek(date);return shortDate(first)+' – '+shortDate(addDays(first,6));}
+        return dayKey(date)===dayKey(new Date())?'Today':shortDate(date);
+    }
+    function html(activePanel,date,view,leftExtra=''){
+        return `<div class="ps-toolbar pipeline-calendar-toolbar"><div class="pipeline-toolbar-left">${studioScheduleViewSwitch(activePanel)}${leftExtra}</div><button type="button" class="action" data-sp-refresh>↻ Refresh</button><div class="ps-calendar-tools"><div class="mw-calendar-view-switch" role="group" aria-label="Calendar view">${['month','week','day'].map(value=>'<button type="button" data-sp-calendar-view="'+value+'" class="'+(view===value?'active':'')+'" aria-pressed="'+String(view===value)+'">'+value[0].toUpperCase()+value.slice(1)+'</button>').join('')}</div><div class="mw-day-nav" aria-label="${view} photographer calendar navigator"><button type="button" class="mw-day-step" data-sp-calendar-step="-1" aria-label="Previous ${view}">‹</button><button type="button" class="mw-day-current" data-sp-calendar-today title="${dayKey(date)===dayKey(new Date())?'Today':'Return to today'}">${esc(label(date,view))}</button><button type="button" class="mw-day-step" data-sp-calendar-step="1" aria-label="Next ${view}">›</button><div class="mw-calendar-control"><button type="button" class="mw-calendar-trigger" data-sp-calendar-toggle aria-label="Choose date" aria-expanded="false" title="Choose date"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/></svg></button><div class="mw-calendar-popover" data-sp-calendar-popover hidden></div></div></div></div></div>`;
+    }
+    function bind(host,handlers){
+        host.querySelector('[data-sp-refresh]')?.addEventListener('click',handlers.refresh);
+        host.querySelectorAll('[data-sp-calendar-view]').forEach(button=>button.addEventListener('click',()=>handlers.view(button.dataset.spCalendarView)));
+        host.querySelectorAll('[data-sp-calendar-step]').forEach(button=>button.addEventListener('click',()=>handlers.shift(Number(button.dataset.spCalendarStep))));
+        host.querySelector('[data-sp-calendar-today]')?.addEventListener('click',handlers.today);
+        const toggle=host.querySelector('[data-sp-calendar-toggle]'),popover=host.querySelector('[data-sp-calendar-popover]');
+        if(!toggle||!popover)return;
+        let month=new Date(handlers.date().getFullYear(),handlers.date().getMonth(),1);
+        const paint=()=>{
+            const year=month.getFullYear(),monthIndex=month.getMonth(),first=new Date(year,monthIndex,1),last=new Date(year,monthIndex+1,0),leading=(first.getDay()+6)%7,today=new Date(),cells=[];
+            for(let i=0;i<leading;i++)cells.push('<span class="mw-calendar-empty" aria-hidden="true"></span>');
+            for(let day=1;day<=last.getDate();day++){
+                const date=new Date(year,monthIndex,day),selected=dayKey(date)===dayKey(handlers.date()),isToday=dayKey(date)===dayKey(today);
+                cells.push('<button type="button" class="mw-calendar-day'+(selected?' selected':'')+(isToday?' is-today':'')+'" data-sp-calendar-day="'+day+'" aria-label="'+date.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})+'">'+day+'</button>');
+            }
+            popover.innerHTML='<div class="mw-calendar-head"><button type="button" data-sp-calendar-month="-1" aria-label="Previous month">‹</button><strong>'+month.toLocaleDateString([],{month:'long',year:'numeric'})+'</strong><button type="button" data-sp-calendar-month="1" aria-label="Next month">›</button></div><div class="mw-calendar-week"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div><div class="mw-calendar-grid">'+cells.join('')+'</div><button type="button" class="mw-calendar-today" data-sp-calendar-today-action>Today</button>';
+            popover.querySelectorAll('[data-sp-calendar-month]').forEach(button=>button.onclick=()=>{month=new Date(year,monthIndex+Number(button.dataset.spCalendarMonth),1);paint();});
+            popover.querySelectorAll('[data-sp-calendar-day]').forEach(button=>button.onclick=()=>{popover.hidden=true;toggle.setAttribute('aria-expanded','false');handlers.dateSelected(new Date(year,monthIndex,Number(button.dataset.spCalendarDay),12));});
+            popover.querySelector('[data-sp-calendar-today-action]').onclick=()=>{popover.hidden=true;toggle.setAttribute('aria-expanded','false');handlers.today();};
+        };
+        toggle.onclick=()=>{const opening=popover.hidden;popover.hidden=!opening;toggle.setAttribute('aria-expanded',String(opening));if(opening){const date=handlers.date();month=new Date(date.getFullYear(),date.getMonth(),1);paint();}};
+    }
+    return {html,bind,label,startOfWeek,dayKey};
+})();
 // Pipeline is the planning home: stage groups, schedule entries and job tasks share one page.
 const pipelineStages = [
     ['Booking / intake', ['New', 'Inquiry', 'Booking', 'Pending', 'Pending Confirmation', 'Awaiting Deposit']],
