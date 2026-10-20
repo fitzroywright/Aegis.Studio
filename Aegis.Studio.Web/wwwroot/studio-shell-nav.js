@@ -192,7 +192,7 @@
             toggle.setAttribute('aria-label', (state.left ? 'Expand' : 'Collapse') + ' left rail');
             toggle.title = toggle.getAttribute('aria-label'); toggle.textContent = state.left ? '›' : '‹';
         });
-        const rightTargets = document.querySelectorAll('.mw-today-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail');
+        const rightTargets = document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail');
         rightTargets.forEach(rail => {
             rail.classList.toggle('studio-rail-collapsed-right', !!state.right);
             const toggle = placeRailToggle(rail, 'right', !!state.right);
@@ -204,7 +204,7 @@
 
     const railObserver = new MutationObserver(() => {
         const leftSelector = '#studioContextRail, .mw-today-left';
-        const rightSelector = '.mw-today-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail';
+        const rightSelector = '.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail';
         const missingLeft = Array.from(document.querySelectorAll(leftSelector))
             .some(rail => !rail.querySelector('[data-rail-toggle="left"]'));
         const missingRight = Array.from(document.querySelectorAll(rightSelector))
