@@ -10176,7 +10176,7 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > main { grid-column:1 !important; grid-row:1; width:100% !important; min-width:0; padding-inline-start:34px; }
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail > [data-rail-toggle="left"] { position:fixed; inset-inline-start:4px; inset-block-start:64px; z-index:1001; }
 .mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:0 minmax(0,1fr) minmax(245px,290px); column-gap:0; }
-.mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(175px,210px) minmax(0,1fr); }
+.mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr); }
 .mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:0 minmax(0,1fr); column-gap:0; }
 @media(max-width:850px) {
  .mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:0 minmax(0,1fr); column-gap:0; }
