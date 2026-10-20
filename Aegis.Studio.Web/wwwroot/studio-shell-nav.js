@@ -16,6 +16,8 @@
     ];
     let currentView = document.body.dataset.studioView || 'today';
     let renderingTools = false;
+    let workspaceLoadPromise = null;
+    let workspaceLoadAttempted = false;
 
     const escText = value => String(value ?? '').replace(/[&<>"']/g, character => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -86,6 +88,18 @@
         }
         renderLeftRail();
         applyRailState();
+    }
+
+    function ensureWorkspaceListLoaded() {
+        const cache = typeof workspaceCache !== 'undefined' ? workspaceCache : window.workspaceCache;
+        if (Array.isArray(cache) && cache.length) return Promise.resolve();
+        if (workspaceLoadPromise || workspaceLoadAttempted || typeof loadWorkspaces !== 'function') return workspaceLoadPromise || Promise.resolve();
+        workspaceLoadAttempted = true;
+        workspaceLoadPromise = Promise.resolve().then(() => loadWorkspaces()).catch(() => {}).finally(() => {
+            workspaceLoadPromise = null;
+            renderLeftRail();
+        });
+        return workspaceLoadPromise;
     }
 
     const railRole=title=>title==='Navigation'?'navigation':title==='My Workspaces'?'workspaces':'actions';
@@ -264,6 +278,7 @@
         currentView=view;
         ensureTools();
         ensureLeftRail();
+        ensureWorkspaceListLoaded();
         syncPageFrame();
         applyRailState();
         syncGridFooterCount();
@@ -344,6 +359,7 @@
         currentView = document.body.dataset.studioView || currentView;
         ensureTools();
         ensureLeftRail();
+        ensureWorkspaceListLoaded();
         ensureFooter();
         syncFooterIdentity();
         const identityNode = document.getElementById('signedInUser');
