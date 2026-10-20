@@ -17,22 +17,35 @@ async function json(url, options) {
     return body.trim() ? JSON.parse(body) : null;
 }
 
+let workspaceLoadPromise = null;
 async function loadWorkspaces() {
-    const access = await json('/api/workspace-access');
-    workspaceCache = access.map(item => ({
-        id: item.workspace.id,
-        name: item.workspace.name,
-        address: item.workspace.emailAddress || '',
-        iconName: item.workspace.iconName || 'folder',
-        accentColor: item.workspace.accentColor || '#b99750',
-        openCount: 0,
-        permissions: item.permissions
-    }));
-    requestWorkspace.innerHTML = workspaceCache
-        .filter(x => x.permissions.accessWorkspace)
-        .map(workspace => `<option value="${workspace.id}">${esc(workspace.name)}</option>`)
-        .join('');
-    renderWorkspaceMenu();
+    if (workspaceLoadPromise) return workspaceLoadPromise;
+    workspaceLoadPromise = (async () => {
+        const access = await json('/api/workspace-access');
+        workspaceCache = access.map(item => ({
+            id: item.workspace.id,
+            name: item.workspace.name,
+            address: item.workspace.emailAddress || '',
+            iconName: item.workspace.iconName || 'folder',
+            accentColor: item.workspace.accentColor || '#b99750',
+            openCount: 0,
+            permissions: item.permissions
+        }));
+        if (requestWorkspace) {
+            requestWorkspace.innerHTML = workspaceCache
+                .filter(x => x.permissions.accessWorkspace)
+                .map(workspace => `<option value="${workspace.id}">${esc(workspace.name)}</option>`)
+                .join('');
+        }
+        renderWorkspaceMenu();
+        window.dispatchEvent(new CustomEvent('studio-workspaces-loaded', { detail: { workspaces: workspaceCache } }));
+        return workspaceCache;
+    })();
+    try {
+        return await workspaceLoadPromise;
+    } finally {
+        workspaceLoadPromise = null;
+    }
 }
 
 // Public workspace entry points delegate to the sole workspace controller.
