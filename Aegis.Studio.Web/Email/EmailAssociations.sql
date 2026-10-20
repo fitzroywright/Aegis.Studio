@@ -50,7 +50,7 @@ create unique index if not exists ux_studio_email_provider_receipt on studio_ema
 
 -- Shared unread state for canonical incoming inquiry/job email messages.
 create table if not exists studio_shared_message_reads(
-    message_id uuid primary key,
+    message_id uuid primary key references studio_messages(id) on delete cascade,
     reader_user_name text not null,
     read_at_utc timestamptz not null default now()
 );
