@@ -203,12 +203,18 @@
         if (!rightRailLayouts.has(layout)) {
             rightRailLayouts.set(layout, {
                 inlineColumns: layout.style.gridTemplateColumns,
-                inlinePaddingEnd: layout.style.paddingInlineEnd
+                inlinePaddingEnd: layout.style.paddingInlineEnd,
+                inlineWidth: layout.style.width,
+                inlineMaxWidth: layout.style.maxWidth,
+                inlineMinWidth: layout.style.minWidth
             });
         }
         const original = rightRailLayouts.get(layout);
         layout.style.gridTemplateColumns = original.inlineColumns;
         layout.style.paddingInlineEnd = original.inlinePaddingEnd;
+        layout.style.width = original.inlineWidth;
+        layout.style.maxWidth = original.inlineMaxWidth;
+        layout.style.minWidth = original.inlineMinWidth;
         if (!collapsed) return;
 
         // The collapsed rail leaves the grid. Keep only the chevron lane and let
@@ -219,6 +225,11 @@
         const display = computed.display;
         const columnGap = Number.parseFloat(computed.columnGap) || 0;
         rail.classList.add('studio-rail-collapsed-right');
+        // Let each containing page layout consume the full available width after
+        // its rail is removed. The fixed toggle overlays only its own 30px lane.
+        layout.style.width = '100%';
+        layout.style.maxWidth = 'none';
+        layout.style.minWidth = '0';
 
         if ((display === 'grid' || display === 'inline-grid') && tracks.length > 1) {
             // Include the existing grid gap inside the chevron lane so the
