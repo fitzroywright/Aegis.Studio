@@ -57,7 +57,7 @@
             const line=lines[i].trim();
             if(explicit.test(line)) {
                 const trailing=lines.slice(i+1,searchEnd).filter(value=>value.trim()).length;
-                if(trailing>0&&trailing<=12){signatureStart=i;break;}
+                if(trailing<=12){signatureStart=i;break;}
             }
             if(closing.test(line)) {
                 const trailing=lines.slice(i+1,searchEnd).filter(value=>value.trim()).length;
