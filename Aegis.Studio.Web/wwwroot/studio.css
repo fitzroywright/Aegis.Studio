@@ -10984,6 +10984,12 @@ body[data-studio-view="media"] .studio-media-page {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.studio-inbox-message-row.is-unread .studio-inbox-message-sender,
+.studio-inbox-message-row.is-unread .studio-inbox-message-subject,
+.studio-inbox-message-row.is-unread .studio-inbox-message-preview {
+  font-weight: 700;
+  color: #29231b;
+}
 .studio-inbox-message-bottom {
   display: flex;
   gap: 9px;
