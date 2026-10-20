@@ -10175,20 +10175,6 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) { grid-template
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail { position:fixed; inset-inline-start:0; top:56px; bottom:36px; grid-column:auto; grid-row:auto; width:0; min-width:0; overflow:visible; z-index:1000; }
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > main { grid-column:1 !important; grid-row:1; width:100% !important; min-width:0; padding-inline-start:34px; }
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail > [data-rail-toggle="left"] { position:fixed; inset-inline-start:4px; inset-block-start:64px; z-index:1001; }
-.mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:0 minmax(0,1fr) minmax(245px,290px); column-gap:0; }
-.mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr); }
-.mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:0 minmax(0,1fr); column-gap:0; }
-@media(max-width:850px) {
- .mw-today-layout:has(> .studio-rail-collapsed-left) { grid-template-columns:0 minmax(0,1fr); column-gap:0; }
- .mw-today-layout:has(> .studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr); }
- .mw-today-layout:has(> .studio-rail-collapsed-left):has(> .studio-rail-collapsed-right) { grid-template-columns:0 minmax(0,1fr); column-gap:0; }
-}
-
-/* Every shared page layout releases the collapsed right-rail track. */
-.mw-list-layout:has(> .mw-list-right.studio-rail-collapsed-right) { grid-template-columns:190px minmax(0,1fr) !important; }
-.workspace-list-layout:has(> .workspace-right-rail.studio-rail-collapsed-right) { grid-template-columns:250px minmax(0,1fr) !important; }
-.fd-layout:has(> .fd-secondary.studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr) !important; }
-.st-layout:has(> .st-right.studio-rail-collapsed-right),.sj-layout:has(> .sj-right.studio-rail-collapsed-right) { grid-template-columns:minmax(0,1fr) !important; }
 
 /* Expanded rail toggles live in the first card header; collapsed rails keep a compact edge control. */
 :is(#studioContextRail,.mw-today-left,.mw-today-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail) > :is(section,article) > header { position:relative; }
