@@ -167,7 +167,10 @@
         button.setAttribute('aria-expanded', String(!collapsed));
         button.setAttribute('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + side + ' rail');
         button.title = button.getAttribute('aria-label');
-        button.textContent = side === 'left' ? (collapsed ? '›' : '‹') : (collapsed ? '‹' : '›');
+        button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>';
+        button.dataset.chevronDirection = side === 'left'
+            ? (collapsed ? 'right' : 'left')
+            : (collapsed ? 'left' : 'right');
         button.onclick = () => setRailState(side, !railState()[side]);
         return button;
     }
@@ -191,7 +194,8 @@
             const toggle = placeRailToggle(rail, 'left', !!state.left);
             toggle.setAttribute('aria-expanded', String(!state.left));
             toggle.setAttribute('aria-label', (state.left ? 'Expand' : 'Collapse') + ' left rail');
-            toggle.title = toggle.getAttribute('aria-label'); toggle.textContent = state.left ? '›' : '‹';
+            toggle.title = toggle.getAttribute('aria-label');
+            toggle.dataset.chevronDirection = state.left ? 'right' : 'left';
         });
         const rightTargets = document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail, .job-detail-right, .studio-media-detail');
         rightTargets.forEach(rail => {
@@ -201,7 +205,8 @@
             const toggle = placeRailToggle(rail, 'right', !!state.right);
             toggle.setAttribute('aria-expanded', String(!state.right));
             toggle.setAttribute('aria-label', (state.right ? 'Expand' : 'Collapse') + ' right rail');
-            toggle.title = toggle.getAttribute('aria-label'); toggle.textContent = state.right ? '‹' : '›';
+            toggle.title = toggle.getAttribute('aria-label');
+            toggle.dataset.chevronDirection = state.right ? 'left' : 'right';
         });
     }
 
