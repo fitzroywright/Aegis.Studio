@@ -104,6 +104,7 @@
         const jobActions=[['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready'],['template-workflow','Template Workflow','◇','ready'],['reminders','Client Reminders','◷','ready']];
         const actionItems=jobPage?jobActions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''):'<button type="button" data-studio-new-booking><span>＋</span><span>New Booking</span></button>'+(document.body.dataset.studioView==='today'?'<button type="button" data-studio-assign-job-lead><span>▣</span><span>Assign Job Lead</span></button>':'');
         const financialActions=document.body.dataset.studioView==='frontdesk'?[['TakePayment','Take Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['NewSale','New Sale']].map(([action,label])=>'<button type="button" data-studio-financial-action="'+action+'"><span>$</span><span>'+label+'</span></button>').join(''):'';
+        const pipelineScheduleAction=document.body.dataset.studioView==='schedule'&&window.history.state?.studioSchedulePanel==='pipeline'?'<button type="button" data-studio-schedule-item><span>▦</span><span>Schedule item</span></button>':'';
         rail.innerHTML = `<section class="mw-list-panel studio-context-card" data-rail-card="navigation">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">↗</span> Navigation</h2></header>
                 <div class="mw-today-rail-links">
@@ -121,7 +122,7 @@
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
-                    ${actionItems}${document.body.dataset.studioView==='clients'?'<button type="button" data-clients-new><span>＋</span><span>New Client</span></button>':''}${financialActions}${document.body.dataset.studioView==='frontdesk'?'<button type="button" data-studio-new-client><span>＋</span><span>New Client</span></button><button type="button" data-studio-close-register><span>▤</span><span>Close Register</span></button>':''}
+                    ${actionItems}${pipelineScheduleAction}${document.body.dataset.studioView==='clients'?'<button type="button" data-clients-new><span>＋</span><span>New Client</span></button>':''}${financialActions}${document.body.dataset.studioView==='frontdesk'?'<button type="button" data-studio-new-client><span>＋</span><span>New Client</span></button><button type="button" data-studio-close-register><span>▤</span><span>Close Register</span></button>':''}
                 </div>
             </section>
             <section class="mw-list-panel studio-context-card" data-rail-card="workspaces">
@@ -134,6 +135,7 @@
         rail.querySelectorAll('[data-studio-financial-action]').forEach(button=>button.onclick=()=>pickFrontDeskFinancialAction(button.dataset.studioFinancialAction).catch(error=>alert(error.message)));
         rail.querySelector('[data-studio-view-all-workspaces]')?.addEventListener('click',()=>window.studioNavigate?.('workspaces'));
         rail.querySelector('[data-studio-new-booking]')?.addEventListener('click',()=>document.body.dataset.studioView==='clients'?window.StudioClients?.newBooking():window.studioLaunchNewBooking?.());
+        rail.querySelector('[data-studio-schedule-item]')?.addEventListener('click',()=>window.dispatchEvent(new CustomEvent('studio-schedule-item')));
         rail.querySelector('[data-clients-new]')?.addEventListener('click',()=>window.StudioClients?.newClient());
         rail.querySelector('[data-studio-assign-job-lead]')?.addEventListener('click',()=>document.getElementById('genericView')?.dispatchEvent(new CustomEvent('studio-assign-job-lead')));
         rail.querySelectorAll('[data-job-action]').forEach(button => button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
