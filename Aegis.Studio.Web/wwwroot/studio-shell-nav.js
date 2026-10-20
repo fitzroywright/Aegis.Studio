@@ -178,72 +178,11 @@
         if (toggle.parentElement !== shell) shell.append(toggle);
         return toggle;
     }
-    const rightRailLayouts = new WeakMap();
-    const rightChevronLane = 30;
-    function splitGridTracks(value) {
-        const tracks = [];
-        let depth = 0, start = 0;
-        for (let index = 0; index < value.length; index++) {
-            if (value[index] === '(') depth++;
-            else if (value[index] === ')') depth--;
-            else if (/\s/.test(value[index]) && depth === 0) {
-                const track = value.slice(start, index).trim();
-                if (track) tracks.push(track);
-                start = index + 1;
-            }
-        }
-        const last = value.slice(start).trim();
-        if (last) tracks.push(last);
-        return tracks;
-    }
-
     function syncRightRailLayout(rail, collapsed) {
         const layout = rail.parentElement;
         if (!layout) return;
-        if (!rightRailLayouts.has(layout)) {
-            rightRailLayouts.set(layout, {
-                inlineColumns: layout.style.gridTemplateColumns,
-                inlinePaddingEnd: layout.style.paddingInlineEnd,
-                inlineWidth: layout.style.width,
-                inlineMaxWidth: layout.style.maxWidth,
-                inlineMinWidth: layout.style.minWidth
-            });
-        }
-        const original = rightRailLayouts.get(layout);
-        layout.style.gridTemplateColumns = original.inlineColumns;
-        layout.style.paddingInlineEnd = original.inlinePaddingEnd;
-        layout.style.width = original.inlineWidth;
-        layout.style.maxWidth = original.inlineMaxWidth;
-        layout.style.minWidth = original.inlineMinWidth;
-        if (!collapsed) return;
-
-        // The collapsed rail leaves the grid. Keep only the chevron lane and let
-        // the adjacent center track grow naturally into all released space.
-        rail.classList.remove('studio-rail-collapsed-right');
-        const computed = getComputedStyle(layout);
-        const tracks = splitGridTracks(computed.gridTemplateColumns || '');
-        const display = computed.display;
-        const columnGap = Number.parseFloat(computed.columnGap) || 0;
-        rail.classList.add('studio-rail-collapsed-right');
-        // Let each containing page layout consume the full available width after
-        // its rail is removed. The fixed toggle overlays only its own 30px lane.
-        layout.style.width = '100%';
-        layout.style.maxWidth = 'none';
-        layout.style.minWidth = '0';
-
-        if ((display === 'grid' || display === 'inline-grid') && tracks.length > 1) {
-            // Include the existing grid gap inside the chevron lane so the
-            // center edge meets the toggle with no additional gutter.
-            const railTrack = Math.max(0, rightChevronLane - columnGap);
-            tracks.splice(-2, 2, 'minmax(0, 1fr)', railTrack + 'px');
-            layout.style.paddingInlineEnd = '0px';
-            layout.style.gridTemplateColumns = tracks.join(' ');
-            return;
-        }
-
-        // Stacked layouts have no dedicated right-hand track. Their single
-        // content track ends exactly at the fixed shell chevron.
-        layout.style.paddingInlineEnd = rightChevronLane + 'px';
+        layout.classList.toggle('studio-shell-right-collapsed', collapsed);
+        rail.classList.toggle('studio-rail-collapsed-right', collapsed);
     }
 
     function applyRailState() {
