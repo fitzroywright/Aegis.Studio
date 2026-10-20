@@ -57,11 +57,28 @@ function editCommercialTemplate(current,kind){
     }catch(error){f.querySelector('[role=alert]').textContent=error.message;}};
 }
 let commercialQueueArea='',commercialQueueOffset=0;
+const productionThumbnailByJob=new Map();
 async function showCatalogProduction(){
     const current=StudioPage.begin('production');
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');genericView.innerHTML='<div class="today-loading">Loading Production…</div>';
-    const [workloadData,workspaces]=await Promise.all([json('/api/production/workload'),loadWorkspaces()]);if(!current())return;
+    const [workloadData,workspaces,mediaSummary]=await Promise.all([json('/api/production/workload'),loadWorkspaces(),json('/api/production/media-summary').catch(()=>[])]);if(!current())return;
     const workspaceNames=new Map(workspaces.map(w=>[w.id,w.name||w.title||w.displayName]));
+    const thumbnailVersionsByJob=new Map();
+    for(const record of Array.isArray(mediaSummary)?mediaSummary:[]){
+        if(!thumbnailVersionsByJob.has(record.jobId))thumbnailVersionsByJob.set(record.jobId,[]);
+        thumbnailVersionsByJob.get(record.jobId).push(...(record.thumbnailVersionIds||[]));
+    }
+    const thumbnailForJob=jobId=>{
+        if(!jobId)return '';
+        let versionId=productionThumbnailByJob.get(jobId);
+        if(!versionId){
+            const versions=[...new Set(thumbnailVersionsByJob.get(jobId)||[])].filter(Boolean);
+            if(!versions.length)return '';
+            versionId=versions[Math.floor(Math.random()*versions.length)];
+            productionThumbnailByJob.set(jobId,versionId);
+        }
+        return '<img class="production-job-thumbnail" src="/api/jobs/'+encodeURIComponent(jobId)+'/versions/by-id/'+encodeURIComponent(versionId)+'/preview?size=thumbnail" alt="" aria-hidden="true" loading="lazy" decoding="async">';
+    };
     window.StudioShell?.setProductionWorkspaceFilter(workspaces,window.studioWorkloadSelection?.workspace,workspace=>{window.studioWorkloadSelection||={};window.studioWorkloadSelection.workspace=workspace;commercialQueueOffset=0;showCatalogProduction().catch(error=>alert(error.message));});
     const selection=window.studioWorkloadSelection||={filter:'',workspace:'',assignee:'',stage:'',search:''};
     const workload=StudioWorkload.model(workloadData,workloadData.jobs||[]),jobMap=new Map((workloadData.jobs||[]).map(j=>[j.id,j]));
@@ -136,7 +153,7 @@ async function showCatalogProduction(){
         const job=jobMap.get(a.jobId)||{},assigned=a.assignedTo?studioFirstName(a.assignedTo):'Unassigned';
         const blocker=a.blockedReason||((workload.waiting(a))?'Waiting on prerequisite or job stage':'');
         const activityName=a.title||a.activityType||'Production activity';
-        return '<article class="production-order-card production-activity-card production-order-tone-'+laneTone(laneForActivity(a))+'" data-activity-row="'+esc(a.id)+'"><div class="production-order-top"><span>Production task</span><span class="production-priority production-pill" data-tone="'+statusTone(a.status)+'">'+esc(a.status||'Unknown')+'</span></div><div class="production-job-title">'+esc(job.title||'Job')+'</div><div class="production-order-taskline"><span class="production-function" data-function="'+functionTone(activityName)+'">'+esc(activityName)+'</span><span class="production-function" data-function="'+functionTone(a.productionArea||a.activityType)+'">'+esc(a.productionArea||a.activityType||'Production')+'</span></div><div class="production-order-meta"><span>'+esc(assigned)+'</span><span>'+esc(dueLabel(a))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'</article>';
+        return '<article class="production-order-card production-activity-card production-order-tone-'+laneTone(laneForActivity(a))+'" data-activity-row="'+esc(a.id)+'"><div class="production-order-top"><span>Production task</span><span class="production-priority production-pill" data-tone="'+statusTone(a.status)+'">'+esc(a.status||'Unknown')+'</span></div><div class="production-job-heading">'+thumbnailForJob(a.jobId)+'<div class="production-job-title">'+esc(job.title||'Job')+'</div></div><div class="production-order-taskline"><span class="production-function" data-function="'+functionTone(activityName)+'">'+esc(activityName)+'</span><span class="production-function" data-function="'+functionTone(a.productionArea||a.activityType)+'">'+esc(a.productionArea||a.activityType||'Production')+'</span></div><div class="production-order-meta"><span>'+esc(assigned)+'</span><span>'+esc(dueLabel(a))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'</article>';
     };
     const lanes=laneNames.map(([key,label])=>{
         const orderCards=cardsByLane.get(key),activityCards=activitiesByLane.get(key);
@@ -148,7 +165,7 @@ async function showCatalogProduction(){
             const orderFunction=[task?.title,task?.activityType,task?.productionArea].filter(Boolean).join(' ');
             const orderArea=task?.productionArea||task?.activityType||'Production';
             const priority=task?.priority&&task.priority!=='Normal'?'<span class="production-type-chip production-priority-label">Priority · '+esc(task.priority)+'</span>':'';
-            return '<article class="production-order-card production-order-tone-'+laneTone(laneFor(w))+'" tabindex="0" data-order-row="'+esc(w.id)+'"><div class="production-order-top"><span>WO-'+esc(w.id.slice(0,8))+'</span><span class="production-priority production-pill" data-tone="'+statusTone(task?.status)+'">'+esc(task?.status||'Unknown')+'</span></div><button type="button" class="production-job-title" data-open-job="'+esc(w.jobId)+'">'+esc(w.jobTitle)+'</button><div class="production-order-taskline"><span class="production-quantity">'+esc(w.product)+' × '+esc(w.quantity)+'</span><span class="production-function" data-function="'+functionTone(orderFunction)+'">'+esc(task?.title||task?.activityType||'Production work')+'</span><span class="production-function" data-function="'+functionTone(orderArea)+'">'+esc(orderArea)+'</span>'+priority+'</div><div class="production-order-meta"><span>'+esc(task?.assignedTo?studioFirstName(task.assignedTo):'Unassigned')+'</span><span>'+esc(dueLabel(task))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'<div class="production-progress-label"><span>'+done+' of '+tasks.length+' steps complete</span><span>'+percent+'%</span></div><div class="production-progress-track" role="progressbar" aria-valuenow="'+percent+'" aria-valuemin="0" aria-valuemax="100"><span style="width:'+percent+'%"></span></div><button type="button" class="production-order-open" data-order="'+esc(w.id)+'">Open work order →</button></article>';
+            return '<article class="production-order-card production-order-tone-'+laneTone(laneFor(w))+'" tabindex="0" data-order-row="'+esc(w.id)+'"><div class="production-order-top"><span>WO-'+esc(w.id.slice(0,8))+'</span><span class="production-priority production-pill" data-tone="'+statusTone(task?.status)+'">'+esc(task?.status||'Unknown')+'</span></div><div class="production-job-heading">'+thumbnailForJob(w.jobId)+'<button type="button" class="production-job-title" data-open-job="'+esc(w.jobId)+'">'+esc(w.jobTitle)+'</button></div><div class="production-order-taskline"><span class="production-quantity">'+esc(w.product)+' × '+esc(w.quantity)+'</span><span class="production-function" data-function="'+functionTone(orderFunction)+'">'+esc(task?.title||task?.activityType||'Production work')+'</span><span class="production-function" data-function="'+functionTone(orderArea)+'">'+esc(orderArea)+'</span>'+priority+'</div><div class="production-order-meta"><span>'+esc(task?.assignedTo?studioFirstName(task.assignedTo):'Unassigned')+'</span><span>'+esc(dueLabel(task))+'</span></div>'+(blocker?'<p class="production-blocker">'+esc(blocker)+'</p>':'')+'<div class="production-progress-label"><span>'+done+' of '+tasks.length+' steps complete</span><span>'+percent+'%</span></div><div class="production-progress-track" role="progressbar" aria-valuenow="'+percent+'" aria-valuemin="0" aria-valuemax="100"><span style="width:'+percent+'%"></span></div><button type="button" class="production-order-open" data-order="'+esc(w.id)+'">Open work order →</button></article>';
         }).join('')+activityCards.map(activityCard).join('');
         return '<section class="production-lane production-lane-'+key+'" data-production-lane="'+key+'" aria-label="'+esc(label)+'"><header><h2>'+esc(label)+'</h2><span>'+(orderCards.length+activityCards.length)+'</span></header><div class="production-lane-cards">'+(cards||'<p class="production-lane-empty">No production work</p>')+'</div></section>';
     }).join('');
@@ -178,6 +195,7 @@ async function showCatalogProduction(){
     genericView.querySelector('[data-prev]').onclick=()=>{commercialQueueOffset=Math.max(0,commercialQueueOffset-50);showCatalogProduction();};
     genericView.querySelector('[data-next]').onclick=()=>{commercialQueueOffset+=50;showCatalogProduction();};
     genericView.querySelector('[data-graph-tasks]').onclick=()=>StudioJobGraph.production();
+    genericView.querySelectorAll('.production-job-thumbnail').forEach(image=>image.onerror=()=>image.remove());
     genericView.querySelectorAll('[data-order-row]').forEach(row=>{const open=()=>openCommercialWorkOrder(rows.find(w=>w.id===row.dataset.orderRow));row.onclick=e=>{if(!e.target.closest('button,input,select,a'))open();};row.onkeydown=e=>{if(e.target===row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();open();}};});
     genericView.querySelectorAll('[data-order]').forEach(b=>b.onclick=()=>openCommercialWorkOrder(rows.find(w=>w.id===b.dataset.order)));
     genericView.querySelectorAll('[data-open-job]').forEach(b=>b.onclick=e=>{e.stopPropagation();openWorkspaceJob(b.dataset.openJob);});
