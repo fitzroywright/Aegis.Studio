@@ -1,3 +1,4 @@
+import { createIntakeApi } from './intake-api.mjs';
 import http from 'node:http';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -97,7 +98,8 @@ export function createServer(env = process.env) {
   if (!secret || secret.length < 32) throw new Error('Set SESSION_SECRET to at least 32 characters.');
   const demo = env.PUBLIC_DEMO_MODE === 'true';
   const demoSelections = new Map();
-  return http.createServer(async (req, res) => {
+  const intake=createIntakeApi(env,readBody,json);
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -111,7 +113,8 @@ export function createServer(env = process.env) {
       }
       const user = readSession(req, secret);
       if (req.method === 'GET' && url.pathname === '/api/session') { json(res, 200, { demo, user: user ? { name: user.name, provider: user.provider, email: user.email, galleryReference: user.galleryReference } : null }); return; }
-      if (req.method === 'POST') requireSameOrigin(req, url);
+      if (await intake.handle(req,res,url)) return;
+      if (['POST','PUT','DELETE'].includes(req.method)) requireSameOrigin(req, url);
       if (req.method === 'POST' && url.pathname === '/api/demo-login') {
         if (!demo) { json(res, 404, { message: 'Demo sign-in is disabled.' }); return; }
         const payload = JSON.parse((await readBody(req)).toString('utf8'));
@@ -120,23 +123,6 @@ export function createServer(env = process.env) {
         json(res, 200, { user: { name: target.name, provider: target.provider, email: target.email, galleryReference: target.galleryReference } }, { 'Set-Cookie': `studio_public_session=${issueSession(target, secret)}; ${cookieFlags(env)}` }); return;
       }
       if (req.method === 'POST' && url.pathname === '/api/logout') { json(res, 200, { ok: true }, { 'Set-Cookie': `studio_public_session=; ${cookieFlags(env).replace('Max-Age=28800', 'Max-Age=0')}` }); return; }
-      if (req.method === 'POST' && url.pathname === '/api/bookings') {
-        const body = await readBody(req); const key = String(req.headers['idempotency-key'] || '');
-        if (!/^[A-Za-z0-9._-]{1,100}$/.test(key)) { json(res, 400, { message: 'A valid idempotency key is required.' }); return; }
-        if (demo) {
-          const input = JSON.parse(body.toString('utf8'));
-          if (!input.clientName || !input.clientEmail || !input.sessionType || !input.startsAt || !input.endsAt) { json(res, 400, { message: 'Complete the required booking details.' }); return; }
-          json(res, 201, { reference: randomUUID(), status: 'received', requiredDeposit: 1000, currency: 'JMD', demo: true }); return;
-        }
-        const upstream = await studioRequest(env, 'POST', '/api/public/v1/bookings', body, key);
-        res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json', 'Cache-Control': 'no-store' }); res.end(Buffer.from(await upstream.arrayBuffer())); return;
-      }
-      const bookingMatch = url.pathname.match(/^\/api\/bookings\/([0-9a-f-]{36})$/i);
-      if (req.method === 'GET' && bookingMatch) {
-        if (demo) { json(res, 200, { reference: bookingMatch[1], status: 'received', demo: true }); return; }
-        const upstream = await studioRequest(env, 'GET', `/api/public/v1/bookings/${bookingMatch[1]}`);
-        res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json', 'Cache-Control': 'no-store' }); res.end(Buffer.from(await upstream.arrayBuffer())); return;
-      }
       const galleryPage = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})$/i);
       const galleryItem = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/items\/([0-9a-f-]{36})\/(preview|thumbnail|download)$/i);
       const selection = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/([0-9a-f-]{36})$/i);
@@ -175,13 +161,16 @@ export function createServer(env = process.env) {
       }
       json(res, 404, { message: 'Not found.' });
     } catch (error) {
-      if (!res.headersSent) json(res, error.status || 503, { message: error.status ? error.message : 'Public service unavailable. Retry using the same request key.' });
+      if (!res.headersSent) json(res, error.status || 503, { code:error.code || 'service_unavailable', message: error.status ? error.message : 'Public service unavailable. Retry using the same request key.',fieldErrors:error.fields || {},correlationId:randomUUID() },error.status===429?{'Retry-After':'60'}:{});
       else res.end();
     }
   });
+  server.on('close',()=>intake.store.close());
+  return server;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const server = createServer();
   server.listen(Number(process.env.PORT || 8080), '0.0.0.0', () => console.log(`Aegis Studio Public Site listening on ${process.env.PORT || 8080}`));
 }
+

@@ -116,11 +116,11 @@ public sealed class OutboundEmailStore
         command.CommandText = """
             update studio_outbound_email
             set status='ProviderAccepted',
-                provider_message_id=$2,
+                provider_message_id=coalesce($2,provider_message_id),
                 attempts=attempts+case when $3::uuid is null then 1 else 0 end,
                 last_error=null,
                 next_attempt_at_utc=null,
-                provider_accepted_at_utc=now(),lease_id=null,lease_until_utc=null
+                provider_accepted_at_utc=coalesce(provider_accepted_at_utc,now()),lease_id=null,lease_until_utc=null
             where id=$1 and ($3::uuid is null or lease_id=$3)
             """;
         command.Parameters.AddWithValue(id);
@@ -139,7 +139,7 @@ public sealed class OutboundEmailStore
                 status=case when attempts+case when $4::uuid is null then 1 else 0 end >= 10 then 'Failed' else 'Retry' end,
                 last_error=$2,
                 next_attempt_at_utc=case when attempts+case when $4::uuid is null then 1 else 0 end >= 10 then null else $3 end,lease_id=null,lease_until_utc=null
-            where id=$1 and ($4::uuid is null or lease_id=$4)
+            where id=$1 and provider_accepted_at_utc is null and ($4::uuid is null or lease_id=$4)
             """;
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(string.IsNullOrWhiteSpace(failureCode) ? "ProviderFailure" : failureCode.Trim());
@@ -169,6 +169,13 @@ public sealed class OutboundEmailStore
     {
         using var c=database.OpenConnection();using var q=new NpgsqlCommand("update studio_outbound_email set status='Attention',last_error=$3,provider_accepted_at_utc=case when $4 then now() else provider_accepted_at_utc end,next_attempt_at_utc=null,lease_id=null,lease_until_utc=null where id=$1 and lease_id=$2",c);
         q.Parameters.AddWithValue(id);q.Parameters.AddWithValue(leaseId);q.Parameters.AddWithValue(reason);q.Parameters.AddWithValue(providerAccepted);q.ExecuteNonQuery();
+    }
+
+    public void MarkVerificationFailure(Guid id,string failure)
+    {
+        using var c=database.OpenConnection();
+        using var q=new NpgsqlCommand("update studio_outbound_email set last_error=$2 where id=$1 and provider_accepted_at_utc is not null and status='ProviderAccepted'",c);
+        q.Parameters.AddWithValue(id);q.Parameters.AddWithValue("ThreadingVerificationPending:"+failure);q.ExecuteNonQuery();
     }
 
     public OutboundEmail? GetDelivery(Guid id)=>Get(id);
@@ -298,5 +305,6 @@ public sealed record OutboundEmailAuditRecord(
     Guid WorkspaceId,string DeliveryChannel="Email");
 
 public sealed record MarkOutboundSentRequest(string? ProviderMessageId);
+
 
 

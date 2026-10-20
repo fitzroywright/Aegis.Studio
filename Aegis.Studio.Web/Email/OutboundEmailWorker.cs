@@ -80,6 +80,13 @@ public sealed class OutboundEmailWorker : BackgroundService
                         await transport.SendAsync(recipient,request,message.Id,stoppingToken);
                         providerAccepted=true;
                         logger.LogInformation("Outbound provider accepted delivery request. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient}", message.Id, message.DeliveryChannel, message.ToAddress);
+                        // Persist acceptance BEFORE the independent Sent Items lookup. Never replay
+                        // an accepted delivery because threading evidence is delayed or unavailable.
+                        if(outbox.MarkProviderAccepted(message.Id,null,lease) is null)
+                            throw new InvalidOperationException("Provider accepted, but acceptance persistence requires reconciliation.");
+                        flows.TryEnqueueOutbound(message.ConversationId.ToString("D"),"Provider",businessId:message.Id.ToString("D"),detail:"ProviderAccepted");
+                        flows.TryEnqueueOutboundUnknown(message.ConversationId.ToString("D"),"Recipient",businessId:message.Id.ToString("D"),detail:"DeliveryReceiptUnavailable");
+                        logger.LogInformation("Outbound acceptance persisted. DeliveryId={DeliveryId} ConversationId={ConversationId}",message.Id,message.ConversationId);
                         string? providerId=null;
                         if(channel==MessageChannel.MsEmail)
                         {
@@ -87,14 +94,9 @@ public sealed class OutboundEmailWorker : BackgroundService
                                 throw new InvalidOperationException("This email transport cannot verify its actual Internet Message-ID.");
                             var verifier=new StudioGraphSentMessageVerifier(http,configuration,secrets);
                             var verified=await verifier.VerifyAsync(message,metadata.GetValueOrDefault("Studio.MessageId",message.Id.ToString("D")),metadata["Email.ReplyTo"],sendingAt,stoppingToken);
-                            outbox.RecordVerifiedInternetId(message.Id,lease,verified);providerId=verified.ProviderId;
+                            outbox.RecordVerifiedInternetId(message.Id,null,verified);providerId=verified.ProviderId;
                         }
-                        if(outbox.MarkProviderAccepted(message.Id,providerId,lease) is not null)
-                        {
-                            logger.LogInformation("Outbound delivery recorded as provider accepted. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} ProviderMessageId={ProviderMessageId}", message.Id, message.DeliveryChannel, message.ToAddress, providerId);
-                            flows.TryEnqueueOutbound(message.ConversationId.ToString("D"),"Provider",businessId:message.Id.ToString("D"),detail:"ProviderAccepted");
-                            flows.TryEnqueueOutboundUnknown(message.ConversationId.ToString("D"),"Recipient",businessId:message.Id.ToString("D"),detail:"DeliveryReceiptUnavailable");
-                        }
+                        logger.LogInformation("Outbound threading verification completed. DeliveryId={DeliveryId} ProviderMessageId={ProviderMessageId}",message.Id,providerId);
                     }
                     catch(ExternalDeliveryOutcomeUnknownException ex)
                     {
@@ -111,8 +113,8 @@ public sealed class OutboundEmailWorker : BackgroundService
                     {
                         if(providerAccepted)
                         {
-                            outbox.MarkAttention(message.Id,lease,"ProviderOutcomeUncertain: provider accepted but Internet Message-ID or delivery recording requires reconciliation.",true);
-                            logger.LogError(ex,"Provider accepted message {MessageId}; reconciliation is required",message.Id);
+                            outbox.MarkVerificationFailure(message.Id,ex.GetType().Name);
+                            logger.LogError(ex,"Outbound accepted delivery needs threading verification. DeliveryId={DeliveryId}; acceptance is retained and no resend is scheduled",message.Id);
                             continue;
                         }
                         var updated=outbox.MarkFailure(message.Id,ex.GetType().Name,DateTimeOffset.UtcNow.AddSeconds(Math.Min(300,5*Math.Pow(2,Math.Min(message.Attempts,6)))),lease);
@@ -129,4 +131,5 @@ public sealed class OutboundEmailWorker : BackgroundService
     }
     public override void Dispose(){http.Dispose();base.Dispose();}
 }
+
 
