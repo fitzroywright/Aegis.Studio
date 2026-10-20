@@ -23,7 +23,6 @@
 .studio-schedule-switch button[aria-pressed=true]{background:#173f68;color:#fff}
 .studio-schedule-switch button:hover{box-shadow:inset 0 -3px var(--theme-accent,#cf792a)}
 .studio-schedule-switch button:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:-2px}
-.ps-header-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .st-pipeline-content .st-tools,.st-commercial .st-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 
 /* Front Desk-style compact search/filter header. */
