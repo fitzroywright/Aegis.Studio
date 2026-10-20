@@ -95,15 +95,14 @@ function bindFrontDeskJobClickDelegation(){
 function openFrontDeskJob(jobId){
     if(!jobId)return Promise.resolve();
     const id=String(jobId);
-    // Front Desk already has the job id. Record the workspace destination first,
-    // then use the established job loader so its conversation/detail surface is
-    // made active before the request completes.
+    // Switch to the Workspaces surface before opening the job. The job loader
+    // ignores results unless that surface is active.
+    if(typeof window.studioNavigate==='function')
+        return Promise.resolve(window.studioNavigate('workspaces',{jobId:id}));
     if(typeof window.openWorkspaceJob==='function'){
         window.studioBeginJobNavigation?.(id,{history:true});
         return Promise.resolve(window.openWorkspaceJob(id,{navigationRecorded:true,history:false}));
     }
-    if(typeof window.studioNavigate==='function')
-        return Promise.resolve(window.studioNavigate('workspaces',{jobId:id}));
     return Promise.reject(new Error('Job navigation is unavailable.'));
 }
 
