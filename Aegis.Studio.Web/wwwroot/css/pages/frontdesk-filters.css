@@ -7,9 +7,11 @@ body[data-studio-view="frontdesk"] .fd-client-header>span{flex:0 0 auto}
 body[data-studio-view="frontdesk"] .fd-client-header input{flex:1 1 100px;min-width:100px;width:100%;max-width:310px;height:26px;box-sizing:border-box;padding:3px 7px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:4px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;font-weight:400}
 body[data-studio-view="frontdesk"] .fd-client-header input:focus-visible,body[data-studio-view="frontdesk"] .fd-column-controls select:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
 body[data-studio-view="frontdesk"] .fd-table{min-width:1120px}
-/* Keep the short booking-created date compact in both the fixed header and scrollable rows. */
+/* Keep both date columns compact and aligned in the fixed header and scrollable rows. */
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:first-child,
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:first-child{width:104px;max-width:104px;box-sizing:border-box}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table th:nth-child(4),
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table td:nth-child(4){width:118px;max-width:118px;box-sizing:border-box}
 
 /* Reuse the Workspaces Overview card and summary rows. */
 .fd-overview { display:flex; flex-direction:column; flex:1 1 0; min-height:0; --smc-footer-background:var(--mw-card-soft,#f5f8fa); --smc-footer-border:color-mix(in srgb,var(--mw-card-color,#9aabba) 42%,white); }
