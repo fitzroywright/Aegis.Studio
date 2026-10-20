@@ -190,7 +190,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 panel.innerHTML=(name==='media'?'':`<header class="jd-card-heading"><h2>${title}</h2>${name==='subjects'?'<div><button type="button" class="jd-link" data-job-media>← Media</button><button type="button" class="jd-link" data-job-add-subject hidden>＋ Add Subject</button></div>':''}</header>`)+`<div class="job-${name}-content"></div>`;
                 panels[name]=panel;contents[name]=panel.querySelector('.job-'+name+'-content');center.append(panel);
             }
-            const right=document.createElement('aside');right.className='job-detail-right';right.setAttribute('aria-label','Job tools and messages');
+            const right=document.createElement('aside');right.className='job-detail-right st-right';right.setAttribute('aria-label','Job tools and messages');
             const selectedFile=document.createElement('section');selectedFile.className='jd-panel job-detail-selected-file';
             selectedFile.innerHTML='<header class="jd-card-heading"><h2>Selected File</h2></header><div class="job-detail-selected-content"><p class="muted">Select a photo in the gallery to inspect it.</p></div>';
             const selectedContent=selectedFile.querySelector('.job-detail-selected-content');
