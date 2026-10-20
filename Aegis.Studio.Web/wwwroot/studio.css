@@ -4332,8 +4332,9 @@ body[data-studio-view="reports"] .op-card {
   color: #52677a;
 }
 .workspace-wow-toolbar .workspace-reference-tabs button.active {
-  color: #125fa4;
-  background: #eaf4fc;
+  color: #fff;
+  background: #986c55;
+  border-color: #986c55;
 }
 .workspace-wow-search input {
   border-color: var(--studio-border);
@@ -4473,16 +4474,19 @@ body[data-studio-view="reports"] .op-card {
   box-shadow: none;
 }
 .workspace-tabs button.active {
-  color: #125fa4;
-  background: #eaf4fc;
+  color: #fff;
+  background: #986c55;
+  border-color: #986c55;
 }
 .production-filters>button.active {
-  color: #125fa4;
-  background: #eaf4fc;
+  color: #fff;
+  background: #986c55;
+  border-color: #986c55;
 }
 .pipeline-view-switch button.active {
-  color: #125fa4;
-  background: #eaf4fc;
+  color: #fff;
+  background: #986c55;
+  border-color: #986c55;
 }
 .studio-table thead th,.op-table thead th {
   background:var(--studio-grid-header-bg);
@@ -5670,8 +5674,9 @@ body[data-studio-view="today"] .generic {
   color: #155f9f;
 }
 .studio-shell-page-tools .mw-calendar-view-switch button.active {
-  background: #fff;
-  color: #155f9f;
+  background: #986c55;
+  color: #fff;
+  border-color: #986c55;
   box-shadow: 0 1px 3px rgba(24,45,67,.12);
 }
 .studio-shell-page-tools .mw-day-nav button {
@@ -8835,8 +8840,9 @@ body[data-studio-view="today"] .mw-today-calendar-tools .mw-calendar-view-switch
   cursor: pointer;
 }
 body[data-studio-view="today"] .mw-today-calendar-tools .mw-calendar-view-switch button.active {
-  background: #234c73;
+  background: #986c55;
   color: #fff;
+  border-color: #986c55;
   box-shadow: 0 1px 2px rgba(20,44,68,.18);
 }
 body[data-studio-view="today"] .mw-today-calendar-tools .mw-day-nav {
