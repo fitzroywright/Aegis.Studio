@@ -40,7 +40,7 @@
 /* Front Desk-style compact search/filter header. */
 :is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex:none;display:flex;align-items:center;flex-wrap:nowrap;gap:10px;min-width:0;padding:8px 11px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border-bottom:2px solid var(--theme-accent,#cf792a);box-sizing:border-box}
 :is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) label{display:flex;align-items:center;gap:7px;margin:0;font-size:11px;font-weight:700;min-width:0}
-:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-filter{flex:0 1 200px}
+:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-filter{flex:0 1 240px}
 :is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-search{flex:1 1 260px}
 :is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) label>span{white-space:nowrap;flex:none}
 :is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) select,:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) input[type=search]{flex:1;min-width:0;width:100%;max-width:none;height:28px;min-height:28px;margin:0;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
