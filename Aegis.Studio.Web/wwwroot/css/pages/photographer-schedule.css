@@ -51,6 +51,9 @@
 .st-pipeline-content .pipeline-job-heading input{flex:1 1 150px;min-width:90px;width:100%;height:27px;min-height:27px;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
 .st-pipeline-content .pipeline-job-heading input::placeholder{color:#e2ebf6;opacity:1}
 .st-pipeline-content .pipeline-job-heading input:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
+.st-pipeline-content .pipeline-status-heading{display:flex;align-items:center;gap:8px;min-width:175px;white-space:nowrap}
+.st-pipeline-content .pipeline-status-heading select{flex:1 1 110px;min-width:0;max-width:150px;height:27px;min-height:27px;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
+.st-pipeline-content .pipeline-status-heading select:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
 
 /* Front Desk-style compact search/filter header. */
 :is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex:none;display:flex;align-items:center;flex-wrap:nowrap;gap:10px;min-width:0;padding:8px 11px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border-bottom:2px solid var(--theme-accent,#cf792a);box-sizing:border-box}
