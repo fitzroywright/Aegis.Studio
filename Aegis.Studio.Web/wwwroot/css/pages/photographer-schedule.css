@@ -54,6 +54,7 @@
 .st-pipeline-content .pipeline-status-heading{display:flex;align-items:center;gap:8px;min-width:175px;white-space:nowrap}
 .st-pipeline-content .pipeline-status-heading select{flex:1 1 110px;min-width:0;max-width:150px;height:27px;min-height:27px;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
 .st-pipeline-content .pipeline-status-heading select:focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
+body[data-studio-view="pipeline"] .studio-context-rail [data-rail-card="workspaces"] .mw-today-rail-links button.is-active{background:var(--studio-control-surface,#edf4fc);color:var(--studio-control-text,#203e62);box-shadow:inset 3px 0 var(--theme-accent,#cf792a);font-weight:700}
 
 /* Front Desk-style compact search/filter header. */
 :is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex:none;display:flex;align-items:center;flex-wrap:nowrap;gap:10px;min-width:0;padding:8px 11px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border-bottom:2px solid var(--theme-accent,#cf792a);box-sizing:border-box}
