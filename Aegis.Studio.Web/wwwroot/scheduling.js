@@ -178,8 +178,8 @@ async function showPipeline() {
     const isAdmin = (profile.user || profile).isAdministrator === true;
     renderPipelineWorkspaceFilters(workspaces);
     const pipelineModeSwitch='<div class="pipeline-mode-switch" role="group" aria-label="Job pipeline view">'+['jobs','calendar','timeline'].map(view=>'<button type="button" data-pipeline-view="'+view+'" class="'+(pipelineView===view?'active':'')+'" aria-pressed="'+String(pipelineView===view)+'">'+view[0].toUpperCase()+view.slice(1)+'</button>').join('')+'</div>';
-    const scheduleItemButton='<div class="pipeline-actions"><button type="button" class="primary pipeline-schedule-item" id="pipelineNewSchedule"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="M12 13v5M9.5 15.5h5"/></svg><span>Schedule item</span></button>'+pipelineModeSwitch+'</div>';
-    genericView.innerHTML=StudioPage.html({title:'Job Pipeline',className:'st-pipeline-content',showHeader:false,summary:StudioPage.metrics([['Jobs',selected.length],['Resources',resources.length],['Next 7 days',nearby.length],['Tasks without dates',undated.length]])+'<div class="pipeline-stage-summary">'+stages.filter(stage=>candidates.some(job=>pipelineStage(job)===stage)||pipelineSelectedStage===stage).map(stage => `<button class="pipeline-stage-tile ${pipelineSelectedStage===stage?'active':''}" data-stage="${esc(stage)}" aria-pressed="${pipelineSelectedStage===stage}"><strong>${esc(stage)}</strong><span>${candidates.filter(job => pipelineStage(job) === stage).length}</span></button>`).join('')+'</div>',attention:'<p>No pipeline issues require attention.</p>',content:`${window.StudioScheduleCalendarControls.html('pipeline',pipelineAnchor,pipelineCalendarPeriod,scheduleItemButton)}
+
+    genericView.innerHTML=StudioPage.html({title:'Job Pipeline',className:'st-pipeline-content',showHeader:false,summary:StudioPage.metrics([['Jobs',selected.length],['Resources',resources.length],['Next 7 days',nearby.length],['Tasks without dates',undated.length]])+'<div class="pipeline-stage-summary">'+stages.filter(stage=>candidates.some(job=>pipelineStage(job)===stage)||pipelineSelectedStage===stage).map(stage => `<button class="pipeline-stage-tile ${pipelineSelectedStage===stage?'active':''}" data-stage="${esc(stage)}" aria-pressed="${pipelineSelectedStage===stage}"><strong>${esc(stage)}</strong><span>${candidates.filter(job => pipelineStage(job) === stage).length}</span></button>`).join('')+'</div>',attention:'<p>No pipeline issues require attention.</p>',content:`${window.StudioScheduleCalendarControls.html('pipeline',pipelineAnchor,pipelineCalendarPeriod,pipelineModeSwitch)}
 
         <p class="pipeline-key"><span>◉ Scheduled work</span><span>✓ Task / deadline</span><span>${nearby.length} items in the next 7 days</span></p>
         <section class="pipeline-planning-surface">${pipelineView === 'jobs' ? pipelineJobGrid(selected,tasks,workspaces) : pipelineView === 'calendar' ? pipelineCalendar(items, resourceMap) : pipelineTimeline(selected, items, resourceMap)}</section>${undated.length?`<details class="pipeline-resource-panel"><summary>${undated.length} tasks without dates</summary>${undated.map(task=>`<article class="task-card"><button class="link-button" data-open-job="${task.jobId}">${esc(task.title)}</button><small>${esc(task.assignedTo?studioFirstName(task.assignedTo):'Unassigned')} · ${esc(task.status)}</small></article>`).join('')}</details>`:''}
@@ -195,7 +195,6 @@ async function showPipeline() {
     genericView.querySelector('#pipelineSearch').onchange=event=>{pipelineSearch=event.target.value;showPipeline().catch(pipelineError);};
     genericView.querySelectorAll('[data-pipeline-row]').forEach(row=>row.onclick=event=>{if(!event.target.closest('button,a,input,select'))void openWorkspaceJob(row.dataset.pipelineRow).catch(error=>alert(error.message));});
     genericView.querySelectorAll('[data-stage]').forEach(button => button.onclick = () => {pipelineSelectedStage = pipelineSelectedStage === button.dataset.stage ? '' : button.dataset.stage; showPipeline().catch(pipelineError);});
-    genericView.querySelector('#pipelineNewSchedule').onclick = () => openScheduleEntryForm();
     genericView.querySelectorAll('[data-pipeline-manage]').forEach(button=>button.onclick=event=>{event.stopPropagation();openPipelineMove(button.dataset.pipelineManage).catch(error=>alert(error.message));});
     genericView.querySelectorAll('[data-pipeline-advance]').forEach(button=>button.onclick=async event=>{event.stopPropagation();await advancePipelineJob(button.dataset.pipelineAdvance,jobs);});
     installPipelineDrag(entries,tasks);
@@ -300,6 +299,10 @@ async function createScheduleResource() {
     await json('/api/schedule/resources', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, resourceType:genericView.querySelector('#scheduleResourceType').value, isActive:true, notes:null }) });
     await showPipeline();
 }
+
+window.addEventListener('studio-schedule-item',()=>{
+    if(document.body.dataset.studioView==='schedule'&&window.history.state?.studioSchedulePanel==='pipeline')openScheduleEntryForm();
+});
 // Older Schedule calls now open the dedicated photographer calendar.
 async function showSchedule() { return window.studioNavigate('schedule'); }
 
