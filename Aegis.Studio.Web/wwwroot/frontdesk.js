@@ -355,7 +355,34 @@ async function openPendingBookingForm(enquiry,client){
     let selectedServices=null;const products=await json('/api/pos/catalog');
     form.elements.jobTemplate.onchange=()=>{const t=jobTemplates.find(t=>t.id===form.elements.jobTemplate.value);selectedServices=t?(t.definition.products||[]).map(p=>p.catalogItemId):null;form.querySelector('[data-template-preview]').disabled=!t;form.querySelector('[data-template-services]').innerHTML=t?products.filter(p=>p.isActive).map(p=>`<label><input data-service="${p.id}" type="checkbox" ${selectedServices.includes(p.id)?'checked':''}>${esc(p.name)}</label>`).join(''):'';form.querySelectorAll('[data-service]').forEach(el=>el.onchange=()=>selectedServices=[...form.querySelectorAll('[data-service]:checked')].map(x=>x.dataset.service));};
     form.querySelector('[data-template-preview]').onclick=()=>StudioGraphTemplates.preview(jobTemplates.find(t=>t.id===form.elements.jobTemplate.value).definition,products,selectedServices);
-    form.onsubmit=async e=>{e.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;try{await json('/api/frontdesk/booking-requests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jobTemplateId:form.elements.jobTemplate.value||null,selectedServiceIds:selectedServices,workspaceId:form.elements.workspace.value,clientName:form.elements.client.value,clientEmail:form.elements.email.value,clientPhone:form.elements.phone.value||null,title:form.elements.title.value,eventDate:form.elements.date.value,requiredDeposit:Number(form.elements.deposit.value),currency:'JMD',notes:form.elements.notes.value,conversationId:enquiry?.id||null})});dialog.close();frontDeskTab='requests';await showFrontDesk();}catch(error){form.querySelector('[role=alert]').textContent=error.message;}finally{button.disabled=false;}};
+    form.onsubmit=async e=>{
+        e.preventDefault();
+        const button=form.querySelector('[type=submit]');
+        const feedback=form.querySelector('[role=alert]');
+        const payload={jobTemplateId:form.elements.jobTemplate.value||null,selectedServiceIds:selectedServices,workspaceId:form.elements.workspace.value,clientName:form.elements.client.value,clientEmail:form.elements.email.value,clientPhone:form.elements.phone.value||null,title:form.elements.title.value,eventDate:form.elements.date.value,requiredDeposit:Number(form.elements.deposit.value),currency:'JMD',notes:form.elements.notes.value,conversationId:enquiry?.id||null};
+        const startedAt=performance.now();
+        const saveContext={workspaceId:payload.workspaceId,conversationId:payload.conversationId,eventDate:payload.eventDate,hasEventDate:!!payload.eventDate};
+        button.disabled=true;
+        feedback.setAttribute('role','status');
+        feedback.textContent='Saving Pending Job…';
+        console.info('[Studio Front Desk Save] Started',saveContext);
+        try{
+            const saved=await json('/api/frontdesk/booking-requests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            const result={requestId:saved?.id||null,jobId:saved?.jobId||null,eventDate:saved?.request?.eventDate||payload.eventDate,elapsedMs:Math.round(performance.now()-startedAt)};
+            console.info('[Studio Front Desk Save] Succeeded',result);
+            feedback.textContent='Saved successfully. '+(result.jobId?'Pending Job ID: '+result.jobId+'. ':'')+'Booking Request ID: '+(result.requestId||'not returned')+'. Event date: '+(result.eventDate||'not returned')+'. Close this dialog to view the updated Front Desk list.';
+            button.textContent='Saved';
+            form.querySelectorAll('[data-cancel]').forEach(close=>close.textContent='Close');
+            frontDeskTab='requests';
+            try{await showFrontDesk();}catch(refreshError){console.warn('[Studio Front Desk Save] Save succeeded, but Front Desk refresh failed',refreshError);}
+        }catch(error){
+            const elapsedMs=Math.round(performance.now()-startedAt);
+            console.error('[Studio Front Desk Save] Failed',{...saveContext,elapsedMs,error});
+            feedback.setAttribute('role','alert');
+            feedback.textContent='Save failed after '+elapsedMs+' ms: '+(error?.message||String(error));
+            button.disabled=false;
+        }
+    };
 }
 function openVerifiedDepositForm(request){return launchFrontDeskPos('RecordDeposit',{bookingId:request.id,jobId:request.jobId});}
 
