@@ -131,27 +131,43 @@ function pipelineCalendar(items, resourceMap) {
 window.StudioScheduleWorkspaceCard=(()=>{
     let activeWorkspace='';
     let initialized=false;
+    let visibleWorkspaces=[];
+    let selectionHandler=null;
     const selected=()=>activeWorkspace;
+    const allowed=items=>(Array.isArray(items)?items:[]).filter(workspace=>workspace.permissions?.accessWorkspace!==false&&workspace.permissions?.view!==false);
+    const make=(id,name,icon)=>'<button type="button" data-schedule-workspace-filter="'+esc(id)+'" aria-pressed="'+String(activeWorkspace===String(id))+'" class="'+(activeWorkspace===String(id)?'is-active':'')+'"><span>'+icon+'</span><span>'+esc(name)+'</span></button>';
     function initialize(value=''){
         if(!initialized){activeWorkspace=String(value||'');initialized=true;}
         return activeWorkspace;
     }
     function select(value){activeWorkspace=String(value||'');initialized=true;return activeWorkspace;}
-    function render(workspaces,value,onSelect){
-        const card=document.querySelector('#studioContextRail [data-rail-card="workspaces"]');
-        const list=card?.querySelector('.mw-today-rail-links');
+    function markup(){
+        if(!visibleWorkspaces.length)return null;
+        return make('','All Workspaces','▦')+visibleWorkspaces.map(workspace=>make(workspace.id,workspace.name,'▣')).join('');
+    }
+    function bindList(list){
         if(!list)return;
-        initialize(value);
-        const visible=(Array.isArray(workspaces)?workspaces:[]).filter(workspace=>workspace.permissions?.accessWorkspace!==false&&workspace.permissions?.view!==false);
-        const make=(id,name,icon)=>'<button type="button" data-schedule-workspace-filter="'+esc(id)+'" aria-pressed="'+String(activeWorkspace===String(id))+'" class="'+(activeWorkspace===String(id)?'is-active':'')+'"><span>'+icon+'</span><span>'+esc(name)+'</span></button>';
-        list.innerHTML=make('','All Workspaces','▦')+visible.map(workspace=>make(workspace.id,workspace.name,'▣')).join('');
         list.querySelectorAll('[data-schedule-workspace-filter]').forEach(button=>button.addEventListener('click',()=>{
             select(button.dataset.scheduleWorkspaceFilter);
-            render(visible,activeWorkspace,onSelect);
-            onSelect?.(activeWorkspace);
+            const current=list.closest('[data-rail-card="workspaces"]')?.querySelector('.mw-today-rail-links');
+            if(current)current.innerHTML=markup()||'';
+            bindList(current);
+            selectionHandler?.(activeWorkspace);
         }));
     }
-    return {render,initialize,select,selected};
+    function render(workspaces,value,onSelect){
+        initialize(value);
+        const visible=allowed(workspaces);
+        if(visible.length)visibleWorkspaces=visible;
+        if(typeof onSelect==='function')selectionHandler=onSelect;
+        const list=document.querySelector('#studioContextRail [data-rail-card="workspaces"] .mw-today-rail-links');
+        if(list&&markup()!==null){list.innerHTML=markup();bindList(list);}
+    }
+    function bindRail(rail=document.querySelector('#studioContextRail')){
+        const list=rail?.querySelector('[data-rail-card="workspaces"] .mw-today-rail-links');
+        if(list&&markup()!==null){list.innerHTML=markup();bindList(list);}
+    }
+    return {render,initialize,select,selected,markup,bindRail};
 })();
 function renderPipelineWorkspaceFilters(workspaces){
     const selected=window.StudioScheduleWorkspaceCard.initialize(pipelineSelectedWorkspace);
