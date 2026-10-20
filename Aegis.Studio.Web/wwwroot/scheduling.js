@@ -230,8 +230,10 @@ async function showPipeline() {
     StudioPage.setCount(selected.length+' jobs');
     genericView.querySelectorAll('[data-open-job]').forEach(button => button.onclick = () => button.dataset.openJob && openWorkspaceJob(button.dataset.openJob).catch(error => alert(error.message)));
     genericView.querySelectorAll('[data-pipeline-view]').forEach(button => button.onclick = () => { pipelineView = button.dataset.pipelineView; showPipeline().catch(pipelineError); });
-    genericView.querySelector('#pipelineStatusFilter').onchange=event=>{pipelineSelectedStatus=event.target.value;pipelineSelectedStage='';showPipeline().catch(pipelineError);};
-    genericView.querySelector('#pipelineSearch').onchange=event=>{pipelineSearch=event.target.value;showPipeline().catch(pipelineError);};
+    const statusFilter=genericView.querySelector('#pipelineStatusFilter');
+    if(statusFilter)statusFilter.onchange=event=>{pipelineSelectedStatus=event.target.value;pipelineSelectedStage='';showPipeline().catch(pipelineError);};
+    const searchInput=genericView.querySelector('#pipelineSearch');
+    if(searchInput)searchInput.onchange=event=>{pipelineSearch=event.target.value;showPipeline().catch(pipelineError);};
     genericView.querySelectorAll('[data-pipeline-row]').forEach(row=>row.onclick=event=>{if(!event.target.closest('button,a,input,select'))void openWorkspaceJob(row.dataset.pipelineRow).catch(error=>alert(error.message));});
     genericView.querySelectorAll('[data-stage]').forEach(button => button.onclick = () => {pipelineSelectedStage = pipelineSelectedStage === button.dataset.stage ? '' : button.dataset.stage; showPipeline().catch(pipelineError);});
     genericView.querySelectorAll('[data-pipeline-manage]').forEach(button=>button.onclick=event=>{event.stopPropagation();openPipelineMove(button.dataset.pipelineManage).catch(error=>alert(error.message));});
