@@ -172,7 +172,7 @@ public static class StudioUnifiedMessagingEndpoints
     {
         app.Services.GetRequiredService<StudioUnifiedMessaging>().EnsureSchema();
         var group=app.MapGroup("/api/messages").RequireAuthorization();
-        group.MapGet("/address-book",(ClaimsPrincipal user,StudioAddressBook book)=>Results.Ok(book.GetAll(user)));
+        group.MapGet("/address-book",(ClaimsPrincipal user,StudioAddressBook book)=>Results.Ok(book.GetMessagingRecipients(user)));
         group.MapPost("/contacts",(CreateMessagingContact request,ClaimsPrincipal user,StudioAddressBook book)=>Execute(()=>Results.Ok(book.Get(book.GetOrCreateExternal(request.DisplayName,request.EmailAddress).Id,user))));
         group.MapGet("/identity",(ClaimsPrincipal user,StudioAddressBook book)=>Results.Ok(book.GetAll(user).FirstOrDefault(e=>string.Equals(e.UserName,CurrentUser(user),StringComparison.OrdinalIgnoreCase))));
         group.MapGet("/inbox",(int? offset,int? limit,string? query,Guid? jobId,bool? unreadOnly,ClaimsPrincipal user,StudioUnifiedInbox inbox)=>Results.Ok(inbox.Get(user,offset??0,limit??100,query,jobId,unreadOnly??false)));
@@ -189,7 +189,7 @@ public static class StudioUnifiedMessagingEndpoints
                     and exists(select 1 from studio_message_route_recipients r where r.message_id=m.id)
                     order by m.created_at_utc desc limit 1)
                 """,c);Add(q,threadId);using var r=q.ExecuteReader();List<Guid> ids=[];while(r.Read())ids.Add(r.GetGuid(0));r.Close();
-            var available=book.GetAll(user);var recipients=available.Where(e=>ids.Contains(e.Id)).ToArray();
+            var available=book.GetMessagingRecipients(user);var recipients=available.Where(e=>ids.Contains(e.Id)).ToArray();
             if(recipients.Length==0)
             {
                 var names=messages.GetThreadParticipants(threadId).Where(n=>!string.Equals(n,CurrentUser(user),StringComparison.OrdinalIgnoreCase)).ToHashSet(StringComparer.OrdinalIgnoreCase);
