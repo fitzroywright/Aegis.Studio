@@ -54,6 +54,9 @@ public sealed class InboundEmailWorker : BackgroundService
                         graphEmail.Body,
                         graphEmail.ReceivedAtUtc,
                         graphEmail.FileAttachments.Select(a => new InboundEmailAttachment(a.FileName, a.ContentType, a.Content, a.IsInline)).ToList(), graphEmail.ProviderMessageId);
+                    logger.LogInformation(
+                        "New email received. MessageId={MessageId} ProviderMessageId={ProviderMessageId} FromAddress={FromAddress} Subject={Subject} ReceivedAtUtc={ReceivedAtUtc} AttachmentCount={AttachmentCount}",
+                        email.MessageId, email.ProviderMessageId, email.FromAddress, email.Subject, email.ReceivedAt, email.FileAttachments.Count);
                     string correlationId = email.MessageId;
                     operationsFlows.TryEnqueueInbound(correlationId, "Mailbox");
                     var result=await intake.ReceiveAsync(email,stoppingToken);
