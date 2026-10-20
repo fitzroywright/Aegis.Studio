@@ -126,6 +126,8 @@ public sealed class UnifiedMessagingPersistenceTests
             new Claim("login_name",name),new Claim(ClaimTypes.Name,name),new Claim(ClaimTypes.Role,"Administrator")],"test"));
         var readerA=Reader("staff-a");var readerB=Reader("staff-b");
 
+        Assert.Empty(inbox.Get(f.Other,0,100,null,null).Items);
+        Assert.Throws<UnauthorizedAccessException>(()=>inbox.MarkIncomingDisplayed(conversation.Id,messageId,f.Other));
         Assert.True(Assert.Single(inbox.Get(readerA,0,100,null,null).Items).IsUnread);
         Assert.Single(inbox.Get(readerA,0,100,null,null,unreadOnly:true).Items);
         var receipts=await Task.WhenAll(
