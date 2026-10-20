@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer, sign } from './server.mjs';
 
 async function fixture(t, extra = {}) {
-  const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', ...extra };
+  const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', INTAKE_DB_PATH: ':memory:', ...extra };
   const server = createServer(env);
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   t.after(() => new Promise(resolve => server.close(resolve)));
@@ -50,25 +50,15 @@ test('live mode disables fake social sign-in and rejects non-HTTPS Studio upstre
   const response = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'maya' }) });
   assert.equal(response.status, 404);
 });
-test('live booking proxy signs Studio V1 request server-side and preserves idempotency key', async t => {
-  const origin = await fixture(t, { PUBLIC_DEMO_MODE: 'false', STUDIO_BASE_URL: 'https://studio.stub', STUDIO_CLIENT: 'website', STUDIO_SECRET: 'server-only-secret-value-0123456789012345' });
-  const originalFetch = globalThis.fetch; let forwarded = 0;
-  globalThis.fetch = async (url, options) => {
-    if (new URL(url).host !== 'studio.stub') return originalFetch(url, options);
-    forwarded++;
-    const parsed = new URL(url), timestamp = options.headers['X-Studio-Timestamp'], nonce = options.headers['X-Studio-Nonce'];
-    assert.equal(options.method, 'POST');
-    assert.equal(options.headers['X-Studio-Client'], 'website');
-    assert.equal(options.headers['Idempotency-Key'], 'booking-demo-1');
-    assert.equal(options.headers['X-Studio-Signature'], sign('server-only-secret-value-0123456789012345', 'POST', parsed.pathname + parsed.search, timestamp, nonce, options.body, 'booking-demo-1'));
-    return new Response(JSON.stringify({ reference: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', status: 'received', requiredDeposit: 1000, currency: 'JMD' }), { status: 201, headers: { 'Content-Type': 'application/json' } });
-  };
-  t.after(() => { globalThis.fetch = originalFetch; });
-  const body = JSON.stringify({ clientName: 'Demo Client', clientEmail: 'client@example.test', sessionType: 'Portrait', startsAt: '2026-11-01T15:00:00Z', endsAt: '2026-11-01T16:00:00Z' });
-  const response = await originalFetch(`${origin}/api/bookings`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-demo-1' }, body });
-  assert.equal(response.status, 201);
-  assert.equal(forwarded, 1);
-  assert.doesNotMatch(await response.text(), /server-only-secret/);
+test('public booking is durably saved without calling internal Studio and replays safely',async t=>{
+ const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),session=await fetch(`${origin}/api/intake-session`),csrf=(await session.json()).csrf,cookie=session.headers.get('set-cookie').split(';')[0];
+ const body=JSON.stringify({clientName:'Test Client',clientEmail:'client@example.test',sessionType:'Portrait',startsAt:'2026-11-01T15:00:00Z',endsAt:'2026-11-01T16:00:00Z'});
+ const options={method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf,'Idempotency-Key':'booking-1'},body};
+ const first=await fetch(`${origin}/api/bookings`,options),receipt=await first.json();assert.equal(first.status,201);assert.match(receipt.intakeReference,/^\d{4}-W-\d{6}$/);
+ const replay=await(await fetch(`${origin}/api/bookings`,options)).json();assert.equal(receipt.id,replay.id);assert.equal(receipt.accessToken,replay.accessToken);
+ const noAccess=await fetch(`${origin}/api/bookings/${receipt.id}`);assert.equal(noAccess.status,404);
+ const status=await(await fetch(`${origin}/api/bookings/${receipt.id}`,{headers:{'X-Intake-Token':receipt.accessToken}})).json();assert.equal(status.importStatus,'Pending');
+ const conflict=await fetch(`${origin}/api/bookings`,{...options,body:body.replace('Test Client','Other Client')});assert.equal(conflict.status,409);
 });
 test('serves standalone client assets and an operational health endpoint', async t => {
   const origin = await fixture(t);

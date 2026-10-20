@@ -56,6 +56,7 @@ public sealed class ClientReminderTests
         long Count(string kind){using var q=new NpgsqlCommand("select count(*) from studio_client_reminder_sources where kind=$1",c,tx);q.Parameters.AddWithValue(kind);return(long)q.ExecuteScalar()!;}
     }
     public const string Fixture="""
+      create table studio_job_subjects(id uuid primary key,job_id uuid,is_system boolean default false,production_status text,updated_at_utc timestamptz default now(),contact_email text default '',contact_phone text default '');
       create table studio_jobs(id uuid primary key,status text,created_at_utc timestamptz,stage_entered_at_utc timestamptz,client_id uuid,conversation_id uuid,title text);
       create table studio_shoot_sessions(id uuid,job_id uuid,call_time_utc timestamptz,location text,status text);
       create table studio_frontdesk_requests(id uuid,job_id uuid,created_at_utc timestamptz,status text,payload jsonb);

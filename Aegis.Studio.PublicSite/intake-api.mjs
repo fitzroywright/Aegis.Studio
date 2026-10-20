@@ -1,6 +1,6 @@
-import { randomUUID, timingSafeEqual, createHash } from 'node:crypto';
+import { randomUUID, randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import { readRosterFile } from './roster-file.mjs';
-import { IntakeStore, fail } from './intake-store.mjs';
+import { IntakeStore, validateRoster, fail } from './intake-store.mjs';
 import { join } from 'node:path';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -47,6 +47,14 @@ export function createIntakeApi(env,readBody,json) {
     if(route==='/api/public-site/v1/openapi.json'&&method==='GET'){
       const {readFile}=await import('node:fs/promises');json(res,200,JSON.parse(await readFile(new URL('./public-site-v1.openapi.json',import.meta.url),'utf8')));return true;
     }
+    const draft=route.match(/^\/api\/roster-drafts(?:\/([0-9a-f-]{36}))?$/i);
+    if(draft){
+      if(method==='POST'&&!draft[1]){await sameOrigin(req,url);const p=await input(req,2_000_000),rows=validateRoster(p.rows),id=randomUUID(),token=randomBytes(32).toString('base64url');store.db.prepare('INSERT INTO roster_drafts VALUES(?,?,1,?)').run(id,createHash('sha256').update(token).digest('hex'),JSON.stringify(rows));json(res,201,{id,accessToken:token,revision:1,rows});return true;}
+      const r=store.db.prepare('SELECT * FROM roster_drafts WHERE id=?').get(draft[1]);if(!r||!equal(r.access_hash,createHash('sha256').update(String(req.headers['x-intake-token']||'')).digest('hex')))fail(404,'not_found','Roster draft not found.');
+      if(method==='GET'){json(res,200,{revision:r.revision,rows:JSON.parse(r.rows)});return true;}
+      if(method==='PUT'){await sameOrigin(req,url);const p=await input(req,2_000_000),rows=validateRoster(p.rows);const n=store.db.prepare('UPDATE roster_drafts SET rows=?,revision=revision+1 WHERE id=? AND revision=?').run(JSON.stringify(rows),draft[1],p.revision);if(!n.changes)fail(409,'revision_conflict','Reload the draft before saving.');json(res,200,{revision:r.revision+1,rows});return true;}
+      fail(405,'method_not_allowed','Unsupported draft operation.');
+    }
     if(route==='/api/roster-file'&&method==='POST'){
       await sameOrigin(req,url);const body=await readBody(req,5_100_000);
       const request=new Request('http://localhost/upload',{method:'POST',headers:{'Content-Type':req.headers['content-type']||''},body});
@@ -82,6 +90,11 @@ export function createIntakeApi(env,readBody,json) {
           store.db.prepare('INSERT INTO attachments VALUES(?,?,?,?,?)').run(file.id,id,JSON.stringify(file),bytes,file.state);v.attachments.push(file);v.revision++;store.db.prepare('UPDATE intakes SET payload=?,revision=? WHERE id=?').run(JSON.stringify(v),v.revision,id);store.change(v);});
         json(res,201,file);return true;
       }
+    }
+    const rescan=route.match(/^\/api\/public-site\/v1\/attachments\/([0-9a-f-]{36})\/rescan$/i);
+    if(rescan&&method==='POST'){
+      authenticate(req,'attachment:scan');const r=store.db.prepare('SELECT * FROM attachments WHERE id=?').get(rescan[1]);if(!r)fail(404,'not_found','Attachment not found.');const m=JSON.parse(r.metadata),result=await scan(Buffer.from(r.content),m.fileName);m.state=result.state;
+      store.transaction(()=>{store.db.prepare('UPDATE attachments SET state=?,metadata=? WHERE id=?').run(m.state,JSON.stringify(m),m.id);const row=store.db.prepare('SELECT payload FROM intakes WHERE id=?').get(r.intake_id),p=JSON.parse(row.payload);p.attachments=p.attachments.map(x=>x.id===m.id?m:x);p.revision++;store.db.prepare('UPDATE intakes SET payload=?,revision=? WHERE id=?').run(JSON.stringify(p),p.revision,p.id);store.change(p);});json(res,200,m);return true;
     }
     const file=route.match(/^\/api\/public-site\/v1\/attachments\/([0-9a-f-]{36})$/i);
     if(file&&method==='GET'){authenticate(req,'intake:pull');const r=store.db.prepare("SELECT metadata,content FROM attachments WHERE id=? AND state='Clean'").get(file[1]);if(!r)fail(404,'unavailable','Attachment is unavailable or quarantined.');const m=JSON.parse(r.metadata);res.writeHead(200,{'Content-Type':m.contentType,'Cache-Control':'no-store','Content-Disposition':'attachment'});res.end(r.content);return true;}

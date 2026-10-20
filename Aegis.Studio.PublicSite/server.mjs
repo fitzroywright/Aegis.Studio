@@ -63,25 +63,6 @@ function requireSameOrigin(req, url) {
 function requireGallery(user, reference) {
   if (!user || user.galleryReference !== reference) throw Object.assign(new Error('Sign in to the client account that owns this gallery.'), { status: 404 });
 }
-function studioConfig(env) {
-  if (!env.STUDIO_BASE_URL || !env.STUDIO_CLIENT || !env.STUDIO_SECRET) throw Object.assign(new Error('Studio API is not configured.'), { status: 503 });
-  const base = new URL(env.STUDIO_BASE_URL);
-  if (base.protocol !== 'https:') throw new Error('STUDIO_BASE_URL must use HTTPS.');
-  return { base, client: env.STUDIO_CLIENT, secret: env.STUDIO_SECRET };
-}
-async function studioRequest(env, method, path, body = Buffer.alloc(0), key = '', bearer = '') {
-  const { base, client, secret } = studioConfig(env);
-  const timestamp = String(Math.floor(Date.now() / 1000)), nonce = randomUUID();
-  const headers = {
-    'X-Studio-Client': client, 'X-Studio-Timestamp': timestamp, 'X-Studio-Nonce': nonce,
-    'X-Studio-Signature': sign(secret, method, path, timestamp, nonce, body, key),
-  };
-  if (key) headers['Idempotency-Key'] = key;
-  if (bearer) headers.Authorization = `Bearer ${bearer}`;
-  if (body.length) headers['Content-Type'] = 'application/json';
-  const response = await fetch(new URL(path, base), { method, headers, body: body.length ? body : undefined, redirect: 'error', signal: AbortSignal.timeout(30000) });
-  return response;
-}
 function demoPage(reference, selected) {
   const gallery = DEMO_GALLERIES[reference];
   return { reference, publicationId: reference, title: gallery.title, finalDeliveryAvailable: false,
@@ -111,7 +92,8 @@ export function createServer(env = process.env) {
         const type = url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
         res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=300' }); res.end(await readFile(new URL(url.pathname.slice(1), ROOT))); return;
       }
-      const user = readSession(req, secret);
+      let user = readSession(req, secret);
+      if(user){const binding=JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];if(binding){const candidates=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).filter(r=>JSON.parse(r.payload).published);if(candidates.length)user={...user,galleryReference:candidates.at(-1).id};}}
       if (req.method === 'GET' && url.pathname === '/api/session') { json(res, 200, { demo, user: user ? { name: user.name, provider: user.provider, email: user.email, galleryReference: user.galleryReference } : null }); return; }
       if (await intake.handle(req,res,url)) return;
       if (['POST','PUT','DELETE'].includes(req.method)) requireSameOrigin(req, url);
@@ -128,8 +110,8 @@ export function createServer(env = process.env) {
       const selection = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/([0-9a-f-]{36})$/i);
       const submit = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/submit$/i);
       if (galleryPage || galleryItem || selection || submit) {
-        const reference = (galleryPage || galleryItem || selection || submit)[1]; if(demo)requireGallery(user, reference);
-        if (demo) {
+        const reference = (galleryPage || galleryItem || selection || submit)[1]; const locallyPublished=intake.store.db.prepare('SELECT id FROM galleries WHERE id=?').get(reference);if(demo&&!locallyPublished)requireGallery(user, reference);
+        if (demo&&!locallyPublished) {
           if (!DEMO_GALLERIES[reference]) { json(res, 404, { message: 'Gallery not found.' }); return; }
           const selectionKey = `${user.id}:${reference}`;
           if (!demoSelections.has(selectionKey)) demoSelections.set(selectionKey, new Set());

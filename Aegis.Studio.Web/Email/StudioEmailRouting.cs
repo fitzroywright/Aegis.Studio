@@ -20,7 +20,7 @@ public sealed class StudioEmailRouting(StudioDatabase database, IInboundEmailRou
     public static string[] MessageIds(string? value) => Regex.Matches(value ?? "", @"<?[^<>\s,]+@[^<>\s,]+>?")
         .Select(m => "<" + m.Value.Trim('<','>') + ">").Distinct(StringComparer.Ordinal).ToArray();
     public static string Header(InboundEmail email, string name) => email.InternetHeaders.FirstOrDefault(h => h.Key.Equals(name,StringComparison.OrdinalIgnoreCase)).Value ?? "";
-    public static string[] ExplicitReferences(string subject) => Regex.Matches(subject, @"\bAEGIS-(?:T[0-9A-F]{32}|[0-9A-F]{32}|[0-9A-F]{8})\b", RegexOptions.IgnoreCase)
+    public static string[] ExplicitReferences(string subject) => Regex.Matches(subject, @"\b(?:AEGIS-(?:T[0-9A-F]{32}|[0-9A-F]{32}|[0-9A-F]{8})|[0-9]{4}-[WS]-[0-9]{6})\b", RegexOptions.IgnoreCase)
         .Select(m=>m.Value.ToUpperInvariant()).Distinct(StringComparer.Ordinal).ToArray();
 
     public EmailRoutingDecision Resolve(InboundEmail email)
@@ -101,6 +101,11 @@ public sealed class StudioEmailRouting(StudioDatabase database, IInboundEmailRou
     }
     private static EmailAssociation[] FindReference(NpgsqlConnection c,string reference)
     {
+        if(Regex.IsMatch(reference,@"^[0-9]{4}-[WS]-[0-9]{6}$"))
+        {
+            using var intake=new NpgsqlCommand("select id from studio_conversations where intake_reference=$1",c);Add(intake,reference);
+            return intake.ExecuteScalar() is Guid cv?[new(cv,null)]:[];
+        }
         using var q=new NpgsqlCommand("""
             select conversation_id,thread_id from studio_email_public_references where reference=$1
             union select id,null::uuid from studio_conversations

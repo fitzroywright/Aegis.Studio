@@ -34,6 +34,7 @@ export class IntakeStore {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(path); this.now = now;
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
+      CREATE TABLE IF NOT EXISTS roster_drafts(id TEXT PRIMARY KEY,access_hash TEXT NOT NULL,revision INTEGER NOT NULL,rows TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS counters(year INTEGER,source TEXT,value INTEGER,PRIMARY KEY(year,source));
       CREATE TABLE IF NOT EXISTS intakes(id TEXT PRIMARY KEY,reference TEXT UNIQUE,owner TEXT NOT NULL,payload TEXT NOT NULL,revision INTEGER NOT NULL,ack_revision INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL,access_hash TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS changes(sequence INTEGER PRIMARY KEY AUTOINCREMENT,intake_id TEXT NOT NULL,revision INTEGER NOT NULL,payload TEXT NOT NULL);
@@ -85,7 +86,7 @@ export class IntakeStore {
     if (!r || owner !== r.owner && fingerprint(token || '') !== r.access_hash) fail(404,'not_found','Intake not found.');
     return r;
   }
-  status(id,owner,token) { const r=this.get(id,owner,token); return { id:r.id,intakeReference:r.reference,createdAtUtc:r.created_at,receiptStatus:'Received',importStatus:r.ack_revision ? 'Imported':'Pending',...JSON.parse(r.status) }; }
+  status(id,owner,token) { const r=this.get(id,owner,token); return { id:r.id,intakeReference:r.reference,createdAtUtc:r.created_at,receiptStatus:'Received',importStatus:r.ack_revision ? 'Imported':'Pending',pendingChanges:r.ack_revision<r.revision,...JSON.parse(r.status) }; }
   feed(cursor = '', limit = 50) {
     let after = 0; try { if (cursor) { after = Number(Buffer.from(cursor,'base64url').toString()); if (!Number.isSafeInteger(after) || after<0) throw Error(); } } catch { fail(400,'invalid_cursor','Invalid change cursor.'); }
     const rows=this.db.prepare('SELECT sequence,payload FROM changes WHERE sequence>? ORDER BY sequence LIMIT ?').all(after,limit);
@@ -95,7 +96,7 @@ export class IntakeStore {
     return this.transaction(()=>{
       const r=this.db.prepare('SELECT * FROM intakes WHERE id=?').get(id); if(!r) fail(404,'not_found','Intake not found.');
       if(!Number.isInteger(revision)||revision<1||revision>r.revision) fail(409,'revision_conflict','Invalid imported revision.');
-      if(revision>=r.ack_revision) this.db.prepare('UPDATE intakes SET ack_revision=?,status=? WHERE id=?').run(revision,JSON.stringify(status),id);
+      if(revision>=r.ack_revision) this.db.prepare('UPDATE intakes SET ack_revision=?,status=? WHERE id=?').run(revision,JSON.stringify({...JSON.parse(r.status),...status}),id);
       return {id,acknowledgedRevision:Math.max(revision,r.ack_revision),currentRevision:r.revision};
     });
   }
@@ -110,8 +111,8 @@ export class IntakeStore {
     return this.transaction(()=>{
       const r=this.db.prepare('SELECT payload FROM intakes WHERE id=?').get(id);if(!r)fail(404,'not_found','Intake not found.');
       if(!event.eventId||!event.transactionReference||!event.provider||!['Deposit','Refund','Dispute'].includes(event.kind)||event.currency!=='JMD'||!Number.isSafeInteger(event.amountMinor)||event.amountMinor<=0)fail(400,'invalid_payment','Verified event ID, provider, reference, kind and positive minor-unit JMD amount required.');
-      const hash=fingerprint(event), old=this.db.prepare('SELECT hash FROM payment_events WHERE id=?').get(event.eventId);
-      if(old){if(old.hash!==hash)fail(409,'payment_conflict','Event ID reused with different facts.');return {eventId:event.eventId};}
+      const hash=fingerprint(event), old=this.db.prepare('SELECT hash,intake_id FROM payment_events WHERE id=?').get(event.eventId);
+      if(old){if(old.hash!==hash||old.intake_id!==id)fail(409,'payment_conflict','Event ID reused with different facts.');return {eventId:event.eventId};}
       this.db.prepare('INSERT INTO payment_events VALUES(?,?,?,?)').run(event.eventId,id,hash,JSON.stringify(event));
       const p=JSON.parse(r.payload);p.paymentEvents.push(event);p.revision++;this.db.prepare('UPDATE intakes SET payload=?,revision=? WHERE id=?').run(JSON.stringify(p),p.revision,id);this.change(p);return {eventId:event.eventId};
     });

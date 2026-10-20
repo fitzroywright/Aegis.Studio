@@ -7,7 +7,7 @@ using Aegis.Studio.Web.Workflow;
 using Npgsql;
 namespace Aegis.Studio.Web.Intake;
 
-public sealed record RosterCommit(long Revision,JsonElement Rows);
+public sealed record RosterCommit(long Revision,JsonElement Rows,bool ResolveConflict=false);
 public sealed class IntakeRosterStore(StudioDatabase database)
 {
     static readonly string[] Fields=["name","reference","collection","contactName","contactEmail","contactPhone","scheduledAtUtc","scheduleLocation","notes","pickupNotification"];
@@ -30,7 +30,17 @@ public sealed class IntakeRosterStore(StudioDatabase database)
     {
         using var c=database.OpenConnection();
         using var q=WorkflowStore.Command(c,null,"select v.intake_reference,r.revision,r.rows::text,v.job_id from studio_conversations v left join studio_intake_rosters r on r.conversation_id=v.id where v.id=$1",cv);using var r=q.ExecuteReader();if(!r.Read())throw new KeyNotFoundException();
-        return new{intakeReference=r.IsDBNull(0)?null:r.GetString(0),revision=r.IsDBNull(1)?0:r.GetInt64(1),rows=r.IsDBNull(2)?JsonSerializer.SerializeToElement(Array.Empty<object>()):JsonSerializer.Deserialize<JsonElement>(r.GetString(2)),jobId=r.IsDBNull(3)?(Guid?)null:r.GetGuid(3)};
+        string? reference=r.IsDBNull(0)?null:r.GetString(0);long revision=r.IsDBNull(1)?0:r.GetInt64(1);
+        var rows=r.IsDBNull(2)?JsonSerializer.SerializeToElement(Array.Empty<object>()):JsonSerializer.Deserialize<JsonElement>(r.GetString(2));Guid? job=r.IsDBNull(3)?null:r.GetGuid(3);r.Close();
+        if(job.HasValue)
+        {
+            string value=(string)WorkflowStore.Scalar(c,null,"""
+              select coalesce(jsonb_agg(jsonb_build_object('subjectId',id,'name',name,'reference',case when reference='' then id::text else reference end,'collection',collection_name,'contactName',contact_name,'contactEmail',contact_email,'contactPhone',contact_phone,'scheduledAtUtc',coalesce(to_char(scheduled_at_utc at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),''),'scheduleLocation',schedule_location,'notes',notes,'pickupNotification',pickup_notification) order by collection_name,name),'[]'::jsonb)::text from studio_job_subjects where job_id=$1 and not is_system
+              """,job.Value)!;
+            rows=JsonSerializer.Deserialize<JsonElement>(value);
+        }
+        string? conflict=WorkflowStore.Scalar(c,null,"select rows::text from studio_intake_roster_conflicts where conversation_id=$1",cv) as string;
+        return new{intakeReference=reference,revision,rows,jobId=job,incomingRows=conflict is null?(JsonElement?)null:JsonSerializer.Deserialize<JsonElement>(conflict)};
     }
     public object Commit(Guid cv,RosterCommit request,string actor)
     {
@@ -39,7 +49,9 @@ public sealed class IntakeRosterStore(StudioDatabase database)
         long current=Convert.ToInt64(WorkflowStore.Scalar(c,tx,"select revision from studio_intake_rosters where conversation_id=$1",cv)??0L);
         if(current!=request.Revision)throw new InvalidOperationException("Roster changed. Reload before saving.");
         WorkflowStore.Sql(c,tx,"insert into studio_intake_rosters(conversation_id,revision,rows,updated_by) values($1,$2,$3::jsonb,$4) on conflict(conversation_id) do update set revision=$2,rows=$3::jsonb,updated_by=$4,updated_at_utc=now()",cv,current+1,request.Rows.GetRawText(),actor);
-        WorkflowStore.Sql(c,tx,"select studio_apply_intake_roster($1)",cv);tx.Commit();return Read(cv);
+        WorkflowStore.Sql(c,tx,"select studio_apply_intake_roster($1)",cv);
+        if(request.ResolveConflict)WorkflowStore.Sql(c,tx,"delete from studio_intake_roster_conflicts where conversation_id=$1",cv);
+        tx.Commit();return Read(cv);
     }
     public static bool Allowed(Guid cv,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja,bool edit)
     {
@@ -50,6 +62,16 @@ public sealed class IntakeRosterStore(StudioDatabase database)
     public static void Map(WebApplication app)
     {
         var g=app.MapGroup("/api/intake").RequireAuthorization();
+        g.MapGet("/lookup/{reference}",(string reference,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja)=>
+        {
+            using var c=db.OpenConnection();Guid? cv=WorkflowStore.Scalar(c,null,"select id from studio_conversations where intake_reference=$1",reference.ToUpperInvariant()) is Guid id?id:null;
+            if(cv is null||!Allowed(cv.Value,user,db,wa,ja,false))return Results.NotFound();
+            return Results.Ok(new{conversationId=cv,jobId=WorkflowStore.Scalar(c,null,"select job_id from studio_conversations where id=$1",cv.Value)});
+        });
+        g.MapGet("/capacity",(ClaimsPrincipal user,StudioDatabase db)=>
+        {
+            if(!user.IsInRole("Administrator"))return Results.Forbid();using var c=db.OpenConnection();using var q=WorkflowStore.Command(c,null,"select year,source,value from studio_intake_sequences order by year desc,source");using var r=q.ExecuteReader();var values=new List<object>();while(r.Read())values.Add(new{year=r.GetInt32(0),source=r.GetString(1),issued=r.GetInt32(2),capacity=999999,attention=r.GetInt32(2)>=950000});return Results.Ok(values);
+        });
         g.MapGet("/{cv:guid}/roster",(Guid cv,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja)=>Allowed(cv,user,db,wa,ja,false)?Results.Ok(new IntakeRosterStore(db).Read(cv)):Results.Forbid());
         g.MapPut("/{cv:guid}/roster",(Guid cv,RosterCommit request,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja)=>
         {
@@ -66,7 +88,9 @@ public sealed class IntakeRosterStore(StudioDatabase database)
         {
             if(!Allowed(cv,user,db,wa,ja,false))return Results.Forbid();using var c=db.OpenConnection();
             var reference=WorkflowStore.Scalar(c,null,"select intake_reference from studio_conversations where id=$1",cv);
-            using var q=WorkflowStore.Command(c,null,"select id,status,last_error,provider_accepted_at_utc,attempts from studio_outbound_email where conversation_id=$1 order by created_at_utc desc",cv);using var r=q.ExecuteReader();var deliveries=new List<object>();while(r.Read())deliveries.Add(new{id=r.GetGuid(0),status=r.GetString(1),error=r.IsDBNull(2)?null:r.GetString(2),providerAcceptedAtUtc=r.IsDBNull(3)?(DateTimeOffset?)null:r.GetFieldValue<DateTimeOffset>(3),attempts=r.GetInt32(4)});return Results.Ok(new{intakeReference=reference,deliveries});
+            var files=new List<object>();using(var f=WorkflowStore.Command(c,null,"select id,metadata->>'fileName',state from studio_intake_attachments where conversation_id=$1",cv))using(var fr=f.ExecuteReader())while(fr.Read())files.Add(new{id=fr.GetGuid(0),fileName=fr.GetString(1),state=fr.GetString(2)});
+            var rosterConflict=WorkflowStore.Scalar(c,null,"select exists(select 1 from studio_intake_roster_conflicts where conversation_id=$1)",cv);
+            using var q=WorkflowStore.Command(c,null,"select id,status,last_error,provider_accepted_at_utc,attempts from studio_outbound_email where conversation_id=$1 order by created_at_utc desc",cv);using var r=q.ExecuteReader();var deliveries=new List<object>();while(r.Read())deliveries.Add(new{id=r.GetGuid(0),status=r.GetString(1),error=r.IsDBNull(2)?null:r.GetString(2),providerAcceptedAtUtc=r.IsDBNull(3)?(DateTimeOffset?)null:r.GetFieldValue<DateTimeOffset>(3),attempts=r.GetInt32(4)});return Results.Ok(new{intakeReference=reference,deliveries,attachments=files,rosterConflict,acknowledgmentStatus=deliveries.Count==0?"NotQueued — check contact and workspace sender":"See delivery details"});
         });
     }
 }

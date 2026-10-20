@@ -44,21 +44,24 @@ try{intakeCsrf=(await api('/api/intake-session')).csrf;}catch{}
 const bookingForm=$('booking-form');
 const kindLabel=document.createElement('label');kindLabel.textContent='Request type';const kindSelect=document.createElement('select');kindSelect.name='intakeKind';kindSelect.append(new Option('Booking request','Booking'),new Option('Inquiry','Inquiry'));kindLabel.append(kindSelect);bookingForm.prepend(kindLabel);
 const rosterBox=document.createElement('details'),rosterTitle=document.createElement('summary'),rosterHost=document.createElement('div');rosterTitle.textContent='Subjects and roster (optional)';rosterBox.append(rosterTitle,rosterHost);bookingForm.append(rosterBox);
-const publicRoster=StudioRosterEditor.open(rosterHost,{readFile:async file=>{const data=new FormData();data.append('file',file);const r=await fetch('/api/roster-file',{method:'POST',body:data,headers:{'X-CSRF-Token':intakeCsrf}});if(!r.ok)throw Error((await r.json()).message);return StudioRosterEditor.csv((await r.json()).csv);},save:async()=>({})});
-$('booking-form').addEventListener('submit', async event => {
-  event.preventDefault(); const form = event.currentTarget, button = form.querySelector('button[type=submit]'); button.disabled = true;
-  const fields = Object.fromEntries(new FormData(form));
-  const starts = new Date(`${fields.startsAt}T${fields.preferredTime || '10:00'}`); const ends = new Date(starts.getTime() + 60 * 60 * 1000);
-  const payload = { clientName: fields.clientName, clientEmail: fields.clientEmail, clientPhone: fields.clientPhone, sessionType: fields.sessionType, startsAt: starts.toISOString(), endsAt: ends.toISOString(), location: '', notes: fields.notes };
-  const roster=publicRoster.getRows();payload.roster=roster;payload.kind=form.elements.intakeKind.value;payload.timeZone='America/Jamaica';
-  const encoded=JSON.stringify(payload);let draft=JSON.parse(sessionStorage.getItem('intake-submit')||'null');if(!draft||draft.body!==encoded){draft={key:crypto.randomUUID(),body:encoded};sessionStorage.setItem('intake-submit',JSON.stringify(draft));}const key=draft.key;
-  try {
-    const receipt = await api('/api/bookings', { method: 'POST', headers: { 'Idempotency-Key': key,'X-CSRF-Token':intakeCsrf }, body: draft.body });
-    $('booking-result').hidden = false; $('booking-result').textContent = `Received — awaiting review.\nReference: ${receipt.intakeReference}\nSaved on the website; awaiting Studio import. This does not confirm your booking.`;
-    sessionStorage.setItem('intake-receipt',JSON.stringify(receipt));sessionStorage.removeItem('intake-submit');
-    $('track-form').hidden = false;
-  } catch (error) { $('booking-result').hidden = false; $('booking-result').textContent = error.message; }
-  finally { button.disabled = false; }
+let draftReceipt=JSON.parse(sessionStorage.getItem('roster-draft')||'null'),draftData={};
+if(draftReceipt)try{draftData=await api('/api/roster-drafts/'+draftReceipt.id,{headers:{'X-Intake-Token':draftReceipt.accessToken}});}catch(e){$('booking-result').hidden=false;$('booking-result').textContent='Could not restore saved roster: '+e.message;}
+const publicRoster=StudioRosterEditor.open(rosterHost,{...draftData,readFile:async file=>{const data=new FormData();data.append('file',file);const r=await fetch('/api/roster-file',{method:'POST',body:data,headers:{'X-CSRF-Token':intakeCsrf}});if(!r.ok)throw Error((await r.json()).message);return StudioRosterEditor.csv((await r.json()).csv);},save:async value=>{
+ const result=await api('/api/roster-drafts'+(draftReceipt?'/'+draftReceipt.id:''),{method:draftReceipt?'PUT':'POST',headers:{'X-CSRF-Token':intakeCsrf,...(draftReceipt?{'X-Intake-Token':draftReceipt.accessToken}:{})},body:JSON.stringify(value)});
+ if(!draftReceipt){draftReceipt={id:result.id,accessToken:result.accessToken};sessionStorage.setItem('roster-draft',JSON.stringify(draftReceipt));}return result;
+}});
+kindSelect.onchange=()=>{const booking=kindSelect.value==='Booking';for(const name of ['clientEmail','sessionType','startsAt','preferredTime'])if(bookingForm.elements[name])bookingForm.elements[name].required=booking;};
+$('booking-form').addEventListener('submit',async event=>{
+ event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type=submit]');button.disabled=true;
+ try{
+  const f=Object.fromEntries(new FormData(form)),payload={kind:f.intakeKind,clientName:f.clientName,clientEmail:f.clientEmail||'',clientPhone:f.clientPhone||'',sessionType:f.sessionType||'',notes:f.notes||'',timeZone:'America/Jamaica',roster:publicRoster.getRows()};
+  if(f.startsAt){const start=new Date(`${f.startsAt}T${f.preferredTime||'10:00'}:00-05:00`);payload.startsAt=start.toISOString();payload.endsAt=new Date(start.getTime()+3600000).toISOString();}
+  const encoded=JSON.stringify(payload);let draft=JSON.parse(sessionStorage.getItem('intake-submit')||'null');if(!draft||draft.body!==encoded){draft={key:crypto.randomUUID(),body:encoded};sessionStorage.setItem('intake-submit',JSON.stringify(draft));}
+  const receipt=await api('/api/bookings',{method:'POST',headers:{'Idempotency-Key':draft.key,'X-CSRF-Token':intakeCsrf},body:draft.body});
+  sessionStorage.setItem('intake-receipt',JSON.stringify(receipt));sessionStorage.removeItem('intake-submit');
+  $('booking-result').hidden=false;$('booking-result').textContent=`Received — awaiting review.\nReference: ${receipt.intakeReference}\nSaved on the website; awaiting Studio import. This does not confirm availability, payment or booking.`;
+  $('track-form').hidden=false;
+ }catch(e){$('booking-result').hidden=false;$('booking-result').textContent=e.message;}finally{button.disabled=false;}
 });
 $('track-form').addEventListener('submit', async event => { event.preventDefault(); const reference = new FormData(event.currentTarget).get('reference').trim(); try { const result = await api(`/api/bookings/${encodeURIComponent(reference)}`,{headers:{'X-Intake-Token':JSON.parse(sessionStorage.getItem('intake-receipt')||'{}').accessToken||''}}); $('track-result').textContent = `Receipt: ${result.receiptStatus} · Studio: ${result.importStatus} · Review: ${result.reviewStatus||'Awaiting review'}`; } catch (error) { $('track-result').textContent = error.message; } });
 $('submit-selections').addEventListener('click', async () => { const button = $('submit-selections'); button.disabled = true; try { const result = await api(`/api/galleries/${state.user.galleryReference}/selections/submit`, { method: 'POST', headers: { 'Idempotency-Key': state.selectionKey }, body: '{}' }); $('selection-result').textContent = `${result.versionIds.length} favourite(s) sent to the Studio team.`; state.selectionKey = crypto.randomUUID(); } catch (error) { $('selection-result').textContent = error.message; } finally { button.disabled = false; } });

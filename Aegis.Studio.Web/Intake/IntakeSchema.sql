@@ -28,7 +28,7 @@ begin
  select job_id into target from studio_conversations where id=cv;
  if target is null then return; end if;
  for row in select jsonb_array_elements(rows) from studio_intake_rosters where conversation_id=cv loop
-  select count(*),min(id::text)::uuid into matches,sid from studio_job_subjects where job_id=target and not is_system and reference=row->>'reference';
+  select count(*),min(id::text)::uuid into matches,sid from studio_job_subjects where job_id=target and not is_system and (reference=row->>'reference' or id::text=row->>'subjectId');
   if matches>1 then raise exception 'Ambiguous subject reference'; end if;
   sid=coalesce(sid,gen_random_uuid());
   insert into studio_job_subjects(id,job_id,name,reference,notes,collection_name,contact_name,contact_email,contact_phone,schedule_location,scheduled_at_utc,updated_by,pickup_notification,preference_source,preference_at_utc)
@@ -48,3 +48,8 @@ create or replace function studio_promote_intake_roster() returns trigger langua
 begin if new.job_id is distinct from old.job_id and new.job_id is not null then perform studio_apply_intake_roster(new.id); end if;return new;end $$;
 drop trigger if exists promote_intake_roster on studio_conversations;
 create trigger promote_intake_roster after update of job_id on studio_conversations for each row execute function studio_promote_intake_roster();
+
+create table if not exists studio_website_import_errors(source text,external_id uuid,revision bigint,error_type text,updated_at_utc timestamptz not null default now(),primary key(source,external_id));
+create table if not exists studio_intake_roster_conflicts(conversation_id uuid primary key references studio_conversations(id),rows jsonb not null,revision bigint not null,created_at_utc timestamptz not null default now());
+
+alter table studio_website_import_errors add column if not exists payload jsonb;
