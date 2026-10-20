@@ -45,8 +45,6 @@
 .st-pipeline-content .pipeline-mode-switch button{min-height:24px;padding:3px 8px;border:0;border-radius:5px;background:transparent;color:#4c647d;font-size:10px;font-weight:700;cursor:pointer}
 .st-pipeline-content .pipeline-mode-switch button.active{background:#234c73;color:#fff;box-shadow:0 1px 2px rgba(20,44,68,.18)}
 .st-pipeline-content .pipeline-mode-switch button:not(.active):hover{background:#dceaf5;color:#173c5d}
-.st-pipeline-content .pipeline-calendar-toolbar>.pipeline-refresh-icon{display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;min-height:28px;padding:4px}
-.st-pipeline-content .pipeline-refresh-icon svg{display:block}
 .st-pipeline-content .pipeline-job-heading{display:flex;align-items:center;gap:8px;min-width:220px;white-space:nowrap}
 .st-pipeline-content .pipeline-job-heading input{flex:1 1 150px;min-width:90px;width:100%;height:27px;min-height:27px;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
 .st-pipeline-content .pipeline-job-heading input::placeholder{color:#e2ebf6;opacity:1}
