@@ -23,7 +23,7 @@ window.StudioPhotographerSchedule=(()=>{
         if(['day','week','month'].includes(options.view))state.view=options.view;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
         genericView.innerHTML='<p role="status">Loading photographer schedules…</p>';
-        const monthStart=new Date(state.date.getFullYear(),state.date.getMonth(),1,12),from=state.view==='day'?dayStart(state.date):state.view==='week'?startOfWeek(state.date):monthStart,days=state.view==='day'?1:state.view==='week'?7:new Date(state.date.getFullYear(),state.date.getMonth()+1,0).getDate(),to=addDays(from,days);
+        const monthStart=new Date(state.date.getFullYear(),state.date.getMonth(),1),from=state.view==='day'?dayStart(state.date):state.view==='week'?startOfWeek(state.date):monthStart,days=state.view==='day'?1:state.view==='week'?7:new Date(state.date.getFullYear(),state.date.getMonth()+1,0).getDate(),to=addDays(from,days);
         let photographers,entries,jobs,workspaces;
         const range='?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
         const availabilityResult=read('/api/schedule/photographer-availability'+range,true).then(data=>({data}),error=>({error}));
