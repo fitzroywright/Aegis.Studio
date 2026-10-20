@@ -60,8 +60,8 @@ let commercialQueueArea='',commercialQueueOffset=0;
 async function showCatalogProduction(){
     const current=StudioPage.begin('production');
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');genericView.innerHTML='<div class="today-loading">Loading Production…</div>';
-    const [workloadData,workspaceResult]=await Promise.all([json('/api/production/workload'),json('/api/workspaces').catch(()=>[])]);if(!current())return;
-    const workspaces=Array.isArray(workspaceResult)?workspaceResult:(workspaceResult?.workspaces||[]),workspaceNames=new Map(workspaces.map(w=>[w.id,w.name||w.title||w.displayName]));
+    const [workloadData,workspaces]=await Promise.all([json('/api/production/workload'),loadWorkspaces()]);if(!current())return;
+    const workspaceNames=new Map(workspaces.map(w=>[w.id,w.name||w.title||w.displayName]));
     window.StudioShell?.setProductionWorkspaceFilter(workspaces,window.studioWorkloadSelection?.workspace,workspace=>{window.studioWorkloadSelection||={};window.studioWorkloadSelection.workspace=workspace;commercialQueueOffset=0;showCatalogProduction().catch(error=>alert(error.message));});
     const selection=window.studioWorkloadSelection||={filter:'',workspace:'',assignee:'',stage:'',search:''};
     const workload=StudioWorkload.model(workloadData,workloadData.jobs||[]),jobMap=new Map((workloadData.jobs||[]).map(j=>[j.id,j]));
