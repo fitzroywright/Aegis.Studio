@@ -166,7 +166,4 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 .st-board.production-main-board>.st-content{gap:0;padding:0}
 .production-overview-entries,.production-overview-entries .studio-workload-summary,.production-overview-entries .workload-indicators{border:0;border-radius:0;background:transparent;box-shadow:none}
 
-/* Collapsed right rail releases its grid track instead of leaving a blank column. */
-.st-page:has(> .st-right.studio-rail-collapsed-right){--studio-right-rail-width:42px}
 
-.st-page:has(> .st-right.studio-rail-collapsed-right){--studio-right-rail-width:42px}
