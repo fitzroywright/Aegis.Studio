@@ -96,7 +96,9 @@
         if (Array.isArray(cache) && cache.length) return Promise.resolve();
         if (workspaceLoadPromise || workspaceLoadAttempted || typeof loadWorkspaces !== 'function') return workspaceLoadPromise || Promise.resolve();
         workspaceLoadAttempted = true;
-        workspaceLoadPromise = Promise.resolve().then(() => loadWorkspaces()).catch(() => {}).finally(() => {
+        workspaceLoadPromise = Promise.resolve().then(() => loadWorkspaces()).catch(() => {
+            workspaceLoadAttempted = false;
+        }).finally(() => {
             workspaceLoadPromise = null;
             renderLeftRail();
         });
@@ -380,6 +382,7 @@
         syncGridFooterCount();
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
+        window.addEventListener('studio-workspaces-loaded',renderLeftRail);
         window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();});
         // Job details and the workspace list share a route. Refresh the masthead
         // when the visible panel changes, not only when the route changes.
