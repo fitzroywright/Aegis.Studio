@@ -204,7 +204,7 @@
         rail.classList.add('studio-rail-collapsed-right');
 
         if (display === 'grid' || display === 'inline-grid') {
-            const tracks = Array.from(columns.matchAll(/([\\d.]+)px/g), match => Number(match[1]));
+            const tracks = Array.from(columns.matchAll(/([\d.]+)px/g), match => Number(match[1]));
             if (tracks.length > 1) {
                 const centerIndex = tracks.length - 2;
                 const expandedCenter = Math.max(0, tracks[centerIndex] + tracks[centerIndex + 1] - rightChevronLane);
