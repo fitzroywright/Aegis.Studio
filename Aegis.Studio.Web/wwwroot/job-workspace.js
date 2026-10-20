@@ -24,7 +24,7 @@ async function renderJobSubjects(job, panel, current, refresh) {
 
     const canEdit=(permissions.permissions||permissions).editJob;
     const canUpload=(permissions.permissions||permissions).manageProduction;
-    const realSubjects=subjects.filter(subject=>!subject.isSystem);
+    const realSubjects=subjects.filter(subject=>!subject.isSystem).map(subject=>({...subject,...(originalSubjects.find(x=>x.id===subject.id)||{})}));
     const pendingSubjectBatches=new Map();
     const uploadToSubject=async(subjectId,files)=>{
         if(!files.length)return;
@@ -88,6 +88,7 @@ async function renderJobSubjects(job, panel, current, refresh) {
                                 <span class="person-role">${esc(role(subject))}</span>
                                 <div class="person-meta">
                                     ${subject.reference?`<span>Ref: ${esc(subject.reference)}</span>`:''}
+                                    ${subject.contactEmail?`<span>Email: ${esc(subject.contactEmail)}</span>`:''}
                                     <span>${esc(subject.imageCount??0)} photo${Number(subject.imageCount??0)===1?'':'s'}</span>
                                     ${subject.scheduledAtUtc?`<span>${esc(new Date(subject.scheduledAtUtc).toLocaleString())}</span>`:''}
                                 </div>
@@ -100,7 +101,7 @@ async function renderJobSubjects(job, panel, current, refresh) {
                 }).join('')||'<div class="people-empty"><strong>No people added yet.</strong><span>Add the people or groups being photographed, or import a roster.</span></div>'}
             </div>
 
-            ${canEdit?'<form class="subject-form people-editor" hidden><input name="subjectId" type="hidden"><label>Name<input name="name" maxlength="200" required></label><label>Reference / ID<input name="reference" maxlength="200"></label><label>Notes / role<textarea name="notes" maxlength="4000" placeholder="Bride, Groom, Student, Bridal Party…"></textarea></label><div class="dialog-actions"><button class="primary">Save</button><button type="button" data-cancel>Cancel</button></div><p role="alert"></p></form>':''}
+            ${canEdit?'<form class="subject-form people-editor" hidden><input name="subjectId" type="hidden"><label>Name<input name="name" maxlength="200" required></label><label>Reference / ID<input name="reference" maxlength="200"></label><label>Email address<input name="contactEmail" type="email" maxlength="320"></label><label>Notes / role<textarea name="notes" maxlength="4000" placeholder="Bride, Groom, Student, Bridal Party…"></textarea></label><div class="dialog-actions"><button class="primary">Save</button><button type="button" data-cancel>Cancel</button></div><p role="alert"></p></form>':''}
         </section>`;
 
     if(canUpload)panel.querySelectorAll('[data-subject-drop]').forEach(card=>{card.ondragover=e=>{if(e.dataTransfer?.types?.includes('Files')){e.preventDefault();card.classList.add('drag-target');}};card.ondragleave=()=>card.classList.remove('drag-target');card.ondrop=async e=>{e.preventDefault();e.stopPropagation();card.classList.remove('drag-target');try{const files=typeof studioDroppedPhotos==='function'?await studioDroppedPhotos(e.dataTransfer):Array.from(e.dataTransfer.files||[]);await uploadToSubject(card.dataset.subjectDrop,files);}catch(error){alert(error.message||String(error));}};});
@@ -124,6 +125,7 @@ async function renderJobSubjects(job, panel, current, refresh) {
         form.hidden=false;
         form.elements.subjectId.value=subject?.id||'';
         for(const key of ['name','reference','notes']) form.elements[key].value=subject?.[key]||'';
+        form.elements.contactEmail.value=subject?.contactEmail||'';
         form.elements.name.focus();
     };
 
@@ -147,11 +149,21 @@ async function renderJobSubjects(job, panel, current, refresh) {
             await json(`/api/jobs/${job.id}/subjects${id?'/'+id:''}`,{
                 method:id?'PUT':'POST',
                 headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({
-                    name:form.elements.name.value,
-                    reference:form.elements.reference.value,
-                    notes:form.elements.notes.value
-                })
+                body:JSON.stringify((()=>{
+                    const existing=originalSubjects.find(subject=>subject.id===id)||{};
+                    return {
+                        name:form.elements.name.value,
+                        reference:form.elements.reference.value,
+                        notes:form.elements.notes.value,
+                        collection:existing.collection||'General',
+                        scheduledAtUtc:existing.scheduledAtUtc||null,
+                        scheduleLocation:existing.scheduleLocation||'',
+                        contactName:existing.contactName||'',
+                        contactEmail:form.elements.contactEmail.value,
+                        contactPhone:existing.contactPhone||'',
+                        photoNotes:existing.photoNotes||''
+                    };
+                })())
             });
             if(current())await refresh();
         }catch(error){
