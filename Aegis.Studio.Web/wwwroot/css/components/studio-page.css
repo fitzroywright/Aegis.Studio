@@ -193,3 +193,6 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 /* Rail controls live in the shared shell so every page uses the same hit target and positioning. */
 .studio-shell-rail-toggle[data-rail-toggle="left"] { position:fixed; inset-inline-start:4px; inset-inline-end:auto; inset-block-start:64px; z-index:1100; transform:none; }
 .studio-shell-rail-toggle[data-rail-toggle="right"] { position:fixed; inset-inline-start:auto; inset-inline-end:4px; inset-block-start:64px; z-index:1100; transform:none; }
+.studio-shell-rail-toggle { display:grid; place-items:center; width:28px; height:28px; min-width:28px; padding:0; border:1px solid #aab9c9; border-radius:50%; background:#fff; color:#29445e; box-shadow:0 1px 4px #172b4033; }
+.studio-shell-rail-toggle svg { display:block; width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
+.studio-shell-rail-toggle[data-chevron-direction="left"] svg { transform:scaleX(-1); }
