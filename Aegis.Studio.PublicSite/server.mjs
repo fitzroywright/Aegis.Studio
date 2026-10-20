@@ -58,7 +58,7 @@ async function readBody(req, limit = 65536) {
 }
 function requireSameOrigin(req, url) {
   const origin = req.headers.origin;
-  if (!origin || new URL(origin).host !== req.headers.host || new URL(origin).origin !== url.origin) throw Object.assign(new Error('Request origin was rejected.'), { status: 403 });
+  if (!origin || new URL(origin).host !== req.headers.host) throw Object.assign(new Error('Request origin was rejected.'), { status: 403 });
 }
 function requireGallery(user, reference) {
   if (!user || user.galleryReference !== reference) throw Object.assign(new Error('Sign in to the client account that owns this gallery.'), { status: 404 });
@@ -128,7 +128,7 @@ export function createServer(env = process.env) {
       const selection = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/([0-9a-f-]{36})$/i);
       const submit = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/submit$/i);
       if (galleryPage || galleryItem || selection || submit) {
-        const reference = (galleryPage || galleryItem || selection || submit)[1]; requireGallery(user, reference);
+        const reference = (galleryPage || galleryItem || selection || submit)[1]; if(demo)requireGallery(user, reference);
         if (demo) {
           if (!DEMO_GALLERIES[reference]) { json(res, 404, { message: 'Gallery not found.' }); return; }
           const selectionKey = `${user.id}:${reference}`;
@@ -148,16 +148,30 @@ export function createServer(env = process.env) {
           if (submit && req.method === 'POST') { json(res, 200, { reference: randomUUID(), publicationId: reference, versionIds: [...selections], submittedAt: new Date().toISOString(), demo: true }); return; }
           json(res, 405, { message: 'Method not allowed.' }); return;
         }
-        const grant = env.CLIENT_GALLERY_GRANTS_JSON ? JSON.parse(env.CLIENT_GALLERY_GRANTS_JSON)[user.id] : null;
-        if (!grant || grant.reference !== reference || !grant.accessToken) { json(res, 404, { message: 'Gallery access is not configured for this client.' }); return; }
-        let method = req.method, path, body = Buffer.alloc(0), key = '';
-        if (galleryPage && method === 'GET') path = `/api/public/v1/galleries/${reference}${url.search}`;
-        else if (galleryItem && method === 'GET') path = `/api/public/v1/galleries/${reference}/items/${galleryItem[2]}/${galleryItem[3]}`;
-        else if (selection && method === 'PUT') { path = `/api/public/v1/galleries/${reference}/selections/${selection[2]}`; body = await readBody(req); }
-        else if (submit && method === 'POST') { path = `/api/public/v1/galleries/${reference}/selections/submit`; body = await readBody(req); key = String(req.headers['idempotency-key'] || ''); }
-        else { json(res, 405, { message: 'Method not allowed.' }); return; }
-        const upstream = await studioRequest(env, method, path, body, key, grant.accessToken);
-        res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json', 'Cache-Control': 'private, no-store' }); res.end(Buffer.from(await upstream.arrayBuffer())); return;
+        // Serve only locally stored copies. The identity binding is configured server-side,
+        // never accepted from an email address or a caller-supplied client ID.
+        const binding=JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user?.id];
+        const row=intake.store.db.prepare('SELECT client_id,payload FROM galleries WHERE id=?').get(reference);
+        if(!user||!binding||!row||row.client_id!==binding){json(res,404,{message:'Gallery not found.'});return;}
+        const gallery=JSON.parse(row.payload);if(!gallery.published){json(res,404,{message:'Gallery unavailable.'});return;}
+        if(galleryPage&&req.method==='GET'){
+          const selected=new Set(intake.store.db.prepare('SELECT id FROM selections WHERE gallery_id=? AND selected=1').all(reference).map(x=>x.id));
+          json(res,200,{reference,publicationId:reference,title:gallery.title,finalDeliveryAvailable:gallery.finalDeliveryAvailable,items:gallery.items.map(x=>({...x,selected:selected.has(x.versionId)})),nextCursor:null});return;
+        }
+        if(galleryItem&&req.method==='GET'){
+          if(!gallery.items.some(x=>x.versionId===galleryItem[2])||galleryItem[3]==='download'&&!gallery.finalDeliveryAvailable){json(res,404,{message:'Item unavailable.'});return;}
+          const media=intake.store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?').get(reference,galleryItem[2]);if(!media){json(res,404,{message:'Item unavailable.'});return;}
+          res.writeHead(200,{'Content-Type':media.type,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});res.end(media.content);return;
+        }
+        if(selection&&req.method==='PUT'){
+          const p=JSON.parse((await readBody(req)).toString());if(typeof p.selected!=='boolean'||!gallery.items.some(x=>x.versionId===selection[2])){json(res,400,{message:'Invalid selection.'});return;}
+          intake.store.db.prepare('INSERT INTO selections VALUES(?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET selected=excluded.selected').run(reference,selection[2],p.selected?1:0);json(res,200,{versionId:selection[2],selected:p.selected});return;
+        }
+        if(submit&&req.method==='POST'){
+          const ids=intake.store.db.prepare('SELECT id FROM selections WHERE gallery_id=? AND selected=1').all(reference).map(x=>x.id);
+          const result=intake.store.replay('gallery:'+user.id,String(req.headers['idempotency-key']||''),{reference,ids},()=>({reference:randomUUID(),publicationId:reference,versionIds:ids,submittedAt:new Date().toISOString()}));json(res,200,result);return;
+        }
+        json(res,405,{message:'Method not allowed.'});return;
       }
       json(res, 404, { message: 'Not found.' });
     } catch (error) {

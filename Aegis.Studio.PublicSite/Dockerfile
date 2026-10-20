@@ -2,6 +2,7 @@ FROM node:24-alpine
 ENV NODE_ENV=production PORT=8080
 WORKDIR /app
 COPY package.json *.mjs *.json ./
+RUN npm install --omit=dev
 COPY public ./public
 RUN mkdir -p /app/data && chown node:node /app/data
 VOLUME ["/app/data"]

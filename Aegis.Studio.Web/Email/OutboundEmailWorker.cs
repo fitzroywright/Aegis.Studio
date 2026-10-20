@@ -98,7 +98,7 @@ public sealed class OutboundEmailWorker : BackgroundService
                         }
                         logger.LogInformation("Outbound threading verification completed. DeliveryId={DeliveryId} ProviderMessageId={ProviderMessageId}",message.Id,providerId);
                     }
-                    catch(ExternalDeliveryOutcomeUnknownException ex)
+                    catch(ExternalDeliveryOutcomeUnknownException ex) when(!providerAccepted)
                     {
                         outbox.MarkAttention(message.Id,lease,"ProviderOutcomeUncertain: reconcile sent items or message trace before resending.");
                         logger.LogError(ex,"Outbound provider outcome is uncertain. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient}", message.Id, message.DeliveryChannel, message.ToAddress);

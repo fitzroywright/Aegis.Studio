@@ -1,4 +1,5 @@
 import { randomUUID, timingSafeEqual, createHash } from 'node:crypto';
+import { readRosterFile } from './roster-file.mjs';
 import { IntakeStore, fail } from './intake-store.mjs';
 import { join } from 'node:path';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -23,7 +24,7 @@ export function createIntakeApi(env,readBody,json) {
   async function input(req,limit){try{return JSON.parse((await readBody(req,limit)).toString('utf8'));}catch(e){if(e.status)throw e;fail(400,'invalid_json','Supply valid JSON.');}}
   async function sameOrigin(req,url){const origin=req.headers.origin;try{if(!origin||new URL(origin).host!==req.headers.host)throw Error();}catch{fail(403,'origin_rejected','Same-origin browser request required.');}
     const cookies=(req.headers.cookie||'').split(';').map(x=>x.trim());
-    if(!equal(cookies.find(x=>x.startsWith('intake_csrf='))?.slice(12),req.headers['x-csrf-token']))fail(403,'csrf_rejected','Reload the form before submitting.');
+    if(!req.headers['x-csrf-token']||!equal(cookies.find(x=>x.startsWith('intake_csrf='))?.slice(12),req.headers['x-csrf-token']))fail(403,'csrf_rejected','Reload the form before submitting.');
   }
   async function scan(bytes,name){
     // File bytes are never rendered, decoded or processed before type checks and scanning.
@@ -45,6 +46,14 @@ export function createIntakeApi(env,readBody,json) {
     }
     if(route==='/api/public-site/v1/openapi.json'&&method==='GET'){
       const {readFile}=await import('node:fs/promises');json(res,200,JSON.parse(await readFile(new URL('./public-site-v1.openapi.json',import.meta.url),'utf8')));return true;
+    }
+    if(route==='/api/roster-file'&&method==='POST'){
+      await sameOrigin(req,url);const body=await readBody(req,5_100_000);
+      const request=new Request('http://localhost/upload',{method:'POST',headers:{'Content-Type':req.headers['content-type']||''},body});
+      const form=await request.formData(),file=form.get('file');if(!file||typeof file==='string')fail(400,'roster_required','Choose a roster file.');
+      const csv=await readRosterFile(Buffer.from(await file.arrayBuffer()),file.name);
+      // Return the text to the same reusable editor for column mapping and explicit commit.
+      json(res,200,{csv});return true;
     }
     if(!route.startsWith('/api/public-site/v1/')&&!/^\/api\/(bookings|inquiries)(\/|$)/.test(route))return false;
     const browser=/^\/api\/(bookings|inquiries)/.test(route);
@@ -78,7 +87,13 @@ export function createIntakeApi(env,readBody,json) {
     if(file&&method==='GET'){authenticate(req,'intake:pull');const r=store.db.prepare("SELECT metadata,content FROM attachments WHERE id=? AND state='Clean'").get(file[1]);if(!r)fail(404,'unavailable','Attachment is unavailable or quarantined.');const m=JSON.parse(r.metadata);res.writeHead(200,{'Content-Type':m.contentType,'Cache-Control':'no-store','Content-Disposition':'attachment'});res.end(r.content);return true;}
     if(route==='/api/public-site/v1/galleries'&&method==='POST'){
       authenticate(req,'gallery:publish');const p=await input(req,1_000_000);if(!/^[0-9a-f-]{36}$/i.test(p.id)||!p.clientId||!Array.isArray(p.items)||p.items.length>10000||!p.title)fail(400,'invalid_gallery','Gallery ID, client ID, title and items required.');
-      store.transaction(()=>{const old=store.db.prepare('SELECT client_id FROM galleries WHERE id=?').get(p.id);if(old&&old.client_id!==p.clientId)fail(409,'gallery_owner','Cannot change gallery owner.');store.db.prepare('INSERT INTO galleries VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').run(p.id,p.clientId,JSON.stringify(p));});json(res,200,{reference:p.id,provider:'PublicSite'});return true;
+      store.transaction(()=>{const old=store.db.prepare('SELECT client_id FROM galleries WHERE id=?').get(p.id);if(old&&old.client_id!==p.clientId)fail(409,'gallery_owner','Cannot change gallery owner.');store.db.prepare('INSERT INTO galleries VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').run(p.id,p.clientId,JSON.stringify({...p,published:false}));});json(res,200,{reference:p.id,provider:'PublicSite'});return true;
+    }
+    const publication=route.match(/^\/api\/public-site\/v1\/galleries\/([0-9a-f-]{36})\/(publish|revoke)$/i);
+    if(publication&&method==='POST'){
+      authenticate(req,'gallery:publish');store.transaction(()=>{const row=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(publication[1]);if(!row)fail(404,'not_found','Gallery not found.');const p=JSON.parse(row.payload);
+        if(publication[2]==='publish'&&p.items.some(x=>!store.db.prepare('SELECT 1 FROM media WHERE gallery_id=? AND id=?').get(p.id,x.versionId)))fail(409,'media_pending','All media must be stored before publishing.');
+        p.published=publication[2]==='publish';store.db.prepare('UPDATE galleries SET payload=? WHERE id=?').run(JSON.stringify(p),p.id);});json(res,200,{state:publication[2]==='publish'?'Published':'Revoked'});return true;
     }
     const media=route.match(/^\/api\/public-site\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})$/i);
     if(media&&method==='PUT'){

@@ -164,6 +164,7 @@
    subjectControl.onchange=async()=>{if(subjectControl.value==='__details'){subjectControl.value=subject;await host.studioOpenSubjects?.();return;}await change({subject:subjectControl.value});};
    host.querySelectorAll('[data-filter]').forEach(button=>{button.onclick=()=>change({collection:button.dataset.filter});if(canEdit){button.ondragover=e=>{if(e.dataTransfer?.types?.includes('Files'))e.preventDefault();};button.ondrop=async e=>{e.preventDefault();e.stopPropagation();await upload(await studioDroppedPhotos(e.dataTransfer),button.dataset.filter||'Unclassified');};}});
    const clear=host.querySelector('[data-clear-subject]');if(clear)clear.onclick=()=>change({subject:''});
+   const rosterButton=document.createElement('button');rosterButton.type='button';rosterButton.textContent='Subjects / roster';rosterButton.onclick=()=>root.openIntakeRoster(job.conversationId);host.querySelector('.jd-gallery-toolbar')?.append(rosterButton);
    host.querySelector('[data-media-search]').oninput=e=>{search=e.target.value;renderTiles();};
    host.querySelector('[data-job-tasks]').onclick=event=>host.studioOpenTasks?.(event);
    for(const [selector,value] of [['[data-grid]',false],['[data-list]',true]])host.querySelector(selector).onclick=()=>{list=value;renderTiles();host.querySelector('[data-grid]').setAttribute('aria-pressed',String(!list));host.querySelector('[data-list]').setAttribute('aria-pressed',String(list));};
@@ -222,9 +223,9 @@
   }
   async function importRoster(){
    if(!canEdit)return;
-   const dialog=studioDialog('Import subject roster','<form class="subject-form"><label>Roster file<input type="file" name="roster" accept=".csv,.xlsx" required></label><label>Name column<input name="nameColumn" value="Name" required></label><label>Subject ID column<input name="idColumn" value="Subject ID" required></label><button type="submit" class="primary">Import</button><p role="alert"></p></form>');
-   dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const f=event.currentTarget,button=f.querySelector('button');button.disabled=true;try{const body=new FormData();body.append('file',f.elements.roster.files[0]);body.append('nameColumn',f.elements.nameColumn.value);body.append('idColumn',f.elements.idColumn.value);await json(`/api/jobs/${job.id}/media/roster-file`,{method:'POST',body});dialog.close();await load();}catch(error){if(f.isConnected)f.querySelector('[role=alert]').textContent=error.message;}finally{if(button.isConnected)button.disabled=false;}};
+   await root.openIntakeRoster(job.conversationId);
   }
+
   const controller={reload:()=>{const focus=root.studioMediaFocus?.jobId===job.id?root.studioMediaFocus:root.studioMediaPage?.[job.id];if(focus?.subjectId!==undefined){subject=focus.subjectId||'';root.studioMediaFocus=null;after='';page=1;previous.length=0;}return load();},upload:()=>host.querySelector('[data-add]')?.click(),importRoster,dispose:()=>{disposed=true;request++;host.ondrop=null;host.ondragover=null;}};
   host.studioJobMedia?.dispose();host.studioJobMedia=controller;
   await load();return controller;
