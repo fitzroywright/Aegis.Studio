@@ -56,7 +56,7 @@
   ].filter(Boolean);
   const entries=section==='overview'?overview:section==='attention'?attention.filter(x=>x.value>0):[...overview,...attention];
   const empty=section==='attention'&&!entries.length&&!notes.length?'<p>No production exceptions in this view.</p>':'';
-  return `<section class="studio-workload-summary" aria-label="${section==='attention'?'Production items needing attention':'Workload for current filters'}"><div class="workload-indicators">${entries.map(x=>x.html).join('')}${empty}</div>${section==='attention'&&notes.length?'<div class="workload-attention-notes">'+notes.map(note=>'<p>'+esc(note)+'</p>').join('')+'</div>':''}</section>`;
+  return `<section class="studio-workload-summary" aria-label="${section==='attention'?'Production items needing attention':'Workload for current filters'}"><div class="workload-indicators">${entries.map(x=>x.html).join('')}${empty}</div>${section!=='overview'&&notes.length?'<div class="workload-attention-notes">'+notes.map(note=>'<p>'+esc(note)+'</p>').join('')+'</div>':''}</section>`;
  }
  function production(filter,workspace='',assignee='',stage='',jobIds=null){
   root.studioWorkloadSelection={filter:filter||'',workspace,assignee,stage,jobIds};commercialQueueOffset=0;
