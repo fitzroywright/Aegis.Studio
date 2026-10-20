@@ -18,6 +18,7 @@
     let renderingTools = false;
     let workspaceLoadPromise = null;
     let workspaceLoadAttempted = false;
+    let productionWorkspaceFilter = null;
 
     const escText = value => String(value ?? '').replace(/[&<>"']/g, character => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -107,11 +108,12 @@
         const rail = document.getElementById('studioContextRail');
         if (!rail) return;
         const cache=typeof workspaceCache!=='undefined'?workspaceCache:window.workspaceCache;
-        const workspaces = Array.isArray(cache) ? cache : [];
-        const workspaceItems = workspaces
-            .filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false)
-            .map(workspace => '<button type="button" data-studio-workspace-id="' + escText(workspace.id) + '"><span>▣</span><span>' + escText(workspace.name) + '</span></button>')
-            .join('');
+        const workspaces = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
+            ? productionWorkspaceFilter.workspaces
+            : (Array.isArray(cache) ? cache : []).filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false);
+        const workspaceItems = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
+            ? '<button type="button" data-production-workspace="" class="' + (!productionWorkspaceFilter.selected ? 'active' : '') + '" aria-pressed="' + String(!productionWorkspaceFilter.selected) + '"><span>▣</span><span>All Workspaces</span></button>' + workspaces.map(workspace => '<button type="button" data-production-workspace="' + escText(workspace.id) + '" class="' + (String(productionWorkspaceFilter.selected) === String(workspace.id) ? 'active' : '') + '" aria-pressed="' + String(String(productionWorkspaceFilter.selected) === String(workspace.id)) + '"><span>▣</span><span>' + escText(workspace.name || workspace.title || workspace.displayName || 'Workspace') + '</span></button>').join('')
+            : workspaces.map(workspace => '<button type="button" data-studio-workspace-id="' + escText(workspace.id) + '"><span>▣</span><span>' + escText(workspace.name) + '</span></button>').join('');
         const scheduleWorkspaceItems=document.body.dataset.studioView==='schedule'?window.StudioScheduleWorkspaceCard?.markup():null;
         // All views share the exact Today rail markup and presentation.
         // Job Detail retains its contextual actions in the shared Actions card.
@@ -157,6 +159,9 @@
         rail.querySelectorAll('[data-job-action]').forEach(button => button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
         rail.querySelectorAll('[data-studio-side]').forEach(button => {
             button.onclick = () => window.studioNavigate?.(button.dataset.studioSide);
+        });
+        rail.querySelectorAll('[data-production-workspace]').forEach(button => {
+            button.onclick = () => productionWorkspaceFilter?.onSelect?.(button.dataset.productionWorkspace || '');
         });
         rail.querySelectorAll('[data-studio-workspace-id]').forEach(button => {
             button.onclick = () => {
@@ -273,8 +278,14 @@
         });
     };
 
-    // The router calls this after a completed navigation. The shell never replaces it.
-    window.StudioShell={sync(view=document.body.dataset.studioView||currentView){
+    // Production supplies its workspace filter data to the shared Workspaces card.
+    // Other views continue to use the permission-scoped workspace cache.
+    window.StudioShell={
+        setProductionWorkspaceFilter(workspaces, selected, onSelect) {
+            productionWorkspaceFilter = { workspaces: Array.isArray(workspaces) ? workspaces : [], selected: selected || '', onSelect };
+            if (document.body.dataset.studioView === 'production') renderLeftRail();
+        },
+        sync(view=document.body.dataset.studioView||currentView){
         currentView=view;
         ensureTools();
         ensureLeftRail();
