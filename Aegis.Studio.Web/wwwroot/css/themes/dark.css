@@ -123,7 +123,7 @@ body[data-theme="fluent-dark"] :is(input,select,textarea,button,a):focus-visible
 body[data-theme="fluent-dark"] :is(.st-link,.sj-gold,.text-button,.link-button,.studio-workspaces-view-all,.mw-list-right header button,.mw-today-right header button) {color:var(--theme-accent)!important;}
 body[data-theme="fluent-dark"] :is(.primary,.smc-content>.composer .send-split button) {background:#82bfff;color:#102033;border-color:#82bfff;}
 body[data-theme="fluent-dark"] :is(.primary,.smc-content>.composer .send-split button):hover {background:#a6d1ff;border-color:#a6d1ff;}
-body[data-theme="fluent-dark"] :is(.sj-view-tabs button.active,.mw-today-view-tabs button.active,.studio-media-status-tabs button.active,.operations-view-switch button[aria-pressed="true"]) {background:var(--theme-accent-soft);color:var(--theme-accent);border-color:var(--studio-control-border);}
+body[data-theme="fluent-dark"] :is(.sj-view-tabs button.active,.mw-today-view-tabs button.active,.mw-calendar-view-switch button.active,.studio-media-status-tabs button.active,.operations-view-switch button[aria-pressed="true"],.pipeline-view-switch button.active,.workspace-tabs button.active,.workspace-reference-tabs button.active,.production-filters>button.active,.production-queue-tabs button.active,.fd-tabs button.active) {background:#986c55;color:#fff;border-color:#986c55;}
 body[data-theme="fluent-dark"] :is(dialog,.studio-dialog,.user-menu-popover) {background:#1a2836;color:var(--theme-text);border-color:var(--theme-border);}
 body[data-theme="fluent-dark"] dialog::backdrop {background:#08101dcc;}
 
@@ -142,7 +142,7 @@ body[data-theme="fluent-dark"] :is(.thread-unread,.message-unread-badge,.away-di
 body[data-theme="fluent-dark"] :where(button:not(.primary):not(.icon-button):not(.text-button):not(.link-button),.action:not(.primary)) {background-color:var(--theme-surface-2);color:var(--theme-text);border-color:var(--theme-border);}
 body[data-theme="fluent-dark"] :where(button:not(.primary),.action:not(.primary)):hover {background-color:var(--theme-accent-soft);}
 body[data-theme="fluent-dark"] :is(.smc-actions button,.smc-footer>button,.studio-workspaces-view-all,.jd-link,.st-link) {background:transparent;color:var(--theme-accent);}
-body[data-theme="fluent-dark"] :is(.mw-today-view-tabs button.active,.sj-view-tabs button.active,.studio-media-status-tabs button.active,.operations-view-switch button[aria-pressed="true"]) {background:var(--theme-accent-soft);color:var(--theme-accent);border-color:var(--theme-accent);}
+
 body[data-theme="fluent-dark"] .op-chart text {fill:var(--theme-muted);}
 body[data-theme="fluent-dark"] :is(.status-pill,.sj-pill.sj-blue,.workflow-heading .studio-status-pill) {background:#223e59;color:#add5ff;border-color:#527fa3;}
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-purple) {background:#392d4d;color:#d5befb;border-color:#9375c8;}
