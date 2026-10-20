@@ -10990,6 +10990,10 @@ body[data-studio-view="media"] .studio-media-page {
   font-weight: 700;
   color: #29231b;
 }
+.studio-inbox-message-row:not(.is-unread) .studio-inbox-message-sender,
+.studio-inbox-message-row:not(.is-unread) .studio-inbox-message-subject {
+  font-weight: 400;
+}
 .studio-inbox-message-bottom {
   display: flex;
   gap: 9px;
