@@ -23,6 +23,37 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class UnifiedMessagingPersistenceTests
 {
     [StudioPostgresFact]
+    public async Task SubjectCanReceiveJobScopedEmailButIsNotAnInboundRoute()
+    {
+        using var f=await Fixture.Create();f.VerifyPaul();
+        var db=new StudioDatabase(f.Source);
+        var workspace=new WorkspaceStore(db).Create(new("Weddings","weddings@studio.test","weddings",true,1));
+        var route=new EmailRouteResult(true,workspace.Id,workspace.Name,workspace.EmailAddress,null);
+        var email=new InboundEmail("<booking@outside.test>",null,"Client","client@outside.test",
+            ["weddings@studio.test"],[],new Dictionary<string,string>(),"Wedding","Initial booking",DateTimeOffset.UtcNow,[]);
+        var conversation=f.Studio.ReceiveEmail(email,route).Conversation;
+        var job=f.Studio.CreateJob(conversation.Id,new CreateJobRequest("Wedding",null));
+        var jobs=new Aegis.Studio.Web.WorkspaceJobs.WorkspaceJobStore(db);
+        Guid subjectId=Guid.NewGuid();
+        jobs.SaveSubject(job.Id,subjectId,new Aegis.Studio.Web.WorkspaceJobs.SubjectRequest(
+            "Alex","A1","",ContactEmail:"alex@outside.test"),"administrator",true);
+
+        var subject=f.Book.GetMessagingRecipients(f.Administrator).Single(x=>x.Id==subjectId);
+        Assert.Equal("Subject",subject.ContactType);
+        Assert.Equal("alex@outside.test",subject.EmailAddress);
+        Assert.Equal(job.Id,subject.ScopeId);
+        Assert.Null(f.Book.Resolve("alex@outside.test"));
+
+        var sent=await f.Router.SendAsync(new(Guid.NewGuid(),null,"Photo pickup","Your photos are ready.",[subject.Id]),
+            new FormFileCollection(),f.Administrator,default);
+
+        Assert.Equal("Queued",sent.Status);
+        Assert.Equal(job.Id,ThreadScopeId(f,sent.ThreadId));
+        Assert.Equal("Job",ThreadScopeType(f,sent.ThreadId));
+        Assert.Equal("alex@outside.test",Assert.Single(f.Outbox.GetPending()).ToAddress);
+    }
+
+    [StudioPostgresFact]
     public async Task InternalSendAndRequestRetryProduceOnePrivateMessageAndNoExternalDelivery()
     {
         using var f=await Fixture.Create();
@@ -167,6 +198,16 @@ public sealed class UnifiedMessagingPersistenceTests
         Assert.Single(inbox.Get(readerB,0,100,null,null,unreadOnly:true).Items);
     }
 
+    private static Guid? ThreadScopeId(Fixture f,Guid threadId)
+    {
+        using var c=f.Source.OpenConnection();using var q=new NpgsqlCommand("select scope_id from studio_message_threads where id=$1",c);
+        q.Parameters.AddWithValue(threadId);return q.ExecuteScalar() as Guid?;
+    }
+    private static string ThreadScopeType(Fixture f,Guid threadId)
+    {
+        using var c=f.Source.OpenConnection();using var q=new NpgsqlCommand("select scope_type from studio_message_threads where id=$1",c);
+        q.Parameters.AddWithValue(threadId);return (string)q.ExecuteScalar()!;
+    }
     private static FormFileCollection Files(string name,string content)
     {
         var stream=new MemoryStream(Encoding.UTF8.GetBytes(content));return [new FormFile(stream,0,stream.Length,"files",name){Headers=new HeaderDictionary(),ContentType="text/plain"}];
