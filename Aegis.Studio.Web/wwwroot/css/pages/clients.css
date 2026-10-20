@@ -45,10 +45,10 @@
 .clients-page .client-jobs-table .sj-column-filter-inline{flex-direction:row;align-items:center;gap:8px;white-space:nowrap}
 .clients-page .client-jobs-table .sj-column-filter-inline>span{flex:0 0 auto}
 .clients-page .client-jobs-table .sj-column-filter-inline select{flex:1 1 auto;width:auto;min-width:92px}
-.clients-page .client-jobs-table th:first-child{width:40%}
-.clients-page .client-jobs-table th:nth-child(2){width:22%}
-.clients-page .client-jobs-table th:nth-child(3){width:20%}
-.clients-page .client-jobs-table th:nth-child(4){width:18%}
+.clients-page .client-jobs-table :is(th,td):first-child{width:40%}
+.clients-page .client-jobs-table :is(th,td):nth-child(2){width:22%}
+.clients-page .client-jobs-table :is(th,td):nth-child(3){width:20%}
+.clients-page .client-jobs-table :is(th,td):nth-child(4){width:18%}
 .clients-page .client-right{gap:8px}
 .clients-page .client-right>.sj-card:first-child .workspace-summary-row{min-height:28px;padding-top:2px;padding-bottom:2px}
 
