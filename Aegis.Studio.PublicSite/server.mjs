@@ -107,7 +107,7 @@ export function createServer(env = process.env) {
     try {
       if (req.method === 'GET' && url.pathname === '/health') { res.writeHead(200, { 'Cache-Control': 'no-store' }).end('ok'); return; }
       if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(await readFile(new URL('index.html', ROOT))); return; }
-      if (req.method === 'GET' && ['/styles.css', '/app.js'].includes(url.pathname)) {
+      if (req.method === 'GET' && ['/styles.css', '/app.js', '/roster-editor.js'].includes(url.pathname)) {
         const type = url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
         res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=300' }); res.end(await readFile(new URL(url.pathname.slice(1), ROOT))); return;
       }

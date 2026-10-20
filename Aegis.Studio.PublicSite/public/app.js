@@ -39,19 +39,28 @@ document.querySelectorAll('[data-identity]').forEach(button => button.addEventLi
   finally { button.disabled = false; }
 }));
 $('sign-out').addEventListener('click', async () => { await api('/api/logout', { method: 'POST', body: '{}' }); $('gallery-grid').replaceChildren(); showAuth(null); });
+let intakeCsrf='';
+try{intakeCsrf=(await api('/api/intake-session')).csrf;}catch{}
+const bookingForm=$('booking-form');
+const kindLabel=document.createElement('label');kindLabel.textContent='Request type';const kindSelect=document.createElement('select');kindSelect.name='intakeKind';kindSelect.append(new Option('Booking request','Booking'),new Option('Inquiry','Inquiry'));kindLabel.append(kindSelect);bookingForm.prepend(kindLabel);
+const rosterBox=document.createElement('details'),rosterTitle=document.createElement('summary'),rosterHost=document.createElement('div');rosterTitle.textContent='Subjects and roster (optional)';rosterBox.append(rosterTitle,rosterHost);bookingForm.append(rosterBox);
+const publicRoster=StudioRosterEditor.open(rosterHost,{readFile:async file=>{const data=new FormData();data.append('file',file);const r=await fetch('/api/roster-file',{method:'POST',body:data,headers:{'X-CSRF-Token':intakeCsrf}});if(!r.ok)throw Error((await r.json()).message);return (await r.json()).cells;},save:async()=>({})});
 $('booking-form').addEventListener('submit', async event => {
   event.preventDefault(); const form = event.currentTarget, button = form.querySelector('button[type=submit]'); button.disabled = true;
   const fields = Object.fromEntries(new FormData(form));
   const starts = new Date(`${fields.startsAt}T${fields.preferredTime || '10:00'}`); const ends = new Date(starts.getTime() + 60 * 60 * 1000);
   const payload = { clientName: fields.clientName, clientEmail: fields.clientEmail, clientPhone: fields.clientPhone, sessionType: fields.sessionType, startsAt: starts.toISOString(), endsAt: ends.toISOString(), location: '', notes: fields.notes };
-  const key = crypto.randomUUID();
+  const roster=publicRoster.getRows();payload.roster=roster;payload.kind=form.elements.intakeKind.value;payload.timeZone='America/Jamaica';
+  const encoded=JSON.stringify(payload);let draft=JSON.parse(sessionStorage.getItem('intake-submit')||'null');if(!draft||draft.body!==encoded){draft={key:crypto.randomUUID(),body:encoded};sessionStorage.setItem('intake-submit',JSON.stringify(draft));}const key=draft.key;
   try {
-    const receipt = await api('/api/bookings', { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify(payload) });
-    $('booking-result').hidden = false; $('booking-result').textContent = `Your request is with our Front Desk team.\nReference: ${receipt.reference}\nDeposit: ${receipt.currency} ${receipt.requiredDeposit}${receipt.demo ? ' · Demo booking' : ''}`;
+    const receipt = await api('/api/bookings', { method: 'POST', headers: { 'Idempotency-Key': key,'X-CSRF-Token':intakeCsrf }, body: draft.body });
+    $('booking-result').hidden = false; $('booking-result').textContent = `Received — awaiting review.\nReference: ${receipt.intakeReference}\nSaved on the website; awaiting Studio import. This does not confirm your booking.`;
+    sessionStorage.setItem('intake-receipt',JSON.stringify(receipt));sessionStorage.removeItem('intake-submit');
     $('track-form').hidden = false;
   } catch (error) { $('booking-result').hidden = false; $('booking-result').textContent = error.message; }
   finally { button.disabled = false; }
 });
-$('track-form').addEventListener('submit', async event => { event.preventDefault(); const reference = new FormData(event.currentTarget).get('reference').trim(); try { const result = await api(`/api/bookings/${encodeURIComponent(reference)}`); $('track-result').textContent = `Status: ${result.status}`; } catch (error) { $('track-result').textContent = error.message; } });
+$('track-form').addEventListener('submit', async event => { event.preventDefault(); const reference = new FormData(event.currentTarget).get('reference').trim(); try { const result = await api(`/api/bookings/${encodeURIComponent(reference)}`,{headers:{'X-Intake-Token':JSON.parse(sessionStorage.getItem('intake-receipt')||'{}').accessToken||''}}); $('track-result').textContent = `Receipt: ${result.receiptStatus} · Studio: ${result.importStatus} · Review: ${result.reviewStatus||'Awaiting review'}`; } catch (error) { $('track-result').textContent = error.message; } });
 $('submit-selections').addEventListener('click', async () => { const button = $('submit-selections'); button.disabled = true; try { const result = await api(`/api/galleries/${state.user.galleryReference}/selections/submit`, { method: 'POST', headers: { 'Idempotency-Key': state.selectionKey }, body: '{}' }); $('selection-result').textContent = `${result.versionIds.length} favourite(s) sent to the Studio team.`; state.selectionKey = crypto.randomUUID(); } catch (error) { $('selection-result').textContent = error.message; } finally { button.disabled = false; } });
 try { const session = await api('/api/session'); showAuth(session.user); if (!session.demo) { document.querySelectorAll('[data-identity]').forEach(button => button.hidden = true); $('auth-note').textContent = 'Client sign-in is being connected.'; } } catch { /* The public booking form remains visible while sign-in recovers. */ }
+

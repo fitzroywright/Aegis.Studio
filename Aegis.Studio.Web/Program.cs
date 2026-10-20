@@ -221,6 +221,7 @@ builder.Services.AddSingleton<GraphEmailDeltaStateStore>();
 builder.Services.AddSingleton<IInboundEmailRouter, ConfiguredEmailRouter>();
 builder.Services.AddHostedService<InboundEmailWorker>();
 builder.Services.AddHostedService<OutboundEmailWorker>();
+builder.Services.AddHostedService<Aegis.Studio.Web.Intake.WebsiteIntakeWorker>();
 builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddSingleton<WorkflowStore>();
 builder.Services.AddHostedService<Aegis.Studio.Web.PublicApi.PublicWebhookWorker>();
@@ -337,6 +338,8 @@ app.MapStudioUnifiedMessaging();
 app.MapStudioEmailAssociations();
 app.MapStudioFulfillment();
 Aegis.Studio.Web.Reminders.ClientReminderEndpoints.MapClientReminders(app);
+Aegis.Studio.Web.Intake.IntakeSchema.Ensure(app.Services.GetRequiredService<StudioDatabase>());
+Aegis.Studio.Web.Intake.IntakeRosterStore.Map(app);
 app.MapStudioQuotes();
 app.MapJobAccess();
 app.MapStudioServiceStatus();
@@ -708,6 +711,7 @@ app.MapGet("/api/attachments/{id:guid}", (Guid id, ClaimsPrincipal user, Attachm
 app.MapGet("/api/accounts/summary", (StudioStore store) => Results.Ok(store.GetAccountsSummary()));
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
+
 
 
 
