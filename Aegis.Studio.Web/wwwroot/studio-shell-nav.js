@@ -172,14 +172,10 @@
         return button;
     }
     function placeRailToggle(rail, side, collapsed) {
-        let toggle = rail.querySelector('[data-rail-toggle="' + side + '"]');
+        let toggle = shell.querySelector('[data-rail-toggle="' + side + '"]');
         if (!toggle) toggle = railButton(side, collapsed);
-        const firstSection = Array.from(rail.children).find(child => child !== toggle && child.querySelector(':scope > header'));
-        const header = firstSection?.querySelector(':scope > header');
-        toggle.classList.toggle('studio-rail-toggle-in-header', !collapsed && !!header);
-        if (collapsed || !header) rail.prepend(toggle);
-        else if (side === 'left') header.insertBefore(toggle, header.querySelector('h2') || header.firstChild);
-        else header.append(toggle);
+        toggle.classList.add('studio-shell-rail-toggle');
+        if (toggle.parentElement !== shell) shell.append(toggle);
         return toggle;
     }
     function applyRailState() {
@@ -187,6 +183,7 @@
         const leftTargets = [document.getElementById('studioContextRail'), document.querySelector('.mw-today-left')].filter(Boolean);
         leftTargets.forEach(rail => {
             rail.classList.toggle('studio-rail-collapsed-left', !!state.left);
+            rail.dataset.shellRailReadyLeft = 'true';
             const toggle = placeRailToggle(rail, 'left', !!state.left);
             toggle.setAttribute('aria-expanded', String(!state.left));
             toggle.setAttribute('aria-label', (state.left ? 'Expand' : 'Collapse') + ' left rail');
@@ -195,6 +192,7 @@
         const rightTargets = document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail');
         rightTargets.forEach(rail => {
             rail.classList.toggle('studio-rail-collapsed-right', !!state.right);
+            rail.dataset.shellRailReadyRight = 'true';
             const toggle = placeRailToggle(rail, 'right', !!state.right);
             toggle.setAttribute('aria-expanded', String(!state.right));
             toggle.setAttribute('aria-label', (state.right ? 'Expand' : 'Collapse') + ' right rail');
@@ -206,9 +204,9 @@
         const leftSelector = '#studioContextRail, .mw-today-left';
         const rightSelector = '.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail';
         const missingLeft = Array.from(document.querySelectorAll(leftSelector))
-            .some(rail => !rail.querySelector('[data-rail-toggle="left"]'));
+            .some(rail => rail.dataset.shellRailReadyLeft !== 'true');
         const missingRight = Array.from(document.querySelectorAll(rightSelector))
-            .some(rail => !rail.querySelector('[data-rail-toggle="right"]'));
+            .some(rail => rail.dataset.shellRailReadyRight !== 'true');
         if (missingLeft || missingRight) applyRailState();
     });
     railObserver.observe(document.body, { childList: true, subtree: true });
