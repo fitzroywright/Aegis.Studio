@@ -229,7 +229,43 @@ public static class FrontDeskBookingRequestEndpoints
             if(!Allowed(user,db))return Results.Forbid();
             using var connection=db.OpenConnection();using var command=new NpgsqlCommand("select id,workspace_id,subject,contact_name,contact_address,channel,created_at_utc from studio_conversations where job_id is null and not is_closed order by created_at_utc desc",connection);using var reader=command.ExecuteReader();var result=new List<object>();while(reader.Read())result.Add(new{id=reader.GetGuid(0),workspaceId=reader.GetGuid(1),subject=reader.GetString(2),contactName=reader.GetString(3),contactAddress=reader.GetString(4),channel=reader.GetString(5),createdAtUtc=reader.GetFieldValue<DateTimeOffset>(6)});return Results.Ok(result);
         });
-        group.MapPost("/booking-requests",(PendingBookingRequest request,ClaimsPrincipal user,StudioDatabase db)=>Allowed(user,db)?Run(()=>Results.Ok(new FrontDeskBookingRequestStore(db).Create(request,Name(user)))):Results.Forbid());
+        group.MapPost("/booking-requests",(PendingBookingRequest request,ClaimsPrincipal user,StudioDatabase db,ILogger<FrontDeskBookingRequestStore> logger,HttpContext context)=>
+        {
+            var started=System.Diagnostics.Stopwatch.StartNew();
+            var traceId=context.TraceIdentifier;
+            var actor=Name(user);
+            logger.LogInformation("Front Desk pending booking save started. TraceId={TraceId} User={User} WorkspaceId={WorkspaceId} ConversationId={ConversationId} EventDate={EventDate} HasEventDate={HasEventDate}",traceId,actor,request.WorkspaceId,request.ConversationId,request.EventDate,request.EventDate!=default);
+            if(!Allowed(user,db))
+            {
+                logger.LogWarning("Front Desk pending booking save denied. TraceId={TraceId} User={User}",traceId,actor);
+                return Results.Forbid();
+            }
+            try
+            {
+                FrontDeskRequest saved=new FrontDeskBookingRequestStore(db).Create(request,actor);
+                started.Stop();
+                logger.LogInformation("Front Desk pending booking save succeeded. TraceId={TraceId} RequestId={RequestId} JobId={JobId} WorkspaceId={WorkspaceId} ConversationId={ConversationId} EventDate={EventDate} ElapsedMs={ElapsedMs}",traceId,saved.Id,saved.JobId,request.WorkspaceId,request.ConversationId,saved.Request.EventDate,started.ElapsedMilliseconds);
+                return Results.Ok(saved);
+            }
+            catch(ArgumentException ex)
+            {
+                started.Stop();
+                logger.LogWarning(ex,"Front Desk pending booking save rejected. TraceId={TraceId} WorkspaceId={WorkspaceId} ConversationId={ConversationId} EventDate={EventDate} ElapsedMs={ElapsedMs}",traceId,request.WorkspaceId,request.ConversationId,request.EventDate,started.ElapsedMilliseconds);
+                return Results.BadRequest(new{error=ex.Message});
+            }
+            catch(KeyNotFoundException ex)
+            {
+                started.Stop();
+                logger.LogWarning(ex,"Front Desk pending booking save target not found. TraceId={TraceId} WorkspaceId={WorkspaceId} ConversationId={ConversationId} ElapsedMs={ElapsedMs}",traceId,request.WorkspaceId,request.ConversationId,started.ElapsedMilliseconds);
+                return Results.NotFound();
+            }
+            catch(Exception ex)
+            {
+                started.Stop();
+                logger.LogError(ex,"Front Desk pending booking save failed. TraceId={TraceId} WorkspaceId={WorkspaceId} ConversationId={ConversationId} EventDate={EventDate} ElapsedMs={ElapsedMs}",traceId,request.WorkspaceId,request.ConversationId,request.EventDate,started.ElapsedMilliseconds);
+                throw;
+            }
+        });
         group.MapGet("/deposit-delivery-channels",(ClaimsPrincipal user,StudioDatabase db,IEnumerable<Common.Messaging.IExternalMessageChannel> channels)=>
             Allowed(user,db)?Results.Ok(channels.Where(x=>x.Channel is Common.Messaging.MessageChannel.MsEmail or Common.Messaging.MessageChannel.WhatsApp).Select(x=>x.Channel==Common.Messaging.MessageChannel.MsEmail?"Email":"WhatsApp").Distinct().ToArray()):Results.Forbid());
         group.MapPost("/booking-requests/{id:guid}/deposit-requested",(Guid id,string? channel,ClaimsPrincipal user,StudioDatabase db,IConfiguration configuration,IEnumerable<Common.Messaging.IExternalMessageChannel> channels)=>
