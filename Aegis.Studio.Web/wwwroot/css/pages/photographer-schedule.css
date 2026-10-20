@@ -36,15 +36,17 @@
 .studio-schedule-switch button:hover{box-shadow:inset 0 -3px var(--theme-accent,#cf792a)}
 .studio-schedule-switch button:focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:-2px}
 .st-pipeline-content .st-tools,.st-commercial .st-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
-.st-pipeline-content .pipeline-calendar-toolbar{margin:-8px -8px 0}
-.st-pipeline-content .pipeline-toolbar-left{display:flex;align-items:center;gap:8px;min-width:0}
+.st-pipeline-content .pipeline-calendar-toolbar{margin:-8px -8px 0;flex-wrap:nowrap;gap:8px}
+.st-pipeline-content .pipeline-toolbar-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
 .st-pipeline-content .pipeline-schedule-item{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .st-pipeline-content .pipeline-schedule-item svg{display:block;flex:0 0 auto}
-.st-pipeline-content .pipeline-mode-row{display:flex;align-items:center;justify-content:flex-start;min-height:36px}
-.st-pipeline-content .pipeline-view-switch{display:inline-flex;align-items:center;gap:2px;padding:2px;background:#eaf1f7;border:1px solid #cddbe8;border-radius:7px}
-.st-pipeline-content .pipeline-view-switch button{min-height:24px;padding:3px 10px;border:0;border-radius:5px;background:transparent;color:#4c647d;font-size:11px;font-weight:700;cursor:pointer}
-.st-pipeline-content .pipeline-view-switch button.active{background:#234c73;color:#fff;box-shadow:0 1px 2px rgba(20,44,68,.18)}
-.st-pipeline-content .pipeline-view-switch button:not(.active):hover{background:#dceaf5;color:#173c5d}
+.st-pipeline-content .pipeline-actions{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.st-pipeline-content .pipeline-mode-switch{display:inline-flex;align-items:center;gap:1px;padding:2px;background:#eaf1f7;border:1px solid #cddbe8;border-radius:7px}
+.st-pipeline-content .pipeline-mode-switch button{min-height:24px;padding:3px 8px;border:0;border-radius:5px;background:transparent;color:#4c647d;font-size:10px;font-weight:700;cursor:pointer}
+.st-pipeline-content .pipeline-mode-switch button.active{background:#234c73;color:#fff;box-shadow:0 1px 2px rgba(20,44,68,.18)}
+.st-pipeline-content .pipeline-mode-switch button:not(.active):hover{background:#dceaf5;color:#173c5d}
+.st-pipeline-content .pipeline-calendar-toolbar>.pipeline-refresh-icon{display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;min-height:28px;padding:4px}
+.st-pipeline-content .pipeline-refresh-icon svg{display:block}
 
 /* Front Desk-style compact search/filter header. */
 :is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex:none;display:flex;align-items:center;flex-wrap:nowrap;gap:10px;min-width:0;padding:8px 11px;background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8);border-bottom:2px solid var(--theme-accent,#cf792a);box-sizing:border-box}
@@ -59,5 +61,5 @@
 .ps-page :is(.ps-calendar-head,.ps-day-head),.ps-page :is(.ps-calendar-head,.ps-day-head)>div:first-child{background:var(--studio-grid-header-bg,#536a80);color:var(--studio-grid-header-text,#f2f5f8)}
 :is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters) :is(input,select):focus-visible{outline:2px solid #ffbc6d;outline-offset:1px}
 .st-pipeline-content .pipeline-filters{margin-inline:-8px}
-@media(max-width:1100px){:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex-wrap:wrap;gap:8px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-filter{flex:1 1 200px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-search{flex:1 1 260px}}
+@media(max-width:1100px){.st-pipeline-content .pipeline-calendar-toolbar{flex-wrap:wrap}.st-pipeline-content .pipeline-toolbar-left{flex-wrap:wrap}:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex-wrap:wrap;gap:8px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-filter{flex:1 1 200px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-search{flex:1 1 260px}}
 
