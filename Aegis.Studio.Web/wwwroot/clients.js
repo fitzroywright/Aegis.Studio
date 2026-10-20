@@ -13,8 +13,8 @@ window.StudioClients=(()=>{
         const esc=safe();
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
         genericView.innerHTML='<p role="status">Loading clients…</p>';
-        let clients,jobs,workspaces;
-        try{[clients,jobs,workspaces]=await Promise.all([loadArray('/api/frontdesk/clients'),loadArray('/api/jobs'),loadArray('/api/workspaces')]);}
+        let clients,jobs,workspaces,workflowJobs=[],employees=[];
+        try{[clients,jobs,workspaces,workflowJobs,employees]=await Promise.all([loadArray('/api/frontdesk/clients'),loadArray('/api/jobs'),loadArray('/api/workspaces'),json('/api/workflow/jobs').catch(()=>[]),json('/api/studio-employees?assignable=true').catch(()=>[])]);}
         catch(e){if(live()){genericView.innerHTML='<section class="mw-list-panel client-load-error"><h2>Clients could not be loaded</h2><p role="alert">'+esc(e.message)+'</p><button class="action" data-c-retry>Retry</button></section>';genericView.querySelector('[data-c-retry]').onclick=()=>render(options);}return;}
         if(!live())return;
         const client=clients.find(c=>c.id===options.clientId);
@@ -27,6 +27,10 @@ window.StudioClients=(()=>{
         let clientMessages=null,messageError=false;
         const linkedIds=new Set(linked.map(j=>j.id));
         const wname=id=>workspaces.find(w=>w.id===id)?.name||'Workspace';
+        const workflowByJob=new Map((Array.isArray(workflowJobs)?workflowJobs:[]).map(item=>[String(item.jobId),item]));
+        const employeeNames=new Map((Array.isArray(employees)?employees:[]).map(person=>[String(person.userName||'').toLowerCase(),person.displayName||person.fullName||person.userName]));
+        const jobOwner=job=>workflowByJob.get(String(job.id))?.owner||job.jobOwner||job.jobLead||job.assignedTo||'';
+        const jobOwnerName=job=>employeeNames.get(String(jobOwner(job)).toLowerCase())||jobOwner(job)||'Unassigned';
         const tone=value=>/cancel|changes/i.test(value)?'rose':/completed|delivered|ready for delivery/i.test(value)?'green':/approval|review/i.test(value)?'purple':/production|upload/i.test(value)?'blue':/scheduled/i.test(value)&&!/awaiting/i.test(value)?'teal':'amber';
         const badge=value=>'<span class="sj-pill sj-'+tone(value)+'">'+esc(value||'Not set')+'</span>';
         function paint(){
@@ -60,8 +64,8 @@ window.StudioClients=(()=>{
             host.innerHTML='<p class="client-empty" role="status">Loading…</p>';
             try{
                 if(tab==='jobs'){
-                    const values=linked.filter(j=>(!state.status||j.status===state.status)&&[j.title,j.status,wname(j.workspaceId)].join(' ').toLowerCase().includes(state.jobSearch.toLowerCase()));
-                    host.innerHTML=`<div class="client-jobs-grid"><div class="client-jobs-head-clip"><table class="sj-table client-jobs-table"><thead><tr><th><label class="client-column-search"><span>Job / Workspace</span><input data-c-job-search type="search" placeholder="Search jobs…" aria-label="Search client jobs" value="${esc(state.jobSearch)}"></label></th><th>Event date</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Status</span><select data-c-job-status aria-label="Job status"><option value="">All statuses</option>${[...new Set(linked.map(j=>j.status))].sort().map(s=>`<option ${s===state.status?'selected':''}>${esc(s)}</option>`).join('')}</select></label></th><th>Gallery</th></tr></thead></table></div><div class="client-jobs-scroll"><table class="sj-table client-jobs-table"><tbody>${values.map(j=>`<tr tabindex="0" data-c-job="${esc(j.id)}" data-sj-job="${esc(j.id)}"><td><strong>${esc(j.title)}</strong><small>${esc(wname(j.workspaceId))}</small></td><td>${esc(date(j.eventDate))}</td><td>${badge(j.status)}</td><td><button class="action" data-c-gallery-job="${esc(j.id)}">View gallery</button></td></tr>`).join('')||'<tr><td colspan="4">No linked jobs match this view.</td></tr>'}</tbody></table></div></div>`;
+                    const values=linked.filter(j=>(!state.status||j.status===state.status)&&[j.title,j.status,wname(j.workspaceId),jobOwnerName(j)].join(' ').toLowerCase().includes(state.jobSearch.toLowerCase()));
+                    host.innerHTML=`<div class="client-jobs-grid"><div class="client-jobs-head-clip"><table class="sj-table client-jobs-table"><thead><tr><th><label class="client-column-search"><span>Job / Workspace</span><input data-c-job-search type="search" placeholder="Search jobs…" aria-label="Search client jobs" value="${esc(state.jobSearch)}"></label></th><th>Event date</th><th>Job Owner</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Status</span><select data-c-job-status aria-label="Job status"><option value="">All statuses</option>${[...new Set(linked.map(j=>j.status))].sort().map(s=>`<option ${s===state.status?'selected':''}>${esc(s)}</option>`).join('')}</select></label></th><th>Gallery</th></tr></thead></table></div><div class="client-jobs-scroll"><table class="sj-table client-jobs-table"><tbody>${values.map(j=>`<tr tabindex="0" data-c-job="${esc(j.id)}" data-sj-job="${esc(j.id)}"><td><strong>${esc(j.title)}</strong><small>${esc(wname(j.workspaceId))}</small></td><td>${esc(date(j.eventDate))}</td><td>${esc(jobOwnerName(j))}</td><td>${badge(j.status)}</td><td><button class="action" data-c-gallery-job="${esc(j.id)}">View gallery</button></td></tr>`).join('')||'<tr><td colspan="5">No linked jobs match this view.</td></tr>'}</tbody></table></div></div>`;
                     host.querySelector('[data-c-job-search]').oninput=e=>{const input=e.target,start=input.selectionStart,end=input.selectionEnd,direction=input.selectionDirection;state.jobSearch=input.value;showTab();const next=host.querySelector('[data-c-job-search]');next.focus({preventScroll:true});next.setSelectionRange(start,end,direction);};
                     host.querySelector('[data-c-job-status]').onchange=e=>{state.status=e.target.value;showTab();};
                     host.querySelectorAll('[data-c-gallery-job]').forEach(b=>b.onclick=e=>{e.stopPropagation();state.tab='galleries';state.focusJob=b.dataset.cGalleryJob;paint();});
