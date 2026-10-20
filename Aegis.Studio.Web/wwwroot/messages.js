@@ -44,6 +44,36 @@
     const inboxSubject = message => String(message.subject || message.title || String(message.body || '').split('\n')[0] || '(No subject)').slice(0,110);
     const inboxJob = thread => thread.scopeType === 'Job' ? (thread.title || thread.scopeId || 'Job') : '—';
     const inboxRecipient = (message,thread) => (message.recipientAddresses?.length ? message.recipientAddresses.join(', ') : '') || message.recipientUserName || message.recipient || (thread.scopeType === 'Job' ? 'Job team' : thread.scopeType === 'Workspace' ? 'Workspace team' : thread.scopeType === 'Direct' ? thread.title : 'Conversation');
+
+    function splitInboundSignature(body) {
+        const text=String(body||'').replace(/\r\n?/g,'\n');
+        const lines=text.split('\n');
+        const quoteIndex=lines.findIndex(line=>/^(?:On .{1,180} wrote:|-----Original Message-----|From:\s+\S|_{5,})/i.test(line.trim()));
+        const searchEnd=quoteIndex<0?lines.length:quoteIndex;
+        let signatureStart=-1;
+        const explicit=/^(?:--\s*|sent from my (?:iphone|ipad|android|device)|sent from outlook|sent via (?:the )?mail for windows|get outlook for (?:ios|android))/i;
+        const closing=/^(?:best regards|kind regards|warm regards|regards|sincerely|yours sincerely|thank you|thanks)[,!]?$/i;
+        for(let i=1;i<searchEnd;i++) {
+            const line=lines[i].trim();
+            if(explicit.test(line)) {
+                const trailing=lines.slice(i+1,searchEnd).filter(value=>value.trim()).length;
+                if(trailing<=12){signatureStart=i;break;}
+            }
+            if(closing.test(line)) {
+                const trailing=lines.slice(i+1,searchEnd).filter(value=>value.trim()).length;
+                if(trailing>0&&trailing<=8){signatureStart=i;break;}
+            }
+        }
+        if(signatureStart<0)return {body:text,signature:''};
+        const signatureEnd=quoteIndex<0?lines.length:quoteIndex;
+        const main=[...lines.slice(0,signatureStart),...lines.slice(signatureEnd)].join('\n').replace(/\n+$/,'');
+        const signature=lines.slice(signatureStart,signatureEnd).join('\n').trim();
+        return {body:main,signature};
+    }
+    const inboundBody = message => message?.internetMessageId || message?.externalMessageId
+        ? splitInboundSignature(message.body) : {body:String(message?.body||''),signature:''};
+    const inboxMessagePreview = message => inboundBody(message).body.replace(/\s+/g,' ').trim().slice(0,220);
+
     async function showMessages() {
         const current=StudioPage.begin('messages');
         ++inboxRevision;selectedThread=null;selectedRecipients=[];sendRequestId=null;
@@ -135,7 +165,7 @@
         document.getElementById('studioInboxPrevious').disabled=inboxOffset===0;
         document.getElementById('studioInboxNext').disabled=inboxOffset+rows.length>=inboxTotal;
         const groups=[{title:'Messages',items:rows}];
-        body.innerHTML=groups.map(group=>'<section class="studio-inbox-group"><div class="studio-inbox-group-heading"><span>⌄</span> '+esc(group.title)+': '+group.items.length+' item(s)</div>'+group.items.map(({thread,message,isUnread})=>'<div role="listitem" tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="studio-inbox-message-row '+(isUnread?'is-unread ':'')+(inboxSelection===message.id?'selected':'')+'"><div class="studio-inbox-message-top"><strong class="studio-inbox-message-sender">'+esc(message.senderUserName||'Unknown')+'</strong><strong class="studio-inbox-message-subject">'+esc(inboxSubject(message))+'</strong><time>'+esc(inboxDate(message.createdAtUtc))+'</time></div><div class="studio-inbox-message-bottom"><span class="studio-inbox-message-job">'+esc(inboxJob(thread))+'</span><span class="studio-inbox-message-preview">'+esc(String(message.body||'').replace(/\s+/g,' ').slice(0,220))+'</span><span class="studio-inbox-message-recipient">To: '+esc(inboxRecipient(message,thread))+'</span></div></div>').join('')+'</section>').join('') || '<div class="studio-inbox-loading">No messages.</div>';
+        body.innerHTML=groups.map(group=>'<section class="studio-inbox-group"><div class="studio-inbox-group-heading"><span>⌄</span> '+esc(group.title)+': '+group.items.length+' item(s)</div>'+group.items.map(({thread,message,isUnread})=>'<div role="listitem" tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="studio-inbox-message-row '+(isUnread?'is-unread ':'')+(inboxSelection===message.id?'selected':'')+'"><div class="studio-inbox-message-top"><strong class="studio-inbox-message-sender">'+esc(message.senderUserName||'Unknown')+'</strong><strong class="studio-inbox-message-subject">'+esc(inboxSubject(message))+'</strong><time>'+esc(inboxDate(message.createdAtUtc))+'</time></div><div class="studio-inbox-message-bottom"><span class="studio-inbox-message-job">'+esc(inboxJob(thread))+'</span><span class="studio-inbox-message-preview">'+esc(inboxMessagePreview(message))+'</span><span class="studio-inbox-message-recipient">To: '+esc(inboxRecipient(message,thread))+'</span></div></div>').join('')+'</section>').join('') || '<div class="studio-inbox-loading">No messages.</div>';
         if(!rows.length)body.innerHTML='<div class="studio-inbox-loading">No messages match the selected filters.</div>';
         body.querySelectorAll('[data-inbox-message]').forEach(row=>{
             const open=async()=>{inboxSelection=row.dataset.inboxMessage;renderInbox();const selected=inboxRows.find(item=>item.message.id===inboxSelection);
@@ -250,7 +280,7 @@
         const senders=(identities?.identities||[]).filter(identity=>['Workspace','Self'].includes(identity.type));
         const replyChoices=senders.length?senders:[{type:'Workspace',label:'Reply'}];
         const defaultSender=senders.find(identity=>identity.type===identities?.defaultIdentity)?.type||senders.find(identity=>identity.isDefault)?.type||senders[0]?.type||'Workspace';
-        pane.innerHTML=`<div class="message-conversation-header"><div><h2>${esc(conversation.subject)}</h2><p>${esc(conversation.contactName)} · ${esc(conversation.contactAddress)}</p></div></div><div class="studio-message-history">${conversation.messages.map(m=>renderMessage({id:m.id,senderUserName:m.author,body:m.body,createdAtUtc:m.createdAt},[])).join('')}${files.length?`<div class="studio-message-files">${files.map(f=>`<a href="/api/attachments/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.fileName)}</a>`).join('')}</div>`:''}</div>
+        pane.innerHTML=`<div class="message-conversation-header"><div><h2>${esc(conversation.subject)}</h2><p>${esc(conversation.contactName)} · ${esc(conversation.contactAddress)}</p></div></div><div class="studio-message-history">${conversation.messages.map(m=>renderMessage({id:m.id,senderUserName:m.author,body:m.body,externalMessageId:m.externalMessageId,createdAtUtc:m.createdAt},[])).join('')}${files.length?`<div class="studio-message-files">${files.map(f=>`<a href="/api/attachments/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.fileName)}</a>`).join('')}</div>`:''}</div>
             <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><span class="studio-send-split" role="group" aria-label="Send reply or add internal note"><button class="primary" type="submit">Send</button><select name="replyMode" aria-label="Reply sender or internal note">${replyChoices.map(identity=>`<option value="${esc(identity.type)}" ${identity.type===defaultSender?'selected':''}>${esc(identity.label)}</option>`).join('')}<option value="Internal">Internal note</option></select></span></div></form>`;
         StudioMessageCard.bindEditors(pane);
         await window.StudioInquiryAssociation?.mount(pane,id,conversation,()=>openLegacyConversation(id));
@@ -331,7 +361,8 @@
         return `<article class="studio-chat-message" data-message-id="${esc(message.id)}">
             <div class="studio-chat-meta"><strong>${esc(message.senderUserName)}</strong><span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
             ${message.subject?`<strong>${esc(message.subject)}</strong>`:''}
-            <div class="studio-chat-body">${renderMentions(message.body)}</div>
+            <div class="studio-chat-body">${renderMentions(inboundBody(message).body)}</div>
+            ${inboundBody(message).signature?`<details class="studio-email-signature"><summary>Show email signature</summary><div class="studio-chat-body">${esc(inboundBody(message).signature)}</div></details>`:''}
             ${files.length?`<div class="studio-message-files">${files.map(file=>`<a href="/api/message-attachments/${file.id}" target="_blank" rel="noopener"><strong>${esc(file.fileName)}</strong><small>${formatBytes(file.size)}</small></a>`).join('')}</div>`:''}
             ${deliveries.filter(d=>d.messageId===message.id).length?`<details class="studio-delivery-details"><summary>Delivery · ${esc([...new Set(deliveries.filter(d=>d.messageId===message.id).map(d=>deliveryLabel(d.status)))].join(', '))}</summary>${deliveries.filter(d=>d.messageId===message.id).map(d=>`<div><span>${esc(d.transport)} · ${esc(d.recipient)} · ${esc(deliveryLabel(d.status))} ${esc(d.detail||'')}</span>${d.transport==='Routing'&&d.status==='Attention'&&d.recipient!=='Attachments'?`<button class="st-link" data-retry-routing="${esc(message.id)}">Resolve again</button>`:''}${d.deliveryId&&['Failed','Attention'].includes(d.status)?`<button class="st-link" data-retry-delivery="${esc(d.deliveryId)}" data-uncertain="${String(d.status==='Attention'&&String(d.detail).startsWith('ProviderOutcomeUncertain'))}">Retry</button>`:''}</div>`).join('')}</details>`:''}
         </article>`;
