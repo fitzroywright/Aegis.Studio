@@ -52,13 +52,14 @@ public sealed class EmailAssociationTests
     {
         var handler=new FakeGraph();using var http=new HttpClient(handler);
         var secret=new FakeSecrets();
-        var channel=new MicrosoftGraphEmailMessageChannel(http,new(){TenantId="tenant",ClientId="client",SenderUpn="workspace@studio.test",ClientSecretName="test",SkipSenderRecipient=false},secret);
+        var channel=new MicrosoftGraphEmailMessageChannel(http,new(){TenantId="tenant",ClientId="client",SenderUpn="hub@studio.test",ClientSecretName="test",SkipSenderRecipient=false},secret);
         Guid id=Guid.NewGuid();string correlation=id.ToString("D");
         await channel.SendAsync(new("client","Client","client@example.test"),new(){Title="Inquiry",Body="Body",Metadata=new Dictionary<string,string>{
             ["Email.MessageId"]="<proposed@studio.test>",["Email.From"]="workspace@studio.test",["Email.ReplyTo"]="monitor@studio.test",["Studio.MessageId"]=correlation}},id);
         Assert.Contains("Message-ID: <proposed@studio.test>",handler.Mime);
         Assert.Contains("Reply-To: monitor@studio.test",handler.Mime);
-        var configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Messaging:MicrosoftGraph:TenantId","tenant"},{"Messaging:MicrosoftGraph:ClientId","client"},{"Messaging:MicrosoftGraph:ClientSecretName","test"}}).Build();
+        Assert.Contains("From: workspace@studio.test",handler.Mime);
+        var configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Messaging:MicrosoftGraph:Email:SenderUpn","hub@studio.test"},{"Messaging:MicrosoftGraph:TenantId","tenant"},{"Messaging:MicrosoftGraph:ClientId","client"},{"Messaging:MicrosoftGraph:ClientSecretName","test"}}).Build();
         var delivery=new OutboundEmail(id,Guid.NewGuid(),"workspace@studio.test","client@example.test","Inquiry","Body",null,"Sending",DateTimeOffset.UtcNow,null);
         var verified=await new StudioGraphSentMessageVerifier(http,configuration,secret).VerifyAsync(delivery,correlation,"monitor@studio.test",DateTimeOffset.UtcNow.AddMinutes(-1),default);
         Assert.Equal("<actual@exchange.test>",verified.InternetMessageId);Assert.Equal("provider-item",verified.ProviderId);
@@ -72,6 +73,8 @@ public sealed class EmailAssociationTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
         {
             if(request.RequestUri!.Host=="login.microsoftonline.com")return new(System.Net.HttpStatusCode.OK){Content=new StringContent("{\"access_token\":\"fake-token\"}")};
+            Assert.Equal("graph.microsoft.com",request.RequestUri.Host);
+            Assert.StartsWith("/v1.0/users/hub@studio.test/",Uri.UnescapeDataString(request.RequestUri.AbsolutePath));
             if(request.Method==HttpMethod.Post){Sends++;Mime=System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(await request.Content!.ReadAsStringAsync(token)));return new(System.Net.HttpStatusCode.Accepted);}
             Reads++;string correlation=System.Text.RegularExpressions.Regex.Match(Mime,@"X-Studio-Message-Id: ([^\r\n]+)").Groups[1].Value;
             var item=new{id="provider-item",internetMessageId="<actual@exchange.test>",internetMessageHeaders=new[]{new{name="X-Studio-Message-Id",value=correlation}},
