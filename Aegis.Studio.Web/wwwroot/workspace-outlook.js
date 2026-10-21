@@ -163,6 +163,8 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     <button type="button" class="jd-job-name-toggle" aria-expanded="false" aria-controls="jobIdentityMenu" title="Show job details"><span>${esc(job.title)}</span><span class="jd-job-name-chevron" aria-hidden="true">⌄</span></button>
                     <div id="jobIdentityMenu" class="jd-job-identity-menu" role="region" aria-label="Job details" hidden>
                         <dl>
+                            <div><dt>Current Status</dt><dd><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show flow details">${esc(job.status)}</button></dd></div>
+                            <div><dt>Days in Stage</dt><dd data-stage-age>Loading…</dd></div>
                             <div><dt>Client</dt><dd>${esc(clientName)}</dd></div>
                             <div><dt>Owner</dt><dd data-job-owner>${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</dd></div>
                             <div><dt>Job Type</dt><dd>${esc(jobType)}</dd></div>
@@ -175,7 +177,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol></div>
                     <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow details" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-workflow-track" aria-live="polite"></div></div></section>
                 </div>
-                <div class="jd-job-status"><div class="jd-status-meta"><span data-stage-age></span></div><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show flow details">${esc(job.status)}</button><small>${esc(job.jobCode||job.code||'')}</small></div>
+                <div class="jd-job-status"><small>${job.jobCode||job.code?'Job Code · '+esc(job.jobCode||job.code):''}</small></div>
                 <section class="jd-next-step" aria-label="Next job action" aria-live="polite"><p role="status">Loading next step…</p></section>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
             const flowToggle=header.querySelector('.jd-status-pill'),flowDrawer=header.querySelector('.jd-flow-drawer');
