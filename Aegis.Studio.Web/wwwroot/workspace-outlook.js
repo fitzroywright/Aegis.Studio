@@ -351,10 +351,10 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     const view=await json('/api/jobs/'+job.id+'/connected-workflow');if(!current()||request!==workflowRequest)return;
                     workflow=view;const data=view.data;
                     window.StudioJobDetails.nextStep(header.querySelector('.jd-next-step'),view,selector=>openAssignments(selector));
-                    window.StudioJobDetails.workflow(header.querySelector('.jd-workflow-track'),data,job,view,selector=>openAssignments(selector),header.querySelector('.jd-flow-summary'));
+
                     const graphView=await json(`/api/jobs/${job.id}/workflow-graph`).catch(()=>null);
                     if(!current()||request!==workflowRequest)return;
-                    if(graphView?.graph)StudioJobDetails.compact(header.querySelector('.jd-workflow-track'),graphView,job,header.querySelector('.jd-flow-summary'),view);
+                    if(graphView?.graph){\n                        StudioJobDetails.compact(header.querySelector('.jd-workflow-track'),graphView,job,header.querySelector('.jd-flow-summary'),view);\n                    }else{\n                        header.querySelector('.jd-workflow-track').textContent='No workflow template is applied to this job.';\n                        header.querySelector('.jd-flow-summary').replaceChildren();\n                    }
                     header.querySelector('.jd-status-pill').textContent=data.stage;
                     header.querySelector('[data-job-owner]').textContent=data.owner?studioFirstName(data.owner):'Unassigned';
                     const crew=(data.sessions||[]).flatMap(session=>session.crew||[]);
