@@ -16,7 +16,7 @@
 #conversationView > .job-detail-page { display:grid; grid-template-columns:minmax(0,1fr) clamp(245px,20vw,300px); grid-template-rows:auto minmax(0,1fr); flex:1; min-width:0; min-height:0; padding:0; gap:8px; overflow:hidden; color:var(--theme-text,#162b50); background:var(--theme-surface,#faf9f6); }
 .job-detail-page [hidden] { display:none; }
 .job-detail-heading { grid-column:1; max-height:min(38vh,320px); min-height:0; overflow:visible; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:11px 14px 8px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); position:relative; isolation:isolate; z-index:5; }
-.job-detail-title { grid-column:1/-1; display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,42%); align-items:start; gap:8px 16px; width:100%; min-width:0; overflow:visible; }
+.job-detail-title { grid-column:1/-1; display:flex; align-items:flex-start; justify-content:space-between; gap:clamp(8px,1.2vw,18px); width:100%; min-width:0; overflow:visible; }
 .job-detail-title h1 { min-width:0; margin:0; font-size:20px; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .jd-client-name { display:flex; align-items:baseline; gap:5px; min-width:0; max-width:40%; padding-left:12px; border-left:1px solid var(--theme-border,#dedbd4); font-size:12px; white-space:nowrap; }
 .jd-client-name > span { flex:none; color:var(--theme-muted,#69758b); font-size:10px; }
@@ -35,7 +35,7 @@
 .jd-job-status small { grid-column:2; color:var(--theme-muted,#7c8493); }
 
 /* Job identity, floating menus, and compact workflow are owned by this layout. */
-.jd-job-name-stack { position:relative; display:flex; flex:1 1 auto; flex-direction:column; gap:2px; width:100%; min-width:0; }
+.jd-job-name-stack { position:relative; display:flex; flex:0 1 58%; flex-direction:column; gap:2px; width:58%; min-width:140px; }
 .jd-job-name-toggle { display:inline-flex; flex:0 1 auto; align-items:center; gap:9px; width:100%; max-width:100%; min-width:0; padding:2px 8px 3px 0; border:0; border-radius:4px; background:transparent; color:var(--theme-text,#162b50); font:inherit; font-size:clamp(13px,1.35vw,19px); line-height:1.15; font-weight:750; text-align:left; cursor:pointer; }
 .jd-job-name-icon { flex:none; width:17px; height:17px; color:#d97827; }
 .jd-job-name-text { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
@@ -53,12 +53,12 @@
 .jd-job-identity-menu .jd-status-label { cursor:default; }
 .jd-job-identity-menu .jd-status-label::after { content:none; }
 .jd-job-identity-menu [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
-
-
-
-
-
-
+.jd-job-name-stack .jd-next-step { grid-column:auto; flex:0 0 32px; width:100%; min-width:0; height:32px; min-height:32px; max-height:32px; box-sizing:border-box; gap:6px; margin:0; padding:3px 6px; overflow:hidden; }
+.jd-job-name-stack .jd-next-step > div { min-width:0; flex:1 1 auto; overflow:hidden; }
+.jd-job-name-stack .jd-next-step small { display:none; }
+.jd-job-name-stack .jd-next-step p { margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; line-height:1.2; }
+.jd-job-name-stack .jd-next-step p strong { color:var(--theme-text,#162b50); font-weight:850; }
+.jd-job-name-stack .jd-next-step button { flex:none; max-width:42%; padding:3px 6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:9px; }
 .jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li { flex:1 1 0; width:0; min-width:0; height:26px; }
 .jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after { min-width:2px; margin:0; }
 .jd-job-identity .jd-flow-summary .jd-workflow-dot { position:relative; display:flex; flex-direction:column; align-items:center; gap:2px; width:18px; min-width:18px; padding:0; background:transparent; }
@@ -68,15 +68,14 @@
 @media(max-width:900px) {
  .job-detail-title.jd-job-identity { gap:clamp(6px,1vw,14px); }
  .jd-job-name-stack { flex-basis:55%; width:55%; min-width:120px; }
- .jd-job-identity .jd-flow-overview { flex:0 0 auto; width:100%; justify-content:flex-start; margin:0; }
+ .jd-job-identity .jd-flow-overview { flex-basis:45%; width:45%; }
  .jd-job-identity .jd-flow-summary .jd-workflow-dot strong { transform:rotate(45deg); transform-origin:top left; }
 }
 @media(max-width:650px) {
- .job-detail-title.jd-job-identity { grid-template-columns:minmax(0,1fr); gap:4px 10px; }
- .jd-job-identity > .jd-next-step { grid-column:1; grid-row:2; }
+ .job-detail-title.jd-job-identity { flex-wrap:wrap; gap:4px 10px; }
  .jd-job-name-stack { flex:1 1 100%; width:100%; min-width:0; }
  .jd-job-name-stack .jd-job-identity-menu { width:min(410px,calc(100vw - 32px)); }
- 
+ .jd-job-identity .jd-flow-overview { flex:1 1 100%; width:100%; margin-left:0; justify-content:flex-start; }
  .jd-job-identity .jd-flow-summary { padding-bottom:36px; }
  .jd-job-identity .jd-flow-drawer { right:auto; left:0; }
 }
@@ -120,8 +119,8 @@ button.jd-stage { position:absolute; display:flex; align-items:center; gap:6px; 
 button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-workflow-caption { grid-column:1/-1; margin-top:8px; display:flex; align-items:center; flex-wrap:wrap; gap:5px 12px; font-size:10px; color:#b4510f; }
 .jd-workflow-caption [data-job-blocked] { color:#bd3040; }
- .jd-flow-overview { display:flex; flex:0 0 auto; align-items:center; justify-content:flex-start; width:100%; min-width:0; margin:0; overflow:visible; }
-.jd-flow-summary { display:flex; flex:1; width:100%; min-width:0; align-items:flex-start; gap:0; list-style:none; margin:0; padding:0 2px 34px 0; overflow:visible; }
+ .jd-flow-overview { display:flex; flex:0 1 42%; align-items:center; justify-content:flex-end; width:42%; min-width:0; margin:0 0 0 auto; overflow:visible; }
+.jd-flow-summary { display:flex; flex:1; width:100%; min-width:0; align-items:flex-start; gap:0; list-style:none; margin:0 0 0 auto; padding:0 2px 34px 0; overflow:visible; overflow-y:visible; }
 /* Phase names are data carried by the shared workflow-dot summary renderer. */
 .jd-flow-toggle { display:grid; place-items:center; width:28px; height:28px; padding:4px; }
 .jd-flow-toggle svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
@@ -301,7 +300,7 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-workflow-dot[data-flow-tone=gray]>.jd-stage-light{background:#a4acb6;border-color:#a4acb6;color:#17202b}
 
 
-.jd-next-step { grid-column:2; grid-row:1; display:flex; align-self:stretch; align-items:center; justify-content:space-between; gap:8px 16px; min-width:0; padding:9px 11px; margin:0; border:1px solid var(--theme-border,#dedbd4); border-left:4px solid var(--theme-accent,#d97827); border-radius:5px; background:var(--theme-surface-alt,#f5f6f8); }
+.jd-next-step { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:8px 16px; padding:9px 11px; margin-top:8px; border:1px solid var(--theme-border,#dedbd4); border-left:4px solid var(--theme-accent,#d97827); border-radius:5px; background:var(--theme-surface-alt,#f5f6f8); }
 .jd-next-step > div { min-width:0; }
 .jd-next-step small { display:block; font-size:11px; font-weight:750; color:var(--theme-text,#162b50); }
 .jd-next-step p { margin:3px 0 0; font-size:11px; color:var(--theme-muted,#69758b); }
