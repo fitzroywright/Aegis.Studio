@@ -165,7 +165,7 @@ async function renderJobSubjects(job, panel, current, refresh) {
 function jobTaskDate(task) { return task.scheduledAtUtc || task.dueAtUtc; }
 function localTaskDay(value) { const d=new Date(value);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 async function renderJobTasks(job,panel,current,refresh) {
-    const [tasks,access,workflowView]=await Promise.all([json(`/api/operations/activities?jobId=${job.id}`),json(`/api/jobs/${job.id}/access`),json(`/api/jobs/${job.id}/connected-workflow`)]);
+    const [tasks,access]=await Promise.all([json(`/api/operations/activities?jobId=${job.id}`),json(`/api/jobs/${job.id}/access`)]);
     if(!current())return;
     panel.innerHTML='<div class="job-actions"><button class="action" data-task-view="list">Tasks</button><button class="action" data-task-view="calendar">Calendar</button></div><div class="task-view"></div>';
     const host=panel.querySelector('.task-view');
@@ -179,7 +179,7 @@ async function renderJobTasks(job,panel,current,refresh) {
         host.querySelectorAll('[data-month]').forEach(b=>b.onclick=()=>{month.setMonth(month.getMonth()+Number(b.dataset.month));render('calendar');});
     };
     panel.querySelectorAll('[data-task-view]').forEach(b=>b.onclick=()=>render(b.dataset.taskView));render('list');
-    if(!workflowView.canManage&&!workflowView.canReview)return;
+    const permissions=access.permissions||access;if(!permissions.editJob&&!permissions.manageProduction)return;
     const employees=await json('/api/studio-employees?assignable=true');
     if(!current())return;
     const form=document.createElement('form');form.className='subject-form';form.innerHTML='<h3>Add task</h3><label>Title<input name="title" required maxlength="200"></label><label>Assigned to<select name="assignedTo"><option value="">Unassigned</option>'+employees.map(e=>'<option value="'+esc(e.userName)+'">'+esc(e.displayName)+(e.roles?.length?' · '+esc(e.roles.join(', ')):'')+'</option>').join('')+'</select></label><label>Scheduled<input name="scheduled" type="datetime-local"></label><label>Due<input name="due" type="datetime-local"></label><button class="primary">Add task</button><p role="alert"></p>';panel.appendChild(form);
