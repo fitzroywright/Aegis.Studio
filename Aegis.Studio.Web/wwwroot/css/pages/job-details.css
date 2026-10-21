@@ -15,7 +15,7 @@
 #conversationView.has-open-job > .workspace-announcement-banners { display:none; }
 #conversationView > .job-detail-page { display:grid; grid-template-columns:minmax(0,1fr) clamp(245px,20vw,300px); grid-template-rows:auto minmax(0,1fr); flex:1; min-width:0; min-height:0; padding:0; gap:8px; overflow:hidden; color:var(--theme-text,#162b50); background:var(--theme-surface,#faf9f6); }
 .job-detail-page [hidden] { display:none; }
-.job-detail-heading { grid-column:1; max-height:min(38vh,320px); min-height:0; overflow:visible; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:11px 14px 8px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); position:relative; z-index:5; }
+.job-detail-heading { grid-column:1; max-height:min(38vh,320px); min-height:0; overflow:visible; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:11px 14px 8px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); position:relative; isolation:isolate; z-index:5; }
 .job-detail-title { grid-column:1/-1; display:flex; align-items:flex-start; justify-content:space-between; gap:clamp(8px,1.2vw,18px); width:100%; min-width:0; overflow:visible; }
 .job-detail-title h1 { min-width:0; margin:0; font-size:20px; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .jd-client-name { display:flex; align-items:baseline; gap:5px; min-width:0; max-width:40%; padding-left:12px; border-left:1px solid var(--theme-border,#dedbd4); font-size:12px; white-space:nowrap; }
@@ -276,7 +276,7 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-dot-subflow>.jd-dot-levels>.jd-dot-level:not(:last-child)::after{position:absolute;left:100%;top:50%;width:12px;min-width:12px}
 
 /* An expanded stage replaces its main dot with endpoints; actual edges return below. */
-.job-detail-heading{position:relative;isolation:isolate}
+
 .jd-flow-summary:has(.jd-workflow-dot)>li.jd-main-expanded{flex:2;min-width:220px}
 .jd-main-endpoints{display:flex;align-items:center;gap:8px;width:100%}
 .jd-main-dashed{flex:1;min-width:24px;border-top:2px dashed currentColor;opacity:.6}
