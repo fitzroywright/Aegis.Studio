@@ -52,7 +52,7 @@
 
 /* Tasks uses the same board, tabs, table header filters and context rail as Jobs. */
 .st-tasks-page{height:100%;min-height:0;overflow:hidden}
-.st-tasks-panel{height:100%;min-width:0}
+.st-tasks-panel{min-width:0}
 .st-tasks-page .sj-summary{background:#fafafa;color:#67707b}
 .st-tasks-page .sj-summary>[data-task-add]{margin-left:auto;flex:0 0 auto}
 .st-tasks-page .st-task-table{min-width:0;table-layout:fixed}
@@ -70,7 +70,7 @@
 .st-tasks-rail .sj-card header{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .st-tasks-rail .sj-card header button{color:#98701c;font-weight:700;background:none;border:0;cursor:pointer}
 .st-tasks-rail .sj-card .mw-section-rows,.st-tasks-rail .sj-card .mw-status-list,.st-tasks-rail .sj-card .smc-feed{padding:8px 12px;overflow:auto;min-height:0;flex:1}
-.st-tasks-rail .mw-status-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e8ebee}
+.st-tasks-rail .mw-status-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;white-space:nowrap;min-height:28px;padding:3px 5px;gap:5px;border-bottom:1px solid #e8ebee}
 .st-tasks-rail .st-task-messages footer{padding:8px 12px;border-top:1px solid #e8ebee}
 @media(max-width:900px){.st-tasks-page.sj-page{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 170px}.st-tasks-page .st-task-table{min-width:900px}}
 
@@ -83,7 +83,7 @@
 .st-tasks-page .sj-job-header input[data-task-search]{max-width:none}
 .st-tasks-page .sj-column-filter-inline select{height:24px}
 .st-tasks-page .sj-summary>[data-task-add]{border-radius:4px;padding:7px 11px;background:#986c55;color:#fff}
-@media(max-width:900px){.st-tasks-page.sj-page{grid-template-columns:minmax(0,1fr);}}
+
 
 /* Match the Jobs grid's dark search control and compact pager. */
 .st-tasks-page .sj-job-header input[data-task-search]{background:#2c537c;color:#fff;border-color:#658bad}
@@ -96,7 +96,7 @@
 /* Keep search on the same line as the Task column label, as in Jobs. */
 .st-tasks-page .sj-job-header{flex-direction:row;align-items:center;gap:8px}
 .st-tasks-page .sj-job-header>span{flex:0 0 auto;white-space:nowrap}
-.st-tasks-page .sj-job-header input[data-task-search]{flex:1 1 auto;width:auto;min-width:90px;max-width:none}
+.st-tasks-page .sj-job-header input[data-task-search]{flex:1 1 auto;width:auto;min-width:90px}
 
 /* Keep the due-date filter beside its column label. */
 .st-tasks-page .sj-column-filter-inline{flex-direction:row;align-items:center;gap:8px}
@@ -123,7 +123,7 @@
 .st-tasks-rail>.mw-list-panel[data-mw-region="attention"] .studio-card-icon{background:#f9e3c8;color:#955923}
 .st-tasks-rail .mw-section-rows{padding-top:1px;padding-bottom:1px}
 .st-tasks-rail .mw-status-list{padding:2px 5px}
-.st-tasks-rail .mw-status-row{display:flex!important;align-items:center;justify-content:space-between;flex-wrap:nowrap;white-space:nowrap;min-height:28px;padding:3px 5px;gap:5px}
+
 .st-tasks-rail .mw-status-row>strong{margin-left:auto;flex:0 0 auto}
 .st-tasks-rail .studio-attention-label{display:flex;align-items:center;gap:5px}
 .st-tasks-rail .studio-attention-label>span{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;background:#fce0df;color:#ad3535}
