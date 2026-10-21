@@ -3606,10 +3606,6 @@ body[data-studio-view] .avatar {
   width: 100%;
   background: #fff;
 }
-.pos-grid {
-  border-spacing: 0;
-  background: #fff;
-}
 .studio-table thead th {
   position: sticky;
   top: 0;
