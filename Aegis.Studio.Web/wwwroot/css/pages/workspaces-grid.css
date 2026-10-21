@@ -15,8 +15,8 @@ body[data-theme="fluent-dark"] .workspace-list-page .workspace-wow-email.workspa
 .workspace-list-page .workspace-wow-copy small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .workspace-list-page .workspace-wow-activity{min-width:0}
 .workspace-list-page .workspace-wow-activity small{white-space:nowrap}
-.workspace-list-page .workspace-column-header,.workspace-list-page .workspace-wow-main{width:100%;min-width:0;box-sizing:border-box;column-gap:6px;padding-left:8px;padding-right:8px;min-height:58px;row-gap:8px;padding-top:5px;padding-bottom:5px;border:0;border-radius:0;background:#fff}
-.workspace-list-page .workspace-wow-main{grid-template-columns:var(--workspace-grid-columns)}
+.workspace-list-page .workspace-column-header,.workspace-list-page .workspace-wow-main{width:100%;min-width:0;box-sizing:border-box;column-gap:6px;padding-left:8px;padding-right:8px}
+.workspace-list-page .workspace-wow-main{grid-template-columns:var(--workspace-grid-columns);min-height:58px;row-gap:8px;padding-top:5px;padding-bottom:5px;border:0;border-radius:0;background:#fff}
 .workspace-list-page .workspace-column-header :is(input,select):focus-visible{outline:2px solid var(--theme-accent,#cf792a);outline-offset:1px}
 
 
