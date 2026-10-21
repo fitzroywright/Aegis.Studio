@@ -338,3 +338,6 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 
 .jd-job-identity-menu .jd-status-pill { max-width:100%; padding:3px 9px; font-size:10px; }
 .jd-job-identity-menu [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
+
+.jd-status-pill.jd-status-label { cursor:default; }
+.jd-status-pill.jd-status-label::after { content:none; }
