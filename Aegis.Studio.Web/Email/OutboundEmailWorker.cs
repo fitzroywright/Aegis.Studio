@@ -43,15 +43,15 @@ public sealed class OutboundEmailWorker : BackgroundService
                         MessageChannel channel=message.DeliveryChannel=="Email"?MessageChannel.MsEmail:MessageChannel.WhatsApp;
                         if(transport is MicrosoftGraphEmailMessageChannel)
                         {
-                            // Common's Graph channel owns its configured mailbox. Construct it
-                            // with the audited workspace/person sender rather than silently
-                            // sending all replies from the installation's default mailbox.
+                            // Workspace/person identities may be distribution lists. Graph's users
+                            // endpoint must address the real hub mailbox; MIME retains the
+                            // audited From identity and monitored Reply-To.
                             transport=new MicrosoftGraphEmailMessageChannel(http,new MicrosoftGraphEmailOptions
                             {
                                 TenantId=configuration["Messaging:MicrosoftGraph:TenantId"]??"",
                                 ClientId=configuration["Messaging:MicrosoftGraph:ClientId"]??"",
                                 ClientSecretName=configuration["Messaging:MicrosoftGraph:ClientSecretName"]??"messaging/msgraph/client-secret",
-                                SenderUpn=message.SenderMailbox??message.FromAddress,SkipSenderRecipient=false
+                                SenderUpn=StudioGraphMailbox.Resolve(configuration),SkipSenderRecipient=false
                             },secrets);
                         }
                         var recipient=new MessageRecipient(message.ToAddress,message.ToAddress,channel==MessageChannel.MsEmail?message.ToAddress:null,

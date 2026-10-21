@@ -20,7 +20,7 @@ public sealed class StudioGraphSentMessageVerifier(HttpClient http,IConfiguratio
         string bearer=authJson.RootElement.GetProperty("access_token").GetString()!;
         for(int attempt=0;attempt<3;attempt++)
         {
-            string mailbox=Uri.EscapeDataString(delivery.SenderMailbox??delivery.FromAddress);
+            string mailbox=Uri.EscapeDataString(StudioGraphMailbox.Resolve(configuration));
             string? url=$"https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/sentitems/messages?$filter="+
                 Uri.EscapeDataString("sentDateTime ge "+since.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")+" and sentDateTime le "+since.AddMinutes(15).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"))+"&$top=50&$select=id,internetMessageId,internetMessageHeaders,from,toRecipients,replyTo";
             List<VerifiedGraphEmail> matches=[];
