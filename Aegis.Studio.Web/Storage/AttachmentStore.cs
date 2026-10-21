@@ -191,12 +191,14 @@ public sealed class AttachmentStore
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(attachment);
+        if(Get(attachment.Id)?.StorageStatus=="Quarantined")throw new InvalidOperationException("Attachment is quarantined and cannot be opened.");
         return storage.OpenReadAsync(attachment.StoredName, cancellationToken);
     }
 
     public string GetPhysicalPath(StudioAttachment attachment)
     {
         ArgumentNullException.ThrowIfNull(attachment);
+        if(Get(attachment.Id)?.StorageStatus=="Quarantined")throw new InvalidOperationException("Attachment is quarantined and cannot be opened.");
 
         string cachePath = Path.Combine(deliveryCacheRoot, attachment.StoredName);
         if (File.Exists(cachePath))
@@ -356,3 +358,4 @@ public sealed record StudioAttachment(
     string UploadedBy,
     string StorageStatus,
     bool IsEmailAttachment = false);
+

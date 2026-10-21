@@ -31,8 +31,11 @@ public sealed class OutboundEmailStore
     public OutboundEmail? QueueAcknowledgement(StudioConversation conversation, string workspaceName)
     {
         if (ExistsAcknowledgement(conversation.Id)) return null;
-        string jobReference = StudioEmailRouting.PublicReference(conversation.Id);
-        string body = $"Hello {conversation.ContactName},\n\nWe received your message and it has been accepted into the {workspaceName} workspace. Our team will handle it from here.\n\nReference: {jobReference}\nPlease keep this reference in the subject when starting a separate email about the same request.\n\nBryan's Studio";
+        using var referenceConnection=database.OpenConnection();
+        using var referenceCommand=new NpgsqlCommand("select intake_reference from studio_conversations where id=$1",referenceConnection);
+        referenceCommand.Parameters.AddWithValue(conversation.Id);
+        string jobReference = referenceCommand.ExecuteScalar() as string ?? StudioEmailRouting.PublicReference(conversation.Id);
+        string body = $"Hello {conversation.ContactName},\n\nWe received your message and it is saved for Front Desk review. Our team will contact you with next steps. Receipt does not confirm availability, payment or booking.\n\nReference: {jobReference}\nPlease keep this reference in the subject when starting a separate email about the same request.\n\nBryan's Studio";
         string subject = $"[{jobReference}] We received your message - {conversation.Subject}";
         return QueueMessage(conversation, body, subject, "Acknowledgement");
     }
@@ -116,11 +119,11 @@ public sealed class OutboundEmailStore
         command.CommandText = """
             update studio_outbound_email
             set status='ProviderAccepted',
-                provider_message_id=$2,
+                provider_message_id=coalesce($2,provider_message_id),
                 attempts=attempts+case when $3::uuid is null then 1 else 0 end,
                 last_error=null,
                 next_attempt_at_utc=null,
-                provider_accepted_at_utc=now(),lease_id=null,lease_until_utc=null
+                provider_accepted_at_utc=coalesce(provider_accepted_at_utc,now()),lease_id=null,lease_until_utc=null
             where id=$1 and ($3::uuid is null or lease_id=$3)
             """;
         command.Parameters.AddWithValue(id);
@@ -139,7 +142,7 @@ public sealed class OutboundEmailStore
                 status=case when attempts+case when $4::uuid is null then 1 else 0 end >= 10 then 'Failed' else 'Retry' end,
                 last_error=$2,
                 next_attempt_at_utc=case when attempts+case when $4::uuid is null then 1 else 0 end >= 10 then null else $3 end,lease_id=null,lease_until_utc=null
-            where id=$1 and ($4::uuid is null or lease_id=$4)
+            where id=$1 and provider_accepted_at_utc is null and ($4::uuid is null or lease_id=$4)
             """;
         command.Parameters.AddWithValue(id);
         command.Parameters.AddWithValue(string.IsNullOrWhiteSpace(failureCode) ? "ProviderFailure" : failureCode.Trim());
@@ -169,6 +172,13 @@ public sealed class OutboundEmailStore
     {
         using var c=database.OpenConnection();using var q=new NpgsqlCommand("update studio_outbound_email set status='Attention',last_error=$3,provider_accepted_at_utc=case when $4 then now() else provider_accepted_at_utc end,next_attempt_at_utc=null,lease_id=null,lease_until_utc=null where id=$1 and lease_id=$2",c);
         q.Parameters.AddWithValue(id);q.Parameters.AddWithValue(leaseId);q.Parameters.AddWithValue(reason);q.Parameters.AddWithValue(providerAccepted);q.ExecuteNonQuery();
+    }
+
+    public void MarkVerificationFailure(Guid id,string failure)
+    {
+        using var c=database.OpenConnection();
+        using var q=new NpgsqlCommand("update studio_outbound_email set last_error=$2 where id=$1 and provider_accepted_at_utc is not null and status='ProviderAccepted'",c);
+        q.Parameters.AddWithValue(id);q.Parameters.AddWithValue("ThreadingVerificationPending:"+failure);q.ExecuteNonQuery();
     }
 
     public OutboundEmail? GetDelivery(Guid id)=>Get(id);
@@ -260,10 +270,10 @@ public sealed class OutboundEmailStore
         r.GetInt32(13),
         r.IsDBNull(14) ? null : r.GetString(14),
         r.IsDBNull(15) ? null : r.GetFieldValue<DateTimeOffset>(15),
-        r.IsDBNull(16) ? null : r.GetFieldValue<DateTimeOffset>(16),r.GetString(17),r.GetString(18),r.IsDBNull(20)?null:r.GetGuid(20),r.IsDBNull(21)?null:r.GetString(21),r.IsDBNull(22)?null:r.GetString(22));
+        r.IsDBNull(16) ? null : r.GetFieldValue<DateTimeOffset>(16),r.GetString(17),r.GetString(18),r.IsDBNull(20)?null:r.GetGuid(20),r.IsDBNull(21)?null:r.GetString(21),r.IsDBNull(22)?null:r.GetString(22),r.GetBoolean(23));
 
     private const string SelectSql =
-        "select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,attempts,last_error,next_attempt_at_utc,provider_accepted_at_utc,delivery_channel,delivery_metadata::text,studio_thread_id,studio_message_id,rfc_message_id,sender_mailbox from studio_outbound_email ";
+        "select id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,attempts,last_error,next_attempt_at_utc,provider_accepted_at_utc,delivery_channel,delivery_metadata::text,studio_thread_id,studio_message_id,rfc_message_id,sender_mailbox,rfc_message_id_verified from studio_outbound_email ";
 }
 
 public sealed record OutboundEmail(
@@ -283,7 +293,10 @@ public sealed record OutboundEmail(
     int Attempts = 0,
     string? LastError = null,
     DateTimeOffset? NextAttemptAtUtc = null,
-    DateTimeOffset? ProviderAcceptedAtUtc = null,string DeliveryChannel="Email",string DeliveryMetadata="{}",Guid? StudioMessageId=null,string? RfcMessageId=null,string? SenderMailbox=null);
+    DateTimeOffset? ProviderAcceptedAtUtc = null,string DeliveryChannel="Email",string DeliveryMetadata="{}",Guid? StudioMessageId=null,string? RfcMessageId=null,string? SenderMailbox=null,bool RfcMessageIdVerified=false)
+{
+    public string ThreadingVerificationStatus=>DeliveryChannel!="Email"?"NotApplicable":RfcMessageIdVerified?"Verified":ProviderAcceptedAtUtc.HasValue?"Pending":"NotSubmitted";
+}
 public sealed record OutboundEmailAuditRecord(
     Guid MessageId,
     Guid ConversationId,
@@ -298,5 +311,6 @@ public sealed record OutboundEmailAuditRecord(
     Guid WorkspaceId,string DeliveryChannel="Email");
 
 public sealed record MarkOutboundSentRequest(string? ProviderMessageId);
+
 
 

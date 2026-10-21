@@ -39,7 +39,7 @@
     let inboxRevision = 0;
     let threadRevision = 0;
     const modeLabel = value => ({InternalOnly:'Studio only',ExternalOnly:'Email only',Combined:'Studio + email'})[value]||value;
-    const deliveryLabel = value => ({ProviderAccepted:'Accepted by Microsoft 365',Attention:'Needs attention',Pending:'Queued',Retry:'Retry scheduled',Sending:'Sending',Delivered:'Delivered',Excluded:'Router copy excluded'})[value]||value;
+    const deliveryLabel = value => ({ProviderAccepted:'Accepted by provider',Attention:'Needs attention',Pending:'Queued',Retry:'Retry scheduled',Sending:'Sending',Delivered:'Delivered',Excluded:'Router copy excluded'})[value]||value;
     const inboxDate = value => value ? new Date(value).toLocaleString() : '—';
     const inboxSubject = message => String(message.subject || message.title || String(message.body || '').split('\n')[0] || '(No subject)').slice(0,110);
     const inboxJob = thread => thread.scopeType === 'Job' ? (thread.title || thread.scopeId || 'Job') : '—';
@@ -284,6 +284,10 @@
             <form id="legacyMessageComposer" class="studio-message-composer"><div><textarea name="body" maxlength="10000" placeholder="Write a reply…" required></textarea><p id="legacySendFeedback" role="status"></p></div><div class="studio-compose-actions"><span class="studio-send-split" role="group" aria-label="Send reply or add internal note"><button class="primary" type="submit">Send</button><select name="replyMode" aria-label="Reply sender or internal note">${replyChoices.map(identity=>`<option value="${esc(identity.type)}" ${identity.type===defaultSender?'selected':''}>${esc(identity.label)}</option>`).join('')}<option value="Internal">Internal note</option></select></span></div></form>`;
         StudioMessageCard.bindEditors(pane);
         await window.StudioInquiryAssociation?.mount(pane,id,conversation,()=>openLegacyConversation(id));
+        const deliveryHost=document.createElement('div');deliveryHost.className='studio-delivery-details';pane.querySelector('.studio-message-history')?.append(deliveryHost);
+        const refreshDeliveries=async()=>{if(!deliveryHost.isConnected)return;try{const state=await json(`/api/intake/${id}/status`);if(!deliveryHost.isConnected)return;deliveryHost.innerHTML=`<strong>Intake ${esc(state.intakeReference||'legacy')}</strong>`+(state.deliveries||[]).map(d=>`<p>${esc(deliveryLabel(d.status))}${d.providerAcceptedAtUtc?' · Accepted '+esc(new Date(d.providerAcceptedAtUtc).toLocaleString()):''} · Attempts ${esc(d.attempts)} · Delivery ${esc(d.id)}${d.error?' · '+esc(d.error):''}</p>`).join('');}catch{if(deliveryHost.isConnected)deliveryHost.textContent='Outbound status unavailable. Check server logs.';}};
+        await refreshDeliveries();const statusTimer=setInterval(()=>{if(!deliveryHost.isConnected){clearInterval(statusTimer);return;}refreshDeliveries();},5000);
+
         const displayedIncoming=(conversation.messages||[]).filter(message=>message.externalMessageId
             &&pane.querySelector('.studio-chat-message[data-message-id="'+CSS.escape(message.id)+'"]'));
         await Promise.all(displayedIncoming.map(message=>json('/api/messages/conversations/'+id+'/messages/'+message.id+'/displayed',{method:'POST'}).catch(()=>null)));
@@ -364,7 +368,7 @@
             <div class="studio-chat-body">${renderMentions(inboundBody(message).body)}</div>
             ${inboundBody(message).signature?`<details class="studio-email-signature"><summary>Show email signature</summary><div class="studio-chat-body">${esc(inboundBody(message).signature)}</div></details>`:''}
             ${files.length?`<div class="studio-message-files">${files.map(file=>`<a href="/api/message-attachments/${file.id}" target="_blank" rel="noopener"><strong>${esc(file.fileName)}</strong><small>${formatBytes(file.size)}</small></a>`).join('')}</div>`:''}
-            ${deliveries.filter(d=>d.messageId===message.id).length?`<details class="studio-delivery-details"><summary>Delivery · ${esc([...new Set(deliveries.filter(d=>d.messageId===message.id).map(d=>deliveryLabel(d.status)))].join(', '))}</summary>${deliveries.filter(d=>d.messageId===message.id).map(d=>`<div><span>${esc(d.transport)} · ${esc(d.recipient)} · ${esc(deliveryLabel(d.status))} ${esc(d.detail||'')}</span>${d.transport==='Routing'&&d.status==='Attention'&&d.recipient!=='Attachments'?`<button class="st-link" data-retry-routing="${esc(message.id)}">Resolve again</button>`:''}${d.deliveryId&&['Failed','Attention'].includes(d.status)?`<button class="st-link" data-retry-delivery="${esc(d.deliveryId)}" data-uncertain="${String(d.status==='Attention'&&String(d.detail).startsWith('ProviderOutcomeUncertain'))}">Retry</button>`:''}</div>`).join('')}</details>`:''}
+            ${deliveries.filter(d=>d.messageId===message.id).length?`<details class="studio-delivery-details"><summary>Delivery · ${esc([...new Set(deliveries.filter(d=>d.messageId===message.id).map(d=>deliveryLabel(d.status)))].join(', '))}</summary>${deliveries.filter(d=>d.messageId===message.id).map(d=>`<div><span>${esc(d.transport)} · ${esc(d.recipient)} · ${esc(deliveryLabel(d.status))} ${esc(d.detail||'')}${d.providerAcceptedAtUtc?' · Accepted '+esc(new Date(d.providerAcceptedAtUtc).toLocaleString()):''}${d.threadingVerificationStatus?' · Threading '+esc(d.threadingVerificationStatus):''}${d.deliveryId?' · Delivery '+esc(d.deliveryId):''}</span>${d.transport==='Routing'&&d.status==='Attention'&&d.recipient!=='Attachments'?`<button class="st-link" data-retry-routing="${esc(message.id)}">Resolve again</button>`:''}${d.deliveryId&&['Failed','Attention'].includes(d.status)?`<button class="st-link" data-retry-delivery="${esc(d.deliveryId)}" data-uncertain="${String(d.status==='Attention'&&String(d.detail).startsWith('ProviderOutcomeUncertain'))}">Retry</button>`:''}</div>`).join('')}</details>`:''}
         </article>`;
     }
 
@@ -705,6 +709,7 @@
     // Give authentication and the initial shell a moment to settle, then show the digest once.
     setTimeout(() => showAwayDigestOnce(), 450);
 })();
+
 
 
 

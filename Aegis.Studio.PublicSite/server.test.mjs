@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer, sign } from './server.mjs';
 
 async function fixture(t, extra = {}) {
-  const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', ...extra };
+  const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', INTAKE_DB_PATH: ':memory:', ...extra };
   const server = createServer(env);
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   t.after(() => new Promise(resolve => server.close(resolve)));
@@ -50,25 +50,15 @@ test('live mode disables fake social sign-in and rejects non-HTTPS Studio upstre
   const response = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'maya' }) });
   assert.equal(response.status, 404);
 });
-test('live booking proxy signs Studio V1 request server-side and preserves idempotency key', async t => {
-  const origin = await fixture(t, { PUBLIC_DEMO_MODE: 'false', STUDIO_BASE_URL: 'https://studio.stub', STUDIO_CLIENT: 'website', STUDIO_SECRET: 'server-only-secret-value-0123456789012345' });
-  const originalFetch = globalThis.fetch; let forwarded = 0;
-  globalThis.fetch = async (url, options) => {
-    if (new URL(url).host !== 'studio.stub') return originalFetch(url, options);
-    forwarded++;
-    const parsed = new URL(url), timestamp = options.headers['X-Studio-Timestamp'], nonce = options.headers['X-Studio-Nonce'];
-    assert.equal(options.method, 'POST');
-    assert.equal(options.headers['X-Studio-Client'], 'website');
-    assert.equal(options.headers['Idempotency-Key'], 'booking-demo-1');
-    assert.equal(options.headers['X-Studio-Signature'], sign('server-only-secret-value-0123456789012345', 'POST', parsed.pathname + parsed.search, timestamp, nonce, options.body, 'booking-demo-1'));
-    return new Response(JSON.stringify({ reference: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', status: 'received', requiredDeposit: 1000, currency: 'JMD' }), { status: 201, headers: { 'Content-Type': 'application/json' } });
-  };
-  t.after(() => { globalThis.fetch = originalFetch; });
-  const body = JSON.stringify({ clientName: 'Demo Client', clientEmail: 'client@example.test', sessionType: 'Portrait', startsAt: '2026-11-01T15:00:00Z', endsAt: '2026-11-01T16:00:00Z' });
-  const response = await originalFetch(`${origin}/api/bookings`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-demo-1' }, body });
-  assert.equal(response.status, 201);
-  assert.equal(forwarded, 1);
-  assert.doesNotMatch(await response.text(), /server-only-secret/);
+test('public booking is durably saved without calling internal Studio and replays safely',async t=>{
+ const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),session=await fetch(`${origin}/api/intake-session`),csrf=(await session.json()).csrf,cookie=session.headers.get('set-cookie').split(';')[0];
+ const body=JSON.stringify({clientName:'Test Client',clientEmail:'client@example.test',sessionType:'Portrait',startsAt:'2026-11-01T15:00:00Z',endsAt:'2026-11-01T16:00:00Z'});
+ const options={method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf,'Idempotency-Key':'booking-1'},body};
+ const first=await fetch(`${origin}/api/bookings`,options),receipt=await first.json();assert.equal(first.status,201);assert.match(receipt.intakeReference,/^\d{4}-W-\d{6}$/);
+ const replay=await(await fetch(`${origin}/api/bookings`,options)).json();assert.equal(receipt.id,replay.id);assert.equal(receipt.accessToken,replay.accessToken);
+ const noAccess=await fetch(`${origin}/api/bookings/${receipt.id}`);assert.equal(noAccess.status,404);
+ const status=await(await fetch(`${origin}/api/bookings/${receipt.id}`,{headers:{'X-Intake-Token':receipt.accessToken}})).json();assert.equal(status.importStatus,'Pending');
+ const conflict=await fetch(`${origin}/api/bookings`,{...options,body:body.replace('Test Client','Other Client')});assert.equal(conflict.status,409);
 });
 test('serves standalone client assets and an operational health endpoint', async t => {
   const origin = await fixture(t);
@@ -76,4 +66,31 @@ test('serves standalone client assets and an operational health endpoint', async
   assert.match(await (await fetch(origin)).text(), /Client Galleries/);
   assert.equal((await fetch(`${origin}/styles.css`)).headers.get('content-type'), 'text/css; charset=utf-8');
   assert.equal((await fetch(`${origin}/app.js`)).headers.get('content-type'), 'text/javascript; charset=utf-8');
+});
+test('server integrations do not require Origin and scopes isolate submission from polling and payment',async t=>{
+ const keys=[{id:'external',secret:'external-test-secret-01234567890123456789',scopes:['intake:submit']},{id:'studio',secret:'studio-test-secret-01234567890123456789',scopes:['intake:pull','intake:ack']},{id:'other',secret:'other-test-secret-01234567890123456789',scopes:['intake:submit']}];
+ const origin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify(keys)}),base=origin+'/api/public-site/v1';
+ const response=await fetch(base+'/intakes',{method:'POST',headers:{Authorization:'Bearer '+keys[0].secret,'Idempotency-Key':'api-1','Content-Type':'application/json'},body:JSON.stringify({kind:'Inquiry',clientName:'Test Client'})});assert.equal(response.status,201);const receipt=await response.json();
+ assert.equal((await fetch(base+'/changes',{headers:{Authorization:'Bearer '+keys[0].secret}})).status,403);
+ assert.equal((await fetch(base+'/intakes/'+receipt.id,{headers:{Authorization:'Bearer '+keys[2].secret}})).status,404);
+ const feed=await(await fetch(base+'/changes',{headers:{Authorization:'Bearer '+keys[1].secret}})).json();assert.equal(feed.items.length,1);
+ const ack=await fetch(base+'/intakes/'+receipt.id+'/ack',{method:'POST',headers:{Authorization:'Bearer '+keys[1].secret,'Content-Type':'application/json'},body:'{"revision":1,"reviewStatus":"AwaitingReview"}'});assert.equal(ack.status,200);
+ const status=await(await fetch(base+'/intakes/'+receipt.id,{headers:{Authorization:'Bearer '+keys[0].secret}})).json();assert.equal(status.importStatus,'Imported');
+ const payment=await fetch(base+'/intakes/'+receipt.id+'/payments',{method:'POST',headers:{Authorization:'Bearer '+keys[0].secret,'Content-Type':'application/json'},body:'{}'});assert.equal(payment.status,403);
+});
+test('local published media is isolated by client binding and revocation',async t=>{
+ const secret='publication-test-secret-01234567890123456789',gallery='11111111-1111-4111-8111-111111111111',version='33333333-3333-4333-8333-333333333333',client='22222222-2222-4222-8222-222222222222';
+ const origin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify([{id:'studio',secret,scopes:['gallery:publish']}]),CLIENT_BINDINGS_JSON:JSON.stringify({'demo-google-maya':client})}),base=origin+'/api/public-site/v1';
+ const headers={Authorization:'Bearer '+secret,'Content-Type':'application/json'};
+ assert.equal((await fetch(base+'/galleries',{method:'POST',headers,body:JSON.stringify({id:gallery,clientId:client,title:'Local gallery',finalDeliveryAvailable:true,items:[{versionId:version,fileName:'portrait.jpg'}]})})).status,200);
+ assert.equal((await fetch(base+`/galleries/${gallery}/publish`,{method:'POST',headers,body:'{}'})).status,409);
+ const bytes=Buffer.from([255,216,255,217]);assert.equal((await fetch(base+`/galleries/${gallery}/media/${version}`,{method:'PUT',headers:{Authorization:'Bearer '+secret,'Content-Type':'image/jpeg'},body:bytes})).status,200);
+ assert.equal((await fetch(base+`/galleries/${gallery}/publish`,{method:'POST',headers,body:'{}'})).status,200);
+ async function login(identity){const r=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity})});return r.headers.get('set-cookie').split(';')[0];}
+ const own=await login('maya'),other=await login('jordan');
+ assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:own}})).status,200);
+ assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:other}})).status,404);
+ const media=await fetch(origin+`/api/galleries/${gallery}/items/${version}/preview`,{headers:{Cookie:own}});assert.deepEqual(Buffer.from(await media.arrayBuffer()),bytes);
+ assert.equal((await fetch(base+`/galleries/${gallery}/revoke`,{method:'POST',headers,body:'{}'})).status,200);
+ assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:own}})).status,404);
 });

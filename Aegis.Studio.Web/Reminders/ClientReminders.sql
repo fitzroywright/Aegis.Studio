@@ -15,6 +15,29 @@ create table if not exists studio_client_reminders(
  automatic boolean not null default false,created_by text not null,
  created_at_utc timestamptz not null default now(),updated_at_utc timestamptz not null default now(),
  message_id uuid,last_error text,source_detail text not null default '',source_location text not null default '');
+alter table studio_client_reminders add column if not exists subject_id uuid references studio_job_subjects(id);
+alter table studio_job_subjects add column if not exists pickup_notification text not null default 'None';
+alter table studio_job_subjects add column if not exists preference_source text;
+alter table studio_job_subjects add column if not exists preference_at_utc timestamptz;
+alter table studio_job_subjects add column if not exists pickup_ready_at_utc timestamptz;
+create or replace function studio_subject_readiness_anchor() returns trigger language plpgsql as $$
+begin
+ if new.production_status='Needs Delivery' then
+  if old.production_status is distinct from new.production_status or new.pickup_ready_at_utc is null then new.pickup_ready_at_utc=now(); end if;
+ else new.pickup_ready_at_utc=null; end if;
+ return new;
+end $$;
+drop trigger if exists subject_readiness_anchor on studio_job_subjects;
+create trigger subject_readiness_anchor before update of production_status on studio_job_subjects for each row execute function studio_subject_readiness_anchor();
+update studio_job_subjects set pickup_ready_at_utc=updated_at_utc where production_status='Needs Delivery' and pickup_ready_at_utc is null;
+create or replace function studio_subject_reminder_current(reminder uuid) returns boolean language sql stable as $$
+ select exists(select 1 from studio_client_reminders r join studio_job_subjects s on s.id=r.subject_id
+ join studio_jobs j on j.id=r.job_id where r.id=reminder and not s.is_system and s.job_id=r.job_id
+ and s.production_status='Needs Delivery' and s.pickup_ready_at_utc=r.anchor_at_utc and s.pickup_notification=r.channel
+ and j.status not in ('Cancelled','Archived','Delivered','Completed')
+ and not exists(select 1 from studio_job_fulfillment f where f.job_id=j.id)
+ and case when r.channel='Email' then lower(s.contact_email)=lower(r.recipient) else regexp_replace(s.contact_phone,'[+ ()\-]','','g')=r.recipient end)
+$$;
 create unique index if not exists ux_client_reminder_event on studio_client_reminders(job_id,kind,source_id,anchor_at_utc) where automatic;
 create index if not exists ix_client_reminders_due on studio_client_reminders(scheduled_at_utc) where status='Scheduled';
 
@@ -45,18 +68,18 @@ $$;
 create or replace function studio_client_reminder_current(reminder uuid)
 returns boolean language sql stable as $$
  select exists(select 1 from studio_client_reminders r where r.id=reminder
- and studio_client_reminder_needed(r.job_id,r.kind,r.source_id,r.anchor_at_utc)
- and (r.kind='FollowUp' or exists(select 1 from studio_client_reminder_sources s where s.job_id=r.job_id and s.kind=r.kind and s.source_id=r.source_id and s.anchor_at_utc=r.anchor_at_utc and s.detail=r.source_detail and s.location=r.source_location)))
+ and case when r.subject_id is not null then studio_subject_reminder_current(r.id) else studio_client_reminder_needed(r.job_id,r.kind,r.source_id,r.anchor_at_utc)
+ and (r.kind='FollowUp' or exists(select 1 from studio_client_reminder_sources s where s.job_id=r.job_id and s.kind=r.kind and s.source_id=r.source_id and s.anchor_at_utc=r.anchor_at_utc and s.detail=r.source_detail and s.location=r.source_location)) end)
 $$;
 
 create or replace function studio_client_reminder_dispatchable(message uuid)
 returns boolean language sql stable as $$
- select exists(select 1 from studio_client_reminders r
+ select exists(select 1 from studio_client_reminders r where r.message_id=message and r.subject_id is not null and r.status='Queued' and studio_subject_reminder_current(r.id)) or exists(select 1 from studio_client_reminders r
  join studio_client_reminder_preferences p on p.job_id=r.job_id
  join studio_jobs j on j.id=r.job_id join studio_conversations cv on cv.id=j.conversation_id
  left join studio_clients cli on cli.id=j.client_id
  left join lateral(select payload from studio_frontdesk_requests where job_id=j.id order by created_at_utc desc limit 1)b on true
- where r.message_id=message and r.status='Queued'
+ where r.message_id=message and r.subject_id is null and r.status='Queued'
  and studio_client_reminder_current(r.id)
  and case when r.channel='Email' then p.email_allowed and lower(r.recipient)=lower(coalesce(nullif(cli.email,''),b.payload->>'clientEmail',case when cv.contact_address like '%@%' then cv.contact_address end))
  else p.whatsapp_allowed and r.recipient=regexp_replace(coalesce(nullif(cli.phone,''),b.payload->>'clientPhone'),'[+ ()\-]','','g') end)

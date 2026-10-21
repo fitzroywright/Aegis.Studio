@@ -180,7 +180,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         int identifier=Array.FindIndex(headers,x=>x.Equals(request.IdColumn,StringComparison.OrdinalIgnoreCase));
         if(name<0||identifier<0)throw new ArgumentException("Select valid Name and Subject ID columns.");
         var data=rows.Skip(1).Select(row=>(Name:Cell(row,name),Id:Cell(row,identifier),Row:row)).ToList();
-        if(data.Any(x=>string.IsNullOrWhiteSpace(x.Name)||x.Name.Length>200||string.IsNullOrWhiteSpace(x.Id)||x.Id.Length>200)||data.Select(x=>x.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=data.Count)
+        if(data.Any(x=>string.IsNullOrWhiteSpace(x.Name)||x.Name.Equals("Unclassified",StringComparison.OrdinalIgnoreCase)||x.Name.Length>200||string.IsNullOrWhiteSpace(x.Id)||x.Id.Length>200)||data.Select(x=>x.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=data.Count)
             throw new ArgumentException("Every row needs a name and a unique Subject ID (maximum 200 characters).");
         Sync(job);using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         Execute(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","roster:"+job);
@@ -191,7 +191,18 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             if(ids.Count>1)throw new ArgumentException("Existing Subject ID is ambiguous: "+row.Id);
             Guid id=ids.Count==1?ids[0]:Guid.NewGuid();
             var attributes=headers.Select((h,i)=>(h,v:Cell(row.Row,i))).Where(x=>!string.IsNullOrWhiteSpace(x.h)).GroupBy(x=>x.h).ToDictionary(x=>x.Key,x=>x.First().v);
+            string? Field(params string[] aliases)
+            {
+                string Key(string text)=>new string(text.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+                var matches=attributes.Where(p=>aliases.Select(Key).Contains(Key(p.Key))).ToArray();
+                if(matches.Length>1)throw new ArgumentException("Ambiguous roster contact columns.");
+                return matches.Length==0?null:matches[0].Value;
+            }
+            string? contactName=Field("ContactName"),contactEmail=Field("ContactEmail","Email"),contactPhone=Field("ContactPhone","Phone"),collection=Field("Collection");
+            if((contactName?.Length??0)>200||(contactEmail?.Length??0)>320||(contactPhone?.Length??0)>100||(collection?.Length??0)>100||!string.IsNullOrEmpty(contactEmail)&&!System.Net.Mail.MailAddress.TryCreate(contactEmail,out _))throw new ArgumentException("Correct invalid roster contact fields before importing.");
+
             Execute(c,tx,"insert into studio_job_subjects(id,job_id,gallery_id,name,reference,notes,updated_by,attributes,collection_name) values($1,$2,$2,$3,$4,'',$5,$6::jsonb,coalesce((select default_collection from studio_media_galleries where id=$2),(select name from studio_media_collections where job_id=$2 order by name limit 1),'General')) on conflict(id) do update set name=excluded.name,attributes=excluded.attributes,updated_by=excluded.updated_by,updated_at_utc=now()",id,job,row.Name,row.Id,user,JsonSerializer.Serialize(attributes));
+            Execute(c,tx,"update studio_job_subjects set contact_name=coalesce($2,contact_name),contact_email=coalesce($3,contact_email),contact_phone=coalesce($4,contact_phone),collection_name=coalesce(nullif($5,''),collection_name) where id=$1",id,(object?)contactName??DBNull.Value,(object?)contactEmail??DBNull.Value,(object?)contactPhone??DBNull.Value,(object?)collection??DBNull.Value);
         }
         Audit(c,tx,job,"RosterImported",user,$"Imported or updated {data.Count} subjects.");tx.Commit();return data.Count;
     }

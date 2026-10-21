@@ -1,3 +1,4 @@
+import { createIntakeApi } from './intake-api.mjs';
 import http from 'node:http';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -57,29 +58,10 @@ async function readBody(req, limit = 65536) {
 }
 function requireSameOrigin(req, url) {
   const origin = req.headers.origin;
-  if (!origin || new URL(origin).host !== req.headers.host || new URL(origin).origin !== url.origin) throw Object.assign(new Error('Request origin was rejected.'), { status: 403 });
+  if (!origin || new URL(origin).host !== req.headers.host) throw Object.assign(new Error('Request origin was rejected.'), { status: 403 });
 }
 function requireGallery(user, reference) {
   if (!user || user.galleryReference !== reference) throw Object.assign(new Error('Sign in to the client account that owns this gallery.'), { status: 404 });
-}
-function studioConfig(env) {
-  if (!env.STUDIO_BASE_URL || !env.STUDIO_CLIENT || !env.STUDIO_SECRET) throw Object.assign(new Error('Studio API is not configured.'), { status: 503 });
-  const base = new URL(env.STUDIO_BASE_URL);
-  if (base.protocol !== 'https:') throw new Error('STUDIO_BASE_URL must use HTTPS.');
-  return { base, client: env.STUDIO_CLIENT, secret: env.STUDIO_SECRET };
-}
-async function studioRequest(env, method, path, body = Buffer.alloc(0), key = '', bearer = '') {
-  const { base, client, secret } = studioConfig(env);
-  const timestamp = String(Math.floor(Date.now() / 1000)), nonce = randomUUID();
-  const headers = {
-    'X-Studio-Client': client, 'X-Studio-Timestamp': timestamp, 'X-Studio-Nonce': nonce,
-    'X-Studio-Signature': sign(secret, method, path, timestamp, nonce, body, key),
-  };
-  if (key) headers['Idempotency-Key'] = key;
-  if (bearer) headers.Authorization = `Bearer ${bearer}`;
-  if (body.length) headers['Content-Type'] = 'application/json';
-  const response = await fetch(new URL(path, base), { method, headers, body: body.length ? body : undefined, redirect: 'error', signal: AbortSignal.timeout(30000) });
-  return response;
 }
 function demoPage(reference, selected) {
   const gallery = DEMO_GALLERIES[reference];
@@ -97,7 +79,8 @@ export function createServer(env = process.env) {
   if (!secret || secret.length < 32) throw new Error('Set SESSION_SECRET to at least 32 characters.');
   const demo = env.PUBLIC_DEMO_MODE === 'true';
   const demoSelections = new Map();
-  return http.createServer(async (req, res) => {
+  const intake=createIntakeApi(env,readBody,json);
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -105,13 +88,15 @@ export function createServer(env = process.env) {
     try {
       if (req.method === 'GET' && url.pathname === '/health') { res.writeHead(200, { 'Cache-Control': 'no-store' }).end('ok'); return; }
       if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(await readFile(new URL('index.html', ROOT))); return; }
-      if (req.method === 'GET' && ['/styles.css', '/app.js'].includes(url.pathname)) {
+      if (req.method === 'GET' && ['/styles.css', '/app.js', '/roster-editor.js'].includes(url.pathname)) {
         const type = url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
         res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=300' }); res.end(await readFile(new URL(url.pathname.slice(1), ROOT))); return;
       }
-      const user = readSession(req, secret);
+      let user = readSession(req, secret);
+      if(user){const binding=JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];if(binding){const candidates=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).filter(r=>JSON.parse(r.payload).published);if(candidates.length)user={...user,galleryReference:candidates.at(-1).id};}}
       if (req.method === 'GET' && url.pathname === '/api/session') { json(res, 200, { demo, user: user ? { name: user.name, provider: user.provider, email: user.email, galleryReference: user.galleryReference } : null }); return; }
-      if (req.method === 'POST') requireSameOrigin(req, url);
+      if (await intake.handle(req,res,url)) return;
+      if (['POST','PUT','DELETE'].includes(req.method)) requireSameOrigin(req, url);
       if (req.method === 'POST' && url.pathname === '/api/demo-login') {
         if (!demo) { json(res, 404, { message: 'Demo sign-in is disabled.' }); return; }
         const payload = JSON.parse((await readBody(req)).toString('utf8'));
@@ -120,30 +105,13 @@ export function createServer(env = process.env) {
         json(res, 200, { user: { name: target.name, provider: target.provider, email: target.email, galleryReference: target.galleryReference } }, { 'Set-Cookie': `studio_public_session=${issueSession(target, secret)}; ${cookieFlags(env)}` }); return;
       }
       if (req.method === 'POST' && url.pathname === '/api/logout') { json(res, 200, { ok: true }, { 'Set-Cookie': `studio_public_session=; ${cookieFlags(env).replace('Max-Age=28800', 'Max-Age=0')}` }); return; }
-      if (req.method === 'POST' && url.pathname === '/api/bookings') {
-        const body = await readBody(req); const key = String(req.headers['idempotency-key'] || '');
-        if (!/^[A-Za-z0-9._-]{1,100}$/.test(key)) { json(res, 400, { message: 'A valid idempotency key is required.' }); return; }
-        if (demo) {
-          const input = JSON.parse(body.toString('utf8'));
-          if (!input.clientName || !input.clientEmail || !input.sessionType || !input.startsAt || !input.endsAt) { json(res, 400, { message: 'Complete the required booking details.' }); return; }
-          json(res, 201, { reference: randomUUID(), status: 'received', requiredDeposit: 1000, currency: 'JMD', demo: true }); return;
-        }
-        const upstream = await studioRequest(env, 'POST', '/api/public/v1/bookings', body, key);
-        res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json', 'Cache-Control': 'no-store' }); res.end(Buffer.from(await upstream.arrayBuffer())); return;
-      }
-      const bookingMatch = url.pathname.match(/^\/api\/bookings\/([0-9a-f-]{36})$/i);
-      if (req.method === 'GET' && bookingMatch) {
-        if (demo) { json(res, 200, { reference: bookingMatch[1], status: 'received', demo: true }); return; }
-        const upstream = await studioRequest(env, 'GET', `/api/public/v1/bookings/${bookingMatch[1]}`);
-        res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json', 'Cache-Control': 'no-store' }); res.end(Buffer.from(await upstream.arrayBuffer())); return;
-      }
       const galleryPage = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})$/i);
       const galleryItem = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/items\/([0-9a-f-]{36})\/(preview|thumbnail|download)$/i);
       const selection = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/([0-9a-f-]{36})$/i);
       const submit = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/submit$/i);
       if (galleryPage || galleryItem || selection || submit) {
-        const reference = (galleryPage || galleryItem || selection || submit)[1]; requireGallery(user, reference);
-        if (demo) {
+        const reference = (galleryPage || galleryItem || selection || submit)[1]; const locallyPublished=intake.store.db.prepare('SELECT id FROM galleries WHERE id=?').get(reference);if(demo&&!locallyPublished)requireGallery(user, reference);
+        if (demo&&!locallyPublished) {
           if (!DEMO_GALLERIES[reference]) { json(res, 404, { message: 'Gallery not found.' }); return; }
           const selectionKey = `${user.id}:${reference}`;
           if (!demoSelections.has(selectionKey)) demoSelections.set(selectionKey, new Set());
@@ -162,26 +130,43 @@ export function createServer(env = process.env) {
           if (submit && req.method === 'POST') { json(res, 200, { reference: randomUUID(), publicationId: reference, versionIds: [...selections], submittedAt: new Date().toISOString(), demo: true }); return; }
           json(res, 405, { message: 'Method not allowed.' }); return;
         }
-        const grant = env.CLIENT_GALLERY_GRANTS_JSON ? JSON.parse(env.CLIENT_GALLERY_GRANTS_JSON)[user.id] : null;
-        if (!grant || grant.reference !== reference || !grant.accessToken) { json(res, 404, { message: 'Gallery access is not configured for this client.' }); return; }
-        let method = req.method, path, body = Buffer.alloc(0), key = '';
-        if (galleryPage && method === 'GET') path = `/api/public/v1/galleries/${reference}${url.search}`;
-        else if (galleryItem && method === 'GET') path = `/api/public/v1/galleries/${reference}/items/${galleryItem[2]}/${galleryItem[3]}`;
-        else if (selection && method === 'PUT') { path = `/api/public/v1/galleries/${reference}/selections/${selection[2]}`; body = await readBody(req); }
-        else if (submit && method === 'POST') { path = `/api/public/v1/galleries/${reference}/selections/submit`; body = await readBody(req); key = String(req.headers['idempotency-key'] || ''); }
-        else { json(res, 405, { message: 'Method not allowed.' }); return; }
-        const upstream = await studioRequest(env, method, path, body, key, grant.accessToken);
-        res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json', 'Cache-Control': 'private, no-store' }); res.end(Buffer.from(await upstream.arrayBuffer())); return;
+        // Serve only locally stored copies. The identity binding is configured server-side,
+        // never accepted from an email address or a caller-supplied client ID.
+        const binding=JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user?.id];
+        const row=intake.store.db.prepare('SELECT client_id,payload FROM galleries WHERE id=?').get(reference);
+        if(!user||!binding||!row||row.client_id!==binding){json(res,404,{message:'Gallery not found.'});return;}
+        const gallery=JSON.parse(row.payload);if(!gallery.published){json(res,404,{message:'Gallery unavailable.'});return;}
+        if(galleryPage&&req.method==='GET'){
+          const selected=new Set(intake.store.db.prepare('SELECT id FROM selections WHERE gallery_id=? AND selected=1').all(reference).map(x=>x.id));
+          json(res,200,{reference,publicationId:reference,title:gallery.title,finalDeliveryAvailable:gallery.finalDeliveryAvailable,items:gallery.items.map(x=>({...x,selected:selected.has(x.versionId)})),nextCursor:null});return;
+        }
+        if(galleryItem&&req.method==='GET'){
+          if(!gallery.items.some(x=>x.versionId===galleryItem[2])||galleryItem[3]==='download'&&!gallery.finalDeliveryAvailable){json(res,404,{message:'Item unavailable.'});return;}
+          const media=intake.store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?').get(reference,galleryItem[2]);if(!media){json(res,404,{message:'Item unavailable.'});return;}
+          res.writeHead(200,{'Content-Type':media.type,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});res.end(media.content);return;
+        }
+        if(selection&&req.method==='PUT'){
+          const p=JSON.parse((await readBody(req)).toString());if(typeof p.selected!=='boolean'||!gallery.items.some(x=>x.versionId===selection[2])){json(res,400,{message:'Invalid selection.'});return;}
+          intake.store.db.prepare('INSERT INTO selections VALUES(?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET selected=excluded.selected').run(reference,selection[2],p.selected?1:0);json(res,200,{versionId:selection[2],selected:p.selected});return;
+        }
+        if(submit&&req.method==='POST'){
+          const ids=intake.store.db.prepare('SELECT id FROM selections WHERE gallery_id=? AND selected=1').all(reference).map(x=>x.id);
+          const result=intake.store.replay('gallery:'+user.id,String(req.headers['idempotency-key']||''),{reference,ids},()=>({reference:randomUUID(),publicationId:reference,versionIds:ids,submittedAt:new Date().toISOString()}));json(res,200,result);return;
+        }
+        json(res,405,{message:'Method not allowed.'});return;
       }
       json(res, 404, { message: 'Not found.' });
     } catch (error) {
-      if (!res.headersSent) json(res, error.status || 503, { message: error.status ? error.message : 'Public service unavailable. Retry using the same request key.' });
+      if (!res.headersSent) json(res, error.status || 503, { code:error.code || 'service_unavailable', message: error.status ? error.message : 'Public service unavailable. Retry using the same request key.',fieldErrors:error.fields || {},correlationId:randomUUID() },error.status===429?{'Retry-After':'60'}:{});
       else res.end();
     }
   });
+  server.on('close',()=>intake.store.close());
+  return server;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const server = createServer();
   server.listen(Number(process.env.PORT || 8080), '0.0.0.0', () => console.log(`Aegis Studio Public Site listening on ${process.env.PORT || 8080}`));
 }
+

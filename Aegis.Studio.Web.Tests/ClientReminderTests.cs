@@ -55,7 +55,25 @@ public sealed class ClientReminderTests
         bool Dispatchable(){using var q=new NpgsqlCommand("select studio_client_reminder_dispatchable('44444444-4444-4444-4444-444444444444')",c,tx);return (bool)q.ExecuteScalar()!;}
         long Count(string kind){using var q=new NpgsqlCommand("select count(*) from studio_client_reminder_sources where kind=$1",c,tx);q.Parameters.AddWithValue(kind);return(long)q.ExecuteScalar()!;}
     }
+    [StudioPostgresFact]public void SubjectReminderUsesItsOwnContactPreferenceAndReadiness()
+    {
+        using var c=new NpgsqlConnection(Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES"));c.Open();using var tx=c.BeginTransaction();
+        string schema="subject_reminder_"+Guid.NewGuid().ToString("N");Run($"create schema {schema};set local search_path to {schema}");Run(Fixture);
+        using var input=typeof(ClientReminderStore).Assembly.GetManifestResourceStream("Aegis.Studio.Web.Reminders.ClientReminders.sql")!;using var reader=new StreamReader(input);Run(reader.ReadToEnd());
+        Run("""
+          insert into studio_jobs(id,status,created_at_utc,title) values('11111111-1111-4111-8111-111111111111','In Production',now(),'Graduation');
+          insert into studio_job_subjects(id,job_id,production_status,contact_email,pickup_notification,pickup_ready_at_utc) values('22222222-2222-4222-8222-222222222222','11111111-1111-4111-8111-111111111111','Needs Delivery','parent@example.invalid','Email',now());
+          insert into studio_client_reminders(id,job_id,kind,source_id,anchor_at_utc,scheduled_at_utc,channel,recipient,subject,body,status,created_by,subject_id,message_id,automatic)
+          select '33333333-3333-4333-8333-333333333333',job_id,'Collection',id,pickup_ready_at_utc,now(),'Email',contact_email,'Pickup','Ready','Queued','Test',id,'33333333-3333-4333-8333-333333333333',true from studio_job_subjects;
+          """);
+        Assert.True(Current());Run("update studio_job_subjects set contact_email='changed@example.invalid'");Assert.False(Current());
+        Run("update studio_job_subjects set contact_email='parent@example.invalid',pickup_notification='None'");Assert.False(Current());
+        Run("update studio_job_subjects set pickup_notification='Email',production_status='Needs Editing'");Assert.False(Current());
+        void Run(string sql){using var q=new NpgsqlCommand(sql,c,tx);q.ExecuteNonQuery();}
+        bool Current(){using var q=new NpgsqlCommand("select studio_client_reminder_dispatchable('33333333-3333-4333-8333-333333333333')",c,tx);return (bool)q.ExecuteScalar()!;}
+    }
     public const string Fixture="""
+      create table studio_job_subjects(id uuid primary key,job_id uuid,is_system boolean default false,production_status text,updated_at_utc timestamptz default now(),contact_email text default '',contact_phone text default '');
       create table studio_jobs(id uuid primary key,status text,created_at_utc timestamptz,stage_entered_at_utc timestamptz,client_id uuid,conversation_id uuid,title text);
       create table studio_shoot_sessions(id uuid,job_id uuid,call_time_utc timestamptz,location text,status text);
       create table studio_frontdesk_requests(id uuid,job_id uuid,created_at_utc timestamptz,status text,payload jsonb);

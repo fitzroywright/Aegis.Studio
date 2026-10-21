@@ -131,7 +131,17 @@ public sealed class ClientReminderStore(StudioDatabase database,IConfiguration c
         {
             if(status is not ("Scheduled" or "Failed"))throw new ArgumentException("This reminder has already entered delivery. Check its delivery history before another send.");
             if(status=="Failed")
-            {string channel=Scalar<string>(c,tx,"select channel from studio_client_reminders where id=$1",id);CheckChannel(c,tx,job,channel);Exec(c,tx,"update studio_client_reminders set recipient=$2 where id=$1",id,Recipient(ContactFor(c,tx,job),channel));}
+            {
+                string channel=Scalar<string>(c,tx,"select channel from studio_client_reminders where id=$1",id);
+                var subject=Scalar<object>(c,tx,"select subject_id from studio_client_reminders where id=$1",id);
+                if(subject is Guid sid)
+                {
+                    if(!Scalar<bool>(c,tx,"select studio_subject_reminder_current($1)",id))throw new ArgumentException("Subject contact, preference or readiness changed. Review the subject before resending.");
+                    var transport=channel=="Email"?MessageChannel.MsEmail:MessageChannel.WhatsApp;
+                    if(!channels.Any(x=>x.Channel==transport)||channel=="WhatsApp"&&string.IsNullOrWhiteSpace(configuration["Messaging:WhatsApp:ReminderTemplateName"]))throw new ArgumentException("Configure the subject notification provider first.");
+                }
+                else {CheckChannel(c,tx,job,channel);Exec(c,tx,"update studio_client_reminders set recipient=$2 where id=$1",id,Recipient(ContactFor(c,tx,job),channel));}
+            }
             var due=change.Action=="postpone"?change.ScheduledAtUtc??throw new ArgumentException("Choose a new time."):DateTimeOffset.UtcNow;
             if(due>DateTimeOffset.UtcNow.AddYears(1))throw new ArgumentException("Schedule within the next year.");
             Exec(c,tx,"update studio_client_reminders set status='Scheduled',scheduled_at_utc=$2,last_error=null,updated_at_utc=now() where id=$1 and message_id is null",id,due.ToUniversalTime());
@@ -145,7 +155,7 @@ public sealed class ClientReminderStore(StudioDatabase database,IConfiguration c
         if(!Scalar<bool>(c,tx,"select pg_try_advisory_xact_lock(72919347)"))return;
         Exec(c,tx,"select set_config('studio.reminder_actor','System',true)");
         Exec(c,tx,"update studio_client_reminders r set status=case e.status when 'ProviderAccepted' then 'Submitted' else e.status end,updated_at_utc=now() from studio_outbound_email e where r.message_id=e.id and r.status in ('Queued','Sending') and e.status in ('ProviderAccepted','Sending','Attention','Failed') and r.status<>case e.status when 'ProviderAccepted' then 'Submitted' else e.status end");
-        Exec(c,tx,"update studio_client_reminders set status='Cancelled',last_error='Client action completed, event changed or contact permission withdrawn',updated_at_utc=now() where status in ('Scheduled','Queued') and (not studio_client_reminder_current(id) or not exists(select 1 from studio_client_reminder_preferences p where p.job_id=studio_client_reminders.job_id and case when channel='Email' then p.email_allowed else p.whatsapp_allowed end))");
+        Exec(c,tx,"update studio_client_reminders set status='Cancelled',last_error='Client action completed, event changed or contact permission withdrawn',updated_at_utc=now() where status in ('Scheduled','Queued') and (not studio_client_reminder_current(id) or (subject_id is null and not exists(select 1 from studio_client_reminder_preferences p where p.job_id=studio_client_reminders.job_id and case when channel='Email' then p.email_allowed else p.whatsapp_allowed end)))");
         Exec(c,tx,"update studio_client_reminders set status='Cancelled',last_error='Client contact changed; create a new reminder',updated_at_utc=now() where status='Queued' and not studio_client_reminder_dispatchable(message_id) and exists(select 1 from studio_outbound_email e where e.id=message_id and e.status in ('Pending','Retry'))");
         Exec(c,tx,"update studio_outbound_email e set status='Cancelled',last_error='Client reminder cancelled' from studio_client_reminders r where r.message_id=e.id and r.status='Cancelled' and e.status in ('Pending','Retry')");
         var rules=new List<(Guid Job,ReminderRuleRequest Rule,string Actor)>();
@@ -165,6 +175,7 @@ public sealed class ClientReminderStore(StudioDatabase database,IConfiguration c
                 Exec(c,tx,"insert into studio_client_reminders(id,job_id,kind,source_id,anchor_at_utc,scheduled_at_utc,channel,recipient,subject,body,created_by,automatic,status,last_error,source_detail,source_location) values($1,$2,$3,$4,$5,now(),$6,$7,$8,$9,$10,true,'Failed',$11,$12,$13) on conflict do nothing",Guid.NewGuid(),rule.Job,source.Kind,source.SourceId,source.AnchorAtUtc,rule.Rule.Channel,rule.Rule.Channel=="Email"?contact.Email??"":contact.Phone??"",ClientReminderRules.Render(rule.Rule.Subject,contact.Client,contact.Job,source.Detail,source.Location),ClientReminderRules.Render(rule.Rule.Body,contact.Client,contact.Job,source.Detail,source.Location),rule.Actor,e.Message,source.Detail,source.Location);
             }
         }
+        ScheduleSubjects(c,tx);
         var dueIds=new List<Guid>();using(var q=new NpgsqlCommand("select id from studio_client_reminders where status='Scheduled' and scheduled_at_utc<=now() order by scheduled_at_utc limit 100",c,tx))using(var r=q.ExecuteReader())while(r.Read())dueIds.Add(r.GetGuid(0));
         var zone=TimeZoneInfo.FindSystemTimeZoneById(configuration["ClientReminders:TimeZone"]??"America/Jamaica");
         if(!ClientReminderRules.IsQuiet(DateTimeOffset.UtcNow,zone))foreach(var id in dueIds)
@@ -173,12 +184,40 @@ public sealed class ClientReminderStore(StudioDatabase database,IConfiguration c
         }
         tx.Commit();
     }
+    void ScheduleSubjects(NpgsqlConnection c,NpgsqlTransaction tx)
+    {
+        // Subject reminders reuse the existing scheduler, delivery guard, outbox and audit history.
+        foreach(string channel in new[]{"Email","WhatsApp"})
+        {
+            var transport=channel=="Email"?MessageChannel.MsEmail:MessageChannel.WhatsApp;
+            bool available=channels.Any(x=>x.Channel==transport)&&(channel!="WhatsApp"||!string.IsNullOrWhiteSpace(configuration["Messaging:WhatsApp:ReminderTemplateName"]));
+            Exec(c,tx,"""
+              insert into studio_client_reminders(id,job_id,kind,source_id,anchor_at_utc,scheduled_at_utc,channel,recipient,subject,body,created_by,automatic,subject_id,status,last_error)
+              select gen_random_uuid(),s.job_id,'Collection',s.id,s.pickup_ready_at_utc,now(),$1,
+               case when $1='Email' then s.contact_email else regexp_replace(s.contact_phone,'[+ ()\-]','','g') end,
+               'Ready for pickup: '||j.title,'Hello '||coalesce(nullif(s.contact_name,''),s.name)||', photographs for '||s.name||' are ready for pickup. Please contact Brian''s to arrange collection. Collection remains subject to payment and release checks.',
+               'Subject pickup preference',true,s.id,case when $2 then 'Scheduled' else 'Failed' end,case when $2 then null else $3 end
+              from studio_job_subjects s join studio_jobs j on j.id=s.job_id where not s.is_system and s.production_status='Needs Delivery'
+               and s.pickup_ready_at_utc is not null and s.pickup_notification=$1 and j.status not in ('Cancelled','Archived','Delivered','Completed')
+               and case when $1='Email' then s.contact_email like '%@%' else s.contact_phone ~ '^\+[0-9]{8,15}$' end
+               and not exists(select 1 from studio_job_fulfillment f where f.job_id=j.id)
+              on conflict do nothing
+              """,channel,available,"Configure the "+channel+" provider/template before sending subject reminders.");
+        }
+    }
     void Queue(NpgsqlConnection c,NpgsqlTransaction tx,Guid id)
     {
         Guid job;string channel,recipient,subject,body,actor;
         using(var q=new NpgsqlCommand("select job_id,channel,recipient,subject,body,created_by from studio_client_reminders where id=$1 for update",c,tx))
         {q.Parameters.AddWithValue(id);using var r=q.ExecuteReader();r.Read();job=r.GetGuid(0);channel=r.GetString(1);recipient=r.GetString(2);subject=r.GetString(3);body=r.GetString(4);actor=r.GetString(5);}
-        CheckChannel(c,tx,job,channel);var contact=ContactFor(c,tx,job);
+        Guid? subjectId=Scalar<object>(c,tx,"select subject_id from studio_client_reminders where id=$1",id) is Guid sid?sid:null;
+        var contact=ContactFor(c,tx,job);
+        if(subjectId.HasValue)
+        {
+            if(!Scalar<bool>(c,tx,"select studio_subject_reminder_current($1)",id))throw new ArgumentException("Subject readiness, contact or preference changed.");
+            using var q=new NpgsqlCommand("select name,contact_email,contact_phone from studio_job_subjects where id=$1 and job_id=$2 and not is_system",c,tx);q.Parameters.AddWithValue(subjectId.Value);q.Parameters.AddWithValue(job);using var r=q.ExecuteReader();if(!r.Read())throw new ArgumentException("Subject unavailable.");contact=contact with{Client=r.GetString(0),Email=r.GetString(1),Phone=r.GetString(2)};
+        }
+        else CheckChannel(c,tx,job,channel);
         if(channel=="Email"&&string.IsNullOrWhiteSpace(contact.From))throw new ArgumentException("Configure the workspace email identity first.");
         if(Recipient(contact,channel)!=recipient)throw new ArgumentException("Client contact changed. Cancel this reminder and create a new one.");
         string reference="AEGIS-"+contact.Conversation.ToString("N")[..8].ToUpperInvariant();

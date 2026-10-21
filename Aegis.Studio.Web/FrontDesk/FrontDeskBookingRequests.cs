@@ -52,7 +52,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
     }
     public IReadOnlyList<FrontDeskRequest> GetAll()
     {
-        using var connection=database.OpenConnection();using var command=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0),r.created_at_utc from studio_frontdesk_requests r order by r.created_at_utc desc",connection);
+        using var connection=database.OpenConnection();using var command=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,greatest(0,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0)+coalesce((select sum(e.amount) from studio_financial_events e where e.job_id=r.job_id and e.kind in ('Refund','Reversal')),0)),r.created_at_utc from studio_frontdesk_requests r order by r.created_at_utc desc",connection);
         using var reader=command.ExecuteReader();List<FrontDeskRequest> result=[];
         while(reader.Read())result.Add(Read(reader));return result;
     }
@@ -64,7 +64,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         if(request.ExternalBookingId is not null)
         {
             Execute(connection,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","booking:"+request.BookingSource+":"+request.ExternalBookingId);
-            using var existing=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0),r.created_at_utc from studio_frontdesk_requests r where payload->>'externalBookingId'=$1 and coalesce(payload->>'bookingSource','FrontDesk')=$2",connection,tx);
+            using var existing=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,greatest(0,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0)+coalesce((select sum(e.amount) from studio_financial_events e where e.job_id=r.job_id and e.kind in ('Refund','Reversal')),0)),r.created_at_utc from studio_frontdesk_requests r where payload->>'externalBookingId'=$1 and coalesce(payload->>'bookingSource','FrontDesk')=$2",connection,tx);
             existing.Parameters.AddWithValue(request.ExternalBookingId);existing.Parameters.AddWithValue(request.BookingSource);using var reader=existing.ExecuteReader();
             if(reader.Read())
             {
@@ -144,7 +144,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         // Serialize duplicate receipt checks across requests before locking the request.
         Execute(connection,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))",provider+":"+reference);
         FrontDeskRequest current;
-        using(var get=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0),r.created_at_utc from studio_frontdesk_requests r where r.id=$1 for update",connection,tx))
+        using(var get=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,greatest(0,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0)+coalesce((select sum(e.amount) from studio_financial_events e where e.job_id=r.job_id and e.kind in ('Refund','Reversal')),0)),r.created_at_utc from studio_frontdesk_requests r where r.id=$1 for update",connection,tx))
         {get.Parameters.AddWithValue(id);using var reader=get.ExecuteReader();if(!reader.Read())throw new KeyNotFoundException("Booking request not found.");current=Read(reader);}
         // Read the total after acquiring the row lock, using a fresh READ COMMITTED snapshot.
         // A concurrent distinct receipt may have committed while this transaction waited.
@@ -168,7 +168,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         Execute(connection,tx,"update studio_frontdesk_requests set status='AwaitingConfirmation' where id=$1",id);
         tx.Commit();return GetAll().Single(x=>x.Id==id);
     }
-    internal static Guid CreatePendingJob(NpgsqlConnection c,NpgsqlTransaction tx,PendingBookingRequest r,string user)
+    internal static Guid CreatePendingJob(NpgsqlConnection c,NpgsqlTransaction tx,PendingBookingRequest r,string user,bool createClient=true)
     {
         Guid conversation=r.ConversationId??Guid.NewGuid();
         if(r.ConversationId.HasValue)
@@ -178,7 +178,12 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         }
         else Execute(c,tx,"insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values($1,$2,$3,$4,$5,'Email',false,now())",conversation,r.WorkspaceId,r.Title,r.ClientName,r.ClientEmail);
         Guid client=r.ClientId??Guid.Empty;
-        if(client==Guid.Empty)
+        if(client==Guid.Empty && r.ConversationId.HasValue && !createClient)
+        {
+            using var selected=new NpgsqlCommand("select client_id from studio_conversations where id=$1",c,tx);selected.Parameters.AddWithValue(conversation);
+            if(selected.ExecuteScalar() is Guid linkedClient)client=linkedClient;
+        }
+        if(client==Guid.Empty && createClient)
         {
             Execute(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","client:"+r.ClientEmail.ToLowerInvariant()+":"+r.ClientName.ToLowerInvariant());
             using var q=new NpgsqlCommand("select id from studio_clients where lower(email)=lower($1) and lower(display_name)=lower($2) order by updated_at_utc desc limit 1",c,tx);q.Parameters.AddWithValue(r.ClientEmail);q.Parameters.AddWithValue(r.ClientName);
@@ -187,7 +192,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         }
         Execute(c,tx,"select set_config('studio.actor',$1,true)",user);
         Guid job=Guid.NewGuid();
-        Execute(c,tx,"insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,client_id) values($1,$2,$3,$4,$5,'Pending',$6,now(),$7)",job,r.WorkspaceId,conversation,r.Title,r.ClientName,r.EventDate,client);
+        Execute(c,tx,"insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,client_id) values($1,$2,$3,$4,$5,'Pending',$6,now(),$7)",job,r.WorkspaceId,conversation,r.Title,r.ClientName,r.EventDate,client==Guid.Empty?DBNull.Value:(object)client);
         Execute(c,tx,"update studio_conversations set job_id=$2 where id=$1",conversation,job);
         Execute(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,visibility,body,created_at_utc) values($1,$2,$3,'Internal','Booking received; Pending Job created for FrontDesk review.',now())",Guid.NewGuid(),conversation,user);
         if(r.JobTemplateId is Guid templateId)
@@ -285,5 +290,6 @@ public static class FrontDeskBookingRequestEndpoints
     private static IResult Run(Func<IResult> action)
     {try{return action();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}}
 }
+
 
 

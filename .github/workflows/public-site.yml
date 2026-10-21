@@ -1,15 +1,7 @@
 name: Public Site
 
+# Builds and tests are run locally on the MacBook.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'Aegis.Studio.PublicSite/**'
-      - '.github/workflows/public-site.yml'
-  pull_request:
-    paths:
-      - 'Aegis.Studio.PublicSite/**'
-      - '.github/workflows/public-site.yml'
   workflow_dispatch:
 
 jobs:

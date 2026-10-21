@@ -17,5 +17,7 @@
     <ProjectReference Include="$(CommonRoot)\Common.Security\Common.Security.Plugin.ActiveDirectory\Common.Security.Plugin.ActiveDirectory.csproj" />
     <ProjectReference Include="$(CommonRoot)\Common.Diagnostics\Common.Diagnostics.csproj" />
   </ItemGroup>
+  <ItemGroup><None Include="../docs/public-site-v1/contract-example.json" Link="contract-example.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>
+
 

@@ -1,43 +1,31 @@
 # Aegis Studio Public Site
 
-A standalone Node 24 application for the public **Booking** and **Client Galleries** experience. The app uses the Studio Public V1 API for live booking and gallery data; it has no dependency on Studio's database or file storage. Its browser never receives the Studio integration secret. In demo mode it shows fake bookings, two fake social identities, and separate fake galleries.
+Standalone Node 24 website for Booking and Client Galleries, with its own durable SQLite database and media copies. The public site does not call internal Studio. Studio polls the versioned public-site API every 60 seconds and pushes approved gallery media to the site.
 
-## Run locally
+Copy `.env.example` to `.env`, provision local test secrets, and run on the MacBook:
 
-```sh
-cp .env.example .env
-# Set SESSION_SECRET to a random value before running.
+```bash
+npm install
 npm test
 npm start
 ```
 
-Open `http://localhost:8080`. `PUBLIC_DEMO_MODE=true` enables Maya Chen (Google) and Jordan Lee (Facebook) demo identities. Demo mode returns isolated fixture galleries and fake booking receipts. It must not be used for real client data.
+The website accepts inquiries and bookings through its browser form and authenticated submission API. It saves before returning a receipt. Form and API share the W reference allocator and intake store. Acknowledgment, import, booking and payment states remain distinct. Rosters can be entered, pasted or uploaded as CSV/XLSX, reviewed and saved. Attachments remain quarantined until scanning passes.
 
-Set `PUBLIC_DEMO_MODE=false` to use Studio's live Public V1 API. In that mode:
+See [the API guide](../docs/public-site-v1/INTEGRATION.md), [OpenAPI](public-site-v1.openapi.json), and [deployment and live proof runbook](../docs/CLIENT-INTAKE-HANDOFF.md).
 
-- `STUDIO_BASE_URL`, `STUDIO_CLIENT`, and `STUDIO_SECRET` configure the server-to-server signed integration.
-- `STUDIO_CLIENT` must have `bookings.write` and `bookings.read` scopes in Studio.
-- gallery grants must be added through the future authenticated social sign-in callback; the current demo login is disabled in live mode.
-- Studio's Public V1 HTTPS endpoint and separate media store must be reachable from this app.
+## Storage and hosting
 
-This initial project includes mocked provider sign-in only. Do not enable fake sign-in on an internet-facing production client portal. Before serving real galleries, complete provider OAuth/OIDC and bind each verified provider subject to a Studio-issued, per-gallery access token. Server routes already require the session's gallery reference to match each requested gallery, and never accept a browser-supplied access token.
+Use a persistent writable volume for `INTAKE_DB_PATH`, including SQLite WAL files. The database stores intake, replay keys, roster drafts, attachment quarantine, payment events, gallery metadata, media and selections. Back it up using SQLite's online backup mechanism or while the service is stopped. Do not copy only the main database file from an active WAL database. Restrict volume access and protect backups.
 
-## Container
+The Dockerfile uses Node 24 and runs as the unprivileged node user. Build the image on the MacBook, then deploy the resulting image behind HTTPS with a persistent `/app/data` volume. Pin deployment image tags to the reviewed revision.
 
-Build from the repository root:
+## Identity and payment boundaries
 
-```sh
-docker build -t aegis-studio-public-site:0.1.0 -f Aegis.Studio.PublicSite/Dockerfile Aegis.Studio.PublicSite
-docker run --rm -p 8080:8080 \
-  -e PUBLIC_DEMO_MODE=true \
-  -e SESSION_SECRET="$(openssl rand -hex 32)" \
-  aegis-studio-public-site:0.1.0
-```
+Demo sign-in is explicitly enabled with `PUBLIC_DEMO_MODE=true` for local acceptance only. Production provider sign-in is not implemented by this intake change; retain the existing sign-in boundary and finish the production identity integration before opening real client galleries. `CLIENT_BINDINGS_JSON` maps an authenticated identity to a Studio client UUID, and the site checks that binding for every local gallery request. Never expose demo login publicly.
 
-Deploy behind an HTTPS reverse proxy or managed container ingress. Set secrets in the platform's secret manager, use `PUBLIC_DEMO_MODE=false` for live API traffic, and restrict network egress to the Studio API and approved identity/media endpoints. For on-prem Studio, expose only the authenticated Public V1 API through a gateway; do not expose the Studio web application or storage directly. Configure a stable public hostname, TLS, request limits, and health-check `/health`. See [`docs/PUBLIC-SITE-DEPLOYMENT.md`](../docs/PUBLIC-SITE-DEPLOYMENT.md) for the deployment runbook.
+A verified payment-provider adapter can submit financial events with its dedicated `payment:verified` credential. Ordinary submitters cannot mark themselves paid. This site and Studio do not collect card details.
 
-## Studio API setup
+## Validation state
 
-Configure the Studio Public V1 integration client and secret as described in [`docs/PUBLIC-V1-INTEGRATION.md`](../docs/PUBLIC-V1-INTEGRATION.md). The Node server signs each request using the exact method, path/query, body bytes, timestamp, nonce, and idempotency key expected by Studio. Booking creation is idempotent and remains a pending Front Desk request until staff review and required deposit verification. Gallery requests use a Studio-issued client capability token kept server-side. Proofs, selections, and final-download authorization remain controlled by Studio.
-
-No storage is shared between Studio and this app. Demo data is in code; live booking and gallery records/media are read or written only through Studio APIs. If webhook delivery is enabled later, persist its deduplication log on this app's own durable volume and keep it separate from Studio storage.
+This branch contains source changes and regression tests. No restore, build, test, deployment, live payment or mail proof has been run in the implementation environment. Run the MacBook checks and controlled end-to-end acceptance before enabling the integration. The REST contract is a candidate V1 until those checks pass.

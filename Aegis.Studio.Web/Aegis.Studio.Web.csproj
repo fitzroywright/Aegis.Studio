@@ -27,7 +27,9 @@
     <EmbeddedResource Include="Reminders/ClientReminders.sql" />
     <EmbeddedResource Include="Messaging/UnifiedMessagingSchema.sql" />
     <EmbeddedResource Include="Email/EmailAssociations.sql" />
+    <EmbeddedResource Include="Intake/IntakeSchema.sql" />
     <EmbeddedResource Include="PublicApi/public-v1.openapi.json" />
+    <EmbeddedResource Include="../Aegis.Studio.PublicSite/public/roster-editor.js" LogicalName="Aegis.Studio.Web.Intake.RosterEditor.js" />
     <Content Update="PublicApi/public-v1.openapi.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
@@ -78,6 +80,7 @@
            Text="Authentication plugin was not staged to $(PublishDir)plugins." />
   </Target>
 </Project>
+
 
 
 

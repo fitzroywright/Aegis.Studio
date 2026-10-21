@@ -1,0 +1,103 @@
+# Replace host, secrets and observed IDs locally. These are placeholders, not a deployed sandbox.
+@base = https://PUBLIC_SITE_HOST/api/public-site/v1
+@submit = SUBMISSION_TOKEN
+@studio = STUDIO_TOKEN
+@payment = VERIFIED_ADAPTER_TOKEN
+@scanner = SCANNER_TOKEN
+@id = OBSERVED_INTAKE_UUID
+@revision = 1
+@attachment = OBSERVED_ATTACHMENT_UUID
+@gallery = OBSERVED_PUBLICATION_UUID
+@version = OBSERVED_VERSION_UUID
+
+### Submit a booking with the body in booking-example.json
+POST {{base}}/intakes
+Authorization: Bearer {{submit}}
+Idempotency-Key: external-booking-001
+Content-Type: application/json
+
+< booking-example.json
+
+### Submit an inquiry
+POST {{base}}/intakes
+Authorization: Bearer {{submit}}
+Idempotency-Key: external-inquiry-001
+Content-Type: application/json
+
+{"kind":"Inquiry","clientName":"Test Client","clientEmail":"test@example.invalid","notes":"Please quote a graduation session."}
+
+### Read your intake status
+GET {{base}}/intakes/{{id}}
+Authorization: Bearer {{submit}}
+
+### Status alias
+GET {{base}}/intakes/{{id}}/status
+Authorization: Bearer {{submit}}
+
+### Poll first page; next request passes ?cursor=OBSERVED_NEXT_CURSOR
+GET {{base}}/changes
+Authorization: Bearer {{studio}}
+
+### Acknowledge only after durable Studio save
+POST {{base}}/intakes/{{id}}/ack
+Authorization: Bearer {{studio}}
+Content-Type: application/json
+
+{"revision":1,"reviewStatus":"AwaitingReview","acknowledgmentStatus":"Queued"}
+
+### Replace roster using the exact current intake revision
+PUT {{base}}/intakes/{{id}}/roster
+Authorization: Bearer {{submit}}
+Content-Type: application/json
+
+{"revision":1,"rows":[{"name":"Student","reference":"student-1","collection":"Class A","pickupNotification":"None"}]}
+
+### Upload to quarantine; substitute actual base64 PDF/JPEG/PNG bytes
+POST {{base}}/intakes/{{id}}/attachments
+Authorization: Bearer {{submit}}
+Content-Type: application/json
+
+{"fileName":"document.pdf","contentBase64":"REPLACE_WITH_FILE_BYTES"}
+
+### Fetch only after the scanner marks the file Clean
+GET {{base}}/attachments/{{attachment}}
+Authorization: Bearer {{studio}}
+
+### Rescan after scanner recovery
+POST {{base}}/attachments/{{attachment}}/rescan
+Authorization: Bearer {{scanner}}
+
+### Verified adapter event; never use a client success-page claim
+POST {{base}}/intakes/{{id}}/payments
+Authorization: Bearer {{payment}}
+Content-Type: application/json
+
+{"eventId":"provider-event-1","provider":"TEST_ADAPTER","transactionReference":"capture-1","kind":"Deposit","amountMinor":10000,"currency":"JMD","occurredAtUtc":"2026-10-20T18:00:00Z"}
+
+### Stage gallery metadata using actual UUIDs
+POST {{base}}/galleries
+Authorization: Bearer {{studio}}
+Content-Type: application/json
+
+{"id":"11111111-1111-4111-8111-111111111111","clientId":"22222222-2222-4222-8222-222222222222","title":"Test gallery","finalDeliveryAvailable":true,"items":[{"versionId":"33333333-3333-4333-8333-333333333333","fileName":"portrait.jpg"}]}
+
+### Upload pinned image bytes
+PUT {{base}}/galleries/{{gallery}}/media/{{version}}
+Authorization: Bearer {{studio}}
+Content-Type: image/jpeg
+
+< portrait.jpg
+
+### Activate after every item upload
+POST {{base}}/galleries/{{gallery}}/publish
+Authorization: Bearer {{studio}}
+Content-Type: application/json
+
+{}
+
+### Revoke
+POST {{base}}/galleries/{{gallery}}/revoke
+Authorization: Bearer {{studio}}
+Content-Type: application/json
+
+{}
