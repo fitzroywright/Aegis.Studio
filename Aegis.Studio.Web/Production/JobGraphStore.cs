@@ -72,23 +72,59 @@ public sealed class JobGraphStore(StudioDatabase database)
     public JobGraphView? Get(Guid job)
     {
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction(System.Data.IsolationLevel.RepeatableRead);
-        var definition = Definition(c, tx, job); if (definition is null) return null;
-        Guid template; int version; long revision;
+        var definition = Definition(c, tx, job);
+        Guid template; int version; long revision; string jobStatus;
+        if (definition is null)
+        {
+            using var q = Command(c, tx, "select workflow_revision,status from studio_jobs where id=$1", job);
+            using var r = q.ExecuteReader(); if (!r.Read()) return null;
+            revision = r.GetInt64(0); jobStatus = r.GetString(1); template = Guid.Empty; version = 1;
+            var steps = new[]
+            {
+                new TemplateStep("inquiry-booking", "Inquiry / Booking", "Booking", "Editing"),
+                new TemplateStep("shoot", "Shoot", "Photography", "Editing", ["inquiry-booking"]),
+                new TemplateStep("production", "Production", "Production", "Editing", ["shoot"]),
+                new TemplateStep("delivery", "Delivery", "Delivery", "Assembly", ["production"]),
+                new TemplateStep("completed", "Completed", "Archive", "Assembly", ["delivery"])
+            };
+            var graph = WorkflowGraphEngine.FromSteps(steps);
+            var current = jobStatus switch
+            {
+                "Pending" or "Needs Assignment" or "Needs Photographer Assignment" or "Photographer Assigned" or "Awaiting Scheduling" or "Scheduled" => 0,
+                "Photography In Progress" or "Shoot Complete" or "Awaiting Upload" => 1,
+                "Awaiting Production Review" or "Active Production" or "Awaiting Approval" or "Changes Requested" => 2,
+                "Ready for Delivery" or "Delivered" => 3,
+                "Completed" or "Cancelled" => 4,
+                _ => 0
+            };
+            var states = steps.ToDictionary(step => step.Key, step => Array.IndexOf(steps, step) < current || current == 4 ? "Completed" : Array.IndexOf(steps, step) == current ? "InProgress" : "NotStarted");
+            var evaluation = WorkflowGraphEngine.Evaluate(graph, states, new HashSet<Guid>());
+            var flat = WorkflowGraphEngine.Flatten(graph).Nodes.ToDictionary(n => n.Id);
+            var evaluationStates = evaluation.Nodes.ToDictionary(n => n.Id);
+            var tasks = steps.Select(step =>
+            {
+                var state = evaluationStates[step.Key];
+                return new GraphTask(Guid.Empty, step.Key, step.Title, states[step.Key], null, null, state.Status,
+                    state.Dependencies, false, state.Reason, state.Dependencies.Select(id => flat[id].Label).ToArray(), step.ActivityType);
+            }).ToArray();
+            tx.Commit();
+            return new(job, template, version, revision, graph, evaluation, tasks, []);
+        }
         using (var q = Command(c, tx, "select i.template_id,i.template_version,j.workflow_revision from studio_job_template_instances i join studio_jobs j on j.id=i.job_id where i.job_id=$1", job))
         { using var r = q.ExecuteReader(); r.Read(); template = r.GetGuid(0); version = r.GetInt32(1); revision = r.GetInt64(2); }
-        var graph = Graph(definition); var evaluation = WorkflowGraphEngine.Evaluate(graph, Statuses(c, tx, job), Services(c, tx, job));
-        var nodes = WorkflowGraphEngine.Flatten(graph).Nodes.ToDictionary(n => n.Id); var states = evaluation.Nodes.ToDictionary(n => n.Id);
-        var tasks = new List<GraphTask>();
+        var customGraph = Graph(definition); var customEvaluation = WorkflowGraphEngine.Evaluate(customGraph, Statuses(c, tx, job), Services(c, tx, job));
+        var nodes = WorkflowGraphEngine.Flatten(customGraph).Nodes.ToDictionary(n => n.Id); var statesById = customEvaluation.Nodes.ToDictionary(n => n.Id);
+        var customTasks = new List<GraphTask>();
         using (var q = Command(c, tx, "select id,workflow_node_id,title,status,assigned_to,optional_step,blocked_reason,activity_type from studio_job_activities where job_id=$1 and workflow_node_id is not null order by step_order", job))
-        { using var r = q.ExecuteReader(); while (r.Read()) { var id = r.GetString(1); var s = states[id]; tasks.Add(new(r.GetGuid(0), id, r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), nodes[id].Role, s.Status, s.Dependencies, r.GetBoolean(5), r.IsDBNull(6) ? s.Reason : r.GetString(6),s.Dependencies.Select(p=>nodes[p].Label).ToArray(),r.GetString(7))); } }
+        { using var r = q.ExecuteReader(); while (r.Read()) { var id = r.GetString(1); var state = statesById[id]; customTasks.Add(new(r.GetGuid(0), id, r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), nodes[id].Role, state.Status, state.Dependencies, r.GetBoolean(5), r.IsDBNull(6) ? state.Reason : r.GetString(6), state.Dependencies.Select(p=>nodes[p].Label).ToArray(), r.GetString(7))); } }
         var history = new List<object>();
         using (var q = Command(c, tx, "select title,status,assigned_to,completed_at_utc from studio_job_activities where job_id=$1 and workflow_node_id is null and template_step_key is not null and work_order_id is null order by created_at_utc", job))
         { using var r = q.ExecuteReader(); while (r.Read()) history.Add(new { title = r.GetString(0), status = r.GetString(1), assignedTo = r.IsDBNull(2) ? null : r.GetString(2), completedAtUtc = r.IsDBNull(3) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(3) }); }
-        var taskMap=tasks.ToDictionary(t=>t.NodeId);
+        var taskMap=customTasks.ToDictionary(t=>t.NodeId);
         WorkflowGraph Display(WorkflowGraph flow,string prefix)=>flow with{Nodes=flow.Nodes.Select(n=>
             n.Kind=="Subflow"&&n.Subflow is not null?n with{Subflow=Display(n.Subflow,prefix+n.Id+"/")}:
             taskMap.TryGetValue(prefix+n.Id,out var task)?n with{Label=task.Title,Task=n.Task! with{Title=task.Title,DefaultAssignee=task.AssignedTo,ActivityType=task.ActivityType??n.Task!.ActivityType}}:n).ToArray()};
-        tx.Commit(); return new(job, template, version, revision, Display(graph,""), evaluation, tasks.ToArray(), history.ToArray());
+        tx.Commit(); return new(job, template, version, revision, Display(customGraph,""), customEvaluation, customTasks.ToArray(), history.ToArray());
     }
     public static void GuardTask(NpgsqlConnection c, NpgsqlTransaction? tx, Guid activity, string requested)
     {
