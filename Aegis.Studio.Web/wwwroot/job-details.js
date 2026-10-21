@@ -5,7 +5,7 @@
  const put=(url,body)=>json(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
  function renderWorkflowSummary(host,items){
   if(!host)return;
-  host.innerHTML=items.map(item=>`<li class="jd-flow-phase ${item.state||''} ${item.expanded?'jd-main-expanded':''}" ${item.phase?`data-flow-phase="${escape(item.phase)}"`:''} title="${escape(item.title||item.label)}">${item.content||`<button type="button" class="jd-workflow-dot ${item.tone||''}" ${item.node?`data-workflow-node="${escape(item.node)}"`:''} ${item.expanded!==undefined?`aria-expanded="${item.expanded}"`:''} ${item.tone?`data-flow-tone="${item.tone}"`:''} title="${escape(item.title||item.label)}" aria-label="${escape(item.title||item.label)}"><span class="jd-stage-light" aria-hidden="true">${escape(item.icon||'')}</span><strong>${escape(item.short||item.label)}</strong></button>`}<span class="sr-only">${escape(item.description||'')}</span></li>`).join('');
+  host.innerHTML=items.map(item=>`<li class="jd-flow-phase ${item.state||''} ${item.expanded?'jd-main-expanded':''}" ${item.phase?`data-flow-phase="${escape(item.phase)}"`:''} title="${escape(item.title||item.label)}">${item.content||`<button type="button" class="jd-workflow-dot ${item.dotState||''}" ${item.node?`data-workflow-node="${escape(item.node)}"`:''} ${item.expanded!==undefined?`aria-expanded="${item.expanded}"`:''} ${item.tone?`data-flow-tone="${item.tone}"`:''} title="${escape(item.title||item.label)}" aria-label="${escape(item.title||item.label)}"><span class="jd-stage-light" aria-hidden="true">${escape(item.icon||'')}</span><strong>${escape(item.short||item.label)}</strong></button>`}<span class="sr-only">${escape(item.description||'')}</span></li>`).join('');
  }
  // Job stages stay aligned with WorkflowRules; milestones read existing session facts.
  const phases=['Pending','Needs Assignment','Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload','Awaiting Production Review','Active Production','Awaiting Approval','Ready for Delivery','Delivered','Completed','Changes Requested','Cancelled','Blocked','Reshoot Required'];
@@ -65,7 +65,7 @@
     const state=skipped?'skipped':complete?'complete':exception?'current exception':current?'current':'pending';
     const description=skipped?'Not required':complete?'Successfully passed':exception?'Needs attention':current?'Current':'Not yet passed';
     const icon=skipped?'–':complete?'✓':exception?'!':'';
-    return {phase:title,label:title,icon,state,tone:complete?'green':exception?'red':current?'amber':'gray',description,title:title+' · '+description};
+    return {phase:title,label:title,icon,state,dotState:complete?'completed':exception?'blocked':current?'available':'pending',tone:complete?'green':exception?'red':current?'amber':'gray',description,title:title+' · '+description};
    }));
    summaryHost.setAttribute('aria-label','Main job flow: '+data.stage);
   }
@@ -307,7 +307,7 @@
     const icon=tone==='green'?'✓':status==='Skipped'||status==='Inactive'?'–':status==='Available'?'▶':tone==='amber'?'◉':tone==='red'?'!':'○';
     const isExpanded=n.kind==='Subflow'&&(expanded===n.id||expanded?.startsWith(n.id+'/'));
     const content=isExpanded?`<div class="jd-main-endpoints" data-main-expanded="${esc(n.id)}">${dot(n,n.id).replace('class="jd-workflow-dot ','data-main-start class="jd-workflow-dot ').replace(`<strong>${esc(shortLabel(n.label))}</strong>`,'<strong>Start</strong>')}<span class="jd-main-dashed" aria-hidden="true"></span>${dot(n,n.id).replace('class="jd-workflow-dot ','data-main-complete class="jd-workflow-dot ').replace(`<strong>${esc(shortLabel(n.label))}</strong>`,'<strong>Complete</strong>')}</div>`:null;
-    return {node:n.id,label:n.label,short:shortLabel(n.label),icon,tone,state:status.toLowerCase(),expanded:isExpanded,title:n.label+': '+summary(n,n.id),content};
+    return {node:n.id,label:n.label,short:shortLabel(n.label),icon,tone,state:status.toLowerCase(),dotState:status.toLowerCase(),expanded:isExpanded,title:n.label+': '+summary(n,n.id),content};
    }));summaryHost.querySelectorAll('[data-workflow-node]').forEach(b=>b.onclick=()=>{const id=b.dataset.workflowNode,node=find(view.graph,id);if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw();}else{const close=selected===id;expanded=null;selected=close?null:id;draw();if(!close)details(node,id);}summaryHost.querySelectorAll('[data-workflow-node]').forEach(button=>{if(button.dataset.workflowNode===id)button.focus();});});}
    if(summaryHost){notifyDrawer();scheduleRoutes();}
   }
