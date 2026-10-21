@@ -112,9 +112,9 @@
       if(sessionJobId===jobId&&sessionReady)return;
       sessionReady=false;sessionJobId=jobId;sessionControl.replaceChildren();sessionLabel.hidden=true;
       try{
-        const workflow=await json('/api/jobs/'+encodeURIComponent(jobId)+'/connected-workflow');
+        const sessions=await json('/api/jobs/'+encodeURIComponent(jobId)+'/shoot-sessions');
         if(job.value!==jobId||!root.isConnected)return;
-        const sessions=workflow?.data?.sessions||[];
+        
         sessionControl.innerHTML=(sessions.length>1?'<option value="">Choose session before uploading</option>':'')+sessions.map(x=>'<option value="'+escMedia(x.id)+'">'+escMedia(x.title||x.name||x.planned_start_utc||'Photography session')+'</option>').join('');
         sessionLabel.hidden=sessions.length<2;sessionReady=true;
       }catch(error){if(job.value===jobId)progress.textContent='Upload sessions could not load: '+(error.message||'Please refresh and retry.');}
