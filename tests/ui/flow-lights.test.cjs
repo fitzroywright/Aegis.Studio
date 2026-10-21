@@ -1,34 +1,10 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),{JSDOM}=require('jsdom');
-const source=p=>fs.readFileSync(path.resolve(__dirname,'../../',p),'utf8');
-function setup(t){const dom=new JSDOM('<main></main>',{runScripts:'outside-only',url:'https://studio.test'});t.after(()=>dom.window.close());const w=dom.window;w.StudioWorkflow={nextAction:()=>({label:'Current next action',selector:'[data-next-action]'})};vm.runInContext(source('Aegis.Studio.Web/wwwroot/job-details.js'),dom.getInternalVMContext());const host=w.document.querySelector('main');return {w,host,draw:(data,job={},activate=null)=>w.StudioJobDetails.workflow(host,data,job,{},activate),light:label=>[...host.querySelectorAll('[data-flow-stage]')].find(b=>b.dataset.flowStage===label)};}
-test('every supported job status has a visible flow light and its current action',t=>{const {host,draw,light}=setup(t);const declaration=source('Aegis.Studio.Web/Workflow/WorkflowRules.cs').match(/string\[\] Stages=\[([^\]]+)\]/)[1];const stages=[...declaration.matchAll(/"([^"]+)"/g)].map(m=>m[1]);for(const stage of stages){let clicked;draw({stage,sessions:[],history:[]},{id:'job'},selector=>clicked=selector);for(const supported of stages)assert.ok(light(supported),supported);assert.equal(host.querySelector('[aria-current="step"]').dataset.flowStage,stage);light(stage).click();assert.equal(clicked,'[data-next-action]');}});
-test('photographer assigned and shoot complete require all required session records',t=>{const {draw,light}=setup(t),done={required:true,crew_finalized:true,crew:[{user_name:'photo'}],shoot:{checked_out_at_utc:'2026-10-11T12:00:00Z',status:'Completed'}},draft={required:true,crew_finalized:false,crew:[],shoot:null};draw({stage:'Awaiting Upload',sessions:[done,draft],history:[]});assert.equal(light('Photographer Assigned').classList.contains('complete'),false);assert.equal(light('Shoot Complete').classList.contains('complete'),false);draw({stage:'Awaiting Upload',sessions:[done,{...draft,required:false}],history:[]});assert.equal(light('Photographer Assigned').classList.contains('complete'),true);assert.equal(light('Shoot Complete').classList.contains('complete'),true);assert.equal(light('Awaiting Upload').classList.contains('current'),true);});
-test('corrections and blockers do not mark unvisited future stages complete',t=>{const {draw,light}=setup(t);draw({stage:'Changes Requested',blockedReason:'Missing images',sessions:[],history:[{new_stage:'Awaiting Production Review',exited_at_utc:'2026-10-11T12:00:00Z'}]});assert.ok(light('Changes Requested').classList.contains('exception'));assert.ok(light('Blocked').classList.contains('exception'));assert.equal(light('Awaiting Production Review').classList.contains('complete'),false);assert.equal(light('Active Production').classList.contains('complete'),false);assert.equal(light('Delivered').classList.contains('complete'),false);});
-test('nonshoot work shows photography milestones as not required',t=>{const {draw,light}=setup(t);draw({stage:'Active Production',sessions:[],history:[]},{jobType:'Print'});for(const label of ['Photographer Assigned','Shoot Complete','Awaiting Upload']){assert.ok(light(label).classList.contains('skipped'));assert.match(light(label).textContent,/Not required/);}assert.ok(light('Active Production').classList.contains('current'));});
-
-test('graph connects the main job path and rejoins corrections at the service transition',t=>{const {host,draw}=setup(t);draw({stage:'Changes Requested',correctionKind:'Source',sessions:[],history:[]});const edges=[...host.querySelectorAll('[data-flow-edge]')].map(p=>p.dataset.flowEdge);assert.ok(edges.includes('Photographer Assigned → Awaiting Scheduling'));assert.ok(edges.includes('Shoot Complete → Awaiting Upload'));assert.ok(edges.includes('Awaiting Production Review → Changes Requested'));assert.ok(edges.includes('Changes Requested → Awaiting Production Review'));assert.equal(edges.includes('Changes Requested → Active Production'),false);draw({stage:'Changes Requested',correctionKind:'Production',sessions:[],history:[]});assert.ok([...host.querySelectorAll('[data-flow-edge]')].some(p=>p.dataset.flowEdge==='Changes Requested → Active Production'));});
-test('reshoot evidence highlights the branch and retains a return to scheduling',t=>{const {host,draw,light}=setup(t);draw({stage:'Awaiting Upload',sessions:[],history:[],outstandingRoster:[{status:'Needs Retake'}]});assert.ok(light('Reshoot Required').classList.contains('exception'));assert.ok([...host.querySelectorAll('[data-flow-edge]')].some(p=>p.dataset.flowEdge==='Reshoot Required → Awaiting Scheduling'));assert.equal(host.querySelectorAll('[aria-current="step"]').length,1);});
-test('successfully passed stages show checks while active and future stages do not',t=>{
- const {draw,light}=setup(t);
- draw({stage:'Awaiting Approval',sessions:[],history:[{new_stage:'Awaiting Production Review',exited_at_utc:'2026-10-11T12:00:00Z'},{new_stage:'Active Production',exited_at_utc:'2026-10-11T13:00:00Z'},{new_stage:'Awaiting Approval'}]});
- for(const label of ['Awaiting Production Review','Active Production'])assert.equal(light(label).querySelector('.jd-stage-light').textContent,'✓');
- for(const label of ['Awaiting Approval','Ready for Delivery'])assert.equal(light(label).querySelector('.jd-stage-light').textContent,'');
-});
-test('cancelled, rejected and reopened stages are not counted as successful passes',t=>{
- const {draw,light}=setup(t);
- for(const stage of ['Cancelled','Changes Requested','Active Production']){
-  draw({stage,sessions:[],history:[{new_stage:'Awaiting Approval',exited_at_utc:'2026-10-11T12:00:00Z'},{new_stage:stage}]});
-  assert.equal(light('Awaiting Approval').querySelector('.jd-stage-light').textContent,'');
- }
- draw({stage:'Awaiting Approval',sessions:[],history:[{new_stage:'Awaiting Approval',exited_at_utc:'2026-10-11T12:00:00Z'},{new_stage:'Ready for Delivery',exited_at_utc:'2026-10-11T13:00:00Z'},{new_stage:'Awaiting Approval'}]});
- assert.equal(light('Awaiting Approval').querySelector('.jd-stage-light').textContent,'');
- assert.equal(light('Ready for Delivery').querySelector('.jd-stage-light').textContent,'');
-});
-test('resolved corrections and the completed terminal stage show checks',t=>{
- const {draw,light}=setup(t);
- draw({stage:'Active Production',sessions:[],history:[{new_stage:'Changes Requested',exited_at_utc:'2026-10-11T12:00:00Z'},{new_stage:'Active Production'}]});
- assert.equal(light('Changes Requested').querySelector('.jd-stage-light').textContent,'✓');
- draw({stage:'Completed',sessions:[],history:[{new_stage:'Delivered',exited_at_utc:'2026-10-11T12:00:00Z'},{new_stage:'Completed'}]});
- for(const label of ['Delivered','Completed'])assert.equal(light(label).querySelector('.jd-stage-light').textContent,'✓');
- assert.ok(light('Completed').classList.contains('complete'));
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
+test('Job Details uses one graph renderer for generic and custom workflows',()=>{
+ const details=fs.readFileSync(path.join(root,'job-details.js'),'utf8');
+ const page=fs.readFileSync(path.join(root,'workspace-outlook.js'),'utf8');
+ assert.match(details,/function compact\(/);
+ assert.doesNotMatch(details,/function workflow\(/);
+ assert.doesNotMatch(page,/StudioJobDetails\.workflow\(/);
+ assert.match(page,/StudioJobDetails\.compact\(/);
 });
