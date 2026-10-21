@@ -204,6 +204,10 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 if(restoreFocus)flowTrigger.focus();
             };
             flowToggle.onclick=event=>{flowTrigger=event.currentTarget;setFlowOpen(flowToggle.getAttribute('aria-expanded')!=='true');};
+            const dismissWorkflow=event=>{
+                if(flowToggle.getAttribute('aria-expanded')==='true'&&!event.target.closest('.jd-flow-drawer,.jd-status-pill,.jd-flow-overview'))setFlowOpen(false);
+            };
+            document.addEventListener('pointerdown',dismissWorkflow);
             header.querySelector('.jd-flow-summary').addEventListener('click',event=>{const icon=event.target.closest('[data-flow-phase]');if(icon){flowTrigger=icon;setFlowOpen(true);}},true);
             header.addEventListener('studio-flow-details-toggle',event=>setFlowOpen(event.detail.open));
             header.addEventListener('keydown',event=>{
@@ -384,7 +388,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);
             const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
             navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
-            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);workflowDialog?.close();taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
+            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);workflowDialog?.close();taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);document.removeEventListener('pointerdown',dismissWorkflow);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
             const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};document.addEventListener('studio-workflow-changed',graphChanged);const previousDispose=disposeJobView;disposeJobView=()=>{document.removeEventListener('studio-workflow-changed',graphChanged);previousDispose();};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
