@@ -12,6 +12,7 @@ public sealed record JobGraphView(Guid JobId, Guid TemplateId, int TemplateVersi
 public sealed record TemplateImpact(string[] Remain, string[] Added, string[] Removed, string[] CompletedAffected,
     string[] AssignmentChanges, string[] DependencyChanges, bool RequiresConfirmation, string FinancialImplications, int TemplateVersion, Dictionary<string,string> TaskLabels);
 public sealed record WorkflowServicesRequest(Guid[] CatalogItemIds, Guid OperationId, long ExpectedRevision, bool ConfirmChanges = false, string? Reason = null);
+public sealed record GraphTaskCommand(string NodeId, string Action, Guid OperationId, long ExpectedRevision, string? Reason = null);
 
 public sealed class JobGraphStore(StudioDatabase database)
 {
@@ -264,5 +265,41 @@ public sealed class JobGraphStore(StudioDatabase database)
         Execute(c, tx, "update studio_job_catalog_agreements set workflow_selected=false where job_id=$1", job);
         foreach (var id in selected) SelectService(c, tx, job, id);
         Record(c, tx, job, request.OperationId, request, actor, "JobWorkflowServicesChanged"); tx.Commit();
+    }
+    public void TransitionTask(Guid job, GraphTaskCommand request, string actor)
+    {
+        if (string.IsNullOrWhiteSpace(request.NodeId) || request.NodeId.Length > 120) throw new ArgumentException("A workflow task is required.");
+        if (request.Action is not ("start" or "complete" or "skip")) throw new ArgumentException("Choose start, complete or skip.");
+        if (request.Action == "skip" && string.IsNullOrWhiteSpace(request.Reason)) throw new ArgumentException("A reason is required to skip a workflow task.");
+        using var c = database.OpenConnection(); using var tx = c.BeginTransaction();
+        using (var q = Command(c, tx, "select id from studio_jobs where id=$1 for update", job)) if (q.ExecuteScalar() is null) throw new KeyNotFoundException();
+        if (Replay(c, tx, job, request.OperationId, request, actor)) { tx.Commit(); return; }
+        Lock(c, tx, job, request.ExpectedRevision);
+        var definition = Definition(c, tx, job) ?? throw new ArgumentException("This job has no configured workflow graph.");
+        var graph = Graph(definition);
+        var task = WorkflowGraphEngine.Flatten(graph).Nodes.SingleOrDefault(n => n.Id == request.NodeId && n.Kind == "Task")
+            ?? throw new ArgumentException("The workflow task was not found.");
+        var evaluation = WorkflowGraphEngine.Evaluate(graph, Statuses(c, tx, job), Services(c, tx, job));
+        var state = evaluation.Nodes.Single(n => n.Id == request.NodeId);
+        var current = Statuses(c, tx, job).GetValueOrDefault(request.NodeId, "NotStarted");
+        if (request.Action == "start")
+        {
+            if (state.Status is not ("Available" or "InProgress")) throw new ArgumentException(state.Reason ?? "This workflow task is not available.");
+            if (current == "InProgress") { tx.Commit(); return; }
+            Execute(c, tx, "update studio_job_activities set status='InProgress',started_at_utc=coalesce(started_at_utc,now()),updated_at_utc=now() where job_id=$1 and workflow_node_id=$2", job, request.NodeId);
+        }
+        else if (request.Action == "complete")
+        {
+            if (state.Status is not ("Available" or "InProgress")) throw new ArgumentException(state.Reason ?? "This workflow task is not available.");
+            Execute(c, tx, "update studio_job_activities set status='Completed',started_at_utc=coalesce(started_at_utc,now()),completed_at_utc=now(),updated_at_utc=now() where job_id=$1 and workflow_node_id=$2", job, request.NodeId);
+        }
+        else
+        {
+            if (!task.Task!.Optional) throw new ArgumentException("Only optional workflow tasks can be skipped.");
+            if (current is "Completed" or "Skipped") throw new ArgumentException("This workflow task is already closed.");
+            Execute(c, tx, "update studio_job_activities set status='Skipped',completed_at_utc=now(),updated_at_utc=now() where job_id=$1 and workflow_node_id=$2", job, request.NodeId);
+        }
+        Record(c, tx, job, request.OperationId, request, actor, "JobWorkflowTask" + char.ToUpperInvariant(request.Action[0]) + request.Action[1..]);
+        tx.Commit();
     }
 }
