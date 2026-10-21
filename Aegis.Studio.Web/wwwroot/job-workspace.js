@@ -31,7 +31,7 @@ async function renderJobSubjects(job, panel, current, refresh) {
         const subject=realSubjects.find(item=>item.id===subjectId),collection=subject?.collection||'Unclassified';
         let batch=pendingSubjectBatches.get(subjectId);
         if(!batch){
-            const view=await json(`/api/jobs/${job.id}/connected-workflow`),sessions=view.data.sessions||[];
+            const view=await json(`/api/jobs/${job.id}/shoot-sessions`),sessions=view||[];
             if(sessions.length>1)throw Error('Use Media Upload to choose the session for these files.');
             batch={batchId:crypto.randomUUID(),sessionId:sessions[0]?.id||null,subjectId,collection,files:files.map(file=>({uploadId:crypto.randomUUID(),fileName:file.name,sizeBytes:file.size}))};
             pendingSubjectBatches.set(subjectId,batch);
