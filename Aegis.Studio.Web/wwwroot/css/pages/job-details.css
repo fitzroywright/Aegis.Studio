@@ -276,3 +276,20 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-next-step > button { flex:none; min-height:34px; font-size:12px; font-weight:750; padding:7px 14px; }
 .jd-next-step[data-state=blocked] { border-left-color:var(--studio-red,#ef3340); }
 @media(max-width:650px) { .jd-next-step { flex-wrap:wrap; } .jd-next-step > button { width:100%; } }
+
+/* Job identity menu floats above the page and never changes the header's layout. */
+.job-detail-heading { overflow:visible; position:relative; z-index:5; }
+.jd-job-identity { position:relative; }
+.jd-job-name-toggle { display:inline-flex; align-items:center; gap:9px; max-width:min(72vw,620px); padding:2px 8px 3px 0; border:0; border-radius:4px; background:transparent; color:var(--theme-text,#162b50); font:inherit; font-size:20px; line-height:1.15; font-weight:750; text-align:left; cursor:pointer; }
+.jd-job-name-toggle > span:first-child { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.jd-job-name-chevron { flex:none; color:#a45a17; transition:transform .18s ease; }
+.jd-job-name-toggle[aria-expanded=true] .jd-job-name-chevron { transform:rotate(180deg); }
+.jd-job-name-toggle:focus-visible { outline:2px solid #d97827; outline-offset:3px; }
+.jd-job-identity-menu { position:absolute; z-index:60; top:calc(100% + 9px); left:0; width:min(410px,calc(100vw - 32px)); max-height:min(60vh,420px); overflow:auto; padding:10px 13px; border:1px solid var(--theme-border,#d4dbe4); border-top:3px solid #e97818; border-radius:7px; background:var(--theme-surface,#fff); box-shadow:0 12px 28px #10243d38; }
+.jd-job-identity-menu[hidden] { display:none; }
+.jd-job-identity-menu dl { display:grid; grid-template-columns:1fr 1fr; gap:0 18px; margin:0; }
+.jd-job-identity-menu dl > div { min-width:0; padding:7px 0; border-bottom:1px solid var(--theme-border,#e7e9ed); }
+.jd-job-identity-menu dl > div:nth-last-child(-n+2) { border-bottom:0; }
+.jd-job-identity-menu dt { margin:0 0 3px; color:var(--theme-muted,#69758b); font-size:9px; font-weight:800; letter-spacing:.055em; text-transform:uppercase; }
+.jd-job-identity-menu dd { margin:0; color:var(--theme-text,#162b50); font-size:12px; font-weight:650; overflow-wrap:anywhere; }
+@media(max-width:520px) { .jd-job-identity-menu dl { grid-template-columns:1fr; } .jd-job-identity-menu dl > div:nth-last-child(-n+2) { border-bottom:1px solid var(--theme-border,#e7e9ed); } .jd-job-identity-menu dl > div:last-child { border-bottom:0; } }
