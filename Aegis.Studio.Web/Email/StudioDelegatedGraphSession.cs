@@ -81,7 +81,7 @@ public sealed class StudioDelegatedGraphSession(IConfiguration configuration, IC
             await SaveAsync(renewed, token);
             return renewed.AccessToken;
         }
-        catch (StudioMailReconnectRequiredException) { File.Delete(CachePath); throw; }
+        catch (StudioMailReconnectRequiredException) { DeleteCache(); throw; }
         finally { gate.Release(); }
     }
     public async Task<OutboundMailboxConnectionStatus> StatusAsync(CancellationToken token)
@@ -98,9 +98,18 @@ public sealed class StudioDelegatedGraphSession(IConfiguration configuration, IC
     public async Task DisconnectAsync(CancellationToken token)
     {
         await gate.WaitAsync(token);
-        try { Interlocked.Increment(ref generation); File.Delete(CachePath); }
+        try { Interlocked.Increment(ref generation); DeleteCache(); }
         finally { gate.Release(); }
     }
+    private void DeleteCache()
+    {
+        // Disconnect is idempotent, including before the first successful connection.
+        // Ignore only absence; permission and other I/O failures must remain visible.
+        try { File.Delete(CachePath); }
+        catch (DirectoryNotFoundException) { }
+        catch (FileNotFoundException) { }
+    }
+
     private async Task<Session> ExchangeAsync(Dictionary<string,string> fields, Session? previous, CancellationToken token)
     {
         fields["client_id"] = ClientId;

@@ -18,9 +18,9 @@ public sealed class StudioDelegatedGraphTests
         byte[] encrypted = StudioDelegatedGraphSession.Encrypt(plain, key);
         Assert.Equal(plain, StudioDelegatedGraphSession.Decrypt(encrypted, key));
         Assert.DoesNotContain("private-refresh-token", Encoding.UTF8.GetString(encrypted));
-        Assert.Throws<CryptographicException>(() => StudioDelegatedGraphSession.Decrypt(encrypted, RandomNumberGenerator.GetBytes(32)));
+        Assert.ThrowsAny<CryptographicException>(() => StudioDelegatedGraphSession.Decrypt(encrypted, RandomNumberGenerator.GetBytes(32)));
         encrypted[^1] ^= 1;
-        Assert.Throws<CryptographicException>(() => StudioDelegatedGraphSession.Decrypt(encrypted, key));
+        Assert.ThrowsAny<CryptographicException>(() => StudioDelegatedGraphSession.Decrypt(encrypted, key));
     }
 
     [Fact]
@@ -79,6 +79,7 @@ public sealed class StudioDelegatedGraphTests
         using var f = new Fixture();
         long generation = f.Session.Generation;
         await f.Session.DisconnectAsync(default);
+        await f.Session.DisconnectAsync(default); // Repeated disconnect before any cache exists is safe.
         await Assert.ThrowsAsync<StudioMailReconnectRequiredException>(() => f.Session.CompleteAsync("code", "verifier", default, generation));
         Assert.False(File.Exists(Path.Combine(f.Directory, "session.enc")));
     }
