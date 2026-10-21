@@ -3607,7 +3607,7 @@ body[data-studio-view] .avatar {
   background: #fff;
 }
 .pos-grid {
-  border-spacing: 0
+  border-spacing: 0;
   background: #fff;
 }
 .studio-table thead th {
@@ -6510,7 +6510,7 @@ body[data-studio-view="workspaces"] .generic {
   padding: 0 13px 8px;
 }
 .workspace-list-page .workspace-wow-main {
-  min-height: 58px
+  min-height: 58px;
   gap: 8px;
   padding: 5px 0;
 }
@@ -9954,7 +9954,7 @@ body[data-studio-view="frontdesk"] .fd-queue .fd-table {
 body[data-studio-view="frontdesk"] .fd-queue .fd-table thead th {
   position: static;
   top: auto;
-  z-index: auto
+  z-index: auto;
   background:var(--studio-grid-header-bg);
   color:var(--studio-grid-header-text);
   font-size: .72rem;
