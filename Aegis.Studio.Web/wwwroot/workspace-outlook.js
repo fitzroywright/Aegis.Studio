@@ -160,6 +160,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const attendingRole=job.attendingJobRole||job.assignedRole||'Photographer';
             const workerName=job.assignedTo?studioFirstName(job.assignedTo):'Unassigned';
             header.innerHTML=`<div class="job-detail-title jd-job-identity">
+                    <div class="jd-job-name-stack">
                     <button type="button" class="jd-job-name-toggle" aria-expanded="false" aria-controls="jobIdentityMenu" title="Show job details"><span>${esc(job.title)}</span><span class="jd-job-name-chevron" aria-hidden="true">⌄</span></button>
                     <div id="jobIdentityMenu" class="jd-job-identity-menu" role="region" aria-label="Job details" hidden>
                         <dl>
@@ -174,11 +175,12 @@ function mergeJobMessages(teamMessages, clientMessages) {
                             <div><dt>Name of Worker</dt><dd data-job-photographer>${esc(workerName)}</dd></div>
                         </dl>
                     </div>
+                    <section class="jd-next-step" aria-label="Next job action" aria-live="polite"><p role="status">Loading next step…</p></section>
+                    </div>
                     <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol></div>
                     <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow details" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-workflow-track" aria-live="polite"></div></div></section>
                 </div>
                 <div class="jd-job-status"><small>${job.jobCode||job.code?'Job Code · '+esc(job.jobCode||job.code):''}</small></div>
-                <section class="jd-next-step" aria-label="Next job action" aria-live="polite"><p role="status">Loading next step…</p></section>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
             const flowDrawer=header.querySelector('.jd-flow-drawer');
             const identityToggle=header.querySelector('.jd-job-name-toggle'),identityMenu=header.querySelector('.jd-job-identity-menu');
