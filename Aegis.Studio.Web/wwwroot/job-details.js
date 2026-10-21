@@ -85,8 +85,9 @@
   const reason=closed?'This job is '+data.stage.toLowerCase()+'.':data.blockedReason?'Blocked: '+data.blockedReason:owner?.status==='Assigned'&&decision.selector?.includes('owner-response')?'Accept ownership of this job before continuing.':decision.selector==='[data-wf-owner]'?'Assign a Job Owner to take responsibility for the next stage.':waiting?'Waiting for '+(data.owner||'the assigned owner')+' to accept ownership.':!decision.selector?'Next required action: '+decision.label+'. An authorized member of staff must complete it.':descriptions[data.stage]||'Complete the required action to continue the job.';
   host.dataset.state=closed?'closed':data.blockedReason?'blocked':decision.selector?'ready':'waiting';
   const cardLabel=closed?'Job Status':'Next Required Action',detail=reason.replace(/^Next required action:\s*/i,'');
-  host.innerHTML='<div class="jd-next-step-copy"><p><strong>'+cardLabel+'</strong> · '+escape(detail)+'</p></div>'+(!closed&&decision.selector?'<button type="button" class="primary" data-next-step-action>'+escape(decision.label)+' <span aria-hidden="true">→</span></button>':'<button type="button" class="action" data-next-step-action>Review workflow</button>');
-  host.querySelector('button').onclick=()=>activate(closed?null:decision.selector);
+  const actionLink=!closed&&decision.selector;
+  host.innerHTML='<div class="jd-next-step-copy"><p><strong>'+cardLabel+'</strong> · '+(actionLink?'<button type="button" class="jd-link jd-next-step-action-link" data-next-step-action>'+escape(detail)+' <span aria-hidden="true">→</span></button>':escape(detail))+'</p></div>'+(!actionLink?'<button type="button" class="action" data-next-step-action>Review workflow</button>':'');
+  host.querySelector('[data-next-step-action]').onclick=()=>activate(closed?null:decision.selector);
  }
  async function media(job,host,selectedHost,isCurrent,onCounts){
   let disposed=false,request=0,selectedId='',data=null,canEdit=false,uploading=false,search='',list=false;
