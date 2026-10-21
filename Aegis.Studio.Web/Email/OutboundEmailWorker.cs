@@ -12,13 +12,14 @@ public sealed class OutboundEmailWorker : BackgroundService
     private readonly StudioOperationsFlowPublisher flows;
     private readonly ILogger<OutboundEmailWorker> logger;
     private readonly IConfiguration configuration;
+    private readonly StudioDelegatedGraphSession? delegatedSession;
     private readonly IChannelSecretResolver secrets;
     private readonly Aegis.Studio.Web.Messaging.StudioMessageAttachmentStore attachments;
     private readonly Aegis.Studio.Web.Persistence.StudioDatabase? database;
     private readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(60)};
-    public OutboundEmailWorker(IEnumerable<IExternalMessageChannel> externalChannels,IConfiguration configuration,OutboundEmailStore outbox,StudioOperationsFlowPublisher flows,ILogger<OutboundEmailWorker> logger,IChannelSecretResolver secrets,Aegis.Studio.Web.Messaging.StudioMessageAttachmentStore attachments,Aegis.Studio.Web.Persistence.StudioDatabase? database=null)
+    public OutboundEmailWorker(IEnumerable<IExternalMessageChannel> externalChannels,IConfiguration configuration,OutboundEmailStore outbox,StudioOperationsFlowPublisher flows,ILogger<OutboundEmailWorker> logger,IChannelSecretResolver secrets,Aegis.Studio.Web.Messaging.StudioMessageAttachmentStore attachments,Aegis.Studio.Web.Persistence.StudioDatabase? database=null,StudioDelegatedGraphSession? delegatedSession=null)
     {
-        this.database=database;this.configuration=configuration;this.outbox=outbox;this.flows=flows;this.logger=logger;this.secrets=secrets;this.attachments=attachments;
+        this.delegatedSession=delegatedSession;this.database=database;this.configuration=configuration;this.outbox=outbox;this.flows=flows;this.logger=logger;this.secrets=secrets;this.attachments=attachments;
         channels=new(StringComparer.Ordinal);
         foreach(var channel in externalChannels)
             if(channel.Channel is MessageChannel.MsEmail or MessageChannel.WhatsApp)channels.TryAdd(channel.Channel==MessageChannel.MsEmail?"Email":"WhatsApp",channel);
@@ -46,7 +47,9 @@ public sealed class OutboundEmailWorker : BackgroundService
                             // Workspace/person identities may be distribution lists. Graph's users
                             // endpoint must address the real hub mailbox; MIME retains the
                             // audited From identity and monitored Reply-To.
-                            transport=new MicrosoftGraphEmailMessageChannel(http,new MicrosoftGraphEmailOptions
+                            if(delegatedSession?.Enabled == true)
+                                transport=new StudioDelegatedGraphChannel(http,delegatedSession,configuration);
+                            else transport=new MicrosoftGraphEmailMessageChannel(http,new MicrosoftGraphEmailOptions
                             {
                                 TenantId=configuration["Messaging:MicrosoftGraph:TenantId"]??"",
                                 ClientId=configuration["Messaging:MicrosoftGraph:ClientId"]??"",
@@ -90,13 +93,18 @@ public sealed class OutboundEmailWorker : BackgroundService
                         string? providerId=null;
                         if(channel==MessageChannel.MsEmail)
                         {
-                            if(transport is not MicrosoftGraphEmailMessageChannel)
+                            if(transport is not MicrosoftGraphEmailMessageChannel && transport is not StudioDelegatedGraphChannel)
                                 throw new InvalidOperationException("This email transport cannot verify its actual Internet Message-ID.");
-                            var verifier=new StudioGraphSentMessageVerifier(http,configuration,secrets);
+                            var verifier=new StudioGraphSentMessageVerifier(http,configuration,secrets,delegatedSession);
                             var verified=await verifier.VerifyAsync(message,metadata.GetValueOrDefault("Studio.MessageId",message.Id.ToString("D")),metadata["Email.ReplyTo"],sendingAt,stoppingToken);
                             outbox.RecordVerifiedInternetId(message.Id,null,verified);providerId=verified.ProviderId;
                         }
                         logger.LogInformation("Outbound threading verification completed. DeliveryId={DeliveryId} ProviderMessageId={ProviderMessageId}",message.Id,providerId);
+                    }
+                    catch(StudioMailReconnectRequiredException) when(!providerAccepted)
+                    {
+                        outbox.MarkAttention(message.Id,lease,"OutboundMailboxReconnectRequired");
+                        logger.LogWarning("Outbound mailbox authorization requires administrator reconnection. DeliveryId={DeliveryId}; no submission occurred",message.Id);
                     }
                     catch(ExternalDeliveryOutcomeUnknownException ex) when(!providerAccepted)
                     {

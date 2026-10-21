@@ -7,21 +7,28 @@ namespace Aegis.Studio.Web.Email;
 public sealed record VerifiedGraphEmail(string ProviderId,string InternetMessageId);
 // Common.Messaging sends MIME with X-Studio-Message-Id. Read the saved provider item
 // to verify the actual Internet Message-ID, From, recipient and monitored Reply-To.
-public sealed class StudioGraphSentMessageVerifier(HttpClient http,IConfiguration configuration,IChannelSecretResolver secrets)
+public sealed class StudioGraphSentMessageVerifier(HttpClient http,IConfiguration configuration,IChannelSecretResolver secrets,StudioDelegatedGraphSession? delegatedSession=null)
 {
     public async Task<VerifiedGraphEmail> VerifyAsync(OutboundEmail delivery,string correlation,string replyTo,DateTimeOffset since,CancellationToken token)
     {
+        string bearer;
+        bool delegated=delegatedSession?.Enabled == true;
+        if(delegated) bearer=await delegatedSession!.AccessTokenAsync(token);
+        else
+        {
         string secret=await secrets.GetSecretAsync(configuration["Messaging:MicrosoftGraph:ClientSecretName"]??"messaging/msgraph/client-secret",token)??"";
         if(string.IsNullOrWhiteSpace(secret))throw new InvalidOperationException("Microsoft Graph verification credentials are unavailable.");
         using var auth=new HttpRequestMessage(HttpMethod.Post,$"https://login.microsoftonline.com/{Uri.EscapeDataString(configuration["Messaging:MicrosoftGraph:TenantId"]??"")}/oauth2/v2.0/token")
         {Content=new FormUrlEncodedContent(new Dictionary<string,string>{["client_id"]=configuration["Messaging:MicrosoftGraph:ClientId"]??"",["client_secret"]=secret,["scope"]="https://graph.microsoft.com/.default",["grant_type"]="client_credentials"})};
         using var authResponse=await http.SendAsync(auth,token);authResponse.EnsureSuccessStatusCode();
         using var authJson=JsonDocument.Parse(await authResponse.Content.ReadAsStringAsync(token));
-        string bearer=authJson.RootElement.GetProperty("access_token").GetString()!;
+        bearer=authJson.RootElement.GetProperty("access_token").GetString()!;
+        }
         for(int attempt=0;attempt<3;attempt++)
         {
             string mailbox=Uri.EscapeDataString(StudioGraphMailbox.Resolve(configuration));
-            string? url=$"https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/sentitems/messages?$filter="+
+            string endpoint=delegated?"me":$"users/{mailbox}";
+            string? url=$"https://graph.microsoft.com/v1.0/{endpoint}/mailFolders/sentitems/messages?$filter="+
                 Uri.EscapeDataString("sentDateTime ge "+since.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")+" and sentDateTime le "+since.AddMinutes(15).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"))+"&$top=50&$select=id,internetMessageId,internetMessageHeaders,from,toRecipients,replyTo";
             List<VerifiedGraphEmail> matches=[];
             for(int page=0;url is not null&&page<5;page++)

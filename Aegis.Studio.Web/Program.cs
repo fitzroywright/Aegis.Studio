@@ -199,6 +199,9 @@ builder.Services.AddSingleton<StudioUnifiedInbox>();
 builder.Services.AddSingleton<StudioUnifiedInbound>();
 builder.Services.AddSingleton<StudioEmailRouting>();
 builder.Services.AddHttpClient<StudioGraphSentMessageVerifier>();
+builder.Services.AddHttpClient("StudioOutboundOAuth", client => client.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddSingleton<StudioDelegatedGraphSession>();
+builder.Services.AddAntiforgery();
 builder.Services.AddSingleton<StudioEmailIntake>();
 builder.Services.AddSingleton<StudioInquiryAssociations>();
 builder.Services.AddHttpClient<global::Common.Messaging.IEmailRecipientDirectory,global::Common.Messaging.Channels.MicrosoftGraph.MicrosoftGraphRecipientDirectory>();
@@ -307,6 +310,7 @@ app.UseStaticFiles(new StaticFileOptions
 app.MapGet("/login", (IWebHostEnvironment e) => Results.File(Path.Combine(e.WebRootPath, "login.html"), "text/html; charset=utf-8")).AllowAnonymous();
 app.MapGet("/", (HttpContext context,IWebHostEnvironment e) => { context.Response.Headers.CacheControl = "no-cache"; return Results.File(Path.Combine(e.WebRootPath, "index.html"), "text/html; charset=utf-8"); }).RequireAuthorization();
 app.MapStudioAuthentication();
+app.MapStudioOutboundMailbox();
 app.MapStudioUserProfiles();
 app.MapStudioNotifications();
 app.MapStudioToday();
