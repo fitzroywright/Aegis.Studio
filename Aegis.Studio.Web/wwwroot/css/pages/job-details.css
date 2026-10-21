@@ -243,12 +243,12 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-dot-stage{min-width:0;text-align:center}.jd-dot-stage.is-expanded{min-width:260px;max-width:560px}
 .jd-workflow-dot{display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;border:0;background:transparent;color:inherit;padding:3px;cursor:pointer;font-size:11px}
 .jd-workflow-dot>span{display:grid;place-items:center;width:22px;height:22px;border:2px solid currentColor;border-radius:50%;font-weight:700}
-.jd-workflow-dot small{font-size:10px;line-height:1.3}.jd-workflow-dot strong{font-size:11px;overflow-wrap:anywhere}
+.jd-workflow-dot small{font-size:10px;line-height:1.3}.jd-workflow-dot strong{font-size:10px;overflow-wrap:anywhere}
 .jd-workflow-dot.completed{color:var(--success,#287749)}.jd-workflow-dot.inprogress,.jd-workflow-dot.available{color:var(--accent,#b75a13)}.jd-workflow-dot.blocked,.jd-workflow-dot.failed,.jd-workflow-dot.reworkrequired{color:var(--danger,#bf374a)}
 .jd-workflow-dot:focus-visible,.jd-dot-expansion button:focus-visible,.jd-dot-details button:focus-visible{outline:3px solid var(--focus,#d88719);outline-offset:2px}
 .jd-workflow-dot.is-component>span{width:17px;height:17px}.jd-dot-endpoints{display:flex;align-items:center;gap:6px;font-size:10px;white-space:nowrap}.jd-dot-dash{flex:1;border-top:2px dashed currentColor;opacity:.6}
 .jd-dot-expansion{padding:6px;border:0;border-radius:0;animation:jd-dot-reveal .18s ease-out}.jd-dot-expansion .jd-dot-levels{padding-top:9px}.jd-dot-details{text-align:left;padding:8px;border:1px solid currentColor;border-radius:6px}.jd-dot-details p,.jd-dot-key{font-size:11px;margin:4px 0}.jd-dot-key{opacity:.85}
-.jd-flow-summary:has(.jd-workflow-dot){align-items:flex-start;gap:4px;overflow:visible}.jd-flow-summary:has(.jd-workflow-dot)>li{min-width:85px;flex:1}
+.jd-flow-summary:has(.jd-workflow-dot){align-items:center;gap:0;overflow:visible}.jd-flow-summary:has(.jd-workflow-dot)>li{display:flex;align-items:center;min-width:88px;flex:1}
 @keyframes jd-dot-reveal{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.jd-dot-expansion{animation:none}}
 @media(max-width:800px){.jd-dot-level{min-width:85px}.jd-dot-stage.is-expanded{min-width:250px}.jd-flow-summary .jd-workflow-dot small{display:none}}
@@ -258,14 +258,12 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 
 /* Match the original inline milestone lights; detail lives in tooltips. */
 .jd-workflow-dot{flex-direction:row;justify-content:flex-start;gap:5px;font-size:10px;padding:0 2px;color:var(--theme-muted,#69758b)}
-.jd-workflow-dot strong{font-size:10px;font-weight:inherit}
+.jd-workflow-dot strong{font-weight:inherit}
 .jd-workflow-dot>.jd-stage-light{width:12px;height:12px;min-width:12px;border:1px solid #a7b2c1;background:#e8ecf1;color:#48576b;font-size:8px}
 .jd-workflow-dot.completed>.jd-stage-light{background:#318348;border-color:#318348;color:#fff}
 .jd-workflow-dot.inprogress>.jd-stage-light,.jd-workflow-dot.available>.jd-stage-light{background:#fb851c;border-color:#fb851c;color:#fff}
 .jd-workflow-dot:is(.blocked,.failed,.reworkrequired,.reprintrequired,.waitingonclient)>.jd-stage-light{background:#bd3040;border-color:#bd3040;color:#fff}
 .jd-workflow-dot:is(.completed,.inprogress,.available){color:var(--theme-text,#162b50);font-weight:750}
-.jd-flow-summary:has(.jd-workflow-dot){align-items:center;gap:0}
-.jd-flow-summary:has(.jd-workflow-dot)>li{display:flex;align-items:center;min-width:88px;flex:1}
 .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after{content:"";flex:1;height:2px;min-width:8px;margin:0 6px;background:#c5cad3}
 .jd-flow-summary .jd-workflow-dot{width:auto;flex-shrink:0}
 
@@ -281,8 +279,8 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 /* An expanded stage replaces its main dot with endpoints; actual edges return below. */
 
 .jd-flow-summary:has(.jd-workflow-dot)>li.jd-main-expanded{flex:2;min-width:220px}
-.jd-main-endpoints{display:flex;align-items:center;gap:8px;width:100%}
-.jd-main-dashed{flex:1;min-width:24px;border-top:2px dashed currentColor;opacity:.6}
+.jd-main-endpoints{display:flex;align-items:center;justify-content:space-between;gap:24px;width:100%}
+.jd-main-dashed{flex:1;min-width:100px;border-top:2px dashed currentColor;opacity:.6}
 .jd-main-endpoints .jd-workflow-dot{flex-direction:column;gap:4px;max-width:110px;text-align:center}
 .jd-subflow-routes{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:1;color:var(--theme-accent,#b87929)}
 .jd-subflow-routes path{fill:none;stroke:currentColor;stroke-width:2;vector-effect:non-scaling-stroke}
@@ -294,8 +292,6 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 
 /* Give the main endpoints room for broad quarter-circle branch arcs. */
 .jd-flow-summary:has(.jd-workflow-dot)>li.jd-main-expanded{flex:3;min-width:320px}
-.jd-main-endpoints{justify-content:space-between;gap:24px}
-.jd-main-dashed{min-width:100px}
 .jd-dot-subflow{padding:18px 16% 18px}
 @media(max-width:700px){.jd-flow-summary:has(.jd-workflow-dot)>li.jd-main-expanded{min-width:250px}.jd-main-endpoints{gap:14px}.jd-main-dashed{min-width:60px}.jd-dot-subflow{padding-left:10%;padding-right:10%}}
 
