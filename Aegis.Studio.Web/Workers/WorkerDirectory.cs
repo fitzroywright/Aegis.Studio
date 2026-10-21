@@ -18,6 +18,31 @@ public sealed class WorkerDirectory(StudioDatabase database)
         return result;
     }
 
+    public void SaveWorkerType(WorkerType type)
+    {
+        if (string.IsNullOrWhiteSpace(type.Code) || string.IsNullOrWhiteSpace(type.DisplayName))
+            throw new ArgumentException("Worker type code and display name are required.");
+        string code = type.NormalizedCode;
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "insert into studio_worker_types(code,display_name,can_be_primary,is_active,updated_at_utc) values($1,$2,$3,true,now()) on conflict(code) do update set display_name=excluded.display_name,can_be_primary=excluded.can_be_primary,is_active=true,updated_at_utc=now()";
+        command.Parameters.AddWithValue(code);
+        command.Parameters.AddWithValue(type.DisplayName.Trim());
+        command.Parameters.AddWithValue(type.CanBePrimary);
+        command.ExecuteNonQuery();
+    }
+
+    public void SetWorkerTypeActive(string code, bool active)
+    {
+        if (string.IsNullOrWhiteSpace(code)) throw new ArgumentException("Worker type code is required.");
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "update studio_worker_types set is_active=$2,updated_at_utc=now() where code=$1";
+        command.Parameters.AddWithValue(code.Trim().ToUpperInvariant());
+        command.Parameters.AddWithValue(active);
+        if (command.ExecuteNonQuery() == 0) throw new KeyNotFoundException("Worker type was not found.");
+    }
+
     public IReadOnlyList<Worker> GetWorkers(string? workerTypeCode = null, bool includeInactive = false)
     {
         using NpgsqlConnection connection = database.OpenConnection();

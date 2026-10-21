@@ -715,6 +715,23 @@ app.MapGet("/api/attachments/{id:guid}", (Guid id, ClaimsPrincipal user, Attachm
 });
 
 app.MapGet("/api/accounts/summary", (StudioStore store) => Results.Ok(store.GetAccountsSummary()));
+app.MapGet("/api/admin/worker-types", (ClaimsPrincipal user, Aegis.Studio.Web.Workers.WorkerDirectory workers) =>
+{
+    if (!user.IsInRole("Administrator")) return Results.Forbid();
+    return Results.Ok(workers.GetTypes(includeInactive: true));
+}).RequireAuthorization();
+app.MapPost("/api/admin/worker-types", (Aegis.Studio.Domain.Workers.WorkerType request, ClaimsPrincipal user, Aegis.Studio.Web.Workers.WorkerDirectory workers) =>
+{
+    if (!user.IsInRole("Administrator")) return Results.Forbid();
+    try { workers.SaveWorkerType(request); return Results.Ok(request); }
+    catch (ArgumentException exception) { return Results.BadRequest(new { error = exception.Message }); }
+}).RequireAuthorization();
+app.MapPut("/api/admin/worker-types/{code}/active", (string code, bool active, ClaimsPrincipal user, Aegis.Studio.Web.Workers.WorkerDirectory workers) =>
+{
+    if (!user.IsInRole("Administrator")) return Results.Forbid();
+    try { workers.SetWorkerTypeActive(code, active); return Results.Ok(); }
+    catch (KeyNotFoundException exception) { return Results.NotFound(new { error = exception.Message }); }
+}).RequireAuthorization();
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
 
