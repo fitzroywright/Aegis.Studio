@@ -16,13 +16,13 @@ public sealed class StudioGraphSentMessageVerifier(HttpClient http,IConfiguratio
         if(delegated) bearer=await delegatedSession!.AccessTokenAsync(token);
         else
         {
-        string secret=await secrets.GetSecretAsync(configuration["Messaging:MicrosoftGraph:ClientSecretName"]??"messaging/msgraph/client-secret",token)??"";
-        if(string.IsNullOrWhiteSpace(secret))throw new InvalidOperationException("Microsoft Graph verification credentials are unavailable.");
-        using var auth=new HttpRequestMessage(HttpMethod.Post,$"https://login.microsoftonline.com/{Uri.EscapeDataString(configuration["Messaging:MicrosoftGraph:TenantId"]??"")}/oauth2/v2.0/token")
-        {Content=new FormUrlEncodedContent(new Dictionary<string,string>{["client_id"]=configuration["Messaging:MicrosoftGraph:ClientId"]??"",["client_secret"]=secret,["scope"]="https://graph.microsoft.com/.default",["grant_type"]="client_credentials"})};
-        using var authResponse=await http.SendAsync(auth,token);authResponse.EnsureSuccessStatusCode();
-        using var authJson=JsonDocument.Parse(await authResponse.Content.ReadAsStringAsync(token));
-        bearer=authJson.RootElement.GetProperty("access_token").GetString()!;
+            string secret=await secrets.GetSecretAsync(configuration["Messaging:MicrosoftGraph:ClientSecretName"]??"messaging/msgraph/client-secret",token)??"";
+            if(string.IsNullOrWhiteSpace(secret))throw new InvalidOperationException("Microsoft Graph verification credentials are unavailable.");
+            using var auth=new HttpRequestMessage(HttpMethod.Post,$"https://login.microsoftonline.com/{Uri.EscapeDataString(configuration["Messaging:MicrosoftGraph:TenantId"]??"")}/oauth2/v2.0/token")
+            {Content=new FormUrlEncodedContent(new Dictionary<string,string>{["client_id"]=configuration["Messaging:MicrosoftGraph:ClientId"]??"",["client_secret"]=secret,["scope"]="https://graph.microsoft.com/.default",["grant_type"]="client_credentials"})};
+            using var authResponse=await http.SendAsync(auth,token);authResponse.EnsureSuccessStatusCode();
+            using var authJson=JsonDocument.Parse(await authResponse.Content.ReadAsStringAsync(token));
+            bearer=authJson.RootElement.GetProperty("access_token").GetString()!;
         }
         for(int attempt=0;attempt<3;attempt++)
         {

@@ -74,6 +74,32 @@ public sealed class StudioDelegatedGraphTests
     }
 
     [Fact]
+    public async Task DisconnectInvalidatesPreviouslyStartedAuthorization()
+    {
+        using var f = new Fixture();
+        long generation = f.Session.Generation;
+        await f.Session.DisconnectAsync(default);
+        await Assert.ThrowsAsync<StudioMailReconnectRequiredException>(() => f.Session.CompleteAsync("code", "verifier", default, generation));
+        Assert.False(File.Exists(Path.Combine(f.Directory, "session.enc")));
+    }
+
+    [Fact]
+    public async Task SentItemsVerificationUsesDelegatedHubAndActualInternetId()
+    {
+        using var f = new Fixture();
+        await f.Session.CompleteAsync("code", "verifier", default);
+        var id = Guid.NewGuid();
+        var request = Request();
+        await f.Channel.SendAsync(Recipient, request, id);
+        var delivery = new OutboundEmail(id, Guid.NewGuid(), "weddings@studio.test", "client@outside.test", "Test", "Body", null, "Sending", DateTimeOffset.UtcNow, null);
+        var verified = await new StudioGraphSentMessageVerifier(new HttpClient(f.Handler, false), f.Configuration, f.SecretResolver, f.Session)
+            .VerifyAsync(delivery, id.ToString("D"), "weddings@studio.test", DateTimeOffset.UtcNow.AddMinutes(-1), default);
+        Assert.Equal("<actual@exchange.test>", verified.InternetMessageId);
+        Assert.Equal("provider-id", verified.ProviderId);
+        Assert.Equal(1, f.Handler.Sends);
+    }
+
+    [Fact]
     public async Task DelegatedSendPreservesMimeIdentityAttachmentsAndThreading()
     {
         using var f = new Fixture();
@@ -117,6 +143,8 @@ public sealed class StudioDelegatedGraphTests
         public Handler Handler { get; } = new();
         private readonly Secrets secrets = new();
         private readonly IConfiguration configuration;
+        public IConfiguration Configuration => configuration;
+        public IChannelSecretResolver SecretResolver => secrets;
         public StudioDelegatedGraphSession Session { get; }
         public StudioDelegatedGraphChannel Channel { get; }
         public Fixture()
@@ -173,6 +201,16 @@ public sealed class StudioDelegatedGraphTests
                     expires_in = refresh ? 3600 : InitialExpires, scope = "User.Read Mail.Send.Shared Mail.Read" });
             }
             Assert.Equal("graph.microsoft.com", request.RequestUri.Host);
+            if (request.RequestUri.AbsolutePath == "/v1.0/me/mailFolders/sentitems/messages")
+            {
+                Assert.Equal("initial-token", request.Headers.Authorization?.Parameter);
+                string correlation = System.Text.RegularExpressions.Regex.Match(Mime, @"X-Studio-Message-Id: ([^\r\n]+)").Groups[1].Value;
+                return Json(new { value = new[] { new { id = "provider-id", internetMessageId = "<actual@exchange.test>",
+                    internetMessageHeaders = new[] { new { name = "X-Studio-Message-Id", value = correlation } },
+                    from = new { emailAddress = new { address = "weddings@studio.test" } },
+                    toRecipients = new[] { new { emailAddress = new { address = "client@outside.test" } } },
+                    replyTo = new[] { new { emailAddress = new { address = "weddings@studio.test" } } } } } });
+            }
             if (request.Method == HttpMethod.Post)
             {
                 Sends++; SendPath = request.RequestUri.AbsolutePath; SendToken = request.Headers.Authorization?.Parameter;

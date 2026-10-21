@@ -14,6 +14,8 @@ public sealed class StudioDelegatedGraphSession(IConfiguration configuration, IC
     public const string CallbackPath = "/oauth/outbound-mail/callback";
     private const string Scopes = "offline_access https://graph.microsoft.com/User.Read https://graph.microsoft.com/Mail.Send.Shared https://graph.microsoft.com/Mail.Read";
     private readonly SemaphoreSlim gate = new(1, 1);
+    private long generation;
+    public long Generation => Interlocked.Read(ref generation);
     public bool Enabled => configuration.GetValue<bool>(Prefix + "Enabled");
     private string CachePath => Path.Combine(configuration[Prefix + "CacheDirectory"] ?? "/var/lib/aegis/studio/outbound-oauth", "session.enc");
     private string Hub => StudioGraphMailbox.Resolve(configuration);
@@ -50,11 +52,12 @@ public sealed class StudioDelegatedGraphSession(IConfiguration configuration, IC
             ["code_challenge_method"] = "S256", ["login_hint"] = Hub, ["prompt"] = "select_account"
         });
     }
-    public async Task CompleteAsync(string code, string verifier, CancellationToken token)
+    public async Task CompleteAsync(string code, string verifier, CancellationToken token, long? expectedGeneration = null)
     {
         await gate.WaitAsync(token);
         try
         {
+            if (!Enabled || (expectedGeneration.HasValue && expectedGeneration != Generation)) throw new StudioMailReconnectRequiredException();
             var session = await ExchangeAsync(new() { ["grant_type"] = "authorization_code", ["code"] = code,
                 ["redirect_uri"] = RedirectUri, ["code_verifier"] = verifier }, null, token);
             string account = await VerifyHubAsync(session.AccessToken, token);
@@ -78,23 +81,24 @@ public sealed class StudioDelegatedGraphSession(IConfiguration configuration, IC
             await SaveAsync(renewed, token);
             return renewed.AccessToken;
         }
+        catch (StudioMailReconnectRequiredException) { File.Delete(CachePath); throw; }
         finally { gate.Release(); }
     }
-    public async Task<object> StatusAsync(CancellationToken token)
+    public async Task<OutboundMailboxConnectionStatus> StatusAsync(CancellationToken token)
     {
         await gate.WaitAsync(token);
         try
         {
             var session = await LoadAsync(token);
-            return new { enabled = Enabled, connected = session is not null && session.Hub.Equals(Hub, StringComparison.OrdinalIgnoreCase)
-                && session.ClientId == ClientId && session.Tenant == Tenant, mailbox = Hub, authorizedAt = session?.AuthorizedAt };
+            return new(Enabled, session is not null && session.Hub.Equals(Hub, StringComparison.OrdinalIgnoreCase)
+                && session.ClientId == ClientId && session.Tenant == Tenant, Hub, session?.AuthorizedAt);
         }
         finally { gate.Release(); }
     }
     public async Task DisconnectAsync(CancellationToken token)
     {
         await gate.WaitAsync(token);
-        try { File.Delete(CachePath); }
+        try { Interlocked.Increment(ref generation); File.Delete(CachePath); }
         finally { gate.Release(); }
     }
     private async Task<Session> ExchangeAsync(Dictionary<string,string> fields, Session? previous, CancellationToken token)
@@ -171,7 +175,7 @@ public sealed class StudioDelegatedGraphSession(IConfiguration configuration, IC
         if (!File.Exists(CachePath)) return null;
         byte[] key = await EncryptionKeyAsync(token);
         try { return JsonSerializer.Deserialize<Session>(Decrypt(await File.ReadAllBytesAsync(CachePath, token), key)); }
-        catch (CryptographicException) { throw new StudioMailReconnectRequiredException(); }
+        catch (Exception ex) when (ex is CryptographicException or JsonException) { throw new StudioMailReconnectRequiredException(); }
         finally { CryptographicOperations.ZeroMemory(key); }
     }
     public static byte[] Encrypt(byte[] plaintext, byte[] key)
@@ -195,4 +199,6 @@ public sealed class StudioDelegatedGraphSession(IConfiguration configuration, IC
     private sealed record Session(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt, string Hub, string Tenant, string ClientId, string AccountId, DateTimeOffset AuthorizedAt);
 }
 
-public sealed class StudioMailReconnectRequiredException() : Exception("Outbound hub authorization is unavailable or expired. An administrator must reconnect the outbound mailbox.");
+public sealed class StudioMailReconnectRequiredException() : Exception("Outbound hub authorization is unavailable or expired. An administrator must reconnect the outbound mailbox.") { }
+
+public sealed record OutboundMailboxConnectionStatus(bool Enabled, bool Connected, string Mailbox, DateTimeOffset? AuthorizedAt);

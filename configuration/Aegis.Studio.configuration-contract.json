@@ -409,6 +409,43 @@
       "configurationKey": "Performance:PhotographerOnTimeGraceMinutes",
       "isConfigured": false,
       "example": "15"
+    },
+    {
+      "id": "outbound-delegated-enabled",
+      "displayName": "Delegated outbound hub mail",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Enables hub user authorization for workspace/person Send As delivery. Inbound polling remains app-only.",
+      "configurationKey": "Messaging:MicrosoftGraph:Email:Delegated:Enabled",
+      "isConfigured": false
+    },
+    {
+      "id": "outbound-delegated-redirect",
+      "displayName": "Outbound mailbox OAuth callback",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Canonical HTTPS Web redirect URI ending /oauth/outbound-mail/callback.",
+      "configurationKey": "Messaging:MicrosoftGraph:Email:Delegated:RedirectUri",
+      "isConfigured": false
+    },
+    {
+      "id": "outbound-delegated-cache",
+      "displayName": "Outbound mailbox encrypted token cache",
+      "kind": "Configuration",
+      "required": false,
+      "purpose": "Persistent service-owned directory outside the deployment root for one Studio process.",
+      "configurationKey": "Messaging:MicrosoftGraph:Email:Delegated:CacheDirectory",
+      "isConfigured": false
+    },
+    {
+      "id": "outbound-delegated-key",
+      "displayName": "Outbound mailbox token encryption key",
+      "kind": "Secret",
+      "required": false,
+      "purpose": "32 random bytes in base64 protecting the persistent delegated OAuth cache. Required when delegated outbound is enabled.",
+      "secretName": "messaging/msgraph/outbound-cache-key",
+      "sensitive": true,
+      "isConfigured": false
     }
   ],
   "runbookReference": "docs/RUNBOOK.md",

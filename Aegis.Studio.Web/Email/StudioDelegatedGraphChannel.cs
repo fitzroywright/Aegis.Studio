@@ -30,6 +30,7 @@ public sealed class StudioDelegatedGraphChannel(HttpClient http, StudioDelegated
         if (response.StatusCode == HttpStatusCode.Accepted) return;
         if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout || response.IsSuccessStatusCode)
             throw new ExternalDeliveryOutcomeUnknownException(new HttpRequestException("Delegated Graph submission outcome requires reconciliation.", null, response.StatusCode));
+        if (response.StatusCode == HttpStatusCode.Unauthorized) await session.DisconnectAsync(cancellationToken);
         // Do not retry a 401 automatically: an operator must reconnect and explicitly retry.
         throw new HttpRequestException($"Delegated Graph send rejected. HTTP {(int)response.StatusCode}; RequestId={RequestId(response)}.", null, response.StatusCode);
     }

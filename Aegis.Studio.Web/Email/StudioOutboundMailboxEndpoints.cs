@@ -8,7 +8,7 @@ namespace Aegis.Studio.Web.Email;
 
 public static class StudioOutboundMailboxEndpoints
 {
-    private sealed record Pending(string Verifier, string Browser, DateTimeOffset ExpiresAt);
+    private sealed record Pending(string Verifier, string Browser, DateTimeOffset ExpiresAt, long Generation);
 
     public static void MapStudioOutboundMailbox(this WebApplication app)
     {
@@ -20,7 +20,12 @@ public static class StudioOutboundMailboxEndpoints
         {
             NoStore(context);
             string status;
-            try { status = System.Text.Json.JsonSerializer.Serialize(await session.StatusAsync(context.RequestAborted)); }
+            try
+            {
+                var connection = await session.StatusAsync(context.RequestAborted);
+                status = !connection.Enabled ? "Delegated outbound mail is not enabled." :
+                    (connection.Connected ? "Connected: " : "Not connected: ") + connection.Mailbox;
+            }
             catch (Exception ex) when (ex is InvalidOperationException or StudioMailReconnectRequiredException or CryptographicException)
             { status = ex.Message; }
             var csrf = antiforgery.GetAndStoreTokens(context);
@@ -30,7 +35,7 @@ public static class StudioOutboundMailboxEndpoints
                 "<header>Brian’s · Outbound mailbox</header><main><h1>Connect outbound mailbox</h1><p>Sign in to Microsoft using the configured hub account. Studio never stores its password.</p><pre>" + HtmlEncoder.Default.Encode(status) + "</pre>" +
                 $"<form method='post' action='{page}/connect'>{hidden}<button>Connect outbound mailbox</button></form>" +
                 $"<form method='post' action='{page}/disconnect'>{hidden}<button>Disconnect</button></form>" +
-                "<p>Disconnect removes Studio’s local authorization. Previously accepted deliveries are not resent.</p><a href='/'>Return to Today</a></main></body></html>", "text/html; charset=utf-8");
+                "<p>Disconnect stops Studio from using this connection. Previously sent messages are not sent again.</p><a href='/'>Return to Today</a></main></body></html>", "text/html; charset=utf-8");
         }).RequireAuthorization(policy => policy.RequireRole("Administrator"));
 
         app.MapPost(page + "/connect", async (HttpContext context, IAntiforgery antiforgery, StudioDelegatedGraphSession session) =>
@@ -46,7 +51,7 @@ public static class StudioOutboundMailboxEndpoints
             string url;
             try { url = await session.AuthorizationUrlAsync(state, verifier, context.RequestAborted); }
             catch (InvalidOperationException ex) { return Results.BadRequest(ex.Message); }
-            pending[state] = new(verifier, browser, DateTimeOffset.UtcNow.AddMinutes(10));
+            pending[state] = new(verifier, browser, DateTimeOffset.UtcNow.AddMinutes(10), session.Generation);
             context.Response.Cookies.Append(cookie, browser, new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Lax, Path = "/", MaxAge = TimeSpan.FromMinutes(10), IsEssential = true });
             return Results.Redirect(url);
         }).RequireAuthorization(policy => policy.RequireRole("Administrator"));
@@ -65,7 +70,7 @@ public static class StudioOutboundMailboxEndpoints
             string code = context.Request.Query["code"].ToString();
             if (context.Request.Query.ContainsKey("error") || string.IsNullOrWhiteSpace(code))
                 return Results.BadRequest("Microsoft sign-in was cancelled or denied. Start again from the administrator page.");
-            try { await session.CompleteAsync(code, attempt.Verifier, context.RequestAborted); }
+            try { await session.CompleteAsync(code, attempt.Verifier, context.RequestAborted, attempt.Generation); }
             catch (Exception ex) when (ex is InvalidOperationException or StudioMailReconnectRequiredException)
             { return Results.BadRequest(ex.Message); }
             return Results.Redirect(page);
