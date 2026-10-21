@@ -80,20 +80,6 @@ async function showFrontDesk() {
 let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskClients=[],frontDeskSchedule=[],frontDeskInvoices=[];
 let frontDeskTab='today',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelectedClientId=null;
 function frontDeskRequestStage(item){return item.status==='Confirmed'?'Confirmed':item.status==='Cancelled'?'Cancelled':item.recordedDeposit>0?'Ready for confirmation':item.status==='AwaitingDeposit'?'Awaiting deposit':'Pending Job';}
-let frontDeskJobClickDelegationBound=false;
-function bindFrontDeskJobClickDelegation(){
-    if(frontDeskJobClickDelegationBound)return;
-    frontDeskJobClickDelegationBound=true;
-    document.addEventListener('click',event=>{
-        const target=event.target.closest?.('[data-frontdesk-job]');
-        if(!target||!genericView.contains(target))return;
-        const jobId=target.dataset.frontdeskJob;
-        if(!jobId)return;
-        event.preventDefault();
-        event.stopPropagation();
-        openFrontDeskJob(jobId).catch(error=>alert(error.message||String(error)));
-    },true);
-}
 function openFrontDeskJob(jobId){
     if(!jobId)return Promise.resolve();
     const id=String(jobId);
@@ -121,8 +107,8 @@ function renderFrontDesk(){
     const unassigned=frontDeskJobs.filter(j=>!j.assignedTo&&j.status!=='Completed');
     const enquiries=frontDeskEnquiries.filter(e=>e&&!frontDeskRequests.some(r=>r?.request?.conversationId===e.id));
     const due=frontDeskRequests.filter(x=>x&&(x.status==='AwaitingDeposit'||(x.request?.requiredDeposit>0&&x.recordedDeposit<x.request.requiredDeposit&&!['Confirmed','Cancelled'].includes(x.status))));
-    const jobQueue=['Pickup / Delivery','Completed'].includes(frontDeskColumnFilters.status);
-    const queueJobs=frontDeskJobs.filter(j=>frontDeskColumnFilters.status==='Completed'?j.status==='Completed':['Ready for Client','Ready for Delivery','Published'].includes(j.status));
+    const jobQueue=['Pickup / Delivery','Completed'].includes(frontDeskColumnFilters.status)||['unassigned','delivery','completed'].includes(frontDeskTab);
+    const queueJobs=frontDeskJobs.filter(j=>frontDeskTab==='unassigned'?!j.assignedTo&&j.status!=='Completed':frontDeskTab==='completed'||frontDeskColumnFilters.status==='Completed'?j.status==='Completed':frontDeskTab==='delivery'||frontDeskColumnFilters.status==='Pickup / Delivery'?['Ready for Client','Ready for Delivery','Published'].includes(j.status):j.status!=='Completed');
     const intakeEntries=[
         ...enquiries.map(e=>({kind:'enquiry',id:e.id,created:e.createdAtUtc,name:e.contactName||'New inquiry',title:e.subject||'Inquiry',date:null,status:'New',source:e.channel||'Inquiry',conversationId:e.id})),
         ...frontDeskRequests.filter(Boolean).map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Client',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:'Booking',request:x}))
@@ -140,7 +126,7 @@ function renderFrontDesk(){
         return true;
     };
     const filtered=entries.filter(e=>metricMatch(e)&&
-        (frontDeskTab==='today'||(frontDeskTab==='enquiries'&&e.kind==='enquiry')||(frontDeskTab==='requests'&&e.kind==='request'))
+        (jobQueue||frontDeskTab==='today'||(frontDeskTab==='enquiries'&&e.kind==='enquiry')||(frontDeskTab==='requests'&&e.kind==='request'))
         &&[e.name,e.title,e.status,e.source].join(' ').toLowerCase().includes(frontDeskTerm.toLowerCase())
         &&(!frontDeskColumnFilters.type||entryType(e)===frontDeskColumnFilters.type)
         &&(!frontDeskColumnFilters.status||jobQueue||e.status===frontDeskColumnFilters.status)
@@ -163,14 +149,14 @@ function renderFrontDesk(){
         const arrow=frontDeskSort.column===key?(frontDeskSort.direction===1?' ↑':' ↓'):' ↕';
         return '<th class="fd-column-head"><div class="fd-column-controls"><button type="button" data-fd-sort="'+key+'" aria-label="Sort by '+label+'">'+label+arrow+'</button><select data-fd-filter="'+key+'" aria-label="Filter '+label+'"><option value="">All '+label+'</option>'+options+'</select></div></th>';
     };
-    const rows=filtered.map(e=>`<tr class="fd-speedbump-row" tabindex="0" role="link" aria-label="Open ${esc(e.name)}" data-fd-row-open="${esc(e.id)}"><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}${jobQueue&&e.status!=='Completed'?` <button type="button" class="action" data-frontdesk-fulfill="${esc(e.jobId)}">Record collection / delivery</button>`:''}</td><td>${pill(e.source,'source')}</td></tr>`).join('');
+    const rows=filtered.map(e=>`<tr class="fd-speedbump-row" tabindex="0" role="link" aria-label="Open ${esc(e.name)}" data-fd-row-open="${esc(e.id)}"><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}${e.kind==='job'?` <button type="button" class="action" data-frontdesk-pos="${esc(e.jobId)}">New Sale</button>`:''}${jobQueue&&e.status!=='Completed'?` <button type="button" class="action" data-frontdesk-fulfill="${esc(e.jobId)}">Record collection / delivery</button>`:''}</td><td>${pill(e.source,'source')}</td></tr>`).join('');
     const metric=(key,label,count,note)=>`<div class="workspace-summary-row"><span aria-hidden="true">${({enquiries:'✉',deposits:'$',confirmation:'✓',unassigned:'▣'})[key]}</span><button type="button" class="fd-overview-link" data-fd-metric="${key}" aria-pressed="${frontDeskMetricView===key}" title="${esc(note)}">${esc(label)}</button><strong>${count}</strong></div>`;
     genericView.innerHTML=`<div class="fd-page">
       
       <div class="fd-layout"><div class="fd-main">
         
         <section class="op-card fd-queue">
-          <div class="fd-table-frame" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<div class="fd-table-head-clip"><table class="fd-table"><thead><tr><th>Date</th><th><div class="fd-client-header"><span>Client / Request</span><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search clients…" value="${esc(frontDeskTerm)}"></div></th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}</tr></thead></table></div><div class="fd-table-scroll"><table class="fd-table"><tbody>${rows||'<tr><td colspan="6">No bookings or inquiries in this queue.</td></tr>'}</tbody></table></div>`:'<div id="frontDeskJobList"></div>'}</div>
+          <div class="fd-table-frame" id="frontDeskTableArea"><div class="fd-table-head-clip"><table class="fd-table"><thead><tr><th>Date</th><th><div class="fd-client-header"><span>Client / Request</span><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search clients…" value="${esc(frontDeskTerm)}"></div></th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}</tr></thead></table></div><div class="fd-table-scroll"><table class="fd-table"><tbody>${rows||'<tr><td colspan="6">No bookings or inquiries in this queue.</td></tr>'}</tbody></table></div></div>
           </section>
         
       </div><aside class="fd-secondary mw-list-right" aria-label="Front Desk activity">
@@ -229,9 +215,9 @@ function renderFrontDesk(){
     const search=genericView.querySelector('#frontDeskSearch');
     if(search)search.oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();};
     genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openFrontDeskJob(b.dataset.frontdeskJob));
-    bindFrontDeskJobClickDelegation();
 
     genericView.querySelectorAll('[data-frontdesk-fulfill]').forEach(button=>button.onclick=()=>recordFrontDeskFulfillment(button.dataset.frontdeskFulfill).catch(error=>alert(error.message)));
+    genericView.querySelectorAll('[data-frontdesk-pos]').forEach(button=>button.onclick=()=>openPos(button.dataset.frontdeskPos));
     genericView.querySelectorAll('[data-fd-row-open]').forEach(row=>{
         const open=()=>{
             const e=entries.find(item=>String(item.id)===row.dataset.fdRowOpen);
@@ -249,7 +235,6 @@ function renderFrontDesk(){
         });
     });
     genericView.querySelectorAll('[data-fd-enquiry]').forEach(b=>b.onclick=()=>openPendingBookingForm(frontDeskEnquiries.find(e=>e.id===b.dataset.fdEnquiry)));
-    if(!['today','requests','enquiries'].includes(frontDeskTab))renderFrontDeskRows();
 }
 function selectFrontDeskClient(clientId){
     frontDeskSelectedClientId=clientId;
@@ -297,34 +282,7 @@ async function takeFrontDeskClientPayment(clientId){
     dialog.querySelectorAll('[data-payment-job]').forEach(button=>button.onclick=()=>{const id=button.dataset.paymentJob;dialog.close();openPos(id,true);});
 }
 async function checkInFrontDeskJob(jobId){try{await json('/api/frontdesk/jobs/'+jobId+'/check-in',{method:'POST'});await showFrontDesk();}catch(error){alert(error.message);}}
-function renderFrontDeskRows(){
-    const host=document.getElementById('frontDeskJobList'),term=frontDeskTerm.trim().toLowerCase();
-    const matches=value=>JSON.stringify(value).toLowerCase().includes(term);
-    if(frontDeskTab==='requests')host.innerHTML=frontDeskRequests.filter(matches).map(x=>{
-        const r=x.request,remaining=Math.max(0,r.requiredDeposit-x.recordedDeposit);
-        return `<article class="front-desk-row"><div><strong>${esc(r.clientName)}</strong><div>${esc(r.title)} · ${esc(r.eventDate)}</div><div class="meta">${esc(frontDeskWorkspaces.find(w=>w.id===r.workspaceId)?.name||'Workspace')} · ${frontDeskRequestStage(x)}</div><div class="meta">Deposit recorded: ${money(x.recordedDeposit)}</div></div><div class="front-desk-actions"><button class="primary" data-frontdesk-job="${x.jobId}">Open Job / Review / Route</button>${!['Confirmed','Cancelled'].includes(x.status)?`<button class="action" data-deposit="${x.id}">Record deposit</button><button class="action" data-deposit-requested="${x.id}">Send deposit request</button><button class="action" data-deposit-delivery="${x.id}">Delivery status</button><button class="primary" data-confirm-booking="${x.jobId}">Confirm booking</button>`:`<button class="action" data-frontdesk-pos="${x.jobId}">Billing</button>`}</div></article>`;
-    }).join('')||'<p class="empty-state">No Pending Jobs. New requests create a Job immediately for FrontDesk review.</p>';
-    else if(frontDeskTab==='enquiries'){
-        const linked=new Set(frontDeskRequests.map(r=>r.request.conversationId).filter(Boolean));
-        host.innerHTML=frontDeskEnquiries.filter(e=>!linked.has(e.id)&&matches(e)).map(e=>`<article class="front-desk-row"><div><strong>${esc(e.contactName)}</strong><div>${esc(e.subject)}</div><small>${esc(e.channel)} · ${esc(new Date(e.createdAtUtc).toLocaleString())}</small></div><button class="primary" data-convert-enquiry="${e.id}">Prepare booking request</button></article>`).join('')||'<p class="empty-state">No unassigned enquiries awaiting booking preparation.</p>';
-    }else{
-        let jobs=frontDeskJobs.filter(matches);if(frontDeskTab==='delivery')jobs=jobs.filter(j=>['Ready for Client','Ready for Delivery','Published'].includes(j.status));else if(frontDeskTab==='completed')jobs=jobs.filter(j=>j.status==='Completed');else if(frontDeskTab==='unassigned')jobs=jobs.filter(j=>!j.assignedTo&&j.status!=='Completed');else jobs=jobs.filter(j=>j.status!=='Completed');
-        host.innerHTML=jobs.map(renderFrontDeskJob).join('')||'<p class="empty-state">No jobs in this queue.</p>';
-    }
-    host.querySelectorAll('[data-fd-job-row]').forEach(row=>{
-        const open=()=>Promise.resolve().then(()=>openFrontDeskJob(row.dataset.fdJobRow)).catch(error=>alert(error.message));
-        row.onclick=event=>{if(!event.target.closest('button,a,input,select,textarea'))open();};
-        row.onkeydown=event=>{if(event.target===row&&['Enter',' '].includes(event.key)){event.preventDefault();open();}};
-    });
-    host.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openFrontDeskJob(b.dataset.frontdeskJob));
-    host.querySelectorAll('[data-frontdesk-fulfill]').forEach(b=>b.onclick=()=>recordFrontDeskFulfillment(b.dataset.frontdeskFulfill));
-    host.querySelectorAll('[data-frontdesk-pos]').forEach(b=>b.onclick=()=>openPos(b.dataset.frontdeskPos));
-    host.querySelectorAll('[data-convert-enquiry]').forEach(b=>b.onclick=()=>openPendingBookingForm(frontDeskEnquiries.find(e=>e.id===b.dataset.convertEnquiry)));
-    host.querySelectorAll('[data-deposit]').forEach(b=>b.onclick=()=>openVerifiedDepositForm(frontDeskRequests.find(r=>r.id===b.dataset.deposit)));
-    host.querySelectorAll('[data-deposit-requested]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const channels=await json('/api/frontdesk/deposit-delivery-channels');if(!Array.isArray(channels)||!channels.length)throw Error('Configure an email or WhatsApp provider before sending a deposit request.');const chosen=channels.length===1?channels[0]:prompt('Delivery channel: '+channels.join(' or '),'Email');if(chosen===null)return;if(!channels.includes(chosen))throw Error('Choose one of the configured delivery channels.');const queued=await json(`/api/frontdesk/booking-requests/${b.dataset.depositRequested}/deposit-requested?channel=${encodeURIComponent(chosen)}`,{method:'POST'});alert(queued.state==='AlreadyQueued'?'A deposit request is already queued. Check its delivery status.':'Deposit request queued for '+(queued.channel||chosen)+' delivery. Check delivery status for provider acceptance or failures.');await showFrontDesk();}catch(e){alert(e.message);}finally{if(b.isConnected)b.disabled=false;}});
-    host.querySelectorAll('[data-deposit-delivery]').forEach(b=>b.onclick=async()=>{try{const delivery=await json(`/api/frontdesk/booking-requests/${b.dataset.depositDelivery}/deposit-delivery`);alert((delivery.channel||'Delivery')+': '+delivery.state+'\nAttempts: '+delivery.attempts+(delivery.lastError?'\nError: '+delivery.lastError:'')+(delivery.providerAcceptedAtUtc?'\nProvider accepted: '+new Date(delivery.providerAcceptedAtUtc).toLocaleString():'')+'\nRecipient delivery receipt is unavailable from the configured provider.');}catch(e){alert(e.message);}});
-}
-function renderFrontDeskJob(job){return `<article class="front-desk-row" tabindex="0" role="link" aria-label="Open ${esc(job.title)}" data-fd-job-row="${esc(job.id)}"><div><strong>${esc(job.clientName)}</strong><div>${esc(job.title)}</div><div class="meta">${esc(job.status)}${job.eventDate?' · '+esc(job.eventDate):''}</div></div><div class="front-desk-actions"><button class="action" onclick="openIntakeRoster('${job.conversationId}')">Subjects / roster</button><button class="action" onclick="openIntakeDeliveryStatus('${job.conversationId}')">Intake / email status</button><button class="action" onclick="linkFrontDeskClient('${job.id}')">${job.clientId?'Linked client':'Link client'}</button><button class="action" onclick="openFrontDeskClient('${job.id}')">Client conversation</button><button class="action" onclick="showFrontDeskFlow('${job.id}')">Next action / Flow</button><button class="action" onclick="messageFrontDeskJob('${job.id}','workspace')">Message Workspace</button><button class="action" onclick="messageFrontDeskJob('${job.id}','escalate')">Escalate</button><button class="action" onclick="messageFrontDeskJob('${job.id}','finance')">Message Accounts / Finance</button><button class="action" data-frontdesk-job="${job.id}">Open job</button><button class="primary" data-frontdesk-pos="${job.id}">New Sale</button><button class="action" onclick="launchFrontDeskPos('TakePayment',{jobId:'${job.id}'})">Take Payment</button><button class="action" onclick="pickFrontDeskSale('IssueRefund','${job.id}')">Issue Refund</button><button class="action" data-view-receipt="${job.id}">View Receipt</button>${['Ready for Client','Ready for Delivery','Published'].includes(job.status)?`<button class="primary" data-frontdesk-fulfill="${job.id}">Record collection / delivery</button>`:''}</div></article>`;}
+
 function frontDeskDialog(title,contents){
     const dialog=document.createElement('dialog');dialog.className='frontdesk-dialog';dialog.innerHTML=`<form class="request-form"><header class="studio-dialog-heading"><h2>${esc(title)}</h2><button class="studio-dialog-close" type="button" data-cancel aria-label="Close">×</button></header>${contents}<p role="alert"></p><div class="dialog-actions"><button type="button" data-cancel>Cancel</button><button class="primary" type="submit">Save</button></div></form>`;document.body.appendChild(dialog);dialog.querySelectorAll('[data-cancel]').forEach(button=>button.onclick=()=>dialog.close());dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();return dialog;
 }
