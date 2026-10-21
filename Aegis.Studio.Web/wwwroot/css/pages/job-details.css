@@ -327,3 +327,11 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
  .jd-job-identity .jd-job-name-toggle { flex:0 1 100%; width:auto; max-width:100%; }
  .jd-job-identity .jd-flow-overview { flex:1 1 100%; width:100%; }
 }
+
+/* Workflow details use the same anchored slide-down behavior as Job Details. */
+.jd-job-identity { position:relative; }
+.jd-job-identity .jd-flow-drawer { position:absolute; z-index:58; top:calc(100% + 5px); left:0; right:0; grid-column:auto; display:block; min-width:0; max-height:0; overflow:hidden; padding:0; border:0 solid var(--theme-border,#d4dbe4); border-radius:7px; background:var(--theme-surface,#fff); box-shadow:0 12px 28px #10243d38; opacity:0; visibility:hidden; transform:translateY(-7px); transition:max-height .24s ease,opacity .2s ease,transform .24s ease,visibility 0s .24s,padding .24s ease,border-width .24s ease; }
+.jd-job-identity .jd-flow-drawer.is-open { max-height:min(62vh,560px); overflow:auto; padding:10px 12px; border-width:1px; opacity:1; visibility:visible; transform:translateY(0); transition:max-height .24s ease,opacity .2s ease,transform .24s ease,visibility 0s,padding .24s ease,border-width .24s ease; }
+.jd-job-identity .jd-flow-drawer-inner { min-height:0; min-width:0; overflow:visible; }
+.jd-job-identity .jd-flow-drawer .jd-workflow-track { max-height:none; overflow:visible; }
+@media(prefers-reduced-motion:reduce) { .jd-job-identity .jd-flow-drawer,.jd-job-identity .jd-flow-drawer.is-open { transition:none; } }
