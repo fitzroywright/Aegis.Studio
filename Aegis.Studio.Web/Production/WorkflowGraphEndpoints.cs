@@ -27,7 +27,13 @@ public static class WorkflowGraphEndpoints
         {
             if (!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
             return Results.Ok(new JobGraphStore(db).Get(job));
+        })).RequireAuthorization();        app.MapPost("/api/jobs/{job:guid}/workflow-graph/tasks", (Guid job, GraphTaskCommand request, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
+        {
+            if (!access.HasPermission(user, job, "EditJob") && !access.HasPermission(user, job, "ManageProduction")) return Results.Forbid();
+            new JobGraphStore(db).TransitionTask(job, request, WorkflowStore.Name(user));
+            return Results.Ok(new JobGraphStore(db).Get(job));
         })).RequireAuthorization();
+
         app.MapGet("/api/jobs/{job:guid}/workflow-graph/impact/{template:guid}", (Guid job, Guid template, ClaimsPrincipal user, WorkflowStore workflow, StudioDatabase db) => Run(() =>
         {
             if (!workflow.CanManage(user, job) && !workflow.IsFrontDesk(user)) return Results.Forbid();
