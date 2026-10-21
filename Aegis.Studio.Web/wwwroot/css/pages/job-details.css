@@ -72,7 +72,8 @@
  .jd-job-identity .jd-flow-summary .jd-workflow-dot strong { transform:rotate(45deg); transform-origin:top left; }
 }
 @media(max-width:650px) {
- .job-detail-title.jd-job-identity { flex-wrap:wrap; gap:4px 10px; }
+ .job-detail-title.jd-job-identity { grid-template-columns:minmax(0,1fr); gap:4px 10px; }
+ .jd-job-identity > .jd-next-step { grid-column:1; grid-row:2; }
  .jd-job-name-stack { flex:1 1 100%; width:100%; min-width:0; }
  .jd-job-name-stack .jd-job-identity-menu { width:min(410px,calc(100vw - 32px)); }
  
