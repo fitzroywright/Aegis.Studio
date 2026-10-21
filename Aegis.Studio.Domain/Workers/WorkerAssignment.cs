@@ -4,7 +4,7 @@ public sealed record WorkerAssignment(
     Guid Id,
     Guid JobId,
     string WorkerUserName,
-    string WorkerTypeCode,
+    string JobRoleCode,
     string Responsibility,
     bool IsPrimary,
     string Status,
@@ -13,7 +13,7 @@ public sealed record WorkerAssignment(
     DateTimeOffset? AcceptedAtUtc = null,
     DateTimeOffset? CompletedAtUtc = null)
 {
-    public string NormalizedWorkerTypeCode => WorkerTypeCode.Trim().ToUpperInvariant();
+    public string NormalizedJobRoleCode => JobRoleCode.Trim().ToUpperInvariant();
 
     public bool IsActive =>
         !string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase) &&

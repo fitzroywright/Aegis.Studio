@@ -6,19 +6,19 @@ namespace Aegis.Studio.Web.Workers;
 
 public sealed class WorkerDirectory(StudioDatabase database)
 {
-    public IReadOnlyList<WorkerType> GetTypes(bool includeInactive = false)
+    public IReadOnlyList<JobRole> GetTypes(bool includeInactive = false)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = "select code,display_name,can_be_primary from studio_worker_types where $1 or is_active order by display_name";
         command.Parameters.AddWithValue(includeInactive);
         using NpgsqlDataReader reader = command.ExecuteReader();
-        List<WorkerType> result = [];
+        List<JobRole> result = [];
         while (reader.Read()) result.Add(new(reader.GetString(0), reader.GetString(1), reader.GetBoolean(2)));
         return result;
     }
 
-    public void SaveWorkerType(WorkerType type)
+    public void SaveJobRole(JobRole type)
     {
         if (string.IsNullOrWhiteSpace(type.Code) || string.IsNullOrWhiteSpace(type.DisplayName))
             throw new ArgumentException("Worker type code and display name are required.");
@@ -32,7 +32,7 @@ public sealed class WorkerDirectory(StudioDatabase database)
         command.ExecuteNonQuery();
     }
 
-    public void SetWorkerTypeActive(string code, bool active)
+    public void SetJobRoleActive(string code, bool active)
     {
         if (string.IsNullOrWhiteSpace(code)) throw new ArgumentException("Worker type code is required.");
         using NpgsqlConnection connection = database.OpenConnection();
@@ -43,7 +43,7 @@ public sealed class WorkerDirectory(StudioDatabase database)
         if (command.ExecuteNonQuery() == 0) throw new KeyNotFoundException("Worker type was not found.");
     }
 
-    public IReadOnlyList<Worker> GetWorkers(string? workerTypeCode = null, bool includeInactive = false)
+    public IReadOnlyList<Worker> GetWorkers(string? jobRoleCode = null, bool includeInactive = false)
     {
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
@@ -53,7 +53,7 @@ public sealed class WorkerDirectory(StudioDatabase database)
             where ($1::text is null or worker_type_code=$1) and ($2 or is_active)
             order by display_name,user_name
             """;
-        command.Parameters.AddWithValue((object?)workerTypeCode?.Trim().ToUpperInvariant() ?? DBNull.Value);
+        command.Parameters.AddWithValue((object?)jobRoleCode?.Trim().ToUpperInvariant() ?? DBNull.Value);
         command.Parameters.AddWithValue(includeInactive);
         using NpgsqlDataReader reader = command.ExecuteReader();
         List<Worker> result = [];
@@ -63,8 +63,8 @@ public sealed class WorkerDirectory(StudioDatabase database)
 
     public void SaveWorker(Worker worker)
     {
-        if (string.IsNullOrWhiteSpace(worker.UserName) || string.IsNullOrWhiteSpace(worker.WorkerTypeCode))
-            throw new ArgumentException("Worker name and worker type are required.");
+        if (string.IsNullOrWhiteSpace(worker.UserName) || string.IsNullOrWhiteSpace(worker.JobRoleCode))
+            throw new ArgumentException("Worker name and job role are required.");
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -75,7 +75,7 @@ public sealed class WorkerDirectory(StudioDatabase database)
             """;
         command.Parameters.AddWithValue(worker.UserName.Trim());
         command.Parameters.AddWithValue(string.IsNullOrWhiteSpace(worker.DisplayName) ? worker.UserName.Trim() : worker.DisplayName.Trim());
-        command.Parameters.AddWithValue(worker.NormalizedWorkerTypeCode);
+        command.Parameters.AddWithValue(worker.NormalizedJobRoleCode);
         command.Parameters.AddWithValue(worker.IsActive);
         command.Parameters.AddWithValue((object?)worker.Email ?? DBNull.Value);
         command.Parameters.AddWithValue((object?)worker.Phone ?? DBNull.Value);
@@ -86,8 +86,8 @@ public sealed class WorkerDirectory(StudioDatabase database)
     {
         if (assignment.Id == Guid.Empty || assignment.JobId == Guid.Empty)
             throw new ArgumentException("A valid assignment and job are required.");
-        if (string.IsNullOrWhiteSpace(assignment.WorkerUserName) || string.IsNullOrWhiteSpace(assignment.WorkerTypeCode))
-            throw new ArgumentException("Worker and worker type are required.");
+        if (string.IsNullOrWhiteSpace(assignment.WorkerUserName) || string.IsNullOrWhiteSpace(assignment.JobRoleCode))
+            throw new ArgumentException("Worker and job role are required.");
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
         if (assignment.IsPrimary)
@@ -112,7 +112,7 @@ public sealed class WorkerDirectory(StudioDatabase database)
             """;
         foreach (object? value in new object?[]
         {
-            assignment.Id, assignment.JobId, assignment.WorkerUserName.Trim(), assignment.NormalizedWorkerTypeCode,
+            assignment.Id, assignment.JobId, assignment.WorkerUserName.Trim(), assignment.NormalizedJobRoleCode,
             assignment.Responsibility.Trim(), assignment.IsPrimary, assignment.Status.Trim(),
             assignment.StartsAtUtc, assignment.EndsAtUtc, assignment.AcceptedAtUtc, assignment.CompletedAtUtc
         }) command.Parameters.AddWithValue(value ?? DBNull.Value);
