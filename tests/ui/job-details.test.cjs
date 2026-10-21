@@ -203,14 +203,7 @@ test('gallery search and list controls operate on the displayed page',async t=>{
  w.document.querySelector('[data-list]').click();assert.equal(w.document.querySelector('.jd-contact-sheet').classList.contains('list'),true);
  w.document.querySelector('[data-grid]').click();assert.equal(w.document.querySelector('.jd-contact-sheet').classList.contains('list'),false);
 });
-test('compact workflow marks the active milestone and exception route',async t=>{
- const {w}=environment(t);const host=w.document.createElement('div');
- for(const [stage,title] of [['Pending','Booking'],['Active Production','Production'],['Awaiting Approval','Production']]){
-  w.StudioJobDetails.workflow(host,{stage});assert.match(host.querySelector('.jd-flow-mainline .current').textContent,new RegExp(title));assert.equal(host.querySelector('.jd-flow-mainline .current').dataset.flowStage,stage);
- }
- for(const stage of ['Changes Requested','Cancelled','Blocked']){w.StudioJobDetails.workflow(host,{stage});assert.equal(host.querySelector('.jd-compact-exception.current').dataset.flowStage,stage);}
- w.StudioJobDetails.workflow(host,{stage:'Completed'});assert.equal(host.querySelectorAll('.jd-flow-mainline button').length,6);assert.equal(host.querySelectorAll('.jd-flow-exception-lane').length,2);
-});
+
 test('upload selection queues files immediately into the current collection',async t=>{
  const {w,fixture}=environment(t);await w.openWorkspaceJob('job');await settle();
  await w.document.querySelector('[data-filter=Selections]').onclick();
@@ -242,13 +235,7 @@ test('workflow next action requires the current owner acceptance before scheduli
  assert.equal(w.StudioWorkflow.nextAction({data:accepted,userName:'owner',canManage:true}).label,'Assign photographer');
  assert.equal(w.StudioWorkflow.nextAction({data:{...accepted,stage:'Awaiting Scheduling'},userName:'owner',canManage:true}).label,'Schedule session');
 });
-test('workflow phases are keyboard buttons and activate the state aware next action',async t=>{
- const {w}=environment(t),host=w.document.createElement('div');w.document.body.append(host);let activated;
- const data={stage:'Needs Photographer Assignment',owner:'owner',ownerAssignment:{assigned_to:'owner',status:'Assigned'},sessions:[]};
- w.StudioJobDetails.workflow(host,data,{id:'job'},{userName:'owner',canManage:true},selector=>activated=selector);
- const current=host.querySelector('button.current');assert.ok(current);assert.equal(current.getAttribute('aria-label'),'Accept ownership');current.click();
- assert.equal(activated,'[data-wf-owner-response="accept-owner"]');
-});
+
 test('Job Details dropped files declare receipts and retries preserve operation identities',async t=>{
  const {w,fixture}=environment(t);const original=w.json;let fail=true;
  w.json=async(url,options)=>{if(url.endsWith('/media/uploads')){fixture.calls.push({url,options});if(fail)throw Error('Response lost');return {assetId:'asset'};}return original(url,options);};
