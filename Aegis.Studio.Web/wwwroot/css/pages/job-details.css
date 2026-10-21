@@ -341,3 +341,19 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 
 .jd-status-pill.jd-status-label { cursor:default; }
 .jd-status-pill.jd-status-label::after { content:none; }
+
+/* Give the job name more room and pin the compact workflow to the far edge. */
+.job-detail-title.jd-job-identity { justify-content:space-between; gap:clamp(8px,1.2vw,18px); }
+.jd-job-identity .jd-job-name-toggle { flex:0 1 58%; width:58%; max-width:58%; min-width:140px; }
+.jd-job-identity .jd-flow-overview { flex:0 1 42%; width:42%; max-width:none; margin-left:auto; justify-content:flex-end; }
+.jd-job-identity .jd-flow-summary { margin-left:auto; }
+.jd-job-identity .jd-flow-drawer { left:auto; right:0; width:min(760px,calc(100vw - 32px)); }
+@media(max-width:900px) {
+ .jd-job-identity .jd-job-name-toggle { flex-basis:55%; width:55%; max-width:55%; min-width:120px; }
+ .jd-job-identity .jd-flow-overview { flex-basis:45%; width:45%; }
+}
+@media(max-width:650px) {
+ .jd-job-identity .jd-job-name-toggle { flex:0 1 100%; width:auto; max-width:100%; }
+ .jd-job-identity .jd-flow-overview { flex:1 1 100%; width:100%; margin-left:0; justify-content:flex-start; }
+ .jd-job-identity .jd-flow-drawer { right:auto; left:0; }
+}
