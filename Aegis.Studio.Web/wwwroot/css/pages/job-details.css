@@ -293,3 +293,16 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-job-identity-menu dt { margin:0 0 3px; color:var(--theme-muted,#69758b); font-size:9px; font-weight:800; letter-spacing:.055em; text-transform:uppercase; }
 .jd-job-identity-menu dd { margin:0; color:var(--theme-text,#162b50); font-size:12px; font-weight:650; overflow-wrap:anywhere; }
 @media(max-width:520px) { .jd-job-identity-menu dl { grid-template-columns:1fr; } .jd-job-identity-menu dl > div:nth-last-child(-n+2) { border-bottom:1px solid var(--theme-border,#e7e9ed); } .jd-job-identity-menu dl > div:last-child { border-bottom:0; } }
+
+/* Keep the compact workflow on the job identity line, beside the name. */
+.job-detail-title.jd-job-identity { display:flex; align-items:flex-start; gap:clamp(10px,1.6vw,24px); min-width:0; overflow:visible; }
+.jd-job-identity .jd-job-name-toggle { flex:0 1 auto; }
+.jd-job-identity .jd-flow-overview { display:flex; flex:1 1 auto; align-self:flex-start; min-width:0; max-width:760px; margin:0; padding:0; overflow:visible; }
+.jd-job-identity .jd-flow-summary { display:flex; flex:1; align-items:flex-start; min-width:0; overflow:visible; padding:0 4px 38px 0; }
+.jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li { flex:1 1 0; min-width:0; height:30px; }
+.jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after { min-width:3px; margin:0 2px; }
+.jd-job-identity .jd-flow-summary .jd-workflow-dot { position:relative; display:flex; flex-direction:column; align-items:center; gap:2px; width:24px; min-width:24px; padding:0; background:transparent; }
+.jd-job-identity .jd-flow-summary .jd-workflow-dot strong { position:absolute; top:22px; left:50%; transform:rotate(45deg); transform-origin:top left; white-space:nowrap; font-size:9px; line-height:1; }
+.jd-job-identity .jd-flow-summary>li.jd-main-expanded { flex:1 1 0; min-width:0; }
+@media(max-width:900px) { .jd-job-identity .jd-flow-overview { max-width:none; } .jd-job-identity .jd-flow-summary .jd-workflow-dot strong { transform:rotate(45deg); transform-origin:top left; } }
+@media(max-width:650px) { .job-detail-title.jd-job-identity { flex-wrap:wrap; gap:4px 10px; } .jd-job-identity .jd-flow-overview { flex:1 1 100%; max-width:none; } .jd-job-identity .jd-flow-summary { padding-bottom:36px; } }
