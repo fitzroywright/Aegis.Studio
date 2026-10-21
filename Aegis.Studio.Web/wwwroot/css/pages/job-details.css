@@ -121,16 +121,7 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-workflow-caption [data-job-blocked] { color:#bd3040; }
  .jd-flow-overview { display:flex; flex:0 1 42%; align-items:center; justify-content:flex-end; width:42%; min-width:0; margin:0 0 0 auto; overflow:visible; }
 .jd-flow-summary { display:flex; flex:1; width:100%; min-width:0; align-items:flex-start; gap:0; list-style:none; margin:0 0 0 auto; padding:0 2px 34px 0; overflow:visible; overflow-y:visible; }
-.jd-flow-phase { position:relative; display:flex; flex:1 1 0; align-items:flex-start; gap:4px; min-width:0; height:26px; font-size:10px; color:var(--theme-muted,#69758b); }
-.jd-flow-phase .jd-stage-light { flex:none; width:15px; height:15px; font-size:8px; }
-.jd-flow-phase strong { position:absolute; top:19px; left:50%; transform:rotate(45deg); transform-origin:top left; white-space:nowrap; font-size:8px; line-height:1; }
-.jd-flow-phase:not(:last-child)::after { content:""; position:absolute; top:7px; left:calc(50% + 9px); right:-2px; height:2px; min-width:2px; margin:0; background:#c5cad3; }
-.jd-flow-phase.complete::after { background:#318348; }
-.jd-flow-phase.complete,.jd-flow-phase.current { color:var(--theme-text,#162b50); font-weight:750; }
-.jd-flow-phase.complete .jd-stage-light { background:#318348; border-color:#318348; }
-.jd-flow-phase.current .jd-stage-light { background:#fb851c; border-color:#fb851c; }
-.jd-flow-phase.exception .jd-stage-light { background:#bd3040; border-color:#bd3040; }
-.jd-flow-phase.skipped .jd-stage-light { background:transparent; color:var(--theme-muted,#69758b); }
+/* Phase names are data carried by the shared workflow-dot summary renderer. */
 .jd-flow-toggle { display:grid; place-items:center; width:28px; height:28px; padding:4px; }
 .jd-flow-toggle svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .jd-flow-toggle[aria-expanded=true] svg { transform:rotate(180deg); }
