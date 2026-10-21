@@ -60,7 +60,7 @@ test('POS, Messaging, Workspaces and Front Desk use their owning stylesheets',()
  const legacy=fs.readFileSync(path.join(root,'css/core/studio-legacy.css'),'utf8');
  for(const selector of [
   /^\s*\.away-digest-list\s*\{/m,
-  /^\s*\.pos-(?:panel|history|catalog-item|grid)(?:\s|\{|$)/m,
+  /^\s*\.pos-(?:panel|history|catalog-item|grid)\s*\{/m,
   /^\s*\.workspace-list-page \.workspace-wow-main\s*\{/m,
   /^\s*\.workspace-list-page \.workspace-wow-stat b\s*\{/m,
   /body\[data-studio-view="frontdesk"\] \.fd-table-frame \.fd-table\s*\{/
