@@ -44,6 +44,24 @@ public sealed class JobGraphStore(StudioDatabase database)
         using var q = Command(c, tx, "select definition::text from studio_job_template_instances where job_id=$1", job);
         return q.ExecuteScalar() is string json ? JsonSerializer.Deserialize<CommercialTemplate>(json, Json) : null;
     }
+    private static TemplateStep[] DefaultSteps() => [
+        new("inquiry-booking", "Inquiry / Booking", "Booking", "Editing"),
+        new("shoot", "Shoot", "Photography", "Editing", ["inquiry-booking"]),
+        new("production", "Production", "Production", "Editing", ["shoot"]),
+        new("delivery", "Delivery", "Delivery", "Assembly", ["production"]),
+        new("completed", "Completed", "Archive", "Assembly", ["delivery"])
+    ];
+    private static void EnsureDefaultActivities(NpgsqlConnection c, NpgsqlTransaction tx, Guid job, string actor)
+    {
+        int position = 0;
+        foreach (var step in DefaultSteps())
+            Execute(c, tx, """
+                insert into studio_job_activities(id,job_id,activity_type,title,status,priority,created_by,created_at_utc,updated_at_utc,
+                  template_step_key,production_area,step_definition,quality_control_required,optional_step,approved_image_required,step_order,workflow_node_id)
+                values($1,$2,$3,$4,'NotStarted','Normal',$5,now(),now(),$6,$7,$8::jsonb,false,false,false,$9,$6)
+                on conflict(job_id,workflow_node_id) where workflow_node_id is not null do nothing
+                """, Guid.NewGuid(), job, step.ActivityType, step.Title, actor, step.Key, step.Area, JsonSerializer.Serialize(step, Json), position++);
+    }
     internal static Dictionary<string, string> Statuses(NpgsqlConnection c, NpgsqlTransaction? tx, Guid job)
     {
         using var q = Command(c, tx, "select workflow_node_id,status from studio_job_activities where job_id=$1 and workflow_node_id is not null", job);
@@ -74,38 +92,27 @@ public sealed class JobGraphStore(StudioDatabase database)
     {
         using var c = database.OpenConnection(); using var tx = c.BeginTransaction(System.Data.IsolationLevel.RepeatableRead);
         var definition = Definition(c, tx, job);
-        Guid template; int version; long revision; string jobStatus;
+        Guid template; int version; long revision;
         if (definition is null)
         {
-            using var q = Command(c, tx, "select workflow_revision,status from studio_jobs where id=$1", job);
+            using var q = Command(c, tx, "select workflow_revision from studio_jobs where id=$1", job);
             using var r = q.ExecuteReader(); if (!r.Read()) return null;
-            revision = r.GetInt64(0); jobStatus = r.GetString(1); template = Guid.Empty; version = 1;
-            var steps = new[]
-            {
-                new TemplateStep("inquiry-booking", "Inquiry / Booking", "Booking", "Editing"),
-                new TemplateStep("shoot", "Shoot", "Photography", "Editing", ["inquiry-booking"]),
-                new TemplateStep("production", "Production", "Production", "Editing", ["shoot"]),
-                new TemplateStep("delivery", "Delivery", "Delivery", "Assembly", ["production"]),
-                new TemplateStep("completed", "Completed", "Archive", "Assembly", ["delivery"])
-            };
+            revision = r.GetInt64(0); template = Guid.Empty; version = 1;
+            var steps = DefaultSteps();
             var graph = WorkflowGraphEngine.FromSteps(steps);
-            var current = jobStatus switch
-            {
-                "Pending" or "Needs Assignment" or "Needs Photographer Assignment" or "Photographer Assigned" or "Awaiting Scheduling" or "Scheduled" => 0,
-                "Photography In Progress" or "Shoot Complete" or "Awaiting Upload" => 1,
-                "Awaiting Production Review" or "Active Production" or "Awaiting Approval" or "Changes Requested" => 2,
-                "Ready for Delivery" or "Delivered" => 3,
-                "Completed" or "Cancelled" => 4,
-                _ => 0
-            };
-            var states = steps.ToDictionary(step => step.Key, step => Array.IndexOf(steps, step) < current || current == 4 ? "Completed" : Array.IndexOf(steps, step) == current ? "InProgress" : "NotStarted");
+            var states = Statuses(c, tx, job);
+            var activityRows = new Dictionary<string, (Guid Id, string? AssignedTo)>();
+            using (var activities = Command(c, tx, "select workflow_node_id,id,assigned_to from studio_job_activities where job_id=$1 and workflow_node_id is not null", job))
+            using (var reader = activities.ExecuteReader())
+                while (reader.Read()) activityRows[reader.GetString(0)] = (reader.GetGuid(1), reader.IsDBNull(2) ? null : reader.GetString(2));
+            foreach (var step in steps) if (!states.ContainsKey(step.Key)) states[step.Key] = "NotStarted";
             var evaluation = WorkflowGraphEngine.Evaluate(graph, states, new HashSet<Guid>());
             var flat = WorkflowGraphEngine.Flatten(graph).Nodes.ToDictionary(n => n.Id);
             var evaluationStates = evaluation.Nodes.ToDictionary(n => n.Id);
             var tasks = steps.Select(step =>
             {
-                var state = evaluationStates[step.Key];
-                return new GraphTask(Guid.Empty, step.Key, step.Title, states[step.Key], null, null, state.Status,
+                var state = evaluationStates[step.Key]; var activity = activityRows.GetValueOrDefault(step.Key);
+                return new GraphTask(activity.Id, step.Key, step.Title, states[step.Key], activity.AssignedTo, null, state.Status,
                     state.Dependencies, false, state.Reason, state.Dependencies.Select(id => flat[id].Label).ToArray(), step.ActivityType);
             }).ToArray();
             tx.Commit();
@@ -275,8 +282,14 @@ public sealed class JobGraphStore(StudioDatabase database)
         using (var q = Command(c, tx, "select id from studio_jobs where id=$1 for update", job)) if (q.ExecuteScalar() is null) throw new KeyNotFoundException();
         if (Replay(c, tx, job, request.OperationId, request, actor)) { tx.Commit(); return; }
         Lock(c, tx, job, request.ExpectedRevision);
-        var definition = Definition(c, tx, job) ?? throw new ArgumentException("This job has no configured workflow graph.");
-        var graph = Graph(definition);
+        var definition = Definition(c, tx, job);
+        WorkflowGraph graph;
+        if (definition is null)
+        {
+            EnsureDefaultActivities(c, tx, job, actor);
+            graph = WorkflowGraphEngine.FromSteps(DefaultSteps());
+        }
+        else graph = Graph(definition);
         var task = WorkflowGraphEngine.Flatten(graph).Nodes.SingleOrDefault(n => n.Id == request.NodeId && n.Kind == "Task")
             ?? throw new ArgumentException("The workflow task was not found.");
         var evaluation = WorkflowGraphEngine.Evaluate(graph, Statuses(c, tx, job), Services(c, tx, job));
