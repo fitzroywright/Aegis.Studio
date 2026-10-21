@@ -161,7 +161,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const workerName=job.assignedTo?studioFirstName(job.assignedTo):'Unassigned';
             header.innerHTML=`<div class="job-detail-title jd-job-identity">
                     <div class="jd-job-name-stack">
-                    <button type="button" class="jd-job-name-toggle" aria-expanded="false" aria-controls="jobIdentityMenu" title="Show job details"><span>${esc(job.title)}</span><span class="jd-job-name-chevron" aria-hidden="true">⌄</span></button>
+                    <button type="button" class="jd-job-name-toggle" aria-expanded="false" aria-controls="jobIdentityMenu" title="Show job details"><svg class="jd-job-name-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18m-11 0v2h4v-2"></path></svg><span class="jd-job-name-text">${esc(job.title)}</span><span class="jd-job-name-chevron" aria-hidden="true">⌄</span></button>
                     <div id="jobIdentityMenu" class="jd-job-identity-menu" role="region" aria-label="Job details" hidden>
                         <dl>
                             <div><dt>Current Status</dt><dd><span class="jd-status-pill jd-status-label">${esc(job.status)}</span></dd></div>
