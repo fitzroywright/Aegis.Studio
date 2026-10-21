@@ -3582,8 +3582,7 @@ body[data-studio-view] .avatar {
   transition: background .12s ease,transform .12s ease;
 }
 .pos-catalog-item {
-  min-height: 52px;
-  background: #fff;
+  min-height: 52px
 
 }
 .job-row strong {
@@ -3621,9 +3620,7 @@ body[data-studio-view] .avatar {
   background: #fff;
 }
 .pos-grid {
-  border-collapse: separate;
-  border-spacing: 0;
-  width: 100%;
+  border-spacing: 0
   background: #fff;
 }
 .studio-table thead th {
@@ -6541,8 +6538,7 @@ body[data-studio-view="workspaces"] .generic {
   padding: 0 13px 8px;
 }
 .workspace-list-page .workspace-wow-main {
-  min-height: 58px;
-  grid-template-columns: 42px minmax(180px,1fr) 44px 52px 44px minmax(68px,.5fr) 88px 16px;
+  min-height: 58px
   gap: 8px;
   padding: 5px 0;
 }
@@ -6559,7 +6555,6 @@ body[data-studio-view="workspaces"] .generic {
   line-height: 13px;
 }
 .workspace-list-page .workspace-wow-stat b {
-  font-size: 13px;
   line-height: 16px;
 }
 .workspace-left-rail .mw-list-panel {
@@ -9992,8 +9987,7 @@ body[data-studio-view="frontdesk"] .fd-queue .fd-table {
 body[data-studio-view="frontdesk"] .fd-queue .fd-table thead th {
   position: static;
   top: auto;
-  z-index: auto;
-  padding: 11px 14px;
+  z-index: auto
   background:var(--studio-grid-header-bg);
   color:var(--studio-grid-header-text);
   font-size: .72rem;
@@ -10032,8 +10026,6 @@ body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls butto
   font-weight: 700;
 }
 body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls select {
-  background:#2c537c;
-  color:#fff;
   border-color:#658bad;
 }
 body[data-studio-view="frontdesk"] .fd-queue .fd-table .action[data-fd-open] {
@@ -10155,5 +10147,5 @@ body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left
 body[data-studio-view="frontdesk"] .fd-table-frame{display:flex;flex:1 1 auto;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
 body[data-studio-view="frontdesk"] .fd-table-head-clip{flex:0 0 auto;min-width:0;width:100%;overflow-y:scroll;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
 body[data-studio-view="frontdesk"] .fd-table-scroll{flex:1 1 auto;min-width:0;width:100%;min-height:0;overflow-x:hidden;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
-body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-width:0;table-layout:fixed}
+body[data-studio-view="frontdesk"] .fd-table-frame .fd-table {width:100%;min-width:0;table-layout:fixed}
 body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:static}
