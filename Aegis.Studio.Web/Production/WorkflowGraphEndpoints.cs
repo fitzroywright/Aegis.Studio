@@ -23,6 +23,22 @@ public static class WorkflowGraphEndpoints
             if (issues.Length > 0) return Results.BadRequest(new { error = string.Join("\n", issues.Select(i => $"{i.NodeId}: {i.Message}")), issues });
             return Results.Ok(WorkflowGraphEngine.Evaluate(request.Graph, new Dictionary<string, string>(), request.CatalogItemIds.ToHashSet()));
         })).RequireAuthorization();
+        app.MapGet("/api/jobs/{job:guid}/shoot-sessions", (Guid job, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
+        {
+            if (!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
+            using var connection = db.OpenConnection();
+            using var command = new Npgsql.NpgsqlCommand("""
+                select ws.id, ws.title
+                from studio_workflow_sessions ws
+                where ws.job_id = $1
+                order by ws.created_at_utc, ws.id
+                """, connection);
+            command.Parameters.AddWithValue(job);
+            using var reader = command.ExecuteReader();
+            var sessions = new List<object>();
+            while (reader.Read()) sessions.Add(new { id = reader.GetGuid(0), title = reader.GetString(1) });
+            return Results.Ok(sessions);
+        })).RequireAuthorization();
         app.MapGet("/api/jobs/{job:guid}/workflow-graph", (Guid job, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
         {
             if (!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
