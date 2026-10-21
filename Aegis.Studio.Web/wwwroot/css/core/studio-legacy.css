@@ -6333,11 +6333,6 @@ body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .three-pane
 .workspace-list-page .workspace-wow-row:last-child {
   border-bottom: 0;
 }
-.workspace-list-page .workspace-wow-main {
-  border: 0;
-  border-radius: 0;
-  background: #fff;
-}
 
 .workspace-list-page .workspace-wow-thumb {
   border-radius: 7px;
@@ -6348,9 +6343,6 @@ body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .three-pane
 }
 .workspace-list-page .workspace-wow-copy small {
   color: #6e7e91;
-}
-.workspace-list-page .workspace-wow-stat b {
-  color: #173c63;
 }
 .workspace-list-page .workspace-wow-stat small {
   color: #7a8797;
@@ -6505,11 +6497,6 @@ body[data-studio-view="workspaces"] .generic {
   max-height: calc(100dvh - 174px);
   padding: 0 13px 8px;
 }
-.workspace-list-page .workspace-wow-main {
-  min-height: 58px;
-  gap: 8px;
-  padding: 5px 0;
-}
 .workspace-list-page .workspace-wow-thumb {
   width: 38px;
   height: 38px;
@@ -6521,9 +6508,6 @@ body[data-studio-view="workspaces"] .generic {
 .workspace-list-page .workspace-wow-copy small {
   font-size: 10px;
   line-height: 13px;
-}
-.workspace-list-page .workspace-wow-stat b {
-  line-height: 16px;
 }
 .workspace-left-rail .mw-list-panel {
   width: 100%;
