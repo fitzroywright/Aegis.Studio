@@ -15,24 +15,70 @@
 #conversationView.has-open-job > .workspace-announcement-banners { display:none; }
 #conversationView > .job-detail-page { display:grid; grid-template-columns:minmax(0,1fr) clamp(245px,20vw,300px); grid-template-rows:auto minmax(0,1fr); flex:1; min-width:0; min-height:0; padding:0; gap:8px; overflow:hidden; color:var(--theme-text,#162b50); background:var(--theme-surface,#faf9f6); }
 .job-detail-page [hidden] { display:none; }
-.job-detail-heading { grid-column:1; max-height:min(38vh,320px); min-height:0; overflow-y:auto; overflow-x:hidden; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:11px 14px 8px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); }
-.job-detail-title { display:flex; align-items:baseline; gap:12px; min-width:0; }
+.job-detail-heading { grid-column:1; max-height:min(38vh,320px); min-height:0; overflow:visible; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:11px 14px 8px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); position:relative; z-index:5; }
+.job-detail-title { grid-column:1/-1; display:flex; align-items:flex-start; justify-content:space-between; gap:clamp(8px,1.2vw,18px); width:100%; min-width:0; overflow:visible; }
 .job-detail-title h1 { min-width:0; margin:0; font-size:20px; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .jd-client-name { display:flex; align-items:baseline; gap:5px; min-width:0; max-width:40%; padding-left:12px; border-left:1px solid var(--theme-border,#dedbd4); font-size:12px; white-space:nowrap; }
 .jd-client-name > span { flex:none; color:var(--theme-muted,#69758b); font-size:10px; }
 .jd-client-name strong { min-width:0; overflow:hidden; text-overflow:ellipsis; font-weight:650; }
 .job-detail-title p { margin:0; font-size:11px; color:var(--theme-muted,#6f7a8b); }
-.jd-job-status { display:grid; grid-template-columns:auto auto; align-items:center; justify-items:end; gap:4px 10px; font-size:10px; }
+.jd-job-status { display:none; }
 .jd-status-meta { display:flex; justify-content:flex-end; gap:10px; white-space:nowrap; text-align:right; color:#b4510f; }
 .jd-status-pill { display:inline-flex; align-items:center; gap:7px; border:0; box-shadow:none; cursor:pointer; font:inherit; font-size:11px; padding:4px 12px; border-radius:20px; background:#d2eedb; color:#204d34; font-weight:700; max-width:210px; text-align:center; }
 .jd-status-pill::after { content:"⌄"; transition:transform .24s ease; }
 .jd-status-pill[aria-expanded=true]::after { transform:rotate(180deg); }
 .jd-status-pill:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
-.jd-flow-drawer { grid-column:1/-1; display:grid; grid-template-rows:0fr; min-width:0; opacity:0; visibility:hidden; transition:grid-template-rows .24s ease,opacity .24s ease,visibility 0s .24s; }
-.jd-flow-drawer.is-open { grid-template-rows:1fr; opacity:1; visibility:visible; transition:grid-template-rows .24s ease,opacity .24s ease,visibility 0s; }
-.jd-flow-drawer-inner { min-height:0; min-width:0; overflow:hidden; }
+.jd-flow-drawer { position:absolute; z-index:58; top:calc(100% + 5px); left:auto; right:0; display:block; width:min(760px,calc(100vw - 32px)); min-width:0; max-height:0; overflow:hidden; padding:0; border:0 solid var(--theme-border,#d4dbe4); border-radius:7px; background:var(--theme-surface,#fff); box-shadow:0 12px 28px #10243d38; opacity:0; visibility:hidden; transform:translateY(-7px); transition:max-height .24s ease,opacity .2s ease,transform .24s ease,visibility 0s .24s,padding .24s ease,border-width .24s ease; }
+.jd-flow-drawer.is-open { max-height:min(62vh,560px); overflow:auto; padding:10px 12px; border-width:1px; opacity:1; visibility:visible; transform:translateY(0); transition:max-height .24s ease,opacity .2s ease,transform .24s ease,visibility 0s,padding .24s ease,border-width .24s ease; }
+.jd-flow-drawer-inner { min-height:0; min-width:0; overflow:visible; }
 @media(prefers-reduced-motion:reduce) { .jd-flow-drawer,.jd-flow-drawer.is-open,.jd-status-pill::after { transition:none; } }
 .jd-job-status small { grid-column:2; color:var(--theme-muted,#7c8493); }
+
+/* Job identity, floating menus, and compact workflow are owned by this layout. */
+.jd-job-name-stack { position:relative; display:flex; flex:0 1 58%; flex-direction:column; gap:2px; width:58%; min-width:140px; }
+.jd-job-name-toggle { display:inline-flex; flex:0 1 auto; align-items:center; gap:9px; width:100%; max-width:100%; min-width:0; padding:2px 8px 3px 0; border:0; border-radius:4px; background:transparent; color:var(--theme-text,#162b50); font:inherit; font-size:clamp(13px,1.35vw,19px); line-height:1.15; font-weight:750; text-align:left; cursor:pointer; }
+.jd-job-name-toggle > span:first-child { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.jd-job-name-chevron { flex:none; color:#a45a17; transition:transform .18s ease; }
+.jd-job-name-toggle[aria-expanded=true] .jd-job-name-chevron { transform:rotate(180deg); }
+.jd-job-name-toggle:focus-visible { outline:2px solid #d97827; outline-offset:3px; }
+.jd-job-identity-menu { position:absolute; z-index:60; top:31px; left:0; width:min(410px,calc(100vw - 32px)); max-height:min(60vh,420px); overflow:auto; padding:10px 13px; border:1px solid var(--theme-border,#d4dbe4); border-top:3px solid #e97818; border-radius:7px; background:var(--theme-surface,#fff); box-shadow:0 12px 28px #10243d38; }
+.jd-job-identity-menu[hidden] { display:none; }
+.jd-job-identity-menu dl { display:grid; grid-template-columns:1fr 1fr; gap:0 18px; margin:0; }
+.jd-job-identity-menu dl > div { min-width:0; padding:7px 0; border-bottom:1px solid var(--theme-border,#e7e9ed); }
+.jd-job-identity-menu dl > div:nth-last-child(-n+2) { border-bottom:0; }
+.jd-job-identity-menu dt { margin:0 0 3px; color:var(--theme-muted,#69758b); font-size:9px; font-weight:800; letter-spacing:.055em; text-transform:uppercase; }
+.jd-job-identity-menu dd { margin:0; color:var(--theme-text,#162b50); font-size:12px; font-weight:650; overflow-wrap:anywhere; }
+.jd-job-identity-menu .jd-status-pill { max-width:100%; padding:3px 9px; font-size:10px; }
+.jd-job-identity-menu .jd-status-label { cursor:default; }
+.jd-job-identity-menu .jd-status-label::after { content:none; }
+.jd-job-identity-menu [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
+.jd-job-name-stack .jd-next-step { grid-column:auto; flex:0 0 32px; width:100%; min-width:0; height:32px; min-height:32px; max-height:32px; box-sizing:border-box; gap:6px; margin:0; padding:3px 6px; overflow:hidden; }
+.jd-job-name-stack .jd-next-step > div { min-width:0; flex:1 1 auto; overflow:hidden; }
+.jd-job-name-stack .jd-next-step small { display:none; }
+.jd-job-name-stack .jd-next-step p { margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; line-height:1.2; }
+.jd-job-name-stack .jd-next-step button { flex:none; max-width:42%; padding:3px 6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:9px; }
+.jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li { flex:1 1 0; width:0; min-width:0; height:26px; }
+.jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after { min-width:2px; margin:0; }
+.jd-job-identity .jd-flow-summary .jd-workflow-dot { position:relative; display:flex; flex-direction:column; align-items:center; gap:2px; width:18px; min-width:18px; padding:0; background:transparent; }
+.jd-job-identity .jd-flow-summary .jd-workflow-dot>.jd-stage-light { width:15px; min-width:15px; height:15px; font-size:7px; }
+.jd-job-identity .jd-flow-summary .jd-workflow-dot strong { position:absolute; top:19px; left:50%; transform:rotate(45deg); transform-origin:top left; white-space:nowrap; font-size:8px; line-height:1; }
+.jd-job-identity .jd-flow-drawer-inner { min-height:0; min-width:0; }
+.jd-job-identity .jd-flow-drawer .jd-workflow-track { max-height:none; overflow:visible; }
+@media(max-width:900px) {
+ .job-detail-title.jd-job-identity { gap:clamp(6px,1vw,14px); }
+ .jd-job-name-stack { flex-basis:55%; width:55%; min-width:120px; }
+ .jd-job-identity .jd-flow-overview { flex-basis:45%; width:45%; }
+ .jd-job-identity .jd-flow-summary .jd-workflow-dot strong { transform:rotate(45deg); transform-origin:top left; }
+}
+@media(max-width:650px) {
+ .job-detail-title.jd-job-identity { flex-wrap:wrap; gap:4px 10px; }
+ .jd-job-name-stack { flex:1 1 100%; width:100%; min-width:0; }
+ .jd-job-name-stack .jd-job-identity-menu { width:min(410px,calc(100vw - 32px)); }
+ .jd-job-identity .jd-flow-overview { flex:1 1 100%; width:100%; margin-left:0; justify-content:flex-start; }
+ .jd-job-identity .jd-flow-summary { padding-bottom:36px; }
+ .jd-job-identity .jd-flow-drawer { right:auto; left:0; }
+}
+@media(prefers-reduced-motion:reduce) { .jd-job-identity .jd-flow-drawer,.jd-job-name-toggle,.jd-job-name-chevron { transition:none; } }
 .jd-workflow-track { display:block; padding:5px 0; min-width:0; overflow:hidden; max-height:none; }
 /* Compact detail workflow: six milestones, two exception lanes, no nested scrollbars. */
 .jd-flow-compact { display:grid; gap:9px; width:100%; min-width:0; padding:9px 12px; box-sizing:border-box; background:var(--theme-surface-alt,#f2f5f8); border:1px solid var(--theme-border,#d9e0e8); border-radius:6px; }
@@ -72,8 +118,8 @@ button.jd-stage { position:absolute; display:flex; align-items:center; gap:6px; 
 button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-workflow-caption { grid-column:1/-1; margin-top:8px; display:flex; align-items:center; flex-wrap:wrap; gap:5px 12px; font-size:10px; color:#b4510f; }
 .jd-workflow-caption [data-job-blocked] { color:#bd3040; }
- .jd-flow-overview { grid-column:1/-1; display:flex; align-items:center; gap:14px; min-width:0; margin-top:10px; }
-.jd-flow-summary { display:flex; flex:1; min-width:0; align-items:center; gap:0; list-style:none; margin:0; padding:0; overflow-x:auto; }
+ .jd-flow-overview { display:flex; flex:0 1 42%; align-items:center; justify-content:flex-end; width:42%; min-width:0; margin:0 0 0 auto; overflow:visible; }
+.jd-flow-summary { display:flex; flex:1; width:100%; min-width:0; align-items:flex-start; gap:0; list-style:none; margin:0 0 0 auto; padding:0 2px 34px 0; overflow:visible; }
 .jd-flow-phase { position:relative; display:flex; flex:1; align-items:center; gap:5px; min-width:88px; font-size:10px; color:var(--theme-muted,#69758b); }
 .jd-flow-phase:not(:last-child)::after { content:""; flex:1; height:2px; min-width:8px; margin:0 6px; background:#c5cad3; }
 .jd-flow-phase.complete::after { background:#318348; }
@@ -87,7 +133,7 @@ button.jd-stage:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-flow-toggle[aria-expanded=true] svg { transform:rotate(180deg); }
 .jd-flow-toggle:focus-visible { outline:2px solid #d97827; outline-offset:2px; }
 .jd-flow-actions { flex:none; display:flex; align-items:center; gap:8px; }
-@media(max-width:900px) { .jd-flow-overview { flex-wrap:wrap; } .jd-flow-summary { flex-basis:100%; } .jd-flow-actions { margin-left:auto; } }
+@media(max-width:900px) { .jd-flow-actions { margin-left:auto; } }
 .jd-link { border:0; background:transparent; color:#9c631c; padding:3px; font-size:11px; font-weight:750; cursor:pointer; }
 .jd-tasks-dialog { width:min(900px,92vw); max-height:85vh; overflow:auto; }
 .jd-tasks-dialog .job-tasks-content { padding:4px; }
@@ -224,7 +270,7 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-dot-subflow{display:flex;align-items:center;gap:12px;overflow:auto;min-width:0;padding:8px}
 .jd-subflow-endpoint{display:flex;align-items:center;gap:5px;flex:none;font-size:10px;white-space:nowrap}
 .jd-subflow-endpoint .jd-stage-light{display:grid;place-items:center;width:17px;height:17px;border:1px solid currentColor;border-radius:50%;font-size:10px}
-.jd-dot-subflow>.jd-dot-levels{flex:1;align-items:center;overflow:visible;gap:12px;padding:0!important}
+.jd-dot-subflow>.jd-dot-levels{flex:1;align-items:center;overflow:visible;gap:12px;padding:0}
 .jd-dot-subflow>.jd-dot-levels::before,.jd-dot-subflow>.jd-dot-levels::after,.jd-dot-subflow>.jd-dot-levels>.jd-dot-level:not(:last-child)::after{content:"";flex:1;min-width:18px;border-top:2px dashed currentColor;opacity:.6}
 .jd-dot-subflow>.jd-dot-levels>.jd-dot-level{position:relative;flex:none;min-width:90px}
 .jd-dot-subflow>.jd-dot-levels>.jd-dot-level:not(:last-child)::after{position:absolute;left:100%;top:50%;width:12px;min-width:12px}
@@ -277,110 +323,3 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-next-step[data-state=blocked] { border-left-color:var(--studio-red,#ef3340); }
 @media(max-width:650px) { .jd-next-step { flex-wrap:wrap; } .jd-next-step > button { width:100%; } }
 
-/* Job identity menu floats above the page and never changes the header's layout. */
-.job-detail-heading { overflow:visible; position:relative; z-index:5; }
-.jd-job-identity { position:relative; }
-.jd-job-name-toggle { display:inline-flex; align-items:center; gap:9px; max-width:min(72vw,620px); padding:2px 8px 3px 0; border:0; border-radius:4px; background:transparent; color:var(--theme-text,#162b50); font:inherit; font-size:20px; line-height:1.15; font-weight:750; text-align:left; cursor:pointer; }
-.jd-job-name-toggle > span:first-child { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.jd-job-name-chevron { flex:none; color:#a45a17; transition:transform .18s ease; }
-.jd-job-name-toggle[aria-expanded=true] .jd-job-name-chevron { transform:rotate(180deg); }
-.jd-job-name-toggle:focus-visible { outline:2px solid #d97827; outline-offset:3px; }
-.jd-job-identity-menu { position:absolute; z-index:60; top:calc(100% + 9px); left:0; width:min(410px,calc(100vw - 32px)); max-height:min(60vh,420px); overflow:auto; padding:10px 13px; border:1px solid var(--theme-border,#d4dbe4); border-top:3px solid #e97818; border-radius:7px; background:var(--theme-surface,#fff); box-shadow:0 12px 28px #10243d38; }
-.jd-job-identity-menu[hidden] { display:none; }
-.jd-job-identity-menu dl { display:grid; grid-template-columns:1fr 1fr; gap:0 18px; margin:0; }
-.jd-job-identity-menu dl > div { min-width:0; padding:7px 0; border-bottom:1px solid var(--theme-border,#e7e9ed); }
-.jd-job-identity-menu dl > div:nth-last-child(-n+2) { border-bottom:0; }
-.jd-job-identity-menu dt { margin:0 0 3px; color:var(--theme-muted,#69758b); font-size:9px; font-weight:800; letter-spacing:.055em; text-transform:uppercase; }
-.jd-job-identity-menu dd { margin:0; color:var(--theme-text,#162b50); font-size:12px; font-weight:650; overflow-wrap:anywhere; }
-@media(max-width:520px) { .jd-job-identity-menu dl { grid-template-columns:1fr; } .jd-job-identity-menu dl > div:nth-last-child(-n+2) { border-bottom:1px solid var(--theme-border,#e7e9ed); } .jd-job-identity-menu dl > div:last-child { border-bottom:0; } }
-
-/* Keep the compact workflow on the job identity line, beside the name. */
-.job-detail-title.jd-job-identity { display:flex; align-items:flex-start; gap:clamp(10px,1.6vw,24px); min-width:0; overflow:visible; }
-.jd-job-identity .jd-job-name-toggle { flex:0 1 auto; }
-.jd-job-identity .jd-flow-overview { display:flex; flex:1 1 auto; align-self:flex-start; min-width:0; max-width:760px; margin:0; padding:0; overflow:visible; }
-.jd-job-identity .jd-flow-summary { display:flex; flex:1; align-items:flex-start; min-width:0; overflow:visible; padding:0 4px 38px 0; }
-.jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li { flex:1 1 0; min-width:0; height:30px; }
-.jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after { min-width:3px; margin:0 2px; }
-.jd-job-identity .jd-flow-summary .jd-workflow-dot { position:relative; display:flex; flex-direction:column; align-items:center; gap:2px; width:24px; min-width:24px; padding:0; background:transparent; }
-.jd-job-identity .jd-flow-summary .jd-workflow-dot strong { position:absolute; top:22px; left:50%; transform:rotate(45deg); transform-origin:top left; white-space:nowrap; font-size:9px; line-height:1; }
-.jd-job-identity .jd-flow-summary>li.jd-main-expanded { flex:1 1 0; min-width:0; }
-@media(max-width:900px) { .jd-job-identity .jd-flow-overview { max-width:none; } .jd-job-identity .jd-flow-summary .jd-workflow-dot strong { transform:rotate(45deg); transform-origin:top left; } }
-@media(max-width:650px) { .job-detail-title.jd-job-identity { flex-wrap:wrap; gap:4px 10px; } .jd-job-identity .jd-flow-overview { flex:1 1 100%; max-width:none; } .jd-job-identity .jd-flow-summary { padding-bottom:36px; } }
-
-/* Reserve a fixed share for the identity and let the workflow use the remaining line. */
-.job-detail-title.jd-job-identity { display:flex; flex-wrap:nowrap; align-items:flex-start; gap:clamp(6px,1vw,14px); width:100%; min-width:0; }
-.jd-job-identity .jd-job-name-toggle { flex:0 1 36%; width:36%; max-width:36%; min-width:90px; font-size:clamp(13px,1.35vw,19px); }
-.jd-job-identity .jd-flow-overview { flex:1 1 64%; width:64%; max-width:none; min-width:0; margin:0; overflow:visible; }
-.jd-job-identity .jd-flow-summary { width:100%; min-width:0; padding:0 2px 34px 0; overflow:visible; }
-.jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li { flex:1 1 0; width:0; min-width:0; height:26px; }
-.jd-job-identity .jd-flow-summary .jd-workflow-dot { width:18px; min-width:18px; }
-.jd-job-identity .jd-flow-summary .jd-workflow-dot>.jd-stage-light { width:15px; min-width:15px; height:15px; font-size:7px; }
-.jd-job-identity .jd-flow-summary .jd-workflow-dot strong { top:19px; font-size:8px; transform:rotate(45deg); transform-origin:top left; }
-.jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after { min-width:2px; margin:0; }
-@media(max-width:900px) {
- .jd-job-identity .jd-job-name-toggle { flex-basis:32%; width:32%; max-width:32%; min-width:78px; }
- .jd-job-identity .jd-flow-overview { flex-basis:68%; width:68%; }
- .jd-job-identity .jd-flow-summary .jd-workflow-dot strong { transform:rotate(45deg); transform-origin:top left; }
-}
-@media(max-width:650px) {
- .job-detail-title.jd-job-identity { flex-wrap:wrap; }
- .jd-job-identity .jd-job-name-toggle { flex:0 1 100%; width:auto; max-width:100%; }
- .jd-job-identity .jd-flow-overview { flex:1 1 100%; width:100%; }
-}
-
-/* Workflow details use the same anchored slide-down behavior as Job Details. */
-.jd-job-identity { position:relative; }
-.jd-job-identity .jd-flow-drawer { position:absolute; z-index:58; top:calc(100% + 5px); left:0; right:0; grid-column:auto; display:block; min-width:0; max-height:0; overflow:hidden; padding:0; border:0 solid var(--theme-border,#d4dbe4); border-radius:7px; background:var(--theme-surface,#fff); box-shadow:0 12px 28px #10243d38; opacity:0; visibility:hidden; transform:translateY(-7px); transition:max-height .24s ease,opacity .2s ease,transform .24s ease,visibility 0s .24s,padding .24s ease,border-width .24s ease; }
-.jd-job-identity .jd-flow-drawer.is-open { max-height:min(62vh,560px); overflow:auto; padding:10px 12px; border-width:1px; opacity:1; visibility:visible; transform:translateY(0); transition:max-height .24s ease,opacity .2s ease,transform .24s ease,visibility 0s,padding .24s ease,border-width .24s ease; }
-.jd-job-identity .jd-flow-drawer-inner { min-height:0; min-width:0; overflow:visible; }
-.jd-job-identity .jd-flow-drawer .jd-workflow-track { max-height:none; overflow:visible; }
-@media(prefers-reduced-motion:reduce) { .jd-job-identity .jd-flow-drawer,.jd-job-identity .jd-flow-drawer.is-open { transition:none; } }
-
-.jd-job-identity-menu .jd-status-pill { max-width:100%; padding:3px 9px; font-size:10px; }
-.jd-job-identity-menu [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
-
-.jd-status-pill.jd-status-label { cursor:default; }
-.jd-status-pill.jd-status-label::after { content:none; }
-
-/* Give the job name more room and pin the compact workflow to the far edge. */
-.job-detail-title.jd-job-identity { justify-content:space-between; gap:clamp(8px,1.2vw,18px); }
-.jd-job-identity .jd-job-name-toggle { flex:0 1 58%; width:58%; max-width:58%; min-width:140px; }
-.jd-job-identity .jd-flow-overview { flex:0 1 42%; width:42%; max-width:none; margin-left:auto; justify-content:flex-end; }
-.jd-job-identity .jd-flow-summary { margin-left:auto; }
-.jd-job-identity .jd-flow-drawer { left:auto; right:0; width:min(760px,calc(100vw - 32px)); }
-@media(max-width:900px) {
- .jd-job-identity .jd-job-name-toggle { flex-basis:55%; width:55%; max-width:55%; min-width:120px; }
- .jd-job-identity .jd-flow-overview { flex-basis:45%; width:45%; }
-}
-@media(max-width:650px) {
- .jd-job-identity .jd-job-name-toggle { flex:0 1 100%; width:auto; max-width:100%; }
- .jd-job-identity .jd-flow-overview { flex:1 1 100%; width:100%; margin-left:0; justify-content:flex-start; }
- .jd-job-identity .jd-flow-drawer { right:auto; left:0; }
-}
-
-/* Keep Next step directly under the title at the same width, within the workflow label height. */
-.job-detail-title.jd-job-identity { align-items:flex-start; }
-.jd-job-identity .jd-job-name-stack { position:relative; display:flex; flex:0 1 58%; flex-direction:column; gap:2px; width:58%; min-width:140px; }
-.jd-job-name-stack .jd-job-name-toggle { flex:0 1 auto; width:100%; max-width:100%; min-width:0; }
-.jd-job-name-stack .jd-job-identity-menu { top:31px; left:0; }
-.jd-job-name-stack .jd-next-step { grid-column:auto; flex:0 0 32px; width:100%; min-width:0; height:32px; min-height:32px; max-height:32px; box-sizing:border-box; gap:6px; margin:0; padding:3px 6px; overflow:hidden; }
-.jd-job-name-stack .jd-next-step > div { min-width:0; flex:1 1 auto; overflow:hidden; }
-.jd-job-name-stack .jd-next-step small { display:none; }
-.jd-job-name-stack .jd-next-step p { margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; line-height:1.2; }
-.jd-job-name-stack .jd-next-step button { flex:none; max-width:42%; padding:3px 6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:9px; }
-.jd-job-identity .jd-flow-overview { flex:0 1 42%; width:42%; }
-@media(max-width:900px) {
- .jd-job-identity .jd-job-name-stack { flex-basis:55%; width:55%; min-width:120px; }
- .jd-job-identity .jd-flow-overview { flex-basis:45%; width:45%; }
-}
-@media(max-width:650px) {
- .job-detail-title.jd-job-identity { flex-wrap:wrap; }
- .jd-job-identity .jd-job-name-stack { flex:1 1 100%; width:100%; min-width:0; }
- .jd-job-name-stack .jd-next-step { max-width:100%; }
- .jd-job-name-stack .jd-job-identity-menu { width:min(410px,calc(100vw - 32px)); }
- .jd-job-identity .jd-flow-overview { flex:1 1 100%; width:100%; }
-}
-
-/* Let the identity row span the full Job Details header so the workflow reaches the right edge. */
-.job-detail-heading > .jd-job-identity { grid-column:1/-1; width:100%; }
-.job-detail-heading > .jd-job-status { display:none; }
