@@ -54,3 +54,21 @@ test('Production filter and Overview styles each have one owning declaration',()
  });
  for(const [selector,count] of found)assert.equal(count,1,'Expected one owning rule for '+selector);
 });
+
+
+test('POS, Messaging, Workspaces and Front Desk use their owning stylesheets',()=>{
+ const legacy=fs.readFileSync(path.join(root,'css/core/studio-legacy.css'),'utf8');
+ for(const selector of [
+  /(^|\\n)\\s*\\.away-digest-list\\s*\\{/,
+  /(^|\\n)\\s*\\.pos-(?:panel|history|catalog-item|grid)(?:\\s|\\{|$)/,
+  /(^|\\n)\\s*\\.workspace-list-page \\.workspace-wow-main\\s*\\{/,
+  /(^|\\n)\\s*\\.workspace-list-page \\.workspace-wow-stat b\\s*\\{/,
+  /body\\[data-studio-view="frontdesk"\\] \\.fd-table-frame \\.fd-table\\s*\\{/
+ ])assert.doesNotMatch(legacy,selector,'Remove the duplicate legacy rule and edit the owning page stylesheet.');
+ const pos=fs.readFileSync(path.join(root,'css/pages/pos.css'),'utf8');
+ const workspaces=fs.readFileSync(path.join(root,'css/pages/workspaces-grid.css'),'utf8');
+ assert.match(pos,/\\.pos-panel/);assert.match(pos,/\\.pos-grid/);assert.match(pos,/\\.pos-catalog-item/);
+ assert.match(workspaces,/\\.workspace-list-page \\.workspace-wow-main/);
+ assert.match(fs.readFileSync(path.join(root,'css/components/messaging.css'),'utf8'),/\\.away-digest-list/);
+ assert.match(fs.readFileSync(path.join(root,'css/pages/frontdesk-filters.css'),'utf8'),/fd-table-frame \\.fd-table/);
+});
