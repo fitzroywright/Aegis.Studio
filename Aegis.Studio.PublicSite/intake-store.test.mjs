@@ -26,7 +26,7 @@ test('invalid roster commit is atomic and missing contacts do not block an opted
  assert.throws(()=>s.roster(r.id,'a','',2,[{name:'Subject',reference:'one',pickupNotification:'Email'}]));assert.equal(s.feed().items.at(-1).revision,2);s.close();
 });
 test('verified financial events replay once and cannot be attached to a different intake',()=>{
- const s=new IntakeStore(':memory:'),a=s.create('a','1',inquiry),b=s.create('a','2',inquiry),event={eventId:'e1',provider:'TestAdapter',transactionReference:'capture-1',kind:'Deposit',amountMinor:10000,currency:'JMD'};
+ const booking={...inquiry,kind:'Booking',sessionType:'Portrait',startsAt:'2026-11-01T10:00:00-05:00',endsAt:'2026-11-01T11:00:00-05:00'};const s=new IntakeStore(':memory:'),a=s.create('a','1',booking),b=s.create('a','2',booking),event={eventId:'e1',provider:'TestAdapter',transactionReference:'capture-1',kind:'Deposit',amountMinor:10000,currency:'JMD'};
  s.payment(a.id,event);s.payment(a.id,event);assert.equal(s.feed().items.at(-1).paymentEvents.length,1);assert.throws(()=>s.payment(b.id,event),e=>e.code==='payment_conflict');assert.throws(()=>s.create('a','3',{...inquiry,paid:true}));s.close();
 });
 test('published contract example uses the same importer shape as the site change feed',()=>{

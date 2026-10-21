@@ -67,3 +67,30 @@ test('serves standalone client assets and an operational health endpoint', async
   assert.equal((await fetch(`${origin}/styles.css`)).headers.get('content-type'), 'text/css; charset=utf-8');
   assert.equal((await fetch(`${origin}/app.js`)).headers.get('content-type'), 'text/javascript; charset=utf-8');
 });
+test('server integrations do not require Origin and scopes isolate submission from polling and payment',async t=>{
+ const keys=[{id:'external',secret:'external-test-secret-01234567890123456789',scopes:['intake:submit']},{id:'studio',secret:'studio-test-secret-01234567890123456789',scopes:['intake:pull','intake:ack']},{id:'other',secret:'other-test-secret-01234567890123456789',scopes:['intake:submit']}];
+ const origin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify(keys)}),base=origin+'/api/public-site/v1';
+ const response=await fetch(base+'/intakes',{method:'POST',headers:{Authorization:'Bearer '+keys[0].secret,'Idempotency-Key':'api-1','Content-Type':'application/json'},body:JSON.stringify({kind:'Inquiry',clientName:'Test Client'})});assert.equal(response.status,201);const receipt=await response.json();
+ assert.equal((await fetch(base+'/changes',{headers:{Authorization:'Bearer '+keys[0].secret}})).status,403);
+ assert.equal((await fetch(base+'/intakes/'+receipt.id,{headers:{Authorization:'Bearer '+keys[2].secret}})).status,404);
+ const feed=await(await fetch(base+'/changes',{headers:{Authorization:'Bearer '+keys[1].secret}})).json();assert.equal(feed.items.length,1);
+ const ack=await fetch(base+'/intakes/'+receipt.id+'/ack',{method:'POST',headers:{Authorization:'Bearer '+keys[1].secret,'Content-Type':'application/json'},body:'{"revision":1,"reviewStatus":"AwaitingReview"}'});assert.equal(ack.status,200);
+ const status=await(await fetch(base+'/intakes/'+receipt.id,{headers:{Authorization:'Bearer '+keys[0].secret}})).json();assert.equal(status.importStatus,'Imported');
+ const payment=await fetch(base+'/intakes/'+receipt.id+'/payments',{method:'POST',headers:{Authorization:'Bearer '+keys[0].secret,'Content-Type':'application/json'},body:'{}'});assert.equal(payment.status,403);
+});
+test('local published media is isolated by client binding and revocation',async t=>{
+ const secret='publication-test-secret-01234567890123456789',gallery='11111111-1111-4111-8111-111111111111',version='33333333-3333-4333-8333-333333333333',client='22222222-2222-4222-8222-222222222222';
+ const origin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify([{id:'studio',secret,scopes:['gallery:publish']}]),CLIENT_BINDINGS_JSON:JSON.stringify({'demo-google-maya':client})}),base=origin+'/api/public-site/v1';
+ const headers={Authorization:'Bearer '+secret,'Content-Type':'application/json'};
+ assert.equal((await fetch(base+'/galleries',{method:'POST',headers,body:JSON.stringify({id:gallery,clientId:client,title:'Local gallery',finalDeliveryAvailable:true,items:[{versionId:version,fileName:'portrait.jpg'}]})})).status,200);
+ assert.equal((await fetch(base+`/galleries/${gallery}/publish`,{method:'POST',headers,body:'{}'})).status,409);
+ const bytes=Buffer.from([255,216,255,217]);assert.equal((await fetch(base+`/galleries/${gallery}/media/${version}`,{method:'PUT',headers:{Authorization:'Bearer '+secret,'Content-Type':'image/jpeg'},body:bytes})).status,200);
+ assert.equal((await fetch(base+`/galleries/${gallery}/publish`,{method:'POST',headers,body:'{}'})).status,200);
+ async function login(identity){const r=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity})});return r.headers.get('set-cookie').split(';')[0];}
+ const own=await login('maya'),other=await login('jordan');
+ assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:own}})).status,200);
+ assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:other}})).status,404);
+ const media=await fetch(origin+`/api/galleries/${gallery}/items/${version}/preview`,{headers:{Cookie:own}});assert.deepEqual(Buffer.from(await media.arrayBuffer()),bytes);
+ assert.equal((await fetch(base+`/galleries/${gallery}/revoke`,{method:'POST',headers,body:'{}'})).status,200);
+ assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:own}})).status,404);
+});

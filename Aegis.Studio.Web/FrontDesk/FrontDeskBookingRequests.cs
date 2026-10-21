@@ -52,7 +52,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
     }
     public IReadOnlyList<FrontDeskRequest> GetAll()
     {
-        using var connection=database.OpenConnection();using var command=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0),r.created_at_utc from studio_frontdesk_requests r order by r.created_at_utc desc",connection);
+        using var connection=database.OpenConnection();using var command=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,greatest(0,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0)+coalesce((select sum(e.amount) from studio_financial_events e where e.job_id=r.job_id and e.kind in ('Refund','Reversal')),0)),r.created_at_utc from studio_frontdesk_requests r order by r.created_at_utc desc",connection);
         using var reader=command.ExecuteReader();List<FrontDeskRequest> result=[];
         while(reader.Read())result.Add(Read(reader));return result;
     }
@@ -64,7 +64,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         if(request.ExternalBookingId is not null)
         {
             Execute(connection,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","booking:"+request.BookingSource+":"+request.ExternalBookingId);
-            using var existing=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0),r.created_at_utc from studio_frontdesk_requests r where payload->>'externalBookingId'=$1 and coalesce(payload->>'bookingSource','FrontDesk')=$2",connection,tx);
+            using var existing=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,greatest(0,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0)+coalesce((select sum(e.amount) from studio_financial_events e where e.job_id=r.job_id and e.kind in ('Refund','Reversal')),0)),r.created_at_utc from studio_frontdesk_requests r where payload->>'externalBookingId'=$1 and coalesce(payload->>'bookingSource','FrontDesk')=$2",connection,tx);
             existing.Parameters.AddWithValue(request.ExternalBookingId);existing.Parameters.AddWithValue(request.BookingSource);using var reader=existing.ExecuteReader();
             if(reader.Read())
             {
@@ -144,7 +144,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         // Serialize duplicate receipt checks across requests before locking the request.
         Execute(connection,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))",provider+":"+reference);
         FrontDeskRequest current;
-        using(var get=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0),r.created_at_utc from studio_frontdesk_requests r where r.id=$1 for update",connection,tx))
+        using(var get=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,greatest(0,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0)+coalesce((select sum(e.amount) from studio_financial_events e where e.job_id=r.job_id and e.kind in ('Refund','Reversal')),0)),r.created_at_utc from studio_frontdesk_requests r where r.id=$1 for update",connection,tx))
         {get.Parameters.AddWithValue(id);using var reader=get.ExecuteReader();if(!reader.Read())throw new KeyNotFoundException("Booking request not found.");current=Read(reader);}
         // Read the total after acquiring the row lock, using a fresh READ COMMITTED snapshot.
         // A concurrent distinct receipt may have committed while this transaction waited.
@@ -178,6 +178,11 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         }
         else Execute(c,tx,"insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc) values($1,$2,$3,$4,$5,'Email',false,now())",conversation,r.WorkspaceId,r.Title,r.ClientName,r.ClientEmail);
         Guid client=r.ClientId??Guid.Empty;
+        if(client==Guid.Empty && r.ConversationId.HasValue && !createClient)
+        {
+            using var selected=new NpgsqlCommand("select client_id from studio_conversations where id=$1",c,tx);selected.Parameters.AddWithValue(conversation);
+            if(selected.ExecuteScalar() is Guid linkedClient)client=linkedClient;
+        }
         if(client==Guid.Empty && createClient)
         {
             Execute(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","client:"+r.ClientEmail.ToLowerInvariant()+":"+r.ClientName.ToLowerInvariant());

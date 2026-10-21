@@ -34,7 +34,7 @@ async function openGallery(reference) {
 
 document.querySelectorAll('[data-identity]').forEach(button => button.addEventListener('click', async () => {
   button.disabled = true;
-  try { const result = await api('/api/demo-login', { method: 'POST', body: JSON.stringify({ identity: button.dataset.identity }) }); showAuth(result.user); }
+  try { const result = await api('/api/demo-login', { method: 'POST', body: JSON.stringify({ identity: button.dataset.identity }) }); showAuth((await api('/api/session')).user); }
   catch (error) { $('auth-note').textContent = error.message; }
   finally { button.disabled = false; }
 }));

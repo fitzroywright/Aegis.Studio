@@ -1,4 +1,6 @@
-# Brian’s public website integration — V1
+# Legacy Studio Public V1 integration
+
+This document describes the legacy API hosted by Studio. It is preserved for existing integrations. The independent reference website now hosts its own [Public website API](public-site-v1/INTEGRATION.md); Studio polls that API and pushes gallery copies outward. Do not give this legacy contract to developers implementing the new website intake flow.
 
 Implementation branch: `feature/studio-complete-workflow-20261011`. This is an integration implementation awaiting connected PostgreSQL, storage, webhook-destination and deployed acceptance. Do not treat unit tests or the reference proxy test as deployment acceptance.
 
@@ -126,3 +128,4 @@ node examples/public-v1-site/server.mjs
 The example binds loopback and still requires an HTTPS reverse proxy, authentication/session policy, abuse protection, and the deployment controls described in the runbook before public use. Environment secrets must never be committed.
 
 Verification performed: native Public V1 contract and proxy tests. Real provider OAuth, real booking-to-gallery acceptance, payment/refund races, remote webhook delivery, and Common.Storage media need connected installation acceptance.
+

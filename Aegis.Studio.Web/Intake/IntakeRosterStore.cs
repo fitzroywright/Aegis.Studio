@@ -7,6 +7,7 @@ using Aegis.Studio.Web.Workflow;
 using Npgsql;
 namespace Aegis.Studio.Web.Intake;
 
+public sealed record IntakeRosterView(string? IntakeReference,long Revision,JsonElement Rows,Guid? JobId,JsonElement? IncomingRows,bool CanEdit=false,bool CanMessage=false);
 public sealed record RosterCommit(long Revision,JsonElement Rows,bool ResolveConflict=false);
 public sealed class IntakeRosterStore(StudioDatabase database)
 {
@@ -15,10 +16,11 @@ public sealed class IntakeRosterStore(StudioDatabase database)
     {
         if(rows.ValueKind!=JsonValueKind.Array||rows.GetArrayLength()>5000)throw new ArgumentException("Supply at most 5000 subject rows.");
         var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var limits=new Dictionary<string,int>{{"name",200},{"reference",200},{"collection",100},{"contactName",200},{"contactEmail",320},{"contactPhone",100},{"scheduledAtUtc",50},{"scheduleLocation",300},{"notes",4000},{"pickupNotification",8}};
         foreach(var row in rows.EnumerateArray())
         {
             if(row.ValueKind!=JsonValueKind.Object)throw new ArgumentException("Invalid roster row.");
-            foreach(var p in row.EnumerateObject())if(Fields.Contains(p.Name)&&(p.Value.ValueKind!=JsonValueKind.String||p.Value.GetString()!.Length>(p.Name=="notes"?4000:p.Name=="contactEmail"?320:200)))throw new ArgumentException("Invalid or oversized roster field: "+p.Name);
+            foreach(var p in row.EnumerateObject())if(Fields.Contains(p.Name)&&(p.Value.ValueKind!=JsonValueKind.String||p.Value.GetString()!.Length>limits[p.Name]))throw new ArgumentException("Invalid or oversized roster field: "+p.Name);
             string name=WebsiteIntakeStore.Text(row,"name"),reference=WebsiteIntakeStore.Text(row,"reference"),email=WebsiteIntakeStore.Text(row,"contactEmail"),phone=WebsiteIntakeStore.Text(row,"contactPhone"),preference=WebsiteIntakeStore.Text(row,"pickupNotification","None");
             if(string.IsNullOrWhiteSpace(name)||name.Equals("Unclassified",StringComparison.OrdinalIgnoreCase)||string.IsNullOrWhiteSpace(reference)||!seen.Add(reference))throw new ArgumentException("Each subject needs a name and a unique stable reference. Unclassified is reserved.");
             if(!string.IsNullOrEmpty(email)&&!System.Net.Mail.MailAddress.TryCreate(email,out _))throw new ArgumentException("Correct the contact email.");
@@ -26,7 +28,7 @@ public sealed class IntakeRosterStore(StudioDatabase database)
             var time=WebsiteIntakeStore.Text(row,"scheduledAtUtc");if(time!=""&&!DateTimeOffset.TryParse(time,out _))throw new ArgumentException("Invalid subject schedule.");
         }
     }
-    public object Read(Guid cv)
+    public IntakeRosterView Read(Guid cv)
     {
         using var c=database.OpenConnection();
         using var q=WorkflowStore.Command(c,null,"select v.intake_reference,r.revision,r.rows::text,v.job_id from studio_conversations v left join studio_intake_rosters r on r.conversation_id=v.id where v.id=$1",cv);using var r=q.ExecuteReader();if(!r.Read())throw new KeyNotFoundException();
@@ -40,7 +42,7 @@ public sealed class IntakeRosterStore(StudioDatabase database)
             rows=JsonSerializer.Deserialize<JsonElement>(value);
         }
         string? conflict=WorkflowStore.Scalar(c,null,"select rows::text from studio_intake_roster_conflicts where conversation_id=$1",cv) as string;
-        return new{intakeReference=reference,revision,rows,jobId=job,incomingRows=conflict is null?(JsonElement?)null:JsonSerializer.Deserialize<JsonElement>(conflict)};
+        return new(reference,revision,rows,job,conflict is null?(JsonElement?)null:JsonSerializer.Deserialize<JsonElement>(conflict));
     }
     public object Commit(Guid cv,RosterCommit request,string actor)
     {
@@ -61,6 +63,11 @@ public sealed class IntakeRosterStore(StudioDatabase database)
     }
     public static void Map(WebApplication app)
     {
+        app.MapGet("/roster-editor.js",()=>
+        {
+            using var input=typeof(IntakeRosterStore).Assembly.GetManifestResourceStream("Aegis.Studio.Web.Intake.RosterEditor.js")!;using var reader=new StreamReader(input);
+            return Results.Text(reader.ReadToEnd(),"text/javascript; charset=utf-8");
+        }).AllowAnonymous();
         var g=app.MapGroup("/api/intake").RequireAuthorization();
         g.MapGet("/lookup/{reference}",(string reference,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja)=>
         {
@@ -72,7 +79,11 @@ public sealed class IntakeRosterStore(StudioDatabase database)
         {
             if(!user.IsInRole("Administrator"))return Results.Forbid();using var c=db.OpenConnection();using var q=WorkflowStore.Command(c,null,"select year,source,value from studio_intake_sequences order by year desc,source");using var r=q.ExecuteReader();var values=new List<object>();while(r.Read())values.Add(new{year=r.GetInt32(0),source=r.GetString(1),issued=r.GetInt32(2),capacity=999999,attention=r.GetInt32(2)>=950000});return Results.Ok(values);
         });
-        g.MapGet("/{cv:guid}/roster",(Guid cv,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja)=>Allowed(cv,user,db,wa,ja,false)?Results.Ok(new IntakeRosterStore(db).Read(cv)):Results.Forbid());
+        g.MapGet("/{cv:guid}/roster",(Guid cv,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja)=>
+        {
+            if(!Allowed(cv,user,db,wa,ja,false))return Results.Forbid();var view=new IntakeRosterStore(db).Read(cv);
+            return Results.Ok(view with{CanEdit=Allowed(cv,user,db,wa,ja,true),CanMessage=view.JobId.HasValue&&ja.HasPermission(user,view.JobId.Value,"ReplyRequester")});
+        });
         g.MapPut("/{cv:guid}/roster",(Guid cv,RosterCommit request,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja)=>
         {
             if(!Allowed(cv,user,db,wa,ja,true))return Results.Forbid();
@@ -84,9 +95,9 @@ public sealed class IntakeRosterStore(StudioDatabase database)
             var f=await request.ReadFormAsync(ct);if(f.Files.Count!=1||f.Files[0].Length>5_000_000)return Results.BadRequest(new{error="Choose one CSV or XLSX file, at most 5 MB."});
             try{await using var s=f.Files[0].OpenReadStream();string csv=RosterFileReader.Read(s,f.Files[0].FileName);return Results.Ok(new{cells=MediaProductionRules.ReadRoster(csv)});}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}
         }).DisableAntiforgery();
-        g.MapGet("/{cv:guid}/status",(Guid cv,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja)=>
+        g.MapGet("/{cv:guid}/status",(Guid cv,ClaimsPrincipal user,StudioDatabase db,Email.StudioInquiryAssociations associations)=>
         {
-            if(!Allowed(cv,user,db,wa,ja,false))return Results.Forbid();using var c=db.OpenConnection();
+            if(!associations.CanAccess(cv,user))return Results.Forbid();using var c=db.OpenConnection();
             var reference=WorkflowStore.Scalar(c,null,"select intake_reference from studio_conversations where id=$1",cv);
             var files=new List<object>();using(var f=WorkflowStore.Command(c,null,"select id,metadata->>'fileName',state from studio_intake_attachments where conversation_id=$1",cv))using(var fr=f.ExecuteReader())while(fr.Read())files.Add(new{id=fr.GetGuid(0),fileName=fr.GetString(1),state=fr.GetString(2)});
             var rosterConflict=WorkflowStore.Scalar(c,null,"select exists(select 1 from studio_intake_roster_conflicts where conversation_id=$1)",cv);

@@ -12,7 +12,7 @@ namespace Aegis.Studio.Web.Messaging;
 
 public sealed record UnifiedSendRequest(Guid RequestId, Guid? ThreadId, string Subject, string Body, Guid[] DestinationIds);
 public sealed record UnifiedSendResult(Guid MessageId, Guid ThreadId, string Status);
-public sealed record StudioDeliveryStatus(Guid MessageId, string Recipient, string Transport, string Status, string? Detail, Guid? DeliveryId);
+public sealed record StudioDeliveryStatus(Guid MessageId, string Recipient, string Transport, string Status, string? Detail, Guid? DeliveryId,DateTimeOffset? ProviderAcceptedAtUtc=null,string? ThreadingVerificationStatus=null);
 
 public sealed class StudioUnifiedMessaging
 {
@@ -211,24 +211,25 @@ public sealed class StudioUnifiedMessaging
     {
         messages.AssertThreadAccess(threadId, user);
         using var c = database.OpenConnection(); using var q = new NpgsqlCommand("""
-            select d.message_id,d.recipient,d.transport,coalesce(e.status,d.status),coalesce(e.last_error,d.detail),e.id
+            select d.message_id,d.recipient,d.transport,coalesce(e.status,d.status),coalesce(e.last_error,d.detail),e.id,e.provider_accepted_at_utc,case when e.rfc_message_id_verified then 'Verified' when e.provider_accepted_at_utc is not null then 'Pending' else 'NotSubmitted' end
             from studio_message_deliveries d join studio_inapp_messages m on m.id=d.message_id
             left join studio_outbound_email e on e.studio_message_id=d.message_id and lower(e.to_address)=lower(d.recipient) and d.transport='Email'
             where m.thread_id=$1 order by d.created_at_utc
             """, c);
         Add(q, threadId); using var r = q.ExecuteReader(); List<StudioDeliveryStatus> result = [];
-        while (r.Read()) result.Add(new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), r.IsDBNull(5) ? null : r.GetGuid(5)));
+        while (r.Read()) result.Add(new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), r.IsDBNull(5) ? null : r.GetGuid(5),r.IsDBNull(6)?null:r.GetFieldValue<DateTimeOffset>(6),r.GetString(7)));
         return result;
     }
 
     public void RetryDelivery(Guid deliveryId, ClaimsPrincipal user, bool reconciledNotSent)
     {
-        using var c = database.OpenConnection(); using var q = new NpgsqlCommand("select studio_thread_id,status,last_error from studio_outbound_email where id=$1", c);
+        using var c = database.OpenConnection(); using var q = new NpgsqlCommand("select studio_thread_id,status,last_error,provider_accepted_at_utc from studio_outbound_email where id=$1", c);
         Add(q, deliveryId); using var r = q.ExecuteReader(); if (!r.Read() || r.IsDBNull(0)) throw new KeyNotFoundException();
-        Guid threadId = r.GetGuid(0); string status = r.GetString(1); string? error=r.IsDBNull(2)?null:r.GetString(2); r.Close(); AssertSendAccess(threadId, user);
+        Guid threadId = r.GetGuid(0); string status = r.GetString(1); string? error=r.IsDBNull(2)?null:r.GetString(2); bool accepted=!r.IsDBNull(3);r.Close(); AssertSendAccess(threadId, user);
+        if(accepted)throw new InvalidOperationException("The provider already accepted this delivery. Reconcile threading instead of resending.");
         if (status is not ("Failed" or "Attention")) throw new InvalidOperationException("Only failed or held deliveries can be retried.");
         if (status == "Attention" && error?.StartsWith("ProviderOutcomeUncertain",StringComparison.Ordinal)==true && !reconciledNotSent) throw new InvalidOperationException("Check provider sent items or message trace and confirm the message was not sent before retrying an uncertain outcome.");
-        using var retry = new NpgsqlCommand("update studio_outbound_email set status='Retry',attempts=0,next_attempt_at_utc=now(),last_error=null where id=$1 and status=$2", c); Add(retry, deliveryId, status); retry.ExecuteNonQuery();
+        using var retry = new NpgsqlCommand("update studio_outbound_email set status='Retry',attempts=0,next_attempt_at_utc=now(),last_error=null where id=$1 and status=$2 and provider_accepted_at_utc is null", c); Add(retry, deliveryId, status); retry.ExecuteNonQuery();
     }
 
     private bool CanSendAsSelf(Guid threadId,ClaimsPrincipal user)
@@ -255,3 +256,4 @@ public sealed class StudioUnifiedMessaging
     internal static void Add(NpgsqlCommand q, params object?[] values) { foreach (var value in values) q.Parameters.AddWithValue(value ?? DBNull.Value); }
     internal static string CurrentUser(ClaimsPrincipal user) => user.FindFirstValue("login_name") ?? user.Identity?.Name ?? throw new UnauthorizedAccessException();
 }
+

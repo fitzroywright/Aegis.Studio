@@ -11,6 +11,7 @@ const equal=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.len
 export function createIntakeApi(env,readBody,json) {
   const store=new IntakeStore(env.INTAKE_DB_PATH || './data/intake.sqlite');
   let credentials;try{credentials=JSON.parse(env.PUBLIC_API_KEYS_JSON || '[]');}catch{throw Error('Invalid PUBLIC_API_KEYS_JSON');}
+  if(!Array.isArray(credentials)||credentials.some(c=>!c.id||typeof c.id!=='string'||typeof c.secret!=='string'||c.secret.length<32||!Array.isArray(c.scopes))||new Set(credentials.map(c=>c.id)).size!==credentials.length)throw Error('Configure unique integration credential IDs, secrets of at least 32 characters, and scopes.');
   const rates=new Map();
   function authenticate(req,scope){
     const token=(req.headers.authorization||'').replace(/^Bearer /,'');
@@ -21,7 +22,7 @@ export function createIntakeApi(env,readBody,json) {
     if(rates.size>2000)for(const k of rates.keys())if(!k.endsWith(`:${minute}`))rates.delete(k);
     if(n>120)fail(429,'rate_limited','Retry after the current minute.');return c.id;
   }
-  async function input(req,limit){try{return JSON.parse((await readBody(req,limit)).toString('utf8'));}catch(e){if(e.status)throw e;fail(400,'invalid_json','Supply valid JSON.');}}
+  async function input(req,limit){try{const p=JSON.parse((await readBody(req,limit)).toString('utf8'));if(!p||typeof p!=='object'||Array.isArray(p))fail(400,'invalid_json','A JSON object is required.');return p;}catch(e){if(e.status)throw e;fail(400,'invalid_json','Supply valid JSON.');}}
   async function sameOrigin(req,url){const origin=req.headers.origin;try{if(!origin||new URL(origin).host!==req.headers.host)throw Error();}catch{fail(403,'origin_rejected','Same-origin browser request required.');}
     const cookies=(req.headers.cookie||'').split(';').map(x=>x.trim());
     if(!req.headers['x-csrf-token']||!equal(cookies.find(x=>x.startsWith('intake_csrf='))?.slice(12),req.headers['x-csrf-token']))fail(403,'csrf_rejected','Reload the form before submitting.');
@@ -100,7 +101,7 @@ export function createIntakeApi(env,readBody,json) {
     if(file&&method==='GET'){authenticate(req,'intake:pull');const r=store.db.prepare("SELECT metadata,content FROM attachments WHERE id=? AND state='Clean'").get(file[1]);if(!r)fail(404,'unavailable','Attachment is unavailable or quarantined.');const m=JSON.parse(r.metadata);res.writeHead(200,{'Content-Type':m.contentType,'Cache-Control':'no-store','Content-Disposition':'attachment'});res.end(r.content);return true;}
     if(route==='/api/public-site/v1/galleries'&&method==='POST'){
       authenticate(req,'gallery:publish');const p=await input(req,1_000_000);if(!/^[0-9a-f-]{36}$/i.test(p.id)||!p.clientId||!Array.isArray(p.items)||p.items.length>10000||!p.title)fail(400,'invalid_gallery','Gallery ID, client ID, title and items required.');
-      store.transaction(()=>{const old=store.db.prepare('SELECT client_id FROM galleries WHERE id=?').get(p.id);if(old&&old.client_id!==p.clientId)fail(409,'gallery_owner','Cannot change gallery owner.');store.db.prepare('INSERT INTO galleries VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').run(p.id,p.clientId,JSON.stringify({...p,published:false}));});json(res,200,{reference:p.id,provider:'PublicSite'});return true;
+      store.transaction(()=>{const old=store.db.prepare('SELECT client_id FROM galleries WHERE id=?').get(p.id);if(old&&old.client_id!==p.clientId)fail(409,'gallery_owner','Cannot change gallery owner.');store.db.prepare('INSERT INTO galleries VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').run(p.id,p.clientId,JSON.stringify({...p,published:false}));});json(res,200,{reference:p.id,provider:'PublicSite',storedVersionIds:store.db.prepare('SELECT id FROM media WHERE gallery_id=?').all(p.id).map(x=>x.id)});return true;
     }
     const publication=route.match(/^\/api\/public-site\/v1\/galleries\/([0-9a-f-]{36})\/(publish|revoke)$/i);
     if(publication&&method==='POST'){
@@ -113,6 +114,7 @@ export function createIntakeApi(env,readBody,json) {
       authenticate(req,'gallery:publish');const r=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(media[1]);if(!r||!JSON.parse(r.payload).items.some(x=>x.versionId===media[2]))fail(404,'not_found','Gallery item not registered.');
       const bytes=await readBody(req,30_000_000),type=String(req.headers['content-type']||'application/octet-stream');
       if(!['image/jpeg','image/png','image/webp'].includes(type))fail(400,'invalid_type','Only raster gallery images accepted.');
+      const old=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?').get(media[1],media[2]);if(old&&(old.type!==type||!Buffer.from(old.content).equals(bytes)))fail(409,'media_conflict','A version ID cannot be reused for different bytes.');
       store.db.prepare('INSERT INTO media VALUES(?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content').run(media[1],media[2],type,bytes);json(res,200,{stored:true});return true;
     }
     fail(404,'not_found','Operation not found.');

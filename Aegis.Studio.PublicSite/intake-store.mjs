@@ -11,12 +11,13 @@ const fingerprint = x => createHash('sha256').update(JSON.stringify(x)).digest('
 export function validateRoster(rows = []) {
   if (!Array.isArray(rows) || rows.length > 5000) fail(400, 'invalid_roster', 'Supply at most 5000 subjects.');
   const seen = new Set();
+  const limits={name:200,reference:200,collection:100,contactName:200,contactEmail:320,contactPhone:100,scheduledAtUtc:50,scheduleLocation:300,notes:4000,pickupNotification:8};
   return rows.map((row, i) => {
     if (!row || typeof row !== 'object') fail(400, 'invalid_roster', 'Invalid row.', { [i]: 'Object required.' });
     const result = {};
     for (const key of ['name','reference','collection','contactName','contactEmail','contactPhone','scheduledAtUtc','scheduleLocation','notes','pickupNotification']) {
       if (row[key] === undefined) continue;
-      if (typeof row[key] !== 'string' || row[key].length > (key === 'notes' ? 4000 : 500)) fail(400, 'invalid_roster', 'Invalid roster value.', { [`${i}.${key}`]: 'Text exceeds limit or has invalid type.' });
+      if (typeof row[key] !== 'string' || row[key].length > limits[key]) fail(400, 'invalid_roster', 'Invalid roster value.', { [`${i}.${key}`]: 'Text exceeds limit or has invalid type.' });
       result[key] = row[key].trim();
     }
     if (!result.name || result.name.toLowerCase() === 'unclassified') fail(400, 'invalid_roster', 'Each subject needs a name; Unclassified is reserved.', { [`${i}.name`]: 'Name required.' });
@@ -25,8 +26,8 @@ export function validateRoster(rows = []) {
     if (!['None', 'Email', 'WhatsApp'].includes(preference) || preference === 'Email' && !result.contactEmail || preference === 'WhatsApp' && !/^\+\d{8,15}$/.test(result.contactPhone || '')) fail(400, 'invalid_roster', 'Notification preference needs a valid contact channel.', { [`${i}.pickupNotification`]: 'Invalid channel or missing contact.' });
     if (result.scheduledAtUtc && !Number.isFinite(Date.parse(result.scheduledAtUtc))) fail(400, 'invalid_roster', 'Invalid subject schedule.');
     result.reference ||= randomUUID(); result.pickupNotification = preference;
-    if (seen.has(result.reference)) fail(400, 'duplicate_subject', 'Resolve duplicate subject references before saving.');
-    seen.add(result.reference); return result;
+    if (seen.has(result.reference.toLowerCase())) fail(400, 'duplicate_subject', 'Resolve duplicate subject references before saving.');
+    seen.add(result.reference.toLowerCase()); return result;
   });
 }
 export class IntakeStore {
@@ -58,8 +59,9 @@ export class IntakeStore {
     return this.replay(owner, key, input, () => {
       const kind = input.kind || 'Booking'; if (!['Inquiry','Booking'].includes(kind)) fail(400, 'invalid_kind', 'Choose Inquiry or Booking.');
       const p = { kind, source: 'Website', submissionMethod: method, externalSource: owner };
+      const limits={clientName:200,clientEmail:320,clientPhone:80,sessionType:200,startsAt:50,endsAt:50,timeZone:100,location:500,notes:4000,destination:200,externalReference:200};
       for (const name of ['clientName','clientEmail','clientPhone','sessionType','startsAt','endsAt','timeZone','location','notes','destination','externalReference']) {
-        if (input[name] !== undefined && (typeof input[name] !== 'string' || input[name].length > (name === 'notes' ? 4000 : 500))) fail(400, 'invalid_field', 'Invalid text field.', { [name]: 'Invalid type or length.' });
+        if (input[name] !== undefined && (typeof input[name] !== 'string' || input[name].length > limits[name])) fail(400, 'invalid_field', 'Invalid text field.', { [name]: 'Invalid type or length.' });
         p[name] = input[name]?.trim() || '';
       }
       if (!p.clientName) fail(400, 'invalid_field', 'Client name is required.', { clientName: 'Required.' });
@@ -110,7 +112,8 @@ export class IntakeStore {
   payment(id,event) {
     return this.transaction(()=>{
       const r=this.db.prepare('SELECT payload FROM intakes WHERE id=?').get(id);if(!r)fail(404,'not_found','Intake not found.');
-      if(!event.eventId||!event.transactionReference||!event.provider||!['Deposit','Refund','Dispute'].includes(event.kind)||event.currency!=='JMD'||!Number.isSafeInteger(event.amountMinor)||event.amountMinor<=0)fail(400,'invalid_payment','Verified event ID, provider, reference, kind and positive minor-unit JMD amount required.');
+      if(JSON.parse(r.payload).kind!=='Booking')fail(409,'booking_required','Verified payment events require a booking.');
+      if(!event.eventId||!event.transactionReference||!event.provider||!['Deposit','Refund','Dispute'].includes(event.kind)||event.currency!=='JMD'||!Number.isSafeInteger(event.amountMinor)||event.amountMinor<=0||event.amountMinor>99_999_999_900)fail(400,'invalid_payment','Verified event ID, provider, reference, kind and positive minor-unit JMD amount required.');
       const hash=fingerprint(event), old=this.db.prepare('SELECT hash,intake_id FROM payment_events WHERE id=?').get(event.eventId);
       if(old){if(old.hash!==hash||old.intake_id!==id)fail(409,'payment_conflict','Event ID reused with different facts.');return {eventId:event.eventId};}
       this.db.prepare('INSERT INTO payment_events VALUES(?,?,?,?)').run(event.eventId,id,hash,JSON.stringify(event));

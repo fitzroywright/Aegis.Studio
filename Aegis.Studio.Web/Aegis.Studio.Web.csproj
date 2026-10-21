@@ -29,7 +29,7 @@
     <EmbeddedResource Include="Email/EmailAssociations.sql" />
     <EmbeddedResource Include="Intake/IntakeSchema.sql" />
     <EmbeddedResource Include="PublicApi/public-v1.openapi.json" />
-    <Content Include="../Aegis.Studio.PublicSite/public/roster-editor.js" Link="wwwroot/roster-editor.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="../Aegis.Studio.PublicSite/public/roster-editor.js" LogicalName="Aegis.Studio.Web.Intake.RosterEditor.js" />
     <Content Update="PublicApi/public-v1.openapi.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

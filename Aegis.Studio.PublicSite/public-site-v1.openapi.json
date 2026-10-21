@@ -33,7 +33,7 @@
           },
           "collection": {
             "type": "string",
-            "maxLength": 200
+            "maxLength": 100
           },
           "contactName": {
             "type": "string",
@@ -45,15 +45,15 @@
           },
           "contactPhone": {
             "type": "string",
-            "maxLength": 200
+            "maxLength": 100
           },
           "scheduledAtUtc": {
             "type": "string",
-            "maxLength": 200
+            "maxLength": 50
           },
           "scheduleLocation": {
             "type": "string",
-            "maxLength": 200
+            "maxLength": 300
           },
           "notes": {
             "type": "string",
@@ -66,7 +66,8 @@
               "Email",
               "WhatsApp"
             ],
-            "default": "None"
+            "default": "None",
+            "maxLength": 8
           }
         },
         "required": [
@@ -78,19 +79,19 @@
         "properties": {
           "clientName": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 200
           },
           "clientEmail": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 320
           },
           "clientPhone": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 80
           },
           "sessionType": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 200
           },
           "location": {
             "type": "string",
@@ -102,11 +103,11 @@
           },
           "destination": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 200
           },
           "externalReference": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 200
           },
           "kind": {
             "type": "string",
@@ -118,15 +119,18 @@
           },
           "startsAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "maxLength": 50
           },
           "endsAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "maxLength": 50
           },
           "timeZone": {
             "type": "string",
-            "default": "America/Jamaica"
+            "default": "America/Jamaica",
+            "maxLength": 100
           },
           "roster": {
             "type": "array",
@@ -367,19 +371,19 @@
         "properties": {
           "clientName": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 200
           },
           "clientEmail": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 320
           },
           "clientPhone": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 80
           },
           "sessionType": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 200
           },
           "location": {
             "type": "string",
@@ -391,11 +395,11 @@
           },
           "destination": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 200
           },
           "externalReference": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 200
           },
           "kind": {
             "type": "string",
@@ -407,15 +411,18 @@
           },
           "startsAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "maxLength": 50
           },
           "endsAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "maxLength": 50
           },
           "timeZone": {
             "type": "string",
-            "default": "America/Jamaica"
+            "default": "America/Jamaica",
+            "maxLength": 100
           },
           "roster": {
             "type": "array",
@@ -1841,6 +1848,14 @@
                       "enum": [
                         "PublicSite"
                       ]
+                    },
+                    "storedVersionIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "description": "Already stored immutable versions; skip these on a resumed upload."
                     }
                   },
                   "required": []
