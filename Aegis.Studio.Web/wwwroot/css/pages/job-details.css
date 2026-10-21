@@ -335,3 +335,6 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
 .jd-job-identity .jd-flow-drawer-inner { min-height:0; min-width:0; overflow:visible; }
 .jd-job-identity .jd-flow-drawer .jd-workflow-track { max-height:none; overflow:visible; }
 @media(prefers-reduced-motion:reduce) { .jd-job-identity .jd-flow-drawer,.jd-job-identity .jd-flow-drawer.is-open { transition:none; } }
+
+.jd-job-identity-menu .jd-status-pill { max-width:100%; padding:3px 9px; font-size:10px; }
+.jd-job-identity-menu [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
