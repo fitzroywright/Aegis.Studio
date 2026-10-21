@@ -296,8 +296,8 @@ public sealed class JobGraphStore(StudioDatabase database)
         else
         {
             if (!task.Task!.Optional) throw new ArgumentException("Only optional workflow tasks can be skipped.");
-            if (current is "Completed" or "Skipped") throw new ArgumentException("This workflow task is already closed.");
-            Execute(c, tx, "update studio_job_activities set status='Skipped',completed_at_utc=now(),updated_at_utc=now() where job_id=$1 and workflow_node_id=$2", job, request.NodeId);
+            if (current is "Completed" or "Cancelled") throw new ArgumentException("This workflow task is already closed.");
+            Execute(c, tx, "update studio_job_activities set status='Cancelled',completed_at_utc=now(),updated_at_utc=now() where job_id=$1 and workflow_node_id=$2", job, request.NodeId);
         }
         Record(c, tx, job, request.OperationId, request, actor, "JobWorkflowTask" + char.ToUpperInvariant(request.Action[0]) + request.Action[1..]);
         tx.Commit();
