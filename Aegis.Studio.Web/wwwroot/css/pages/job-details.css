@@ -37,7 +37,8 @@
 /* Job identity, floating menus, and compact workflow are owned by this layout. */
 .jd-job-name-stack { position:relative; display:flex; flex:0 1 58%; flex-direction:column; gap:2px; width:58%; min-width:140px; }
 .jd-job-name-toggle { display:inline-flex; flex:0 1 auto; align-items:center; gap:9px; width:100%; max-width:100%; min-width:0; padding:2px 8px 3px 0; border:0; border-radius:4px; background:transparent; color:var(--theme-text,#162b50); font:inherit; font-size:clamp(13px,1.35vw,19px); line-height:1.15; font-weight:750; text-align:left; cursor:pointer; }
-.jd-job-name-toggle > span:first-child { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.jd-job-name-icon { flex:none; width:17px; height:17px; color:#d97827; }
+.jd-job-name-text { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .jd-job-name-chevron { flex:none; color:#a45a17; transition:transform .18s ease; }
 .jd-job-name-toggle[aria-expanded=true] .jd-job-name-chevron { transform:rotate(180deg); }
 .jd-job-name-toggle:focus-visible { outline:2px solid #d97827; outline-offset:3px; }
@@ -56,6 +57,7 @@
 .jd-job-name-stack .jd-next-step > div { min-width:0; flex:1 1 auto; overflow:hidden; }
 .jd-job-name-stack .jd-next-step small { display:none; }
 .jd-job-name-stack .jd-next-step p { margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; line-height:1.2; }
+.jd-job-name-stack .jd-next-step p strong { color:var(--theme-text,#162b50); font-weight:850; }
 .jd-job-name-stack .jd-next-step button { flex:none; max-width:42%; padding:3px 6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:9px; }
 .jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li { flex:1 1 0; width:0; min-width:0; height:26px; }
 .jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after { min-width:2px; margin:0; }
