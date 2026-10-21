@@ -7534,8 +7534,7 @@ body[data-studio-view="today"] .mw-today-toolbar-actions [data-assign-job-lead]:
   display: none;
 }
 .mw-today-right .mw-session-row {
-  min-width: 0;
-  grid-template-columns: minmax(0,1fr) auto;
+  min-width: 0;;
 }
 .mw-today-right .mw-session-row {
   grid-template-columns: minmax(58px,.7fr) minmax(0,1.3fr);
@@ -7868,8 +7867,7 @@ body[data-studio-view="today"] .mw-list-panel>header h2 {
   font-size: .85rem;
 }
 .studio-context-rail .studio-context-card>header h2 {
-  font-weight: 600;
-  font-size: .85rem;
+  font-weight: 600;;
 }
 body[data-studio-view="today"] .mw-today-right .mw-list-panel>header button {
   background: transparent !important;
@@ -8041,8 +8039,7 @@ body .shell>.studio-context-rail .mw-list-panel>header {
 .shell>.studio-context-rail {
   display: grid !important;
   grid-template-rows: repeat(3,minmax(0,1fr));
-  align-content: stretch;
-  overflow: hidden;
+  align-content: stretch;;
 }
 .shell>.studio-context-rail>.studio-context-card {
   min-height: 0;
@@ -8306,10 +8303,7 @@ body[data-studio-view="today"] .mw-today-focus-label {
   padding: 2px 7px;
   font-size: .58rem;
 }
-.shell>.studio-context-rail {
-  padding-top: 62px;
-  padding-bottom: 6px;
-  gap: 7px;
+.shell>.studio-context-rail {;;;
 }
 body[data-studio-view="today"] .mw-today-page {
   padding-top: 62px !important;
