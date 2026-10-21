@@ -138,7 +138,7 @@
    if(!canEdit||uploading||!files.length)return;uploading=true;
    try{
     if(pendingBatch)throw Error('Retry the pending batch before adding more files.');
-    const view=await json(`/api/jobs/${job.id}/connected-workflow`),sessions=view.data.sessions||[];
+    const view=await json(`/api/jobs/${job.id}/shoot-sessions`),sessions=view||[];
     let sessionId=sessions[0]?.id||null;
     if(sessions.length>1){
      sessionId=await new Promise(resolve=>{const d=studioDialog('Choose upload session',`<form><label>Session<select name="session">${sessions.map(s=>`<option value="${escape(s.id)}">${escape(s.title)}</option>`).join('')}</select></label><button type="submit" class="primary">Upload</button></form>`);d.addEventListener('close',()=>resolve(null),{once:true});d.querySelector('form').onsubmit=e=>{e.preventDefault();resolve(e.currentTarget.elements.session.value);d.close();};});
