@@ -3554,12 +3554,6 @@ body[data-studio-view] .avatar {
 .op-card {
   overflow: hidden;
 }
-.pos-panel {
-  overflow: hidden;
-}
-.pos-history {
-  overflow: hidden;
-}
 .studio-card {
   overflow: hidden;
 }
@@ -3580,10 +3574,6 @@ body[data-studio-view] .avatar {
   min-height: 52px;
   background: #fff;
   transition: background .12s ease,transform .12s ease;
-}
-.pos-catalog-item {
-  min-height: 52px
-
 }
 .job-row strong {
   color: #21150f;
@@ -3608,9 +3598,6 @@ body[data-studio-view] .avatar {
   color: #716a63;
 }
 .frontdesk-client-row small {
-  color: #716a63;
-}
-.pos-catalog-item small {
   color: #716a63;
 }
 .studio-table {
@@ -3991,18 +3978,6 @@ body:not([data-studio-view="today"]):not([data-studio-view="workspaces"]) .gener
 }
 .production-queue-card {
   background: #fff;
-}
-.pos-panel {
-  border: 1px solid var(--studio-border);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(23,52,78,.045);
-}
-.pos-history {
-  border: 1px solid var(--studio-border);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(23,52,78,.045);
 }
 .studio-card {
   border: 1px solid var(--studio-border);
@@ -4481,9 +4456,6 @@ body[data-studio-view="reports"] .op-card {
   border-color: var(--studio-border-soft) !important;
 }
 .frontdesk-client-row {
-  border-color: var(--studio-border-soft) !important;
-}
-.pos-catalog-item {
   border-color: var(--studio-border-soft) !important;
 }
 
@@ -6791,11 +6763,6 @@ body[data-studio-view="workspaces"] .generic {
   font-size: 24px;
   line-height: 1;
   color: var(--theme-muted,#69758b);
-}
-.away-digest-list {
-  display: grid;
-  max-height: 460px;
-  overflow: auto;
 }
 .away-digest-list>button {
   display: grid;
