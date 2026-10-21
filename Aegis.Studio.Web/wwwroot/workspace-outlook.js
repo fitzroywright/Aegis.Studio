@@ -164,7 +164,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     <div id="jobIdentityMenu" class="jd-job-identity-menu" role="region" aria-label="Job details" hidden>
                         <dl>
                             <div><dt>Client</dt><dd>${esc(clientName)}</dd></div>
-                            <div><dt>Owner</dt><dd>${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</dd></div>
+                            <div><dt>Owner</dt><dd data-job-owner>${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</dd></div>
                             <div><dt>Job Type</dt><dd>${esc(jobType)}</dd></div>
                             <div><dt>Event Date</dt><dd>${esc(eventDate)}</dd></div>
                             <div><dt>Location</dt><dd data-job-location>Loading…</dd></div>
@@ -350,7 +350,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(!current()||request!==workflowRequest)return;
                     if(graphView?.graph)StudioJobDetails.compact(header.querySelector('.jd-workflow-track'),graphView,job,header.querySelector('.jd-flow-summary'),view);
                     header.querySelector('.jd-status-pill').textContent=data.stage;
-                    header.querySelector('[data-job-owner]').textContent='Owner: '+(data.owner?studioFirstName(data.owner):'Unassigned');
+                    header.querySelector('[data-job-owner]').textContent=data.owner?studioFirstName(data.owner):'Unassigned';
                     const crew=(data.sessions||[]).flatMap(session=>session.crew||[]);
                     const photographers=[...new Set(crew.map(person=>person.user_name).filter(Boolean))];
                     header.querySelector('[data-job-photographer]').textContent=photographers.length?photographers.map(person=>studioFirstName(person)).join(', '):job.assignedTo?studioFirstName(job.assignedTo):'Unassigned';
