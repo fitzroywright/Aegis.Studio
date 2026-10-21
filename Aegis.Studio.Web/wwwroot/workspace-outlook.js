@@ -163,7 +163,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     <button type="button" class="jd-job-name-toggle" aria-expanded="false" aria-controls="jobIdentityMenu" title="Show job details"><span>${esc(job.title)}</span><span class="jd-job-name-chevron" aria-hidden="true">⌄</span></button>
                     <div id="jobIdentityMenu" class="jd-job-identity-menu" role="region" aria-label="Job details" hidden>
                         <dl>
-                            <div><dt>Current Status</dt><dd><button type="button" class="jd-status-pill" aria-expanded="false" aria-controls="jobFlowDrawer" title="Show flow details">${esc(job.status)}</button></dd></div>
+                            <div><dt>Current Status</dt><dd><span class="jd-status-pill jd-status-label">${esc(job.status)}</span></dd></div>
                             <div><dt>Days in Stage</dt><dd data-stage-age>Loading…</dd></div>
                             <div><dt>Client</dt><dd>${esc(clientName)}</dd></div>
                             <div><dt>Owner</dt><dd data-job-owner>${esc(job.jobLead?studioFirstName(job.jobLead):'Unassigned')}</dd></div>
@@ -180,7 +180,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 <div class="jd-job-status"><small>${job.jobCode||job.code?'Job Code · '+esc(job.jobCode||job.code):''}</small></div>
                 <section class="jd-next-step" aria-label="Next job action" aria-live="polite"><p role="status">Loading next step…</p></section>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
-            const flowToggle=header.querySelector('.jd-status-pill'),flowDrawer=header.querySelector('.jd-flow-drawer');
+            const flowDrawer=header.querySelector('.jd-flow-drawer');
             const identityToggle=header.querySelector('.jd-job-name-toggle'),identityMenu=header.querySelector('.jd-job-identity-menu');
             const setIdentityOpen=open=>{
                 identityToggle.setAttribute('aria-expanded',String(open));
@@ -196,24 +196,22 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     event.preventDefault();setIdentityOpen(false);identityToggle.focus();
                 }
             });
-            let flowTrigger=flowToggle;
+            let flowOpen=false,flowTrigger=null;
             const setFlowOpen=(open,restoreFocus=false)=>{
-                flowToggle.setAttribute('aria-expanded',String(open));
-                flowToggle.title=open?'Hide flow details':'Show flow details';
+                flowOpen=open;
                 flowDrawer.classList.toggle('is-open',open);
                 flowDrawer.setAttribute('aria-hidden',String(!open));
                 flowDrawer.toggleAttribute('inert',!open);
-                if(restoreFocus)flowTrigger.focus();
+                if(restoreFocus)flowTrigger?.focus();
             };
-            flowToggle.onclick=event=>{flowTrigger=event.currentTarget;setFlowOpen(flowToggle.getAttribute('aria-expanded')!=='true');};
             const dismissWorkflow=event=>{
-                if(flowToggle.getAttribute('aria-expanded')==='true'&&!event.target.closest('.jd-flow-drawer,.jd-status-pill,.jd-flow-overview'))setFlowOpen(false);
+                if(flowOpen&&!event.target.closest('.jd-flow-drawer,.jd-flow-overview'))setFlowOpen(false);
             };
             document.addEventListener('pointerdown',dismissWorkflow);
-            header.querySelector('.jd-flow-summary').addEventListener('click',event=>{const icon=event.target.closest('[data-flow-phase]');if(icon){flowTrigger=icon;setFlowOpen(true);}},true);
+            header.querySelector('.jd-flow-summary').addEventListener('click',event=>{const icon=event.target.closest('[data-flow-phase]');if(icon){flowTrigger=icon;setFlowOpen(!flowOpen);}},true);
             header.addEventListener('studio-flow-details-toggle',event=>setFlowOpen(event.detail.open));
             header.addEventListener('keydown',event=>{
-                if(event.key==='Escape'&&flowToggle.getAttribute('aria-expanded')==='true'){
+                if(event.key==='Escape'&&flowOpen){
                     event.preventDefault();event.stopPropagation();setFlowOpen(false,true);
                 }
             });
