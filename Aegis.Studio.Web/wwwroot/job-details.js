@@ -3,6 +3,10 @@
  'use strict';
  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const put=(url,body)=>json(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ function renderWorkflowSummary(host,items){
+  if(!host)return;
+  host.innerHTML=items.map(item=>`<li class="jd-flow-phase ${item.state||''}" ${item.phase?`data-flow-phase="${escape(item.phase)}"`:''} title="${escape(item.title||item.label)}"><button type="button" class="jd-workflow-dot ${item.tone||''}" ${item.node?`data-workflow-node="${escape(item.node)}"`:''} ${item.expanded!==undefined?`aria-expanded="${item.expanded}"`:''} ${item.tone?`data-flow-tone="${item.tone}"`:''} title="${escape(item.title||item.label)}" aria-label="${escape(item.title||item.label)}"><span class="jd-stage-light" aria-hidden="true">${escape(item.icon||'')}</span><strong>${escape(item.short||item.label)}</strong></button><span class="sr-only">${escape(item.description||'')}</span></li>`).join('');
+ }
  // Job stages stay aligned with WorkflowRules; milestones read existing session facts.
  const phases=['Pending','Needs Assignment','Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload','Awaiting Production Review','Active Production','Awaiting Approval','Ready for Delivery','Delivered','Completed','Changes Requested','Cancelled','Blocked','Reshoot Required'];
  const photographyStages=new Set(['Needs Photographer Assignment','Photographer Assigned','Awaiting Scheduling','Scheduled','Photography In Progress','Shoot Complete','Awaiting Upload']);
@@ -54,14 +58,15 @@
   host.setAttribute('aria-label','Job workflow: '+data.stage+(data.blockedReason?' · Blocked: '+data.blockedReason:''));
   if(summaryHost){
    const activeStage=main.includes(data.stage)?data.stage:lastNormal;
-   summaryHost.innerHTML=groups.map(([title,steps])=>{
+   renderWorkflowSummary(summaryHost,groups.map(([title,steps])=>{
     const applicable=steps.filter(label=>!(noShoot&&photographyStages.has(label)));
     const skipped=!applicable.length,complete=!skipped&&applicable.every(hostStageComplete);
     const current=steps.includes(activeStage),exception=current&&(!main.includes(data.stage)||!!data.blockedReason||title==='Shoot'&&reshoot);
     const state=skipped?'skipped':complete?'complete':exception?'current exception':current?'current':'pending';
     const description=skipped?'Not required':complete?'Successfully passed':exception?'Needs attention':current?'Current':'Not yet passed';
-    return `<li class="jd-flow-phase ${state}" data-flow-phase="${title}" title="${title} · ${description}"><span class="jd-stage-light" aria-hidden="true">${skipped?'–':complete?'✓':exception?'!':''}</span><span>${title}</span><span class="sr-only">${description}</span></li>`;
-   }).join('');
+    const icon=skipped?'–':complete?'✓':exception?'!':'';
+    return {phase:title,label:title,icon,state,tone:complete?'green':exception?'red':current?'amber':'gray',description,title:title+' · '+description};
+   }));
    summaryHost.setAttribute('aria-label','Main job flow: '+data.stage);
   }
   host.querySelectorAll('[data-flow-stage]').forEach(button=>{
@@ -297,7 +302,11 @@
     if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw(id);}else{selected=id;details(node,id);}
    });
    if(focus)[...host.querySelectorAll('[data-workflow-node]')].find(b=>b.dataset.workflowNode===focus)?.focus();
-   if(summaryHost){summaryHost.innerHTML=view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>{const open=n.kind==='Subflow'&&(expanded===n.id||expanded?.startsWith(n.id+'/'));return `<li class="${open?'jd-main-expanded':''}">${open?`<div class="jd-main-endpoints" data-main-expanded="${esc(n.id)}">${dot(n,n.id).replace('class="jd-workflow-dot ','data-main-start class="jd-workflow-dot ').replace(`<strong>${esc(shortLabel(n.label))}</strong>`,'<strong>Start</strong>')}<span class="jd-main-dashed" aria-hidden="true"></span>${dot(n,n.id).replace('class="jd-workflow-dot ','data-main-complete class="jd-workflow-dot ').replace(`<strong>${esc(shortLabel(n.label))}</strong>`,'<strong>Complete</strong>')}</div>`:dot(n,n.id)}</li>`;}).join('');summaryHost.querySelectorAll('[data-workflow-node]').forEach(b=>b.onclick=()=>{const id=b.dataset.workflowNode,node=find(view.graph,id);if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw();}else{const close=selected===id;expanded=null;selected=close?null:id;draw();if(!close)details(node,id);}summaryHost.querySelectorAll('[data-workflow-node]').forEach(button=>{if(button.dataset.workflowNode===id)button.focus();});});}
+   if(summaryHost){renderWorkflowSummary(summaryHost,view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>{
+    const status=state(n,n.id),tone=status==='Completed'?'green':['Available','InProgress','Partial','ReadyForDelivery'].includes(status)?'amber':['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient'].includes(status)?'red':'gray';
+    const icon=tone==='green'?'✓':status==='Skipped'||status==='Inactive'?'–':status==='Available'?'▶':tone==='amber'?'◉':tone==='red'?'!':'○';
+    return {node:n.id,label:n.label,short:shortLabel(n.label),icon,tone,state:status.toLowerCase(),expanded:n.kind==='Subflow'&&(expanded===n.id||expanded?.startsWith(n.id+'/')),title:n.label+': '+summary(n,n.id)};
+   }));summaryHost.querySelectorAll('[data-workflow-node]').forEach(b=>b.onclick=()=>{const id=b.dataset.workflowNode,node=find(view.graph,id);if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw();}else{const close=selected===id;expanded=null;selected=close?null:id;draw();if(!close)details(node,id);}summaryHost.querySelectorAll('[data-workflow-node]').forEach(button=>{if(button.dataset.workflowNode===id)button.focus();});});}
    if(summaryHost){notifyDrawer();scheduleRoutes();}
   }
   let routeFrame=0;
