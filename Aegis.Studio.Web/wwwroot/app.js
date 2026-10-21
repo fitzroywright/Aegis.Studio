@@ -94,7 +94,7 @@ async function openConversation(id) {
             ${conversation.messages.map(message => `
                 <article class="message ${message.visibility.toLowerCase()}" data-message-id="${esc(message.id)}">
                     <div class="message-head">${esc(message.visibility.toUpperCase())} · ${esc(message.author)} · ${new Date(message.createdAt).toLocaleString()}</div>
-                    <p>${esc(message.body)}</p>
+                    ${StudioEmailBody.render(message)}
                 </article>`).join('')}
         </div>
     if(selectedConversation===id){

@@ -25,7 +25,7 @@ function fixture(){
         if(url==='/api/messages/identity')return {displayName:'Paul',emailAddress:'paul@studio.test'};
         return [];
     };
-    for(const name of ['studio-status-order.js','subject-picker.js','studio-message-card.js'])w.eval(fs.readFileSync(path.join(__dirname,'../../Aegis.Studio.Web/wwwroot',name),'utf8'));
+    for(const name of ['studio-status-order.js','subject-picker.js','studio-email-body.js','studio-message-card.js'])w.eval(fs.readFileSync(path.join(__dirname,'../../Aegis.Studio.Web/wwwroot',name),'utf8'));
     w.ResizeObserver=class{observe(){}disconnect(){}};w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
     w.eval(source);return {dom,w,requests};
 }
@@ -64,4 +64,19 @@ test('Known delivery failure retries without uncertain outcome confirmation',asy
 });
 test('Reply attachments and request identity survive a failed send and retry',async()=>{
  const f=fixture();try{const w=f.w,sent=[];await w.showStudioMessages();w.document.querySelector('[data-inbox-message]').click();await new Promise(r=>setImmediate(r));w.document.getElementById('studioMessageBody').value='Production reply';Object.defineProperty(w.document.getElementById('studioMessageFile'),'files',{value:[new w.File(['document'],'handoff.pdf',{type:'application/pdf'})]});w.fetch=async(url,o)=>{if(url==='/api/messages/send'){sent.push(o.body);return {ok:sent.length>1,json:async()=>sent.length>1?{threadId:'thread-1'}:{error:'Temporary failure'}};}return {ok:true};};let form=w.document.getElementById('studioMessageComposer');await form.onsubmit({preventDefault(){},target:form});assert.match(w.document.getElementById('studioSendFeedback').textContent,/Temporary failure/);assert.equal(w.document.getElementById('studioMessageBody').value,'Production reply');await form.onsubmit({preventDefault(){},target:form});const first=JSON.parse(sent[0].get('message')),second=JSON.parse(sent[1].get('message'));assert.equal(first.requestId,second.requestId);assert.equal(first.threadId,'thread-1');assert.equal(first.body,'Production reply');assert.equal(sent[0].get('files').name,'handoff.pdf');}finally{f.dom.window.close();}
+});
+
+test('Inbound history renders the reply with recoverable collapsed original',async()=>{
+ const f=fixture();try{
+  const original=f.w.json;
+  const body='Check if this is reply 2  On Wed, Oct 21, 2026, 08:53 Weddings <weddings@studio.test> wrote: Previous reply';
+  f.w.json=async(url,...args)=>url==='/api/messages/threads/thread-1'
+   ?[{id:'message-1',senderUserName:'Client',body,externalMessageId:'provider-id',createdAtUtc:'2026-10-21T13:00:00Z'}]
+   :original(url,...args);
+  await f.w.showStudioMessages();f.w.document.querySelector('[data-inbox-message]').click();await new Promise(r=>setImmediate(r));
+  const pane=f.w.document.getElementById('messageConversationPane');
+  assert.equal(pane.querySelector('.studio-email-body').textContent,'Check if this is reply 2');
+  const details=pane.querySelector('.studio-email-signature');assert(details);assert.equal(details.open,false);
+  assert.ok(details.textContent.includes(body));
+ }finally{f.dom.window.close();}
 });

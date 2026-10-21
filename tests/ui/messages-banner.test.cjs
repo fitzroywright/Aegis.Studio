@@ -12,7 +12,7 @@ async function environment(t,config={}){
   if(url==='/api/messages/threads')return [thread];if(url==='/api/messages/threads/thread')return [message];
   if(url==='/api/messages/identity')return {displayName:'Studio'};return [];
  }});w.HTMLElement.prototype.scrollIntoView=function(){};
- for(const f of ['studio-message-card.js','studio-page.js','messages.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+ for(const f of ['studio-email-body.js','studio-message-card.js','studio-page.js','messages.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
  await w.showStudioMessages();return {w,calls};
 }
 test('Messages puts controls above both panes and keeps only context and attention on the rail',async t=>{

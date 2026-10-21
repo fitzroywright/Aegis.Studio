@@ -45,34 +45,8 @@
     const inboxJob = thread => thread.scopeType === 'Job' ? (thread.title || thread.scopeId || 'Job') : '—';
     const inboxRecipient = (message,thread) => (message.recipientAddresses?.length ? message.recipientAddresses.join(', ') : '') || message.recipientUserName || message.recipient || (thread.scopeType === 'Job' ? 'Job team' : thread.scopeType === 'Workspace' ? 'Workspace team' : thread.scopeType === 'Direct' ? thread.title : 'Conversation');
 
-    function splitInboundSignature(body) {
-        const text=String(body||'').replace(/\r\n?/g,'\n');
-        const lines=text.split('\n');
-        const quoteIndex=lines.findIndex(line=>/^(?:On .{1,180} wrote:|-----Original Message-----|From:\s+\S|_{5,})/i.test(line.trim()));
-        const searchEnd=quoteIndex<0?lines.length:quoteIndex;
-        let signatureStart=-1;
-        const explicit=/^(?:--\s*|sent from my (?:iphone|ipad|android|device)|sent from outlook|sent via (?:the )?mail for windows|get outlook for (?:ios|android))/i;
-        const closing=/^(?:best regards|kind regards|warm regards|regards|sincerely|yours sincerely|thank you|thanks)[,!]?$/i;
-        for(let i=1;i<searchEnd;i++) {
-            const line=lines[i].trim();
-            if(explicit.test(line)) {
-                const trailing=lines.slice(i+1,searchEnd).filter(value=>value.trim()).length;
-                if(trailing<=12){signatureStart=i;break;}
-            }
-            if(closing.test(line)) {
-                const trailing=lines.slice(i+1,searchEnd).filter(value=>value.trim()).length;
-                if(trailing>0&&trailing<=8){signatureStart=i;break;}
-            }
-        }
-        if(signatureStart<0)return {body:text,signature:''};
-        const signatureEnd=quoteIndex<0?lines.length:quoteIndex;
-        const main=[...lines.slice(0,signatureStart),...lines.slice(signatureEnd)].join('\n').replace(/\n+$/,'');
-        const signature=lines.slice(signatureStart,signatureEnd).join('\n').trim();
-        return {body:main,signature};
-    }
-    const inboundBody = message => message?.internetMessageId || message?.externalMessageId
-        ? splitInboundSignature(message.body) : {body:String(message?.body||''),signature:''};
-    const inboxMessagePreview = message => inboundBody(message).body.replace(/\s+/g,' ').trim().slice(0,220);
+    const inboundBody = message => StudioEmailBody.parts(message);
+    const inboxMessagePreview = message => (inboundBody(message).body || (inboundBody(message).collapsed ? 'No new reply text' : '')).replace(/\s+/g,' ').trim().slice(0,220);
 
     async function showMessages() {
         const current=StudioPage.begin('messages');
@@ -365,8 +339,7 @@
         return `<article class="studio-chat-message" data-message-id="${esc(message.id)}">
             <div class="studio-chat-meta"><strong>${esc(message.senderUserName)}</strong><span>${new Date(message.createdAtUtc).toLocaleString()}</span></div>
             ${message.subject?`<strong>${esc(message.subject)}</strong>`:''}
-            <div class="studio-chat-body">${renderMentions(inboundBody(message).body)}</div>
-            ${inboundBody(message).signature?`<details class="studio-email-signature"><summary>Show email signature</summary><div class="studio-chat-body">${esc(inboundBody(message).signature)}</div></details>`:''}
+            ${StudioEmailBody.render(message, renderMentions)}
             ${files.length?`<div class="studio-message-files">${files.map(file=>`<a href="/api/message-attachments/${file.id}" target="_blank" rel="noopener"><strong>${esc(file.fileName)}</strong><small>${formatBytes(file.size)}</small></a>`).join('')}</div>`:''}
             ${deliveries.filter(d=>d.messageId===message.id).length?`<details class="studio-delivery-details"><summary>Delivery · ${esc([...new Set(deliveries.filter(d=>d.messageId===message.id).map(d=>deliveryLabel(d.status)))].join(', '))}</summary>${deliveries.filter(d=>d.messageId===message.id).map(d=>`<div><span>${esc(d.transport)} · ${esc(d.recipient)} · ${esc(deliveryLabel(d.status))} ${esc(d.detail||'')}${d.providerAcceptedAtUtc?' · Accepted '+esc(new Date(d.providerAcceptedAtUtc).toLocaleString()):''}${d.threadingVerificationStatus?' · Threading '+esc(d.threadingVerificationStatus):''}${d.deliveryId?' · Delivery '+esc(d.deliveryId):''}</span>${d.transport==='Routing'&&d.status==='Attention'&&d.recipient!=='Attachments'?`<button class="st-link" data-retry-routing="${esc(message.id)}">Resolve again</button>`:''}${d.deliveryId&&['Failed','Attention'].includes(d.status)?`<button class="st-link" data-retry-delivery="${esc(d.deliveryId)}" data-uncertain="${String(d.status==='Attention'&&String(d.detail).startsWith('ProviderOutcomeUncertain'))}">Retry</button>`:''}</div>`).join('')}</details>`:''}
         </article>`;
