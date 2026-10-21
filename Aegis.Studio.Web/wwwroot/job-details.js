@@ -236,7 +236,7 @@
   host.studioJobMedia?.dispose();host.studioJobMedia=controller;
   await load();return controller;
  }
- root.StudioJobDetails={workflow,phaseIndex,media,nextStep};
+ root.StudioJobDetails={workflow,phaseIndex,media,nextStep,renderWorkflowSummary};
 })(window);
 
 // Job-only compact projection. The template designer retains the complete editable canvas.
@@ -302,7 +302,7 @@
     if(node.kind==='Subflow'){expanded=expanded===id?null:id;selected=null;draw(id);}else{selected=id;details(node,id);}
    });
    if(focus)[...host.querySelectorAll('[data-workflow-node]')].find(b=>b.dataset.workflowNode===focus)?.focus();
-   if(summaryHost){renderWorkflowSummary(summaryHost,view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>{
+   if(summaryHost){root.StudioJobDetails.renderWorkflowSummary(summaryHost,view.graph.nodes.filter(n=>!['Start','End'].includes(n.kind)&&state(n,n.id)!=='Inactive').map(n=>{
     const status=state(n,n.id),tone=status==='Completed'?'green':['Available','InProgress','Partial','ReadyForDelivery'].includes(status)?'amber':['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient'].includes(status)?'red':'gray';
     const icon=tone==='green'?'✓':status==='Skipped'||status==='Inactive'?'–':status==='Available'?'▶':tone==='amber'?'◉':tone==='red'?'!':'○';
     return {node:n.id,label:n.label,short:shortLabel(n.label),icon,tone,state:status.toLowerCase(),expanded:n.kind==='Subflow'&&(expanded===n.id||expanded?.startsWith(n.id+'/')),title:n.label+': '+summary(n,n.id)};
