@@ -57,6 +57,57 @@ public sealed class WorkerDirectory(StudioDatabase database)
         command.ExecuteNonQuery();
     }
 
+    public WorkerAssignment Assign(WorkerAssignment assignment)
+    {
+        if (assignment.Id == Guid.Empty || assignment.JobId == Guid.Empty)
+            throw new ArgumentException("A valid assignment and job are required.");
+        if (string.IsNullOrWhiteSpace(assignment.WorkerUserName) || string.IsNullOrWhiteSpace(assignment.WorkerTypeCode))
+            throw new ArgumentException("Worker and worker type are required.");
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
+        if (assignment.IsPrimary)
+        {
+            using NpgsqlCommand clear = connection.CreateCommand();
+            clear.Transaction = transaction;
+            clear.CommandText = "update studio_job_worker_assignments set is_primary=false,updated_at_utc=now() where job_id=$1";
+            clear.Parameters.AddWithValue(assignment.JobId);
+            clear.ExecuteNonQuery();
+        }
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            insert into studio_job_worker_assignments
+                (id,job_id,worker_user_name,worker_type_code,responsibility,is_primary,status,starts_at_utc,ends_at_utc,accepted_at_utc,completed_at_utc)
+            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            on conflict(id) do update set worker_user_name=excluded.worker_user_name,
+                worker_type_code=excluded.worker_type_code,responsibility=excluded.responsibility,
+                is_primary=excluded.is_primary,status=excluded.status,starts_at_utc=excluded.starts_at_utc,
+                ends_at_utc=excluded.ends_at_utc,accepted_at_utc=excluded.accepted_at_utc,
+                completed_at_utc=excluded.completed_at_utc,updated_at_utc=now()
+            """;
+        foreach (object? value in new object?[]
+        {
+            assignment.Id, assignment.JobId, assignment.WorkerUserName.Trim(), assignment.NormalizedWorkerTypeCode,
+            assignment.Responsibility.Trim(), assignment.IsPrimary, assignment.Status.Trim(),
+            assignment.StartsAtUtc, assignment.EndsAtUtc, assignment.AcceptedAtUtc, assignment.CompletedAtUtc
+        }) command.Parameters.AddWithValue(value ?? DBNull.Value);
+        command.ExecuteNonQuery();
+        transaction.Commit();
+        return assignment;
+    }
+
+    public void SetStatus(Guid assignmentId, string status)
+    {
+        if (assignmentId == Guid.Empty || string.IsNullOrWhiteSpace(status))
+            throw new ArgumentException("Assignment and status are required.");
+        using NpgsqlConnection connection = database.OpenConnection();
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "update studio_job_worker_assignments set status=$2,accepted_at_utc=case when $2='Accepted' and accepted_at_utc is null then now() else accepted_at_utc end,completed_at_utc=case when $2='Completed' then coalesce(completed_at_utc,now()) else completed_at_utc end,updated_at_utc=now() where id=$1";
+        command.Parameters.AddWithValue(assignmentId);
+        command.Parameters.AddWithValue(status.Trim());
+        if (command.ExecuteNonQuery() == 0) throw new KeyNotFoundException("Worker assignment was not found.");
+    }
+
     public IReadOnlyList<WorkerAssignment> GetAssignments(Guid jobId)
     {
         using NpgsqlConnection connection = database.OpenConnection();
