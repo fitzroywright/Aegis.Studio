@@ -380,3 +380,7 @@ body[data-theme="fluent-dark"] .jd-workflow-dot.blocked,body[data-theme="fluent-
  .jd-job-name-stack .jd-job-identity-menu { width:min(410px,calc(100vw - 32px)); }
  .jd-job-identity .jd-flow-overview { flex:1 1 100%; width:100%; }
 }
+
+/* Let the identity row span the full Job Details header so the workflow reaches the right edge. */
+.job-detail-heading > .jd-job-identity { grid-column:1/-1; width:100%; }
+.job-detail-heading > .jd-job-status { display:none; }
