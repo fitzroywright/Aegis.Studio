@@ -58,7 +58,9 @@
 .jd-job-name-stack .jd-next-step small { display:none; }
 .jd-job-name-stack .jd-next-step p { margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; line-height:1.2; }
 .jd-job-name-stack .jd-next-step p strong { color:var(--theme-text,#162b50); font-weight:850; }
-.jd-job-name-stack .jd-next-step button { flex:none; max-width:42%; padding:3px 6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:9px; }
+.jd-job-name-stack .jd-next-step button:not(.jd-next-step-action-link) { flex:none; max-width:42%; padding:3px 6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:9px; }
+.jd-job-name-stack .jd-next-step-action-link { flex:1 1 auto; min-width:0; padding:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; text-align:left; }
+.jd-next-step-action-link span { display:inline-block; margin-left:3px; }
 .jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li { flex:1 1 0; width:0; min-width:0; height:26px; }
 .jd-job-identity .jd-flow-summary:has(.jd-workflow-dot)>li:not(:last-child)::after { min-width:2px; margin:0; }
 .jd-job-identity .jd-flow-summary .jd-workflow-dot { position:relative; display:flex; flex-direction:column; align-items:center; gap:2px; width:18px; min-width:18px; padding:0; background:transparent; }
