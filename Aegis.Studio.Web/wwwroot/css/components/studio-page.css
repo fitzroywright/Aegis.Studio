@@ -87,7 +87,7 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 .production-workload-details .workload-indicators{gap:4px}
 .production-kanban{display:flex;align-items:stretch;gap:8px;flex:1 1 auto;min-height:120px;min-width:0;overflow:auto;overscroll-behavior:contain;padding:1px 1px 6px}
 .production-lane{display:flex;flex:0 0 clamp(220px,23vw,270px);flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--studio-production-lane-surface,var(--studio-card-surface));border:1px solid var(--studio-grid-border);border-radius:5px}
-.production-lane>header{display:flex;align-items:center;justify-content:space-between;gap:6px;flex:0 0 auto;padding:7px 9px;background:var(--studio-rail-accent,#f4f6f8);border-bottom:1px solid var(--studio-grid-border)}
+.production-lane>header{display:flex;align-items:center;justify-content:space-between;gap:6px;flex:0 0 auto;padding:7px 9px;;border-bottom:1px solid var(--studio-grid-border)}
 .production-lane>header h2{margin:0;color:var(--theme-text);font-size:12px}
 .production-lane>header>span{display:grid;place-items:center;min-width:22px;height:22px;border-radius:50%;background:var(--studio-card-surface);color:var(--theme-text);font-size:11px;font-weight:700}
 .production-lane-attention{--studio-production-lane-surface:var(--studio-production-attention-surface,var(--studio-card-surface));border-top:3px solid #b44b42}
@@ -120,8 +120,8 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 .production-pill[data-tone=qc]{background:#f0eafb;border-color:#d2c3e6;color:#5d4781}
 .production-pill[data-tone=complete]{background:#e4f1e8;border-color:#c1dcc9;color:#326749}
 .production-pill[data-tone=neutral]{background:#eceff2;border-color:#d2d7dc;color:#4e5964}
-.production-progress-track{height:6px;overflow:hidden;border-radius:5px;background:var(--studio-grid-border)}
-.production-progress-track>span{display:block;height:100%;background:#4b83b4}
+.production-progress-track{height:6px;overflow:hidden;border-radius:5px;}
+.production-progress-track>span{display:block;height:100%;}
 .production-order-open{align-self:stretch;padding:5px 7px;border:1px solid var(--studio-grid-border);border-radius:4px;background:var(--studio-rail-accent,#f4f6f8);color:var(--theme-text);font:inherit;font-size:10px;font-weight:700;cursor:pointer}
 .production-order-open:hover,.production-job-title:hover{text-decoration:underline}
 .production-lane-empty{margin:auto;color:var(--theme-muted);font-size:11px}
