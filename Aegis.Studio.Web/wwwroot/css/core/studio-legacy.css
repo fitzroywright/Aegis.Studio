@@ -1,5 +1,5 @@
 /* Shared role colors consumed by each left-rail card's owning rules. */
-:root { --studio-grid-header-bg:#536a80; --studio-grid-header-text:#f2f5f8; --studio-grid-header-border:#8394a4; --studio-grid-body-bg:#ffffff; }
+:root { --studio-grid-header-bg:#536a80; --studio-grid-header-text:#f2f5f8; --studio-grid-header-border:#8394a4; }
 /* Today is the canonical left-rail presentation across Studio pages. */
 #studioContextRail > [data-rail-card] { --studio-rail-border:2px solid var(--studio-rail-accent); --studio-rail-title:#fff; --studio-rail-title-weight:750; border:var(--studio-rail-border); border-radius:7px; background:var(--theme-surface,#fff); overflow:hidden; min-width:0; }
 #studioContextRail > [data-rail-card] > header { background:var(--studio-rail-accent); border-bottom:1px solid var(--studio-rail-accent); padding:8px 10px; min-height:0; }
