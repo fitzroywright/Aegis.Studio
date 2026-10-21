@@ -163,8 +163,10 @@ public sealed class StudioDelegatedGraphSession(IConfiguration configuration, IC
         string temporary = CachePath + "." + Guid.NewGuid().ToString("N");
         try
         {
-            await using (var file = new FileStream(temporary, new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write,
-                UnixCreateMode = OperatingSystem.IsWindows() ? null : UnixFileMode.UserRead | UnixFileMode.UserWrite }))
+            var fileOptions = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
+            if (!OperatingSystem.IsWindows())
+                fileOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            await using (var file = new FileStream(temporary, fileOptions))
             { await file.WriteAsync(encrypted, token); file.Flush(true); }
             File.Move(temporary, CachePath, true);
         }
