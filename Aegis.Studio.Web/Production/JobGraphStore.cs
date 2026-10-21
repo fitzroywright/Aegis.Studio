@@ -95,9 +95,13 @@ public sealed class JobGraphStore(StudioDatabase database)
         Guid template; int version; long revision;
         if (definition is null)
         {
-            using var q = Command(c, tx, "select workflow_revision from studio_jobs where id=$1", job);
-            using var r = q.ExecuteReader(); if (!r.Read()) return null;
-            revision = r.GetInt64(0); template = Guid.Empty; version = 1;
+            using (var q = Command(c, tx, "select workflow_revision from studio_jobs where id=$1", job))
+            using (var r = q.ExecuteReader())
+            {
+                if (!r.Read()) return null;
+                revision = r.GetInt64(0);
+            }
+            template = Guid.Empty; version = 1;
             var steps = DefaultSteps();
             var graph = WorkflowGraphEngine.FromSteps(steps);
             var states = Statuses(c, tx, job);
