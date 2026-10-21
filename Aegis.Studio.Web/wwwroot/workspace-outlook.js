@@ -150,7 +150,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
         if (scope === 'Job') {
             detailPane.classList.add('job-reading-view','job-detail-page');
             conversationView.classList.add('has-open-job');
-            let disposed=false,workflowDialog=null,taskDialog=null;
+            let disposed=false,taskDialog=null;
             const current=()=>!disposed && version===revision && selectedJob?.id===job.id && detailPane.classList.contains('job-detail-page') && !conversationView.classList.contains('hidden');
             const header=detailPane.querySelector('.detail-header');
             header.className='job-detail-heading';
@@ -328,13 +328,13 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(action==='subject'){await selectPanel('subjects');contents.subjects.querySelector('#addJobSubject')?.click();}
                     if(action==='task'){await selectPanel('tasks');contents.tasks.querySelector('form input')?.focus();}
                     if(action==='edit')await openJobDetailsEditor(job);
-                    if(action==='workflow')await openAssignments();
+                    if(action==='workflow')openGraphAction();
                     if(action==='template-workflow')await StudioJobGraph.open(job.id);
                     if(action==='reminders')await window.StudioClientReminders.open(job.id);
                 }catch(error){alert(error.message||String(error));}
             };
             window.addEventListener('studio-job-action',handleAction);
-            attention.querySelector('[data-view-workflow]').onclick=()=>openAssignments();
+            attention.querySelector('[data-view-workflow]').onclick=()=>openGraphAction();
             messageHeader.querySelector('[data-message-search]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
             messageHeader.querySelector('[data-message-more]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
 
@@ -391,7 +391,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);
             const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
             navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
-            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);workflowDialog?.close();taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);document.removeEventListener('pointerdown',dismissWorkflow);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
+            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);document.removeEventListener('pointerdown',dismissWorkflow);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
             const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};document.addEventListener('studio-workflow-changed',graphChanged);const previousDispose=disposeJobView;disposeJobView=()=>{document.removeEventListener('studio-workflow-changed',graphChanged);previousDispose();};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
