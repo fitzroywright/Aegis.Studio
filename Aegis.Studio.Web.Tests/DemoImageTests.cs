@@ -47,7 +47,7 @@ public sealed class DemoImageTests
         Assert.StartsWith("https://raw.githubusercontent.com/Prompt-Haus/OpenPeople/",assetRoot,StringComparison.Ordinal);
     }
     [Fact]
-    public void DemoWorkerAssignmentStatusesCoverRolesAndJobStages()
+    public void DemoWorkerRoleStatusRulesFollowJobStages()
     {
         Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoFullStudioData")!;
         Type jobType=seed.GetNestedType("DemoJob",BindingFlags.NonPublic)!;
@@ -73,6 +73,7 @@ public sealed class DemoImageTests
 
         object cancelled=Job("Cancelled",3);
         Assert.Equal("Cancelled",Status(cancelled,"PHOTOGRAPHER","Cancelled"));
+        Assert.Equal("Cancelled",Status(cancelled,"EDITOR","Cancelled"));
     }
 
     [Fact]
