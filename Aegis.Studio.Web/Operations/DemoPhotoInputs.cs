@@ -8,9 +8,9 @@ namespace Aegis.Studio.Web.Operations;
 internal static partial class DemoDataExpansion
 {
     private sealed record PhotoInput(string Url, string Source, string License, string Page);
-    private static readonly string inputDirectory = Path.Combine(Path.GetTempPath(), "aegis-studio-photo-inputs");
-
-    private static readonly string aiPhotoRoot = Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_AI_PHOTOS") ?? Path.Combine(Path.GetTempPath(), "aegis-studio-demo-ai-photos");
+    private static readonly string aiPhotoRoot = Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS")
+        ?? "/var/lib/aegis-studio/demo-photos";
+    private static readonly string inputDirectory = Path.Combine(aiPhotoRoot, "source-cache");
     private const int OpenPeoplePhotoCount = 100;
     private const string OpenPeopleAssetUrl = "https://raw.githubusercontent.com/Prompt-Haus/OpenPeople/main/openpeople/data/curated/P{0:000}/assets/studio_portrait.jpg";
     private const string OpenPeoplePageUrl = "https://github.com/Prompt-Haus/OpenPeople";
@@ -37,39 +37,78 @@ internal static partial class DemoDataExpansion
         string[] files=Directory.EnumerateFiles(directory)
             .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
             .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray();
-        for(int offset=0;offset<files.Length;offset++)
+        if (variant < 0 || variant >= files.Length) return false;
+        string file=files[variant];
+        try
         {
-            string file=files[(int)(Math.Abs((long)variant+offset)%files.Length)];
-            try
-            {
-                using var decoded=StudioImageProcessor.DecodeOriented(File.OpenRead(file));
-                using var resized=StudioImageProcessor.ResizeMax(decoded,4096);
-                bytes=StudioImageProcessor.EncodeJpeg(resized,95);
-                string name=Path.GetFileNameWithoutExtension(file);
-                bool openPeople=name.StartsWith("OpenPeople-P",StringComparison.OrdinalIgnoreCase);
-                string? sourceUrl=null;
-                if(openPeople && int.TryParse(name.AsSpan("OpenPeople-P".Length),out int person))
-                    sourceUrl=string.Format(System.Globalization.CultureInfo.InvariantCulture,OpenPeopleAssetUrl,person);
-                input=new PhotoInput(sourceUrl ?? new Uri(Path.GetFullPath(file)).AbsoluteUri,
-                    openPeople ? "Prompt-Haus OpenPeople" : "AI generated",
-                    openPeople ? "CC BY 4.0" : "AI-generated demo image",
-                    openPeople ? OpenPeoplePageUrl : file);
-                return true;
-            }
-            catch(Exception error) when(error is IOException or ArgumentException or InvalidOperationException) {}
+            using var decoded=StudioImageProcessor.DecodeOriented(File.OpenRead(file));
+            using var resized=StudioImageProcessor.ResizeMax(decoded,4096);
+            bytes=StudioImageProcessor.EncodeJpeg(resized,95);
+            string name=Path.GetFileNameWithoutExtension(file);
+            bool openPeople=name.StartsWith("OpenPeople-P",StringComparison.OrdinalIgnoreCase);
+            bool bryansPhoto=name.StartsWith("BryansStudio-",StringComparison.OrdinalIgnoreCase);
+            string? sourceUrl=null;
+            if(openPeople && int.TryParse(name.AsSpan("OpenPeople-P".Length),out int person))
+                sourceUrl=string.Format(System.Globalization.CultureInfo.InvariantCulture,OpenPeopleAssetUrl,person);
+            string relative=Path.GetRelativePath(aiPhotoRoot,file).Replace(Path.DirectorySeparatorChar,'/');
+            input=new PhotoInput(sourceUrl ?? new Uri(Path.GetFullPath(file)).AbsoluteUri,
+                openPeople ? "Prompt-Haus OpenPeople" : bryansPhoto ? "Bryan's Photo Studios presentation bundle" : "AI generated",
+                openPeople ? "CC BY 4.0" : bryansPhoto ? "Approved for Studio demo use" : "AI-generated demo image",
+                openPeople ? OpenPeoplePageUrl : bryansPhoto ? "aegis-demo-resource://" + relative : file);
+            return true;
         }
-        return false;
+        catch(Exception error) when(error is IOException or ArgumentException or InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     internal static void PreparePhotos(Action<DemoSeedProgress>? report)
     {
         // Prepare and validate all synthetic portraits and contextual source photos before any demo records are replaced.
         EnsureOpenPeoplePortraits(report);
+        ValidateLocalDemoPhotos(report);
         string[] urls = realPhotoUrls.Concat(weddingPhotoUrls).Distinct().ToArray();
         for (int i = 0; i < urls.Length; i++)
         {
             report?.Invoke(new(1, "Preparing photographs", i, urls.Length, $"Verifying contextual photograph source {i+1}/{urls.Length} before recreating data."));
             _ = PhotoBytes(urls[i], i, null, allowAi: false);
+        }
+    }
+
+    private static void ValidateLocalDemoPhotos(Action<DemoSeedProgress>? report)
+    {
+        try
+        {
+            Directory.CreateDirectory(aiPhotoRoot);
+        }
+        catch (UnauthorizedAccessException error)
+        {
+            throw new InvalidOperationException(
+                $"Studio cannot access the demo photo library at '{aiPhotoRoot}'. Run the Kratos photo-library setup script and grant write access to the aegis-studio service account before recreating demo data.",
+                error);
+        }
+
+        string[] files = Directory.EnumerateFiles(aiPhotoRoot, "*", SearchOption.AllDirectories)
+            .Where(file => !Path.GetRelativePath(aiPhotoRoot, file)
+                .StartsWith("source-cache" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            .Where(file => new[] { ".jpg", ".jpeg", ".png", ".webp" }
+                .Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+        for (int index = 0; index < files.Length; index++)
+        {
+            report?.Invoke(new(1, "Preparing photographs", index, files.Length,
+                $"Validating local demo photo {index + 1}/{files.Length}."));
+            try
+            {
+                using var image = StudioImageProcessor.DecodeOriented(File.OpenRead(files[index]));
+                if (image.Width <= 0 || image.Height <= 0)
+                    throw new InvalidDataException("Image dimensions are invalid.");
+            }
+            catch (Exception error) when (error is IOException or ArgumentException or InvalidOperationException)
+            {
+                throw new InvalidDataException($"Demo photo failed validation: '{files[index]}'.", error);
+            }
         }
     }
 
