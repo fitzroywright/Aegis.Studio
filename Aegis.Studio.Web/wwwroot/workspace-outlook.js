@@ -308,7 +308,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(action==='task'){await selectPanel('tasks');contents.tasks.querySelector('form input')?.focus();}
                     if(action==='edit')await openJobDetailsEditor(job);
                     if(action==='workflow')openGraphAction();
-                    if(action==='template-workflow')await StudioJobGraph.open(job.id);
+                    if(action==='template-workflow')openGraphAction();
                     if(action==='reminders')await window.StudioClientReminders.open(job.id);
                 }catch(error){alert(error.message||String(error));}
             };
@@ -323,7 +323,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 const started=Date.parse(action?.task?.startedAtUtc||action?.task?.startedAt||'');
                 header.querySelector('[data-stage-age]').textContent=Number.isFinite(started)?'In workflow: '+Math.floor(Math.max(0,Date.now()-started)/86400000)+' days':'Timing unavailable';
             };
-            const openGraphAction=nodeId=>{const task=workflow?.tasks?.find(item=>item.nodeId===nodeId);window.StudioJobGraph.open(job.id,task?.id).catch(error=>console.error('[Studio Job Details] Could not open workflow task',error));};
+            const openGraphAction=nodeId=>{const task=workflow?.tasks?.find(item=>item.nodeId===nodeId);window.StudioJobGraph.launchTask(job.id,task?.id).catch(error=>console.error('[Studio Job Details] Could not launch next action',error));};
             const refreshWorkflow=async()=>{
                 const request=++workflowRequest;
                 const controller=new AbortController();
