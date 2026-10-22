@@ -4,6 +4,7 @@ set -euo pipefail
 photo_root="${AEGIS_STUDIO_DEMO_PHOTOS:-/var/lib/aegis-studio/demo-photos}"
 unit_name="${AEGIS_STUDIO_SYSTEMD_UNIT:-aegis-studio}"
 photo_zip="${1:-}"
+categories=(people wedding graduation family sports product)
 
 if [[ "$EUID" -ne 0 ]]; then
   echo "Run this script with sudo so it can create the persistent photo folder and set its owner." >&2
@@ -26,35 +27,37 @@ fi
 if [[ -z "$service_user" ]]; then service_user=root; fi
 if [[ -z "$service_group" ]]; then service_group="$(id -gn "$service_user")"; fi
 
-install -d -o "$service_user" -g "$service_group" -m 0750 "$photo_root"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 unzip -q "$photo_zip" -d "$temporary/unpacked"
-installed=0
+install -d -o "$service_user" -g "$service_group" -m 0750 "$photo_root"
+counts=(0 0 0 0 0 0)
+total=0
 while IFS= read -r -d '' source; do
-  name="${source##*/}"
-  lower="$(printf '%s' "$source" | tr '[:upper:]' '[:lower:]')"
-  case "$lower" in
-    *wedding*|*engagement*) category=wedding ;;
-    *graduation*|*school*) category=graduation ;;
-    *family*|*newborn*) category=family ;;
-    *corporate*) category=people ;;
-    *sport*|*athlete*|*team*) category=sports ;;
-    *product*|*commercial*) category=product ;;
-    *portrait*|*headshot*|*consultation*|*passport*|*/id-*) category=people ;;
+  folder="${source%/*}"
+  folder="${folder##*/}"
+  case "$folder" in
+    "Corporate & Groups"|"ID & Passport"|"Portraits"|"Studio") category=people; index=0 ;;
+    "Weddings") category=wedding; index=1 ;;
+    "Graduation & School") category=graduation; index=2 ;;
+    "Family & Newborn") category=family; index=3 ;;
+    "Sports & Teams") category=sports; index=4 ;;
+    "Product & Commercial") category=product; index=5 ;;
     *) continue ;;
   esac
   mime="$(file --brief --mime-type "$source")"
-  [[ "$mime" == image/* ]] || { echo "Skipping non-image entry: $source" >&2; continue; }
-  destination="$photo_root/$category/BryansStudio-$name"
-  install -D -o "$service_user" -g "$service_group" -m 0640 "$source" "$destination"
-  installed=$((installed + 1))
+  [[ "$mime" == image/* ]] || { echo "Recognized demo photo is not a usable image: $source" >&2; exit 1; }
+  name="${source##*/}"
+  install -D -o "$service_user" -g "$service_group" -m 0640 "$source" "$photo_root/$category/BryansStudio-$name"
+  counts[$index]=$((counts[$index] + 1))
+  total=$((total + 1))
 done < <(find "$temporary/unpacked" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print0)
-if [[ "$installed" -eq 0 ]]; then
-  echo "No recognized demo photos were found in $photo_zip." >&2
-  exit 1
-fi
 
+for index in "${!categories[@]}"; do
+  if [[ "${counts[$index]}" -eq 0 ]]; then
+    echo "The supplied photo ZIP has no usable image for required category '${categories[$index]}'." >&2
+    exit 1
+  fi
+done
 
-count="$(find "$photo_root" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | wc -l | xargs)"
-echo "Studio demo photo library ready: $photo_root ($count local image files). Demo generation uses only these installed photos."
+echo "Studio demo photo library ready: $photo_root ($total local image files across ${#categories[@]} required categories). Demo generation does not download images."
