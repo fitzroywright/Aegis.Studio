@@ -7,6 +7,7 @@ using static Aegis.Studio.Web.Production.CommercialEndpoints;
 namespace Aegis.Studio.Web.Production;
 
 public sealed record GraphPreviewRequest(WorkflowGraph Graph, Guid[] CatalogItemIds);
+public sealed record GraphJobActionRequest(string Action, long ExpectedRevision, Guid OperationId, string? Reason = null, string? UserName = null, string? Method = null, string? Reference = null);
 public static class WorkflowGraphEndpoints
 {
     public static void MapJobWorkflowGraphs(this WebApplication app)
