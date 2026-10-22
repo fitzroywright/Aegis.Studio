@@ -42,6 +42,7 @@ function setup(w){
   }
   if(url.includes('/threads/Job/'))return {id:'thread'};
   if(base==='/api/auth/me')return {user:{userName:'studio.admin',displayName:'Studio Admin'}};
+  if(base==='/api/security/global-role-me')return {frontDesk:true};
   if(base==='/api/operations/activities')return [{id:'task',title:'Retouch portraits',status:'NotStarted',assignedTo:'studio.admin'}];
   if(base==='/api/schedule/entries')return [{location:'Kingston Studio'}];
   if(base.endsWith('/operations/audit'))return [{action:'Job created',detail:'Front Desk booking',createdAtUtc:'2026-10-10T12:00:00Z'}];
