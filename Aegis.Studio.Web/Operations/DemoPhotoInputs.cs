@@ -77,17 +77,25 @@ internal static partial class DemoDataExpansion
     {
         string directory=Path.Combine(aiPhotoRoot,"people");
         Directory.CreateDirectory(directory);
-        int available=Enumerable.Range(1,OpenPeoplePhotoCount).Count(person =>
+        bool IsValidPortrait(string file)
         {
-            string file=Path.Combine(directory,$"OpenPeople-P{person:000}.jpg");
-            return File.Exists(file) && new FileInfo(file).Length>10_000;
-        });
+            if(!File.Exists(file) || new FileInfo(file).Length<=10_000)return false;
+            try
+            {
+                using var image=StudioImageProcessor.DecodeOriented(File.OpenRead(file));
+                return image.Width>0 && image.Height>0;
+            }
+            catch(Exception error) when(error is IOException or ArgumentException or InvalidOperationException)
+            { return false; }
+        }
+        int available=Enumerable.Range(1,OpenPeoplePhotoCount).Count(person =>
+            IsValidPortrait(Path.Combine(directory,$"OpenPeople-P{person:000}.jpg")));
         if(available==OpenPeoplePhotoCount)return;
 
         for(int person=1;person<=OpenPeoplePhotoCount;person++)
         {
             string file=Path.Combine(directory,$"OpenPeople-P{person:000}.jpg");
-            if(File.Exists(file) && new FileInfo(file).Length>10_000)continue;
+            if(IsValidPortrait(file))continue;
             report?.Invoke(new(1,"Preparing photographs",person-1,OpenPeoplePhotoCount,$"Downloading free synthetic portrait {person}/{OpenPeoplePhotoCount}."));
             string url=string.Format(System.Globalization.CultureInfo.InvariantCulture,OpenPeopleAssetUrl,person);
             byte[] bytes=openPeopleClient.GetByteArrayAsync(url).GetAwaiter().GetResult();
