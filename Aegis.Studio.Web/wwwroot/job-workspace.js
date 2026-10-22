@@ -169,11 +169,11 @@ async function renderJobTasks(job,panel,current) {
     panel.innerHTML=`<section class="job-section job-workflow-entry">
         <h2>Workflow</h2>
         <p>Job tasks are managed in the configured workflow graph.</p>
-        <button type="button" class="primary" data-open-job-workflow>Open Workflow</button>
+        <button type="button" class="primary" data-open-job-workflow>Next Action</button>
     </section>`;
     panel.querySelector('[data-open-job-workflow]').onclick=()=>{
-        if(typeof window.StudioJobGraph?.open!=='function'){alert('The workflow graph is unavailable.');return;}
-        window.StudioJobGraph.open(job.id).catch(error=>alert(error.message||String(error)));
+        if(typeof window.StudioJobGraph?.launchTask!=='function'){alert('The workflow graph is unavailable.');return;}
+        window.StudioJobGraph.launchTask(job.id).catch(error=>alert(error.message||String(error)));
     };
 }
 
