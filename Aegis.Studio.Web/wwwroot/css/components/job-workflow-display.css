@@ -1,6 +1,4 @@
 /* Job Details owns one standalone workflow summary and its click-to-expand subflow. */
-.jd-flow-overview{position:relative;min-width:0;overflow:visible}
-.jd-workflow-track{position:relative;display:block;flex:1 1 auto;width:100%;min-width:0;max-height:none;padding:5px 0;overflow:visible}
 .jd-workflow-display{display:flex;align-items:flex-start;justify-content:space-between;gap:4px;width:100%;min-width:0;overflow:visible}
 .jd-workflow-stage{position:relative;display:flex;flex:1 1 0;min-width:24px;align-items:center;flex-direction:column;margin:0;padding:2px;border:0;background:transparent;color:var(--theme-text,#162b50)}
 .jd-workflow-stage[data-subflow-stage]{cursor:pointer}
