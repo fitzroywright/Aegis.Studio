@@ -150,7 +150,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
         if (scope === 'Job') {
             detailPane.classList.add('job-reading-view','job-detail-page');
             conversationView.classList.add('has-open-job');
-            let disposed=false,workflowDialog=null,taskDialog=null;
+            let disposed=false,taskDialog=null;
             const current=()=>!disposed && version===revision && selectedJob?.id===job.id && detailPane.classList.contains('job-detail-page') && !conversationView.classList.contains('hidden');
             const header=detailPane.querySelector('.detail-header');
             header.className='job-detail-heading';
@@ -328,70 +328,70 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(action==='subject'){await selectPanel('subjects');contents.subjects.querySelector('#addJobSubject')?.click();}
                     if(action==='task'){await selectPanel('tasks');contents.tasks.querySelector('form input')?.focus();}
                     if(action==='edit')await openJobDetailsEditor(job);
-                    if(action==='workflow')await openAssignments();
+                    if(action==='workflow')openGraphAction();
                     if(action==='template-workflow')await StudioJobGraph.open(job.id);
                     if(action==='reminders')await window.StudioClientReminders.open(job.id);
                 }catch(error){alert(error.message||String(error));}
             };
             window.addEventListener('studio-job-action',handleAction);
-            attention.querySelector('[data-view-workflow]').onclick=()=>openAssignments();
+            attention.querySelector('[data-view-workflow]').onclick=()=>openGraphAction();
             messageHeader.querySelector('[data-message-search]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');const term=prompt('Search this conversation');if(term===null)return;messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=!!term&&!row.textContent.toLowerCase().includes(term.toLowerCase()));};
             messageHeader.querySelector('[data-message-more]').onclick=()=>{StudioMessageCard.setMode(messageCard,'messages');messagesPanel.querySelectorAll('.message').forEach(row=>row.hidden=false);composer.querySelector('textarea').focus();};
 
             let workflow=null,workflowRequest=0;
             const updateAge=()=>{
-                if(['Completed','Cancelled'].includes(workflow?.data?.stage)){header.querySelector('[data-stage-age]').textContent=workflow.data.stage;return;}
-                const start=Date.parse(workflow?.data?.enteredAt||'');
-                header.querySelector('[data-stage-age]').textContent=Number.isFinite(start)?(window.StudioWorkflow?.elapsed?.(Math.max(0,(Date.now()-start)/3600000))||Math.floor(Math.max(0,Date.now()-start)/3600000)+' hours'):'Timing unavailable';
+                const action=window.StudioJobDetails.workflowAction(workflow);
+                const started=Date.parse(action?.task?.startedAtUtc||action?.task?.startedAt||'');
+                header.querySelector('[data-stage-age]').textContent=Number.isFinite(started)?'In workflow: '+Math.floor(Math.max(0,Date.now()-started)/86400000)+' days':'Timing unavailable';
             };
+            const openGraphAction=nodeId=>{
+                setFlowOpen(true);
+                if(!nodeId)return;
+                const target=[...header.querySelectorAll('.jd-flow-summary [data-workflow-node]')].find(button=>button.dataset.workflowNode===nodeId);
+                target?.click();
+            };
+            header.querySelector('[data-job-workflow]').onclick=()=>openGraphAction();
             const refreshWorkflow=async()=>{
                 const request=++workflowRequest;
-                const advance=header.querySelector('[data-next-step-action]');if(advance)advance.disabled=true;
-                let failedRequest='connected workflow';
                 try{
-                    const view=await json('/api/jobs/'+job.id+'/connected-workflow');if(!current()||request!==workflowRequest)return;
-                    workflow=view;const data=view.data;
-                    window.StudioJobDetails.nextStep(header.querySelector('.jd-next-step'),view,selector=>openAssignments(selector));
-                    failedRequest='workflow graph';
-                    const graphView=await json(`/api/jobs/${job.id}/workflow-graph`);
+                    const graphView=await json('/api/jobs/'+job.id+'/workflow-graph');
                     if(!current()||request!==workflowRequest)return;
-                    StudioJobDetails.compact(header.querySelector('.jd-workflow-track'),graphView,job,header.querySelector('.jd-flow-summary'),view);
-                    header.querySelector('.jd-status-pill').textContent=data.stage;
-                    header.querySelector('[data-job-owner]').textContent=data.owner?studioFirstName(data.owner):'Unassigned';
-                    const crew=(data.sessions||[]).flatMap(session=>session.crew||[]);
-                    const photographers=[...new Set(crew.map(person=>person.user_name).filter(Boolean))];
-                    header.querySelector('[data-job-photographer]').textContent=photographers.length?photographers.map(person=>studioFirstName(person)).join(', '):job.assignedTo?studioFirstName(job.assignedTo):'Unassigned';
+                    workflow=graphView;
+                    const action=window.StudioJobDetails.workflowAction(graphView),task=action?.task;
+                    StudioJobDetails.compact(header.querySelector('.jd-workflow-track'),graphView,job,header.querySelector('.jd-flow-summary'));
+                    StudioJobDetails.nextStep(header.querySelector('.jd-next-step'),graphView,nodeId=>nodeId?openGraphAction(nodeId):refreshWorkflow());
+                    header.querySelector('.jd-status-pill').textContent=task?.title||(graphView.tasks?.length?'Workflow complete':'Workflow unavailable');
+                    header.querySelector('[data-job-owner]').textContent='Owner: '+(task?.assignedTo?studioFirstName(task.assignedTo):job.jobLead?studioFirstName(job.jobLead):'Unassigned');
+                    const responsible=graphView.tasks?.find(item=>item.role&&item.assignedTo);
+                    const worker=responsible?.assignedTo||job.assignedTo||'Unassigned';
+                    header.querySelector('[data-job-photographer]').textContent=studioFirstName(worker);
                     header.querySelector('[data-job-photographer]').title=header.querySelector('[data-job-photographer]').textContent;
-                    header.querySelector('[data-job-blocked]').textContent=data.blockedReason?'Blocked: '+data.blockedReason:'';
-                    header.querySelector('.jd-workflow-caption').hidden=!data.blockedReason;
-                    const next={'Pending':'Review and confirm booking','Needs Assignment':'Assign a job owner','Needs Photographer Assignment':'Assign photographers','Awaiting Scheduling':'Schedule required sessions','Scheduled':'Start photography','Photography In Progress':'Finish required sessions','Awaiting Upload':'Complete and submit source media','Awaiting Production Review':'Review source material','Active Production':'Complete production and submit finished work','Awaiting Approval':'Approve finished work','Changes Requested':'Resolve requested corrections','Ready for Delivery':'Publish gallery and record delivery','Delivered':'Complete job'}[data.stage];
-                    attention.querySelector('.jd-attention-items').innerHTML=(data.blockedReason?'<p class="jd-blocked">'+esc(data.blockedReason)+'</p>':'')+(next?'<p>'+esc(next)+'</p>':'<p>No outstanding workflow action.</p>')+((data.fieldConflicts||[]).length?'<p>Sync conflicts recorded: '+data.fieldConflicts.length+' · Review conflict history</p>':'')+Object.entries(data.rosterCounts||{}).map(([state,n])=>'<p>'+esc(state)+': '+esc(n)+'</p>').join('')+((data.outstandingRoster||[]).length?'<p>Outstanding roster: '+data.outstandingRoster.length+'</p>':'');
-                    const decision=window.StudioWorkflow.nextAction(view),button=attention.querySelector('[data-view-workflow]');button.textContent=decision.label+' →';button.onclick=()=>openAssignments(decision.selector);updateAge();
-                }catch(error){if(current()&&request===workflowRequest){console.error('[Studio Job Details] Failed to load '+failedRequest+' for job '+job.id,error);const nextStep=header.querySelector('.jd-next-step');window.StudioJobDetails.nextStep(nextStep,null,()=>refreshWorkflow());nextStep.querySelector('.jd-next-step-copy p').textContent='Workflow unavailable ('+failedRequest+'): '+(error?.message||String(error));header.querySelector('[data-stage-age]').textContent='Workflow unavailable';attention.querySelector('.jd-attention-items').replaceChildren();}}
-            };
-            const openAssignments=async selector=>{
-                setFlowOpen(false);
-                if(typeof selector!=='string')selector=null;
-                const dialog=studioDialog('Assignments & Workflow','<div class="job-detail-workflow-content"></div>');dialog.classList.add('job-detail-workflow-dialog');
-                workflowDialog=dialog;
-                const host=dialog.querySelector('.job-detail-workflow-content');
-                dialog.addEventListener('close',()=>{
-                    if(host.__studioWorkflowClock)clearInterval(host.__studioWorkflowClock);
-                    workflowDialog=null;
-                    if(current()){
-                        refreshWorkflow();refreshLocation();
-                        for(const name of ['tasks','activity'])loaded.delete(name);
-                        if(taskDialog?.open)loadPanel('tasks',true);
-                        if(activityToggle.getAttribute('aria-expanded')==='true')loadPanel('activity',true);
+                    const blocked=action?.status==='Blocked'?task?.reason||'A workflow prerequisite is blocking this task.':'';
+                    header.querySelector('[data-job-blocked]').textContent=blocked?'Blocked: '+blocked:'';
+                    header.querySelector('.jd-workflow-caption').hidden=!blocked;
+                    const attention=header.querySelector('.jd-attention-items');
+                    attention.replaceChildren();
+                    if(task){const item=document.createElement('p');item.textContent=task.title+(task.reason?' · '+task.reason:'');attention.append(item);}
+                    const button=header.querySelector('[data-view-workflow]');
+                    button.textContent=task?'Open '+task.title+' →':'Open workflow →';
+                    button.onclick=()=>openGraphAction(action?.nodeId);
+                    updateAge();
+                }catch(error){
+                    if(current()&&request===workflowRequest){
+                        console.error('[Studio Job Details] Failed to load workflow graph for job '+job.id,error);
+                        const nextStep=header.querySelector('.jd-next-step');
+                        StudioJobDetails.nextStep(nextStep,null,()=>refreshWorkflow());
+                        nextStep.querySelector('.jd-next-step-copy p').textContent='Workflow graph could not be loaded: '+(error?.message||String(error));
+                        header.querySelector('[data-stage-age]').textContent='Workflow unavailable';
+                        header.querySelector('.jd-attention-items').replaceChildren();
                     }
-                }, {once:true});
-                try{await window.StudioWorkflow.render(host,job.id,()=>current()&&dialog.isConnected);if(selector)host.querySelector(selector)?.click();}catch(error){host.textContent=error.message||String(error);}
+                }
             };
-            // No detached panel retains a running clock.
+                        // No detached panel retains a running clock.
             const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);
             const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
             navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
-            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);workflowDialog?.close();taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);document.removeEventListener('pointerdown',dismissWorkflow);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
+            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);document.removeEventListener('pointerdown',dismissWorkflow);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
             const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};document.addEventListener('studio-workflow-changed',graphChanged);const previousDispose=disposeJobView;disposeJobView=()=>{document.removeEventListener('studio-workflow-changed',graphChanged);previousDispose();};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));

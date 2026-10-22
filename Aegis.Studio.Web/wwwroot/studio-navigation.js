@@ -547,11 +547,11 @@
                 try{
                     const jobId=form.elements.jobId.value;
                     const userName=form.elements.userName.value||null;
-                    const wf=await json('/api/jobs/'+encodeURIComponent(jobId)+'/connected-workflow');
-                    const result=await json('/api/jobs/'+encodeURIComponent(jobId)+'/connected-workflow',{
-                        method:'PUT',
+                    const wf=await json('/api/jobs/'+encodeURIComponent(jobId)+'/workflow-graph');
+                    const result=await json('/api/jobs/'+encodeURIComponent(jobId)+'/workflow-graph',{
+                        method:'POST',
                         headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({action:'owner',userName,reason:'Today owner assignment',expectedRevision:wf.data.revision,operationId:crypto.randomUUID()})
+                        body:JSON.stringify({action:'assign-owner',userName,reason:'Today owner assignment',expectedRevision:wf.revision,operationId:crypto.randomUUID()})
                     });
                     state.jobs=state.jobs.map(job=>String(job.id)===String(jobId)?{...job,jobLead:result.jobLead??userName}:job);
                     dialog.close();

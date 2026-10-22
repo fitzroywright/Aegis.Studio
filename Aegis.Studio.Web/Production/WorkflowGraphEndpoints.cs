@@ -7,6 +7,7 @@ using static Aegis.Studio.Web.Production.CommercialEndpoints;
 namespace Aegis.Studio.Web.Production;
 
 public sealed record GraphPreviewRequest(WorkflowGraph Graph, Guid[] CatalogItemIds);
+public sealed record GraphJobActionRequest(string Action, long ExpectedRevision, Guid OperationId, string? Reason = null, string? UserName = null, string? Method = null, string? Reference = null, Guid? WorkspaceId = null);
 public static class WorkflowGraphEndpoints
 {
     public static void MapJobWorkflowGraphs(this WebApplication app)
@@ -23,11 +24,40 @@ public static class WorkflowGraphEndpoints
             if (issues.Length > 0) return Results.BadRequest(new { error = string.Join("\n", issues.Select(i => $"{i.NodeId}: {i.Message}")), issues });
             return Results.Ok(WorkflowGraphEngine.Evaluate(request.Graph, new Dictionary<string, string>(), request.CatalogItemIds.ToHashSet()));
         })).RequireAuthorization();
+        app.MapGet("/api/jobs/{job:guid}/shoot-sessions", (Guid job, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
+        {
+            if (!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
+            using var connection = db.OpenConnection();
+            using var command = new Npgsql.NpgsqlCommand("""
+                select ws.id, ws.title
+                from studio_workflow_sessions ws
+                where ws.job_id = $1
+                order by ws.created_at_utc, ws.id
+                """, connection);
+            command.Parameters.AddWithValue(job);
+            using var reader = command.ExecuteReader();
+            var sessions = new List<object>();
+            while (reader.Read()) sessions.Add(new { id = reader.GetGuid(0), title = reader.GetString(1) });
+            return Results.Ok(sessions);
+        })).RequireAuthorization();
         app.MapGet("/api/jobs/{job:guid}/workflow-graph", (Guid job, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
         {
             if (!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
             return Results.Ok(new JobGraphStore(db).Get(job));
         })).RequireAuthorization();
+        app.MapPost("/api/jobs/{job:guid}/workflow-graph/actions", (Guid job, GraphJobActionRequest request, ClaimsPrincipal user, WorkflowStore workflow) => Run(() =>
+        {
+            var action = request.Action switch { "confirm-booking" => "confirm", "assign-owner" => "owner", "deliver" => "deliver", "transfer-workspace" => "transfer", _ => throw new ArgumentException("Choose a supported workflow graph action.") };
+            var command = new WorkflowCommand(action, request.ExpectedRevision, request.OperationId, UserName: request.UserName, Reason: request.Reason, Method: request.Method, Reference: request.Reference, WorkspaceId: request.WorkspaceId);
+            return Results.Ok(workflow.Execute(job, command, user));
+        })).RequireAuthorization();
+        app.MapPost("/api/jobs/{job:guid}/workflow-graph/tasks", (Guid job, GraphTaskCommand request, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
+        {
+            if (!access.HasPermission(user, job, "EditJob") && !access.HasPermission(user, job, "ManageProduction")) return Results.Forbid();
+            new JobGraphStore(db).TransitionTask(job, request, WorkflowStore.Name(user));
+            return Results.Ok(new JobGraphStore(db).Get(job));
+        })).RequireAuthorization();
+
         app.MapGet("/api/jobs/{job:guid}/workflow-graph/impact/{template:guid}", (Guid job, Guid template, ClaimsPrincipal user, WorkflowStore workflow, StudioDatabase db) => Run(() =>
         {
             if (!workflow.CanManage(user, job) && !workflow.IsFrontDesk(user)) return Results.Forbid();

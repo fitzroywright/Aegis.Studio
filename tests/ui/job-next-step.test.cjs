@@ -1,16 +1,54 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{JSDOM}=require('jsdom');
-function setup(t){const d=new JSDOM('<body><section id="next"></section></body>',{runScripts:'outside-only',url:'https://studio.test'}),w=d.window;t.after(()=>w.close());let writes=0;w.json=async()=>{writes++;throw Error('Unexpected request');};for(const file of ['connected-workflow.js','job-details.js'])w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/'+file),'utf8'));const host=w.document.querySelector('#next');return{w,host,writes:()=>writes};}
-const view=stage=>({data:{stage,owner:'owner',ownerAssignment:{assigned_to:'owner',status:'Accepted'},sessions:[]},userName:'owner',canManage:true,canReview:true,canFrontDesk:true,canAssignOwner:true});
-test('visible next action uses existing transition controls without sending a stage command',t=>{const {w,host,writes}=setup(t);for(const [stage,label,selector] of [['Pending','Confirm the booking','[data-wf-action="confirm"]'],['Awaiting Upload','Complete the required contributions','[data-wf-action="submit-source"]'],['Awaiting Production Review','Review the uploaded source material','[data-wf-action="accept-source"]'],['Active Production','Complete the required production work','[data-wf-action="submit-finished"]'],['Awaiting Approval','Review and approve the finished work','[data-wf-action="approve-finished"]'],['Ready for Delivery','Check the approved deliverables','[data-wf-action="deliver"]'],['Delivered','Complete the job','[data-wf-action="close"]']]){let activated;w.StudioJobDetails.nextStep(host,view(stage),s=>activated=s);const button=host.querySelector('.jd-next-step-action-link');assert.ok(button,stage);assert.match(button.textContent,new RegExp(label));button.click();assert.equal(activated,selector);}assert.equal(writes(),0);});
-test('ownership and scheduling prerequisites remain the next visible step',t=>{const {w,host}=setup(t);const v=view('Needs Photographer Assignment');v.data.ownerAssignment.status='Assigned';let activated;w.StudioJobDetails.nextStep(host,v,s=>activated=s);assert.match(host.textContent,/Accept ownership/);host.querySelector('button').click();assert.equal(activated,'[data-wf-owner-response="accept-owner"]');v.userName='other';w.StudioJobDetails.nextStep(host,v,()=>{});assert.equal(host.querySelector('.primary'),null);assert.match(host.textContent,/Waiting for owner to accept ownership/);v.data.ownerAssignment.status='Accepted';v.data.stage='Awaiting Scheduling';w.StudioJobDetails.nextStep(host,v,()=>{});assert.match(host.querySelector('.jd-next-step-action-link').textContent,/Set the date, time and location/);});
-test('blocked work offers resolution and escapes the blocker text',t=>{const {w,host}=setup(t),v=view('Active Production');v.data.blockedReason='<img src=x onerror=bad()> missing client selection';let selector;w.StudioJobDetails.nextStep(host,v,s=>selector=s);assert.equal(host.querySelector('img'),null);assert.match(host.textContent,/Blocked:/);assert.match(host.querySelector('.jd-next-step-action-link').textContent,/Blocked:/);host.querySelector('button').click();assert.equal(selector,'[data-wf-block]');});
-test('unauthorized and terminal jobs cannot expose a primary advance action',t=>{const {w,host}=setup(t),v=view('Awaiting Approval');v.canReview=false;let selector='unset';w.StudioJobDetails.nextStep(host,v,s=>selector=s);assert.equal(host.querySelector('.primary'),null);assert.match(host.textContent,/authorized member/);host.querySelector('button').click();assert.equal(selector,null);for(const stage of ['Completed','Cancelled']){w.StudioJobDetails.nextStep(host,view(stage),()=>{});assert.equal(host.querySelector('.primary'),null);assert.equal(host.dataset.state,'closed');}});
-test('workflow failure offers retry and a successful refresh replaces it with the current action',t=>{const {w,host}=setup(t);let retried=false;w.StudioJobDetails.nextStep(host,null,()=>retried=true);assert.match(host.textContent,/Retry workflow/);host.querySelector('button').click();assert.equal(retried,true);w.StudioJobDetails.nextStep(host,view('Awaiting Approval'),()=>{});assert.match(host.textContent,/Approve finished work/);assert.doesNotMatch(host.textContent,/Retry workflow/);});
-test('Job Details renders the generic graph and exposes the next action alongside it',async t=>{
- const {environment}=require('./job-detail-fixture.cjs'),{w,fixture}=environment(t),original=w.json;
- w.json=async(url,options)=>{if(url.endsWith('/connected-workflow')&&!options){const v=view('Awaiting Production Review');v.data={...v.data,history:[],submissions:[],revision:7};return v;}return original(url,options);};
- await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,30));
- const next=w.document.querySelector('.job-detail-heading .jd-next-step');assert.ok(next);assert.equal(next.closest('.jd-flow-drawer'),null);assert.match(next.querySelector('.primary').textContent,/Accept source material/);assert.equal(fixture.calls.some(c=>c.options?.method==='POST'&&c.url.endsWith('/connected-workflow')),false);
- next.querySelector('button').click();await new Promise(r=>setTimeout(r,35));
- const command=fixture.calls.find(c=>c.options?.method==='POST'&&c.url.endsWith('/connected-workflow'));assert.ok(command);assert.equal(JSON.parse(command.options.body).action,'accept-source');assert.equal(JSON.parse(command.options.body).expectedRevision,7);assert.ok(JSON.parse(command.options.body).operationId);
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const {JSDOM}=require('jsdom');
+
+function setup(t){
+ const dom=new JSDOM('<body><section id="next"></section></body>',{runScripts:'outside-only',url:'https://studio.test'});
+ const w=dom.window;t.after(()=>w.close());w.StudioGraph={esc:String};
+ w.json=async()=>{throw Error('Unexpected request');};
+ w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/job-details.js'),'utf8'));
+ return{w,host:w.document.querySelector('#next')};
+}
+function graph(statuses){
+ const ids=['booking','shoot','production'];
+ const labels=['Inquiry / Booking','Shoot','Production'];
+ const nodes=[{id:'start',label:'Start',kind:'Start'}];
+ const tasks=[],states=[];
+ ids.forEach((id,index)=>{
+  nodes.push({id,label:labels[index],kind:'Task'});
+  const reason=statuses[index]==='Blocked'?'Waiting for prerequisite <script>':null;
+  states.push({id,status:statuses[index],dependencies:index?[ids[index-1]]:[],reason});
+  tasks.push({id:'task-'+id,nodeId:id,title:labels[index],status:statuses[index],eligibility:statuses[index],assignedTo:index===1?'Photographer':null,role:index===1?'Photographer':null,reason,dependencyLabels:index?[labels[index-1]]:[]});
+ });
+ nodes.push({id:'end',label:'Complete',kind:'End'});
+ return{graph:{nodes,edges:[]},evaluation:{nodes:states,edges:{}},tasks};
+}
+test('next action comes from the graph task and opens that node',t=>{
+ const{w,host}=setup(t),view=graph(['Completed','Available','Blocked']);let selected;
+ w.StudioJobDetails.nextStep(host,view,id=>selected=id);
+ assert.match(host.querySelector('.jd-next-step-action-link').textContent,/Shoot/);
+ host.querySelector('button').click();assert.equal(selected,'shoot');assert.equal(host.dataset.state,'ready');
+});
+test('blocked graph task shows its reason as escaped text',t=>{
+ const{w,host}=setup(t),view=graph(['Completed','Blocked','NotStarted']);
+ w.StudioJobDetails.nextStep(host,view,()=>{});
+ assert.match(host.textContent,/Blocked: Waiting for prerequisite/);assert.equal(host.querySelector('script'),null);assert.equal(host.dataset.state,'blocked');
+});
+test('completed graph has no next action and workflow failure offers one retry',t=>{
+ const{w,host}=setup(t);
+ w.StudioJobDetails.nextStep(host,graph(['Completed','Completed','Completed']),()=>{});
+ assert.match(host.textContent,/Workflow Complete/);assert.equal(host.querySelector('[data-next-step-action]'),null);
+ let retried=false;w.StudioJobDetails.nextStep(host,null,()=>retried=true);host.querySelector('button').click();assert.equal(retried,true);
+});
+test('Job Details loads and expands one workflow graph without a legacy workflow request or dialog',async t=>{
+ const{environment}=require('./job-detail-fixture.cjs'),{w,fixture}=environment(t);
+ await w.openWorkspaceJob('job');await new Promise(r=>setTimeout(r,40));
+ const next=w.document.querySelector('.job-detail-heading .jd-next-step');assert.ok(next);assert.match(next.textContent,/Next Required Action/);
+ assert.ok(fixture.calls.some(c=>c.url.endsWith('/workflow-graph')));
+ assert.equal(fixture.calls.some(c=>c.url.endsWith('/connected-workflow')),false);
+ next.querySelector('[data-next-step-action]').click();await new Promise(r=>setTimeout(r,20));
+ assert.ok(w.document.querySelector('.jd-flow-drawer.is-open'));
+ assert.equal(w.document.querySelectorAll('.job-detail-workflow-dialog').length,0);
 });

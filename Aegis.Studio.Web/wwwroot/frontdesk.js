@@ -281,7 +281,7 @@ async function renderFrontDeskClientContext(){
     <h3>Jobs → Workspaces</h3><div class="frontdesk-client-jobs">${jobs.map(job=>`<article class="front-desk-row"><div><strong>${esc(job.title)}</strong><small>${esc(frontDeskWorkspaces.find(w=>w.id===job.workspaceId)?.name||'Workspace')} · ${esc(job.status)}${job.eventDate?' · '+esc(job.eventDate):''}</small></div><div class="front-desk-actions"><button class="action" onclick="showFrontDeskFlow('${job.id}')">Next action / Flow</button><button class="action" onclick="messageFrontDeskJob('${job.id}','workspace')">Message Workspace</button><button class="action" onclick="messageFrontDeskJob('${job.id}','escalate')">Escalate</button><button class="action" onclick="messageFrontDeskJob('${job.id}','finance')">Accounts / Finance</button><button class="action" onclick="checkInFrontDeskJob('${job.id}')">Check In</button><button class="primary" data-frontdesk-job="${job.id}">Open</button></div></article>`).join('')||'<p class="muted">No linked jobs yet.</p>'}</div>
     ${upcoming.length?`<h3>Upcoming</h3><div class="frontdesk-client-jobs">${upcoming.slice(0,8).map(entry=>`<article class="front-desk-row"><div><strong>${esc(entry.title)}</strong><small>${esc(new Date(entry.startsAtUtc).toLocaleString())} · ${esc(entry.location||'Location not set')}</small></div>${entry.jobId?`<button type="button" class="action" data-frontdesk-job="${entry.jobId}">Open job</button>`:''}</article>`).join('')}</div>`:''}
     ${quotes.length?`<h3>Quotes</h3><div class="frontdesk-client-jobs">${quotes.slice(0,5).map(q=>`<article class="front-desk-row"><div><strong>${esc(q.request?.title||'Quote')}</strong><small>${esc(q.status)} · ${money(q.total)}</small></div></article>`).join('')}</div>`:''}`;
-    host.querySelectorAll('[data-confirm-booking]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const v=await json('/api/jobs/'+b.dataset.confirmBooking+'/connected-workflow');const reason='';if(reason===null){b.disabled=false;return;}await json('/api/jobs/'+b.dataset.confirmBooking+'/connected-workflow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'confirm',expectedRevision:v.data.revision,operationId:crypto.randomUUID(),reason})});await showFrontDesk();}catch(error){alert(error.message);b.disabled=false;}});
+    host.querySelectorAll('[data-confirm-booking]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const v=await json('/api/jobs/'+b.dataset.confirmBooking+'/workflow-graph');const reason='';if(reason===null){b.disabled=false;return;}await json('/api/jobs/'+b.dataset.confirmBooking+'/workflow-graph/actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'confirm-booking',expectedRevision:v.revision,operationId:crypto.randomUUID(),reason})});await showFrontDesk();}catch(error){alert(error.message);b.disabled=false;}});
     host.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>openFrontDeskJob(b.dataset.frontdeskJob));
 }
 async function createFrontDeskClientJob(clientId){
@@ -468,31 +468,7 @@ async function showClientQuotes(clientId){
 }
 
 
-async function showFrontDeskFlow(jobId) {
-    const [job,timeline,configuredStages]=await Promise.all([
-        json('/api/jobs/'+jobId),
-        json('/api/jobs/'+jobId+'/timeline?count=200'),
-        json('/api/workflow/stages')
-    ]);
-    const events=Array.isArray(timeline)?timeline:(timeline.items||timeline.events||[]);
-    const stageNames=configuredStages;
-    const normalized=String(job.status||'').toLowerCase();
-    let current=stageNames.findIndex(stage=>stage.toLowerCase()===normalized);
-    if(current<0&&['new','confirmed','inquiry','needs scheduling'].includes(normalized))current=stageNames.findIndex(stage=>stage.toLowerCase()==='needs scheduling');
-    if(current<0)current=0;
-    const eventMarkup=list=>list.slice(0,30).map(event=>`<p><strong>${esc(event.title||event.eventType||'Activity')}</strong><small>${esc(event.detail||event.description||'')} ${event.createdAtUtc||event.occurredAtUtc?' · '+new Date(event.createdAtUtc||event.occurredAtUtc).toLocaleString():''}</small></p>`).join('')||'<p class="muted">No recorded history for this stage.</p>';
-    const dialog=studioDialog('Job Flow — '+job.title,`<div data-frontdesk-workflow></div><div class="frontdesk-flow">${stageNames.map((stage,index)=>`<button type="button" class="frontdesk-flow-stage ${index<current?'complete':index===current?'current':'future'}" data-flow-stage-name="${esc(stage)}"><small>${index<current?'Completed':index===current?'Current':'Upcoming'}</small><strong>${esc(stage)}</strong></button>`).join('<span>›</span>')}</div><div class="frontdesk-flow-history"><h3 data-flow-history-title>History</h3><div data-flow-history>${eventMarkup(events)}</div></div>`);
-    dialog.querySelectorAll('[data-flow-stage-name]').forEach(button=>button.onclick=()=>{
-        const stage=button.dataset.flowStageName;
-        dialog.querySelector('[data-flow-history-title]').textContent=stage+' history';
-        const related=events.filter(event=>[event.title,event.eventType,event.detail,event.description].filter(Boolean).join(' ').toLowerCase().includes(stage.toLowerCase()));
-        dialog.querySelector('[data-flow-history]').innerHTML=eventMarkup(related);
-    });
-    const host=dialog.querySelector('[data-frontdesk-workflow]');
-    dialog.addEventListener('close',()=>{if(host.__studioWorkflowClock)clearInterval(host.__studioWorkflowClock);},{once:true});
-    try{await window.StudioWorkflow.render(host,jobId,()=>dialog.isConnected);}catch(e){host.textContent=e.message;}
-    return dialog;
-}
+async function showFrontDeskFlow(jobId){return openFrontDeskJob(jobId);}
 
 async function loadFrontDeskCommunications(){
     const host=document.getElementById('fdCommunicationFeed');
@@ -564,10 +540,10 @@ async function messageFrontDeskJob(jobId, mode) {
 
 
 async function recordFrontDeskFulfillment(jobId){
- const workflow=await json(`/api/jobs/${jobId}/connected-workflow`);
+ const workflow=await json(`/api/jobs/${jobId}/workflow-graph`);
  const job=frontDeskJobs.find(j=>j.id===jobId),operationId=crypto.randomUUID();
  const dialog=frontDeskDialog('Confirm collection / delivery',`<p>${esc(job?.title||'Job')} · ${esc(job?.clientName||'')}</p><label>Method<select name="method"><option value="Collected">Client collected</option><option value="Delivered">Delivered to client</option></select></label><label>Received by<input name="recipient" required maxlength="200"></label>`);
- dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{await json(`/api/frontdesk/jobs/${jobId}/fulfillment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId,expectedRevision:workflow.data.revision,method:form.elements.method.value,recipient:form.elements.recipient.value})});dialog.close();await showFrontDesk();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
+ dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{await json(`/api/frontdesk/jobs/${jobId}/fulfillment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId,expectedRevision:workflow.revision,method:form.elements.method.value,recipient:form.elements.recipient.value})});dialog.close();await showFrontDesk();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
 
 

@@ -7,18 +7,23 @@
   if(!host)return;
   host.innerHTML=items.map(item=>`<li class="jd-flow-phase ${item.state||''} ${item.expanded?'jd-main-expanded':''}" ${item.phase?`data-flow-phase="${escape(item.phase)}"`:''} title="${escape(item.title||item.label)}">${item.content||`<button type="button" class="jd-workflow-dot ${item.dotState||''}" ${item.node?`data-workflow-node="${escape(item.node)}"`:''} ${item.expanded!==undefined?`aria-expanded="${item.expanded}"`:''} ${item.tone?`data-flow-tone="${item.tone}"`:''} title="${escape(item.title||item.label)}" aria-label="${escape(item.title||item.label)}"><span class="jd-stage-light" aria-hidden="true">${escape(item.icon||'')}</span><strong>${escape(item.short||item.label)}</strong></button>`}<span class="sr-only">${escape(item.description||'')}</span></li>`).join('');
  }
+ function workflowAction(view){
+  const tasks=new Map((view?.tasks||[]).map(task=>[task.nodeId,task]));
+  const states=new Map((view?.evaluation?.nodes||[]).map(node=>[node.id,node]));
+  const order=(view?.graph?.nodes||[]).filter(node=>node.kind==='Task').map(node=>node.id);
+  const open=order.map(id=>({id,task:tasks.get(id),status:states.get(id)?.status||'Unknown'})).filter(x=>x.task&&!['Completed','Skipped','Inactive','Cancelled'].includes(x.status));
+  const current=open.find(x=>x.status==='InProgress')||open.find(x=>x.status==='Available')||open[0]||null;
+  return current?{nodeId:current.id,task:current.task,status:current.status}:null;
+ }
  function nextStep(host,view,activate){
   if(!host)return;
   if(!view){host.dataset.state='unavailable';host.innerHTML='<div class="jd-next-step-copy"><p><strong>Next Required Action</strong> · Workflow could not be loaded.</p></div><button type="button" class="action" data-next-step-action>Retry workflow</button>';host.querySelector('button').onclick=()=>activate(null);return;}
-  const data=view.data||{},decision=root.StudioWorkflow.nextAction(view),closed=['Completed','Cancelled'].includes(data.stage);
-  const owner=data.ownerAssignment,waiting=owner?.status==='Assigned'&&!decision.selector;
-  const descriptions={Pending:'Confirm the booking after the deposit requirement or an approved override is satisfied.','Needs Assignment':'Assign a Job Owner to take responsibility for the next stage.','Needs Photographer Assignment':'Assign the photography crew before scheduling.','Awaiting Scheduling':'Set the date, time and location for the required sessions.',Scheduled:'Record the photographer’s progress to move the job forward.','Photography In Progress':'Finish the required sessions and record their outcomes.','Awaiting Upload':'Complete the required contributions and submit source media for review.','Awaiting Production Review':'Review the uploaded source material before accepting it into production.','Active Production':'Complete the required production work, then submit it for approval.','Awaiting Approval':'Review and approve the finished work before delivery.','Changes Requested':'Resolve the requested corrections before resubmitting the work.','Ready for Delivery':'Check the approved deliverables and record delivery. Financial release checks still apply.',Delivered:'Complete the job after delivery.'};
-  const reason=closed?'This job is '+data.stage.toLowerCase()+'.':data.blockedReason?'Blocked: '+data.blockedReason:owner?.status==='Assigned'&&decision.selector?.includes('owner-response')?'Accept ownership of this job before continuing.':decision.selector==='[data-wf-owner]'?'Assign a Job Owner to take responsibility for the next stage.':waiting?'Waiting for '+(data.owner||'the assigned owner')+' to accept ownership.':!decision.selector?'Next required action: '+decision.label+'. An authorized member of staff must complete it.':descriptions[data.stage]||'Complete the required action to continue the job.';
-  host.dataset.state=closed?'closed':data.blockedReason?'blocked':decision.selector?'ready':'waiting';
-  const cardLabel=closed?'Job Status':'Next Required Action',detail=reason.replace(/^Next required action:\s*/i,'');
-  const actionLink=!closed&&decision.selector;
-  host.innerHTML='<div class="jd-next-step-copy"><p><strong>'+cardLabel+'</strong> · '+(actionLink?'<button type="button" class="jd-link jd-next-step-action-link" data-next-step-action>'+escape(detail)+' <span aria-hidden="true">→</span></button>':escape(detail))+'</p></div>'+(!actionLink?'<button type="button" class="action" data-next-step-action>Review workflow</button>':'');
-  host.querySelector('[data-next-step-action]').onclick=()=>activate(closed?null:decision.selector);
+  const current=workflowAction(view),task=current?.task,complete=(view.tasks||[]).length>0&&!current;
+  host.dataset.state=complete?'completed':current?.status==='Blocked'?'blocked':current?'ready':'waiting';
+  const label=complete?'Workflow Complete':'Next Required Action';
+  const detail=complete?'All configured workflow tasks are complete.':task?[current.status==='Blocked'?'Blocked: '+(task.reason||'A prerequisite must be resolved.'):task.reason,task.assignedTo?'Assigned to '+task.assignedTo:null,task.role?'Role: '+task.role:null].filter(Boolean).join(' · '):'No active task is available in this workflow.';
+  host.innerHTML='<div class="jd-next-step-copy"><p><strong>'+label+'</strong> · '+escape(detail)+'</p></div>'+(current?'<button type="button" class="jd-link jd-next-step-action-link" data-next-step-action>'+escape(task.title)+' <span aria-hidden="true">→</span></button>':'');
+  host.querySelector('[data-next-step-action]')?.addEventListener('click',()=>activate(current.nodeId));
  }
  async function media(job,host,selectedHost,isCurrent,onCounts){
   let disposed=false,request=0,selectedId='',data=null,canEdit=false,uploading=false,search='',list=false;
@@ -133,7 +138,7 @@
    if(!canEdit||uploading||!files.length)return;uploading=true;
    try{
     if(pendingBatch)throw Error('Retry the pending batch before adding more files.');
-    const view=await json(`/api/jobs/${job.id}/connected-workflow`),sessions=view.data.sessions||[];
+    const view=await json(`/api/jobs/${job.id}/shoot-sessions`),sessions=view||[];
     let sessionId=sessions[0]?.id||null;
     if(sessions.length>1){
      sessionId=await new Promise(resolve=>{const d=studioDialog('Choose upload session',`<form><label>Session<select name="session">${sessions.map(s=>`<option value="${escape(s.id)}">${escape(s.title)}</option>`).join('')}</select></label><button type="submit" class="primary">Upload</button></form>`);d.addEventListener('close',()=>resolve(null),{once:true});d.querySelector('form').onsubmit=e=>{e.preventDefault();resolve(e.currentTarget.elements.session.value);d.close();};});
@@ -297,12 +302,12 @@
   if(root.ResizeObserver){host.__workflowRouteObserver=new ResizeObserver(scheduleRoutes);host.__workflowRouteObserver.observe(host);if(summaryHost)host.__workflowRouteObserver.observe(summaryHost);}
   function notifyDrawer(){host.dispatchEvent(new CustomEvent('studio-flow-details-toggle',{bubbles:true,detail:{open:!!(expanded||selected)}}));}
   function details(node,id){
-   const task=tasks.get(id),evaluation=states.get(id),reason=task?.reason||evaluation?.reason,next=root.StudioWorkflow?.nextAction?.(authority.data?authority:{...authority,data:{}}),canAssign=task&&!task.assignedTo&&(authority.canManage||authority.canReview);
+   const task=tasks.get(id),evaluation=states.get(id),reason=task?.reason||evaluation?.reason,canAssign=task&&!task.assignedTo&&(authority.canManage||authority.canReview);
    const hostDetails=host.querySelector('[data-workflow-details]');
-   hostDetails.innerHTML=`<section class="jd-dot-details"><strong>${esc(node.label)} · ${esc(state(node,id))}</strong><p>${esc(reason||(['Available','Completed','Skipped'].includes(state(node,id))?'No outstanding prerequisite reported.':'No specific blocker recorded; review workflow requirements.'))}</p><p>Responsible: ${esc(task?.assignedTo||'Unassigned')}${task?.role?' · Team / role: '+esc(task.role):''}${task?.optional?' · Optional step':''}</p><p>Depends on: ${esc((task?.dependencyLabels||evaluation?.dependencies||[]).join(', ')||'Workflow start')}</p><button type="button" data-existing-task>Review requirements, assignment and available actions →</button>${canAssign?'<button type="button" data-step-assign>Assign responsible person →</button>':''}${next?.selector?`<button type="button" data-step-next>${esc(next.label)} →</button>`:''}<button type="button" class="jd-link" data-close-step>Close details</button></section>`;
+   hostDetails.innerHTML=`<section class="jd-dot-details"><strong>${esc(node.label)} · ${esc(state(node,id))}</strong><p>${esc(reason||(['Available','Completed','Skipped'].includes(state(node,id))?'No outstanding prerequisite reported.':'No specific blocker recorded; review workflow requirements.'))}</p><p>Responsible: ${esc(task?.assignedTo||'Unassigned')}${task?.role?' · Team / role: '+esc(task.role):''}${task?.optional?' · Optional step':''}</p><p>Depends on: ${esc((task?.dependencyLabels||evaluation?.dependencies||[]).join(', ')||'Workflow start')}</p><button type="button" data-existing-task>Open graph task details →</button>${canAssign?'<button type="button" data-step-assign>Assign responsible person →</button>':''}<button type="button" class="jd-link" data-close-step>Close details</button></section>`;
    hostDetails.querySelector('[data-existing-task]').onclick=()=>root.StudioJobGraph.open(job.id,task?.id).catch(e=>alert(e.message));
    hostDetails.querySelector('[data-step-assign]')?.addEventListener('click',async()=>{try{const dialog=await root.StudioJobGraph.open(job.id,task.id);[...dialog.querySelectorAll('[data-assign]')].find(b=>b.dataset.assign===task.id)?.click();}catch(e){alert(e.message);}});
-   hostDetails.querySelector('[data-step-next]')?.addEventListener('click',()=>root.StudioWorkflow.open(job.id,next.selector).catch(e=>alert(e.message)));
+
    hostDetails.querySelector('[data-close-step]').onclick=()=>{selected=null;hostDetails.innerHTML='';notifyDrawer();[...host.querySelectorAll('[data-workflow-node]'),...(summaryHost?.querySelectorAll('[data-workflow-node]')||[])].find(b=>b.dataset.workflowNode===id)?.focus();};
   }
   draw();return {get expanded(){return expanded;},get selected(){return selected;}};

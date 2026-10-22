@@ -244,14 +244,16 @@ async function showPipeline() {
     if (isAdmin) genericView.querySelector('#scheduleAddResource').onclick = () => createScheduleResource().catch(pipelineError);
 }
 async function openPipelineMove(jobId){
-    // The connected workflow owns versioned workspace transfer and permission checks.
-    if(window.StudioWorkflow?.open)return StudioWorkflow.open(jobId,'[data-wf-transfer]');
-    return openWorkspaceJob(jobId);
+    const [workspaces,workflow]=await Promise.all([json('/api/frontdesk/workspaces'),json(`/api/jobs/${jobId}/workflow-graph`)]);
+    const dialog=studioDialog('Transfer Workspace',`<form><label>Destination<select name="workspace" required>${workspaces.map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select></label><label>Reason<textarea name="reason" required maxlength="4000"></textarea></label><button class="primary">Transfer</button><p role="alert"></p></form>`);
+    dialog.querySelector('form').onsubmit=async event=>{
+        event.preventDefault();const form=event.currentTarget,button=form.querySelector('button');button.disabled=true;
+        try{await json(`/api/jobs/${jobId}/workflow-graph/actions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'transfer-workspace',workspaceId:form.elements.workspace.value,reason:form.elements.reason.value,operationId:crypto.randomUUID(),expectedRevision:workflow.revision})});dialog.close();await showPipeline();}
+        catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}
+    };
 }
 async function advancePipelineJob(jobId){
-    // Stages depend on the job's workflow; there is no direct status write from Pipeline.
-    if(window.StudioWorkflow?.open)return StudioWorkflow.open(jobId);
-    return openWorkspaceJob(jobId);
+    return window.StudioJobGraph.open(jobId);
 }
 function installPipelineDrag(entries,tasks){
     const scheduleMap=new Map(entries.map(item=>[item.id,item])),taskMap=new Map(tasks.map(item=>[item.id,item]));

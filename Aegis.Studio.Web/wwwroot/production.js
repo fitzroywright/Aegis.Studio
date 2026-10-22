@@ -8,12 +8,6 @@ let productionSelectedJob = '';
 
 let productionView='queue';
 let productionQueueScope='mine',productionStageFilter='',productionWorkspaceFilter='',productionAssigneeFilter='',productionDueFilter='';
-async function createOperationalActivity(event) {
-    event.preventDefault();
-    await StudioWorkflow.command(activityJob.value,{action:'task',kind:activityType.value,title:activityTitle.value.trim(),description:activityDescription.value.trim()||null,priority:activityPriority.value,userName:activityAssigned.value.trim()||null,scheduledAtUtc:activityScheduled.value?new Date(activityScheduled.value).toISOString():null,dueAtUtc:activityDue.value?new Date(activityDue.value).toISOString():null,location:activityLocation.value.trim()||null,handoffTo:activityHandoff.value.trim()||null},event.currentTarget);
-    activityDialog.close(); await showProduction();
-}
-
 async function createShootSession(event) {
     event.preventDefault();
     const resourceIds=Array.from(shootResources.selectedOptions).map(o=>o.value);
@@ -21,8 +15,6 @@ async function createShootSession(event) {
     shootDialog.close();if(document.body.dataset.studioView==='production')await showProduction();else await openWorkspaceJob(shootJob.value);
 }
 
-async function setOperationalActivityStatus(id,status,blockedReason) { const item=operationalActivityCache.get(id); if(!item)return; await StudioWorkflow.command(item.jobId,{action:'task-progress',taskId:id,status,blockedReason:blockedReason||null},item); await showProduction(); }
-async function blockOperationalActivity(id) { const reason=prompt('Why is this activity blocked?'); if(reason) await setOperationalActivityStatus(id,'Blocked',reason); }
 async function updateShoot(id,action) { const shoot=shootCache.get(id);if(shoot)await openPhotographerReport(shoot.jobId,shoot.scheduleEntryId); }
 
 async function recordShootResults(id) {
@@ -81,8 +73,8 @@ async function openProductionItems(activity){
  const dialog=studioDialog(activity.title+' — Production / QC','<p>Loading approved production items…</p>');
  const host=dialog.querySelector('.studio-dialog-body');
  async function load(after=''){
-  const [data,orders,workflowView]=await Promise.all([json(`/api/jobs/${activity.jobId}/production/${activity.id}/items`+(after?'?after='+after:'')),json(`/api/jobs/${activity.jobId}/production/${activity.id}/order-lines`),json(`/api/jobs/${activity.jobId}/connected-workflow`)]);if(!dialog.isConnected)return;
-  host.innerHTML=`${orders.filter(l=>workflowView.canReview&&!l.sourceVersionId).map(l=>`<article class="task-card"><strong>${esc(l.description)} · ${l.quantity} purchased</strong><p>Approved source required</p><button data-order-source="${l.id}">Choose approved image</button></article>`).join('')}<p>${data.completed}/${data.quantity} units produced · ${data.passed}/${data.total} items passed QC · ${data.rejected} rejected</p><progress max="${Math.max(1,data.quantity)}" value="${data.completed}"></progress>${data.items.map(i=>`<article class="task-card"><a href="/api/jobs/${activity.jobId}/versions/by-id/${i.sourceVersionId}/content">${esc(i.fileName)} · Approved v${i.versionNumber}</a><small>${esc(i.productCode)} · ${i.completedQuantity}/${i.quantity} · ${esc(i.qcState)}</small>${i.refundedProducedQuantity?`<p>${i.refundedProducedQuantity} produced units refunded — review stock / waste.</p>`:''}${i.qcReason?`<p>${esc(i.qcReason)}</p>`:''}${workflowView.canReview?`<button ${i.qcState==='Cancelled'?'disabled':''} data-qc-pass="${i.id}">Pass QC</button><button ${i.qcState==='Cancelled'?'disabled':''} data-qc-reject="${i.id}">Reject / Rework</button>`:i.qcState==='Pending'&&StudioWorkflow.canReportTask(workflowView,activity)?`<button data-produced="${i.id}">Record produced quantity</button>`:''}</article>`).join('')||'<p>No approved items yet. Approve the job media to create its production items.</p>'}${data.items.length===100?'<button data-next-items>Next items</button>':''}${after?'<button data-first-items>First items</button>':''}<p role="alert"></p>`;
+  const [data,orders,access]=await Promise.all([json(`/api/jobs/${activity.jobId}/production/${activity.id}/items`+(after?'?after='+after:'')),json(`/api/jobs/${activity.jobId}/production/${activity.id}/order-lines`),json(`/api/jobs/${activity.jobId}/access`)]);if(!dialog.isConnected)return;const permissions=access.permissions||access;const canManageProduction=!!permissions.manageProduction;
+  host.innerHTML=`${orders.filter(l=>canManageProduction&&!l.sourceVersionId).map(l=>`<article class="task-card"><strong>${esc(l.description)} · ${l.quantity} purchased</strong><p>Approved source required</p><button data-order-source="${l.id}">Choose approved image</button></article>`).join('')}<p>${data.completed}/${data.quantity} units produced · ${data.passed}/${data.total} items passed QC · ${data.rejected} rejected</p><progress max="${Math.max(1,data.quantity)}" value="${data.completed}"></progress>${data.items.map(i=>`<article class="task-card"><a href="/api/jobs/${activity.jobId}/versions/by-id/${i.sourceVersionId}/content">${esc(i.fileName)} · Approved v${i.versionNumber}</a><small>${esc(i.productCode)} · ${i.completedQuantity}/${i.quantity} · ${esc(i.qcState)}</small>${i.refundedProducedQuantity?`<p>${i.refundedProducedQuantity} produced units refunded — review stock / waste.</p>`:''}${i.qcReason?`<p>${esc(i.qcReason)}</p>`:''}${canManageProduction?`<button ${i.qcState==='Cancelled'?'disabled':''} data-qc-pass="${i.id}">Pass QC</button><button ${i.qcState==='Cancelled'?'disabled':''} data-qc-reject="${i.id}">Reject / Rework</button>`:i.qcState==='Pending'&&canManageProduction?`<button data-produced="${i.id}">Record produced quantity</button>`:''}</article>`).join('')||'<p>No approved items yet. Approve the job media to create its production items.</p>'}${data.items.length===100?'<button data-next-items>Next items</button>':''}${after?'<button data-first-items>First items</button>':''}<p role="alert"></p>`;
   host.querySelectorAll('[data-order-source]').forEach(b=>b.onclick=async()=>{
    const picker=studioDialog('Choose approved source','<p>Loading approved images…</p>'),body=picker.querySelector('.studio-dialog-body');
    async function page(cursor=''){
