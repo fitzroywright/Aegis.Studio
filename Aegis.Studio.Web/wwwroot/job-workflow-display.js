@@ -33,6 +33,7 @@
   };
   return {taskState,stageState};
  }
+ function shortStageLabel(label){const words=String(label??'').trim().split(/[\s/]+/).filter(Boolean);return words.length?words[words.length-1]:'';}
  function icon(state){return state==='Completed'||state==='Skipped'?'✓':state==='InProgress'?'●':state==='Blocked'?'!':'›';}
  function render(host,view){
   const graph=view?.graph;if(!host||!graph?.nodes)return;
@@ -40,10 +41,10 @@
   const states=statusReader(view),nodes=graph.nodes.filter(n=>!['Start','End'].includes(n.kind)).map(n=>({...n,_displayState:states.stageState(n)})).filter(n=>n._displayState!=='Inactive');
   const expandedId=host.dataset.expanded||'',expandedNode=nodes.find(n=>n.id===expandedId&&n.kind==='Subflow'&&Array.isArray(n.subflow?.nodes));
   const items=nodes.map((node,index)=>{
-   const label=esc(node.label),state=node._displayState,klass=state.toLowerCase(),before=index?'<span class="jd-workflow-connector" aria-hidden="true"></span>':'';
+   const label=esc(node.label),shortLabel=esc(shortStageLabel(node.label)),state=node._displayState,klass=state.toLowerCase(),before=index?'<span class="jd-workflow-connector" aria-hidden="true"></span>':'';
    if(node.id===expandedNode?.id)return before+'<div class="jd-workflow-subflow-main '+klass+'" data-expanded-stage="'+esc(node.id)+'" aria-label="Expanded '+label+'"><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" data-endpoint="start" aria-expanded="true" aria-label="Start '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">›</span><span class="jd-workflow-endpoint-label">Start '+label+'</span></button><span class="jd-workflow-main-dashes" aria-hidden="true"></span><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" data-endpoint="end" aria-expanded="true" aria-label="End '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">×</span><span class="jd-workflow-endpoint-label">End '+label+'</span></button></div>';
-   if(node.kind==='Subflow'&&Array.isArray(node.subflow?.nodes))return before+'<button type="button" class="jd-workflow-stage '+klass+'" data-subflow-stage="'+esc(node.id)+'" aria-expanded="false" title="'+label+' · '+state+'"><span class="jd-workflow-stage-icon" aria-hidden="true">'+icon(state)+'</span><span class="jd-workflow-stage-label">'+label+'</span></button>';
-   return before+'<div class="jd-workflow-stage '+klass+'" role="listitem" aria-label="'+label+' · '+state+'"><span class="jd-workflow-stage-icon" aria-hidden="true">'+icon(state)+'</span><span class="jd-workflow-stage-label">'+label+'</span></div>';
+   if(node.kind==='Subflow'&&Array.isArray(node.subflow?.nodes))return before+'<button type="button" class="jd-workflow-stage '+klass+'" data-subflow-stage="'+esc(node.id)+'" aria-expanded="false" title="'+label+' · '+state+'"><span class="jd-workflow-stage-icon" aria-hidden="true">'+icon(state)+'</span><span class="jd-workflow-stage-label"'+shortLabel+'</span></button>';
+   return before+'<div class="jd-workflow-stage '+klass+'" role="listitem" aria-label="'+label+' · '+state+'"><span class="jd-workflow-stage-icon" aria-hidden="true">'+icon(state)+'</span><span class="jd-workflow-stage-label"'+shortLabel+'</span></div>';
   }).join('');
   host.innerHTML='<div class="jd-workflow-display" role="list" aria-label="Job workflow">'+items+'</div><div class="jd-workflow-expansion" hidden></div>';
   host.querySelectorAll('[data-subflow-stage]').forEach(button=>button.onclick=()=>{host.dataset.expanded=button.dataset.subflowStage;render(host,view);});
