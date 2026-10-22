@@ -177,12 +177,10 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     </div>
                     <section class="jd-next-step" aria-label="Next job action" aria-live="polite"><p role="status">Loading next step…</p></section>
                     </div>
-                    <div class="jd-flow-overview"><ol class="jd-flow-summary" aria-label="Main job flow"></ol></div>
-                    <section id="jobFlowDrawer" class="jd-flow-drawer" aria-label="Job flow details" aria-hidden="true" inert><div class="jd-flow-drawer-inner"><div class="jd-workflow-track" aria-live="polite"></div></div></section>
+                    <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"></div></div>
                 </div>
                 <div class="jd-job-status"><small>${job.jobCode||job.code?'Job Code · '+esc(job.jobCode||job.code):''}</small></div>
                 <div class="jd-workflow-caption" hidden><span data-job-blocked></span></div>`;
-            const flowDrawer=header.querySelector('.jd-flow-drawer');
             const identityToggle=header.querySelector('.jd-job-name-toggle'),identityMenu=header.querySelector('.jd-job-identity-menu');
             const setIdentityOpen=open=>{
                 identityToggle.setAttribute('aria-expanded',String(open));
@@ -196,25 +194,6 @@ function mergeJobMessages(teamMessages, clientMessages) {
             header.addEventListener('keydown',event=>{
                 if(event.key==='Escape'&&identityToggle.getAttribute('aria-expanded')==='true'){
                     event.preventDefault();setIdentityOpen(false);identityToggle.focus();
-                }
-            });
-            let flowOpen=false,flowTrigger=null;
-            const setFlowOpen=(open,restoreFocus=false)=>{
-                flowOpen=open;
-                flowDrawer.classList.toggle('is-open',open);
-                flowDrawer.setAttribute('aria-hidden',String(!open));
-                flowDrawer.toggleAttribute('inert',!open);
-                if(restoreFocus)flowTrigger?.focus();
-            };
-            const dismissWorkflow=event=>{
-                if(flowOpen&&!event.target.closest('.jd-flow-drawer,.jd-flow-overview'))setFlowOpen(false);
-            };
-            document.addEventListener('pointerdown',dismissWorkflow);
-            header.querySelector('.jd-flow-summary').addEventListener('click',event=>{const icon=event.target.closest('[data-flow-phase]');if(icon){flowTrigger=icon;setFlowOpen(!flowOpen);}},true);
-            header.addEventListener('studio-flow-details-toggle',event=>setFlowOpen(event.detail.open));
-            header.addEventListener('keydown',event=>{
-                if(event.key==='Escape'&&flowOpen){
-                    event.preventDefault();event.stopPropagation();setFlowOpen(false,true);
                 }
             });
             const board=document.createElement('div');board.className='job-detail-board';
@@ -344,12 +323,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 const started=Date.parse(action?.task?.startedAtUtc||action?.task?.startedAt||'');
                 header.querySelector('[data-stage-age]').textContent=Number.isFinite(started)?'In workflow: '+Math.floor(Math.max(0,Date.now()-started)/86400000)+' days':'Timing unavailable';
             };
-            const openGraphAction=nodeId=>{
-                setFlowOpen(true);
-                if(!nodeId)return;
-                const target=[...header.querySelectorAll('.jd-flow-summary [data-workflow-node]')].find(button=>button.dataset.workflowNode===nodeId);
-                target?.click();
-            };
+            const openGraphAction=nodeId=>{const task=workflow?.tasks?.find(item=>item.nodeId===nodeId);window.StudioJobGraph.open(job.id,task?.id).catch(error=>console.error('[Studio Job Details] Could not open workflow task',error));};
             const refreshWorkflow=async()=>{
                 const request=++workflowRequest;
                 const controller=new AbortController();
@@ -359,7 +333,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(!current()||request!==workflowRequest)return;
                     workflow=graphView;
                     const action=window.StudioJobDetails.workflowAction(graphView),task=action?.task;
-                    StudioJobDetails.compact(header.querySelector('.jd-workflow-track'),graphView,job,header.querySelector('.jd-flow-summary'));
+                    StudioGraph.canvas(header.querySelector('.jd-workflow-track'),graphView.graph,{summary:true,evaluation:graphView.evaluation,onSelect:nodeId=>{const selected=graphView.tasks?.find(item=>item.nodeId===nodeId);if(selected)window.StudioJobGraph.open(job.id,selected.id).catch(error=>console.error('[Studio Job Details] Could not open workflow task',error));}});
                     StudioJobDetails.nextStep(header.querySelector('.jd-next-step'),graphView,nodeId=>nodeId?openGraphAction(nodeId):refreshWorkflow());
                     header.querySelector('.jd-status-pill').textContent=task?.title||(graphView.tasks?.length?'Workflow complete':'Workflow unavailable');
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(task?.assignedTo?studioFirstName(task.assignedTo):job.jobLead?studioFirstName(job.jobLead):'Unassigned');
@@ -370,10 +344,10 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     const blocked=action?.status==='Blocked'?task?.reason||'A workflow prerequisite is blocking this task.':'';
                     header.querySelector('[data-job-blocked]').textContent=blocked?'Blocked: '+blocked:'';
                     header.querySelector('.jd-workflow-caption').hidden=!blocked;
-                    const attention=header.querySelector('.jd-attention-items');
-                    attention.replaceChildren();
-                    if(task){const item=document.createElement('p');item.textContent=task.title+(task.reason?' · '+task.reason:'');attention.append(item);}
-                    const button=header.querySelector('[data-view-workflow]');
+                    const attentionItems=attention.querySelector('.jd-attention-items');
+                    attentionItems.replaceChildren();
+                    if(task){const item=document.createElement('p');item.textContent=task.title+(task.reason?' · '+task.reason:'');attentionItems.append(item);}
+                    const button=attention.querySelector('[data-view-workflow]');
                     button.textContent=task?'Open '+task.title+' →':'Open workflow →';
                     button.onclick=()=>openGraphAction(action?.nodeId);
                     updateAge();
@@ -385,13 +359,13 @@ function mergeJobMessages(teamMessages, clientMessages) {
                         StudioJobDetails.nextStep(nextStep,null,()=>refreshWorkflow());
                         nextStep.querySelector('.jd-next-step-copy p').textContent='Workflow graph could not be loaded: '+message;
                         header.querySelector('[data-stage-age]').textContent='Workflow unavailable';
-                        const attentionItems=header.querySelector('.jd-attention-items');
+                        const attentionItems=attention.querySelector('.jd-attention-items');
                         attentionItems.replaceChildren();
                         const status=document.createElement('p');
                         status.setAttribute('role','status');
                         status.textContent='Workflow unavailable: '+message;
                         attentionItems.append(status);
-                        const retry=header.querySelector('[data-view-workflow]');
+                        const retry=attention.querySelector('[data-view-workflow]');
                         retry.textContent='Retry workflow →';
                         retry.onclick=()=>refreshWorkflow();
                     }
@@ -401,7 +375,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);
             const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
             navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
-            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);document.removeEventListener('pointerdown',dismissWorkflow);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
+            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.remove();});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
             const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};document.addEventListener('studio-workflow-changed',graphChanged);const previousDispose=disposeJobView;disposeJobView=()=>{document.removeEventListener('studio-workflow-changed',graphChanged);previousDispose();};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
