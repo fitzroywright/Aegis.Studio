@@ -33,7 +33,7 @@ internal static class DemoJobPhotoPopulation
             int target=existing.Count(x=>x.StartsWith("demo-people/",StringComparison.Ordinal)) + Math.Max(0,40-existing.Count);
             for(int photo=0;photo<target;photo++)
             {
-                report?.Invoke(new(96+3*ordinal/Math.Max(1,jobs.Count),"Photos for every job",ordinal,jobs.Count,$"Job {ordinal+1}/{jobs.Count}: checking people photograph {photo+1}/{target}."));
+                report?.Invoke(new(96+3*ordinal/Math.Max(1,jobs.Count),"Photos for every job",ordinal,jobs.Count,$"Job {ordinal+1}/{jobs.Count}: loading people photograph {photo+1}/{target}."));
                 string key=$"demo-people/{photo+1:000}";
                 DemoDataExpansion.AddImage(connection,transaction,versions,job,key,Id(job,key+"/version"),1,photo,null,login,searchTerm:"portrait");
                 Guid asset=Id(job,key+"/asset");
