@@ -32,7 +32,7 @@
 .jd-job-status small { grid-column:2; color:var(--theme-muted,#7c8493); }
 
 /* Job identity, floating menus, and compact workflow are owned by this layout. */
-.jd-job-name-stack { position:relative; display:flex; flex:0 1 58%; flex-direction:column; gap:2px; width:58%; min-width:140px; }
+.jd-job-name-stack { position:relative; display:flex; flex:1 1 auto; flex-direction:column; gap:2px; width:100%; min-width:140px; }
 .jd-job-name-toggle { display:inline-flex; flex:0 1 auto; align-items:center; gap:9px; width:100%; max-width:100%; min-width:0; padding:2px 8px 3px 0; border:0; border-radius:4px; background:transparent; color:var(--theme-text,#162b50); font:inherit; font-size:clamp(13px,1.35vw,19px); line-height:1.15; font-weight:750; text-align:left; cursor:pointer; }
 .jd-job-name-icon { flex:none; width:17px; height:17px; color:#d97827; }
 .jd-job-name-text { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
@@ -60,12 +60,11 @@
 .jd-next-step-action-link span { display:inline-block; margin-left:3px; }
 @media(max-width:900px) {
  .job-detail-title.jd-job-identity { gap:clamp(6px,1vw,14px); }
- .jd-job-name-stack { flex-basis:55%; width:55%; min-width:120px; }
 }
 @media(max-width:650px) {
  .job-detail-heading { grid-template-columns:minmax(0,1fr); }
  .job-detail-title.jd-job-identity { grid-column:1; grid-row:1; flex-wrap:wrap; gap:4px 10px; }
- .jd-job-name-stack { flex:1 1 100%; width:100%; min-width:0; }
+ .jd-job-name-stack { min-width:0; }
  .jd-job-name-stack .jd-job-identity-menu { width:min(410px,calc(100vw - 32px)); }
  .jd-flow-overview { grid-column:1; grid-row:2; height:auto; min-height:76px; }
 }
