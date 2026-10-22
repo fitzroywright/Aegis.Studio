@@ -28,6 +28,7 @@ function setup(w){
    const evaluationEdges=Object.fromEntries(edges.map(e=>[e.id,state.get(e.from)==='Completed'||e.from==='start'?'Completed':'Pending']));
    return {jobId,templateId:'00000000-0000-0000-0000-000000000000',templateVersion:1,revision:1,graph:{nodes,edges},evaluation:{nodes:evaluationNodes,edges:evaluationEdges,completed:index===4},tasks,history:[]};
   }
+  if(base.endsWith('/shoot-sessions'))return [];
   if(base.endsWith('/connected-workflow'))return workflow(jobs.find(j=>base.includes('/'+j.id+'/'))||jobs[0]);
   if(base.endsWith('/subjects')){if(fixture.delaySubjects)await fixture.delaySubjects;if(fixture.failSubjects)throw new Error('Subjects unavailable');return subjects;}
   if(/\/media\/assets\/[^/]+$/.test(base)&&options?.method==='PUT'){const asset=assets.find(a=>base.endsWith('/'+a.id));if(!asset)throw Error('Unknown photo');Object.assign(asset,JSON.parse(options.body));return null;}
