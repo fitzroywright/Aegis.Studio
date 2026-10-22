@@ -49,7 +49,7 @@ test('Job Details shows one status-colored display and never opens the workflow 
  assert.ok(host.querySelector('.jd-workflow-stage.inprogress'));
  assert.ok(host.querySelector('.jd-workflow-stage.available'));
  assert.ok(host.querySelector('.jd-workflow-stage.pending'));
- host.querySelectorAll('.jd-workflow-stage-label').forEach(label=>assert.equal(label.textContent.trim().split(/\\s+/).length,1));
+ host.querySelectorAll('.jd-workflow-stage-label').forEach(label=>assert.equal(label.textContent.trim().split(/\s+/).length,1));
  assert.equal(host.querySelector('.jd-workflow-stage.blocked .jd-workflow-stage-icon').textContent,'!');
  host.querySelectorAll('.jd-workflow-stage[role="listitem"]').forEach(node=>node.click());
  assert.equal(editorOpens,0);assert.equal(canvasCalls,0);
