@@ -46,7 +46,7 @@
   const entry=(flow.edges||[]).find(e=>e.from===start?.id&&stagePositions.has(e.to));
   const firstId=entry?.to||stages[0]?.id,first=firstId?stagePositions.get(firstId):null;
   if(first){
-   const left=startX-52,turn=cy+50;
+   const left=startX-36,turn=cy+50;
    paths.push('<path class="sg-subflow-path"'+edgeAttrs(entry||{id:'entry'})+' d="M'+startX+' '+(cy+11)+' V'+(cy+35)+' Q'+startX+' '+turn+' '+(startX-14)+' '+turn+' H'+left+' Q'+(left-12)+' '+turn+' '+(left-12)+' '+(turn+12)+' V'+first.y+' H'+(first.x-13)+'"'+arrow+'/>');
   }
   for(const edge of flow.edges||[]){
