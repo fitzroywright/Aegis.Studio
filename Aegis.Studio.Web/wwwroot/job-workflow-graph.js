@@ -1,6 +1,21 @@
 (function(root){
  'use strict';
  const esc=StudioGraph.esc,send=(url,body,method='POST')=>json(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ async function launchTask(job,taskId=null){
+  const [access,identity,globalRole,view]=await Promise.all([json(`/api/jobs/${job}/access`),json('/api/auth/me'),json('/api/security/global-role-me'),json(`/api/jobs/${job}/workflow-graph`)]);
+  const permissions=access.permissions||access,user=identity.user||identity,actor=user.userName||user.loginName||'';
+  const canAct=!!(permissions.editJob||permissions.manageProduction||globalRole.frontDesk);
+  const task=(view?.tasks||[]).find(t=>t.id===taskId)||(()=>{const ids=(view?.graph?.nodes||[]).filter(n=>n.kind==='Task').map(n=>n.id);const states=new Map((view?.evaluation?.nodes||[]).map(n=>[n.id,n.status]));const id=ids.find(x=>states.get(x)==='InProgress')||ids.find(x=>states.get(x)==='Available');return (view?.tasks||[]).find(t=>t.nodeId===id);})();
+  if(!task)throw Error('There is no available next action for this job.');
+  const assigned=task.assignedTo&&task.assignedTo.toLowerCase()===actor.toLowerCase();
+  const allowed=(canAct||assigned)&&['Available','InProgress'].includes(task.eligibility);
+  const d=studioDialog('Next required action',`<h3>${esc(task.description||task.title)}</h3><p>${esc(task.title)}</p><p><strong>Status:</strong> ${esc(task.eligibility)}</p><p>${esc(task.reason||task.dependencyLabels?.join(', ')||'')}</p><div class="dialog-actions">${allowed&&task.eligibility==='Available'?'<button data-start class="primary">Start action</button>':''}${allowed&&task.eligibility==='InProgress'?'<button data-complete class="primary">Complete action</button>':''}<button type="button" data-close>Close</button></div><p role="alert"></p>`);
+  d.querySelector('[data-close]').onclick=()=>d.close();
+  const transition=async(action,button)=>{button.disabled=true;try{await send(`/api/jobs/${job}/workflow-graph/tasks`,{nodeId:task.nodeId,action,operationId:crypto.randomUUID(),expectedRevision:view.revision});d.close();document.dispatchEvent(new CustomEvent('studio-workflow-changed',{detail:{jobId:job}}));}catch(error){d.querySelector('[role=alert]').textContent=error.message||String(error);button.disabled=false;}};
+  d.querySelector('[data-start]')?.addEventListener('click',e=>transition('start',e.currentTarget));
+  d.querySelector('[data-complete]')?.addEventListener('click',e=>transition('complete',e.currentTarget));
+  return d;
+ }
  async function open(job,focusTask=null){
   const [access,identity,globalRole]=await Promise.all([json(`/api/jobs/${job}/access`),json('/api/auth/me'),json('/api/security/global-role-me')]);
   const permissions=access.permissions||access,user=identity.user||identity,authority={canManage:!!permissions.editJob,canReview:!!permissions.manageProduction,canFrontDesk:!!globalRole.frontDesk,userName:user.userName||user.loginName};
@@ -53,5 +68,5 @@
   const draw=()=>{const state=genericView.querySelector('[data-state]').value;const filtered=rows.filter(r=>!state||r.task.eligibility===state);genericView.querySelector('[data-table]').innerHTML=`<table class="pos-grid"><thead><tr><th>Task</th><th>Assigned / role</th><th>State</th><th>Dependencies</th></tr></thead><tbody>${filtered.map(r=>`<tr data-job="${r.jobId}" tabindex="0"><td>${esc(r.task.title)}</td><td>${esc(r.task.assignedTo||r.task.role||'Unassigned')}</td><td>${esc(r.task.eligibility)}</td><td>${esc(r.task.reason||(r.task.dependencyLabels||r.task.dependencies).join(', '))}</td></tr>`).join('')||'<tr><td colspan="4">No matching workflow tasks.</td></tr>'}</tbody></table>`;genericView.querySelectorAll('[data-job]').forEach(el=>{el.onclick=async()=>{const dialog=await open(el.dataset.job);dialog.addEventListener('close',async()=>{if(current()){rows=await json('/api/production/workflow-tasks?mine='+genericView.querySelector('[data-mine]').checked);draw();}},{once:true});};el.onkeydown=e=>{if(e.key==='Enter')el.click();};});StudioPage.setCount(filtered.length+' tasks');};
   genericView.querySelector('[data-state]').onchange=draw;genericView.querySelector('[data-mine]').onchange=async e=>{rows=await json('/api/production/workflow-tasks?mine='+e.target.checked);draw();};genericView.querySelector('[data-orders]').onclick=()=>showCatalogProduction();draw();
  }
- root.StudioJobGraph={open,change,services,production};
+ root.StudioJobGraph={open,launchTask,change,services,production};
 })(window);
