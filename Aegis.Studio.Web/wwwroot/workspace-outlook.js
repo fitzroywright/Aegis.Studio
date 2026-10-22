@@ -350,7 +350,6 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 const target=[...header.querySelectorAll('.jd-flow-summary [data-workflow-node]')].find(button=>button.dataset.workflowNode===nodeId);
                 target?.click();
             };
-            header.querySelector('[data-job-workflow]').onclick=()=>openGraphAction();
             const refreshWorkflow=async()=>{
                 const request=++workflowRequest;
                 try{
