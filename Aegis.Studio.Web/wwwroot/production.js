@@ -8,12 +8,6 @@ let productionSelectedJob = '';
 
 let productionView='queue';
 let productionQueueScope='mine',productionStageFilter='',productionWorkspaceFilter='',productionAssigneeFilter='',productionDueFilter='';
-async function createOperationalActivity(event) {
-    event.preventDefault();
-    await StudioWorkflow.command(activityJob.value,{action:'task',kind:activityType.value,title:activityTitle.value.trim(),description:activityDescription.value.trim()||null,priority:activityPriority.value,userName:activityAssigned.value.trim()||null,scheduledAtUtc:activityScheduled.value?new Date(activityScheduled.value).toISOString():null,dueAtUtc:activityDue.value?new Date(activityDue.value).toISOString():null,location:activityLocation.value.trim()||null,handoffTo:activityHandoff.value.trim()||null},event.currentTarget);
-    activityDialog.close(); await showProduction();
-}
-
 async function createShootSession(event) {
     event.preventDefault();
     const resourceIds=Array.from(shootResources.selectedOptions).map(o=>o.value);
@@ -21,8 +15,6 @@ async function createShootSession(event) {
     shootDialog.close();if(document.body.dataset.studioView==='production')await showProduction();else await openWorkspaceJob(shootJob.value);
 }
 
-async function setOperationalActivityStatus(id,status,blockedReason) { const item=operationalActivityCache.get(id); if(!item)return; await StudioWorkflow.command(item.jobId,{action:'task-progress',taskId:id,status,blockedReason:blockedReason||null},item); await showProduction(); }
-async function blockOperationalActivity(id) { const reason=prompt('Why is this activity blocked?'); if(reason) await setOperationalActivityStatus(id,'Blocked',reason); }
 async function updateShoot(id,action) { const shoot=shootCache.get(id);if(shoot)await openPhotographerReport(shoot.jobId,shoot.scheduleEntryId); }
 
 async function recordShootResults(id) {
