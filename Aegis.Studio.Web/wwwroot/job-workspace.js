@@ -172,8 +172,8 @@ async function renderJobTasks(job,panel,current) {
         <button type="button" class="primary" data-open-job-workflow>Open Workflow</button>
     </section>`;
     panel.querySelector('[data-open-job-workflow]').onclick=()=>{
-        if(typeof StudioJobGraph?.open!=='function'){alert('The workflow graph is unavailable.');return;}
-        StudioJobGraph.open(job.id).catch(error=>alert(error.message||String(error)));
+        if(typeof window.StudioJobGraph?.open!=='function'){alert('The workflow graph is unavailable.');return;}
+        window.StudioJobGraph.open(job.id).catch(error=>alert(error.message||String(error)));
     };
 }
 
