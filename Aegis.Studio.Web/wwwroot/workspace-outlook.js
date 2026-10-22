@@ -333,7 +333,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(!current()||request!==workflowRequest)return;
                     workflow=graphView;
                     const action=window.StudioJobDetails.workflowAction(graphView),task=action?.task;
-                    StudioGraph.canvas(header.querySelector('.jd-workflow-track'),graphView.graph,{summary:true,evaluation:graphView.evaluation,onSelect:nodeId=>{const selected=graphView.tasks?.find(item=>item.nodeId===nodeId);if(selected)window.StudioJobGraph.open(job.id,selected.id).catch(error=>console.error('[Studio Job Details] Could not open workflow task',error));}});
+                    StudioJobWorkflowDisplay.render(header.querySelector('.jd-workflow-track'),graphView,nodeId=>{const selected=graphView.tasks?.find(item=>item.nodeId===nodeId);if(selected)window.StudioJobGraph.open(job.id,selected.id).catch(error=>console.error('[Studio Job Details] Could not open workflow task',error));});
                     StudioJobDetails.nextStep(header.querySelector('.jd-next-step'),graphView,nodeId=>nodeId?openGraphAction(nodeId):refreshWorkflow());
                     header.querySelector('.jd-status-pill').textContent=task?.title||(graphView.tasks?.length?'Workflow complete':'Workflow unavailable');
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(task?.assignedTo?studioFirstName(task.assignedTo):job.jobLead?studioFirstName(job.jobLead):'Unassigned');
