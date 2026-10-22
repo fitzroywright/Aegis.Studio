@@ -175,7 +175,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                             <div><dt>Name of Worker</dt><dd data-job-photographer>${esc(workerName)}</dd></div>
                         </dl>
                     </div>
-                    <section class="jd-next-step" aria-label="Next job action" aria-live="polite"><p role="status">Loading next step…</p></section>
+                    <div class="jd-next-action" aria-label="Next job action"></div>
                     </div>
                 </div>
                 <div class="jd-flow-overview"><div class="jd-workflow-track" aria-label="Job workflow" aria-live="polite"></div></div>
@@ -334,7 +334,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     workflow=graphView;
                     const action=window.StudioJobDetails.workflowAction(graphView),task=action?.task;
                     StudioJobWorkflowDisplay.render(header.querySelector('.jd-workflow-track'),graphView);
-                    StudioJobDetails.nextStep(header.querySelector('.jd-next-step'),graphView,nodeId=>nodeId?openGraphAction(nodeId):refreshWorkflow());
+                    StudioJobDetails.nextActionLink(header.querySelector('.jd-next-action'),graphView,nodeId=>openGraphAction(nodeId));
                     header.querySelector('.jd-status-pill').textContent=task?.title||(graphView.tasks?.length?'Workflow complete':'Workflow unavailable');
                     header.querySelector('[data-job-owner]').textContent='Owner: '+(task?.assignedTo?studioFirstName(task.assignedTo):job.jobLead?studioFirstName(job.jobLead):'Unassigned');
                     const responsible=graphView.tasks?.find(item=>item.role&&item.assignedTo);
@@ -355,9 +355,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     if(current()&&request===workflowRequest){
                         const message=error?.name==='AbortError'?'Workflow request timed out after 20 seconds.':error?.message||String(error);
                         console.error('[Studio Job Details] Failed to load workflow graph for job '+job.id,error);
-                        const nextStep=header.querySelector('.jd-next-step');
-                        StudioJobDetails.nextStep(nextStep,null,()=>refreshWorkflow());
-                        nextStep.querySelector('.jd-next-step-copy p').textContent='Workflow graph could not be loaded: '+message;
+                        header.querySelector('.jd-next-action').replaceChildren();
                         header.querySelector('[data-stage-age]').textContent='Workflow unavailable';
                         const attentionItems=attention.querySelector('.jd-attention-items');
                         attentionItems.replaceChildren();
