@@ -8,8 +8,17 @@
 .jd-workflow-stage.inprogress .jd-workflow-stage-icon,.jd-workflow-stage.available .jd-workflow-stage-icon{background:#d99416;border-color:#d99416}
 .jd-workflow-stage.blocked .jd-workflow-stage-icon{background:#bd3040;border-color:#bd3040;color:#fff}
 .jd-workflow-stage-label{position:absolute;left:50%;top:29px;transform:rotate(45deg);transform-origin:top left;font-size:10px;white-space:nowrap}
-.jd-workflow-expansion{position:absolute;z-index:5;top:46px;left:0;width:100%;display:flex;align-items:flex-start;gap:8px;min-width:0;padding:4px 0;overflow:visible;background:var(--theme-surface,#fff)}
+.jd-workflow-expansion{position:absolute;z-index:5;top:58px;left:0;width:100%;min-width:0;overflow:visible;pointer-events:none}
 .jd-workflow-expansion[hidden]{display:none}
-.jd-subflow-endpoint,.jd-subflow-step{position:relative;flex:none;display:flex;align-items:center;gap:5px;font-size:10px;white-space:nowrap;color:var(--theme-text,#162b50)}
-.jd-subflow-step{flex-direction:column;border:0;background:transparent;padding:0;cursor:pointer}
-.jd-subflow-dashes{flex:1;min-width:8px;margin-top:12px;border-top:2px dashed #788393}
+.jd-subflow-diagram{display:block;width:100%;height:148px;overflow:visible}
+.jd-subflow-route{fill:none;stroke:#788393;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.jd-subflow-main-dashes{fill:none;stroke:#788393;stroke-width:2;stroke-dasharray:5 5}
+.jd-subflow-endpoint circle,.jd-subflow-step circle{fill:var(--theme-surface,#fff);stroke:#788393;stroke-width:2}
+.jd-subflow-endpoint path{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.jd-subflow-label{font-size:10px;fill:var(--theme-text,#162b50);pointer-events:none}
+.jd-subflow-step{cursor:pointer;pointer-events:auto}
+.jd-subflow-glyph{font-size:10px;fill:var(--theme-text,#162b50);pointer-events:none}
+.jd-subflow-step.completed circle{fill:#318348;stroke:#318348}.jd-subflow-step.completed .jd-subflow-glyph{fill:#fff}
+.jd-subflow-step.inprogress circle,.jd-subflow-step.available circle{fill:#d99416;stroke:#d99416}
+.jd-subflow-step.blocked circle{fill:#bd3040;stroke:#bd3040}.jd-subflow-step.blocked .jd-subflow-glyph{fill:#fff}
+.jd-subflow-step:focus-visible{outline:none}.jd-subflow-step:focus-visible circle{stroke:#d88719;stroke-width:3}
