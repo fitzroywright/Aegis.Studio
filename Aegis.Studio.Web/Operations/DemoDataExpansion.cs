@@ -88,7 +88,7 @@ internal static partial class DemoDataExpansion
             int assetCount=number==4?5:4;
             for(int asset=0;asset<assetCount;asset++)
             {
-                report?.Invoke(new(10 + (int)(20 * (index + (double)asset / assetCount) / JobNumbers.Length), "Legacy photographs", asset, assetCount, $"Job {index+1}/{JobNumbers.Length}: downloading and storing photo {asset+1}/{assetCount}."));
+                report?.Invoke(new(10 + (int)(20 * (index + (double)asset / assetCount) / JobNumbers.Length), "Legacy photographs", asset, assetCount, $"Job {index+1}/{JobNumbers.Length}: loading and storing photo {asset+1}/{assetCount}."));
                 string key=$"demo-{number}-{asset}";
                 Guid requestedOriginal=Id(26,number*100+asset);
                 Guid original=number==4
