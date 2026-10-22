@@ -8,7 +8,7 @@ namespace Aegis.Studio.Web.Operations;
 internal static partial class DemoDataExpansion
 {
     private sealed record PhotoInput(string Url, string Source, string License, string Page);
-    private static string aiPhotoRoot => Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS")
+    private static string photoLibraryRoot => Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS")
         ?? "/var/lib/aegis-studio/demo-photos";
     private static readonly ConcurrentDictionary<string,string> demoPhotoSourceCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string,string> demoPhotoSourceNameCache = new(StringComparer.OrdinalIgnoreCase);
@@ -29,7 +29,7 @@ internal static partial class DemoDataExpansion
 
     private static string[] LocalPhotos(string category)
     {
-        string directory=Path.Combine(aiPhotoRoot,category);
+        string directory=Path.Combine(photoLibraryRoot,category);
         if (!Directory.Exists(directory)) return [];
         return Directory.EnumerateFiles(directory)
             .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
@@ -49,7 +49,7 @@ internal static partial class DemoDataExpansion
             using var decoded=StudioImageProcessor.DecodeOriented(File.OpenRead(file));
             using var resized=StudioImageProcessor.ResizeMax(decoded,4096);
             bytes=StudioImageProcessor.EncodeJpeg(resized,95);
-            string relative=Path.GetRelativePath(aiPhotoRoot,file).Replace(Path.DirectorySeparatorChar,'/');
+            string relative=Path.GetRelativePath(photoLibraryRoot,file).Replace(Path.DirectorySeparatorChar,'/');
             bool bryansPhoto=Path.GetFileName(file).StartsWith("BryansStudio-",StringComparison.OrdinalIgnoreCase);
             input=new PhotoInput(
                 "aegis-demo-resource://"+relative,
@@ -72,22 +72,22 @@ internal static partial class DemoDataExpansion
         {
             string[] files=LocalPhotos(category);
             if(files.Length==0)
-                throw new InvalidOperationException($"The local demo photo library has no usable photos for category '{category}' at '{Path.Combine(aiPhotoRoot,category)}'. Add at least one image to that Kratos library folder and retry. Demo generation does not download images.");
+                throw new InvalidOperationException($"The local demo photo library has no usable photos for category '{category}' at '{Path.Combine(photoLibraryRoot,category)}'. Add at least one image to that Kratos library folder and retry. Demo generation does not download images.");
         }
     }
 
     private static void ValidateLocalDemoPhotos(Action<DemoSeedProgress>? report)
     {
-        if (!Directory.Exists(aiPhotoRoot))
+        if (!Directory.Exists(photoLibraryRoot))
             throw new InvalidOperationException(
-                $"Studio cannot find the demo photo library at '{aiPhotoRoot}'. Install the local demo photo library on Kratos before recreating demo data. Demo generation does not download images.");
+                $"Studio cannot find the demo photo library at '{photoLibraryRoot}'. Install the local demo photo library on Kratos before recreating demo data. Demo generation does not download images.");
 
-        string[] files = Directory.EnumerateFiles(aiPhotoRoot, "*", SearchOption.AllDirectories)
+        string[] files = Directory.EnumerateFiles(photoLibraryRoot, "*", SearchOption.AllDirectories)
             .Where(file => new[] { ".jpg", ".jpeg", ".png", ".webp" }
                 .Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
             .ToArray();
         if(files.Length==0)
-            throw new InvalidOperationException($"The local demo photo library at '{aiPhotoRoot}' contains no supported images.");
+            throw new InvalidOperationException($"The local demo photo library at '{photoLibraryRoot}' contains no supported images.");
 
         for (int index = 0; index < files.Length; index++)
         {
@@ -119,6 +119,6 @@ internal static partial class DemoDataExpansion
 
         string category=PhotoCategory(searchTerm);
         throw new InvalidOperationException(
-            $"No local demo photo is available for category '{category}' in '{Path.Combine(aiPhotoRoot,category)}'. Demo generation uses only the Kratos photo library and does not download images.");
+            $"No local demo photo is available for category '{category}' in '{Path.Combine(photoLibraryRoot,category)}'. Demo generation uses only the Kratos photo library and does not download images.");
     }
 }
