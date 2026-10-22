@@ -106,7 +106,6 @@ window.StudioPhotographerSchedule=(()=>{
             genericView.querySelector('[data-ps-photographer]').onchange=e=>{state.photographer=e.target.value;paint();};
             genericView.querySelector('[data-ps-search]').oninput=e=>{state.term=e.target.value;paint();genericView.querySelector('[data-ps-search]').focus();};
             genericView.querySelector('[data-ps-inactive]').onchange=e=>{state.inactive=e.target.checked;render();};
-            genericView.querySelector('[data-ps-pipeline]').onclick=()=>window.studioNavigate('schedule',{...window.StudioPhotographerSchedule.options(),panel:'pipeline'});
             genericView.querySelectorAll('[data-ps-only]').forEach(b=>b.onclick=()=>{state.photographer=b.dataset.psOnly;paint();});
             genericView.querySelectorAll('[data-ps-entry]').forEach(b=>b.onclick=()=>{const entry=rawEntries.find(e=>e.id===b.dataset.psEntry);if(entry?.jobId){openWorkspaceJob(entry.jobId).catch(error=>alert(error.message));return;}entryDetails(entry,roster.find(p=>p.userName===b.dataset.psPerson)||{displayName:'Worker not assigned'});});
             genericView.querySelectorAll('[data-ps-profile]').forEach(b=>b.onclick=()=>profile(roster.find(p=>p.userName===b.dataset.psProfile)));
