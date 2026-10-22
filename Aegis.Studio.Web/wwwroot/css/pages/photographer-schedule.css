@@ -86,3 +86,10 @@ body[data-studio-view="schedule"] .studio-context-rail [data-rail-card="workspac
 .ps-shoot[data-role="REVIEWER"] .ps-status-pill{background:#47a538}
 .ps-shoot[data-role="DELIVERY"] .ps-status-pill{background:#c86a26}
 @media(max-width:1100px){.ps-role-filter{gap:6px;padding:8px}.ps-role-filter button{padding-inline:10px}}
+.ps-todays-sessions>header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ps-todays-sessions>header>span{color:#677482;font-size:10px;white-space:nowrap}
+.ps-session-row{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-bottom:1px solid #e4e7eb}
+.ps-session-row:last-child{border-bottom:0}
+.ps-session-time{color:#344f68;font-size:10px;font-weight:700}
+.ps-session-row strong{color:#1e3449;font-size:11px;line-height:1.3}
+.ps-session-row small{color:#66727f;font-size:10px}
