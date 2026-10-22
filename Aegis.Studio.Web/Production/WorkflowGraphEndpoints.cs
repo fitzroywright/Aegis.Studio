@@ -7,7 +7,7 @@ using static Aegis.Studio.Web.Production.CommercialEndpoints;
 namespace Aegis.Studio.Web.Production;
 
 public sealed record GraphPreviewRequest(WorkflowGraph Graph, Guid[] CatalogItemIds);
-public sealed record GraphJobActionRequest(string Action, long ExpectedRevision, Guid OperationId, string? Reason = null, string? UserName = null, string? Method = null, string? Reference = null);
+public sealed record GraphJobActionRequest(string Action, long ExpectedRevision, Guid OperationId, string? Reason = null, string? UserName = null, string? Method = null, string? Reference = null, Guid? WorkspaceId = null);
 public static class WorkflowGraphEndpoints
 {
     public static void MapJobWorkflowGraphs(this WebApplication app)
@@ -47,8 +47,8 @@ public static class WorkflowGraphEndpoints
         })).RequireAuthorization();
         app.MapPost("/api/jobs/{job:guid}/workflow-graph/actions", (Guid job, GraphJobActionRequest request, ClaimsPrincipal user, WorkflowStore workflow) => Run(() =>
         {
-            var action = request.Action switch { "confirm-booking" => "confirm", "assign-owner" => "owner", "deliver" => "deliver", _ => throw new ArgumentException("Choose a supported workflow graph action.") };
-            var command = new WorkflowCommand(action, request.ExpectedRevision, request.OperationId, UserName: request.UserName, Reason: request.Reason, Method: request.Method, Reference: request.Reference);
+            var action = request.Action switch { "confirm-booking" => "confirm", "assign-owner" => "owner", "deliver" => "deliver", "transfer-workspace" => "transfer", _ => throw new ArgumentException("Choose a supported workflow graph action.") };
+            var command = new WorkflowCommand(action, request.ExpectedRevision, request.OperationId, UserName: request.UserName, Reason: request.Reason, Method: request.Method, Reference: request.Reference, WorkspaceId: request.WorkspaceId);
             return Results.Ok(workflow.Execute(job, command, user));
         })).RequireAuthorization();
         app.MapPost("/api/jobs/{job:guid}/workflow-graph/tasks", (Guid job, GraphTaskCommand request, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
