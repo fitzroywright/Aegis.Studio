@@ -41,7 +41,7 @@
   const items=nodes.map((node,index)=>{
    const label=esc(node.label),state=node._displayState,klass=state.toLowerCase();
    const before=index?'<span class="jd-workflow-connector" aria-hidden="true"></span>':'';
-   if(node.id===expandedNode?.id)return before+'<div class="jd-workflow-subflow-main '+klass+'" data-expanded-stage="'+esc(node.id)+'" aria-label="Expanded '+label+'"><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" aria-expanded="true" aria-label="Start '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">›</span><span class="jd-workflow-endpoint-label">Start '+label+'</span></button><span class="jd-workflow-main-dashes" aria-hidden="true"></span><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" aria-expanded="true" aria-label="End '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">×</span><span class="jd-workflow-endpoint-label">End '+label+'</span></button></div>';
+   if(node.id===expandedNode?.id)return before+'<div class="jd-workflow-subflow-main '+klass+'" data-expanded-stage="'+esc(node.id)+'" aria-label="Expanded '+label+'"><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" data-endpoint="start" aria-expanded="true" aria-label="Start '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">›</span><span class="jd-workflow-endpoint-label">Start '+label+'</span></button><span class="jd-workflow-main-dashes" aria-hidden="true"></span><button type="button" class="jd-workflow-endpoint" data-collapse="'+esc(node.id)+'" data-endpoint="end" aria-expanded="true" aria-label="End '+label+'"><span class="jd-workflow-stage-icon" aria-hidden="true">×</span><span class="jd-workflow-endpoint-label">End '+label+'</span></button></div>';
    if(node.kind==='Subflow'&&Array.isArray(node.subflow?.nodes))return before+'<button type="button" class="jd-workflow-stage '+klass+'" data-subflow-stage="'+esc(node.id)+'" aria-expanded="false" title="'+label+' · '+state+'"><span class="jd-workflow-stage-icon" aria-hidden="true">'+glyph(state)+'</span><span class="jd-workflow-stage-label">'+label+'</span></button>';
    return before+'<div class="jd-workflow-stage '+klass+'" role="listitem" aria-label="'+label+' · '+state+'"><span class="jd-workflow-stage-icon" aria-hidden="true">'+glyph(state)+'</span><span class="jd-workflow-stage-label">'+label+'</span></div>';
   }).join('');
@@ -55,8 +55,8 @@
   const width=Math.max(240,host.clientWidth||760),hostRect=host.getBoundingClientRect();
   const centerOf=selector=>{const rect=host.querySelector(selector)?.getBoundingClientRect();return rect?.width?rect.left-hostRect.left+rect.width/2:null;};
   const center=centerOf('[data-expanded-stage]')??width/2;
-  const sx=centerOf('[aria-label="Start '+node.label+'"]')??center-70;
-  const ex=centerOf('[aria-label="End '+node.label+'"]')??center+70;
+  const sx=centerOf('[data-endpoint="start"]')??center-70;
+  const ex=centerOf('[data-endpoint="end"]')??center+70;
   const evaluation=new Map((view.evaluation?.nodes||[]).map(n=>[n.id,n]));
   const tasks=new Map((view.tasks||[]).map(t=>[t.nodeId,t]));
   const steps=(node.subflow.nodes||[]).filter(n=>!['Start','End'].includes(n.kind));
