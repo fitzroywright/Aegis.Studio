@@ -11,6 +11,10 @@ internal static partial class DemoDataExpansion
     private static readonly string inputDirectory = Path.Combine(Path.GetTempPath(), "aegis-studio-photo-inputs");
 
     private static readonly string aiPhotoRoot = Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_AI_PHOTOS") ?? "/var/lib/aegis-studio/demo-ai-photos";
+    private const int OpenPeoplePhotoCount = 100;
+    private const string OpenPeopleAssetUrl = "https://raw.githubusercontent.com/Prompt-Haus/OpenPeople/main/openpeople/data/curated/P{0:000}/assets/studio_portrait.jpg";
+    private const string OpenPeoplePageUrl = "https://github.com/Prompt-Haus/OpenPeople";
+    private static readonly HttpClient openPeopleClient = new() { Timeout = TimeSpan.FromSeconds(45) };
     private static string PhotoCategory(string? type)
     {
         type ??= "";
@@ -20,9 +24,9 @@ internal static partial class DemoDataExpansion
         if (type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return "family";
         if (type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||type.Contains("Team",StringComparison.OrdinalIgnoreCase)) return "sports";
         if (type.Contains("Product",StringComparison.OrdinalIgnoreCase)||type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)) return "product";
-        if (type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)) return "corporate";
-        if (type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||type.Contains("ID",StringComparison.OrdinalIgnoreCase)) return "id";
-        return "portrait";
+        if (type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)) return "people";
+        if (type.Contains("Passport",StringComparison.OrdinalIgnoreCase)||type.Contains("ID",StringComparison.OrdinalIgnoreCase)) return "people";
+        return "people";
     }
     private static bool TryAiPhoto(string? type,int variant,out byte[] bytes,out PhotoInput? input)
     {
@@ -41,7 +45,15 @@ internal static partial class DemoDataExpansion
                 using var decoded=StudioImageProcessor.DecodeOriented(File.OpenRead(file));
                 using var resized=StudioImageProcessor.ResizeMax(decoded,4096);
                 bytes=StudioImageProcessor.EncodeJpeg(resized,95);
-                input=new PhotoInput(new Uri(Path.GetFullPath(file)).AbsoluteUri,"AI generated","AI-generated demo image",file);
+                string name=Path.GetFileNameWithoutExtension(file);
+                bool openPeople=name.StartsWith("OpenPeople-P",StringComparison.OrdinalIgnoreCase);
+                string? sourceUrl=null;
+                if(openPeople && int.TryParse(name.AsSpan("OpenPeople-P".Length),out int person))
+                    sourceUrl=string.Format(System.Globalization.CultureInfo.InvariantCulture,OpenPeopleAssetUrl,person);
+                input=new PhotoInput(sourceUrl ?? new Uri(Path.GetFullPath(file)).AbsoluteUri,
+                    openPeople ? "Prompt-Haus OpenPeople" : "AI generated",
+                    openPeople ? "CC BY 4.0" : "AI-generated demo image",
+                    openPeople ? OpenPeoplePageUrl : file);
                 return true;
             }
             catch(Exception error) when(error is IOException or ArgumentException or InvalidOperationException) {}
@@ -51,26 +63,54 @@ internal static partial class DemoDataExpansion
 
     internal static void PreparePhotos(Action<DemoSeedProgress>? report)
     {
-        // Downloaded source inputs are independent of application/demo records.
-        // Resolve and decode them before opening scenario transactions or deleting the old dataset.
-        string[] required = ["wedding","graduation","corporate","family","newborn","sports","product","id","portrait"];
-        if (required.All(category =>
-        {
-            string folder=Path.Combine(aiPhotoRoot,category);
-            return Directory.Exists(folder) && Directory.EnumerateFiles(folder)
-                .Any(file => new[]{".png",".jpg",".jpeg",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase));
-        })) return;
-        string[] urls = realPhotoUrls.Concat(weddingPhotoUrls).Concat(DemoPortraitCatalogue.Photos.Take(24).Select(p => p.Url)).Distinct().ToArray();
+        // Prepare and validate all synthetic portraits and contextual source photos before any demo records are replaced.
+        EnsureOpenPeoplePortraits(report);
+        string[] urls = realPhotoUrls.Concat(weddingPhotoUrls).Distinct().ToArray();
         for (int i = 0; i < urls.Length; i++)
         {
-            report?.Invoke(new(1, "Preparing photographs", i, urls.Length, $"Verifying photograph source {i+1}/{urls.Length} before recreating data."));
-            _ = PhotoBytes(urls[i], i, null);
+            report?.Invoke(new(1, "Preparing photographs", i, urls.Length, $"Verifying contextual photograph source {i+1}/{urls.Length} before recreating data."));
+            _ = PhotoBytes(urls[i], i, null, allowAi: false);
         }
     }
 
-    private static byte[] PhotoBytes(string url, int variant, string? searchTerm)
+    private static void EnsureOpenPeoplePortraits(Action<DemoSeedProgress>? report)
     {
-        if (TryAiPhoto(searchTerm,variant,out var aiBytes,out var aiInput))
+        string directory=Path.Combine(aiPhotoRoot,"people");
+        Directory.CreateDirectory(directory);
+        bool IsValidPortrait(string file)
+        {
+            if(!File.Exists(file) || new FileInfo(file).Length<=10_000)return false;
+            try
+            {
+                using var image=StudioImageProcessor.DecodeOriented(File.OpenRead(file));
+                return image.Width>0 && image.Height>0;
+            }
+            catch(Exception error) when(error is IOException or ArgumentException or InvalidOperationException)
+            { return false; }
+        }
+        int available=Enumerable.Range(1,OpenPeoplePhotoCount).Count(person =>
+            IsValidPortrait(Path.Combine(directory,$"OpenPeople-P{person:000}.jpg")));
+        if(available==OpenPeoplePhotoCount)return;
+
+        for(int person=1;person<=OpenPeoplePhotoCount;person++)
+        {
+            string file=Path.Combine(directory,$"OpenPeople-P{person:000}.jpg");
+            if(IsValidPortrait(file))continue;
+            report?.Invoke(new(1,"Preparing photographs",person-1,OpenPeoplePhotoCount,$"Downloading free synthetic portrait {person}/{OpenPeoplePhotoCount}."));
+            string url=string.Format(System.Globalization.CultureInfo.InvariantCulture,OpenPeopleAssetUrl,person);
+            byte[] bytes=openPeopleClient.GetByteArrayAsync(url).GetAwaiter().GetResult();
+            if(bytes.Length<10_000)throw new InvalidDataException($"OpenPeople portrait {person} was unexpectedly small.");
+            using var stream=new MemoryStream(bytes,false);
+            using var decoded=StudioImageProcessor.DecodeOriented(stream);
+            using var resized=StudioImageProcessor.ResizeMax(decoded,4096);
+            byte[] validated=StudioImageProcessor.EncodeJpeg(resized,95);
+            File.WriteAllBytes(file,validated);
+        }
+    }
+
+    private static byte[] PhotoBytes(string url, int variant, string? searchTerm, bool allowAi = true)
+    {
+        if (allowAi && TryAiPhoto(searchTerm,variant,out var aiBytes,out var aiInput))
         {
             demoPhotoSourceCache[url]=aiInput!.Url;
             demoPhotoSourceNameCache[url]=aiInput.Source;

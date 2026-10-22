@@ -27,7 +27,9 @@ The full seed adds 27 jobs, six workspaces, 12 clients, four photographer profil
 
 The wedding has a rehearsal and primary session, two payments and versioned media. Employee IDs, school portraits, graduation and corporate headshots have large subject rosters. Production activities identify their actual media collection. The ID roster retains subjects without photographs and retake states. Booking requests below the deposit threshold remain separate from jobs.
 
-Real Wikimedia photographs pass through Common.Storage, with source URLs in metadata. Each version owns a storage path; downloaded bytes are cached, and demo JPEG derivatives are limited to 1200 pixels. Internet access is needed for the first seed. No image generator is used.
+Portraits, corporate headshots and ID photos use the 100-person synthetic OpenPeople portrait set, downloaded directly from its public GitHub repository during the first demo seed. The people are synthetic; the image assets are licensed CC BY 4.0. The seed records the source, license and project page in image metadata. No paid image API, account or key is used. Wedding, graduation, family, newborn and sports examples continue using contextual Wikimedia photographs. All images pass through Common.Storage; downloaded bytes are cached, and demo JPEG derivatives are limited to 1200 pixels. The first seed needs Internet access to the free public sources.
+
+To regenerate demo data, use Admin's demo reset and then Load Demo Data. The seed validates the free portrait set and contextual source photos before writing the replacement dataset.
 
 The v6 marker prevents subsequent demo loads from resetting edits. Loading an older dataset upgrades the full seed once. Asset and subject identifiers reserve 10,000 positions per job, preventing the previous large-job collisions.
 
