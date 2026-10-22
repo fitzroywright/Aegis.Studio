@@ -44,6 +44,12 @@ public static class WorkflowGraphEndpoints
             if (!access.HasPermission(user, job, "ViewJob")) return Results.Forbid();
             return Results.Ok(new JobGraphStore(db).Get(job));
         })).RequireAuthorization();
+        app.MapPost("/api/jobs/{job:guid}/workflow-graph/actions", (Guid job, GraphJobActionRequest request, ClaimsPrincipal user, WorkflowStore workflow) => Run(() =>
+        {
+            if (request.Action != "confirm-booking") throw new ArgumentException("Choose a supported workflow graph action.");
+            var command = new WorkflowCommand("confirm", request.ExpectedRevision, request.OperationId, Reason: request.Reason);
+            return Results.Ok(workflow.Execute(job, command, user));
+        })).RequireAuthorization();
         app.MapPost("/api/jobs/{job:guid}/workflow-graph/tasks", (Guid job, GraphTaskCommand request, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
         {
             if (!access.HasPermission(user, job, "EditJob") && !access.HasPermission(user, job, "ManageProduction")) return Results.Forbid();
