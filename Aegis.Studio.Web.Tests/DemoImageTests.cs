@@ -47,6 +47,35 @@ public sealed class DemoImageTests
         Assert.StartsWith("https://raw.githubusercontent.com/Prompt-Haus/OpenPeople/",assetRoot,StringComparison.Ordinal);
     }
     [Fact]
+    public void DemoWorkerAssignmentStatusesCoverRolesAndJobStages()
+    {
+        Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoFullStudioData")!;
+        Type jobType=seed.GetNestedType("DemoJob",BindingFlags.NonPublic)!;
+        ConstructorInfo constructor=jobType.GetConstructors(BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic).Single();
+        object Job(string status,int dayOffset=0)=>constructor.Invoke(new object[]{101,1,1,"Demo job",status,dayOffset,"Studio A",100m,50m,"demo.sam","Portrait"});
+        MethodInfo roleStatus=seed.GetMethod("RoleStatus",BindingFlags.NonPublic|BindingFlags.Static)!;
+        string Status(object job,string role,string stage,int ordinal=1)=>(string)roleStatus.Invoke(null,new object[]{job,role,stage,ordinal})!;
+
+        object scheduled=Job("Scheduled",3);
+        Assert.Equal("Assigned",Status(scheduled,"PHOTOGRAPHER","Scheduled",1));
+        Assert.Equal("Accepted",Status(scheduled,"PHOTOGRAPHER","Scheduled",2));
+
+        object editing=Job("Editing");
+        Assert.Equal("Accepted",Status(editing,"EDITOR","Changes Requested"));
+        Assert.Equal("Accepted",Status(editing,"RETOUCHER","Changes Requested",2));
+
+        object qualityControl=Job("QC");
+        Assert.Equal("Accepted",Status(qualityControl,"REVIEWER","In Production"));
+
+        object completed=Job("Completed",-1);
+        Assert.Equal("Completed",Status(completed,"PHOTOGRAPHER","Completed"));
+        Assert.Equal("Completed",Status(completed,"DELIVERY","Completed"));
+
+        object cancelled=Job("Cancelled",3);
+        Assert.Equal("Cancelled",Status(cancelled,"PHOTOGRAPHER","Cancelled"));
+    }
+
+    [Fact]
     public void LargeWeddingAndGraduationMediaCannotOverwriteAdjacentJobs()
     {
         Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoFullStudioData")!;
