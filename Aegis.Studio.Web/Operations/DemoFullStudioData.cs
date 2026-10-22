@@ -226,8 +226,8 @@ internal static class DemoFullStudioData
         {
             var role=roles[index];
             string status=role.Status;
-            DateTimeOffset? accepted=status is "Accepted" or "Completed" ? start.AddHours(-1) : null;
-            DateTimeOffset? completed=status=="Completed" ? end : null;
+            DateTimeOffset? accepted=status is "Accepted" or "Completed" ? DateTimeOffset.UtcNow.AddHours(-1) : null;
+            DateTimeOffset? completed=status=="Completed" ? DateTimeOffset.UtcNow.AddHours(-2) : null;
             DateTimeOffset? starts=index==0?start:null;
             DateTimeOffset? ends=index==0?end:null;
             Execute(c,tx,"insert into studio_job_worker_assignments(id,job_id,worker_user_name,worker_type_code,responsibility,is_primary,status,starts_at_utc,ends_at_utc,accepted_at_utc,completed_at_utc,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now()) on conflict(id) do update set worker_user_name=excluded.worker_user_name,worker_type_code=excluded.worker_type_code,responsibility=excluded.responsibility,is_primary=excluded.is_primary,status=excluded.status,starts_at_utc=excluded.starts_at_utc,ends_at_utc=excluded.ends_at_utc,accepted_at_utc=excluded.accepted_at_utc,completed_at_utc=excluded.completed_at_utc,updated_at_utc=now()",
