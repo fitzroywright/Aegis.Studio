@@ -11,9 +11,8 @@
   const taskState=id=>{
    const evaluated=evaluation.get(id),task=tasks.get(id),actual=task?.status;
    if(actual==='Completed'||evaluated?.status==='Completed')return 'Completed';
-   if(actual==='InProgress'||actual==='Partial'||actual==='ReadyForDelivery'||evaluated?.status==='InProgress')return 'InProgress';
-   if(['Failed','ReworkRequired','ReprintRequired'].includes(actual))return 'Blocked';
-   if(actual==='Blocked'&&task?.reason&&task.reason!==evaluated?.reason)return 'Blocked';
+   if(['InProgress','Partial','ReadyForDelivery'].includes(actual)||evaluated?.status==='InProgress')return 'InProgress';
+   if(['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient'].includes(actual))return 'Blocked';
    if(actual==='Skipped'||actual==='Cancelled'||evaluated?.status==='Skipped')return 'Skipped';
    if(evaluated?.status==='Inactive')return 'Inactive';
    if(evaluated?.status==='Available')return 'Available';
@@ -71,9 +70,8 @@
   const statusFor=id=>{
    const evaluated=evaluation.get(id),task=tasks.get(id),actual=task?.status;
    if(actual==='Completed'||evaluated?.status==='Completed')return 'Completed';
-   if(actual==='InProgress'||actual==='Partial'||actual==='ReadyForDelivery'||evaluated?.status==='InProgress')return 'InProgress';
-   if(['Failed','ReworkRequired','ReprintRequired'].includes(actual))return 'Blocked';
-   if(actual==='Blocked'&&task?.reason&&task.reason!==evaluated?.reason)return 'Blocked';
+   if(['InProgress','Partial','ReadyForDelivery'].includes(actual)||evaluated?.status==='InProgress')return 'InProgress';
+   if(['Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient'].includes(actual))return 'Blocked';
    if(actual==='Skipped'||actual==='Cancelled'||evaluated?.status==='Skipped')return 'Skipped';
    if(evaluated?.status==='Inactive')return 'Inactive';
    if(evaluated?.status==='Available')return 'Available';
