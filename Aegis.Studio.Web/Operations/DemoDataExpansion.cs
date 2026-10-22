@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using Aegis.Studio.Web.Media;
-using System.Net.Http;
 using Npgsql;
 using Common.Storage;
 
