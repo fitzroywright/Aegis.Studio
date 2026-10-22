@@ -285,7 +285,7 @@ internal static class DemoFullStudioData
         int sourceCount=PhysicalSourceCount(job);
         for(int i=0;i<count;i++)
         {
-            report?.Invoke(new(32 + (int)(63 * (ordinal-1 + (double)i / count) / Jobs.Length), "Studio photographs", i, count, $"Job {ordinal}/{Jobs.Length}: {job.Title} — downloading and storing photo {i+1}/{count}."));
+            report?.Invoke(new(32 + (int)(63 * (ordinal-1 + (double)i / count) / Jobs.Length), "Studio photographs", i, count, $"Job {ordinal}/{Jobs.Length}: {job.Title} — loading and storing photo {i+1}/{count}."));
             string key=$"demo-full/{job.Number}/asset-{i+1:000}";
             Guid versionId=MediaId(64,job.Number,i);
             // Stable asset IDs and counts are independent of the smaller reviewed photograph set.
