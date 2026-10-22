@@ -26,7 +26,7 @@ public sealed class DemoImageTests
     }
 
     [Fact]
-    public void DemoPhotoCatalogueUsesRealWikimediaSourcesAndHasNoSyntheticGenerator()
+    public void DemoPhotosUseFreeSyntheticPortraitsAndContextualWikimediaSources()
     {
         Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoDataExpansion")!;
         FieldInfo catalogue=seed.GetField("realPhotoUrls",BindingFlags.NonPublic|BindingFlags.Static)!;
@@ -37,7 +37,14 @@ public sealed class DemoImageTests
             Assert.StartsWith("https://commons.wikimedia.org/wiki/Special:Redirect/file/",url,StringComparison.Ordinal);
             Assert.True(url.EndsWith(".jpg",StringComparison.OrdinalIgnoreCase)||url.EndsWith(".png",StringComparison.OrdinalIgnoreCase));
         });
-        Assert.Null(seed.GetMethod("CreateIllustration",BindingFlags.NonPublic|BindingFlags.Static));
+        MethodInfo category=seed.GetMethod("PhotoCategory",BindingFlags.NonPublic|BindingFlags.Static)!;
+        Assert.Equal("people",category.Invoke(null,new object?[]{"Corporate Headshots"}));
+        Assert.Equal("people",category.Invoke(null,new object?[]{"Passport / Visa"}));
+        Assert.Equal("people",category.Invoke(null,new object?[]{"Portrait"}));
+        Assert.Equal("wedding",category.Invoke(null,new object?[]{"Wedding"}));
+        Assert.Equal("graduation",category.Invoke(null,new object?[]{"Graduation"}));
+        string assetRoot=(string)seed.GetField("OpenPeopleAssetUrl",BindingFlags.NonPublic|BindingFlags.Static)!.GetRawConstantValue()!;
+        Assert.StartsWith("https://raw.githubusercontent.com/Prompt-Haus/OpenPeople/",assetRoot,StringComparison.Ordinal);
     }
     [Fact]
     public void LargeWeddingAndGraduationMediaCannotOverwriteAdjacentJobs()
