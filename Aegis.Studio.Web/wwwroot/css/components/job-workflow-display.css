@@ -1,35 +1,37 @@
-/* Job Details workflow display. This file owns the standalone summary and its inline expansion. */
-.jd-flow-overview{position:relative;min-width:0;overflow:visible}
-.jd-workflow-track{position:relative;display:block;flex:1 1 auto;width:100%;min-width:0;max-height:none;padding:5px 0;overflow:visible}
-.jd-workflow-display{display:flex;align-items:flex-start;justify-content:space-between;gap:4px;width:100%;min-width:0;overflow:visible}
-.jd-workflow-stage{position:relative;display:flex;flex:1 1 0;min-width:24px;align-items:center;flex-direction:column;margin:0;padding:2px;border:0;background:transparent;color:var(--theme-text,#162b50);cursor:pointer}
+/* Job Details owns one standalone workflow summary and its click-to-expand subflow. */
+.jd-workflow-display{position:relative;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:4px;width:100%;min-width:0;overflow:visible}
+.jd-workflow-stage{position:relative;display:flex;flex:1 1 0;min-width:24px;align-items:center;flex-direction:column;margin:0;padding:2px;border:0;background:transparent;color:var(--theme-text,#162b50)}
+.jd-workflow-stage[data-subflow-stage]{cursor:pointer}
 .jd-workflow-connector{position:relative;flex:1 1 20px;min-width:10px;height:24px}
 .jd-workflow-connector::after{content:"";position:absolute;top:13px;left:0;right:0;border-top:2px solid #c5cad3}
-.jd-workflow-stage-icon{position:relative;z-index:1;display:grid;place-items:center;flex:none;width:24px;height:24px;box-sizing:border-box;border:2px solid #a4acb6;border-radius:50%;background:var(--theme-surface,#fff);font-size:12px;font-weight:700}
+.jd-workflow-stage-icon{position:relative;z-index:1;display:grid;place-items:center;flex:none;width:24px;height:24px;box-sizing:border-box;border:2px solid #a4acb6;border-radius:50%;background:var(--theme-surface,#fff);color:#687587;font-size:12px;font-weight:700}
 .jd-workflow-stage.completed .jd-workflow-stage-icon{color:#fff;background:#318348;border-color:#318348}
-.jd-workflow-stage.inprogress .jd-workflow-stage-icon,.jd-workflow-stage.available .jd-workflow-stage-icon{background:#d99416;border-color:#d99416}
-.jd-workflow-stage.blocked .jd-workflow-stage-icon{background:#bd3040;border-color:#bd3040;color:#fff}
+.jd-workflow-stage.skipped .jd-workflow-stage-icon{color:#fff;background:#618071;border-color:#618071}
+.jd-workflow-stage.inprogress .jd-workflow-stage-icon,.jd-workflow-stage.available .jd-workflow-stage-icon{color:#fff;background:#d99416;border-color:#d99416}
+.jd-workflow-stage.blocked .jd-workflow-stage-icon{color:#fff;background:#bd3040;border-color:#bd3040}
 .jd-workflow-stage-label{position:absolute;left:50%;top:29px;transform:rotate(45deg);transform-origin:top left;font-size:10px;white-space:nowrap}
+.jd-workflow-stage[data-subflow-stage]:focus-visible,.jd-workflow-endpoint:focus-visible{outline:2px solid #d97827;outline-offset:2px}
 .jd-workflow-subflow-main{position:relative;display:flex;flex:1.5 1 150px;align-items:flex-start;min-width:132px;height:24px}
-.jd-workflow-endpoint{position:relative;z-index:1;display:flex;flex:none;align-items:flex-start;justify-content:center;width:28px;height:24px;margin:0;padding:0;border:0;background:transparent;color:var(--theme-text,#162b50);cursor:pointer}
-.jd-workflow-endpoint .jd-workflow-stage-icon{width:24px;height:24px}
+.jd-workflow-endpoint{position:relative;z-index:1;display:flex;flex:none;align-items:flex-start;justify-content:center;width:28px;height:24px;margin:0;padding:0;border:0;background:transparent;color:#b47712;cursor:pointer}
+.jd-workflow-endpoint .jd-workflow-stage-icon{width:24px;height:24px;color:#b47712;border-color:#d99416}
+.jd-workflow-subflow-main.completed .jd-workflow-stage-icon{color:#fff;background:#318348;border-color:#318348}
+.jd-workflow-subflow-main.inprogress .jd-workflow-stage-icon,.jd-workflow-subflow-main.available .jd-workflow-stage-icon{color:#fff;background:#d99416;border-color:#d99416}
+.jd-workflow-subflow-main.blocked .jd-workflow-stage-icon{color:#fff;background:#bd3040;border-color:#bd3040}
 .jd-workflow-endpoint-label{position:absolute;top:29px;left:50%;transform:rotate(45deg);transform-origin:top left;font-size:10px;white-space:nowrap}
 .jd-workflow-main-dashes{position:relative;flex:1 1 20px;height:24px;min-width:14px}
 .jd-workflow-main-dashes::after{content:"";position:absolute;top:12px;left:0;right:0;border-top:2px dashed #788393}
-.jd-workflow-expansion{position:absolute;z-index:4;top:0;left:0;width:100%;height:170px;min-width:0;overflow:visible;pointer-events:none}
+.jd-workflow-expansion{position:absolute;z-index:1;top:0;left:0;width:100%;height:170px;min-width:0;overflow:visible;pointer-events:none}
 .jd-workflow-expansion[hidden]{display:none}
 .jd-subflow-diagram{display:block;width:100%;height:170px;overflow:visible}
 .jd-subflow-route{fill:none;stroke:#788393;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.jd-subflow-main-dashes{fill:none;stroke:#788393;stroke-width:2;stroke-dasharray:5 5}
-.jd-subflow-endpoint circle,.jd-subflow-step circle{fill:var(--theme-surface,#fff);stroke:#788393;stroke-width:2}
-.jd-subflow-endpoint path{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.jd-subflow-step circle{fill:var(--theme-surface,#fff);stroke:#788393;stroke-width:2}
 .jd-subflow-label{font-size:10px;fill:var(--theme-text,#162b50);pointer-events:none}
-.jd-subflow-step{cursor:pointer;pointer-events:auto}
+.jd-subflow-step{pointer-events:none}
 .jd-subflow-glyph{font-size:10px;fill:var(--theme-text,#162b50);pointer-events:none}
 .jd-subflow-step.completed circle{fill:#318348;stroke:#318348}
-.jd-subflow-step.completed .jd-subflow-glyph{fill:#fff}
+.jd-subflow-step.completed .jd-subflow-glyph,.jd-subflow-step.skipped .jd-subflow-glyph{fill:#fff}
+.jd-subflow-step.skipped circle{fill:#618071;stroke:#618071}
 .jd-subflow-step.inprogress circle,.jd-subflow-step.available circle{fill:#d99416;stroke:#d99416}
+.jd-subflow-step.inprogress .jd-subflow-glyph,.jd-subflow-step.available .jd-subflow-glyph{fill:#fff}
 .jd-subflow-step.blocked circle{fill:#bd3040;stroke:#bd3040}
 .jd-subflow-step.blocked .jd-subflow-glyph{fill:#fff}
-.jd-subflow-step:focus-visible{outline:none}
-.jd-subflow-step:focus-visible circle{stroke:#d88719;stroke-width:3}

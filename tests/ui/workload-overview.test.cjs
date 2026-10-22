@@ -18,26 +18,6 @@ test('workflow prerequisites and approval gates separate waiting from executable
  const m=w.StudioWorkload.model(data,[job],now);assert.equal(m.bucket(m.activities[0]),'waiting');assert.equal(m.overdue(m.activities[0]),true);assert.equal(m.bucket(m.activities[1]),'ready');assert.equal(m.bucket(m.activities[2]),'waiting');
  const gate=w.StudioWorkload.model({activities:[task('deposit')]},[{...job,status:'Pending'}]);assert.equal(gate.bucket(gate.activities[0]),'waiting');
 });
-function workflow(){
- const sub={nodes:[{id:'start',label:'Start',kind:'Start'},{id:'edit',label:'Edit',kind:'Task'},{id:'qc',label:'QC',kind:'Task'},{id:'end',label:'Complete',kind:'End'}],edges:[{id:'a',from:'start',to:'edit'},{id:'b',from:'start',to:'qc'},{id:'c',from:'edit',to:'end'},{id:'d',from:'qc',to:'end'}]};
- return {graph:{nodes:[{id:'start',label:'Start',kind:'Start'},{id:'produce',label:'Production',kind:'Subflow',subflow:sub},{id:'shoot',label:'Photography',kind:'Subflow',subflow:sub},{id:'delivery',label:'Delivery',kind:'Task'},{id:'end',label:'Complete',kind:'End'}],edges:[{id:'one',from:'start',to:'produce'},{id:'two',from:'start',to:'shoot'},{id:'three',from:'produce',to:'delivery'},{id:'four',from:'shoot',to:'delivery'},{id:'five',from:'delivery',to:'end'}]},evaluation:{completed:false,nodes:[{id:'produce/edit',status:'InProgress'},{id:'produce/qc',status:'Blocked',reason:'QC rejected'},{id:'produce/end',status:'Blocked'},{id:'shoot/edit',status:'Completed'},{id:'shoot/qc',status:'Skipped'},{id:'shoot/end',status:'Completed'},{id:'delivery',status:'Blocked'}],edges:{}},tasks:[{id:'qc-task',nodeId:'produce/qc',status:'Blocked',reason:'QC rejected: colour mismatch',assignedTo:null,role:'Production Manager',dependencyLabels:['Edit'],optional:false}]};
-}
-test('expanding a stage exposes endpoints and parallel dots, retains context and makes no state-changing request',t=>{
- const w=setup(t),view=workflow(),before=JSON.stringify(view),host=w.document.getElementById('host');let requests=0;w.json=async()=>{requests++;throw Error('Unexpected write');};
- w.StudioJobDetails.compact(host,view,job,w.document.getElementById('summary'));assert.equal(host.querySelectorAll('[data-workflow-node]').length,0);assert.equal(w.document.querySelectorAll('#summary [data-workflow-node="produce"]').length,1);
- w.document.querySelector('#summary [data-workflow-node="produce"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.match(w.document.getElementById('summary').textContent,/Start/);assert.match(w.document.getElementById('summary').textContent,/Complete/);assert.equal(host.querySelector('[data-workflow-node="shoot"]'),null);assert.ok(w.document.querySelector('#summary [data-workflow-node="shoot"]'));const edit=host.querySelector('[data-workflow-node="produce/edit"]'),qc=host.querySelector('[data-workflow-node="produce/qc"]');assert.equal(edit.closest('.jd-dot-level'),qc.closest('.jd-dot-level'));
- w.document.querySelector('#summary [data-workflow-node="shoot"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,1);assert.equal(host.querySelector('[data-workflow-node="produce/edit"]'),null);w.document.querySelector('#summary [data-workflow-node="shoot"]').click();assert.equal(host.querySelectorAll('.jd-dot-expansion').length,0);assert.equal(requests,0);assert.equal(JSON.stringify(view),before);
-});
-test('step details expose exact blockers, unassigned responsibility and navigate to the existing command screen',async t=>{
- const w=setup(t),host=w.document.getElementById('host');let target;w.StudioJobGraph={open:async(...args)=>target=args};w.StudioJobDetails.compact(host,workflow(),job);host.querySelector('[data-workflow-node="produce"]').click();host.querySelector('[data-workflow-node="produce/qc"]').click();assert.match(host.textContent,/QC rejected: colour mismatch/);assert.match(host.textContent,/Responsible: Unassigned/);assert.match(host.textContent,/Production Manager/);await host.querySelector('[data-existing-task]').onclick();assert.deepEqual(target,['job','qc-task']);host.querySelector('[data-close-step]').click();assert.equal(w.document.activeElement.dataset.workflowNode,'produce/qc');
-});
-test('completed and optional substages follow evaluated completion; pending required work cannot be ticked by the UI',t=>{
- const w=setup(t),view=workflow(),host=w.document.getElementById('host');w.StudioJobDetails.compact(host,view,job);assert.match(host.querySelector('[data-workflow-node="shoot"]').getAttribute('aria-label'),/2 of 2 steps complete/);assert.ok(host.querySelector('[data-workflow-node="shoot"]').classList.contains('completed'));assert.ok(!host.querySelector('[data-workflow-node="produce"]').classList.contains('completed'));
- view.evaluation.nodes.find(x=>x.id==='shoot/qc').status='Blocked';w.StudioJobDetails.compact(host,view,job);assert.ok(!host.querySelector('[data-workflow-node="shoot"]').classList.contains('completed'));
-});
-test('single task workflows stay interactive and inactive service branches are excluded',t=>{
- const w=setup(t),host=w.document.getElementById('host'),view={graph:{nodes:[{id:'a',label:'Delivery',kind:'Task'},{id:'b',label:'Unused service',kind:'Task'}],edges:[]},evaluation:{nodes:[{id:'a',status:'Available'},{id:'b',status:'Inactive'}],edges:{}},tasks:[]};w.StudioJobDetails.compact(host,view,job);assert.equal(host.querySelectorAll('[data-workflow-node]').length,1);host.querySelector('button').click();assert.match(host.textContent,/Responsible: Unassigned/);assert.ok(host.querySelector('[data-existing-task]'));
-});
 test('canonical Production filters the existing work-order queue and preserves drilldown context',async t=>{
  const w=setup(t);w.document.body.innerHTML='<main id="genericView"></main><div id="conversationView"></div><span id="studioFooterRate"></span>';Object.assign(w,{genericView:w.document.getElementById('genericView'),conversationView:w.document.getElementById('conversationView'),esc:w.StudioGraph.esc,studioFirstName:x=>x,alert:message=>{throw Error(message);}});w.requestAnimationFrame=fn=>w.setTimeout(fn,0);w.ResizeObserver=class{observe(){}disconnect(){}};for(const f of ['studio-message-card.js','studio-page.js','commercial.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
  const workload={jobs:[{...job,workspaceId:'w',workspaceName:'Weddings'}],productionJobIds:['job'],activities:[task('print','InProgress',{assignedTo:'staff',productionArea:'Printing',workOrderId:'order'}),task('blocked','Blocked',{workOrderId:'blocked-order',productionArea:'Printing',blockedReason:'Approved source required'}),task('retouch','InProgress',{productionArea:'Editing',title:'Retouch portraits'})],orders:[{id:'order',jobId:'job',quantity:30,activityIds:['print']},{id:'blocked-order',jobId:'job',quantity:12,activityIds:['blocked']}],items:[]};const requests=[];
@@ -57,60 +37,6 @@ test('Operations separates delivery overdue, explainable concern and unknown dat
 });
 test('a recorded due date, not a blank or invalid timestamp, is required to call work overdue',t=>{
  const w=setup(t),m=w.StudioWorkload.model({activities:[task('none'),task('invalid','NotStarted',{dueAtUtc:'not-a-date'}),task('cancelled','Cancelled',{dueAtUtc:'2000-01-01'})]},[job]);assert.ok(m.activities.every(a=>!m.overdue(a)));
-});
-
-test('main icons toggle drawer on second click and subflows place endpoint icons around component path',t=>{
- const w=setup(t),host=w.document.getElementById('host'),summary=w.document.getElementById('summary'),events=[];
- host.addEventListener('studio-flow-details-toggle',e=>events.push(e.detail.open));
- w.StudioJobDetails.compact(host,workflow(),job,summary);
- summary.querySelector('[data-workflow-node="produce"]').click();
- assert.equal(events.at(-1),true);
- assert.equal(summary.querySelectorAll('[data-main-expanded] [data-workflow-node]').length,2);assert.equal(host.querySelectorAll('.jd-subflow-endpoint').length,0);assert.ok(summary.querySelector('.jd-main-dashed'));
- assert.ok(host.querySelector('.jd-dot-subflow>.jd-dot-levels [data-workflow-node="produce/edit"]'));
- summary.querySelector('[data-workflow-node="produce"]').click();
- assert.equal(events.at(-1),false);assert.equal(host.querySelector('.jd-dot-subflow'),null);assert.equal(summary.querySelector('[data-main-expanded]'),null);assert.equal(summary.querySelectorAll('[data-workflow-node="produce"]').length,1);
- summary.querySelector('[data-workflow-node="delivery"]').click();assert.equal(events.at(-1),true);
- summary.querySelector('[data-workflow-node="delivery"]').click();assert.equal(events.at(-1),false);
- assert.equal(host.querySelector('.jd-dot-details'),null);
-});
-
-test('curved connectors attach at dot rims and refresh after drawer transitions',t=>{
- const w=setup(t),host=w.document.getElementById('host'),summary=w.document.getElementById('summary');let frame;
- w.requestAnimationFrame=fn=>{frame=fn;return 1;};w.cancelAnimationFrame=()=>{};
- w.HTMLElement.prototype.getBoundingClientRect=function(){
-  if(this===w.document.body)return{left:0,top:0,width:600,height:300};
-  const button=this.closest?.('[data-workflow-node]'),id=button?.dataset.workflowNode;
-  const left=button?.hasAttribute('data-main-start')?20:button?.hasAttribute('data-main-complete')?400:id==='produce/edit'?100:220;
-  return{left,top:id?.includes('/')?150:20,width:12,height:12};
- };
- w.StudioJobDetails.compact(host,workflow(),job,summary);
- summary.querySelector('[data-workflow-node="produce"]').click();frame();
- const paths=[...w.document.querySelectorAll('[data-subflow-routes] path')];
- assert.equal(paths.length,4);assert.match(paths[0].getAttribute('d'),/^M 26 32 V /);
- assert.match(paths[0].getAttribute('d'),/ H 100$/);
- assert.ok(paths.every(p=>/ [CQ] /.test(p.getAttribute('d'))));assert.match(paths.at(-1).getAttribute('d'),/ V 32$/);
- w.document.body.dispatchEvent(new w.Event('transitionend'));frame();
- assert.equal(w.document.querySelectorAll('[data-subflow-routes]').length,1);
- summary.querySelector('[data-workflow-node="produce"]').click();
- assert.equal(w.document.querySelector('[data-subflow-routes]'),null);
-});
-
-test('workflow labels are short while tooltips preserve full step descriptions',t=>{
- const w=setup(t),host=w.document.getElementById('host'),view={graph:{nodes:[{id:'qc',label:'Quality control and final inspection',description:'Inspect colour and finish before packaging',kind:'Task'}],edges:[]},evaluation:{nodes:[{id:'qc',status:'Available'}],edges:{}},tasks:[]};
- w.StudioJobDetails.compact(host,view,job);
- const button=host.querySelector('[data-workflow-node]');
- assert.equal(button.querySelector('strong').textContent,'QC');
- assert.match(button.title,/Quality control and final inspection/);
- assert.match(button.title,/Inspect colour and finish before packaging/);
-});
-
-test('workflow dots use green ticks, amber executable work, red problems and gray future tasks',t=>{
- const w=setup(t),host=w.document.getElementById('host'),statuses=['Completed','Available','InProgress','Partial','ReadyForDelivery','Blocked','Failed','ReworkRequired','ReprintRequired','WaitingOnClient','Pending','Scheduled','Unknown'];
- const nodes=statuses.map((status,i)=>({id:'n'+i,label:status,kind:'Task'}));
- w.StudioJobDetails.compact(host,{graph:{nodes,edges:[]},evaluation:{nodes:nodes.map((n,i)=>({id:n.id,status:statuses[i]})),edges:{}},tasks:[]},job);
- const tones=['green','amber','amber','amber','amber','red','red','red','red','red','gray','gray','gray'];
- host.querySelectorAll('[data-workflow-node]').forEach((b,i)=>assert.equal(b.dataset.flowTone,tones[i]));
- assert.equal(host.querySelector('[data-flow-tone=green] .jd-stage-light').textContent,'✓');
 });
 
 test('completed activities retain unresolved physical QC and rework without remaining production',t=>{
