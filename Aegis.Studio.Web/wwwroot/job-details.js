@@ -173,7 +173,7 @@
   host.studioJobMedia?.dispose();host.studioJobMedia=controller;
   await load();return controller;
  }
- root.StudioJobDetails={media,nextStep,renderWorkflowSummary};
+ root.StudioJobDetails={media,nextStep,workflowAction,renderWorkflowSummary};
 })(window);
 
 // Job-only compact projection. The template designer retains the complete editable canvas.
