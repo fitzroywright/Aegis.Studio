@@ -23,7 +23,7 @@ The navigation controller owns routing and startup. Global roles and announcemen
 
 ## Demo graph
 
-The full seed adds 27 jobs, six workspaces, 12 clients, four photographer profiles, linked bookings, schedule resources, sessions, production activities, invoices, payments, notifications, conversations, subject rosters, collections, document attachments and hundreds of genuine media assets. Existing earlier demo jobs and user records remain available.
+The full seed adds 27 jobs, six workspaces, 12 clients, photographer profiles, generic demo workers for Photographer, Editor, Retoucher, Reviewer and Delivery, linked bookings, schedule resources, sessions, production activities, invoices, payments, notifications, conversations, subject rosters, collections, document attachments and hundreds of media assets. Each seeded job receives role-aware worker assignments that reflect its production stage. Assignment states are distributed across roles and jobs, including Assigned, Accepted, Completed and Cancelled. Existing earlier demo jobs and user records remain available.
 
 The wedding has a rehearsal and primary session, two payments and versioned media. Employee IDs, school portraits, graduation and corporate headshots have large subject rosters. Production activities identify their actual media collection. The ID roster retains subjects without photographs and retake states. Booking requests below the deposit threshold remain separate from jobs.
 
