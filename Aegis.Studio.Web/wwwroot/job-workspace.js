@@ -164,26 +164,17 @@ async function renderJobSubjects(job, panel, current, refresh) {
 
 function jobTaskDate(task) { return task.scheduledAtUtc || task.dueAtUtc; }
 function localTaskDay(value) { const d=new Date(value);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-async function renderJobTasks(job,panel,current,refresh) {
-    const [tasks,access]=await Promise.all([json(`/api/operations/activities?jobId=${job.id}`),json(`/api/jobs/${job.id}/access`)]);
+async function renderJobTasks(job,panel,current) {
     if(!current())return;
-    panel.innerHTML='<div class="job-actions"><button class="action" data-task-view="list">Tasks</button><button class="action" data-task-view="calendar">Calendar</button></div><div class="task-view"></div>';
-    const host=panel.querySelector('.task-view');
-    const row=t=>`<article class="task-card"><strong>${esc(t.title)}</strong><small>${esc(t.status)} · ${esc(t.assignedTo ? studioFirstName(t.assignedTo) : 'Unassigned')}${jobTaskDate(t)?' · '+esc(new Date(jobTaskDate(t)).toLocaleString()):' · Unscheduled'}</small></article>`;
-    let month=new Date();month.setDate(1);
-    const render=view=>{
-        panel.querySelectorAll('[data-task-view]').forEach(b=>b.classList.toggle('active',b.dataset.taskView===view));
-        if(view==='list'){host.innerHTML=tasks.map(row).join('') || '<p>No tasks yet.</p>';return;}
-        const year=month.getFullYear(),m=month.getMonth(),days=new Date(year,m+1,0).getDate();
-        host.innerHTML=`<div class="job-actions"><button class="action" data-month="-1" aria-label="Previous month">←</button><strong>${esc(month.toLocaleDateString(undefined,{month:'long',year:'numeric'}))}</strong><button class="action" data-month="1" aria-label="Next month">→</button></div><div class="job-calendar">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<b>${d}</b>`).join('')}${'<div></div>'.repeat(month.getDay())}${Array.from({length:days},(_,i)=>{const day=localTaskDay(new Date(year,m,i+1));return `<section><b>${i+1}</b>${tasks.filter(t=>jobTaskDate(t)&&localTaskDay(jobTaskDate(t))===day).map(row).join('')}</section>`;}).join('')}</div><h3>Unscheduled</h3>${tasks.filter(t=>!jobTaskDate(t)).map(row).join('')||'<p>None</p>'}`;
-        host.querySelectorAll('[data-month]').forEach(b=>b.onclick=()=>{month.setMonth(month.getMonth()+Number(b.dataset.month));render('calendar');});
+    panel.innerHTML=`<section class="job-section job-workflow-entry">
+        <h2>Workflow</h2>
+        <p>Job tasks are managed in the configured workflow graph.</p>
+        <button type="button" class="primary" data-open-job-workflow>Open Workflow</button>
+    </section>`;
+    panel.querySelector('[data-open-job-workflow]').onclick=()=>{
+        if(typeof StudioJobGraph?.open!=='function'){alert('The workflow graph is unavailable.');return;}
+        StudioJobGraph.open(job.id).catch(error=>alert(error.message||String(error)));
     };
-    panel.querySelectorAll('[data-task-view]').forEach(b=>b.onclick=()=>render(b.dataset.taskView));render('list');
-    const permissions=access.permissions||access;if(!permissions.editJob&&!permissions.manageProduction)return;
-    const employees=await json('/api/studio-employees?assignable=true');
-    if(!current())return;
-    const form=document.createElement('form');form.className='subject-form';form.innerHTML='<h3>Add task</h3><label>Title<input name="title" required maxlength="200"></label><label>Assigned to<select name="assignedTo"><option value="">Unassigned</option>'+employees.map(e=>'<option value="'+esc(e.userName)+'">'+esc(e.displayName)+(e.roles?.length?' · '+esc(e.roles.join(', ')):'')+'</option>').join('')+'</select></label><label>Scheduled<input name="scheduled" type="datetime-local"></label><label>Due<input name="due" type="datetime-local"></label><button class="primary">Add task</button><p role="alert"></p>';panel.appendChild(form);
-    form.onsubmit=async e=>{e.preventDefault();const button=form.querySelector('button');button.disabled=true;try{await StudioWorkflow.command(job.id,{action:'task',title:form.elements.title.value,kind:'Other',priority:'Normal',userName:form.elements.assignedTo.value||null,scheduledAtUtc:form.elements.scheduled.value?new Date(form.elements.scheduled.value).toISOString():null,dueAtUtc:form.elements.due.value?new Date(form.elements.due.value).toISOString():null},form);if(current())await refresh();}catch(error){form.querySelector('[role=alert]').textContent=error.message;}finally{button.disabled=false;}};
 }
 
 async function renderJobActivity(job,panel,current) {
