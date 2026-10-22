@@ -36,7 +36,7 @@ internal static partial class DemoDataExpansion
             .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
-    private static bool TryAiPhoto(string? type,int variant,out byte[] bytes,out PhotoInput? input)
+    private static bool TryLocalDemoPhoto(string? type,int variant,out byte[] bytes,out PhotoInput? input)
     {
         bytes=[];
         input=null;
@@ -83,8 +83,6 @@ internal static partial class DemoDataExpansion
                 $"Studio cannot find the demo photo library at '{aiPhotoRoot}'. Install the local demo photo library on Kratos before recreating demo data. Demo generation does not download images.");
 
         string[] files = Directory.EnumerateFiles(aiPhotoRoot, "*", SearchOption.AllDirectories)
-            .Where(file => !Path.GetRelativePath(aiPhotoRoot, file)
-                .StartsWith("source-cache" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             .Where(file => new[] { ".jpg", ".jpeg", ".png", ".webp" }
                 .Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
             .ToArray();
@@ -108,9 +106,9 @@ internal static partial class DemoDataExpansion
         }
     }
 
-    private static byte[] PhotoBytes(string url, int variant, string? searchTerm, bool allowAi = true)
+    private static byte[] PhotoBytes(string url, int variant, string? searchTerm)
     {
-        if(TryAiPhoto(searchTerm,variant,out var bytes,out var input))
+        if(TryLocalDemoPhoto(searchTerm,variant,out var bytes,out var input))
         {
             demoPhotoSourceCache[url]=input!.Url;
             demoPhotoSourceNameCache[url]=input.Source;
