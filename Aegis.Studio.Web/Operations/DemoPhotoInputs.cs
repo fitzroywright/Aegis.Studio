@@ -29,18 +29,12 @@ internal static partial class DemoDataExpansion
 
     private static string[] LocalPhotos(string category)
     {
-        // Older library installs placed the supplied "Family & Newborn" image under
-        // newborn because the setup script matched that folder name first. Accept both
-        // locations so existing Kratos libraries work without a reinstall.
-        string[] directories=category=="family"?["family","newborn"]:[category];
-        return directories
-            .SelectMany(name=>
-            {
-                string directory=Path.Combine(photoLibraryRoot,name);
-                return Directory.Exists(directory)?Directory.EnumerateFiles(directory):Enumerable.Empty<string>();
-            })
-            .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
-            .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray();
+        string directory=Path.Combine(photoLibraryRoot,category);
+        return Directory.Exists(directory)
+            ? Directory.EnumerateFiles(directory)
+                .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
+                .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray()
+            : [];
     }
 
     private static bool TryLocalDemoPhoto(string? type,int variant,out byte[] bytes,out PhotoInput? input)
@@ -79,7 +73,7 @@ internal static partial class DemoDataExpansion
         {
             string[] files=LocalPhotos(category);
             if(files.Length==0)
-                throw new InvalidOperationException($"The local demo photo library has no usable photos for category '{category}' at '{Path.Combine(photoLibraryRoot,category)}'. Add at least one image to that Kratos library folder and retry. Demo generation does not download images.");
+                throw new InvalidOperationException($"The local demo photo library has no usable photos for category '{category}' at '{Path.Combine(photoLibraryRoot,category)}'. Run the published installer: sudo bash /path/to/published/app/Demo/Prepare-Kratos-Demo-Photo-Library.sh. Demo generation does not download images.");
         }
     }
 
