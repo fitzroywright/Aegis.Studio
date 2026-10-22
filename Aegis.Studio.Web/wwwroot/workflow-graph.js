@@ -82,9 +82,9 @@
    const from=baseModel.nodes.find(n=>n.id===edge.from),to=baseModel.nodes.find(n=>n.id===edge.to),fp=layout.node(edge.from),tp=layout.node(edge.to);
    points[0]={x:(from.x??fp.x)+90,y:from.y??fp.y};points[points.length-1]={x:(to.x??tp.x)-90,y:to.y??tp.y};
   }
-  const fromPos=layout.node(edge.from),toPos=layout.node(edge.to);
-  if(expanded.has(edge.from))points[0]={x:fromPos.x+91,y:fromPos.y};
-  if(expanded.has(edge.to))points[points.length-1]={x:toPos.x-91,y:toPos.y};
+  const fromPos=layout.node(edge.from),toPos=layout.node(edge.to),endpointOffset=options.summary?12:91;
+  if(expanded.has(edge.from))points[0]={x:fromPos.x+endpointOffset,y:fromPos.y};
+  if(expanded.has(edge.to))points[points.length-1]={x:toPos.x-endpointOffset,y:toPos.y};
   const label=edge.label||'';
   return '<g class="sg-edge '+esc(state.toLowerCase())+'" tabindex="'+(options.editable?'0':'-1')+'" role="button" aria-label="Connection '+esc(label||edge.id)+'" data-edge="'+esc(edge.id)+'"><polyline points="'+points.map(p=>p.x+','+p.y).join(' ')+'" marker-end="url(#'+marker+')"/><text x="'+(line.x||points[Math.floor(points.length/2)].x)+'" y="'+((line.y||points[Math.floor(points.length/2)].y)-7)+'">'+esc(label.length>36?label.slice(0,35)+'…':label)+'</text><title>'+esc(label||edge.id)+'</title></g>';
  }
@@ -92,6 +92,10 @@
   const p=layout.node(node.id),state=states.get(node.id)?.status||'Definition',x=options.editable&&Number.isFinite(node.x)?node.x:p.x,y=options.editable&&Number.isFinite(node.y)?node.y:p.y;
   positions.set(node.id,{x,y});
   if(node.kind==='Subflow'&&node.subflow&&expanded.has(node.id))return expandedSubflowMarkup(node,{x,y},states,model,positions,marker,options);
+  if(options.summary){
+   const stateClass=String(state).toLowerCase().replace(/[^a-z0-9_-]/g,''),glyph=state==='Completed'?'M-5 0l3 3 7-7':state==='InProgress'?'M-4 0h8':state==='Blocked'?'M-4 -4l8 8m0-8-8 8':'M-3 -4L4 0l-7 4';
+   return '<g class="sg-node sg-summary-node '+stateClass+(node.id===options.selected?' selected':'')+'" tabindex="0" role="button" aria-label="'+esc(node.label+': '+state)+'" data-node="'+esc(node.id)+'" data-kind="'+esc(node.kind)+'" transform="translate('+x+' '+y+')"><circle class="sg-summary-mark" r="11"/><path class="sg-summary-glyph" d="'+glyph+'"/><text x="4" y="23" text-anchor="start" transform="rotate(45 4 23)">'+esc(node.label)+'</text><title>'+esc(node.label)+' · '+esc(state)+'</title></g>';
+  }
   const lines=(node.label.match(/.{1,23}(?:\\s|$)|.{1,23}/g)||[node.label]).slice(0,2);
   const type=node.kind==='Subflow'?'':esc(node.kind);
   return '<g class="sg-node '+esc(state.toLowerCase())+' '+(node.id===options.selected?'selected':'')+'" tabindex="0" role="button" aria-label="'+esc(node.label)+': '+esc(state)+'" data-node="'+esc(node.id)+'" data-kind="'+esc(node.kind)+'" transform="translate('+(x-90)+' '+(y-37)+')"><rect width="180" height="74" rx="'+(node.kind==='Decision'?24:8)+'"/><text x="90" y="21" text-anchor="middle">'+type+'</text>'+lines.map((line,index)=>'<text class="sg-label" x="90" y="'+(39+index*14)+'" text-anchor="middle">'+esc(line)+'</text>').join('')+'<text class="sg-state" x="90" y="67" text-anchor="middle">'+esc(state==='Definition'?node.join==='Any'?'Any qualifying branch':'':state)+'</text>'+(options.editable?'<circle data-port="in" cx="0" cy="37" r="7"/><circle data-port="out" cx="180" cy="37" r="7"/>':'')+'<title>'+esc(node.label)+(node.task?.defaultAssignee?' · Assigned to '+esc(node.task.defaultAssignee):'')+(node.role?' · '+esc(node.role):'')+'</title></g>';
@@ -99,27 +103,30 @@
  function canvas(host,graph,options={}){
   const expanded=options.expanded||new Set(),model=visible(graph,expanded),baseModel=visible(graph,new Set()),states=new Map((options.evaluation?.nodes||[]).map(n=>[n.id,n]));
   for(const n of baseModel.nodes.filter(n=>n.kind==='Subflow')){const children=[...states.values()].filter(s=>s.id.startsWith(n.id+'/'));if(children.length)states.set(n.id,{status:children.every(s=>s.status==='Inactive')?'Inactive':children.every(s=>['Completed','Skipped','Inactive'].includes(s.status))?'Completed':children.some(s=>s.status==='InProgress')?'InProgress':children.some(s=>s.status==='Available')?'Available':'Blocked'});}
-  const layout=new dagre.graphlib.Graph({multigraph:true}).setGraph({rankdir:'LR',nodesep:46,ranksep:80,marginx:24,marginy:28}).setDefaultEdgeLabel(()=>({}));
-  for(const n of baseModel.nodes)layout.setNode(n.id,{width:180,height:74});
-  for(const e of baseModel.edges)if(layout.hasNode(e.from)&&layout.hasNode(e.to))layout.setEdge(e.from,e.to,{width:e.label?Math.min(240,e.label.length*6):0,height:e.label?22:0},e.id);
+  const layoutModel=options.summary?{nodes:baseModel.nodes.filter(n=>n.kind!=='Start'&&n.kind!=='End'),edges:baseModel.edges.filter(e=>baseModel.nodes.some(n=>n.id===e.from&&n.kind!=='Start'&&n.kind!=='End')&&baseModel.nodes.some(n=>n.id===e.to&&n.kind!=='Start'&&n.kind!=='End'))}:baseModel;
+  const layout=new dagre.graphlib.Graph({multigraph:true}).setGraph({rankdir:'LR',nodesep:options.summary?30:46,ranksep:options.summary?46:80,marginx:24,marginy:28}).setDefaultEdgeLabel(()=>({}));
+  for(const n of layoutModel.nodes)layout.setNode(n.id,{width:options.summary?24:180,height:options.summary?24:74});
+  for(const e of layoutModel.edges)if(layout.hasNode(e.from)&&layout.hasNode(e.to))layout.setEdge(e.from,e.to,{width:e.label?Math.min(240,e.label.length*6):0,height:e.label?22:0},e.id);
   dagre.layout(layout);
-  const expandedNodes=baseModel.nodes.filter(n=>n.kind==='Subflow'&&n.subflow&&expanded.has(n.id));
+  const expandedNodes=layoutModel.nodes.filter(n=>n.kind==='Subflow'&&n.subflow&&expanded.has(n.id));
   const naturalWidth=Math.max(layout.graph().width||400,400,...expandedNodes.map(n=>layout.node(n.id).x+200));
-  const height=Math.max(layout.graph().height||160,160,...expandedNodes.map(n=>layout.node(n.id).y+220));
+  const height=Math.max(layout.graph().height||100,100,...expandedNodes.map(n=>layout.node(n.id).y+220));
   const availableWidth=host.clientWidth||host.parentElement?.clientWidth||0;
-  const width=expandedNodes.length&&availableWidth>0&&naturalWidth>availableWidth?availableWidth:naturalWidth;
+  const width=(expandedNodes.length||options.summary)&&availableWidth>0&&naturalWidth>availableWidth?availableWidth:naturalWidth;
   const marker='graph-arrow-'+crypto.randomUUID(),positions=new Map();
-  host.classList.add('studio-graph');
-  const svgMarkup=baseModel.edges.map(e=>renderEdgeMarkup(e,layout,baseModel,states,expanded,marker,options)).join('')+baseModel.nodes.map(n=>renderNodeMarkup(n,layout,baseModel,model,states,positions,expanded,marker,options)).join('');
-  host.innerHTML=`<div class="sg-tools"><button type="button" data-zoom="1.2" aria-label="Zoom in">＋</button><button type="button" data-zoom="0.83" aria-label="Zoom out">−</button><button type="button" data-fit>Fit</button><button type="button" data-layout>Auto layout</button><span>${options.editable?'Drag nodes or connect the right port to a left port.':'Drag empty space to pan. Select a task to view details.'}</span></div><div class="sg-viewport" tabindex="0" aria-label="Workflow graph canvas"><svg role="img" aria-label="Connected workflow" viewBox="0 0 ${width} ${height}"><defs><marker id="${marker}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><g class="sg-world">${svgMarkup}</g></svg></div>`;
+  host.classList.remove(options.summary?'studio-graph':'sg-summary');host.classList.add(options.summary?'sg-summary':'studio-graph');
+  const svgMarkup=layoutModel.edges.map(e=>renderEdgeMarkup(e,layout,layoutModel,states,expanded,marker,options)).join('')+layoutModel.nodes.map(n=>renderNodeMarkup(n,layout,layoutModel,model,states,positions,expanded,marker,options)).join('');
+  const toolsMarkup=options.summary?'':`<div class="sg-tools"><button type="button" data-zoom="1.2" aria-label="Zoom in">＋</button><button type="button" data-zoom="0.83" aria-label="Zoom out">−</button><button type="button" data-fit>Fit</button><button type="button" data-layout>Auto layout</button><span>${options.editable?'Drag nodes or connect the right port to a left port.':'Drag empty space to pan. Select a task to view details.'}</span></div>`;
+  const svgStyle=options.summary?` style="width:${width}px;height:${height}px"`:'';
+  host.innerHTML=toolsMarkup+`<div class="sg-viewport" tabindex="0" aria-label="Workflow graph canvas"><svg role="img" aria-label="Connected workflow"${svgStyle} viewBox="0 0 ${width} ${height}"><defs><marker id="${marker}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><g class="sg-world">${svgMarkup}</g></svg></div>`;
   const viewport=host.querySelector('.sg-viewport'),svg=host.querySelector('svg');let box={x:0,y:0,w:width,h:height};
   const update=()=>svg.setAttribute('viewBox',`${box.x} ${box.y} ${box.w} ${box.h}`);
   if(options.editable&&viewport.clientWidth>0&&viewport.clientHeight>0){box={x:0,y:(height-viewport.clientHeight)/2,w:Math.min(width,viewport.clientWidth),h:viewport.clientHeight};update();}
   host.querySelectorAll('[data-zoom]').forEach(b=>b.onclick=()=>{const f=Number(b.dataset.zoom),w=box.w/f,h=box.h/f;box.x+=(box.w-w)/2;box.y+=(box.h-h)/2;box.w=w;box.h=h;update();});
-  host.querySelector('[data-fit]').onclick=()=>{box={x:0,y:0,w:width,h:height};update();};
-  if(expanded.size){const collapse=document.createElement('button');collapse.type='button';collapse.textContent='Close expanded stage';collapse.onclick=()=>{canvas(host,graph,{...options,expanded:new Set()});};host.querySelector('.sg-tools').append(collapse);}
-  host.querySelector('[data-layout]').onclick=()=>{if(options.editable){for(const n of model.nodes){delete n.source.x;delete n.source.y;}options.onChange?.();}else host.querySelector('[data-fit]').click();};
-  viewport.onwheel=e=>{e.preventDefault();host.querySelector(`[data-zoom="${e.deltaY<0?'1.2':'0.83'}"]`).click();};
+  const fitButton=host.querySelector('[data-fit]');if(fitButton)fitButton.onclick=()=>{box={x:0,y:0,w:width,h:height};update();};
+  if(expanded.size&&!options.summary){const collapse=document.createElement('button');collapse.type='button';collapse.textContent='Close expanded stage';collapse.onclick=()=>{canvas(host,graph,{...options,expanded:new Set()});};host.querySelector('.sg-tools').append(collapse);}
+  const layoutButton=host.querySelector('[data-layout]');if(layoutButton)layoutButton.onclick=()=>{if(options.editable){for(const n of model.nodes){delete n.source.x;delete n.source.y;}options.onChange?.();}else fitButton?.click();};
+  if(!options.summary)viewport.onwheel=e=>{e.preventDefault();host.querySelector(`[data-zoom="${e.deltaY<0?'1.2':'0.83'}"]`).click();};
   let drag=null,connect=null;
   svg.onpointerdown=e=>{
    const node=e.target.closest('[data-node]'),port=e.target.closest('[data-port]');
