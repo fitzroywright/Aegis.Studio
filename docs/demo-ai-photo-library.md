@@ -6,13 +6,13 @@ The setup script installs the approved Bryan's Studio Demo Photo Library ZIP int
 
 ## Install on Kratos
 
-Copy the photo-library ZIP to Kratos:
+From the Mac used by `Build-Deploy-Studio-Kratos.ps1`, copy the ZIP to Kratos using the deployment script's default host and account:
 
-    scp ~/Downloads/Bryans-Studio-Demo-Photo-Library.zip <your-kratos-account>@kratos:/tmp/
+    scp -o User=fwright@fftpj.local ~/Downloads/Bryans-Studio-Demo-Photo-Library.zip kratos:/tmp/
 
-Then run this as root on Kratos:
+Then run the installer at the Studio deployment path defined by `Deploy-Kratos-Server.sh`:
 
-    sudo bash /path/to/published/app/Demo/Prepare-Kratos-Demo-Photo-Library.sh /tmp/Bryans-Studio-Demo-Photo-Library.zip
+    ssh -l fwright@fftpj.local kratos 'sudo bash /opt/aegis/studio/Demo/Prepare-Kratos-Demo-Photo-Library.sh /tmp/Bryans-Studio-Demo-Photo-Library.zip'
 
 The setup script creates the persistent photo root, assigns ownership to the Studio systemd service account, and installs the supplied photos into exact category folders. It verifies all six required categories and never downloads photos.
 
