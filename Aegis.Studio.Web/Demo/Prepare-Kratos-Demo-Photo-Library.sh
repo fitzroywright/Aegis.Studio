@@ -3,19 +3,19 @@ set -euo pipefail
 
 photo_root="${AEGIS_STUDIO_DEMO_PHOTOS:-/var/lib/aegis-studio/demo-photos}"
 unit_name="${AEGIS_STUDIO_SYSTEMD_UNIT:-aegis-studio}"
-photo_zip="${1:-}"
+photo_source="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/Photos"
+categories=(people wedding graduation family sports product)
 
 if [[ "$EUID" -ne 0 ]]; then
   echo "Run this script with sudo so it can create the persistent photo folder and set its owner." >&2
   exit 1
 fi
-if [[ -z "$photo_zip" || ! -f "$photo_zip" ]]; then
-  echo "Usage: sudo bash $0 /path/to/Bryans-Studio-Demo-Photo-Library.zip" >&2
-  exit 2
+if [[ ! -d "$photo_source" ]]; then
+  echo "Bundled Studio demo photographs are missing from '$photo_source'." >&2
+  exit 1
 fi
 command -v systemctl >/dev/null
 command -v file >/dev/null
-command -v unzip >/dev/null
 
 service_user="$(systemctl show "$unit_name" -p User --value 2>/dev/null || true)"
 service_group="$(systemctl show "$unit_name" -p Group --value 2>/dev/null || true)"
@@ -27,34 +27,26 @@ if [[ -z "$service_user" ]]; then service_user=root; fi
 if [[ -z "$service_group" ]]; then service_group="$(id -gn "$service_user")"; fi
 
 install -d -o "$service_user" -g "$service_group" -m 0750 "$photo_root"
-temporary="$(mktemp -d)"
-trap 'rm -rf "$temporary"' EXIT
-unzip -q "$photo_zip" -d "$temporary/unpacked"
-installed=0
-while IFS= read -r -d '' source; do
-  name="${source##*/}"
-  lower="$(printf '%s' "$source" | tr '[:upper:]' '[:lower:]')"
-  case "$lower" in
-    *wedding*|*engagement*) category=wedding ;;
-    *graduation*|*school*) category=graduation ;;
-    *family*|*newborn*) category=family ;;
-    *corporate*) category=people ;;
-    *sport*|*athlete*|*team*) category=sports ;;
-    *product*|*commercial*) category=product ;;
-    *portrait*|*headshot*|*consultation*|*passport*|*/id-*) category=people ;;
-    *) continue ;;
-  esac
-  mime="$(file --brief --mime-type "$source")"
-  [[ "$mime" == image/* ]] || { echo "Skipping non-image entry: $source" >&2; continue; }
-  destination="$photo_root/$category/BryansStudio-$name"
-  install -D -o "$service_user" -g "$service_group" -m 0640 "$source" "$destination"
-  installed=$((installed + 1))
-done < <(find "$temporary/unpacked" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print0)
-if [[ "$installed" -eq 0 ]]; then
-  echo "No recognized demo photos were found in $photo_zip." >&2
-  exit 1
-fi
+total=0
+for category in "${categories[@]}"; do
+  source_directory="$photo_source/$category"
+  if [[ ! -d "$source_directory" ]]; then
+    echo "Bundled demo photo category is missing: '$source_directory'." >&2
+    exit 1
+  fi
+  count=0
+  while IFS= read -r -d '' source; do
+    mime="$(file --brief --mime-type "$source")"
+    [[ "$mime" == image/* ]] || { echo "Bundled file is not a usable image: $source" >&2; exit 1; }
+    name="${source##*/}"
+    install -D -o "$service_user" -g "$service_group" -m 0640 "$source" "$photo_root/$category/BryansStudio-$name"
+    count=$((count + 1))
+    total=$((total + 1))
+  done < <(find "$source_directory" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print0 | sort -z)
+  if [[ "$count" -eq 0 ]]; then
+    echo "Bundled demo photo category '$category' has no supported images." >&2
+    exit 1
+  fi
+done
 
-
-count="$(find "$photo_root" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | wc -l | xargs)"
-echo "Studio demo photo library ready: $photo_root ($count local image files). Demo generation uses only these installed photos."
+echo "Studio demo photo library ready: $photo_root ($total bundled local image files across ${#categories[@]} required categories). Demo generation does not download images."
