@@ -70,7 +70,7 @@
  .jd-flow-overview { grid-column:1; grid-row:2; height:auto; min-height:76px; }
 }
 @media(prefers-reduced-motion:reduce) { .jd-job-name-toggle,.jd-job-name-chevron { transition:none; } }
-.jd-workflow-track { display:block; flex:1 1 auto; width:100%; padding:5px 0; min-width:0; overflow:visible; max-height:none; }
+.jd-workflow-track { position:relative; display:block; flex:1 1 auto; width:100%; padding:5px 0; min-width:0; overflow:visible; max-height:none; }
 .jd-workflow-caption { grid-column:1/-1; margin-top:8px; display:flex; align-items:center; flex-wrap:wrap; gap:5px 12px; font-size:10px; color:#b4510f; }
 .jd-workflow-caption [data-job-blocked] { color:#bd3040; }
  .jd-flow-overview { grid-column:2; grid-row:1; position:relative; display:flex; flex:1 1 auto; align-items:center; justify-content:flex-start; width:100%; height:76px; min-width:0; margin:0; overflow:visible; }
