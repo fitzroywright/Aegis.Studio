@@ -29,9 +29,16 @@ internal static partial class DemoDataExpansion
 
     private static string[] LocalPhotos(string category)
     {
-        string directory=Path.Combine(photoLibraryRoot,category);
-        if (!Directory.Exists(directory)) return [];
-        return Directory.EnumerateFiles(directory)
+        // Older library installs placed the supplied "Family & Newborn" image under
+        // newborn because the setup script matched that folder name first. Accept both
+        // locations so existing Kratos libraries work without a reinstall.
+        string[] directories=category=="family"?["family","newborn"]:[category];
+        return directories
+            .SelectMany(name=>
+            {
+                string directory=Path.Combine(photoLibraryRoot,name);
+                return Directory.Exists(directory)?Directory.EnumerateFiles(directory):Enumerable.Empty<string>();
+            })
             .Where(file=>new[]{".jpg",".jpeg",".png",".webp"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))
             .OrderBy(file=>file,StringComparer.OrdinalIgnoreCase).ToArray();
     }

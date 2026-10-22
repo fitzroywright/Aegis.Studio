@@ -14,6 +14,6 @@ Then run this as root on Kratos:
 
     sudo bash /path/to/published/app/Demo/Prepare-Kratos-Demo-Photo-Library.sh /tmp/Bryans-Studio-Demo-Photo-Library.zip
 
-The setup script creates the persistent photo root, assigns ownership to the Studio systemd service account, and installs the supplied photos into category folders.
+The setup script creates the persistent photo root, assigns ownership to the Studio systemd service account, and installs the supplied photos into category folders. Older installs that placed the family photograph in a `newborn` folder remain supported.
 
 If the service uses a different unit name, set `AEGIS_STUDIO_SYSTEMD_UNIT` for the setup command. If it uses a different photo root, set `AEGIS_STUDIO_DEMO_PHOTOS` for both the setup command and the Studio service environment.
