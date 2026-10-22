@@ -50,14 +50,8 @@
 .jd-job-identity-menu .jd-status-label { cursor:default; }
 .jd-job-identity-menu .jd-status-label::after { content:none; }
 .jd-job-identity-menu [data-stage-age] { color:var(--theme-text,#162b50); font-size:12px; font-weight:650; }
-.jd-job-name-stack .jd-next-step { grid-column:auto; flex:0 0 32px; width:100%; min-width:0; height:32px; min-height:32px; max-height:32px; box-sizing:border-box; gap:6px; margin:0; padding:3px 6px; overflow:hidden; }
-.jd-job-name-stack .jd-next-step > div { min-width:0; flex:1 1 auto; overflow:hidden; }
-.jd-job-name-stack .jd-next-step small { display:none; }
-.jd-job-name-stack .jd-next-step p { margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; line-height:1.2; }
-.jd-job-name-stack .jd-next-step p strong { color:var(--theme-text,#162b50); font-weight:850; }
-.jd-job-name-stack .jd-next-step button:not(.jd-next-step-action-link) { flex:none; max-width:42%; padding:3px 6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:9px; }
-.jd-job-name-stack .jd-next-step-action-link { flex:1 1 auto; min-width:0; padding:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; text-align:left; }
-.jd-next-step-action-link span { display:inline-block; margin-left:3px; }
+.jd-next-action-link { align-self:flex-start; max-width:100%; min-width:0; padding:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:10px; text-align:left; }
+.jd-next-action-link span { display:inline-block; margin-left:3px; }
 @media(max-width:900px) {
  .job-detail-title.jd-job-identity { gap:clamp(6px,1vw,14px); }
 }
@@ -171,13 +165,4 @@
 
 
 
-
-/* Compact job projection, independent of the full template designer. */
-.jd-next-step { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:8px 16px; padding:9px 11px; margin-top:8px; border:1px solid var(--theme-border,#dedbd4); border-left:4px solid var(--theme-accent,#d97827); border-radius:5px; background:var(--theme-surface-alt,#f5f6f8); }
-.jd-next-step > div { min-width:0; }
-.jd-next-step small { display:block; font-size:11px; font-weight:750; color:var(--theme-text,#162b50); }
-.jd-next-step p { margin:3px 0 0; font-size:11px; color:var(--theme-muted,#69758b); }
-.jd-next-step > button { flex:none; min-height:34px; font-size:12px; font-weight:750; padding:7px 14px; }
-.jd-next-step[data-state=blocked] { border-left-color:var(--studio-red,#ef3340); }
-@media(max-width:650px) { .jd-next-step { flex-wrap:wrap; } .jd-next-step > button { width:100%; } }
 
