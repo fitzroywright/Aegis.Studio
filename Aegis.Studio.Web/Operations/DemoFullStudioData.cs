@@ -153,17 +153,6 @@ internal static class DemoFullStudioData
             ("demo.anna","Anna Clarke","PartTime",new[]{"Newborn","School","Events"}),
             ("demo.michael","Michael Grant","Contractor",new[]{"Commercial","Corporate","Events"})
         };
-        var roleTypes=new[]
-        {
-            ("PHOTOGRAPHER","Photographer",true),
-            ("EDITOR","Editor",false),
-            ("RETOUCHER","Retoucher",false),
-            ("REVIEWER","Reviewer",false),
-            ("DELIVERY","Delivery",false)
-        };
-        foreach(var role in roleTypes)
-            Execute(c,tx,"insert into studio_worker_types(code,display_name,can_be_primary,is_active,updated_at_utc) values($1,$2,$3,true,now()) on conflict(code) do nothing",role.Item1,role.Item2,role.Item3);
-
         int i=0;
         foreach(var p in people)
         {
@@ -209,7 +198,14 @@ internal static class DemoFullStudioData
             new("PHOTOGRAPHER",job.Photographer,"Primary photographer",RoleStatus(job,"PHOTOGRAPHER",stage,ordinal))
         };
         bool cancelled=job.Status.Equals("Cancelled",StringComparison.OrdinalIgnoreCase);
-        if(!cancelled)
+        if(cancelled)
+        {
+            roles.Add(new("EDITOR","demo.editor","Prepare and edit the selected images","Cancelled"));
+            roles.Add(new("RETOUCHER","demo.retoucher","Retouch selected images","Cancelled"));
+            roles.Add(new("REVIEWER","demo.reviewer","Review production quality","Cancelled"));
+            roles.Add(new("DELIVERY","demo.delivery","Prepare and hand off the finished order","Cancelled"));
+        }
+        else
         {
             roles.Add(new("EDITOR","demo.editor","Prepare and edit the selected images",RoleStatus(job,"EDITOR",stage,ordinal)));
             if(ordinal%2==0 || stage is "In Production" or "Changes Requested" or "Needs Review" or "Ready for Client")
