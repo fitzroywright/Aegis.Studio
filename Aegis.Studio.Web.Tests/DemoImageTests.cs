@@ -51,7 +51,7 @@ public sealed class DemoImageTests
     {
         Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoFullStudioData")!;
         Type jobType=seed.GetNestedType("DemoJob",BindingFlags.NonPublic)!;
-        ConstructorInfo constructor=jobType.GetConstructors(BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic).Single();
+        ConstructorInfo constructor=jobType.GetConstructors(BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic).Single(candidate=>candidate.GetParameters().Length==11);
         object Job(string status,int dayOffset=0)=>constructor.Invoke(new object[]{101,1,1,"Demo job",status,dayOffset,"Studio A",100m,50m,"demo.sam","Portrait"});
         MethodInfo roleStatus=seed.GetMethod("RoleStatus",BindingFlags.NonPublic|BindingFlags.Static)!;
         string Status(object job,string role,string stage,int ordinal=1)=>(string)roleStatus.Invoke(null,new object[]{job,role,stage,ordinal})!;
