@@ -46,8 +46,8 @@ public static class WorkflowGraphEndpoints
         })).RequireAuthorization();
         app.MapPost("/api/jobs/{job:guid}/workflow-graph/actions", (Guid job, GraphJobActionRequest request, ClaimsPrincipal user, WorkflowStore workflow) => Run(() =>
         {
-            if (request.Action != "confirm-booking") throw new ArgumentException("Choose a supported workflow graph action.");
-            var command = new WorkflowCommand("confirm", request.ExpectedRevision, request.OperationId, Reason: request.Reason);
+            var action = request.Action switch { "confirm-booking" => "confirm", "assign-owner" => "owner", _ => throw new ArgumentException("Choose a supported workflow graph action.") };
+            var command = new WorkflowCommand(action, request.ExpectedRevision, request.OperationId, UserName: request.UserName, Reason: request.Reason);
             return Results.Ok(workflow.Execute(job, command, user));
         })).RequireAuthorization();
         app.MapPost("/api/jobs/{job:guid}/workflow-graph/tasks", (Guid job, GraphTaskCommand request, ClaimsPrincipal user, JobAccessService access, StudioDatabase db) => Run(() =>
