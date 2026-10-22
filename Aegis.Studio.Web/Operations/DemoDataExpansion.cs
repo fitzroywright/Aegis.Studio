@@ -9,115 +9,6 @@ namespace Aegis.Studio.Web.Operations;
 // Only deterministic DEMO identifiers are used; no real jobs or files are changed.
 internal static partial class DemoDataExpansion
 {
-    private static readonly HttpClient demoPhotoClient = CreateDemoPhotoClient();
-
-    private static HttpClient CreateDemoPhotoClient()
-    {
-        var client=new HttpClient { Timeout=TimeSpan.FromSeconds(30) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Aegis.Studio/1.0 (demo-data)");
-        client.DefaultRequestHeaders.Accept.ParseAdd("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
-        return client;
-    }
-
-    private sealed record DemoPhotoCandidate(string Url,string Source,string License,string Page);
-
-    private static HttpResponseMessage DownloadDemoPhoto(string preferredUrl,int variant,string? searchTerm=null)
-    {
-        var cataloguePhoto=DemoPortraitCatalogue.Photos.FirstOrDefault(photo=>photo.Url==preferredUrl);
-        // Never replace category-specific demo photographs with an unrelated portrait.
-        // A failed category download must be reported rather than silently mislabelled.
-        bool categorySpecific=searchTerm is not null &&
-            new[]{"Wedding","Engagement","Graduation","School","Product","Commercial","Family","Newborn","Sports","Athlete","Team"}
-                .Any(term=>searchTerm.Contains(term,StringComparison.OrdinalIgnoreCase));
-        int[] matchingVariants=searchTerm is null ? [] :
-            searchTerm.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("Engagement",StringComparison.OrdinalIgnoreCase)?[10,11]:
-            searchTerm.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("School",StringComparison.OrdinalIgnoreCase)?[0,1,2,3]:
-            searchTerm.Contains("Family",StringComparison.OrdinalIgnoreCase)?[12,6]:
-            searchTerm.Contains("Newborn",StringComparison.OrdinalIgnoreCase)?[7,6]:
-            searchTerm.Contains("Sports",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("Team",StringComparison.OrdinalIgnoreCase)?[8]:
-            searchTerm.Contains("Product",StringComparison.OrdinalIgnoreCase)||searchTerm.Contains("Commercial",StringComparison.OrdinalIgnoreCase)?[9]:
-            [];
-        string[] urls=categorySpecific
-            ? new[]{preferredUrl}.Concat(matchingVariants.Select(index=>realPhotoUrls[index])).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
-            : [preferredUrl,DemoPortraitCatalogue.Url(Math.Abs(variant)%DemoPortraitCatalogue.Photos.Count)];
-        DemoPhotoCandidate[] candidates=urls.Select(url=>
-        {
-            var photo=DemoPortraitCatalogue.Photos.FirstOrDefault(item=>item.Url==url);
-            return new DemoPhotoCandidate(url,"Wikimedia Commons",photo?.License??"Catalogue source",photo?.Page??url);
-        }).ToArray();
-
-        int start=0;
-        Exception? lastError=null;
-        for(int offset=0;offset<candidates.Length;offset++)
-        {
-            DemoPhotoCandidate candidate=candidates[(start+offset)%candidates.Length];
-            for(int retry=0;retry<3;retry++)
-            {
-                try
-                {
-                    HttpResponseMessage response=demoPhotoClient.GetAsync(candidate.Url).GetAwaiter().GetResult();
-                    if(response.IsSuccessStatusCode)
-                    {
-                        response.Headers.TryAddWithoutValidation("X-Aegis-Demo-Source",candidate.Source);
-                        response.Headers.TryAddWithoutValidation("X-Aegis-Demo-License",candidate.License);
-                        response.Headers.TryAddWithoutValidation("X-Aegis-Demo-Page",candidate.Page);
-                        return response;
-                    }
-                    int status=(int)response.StatusCode;
-                    lastError=new HttpRequestException($"Demo image source {candidate.Source} returned HTTP {status}.");
-                    if(status!=429&&status<500)
-                    {
-                        response.Dispose();
-                        break;
-                    }
-                    TimeSpan wait=response.Headers.RetryAfter?.Delta??TimeSpan.FromSeconds(Math.Min(8,1*Math.Pow(2,retry)));
-                    response.Dispose();
-                    Task.Delay(TimeSpan.FromSeconds(Math.Clamp(wait.TotalSeconds,1,10))).GetAwaiter().GetResult();
-                }
-                catch(Exception error)
-                {
-                    lastError=error;
-                    break;
-                }
-            }
-        }
-        throw new HttpRequestException($"All {candidates.Length} demo image sources failed for category {searchTerm??"General"}. Last error: {lastError?.Message}",lastError);
-    }
-
-    private static string Header(HttpResponseMessage response,string name,string fallback)
-        => response.Headers.TryGetValues(name,out IEnumerable<string>? values)?values.FirstOrDefault()??fallback:fallback;
-
-    private static readonly string[] weddingPhotoUrls =
-    [
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bride_and_bridegroom.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bride_and_Groom_at_their_introduction_ceremony.1.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1294168).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1293933).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wedding_couple_(1294004).jpg"
-    ];
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,byte[]> weddingPhotoCache = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,string> demoPhotoSourceCache = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,string> demoPhotoSourceNameCache = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,string> demoPhotoLicenseCache = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,string> demoPhotoPageCache = new(StringComparer.OrdinalIgnoreCase);
-    // Curated real photographs only. Each file is CC0 or public domain on Wikimedia Commons.
-    // Keep the Commons file URL in storage metadata so every seeded image retains provenance.
-    private static readonly string[] realPhotoUrls =
-    [
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Graduating_pupils.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Graduating_Students(GN11751).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Graduation_pictures.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Ceremony_graduation.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Headshot.Corporate.2023.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Woman_(headshot).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Parents_and_their_baby.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/New_born_baby_with_father.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Team_picture_time.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Woman_(headshot).jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/People_at_Wedding_ceremony.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/A_group_picture_together_with_the_groom_at_Wedding_ceremony.jpg",
-        "https://commons.wikimedia.org/wiki/Special:Redirect/file/Family_portrait.jpg"
-    ];
     internal static readonly int[] JobNumbers = [1,2,4,5,7,8];
     internal static Guid Id(int group,int number) => Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
 
@@ -253,9 +144,9 @@ internal static partial class DemoDataExpansion
         byte[]? bytes=null;
         string? selectedUrl=null;
         Exception? lastError=null;
-        for(int attempt=0;attempt<weddingPhotoUrls.Length;attempt++)
+        for(int attempt=0;attempt<1;attempt++)
         {
-            string url=weddingPhotoUrls[(photoIndex+attempt)%weddingPhotoUrls.Length];
+            string url=$"local-demo-library://wedding/{photoIndex}";
             try
             {
                 bytes=PhotoBytes(url,photoIndex,"wedding");
@@ -328,9 +219,9 @@ internal static partial class DemoDataExpansion
         byte[]? bytes=null;
         string? selectedUrl=null;
         Exception? lastError=null;
-        for(int attempt=0;bytes is null&&attempt<(sourceUrl is null?realPhotoUrls.Length:1);attempt++)
+        for(int attempt=0;bytes is null&&attempt<1;attempt++)
         {
-            string url=sourceUrl??realPhotoUrls[(variant+attempt)%realPhotoUrls.Length];
+            string url=sourceUrl??$"local-demo-library://{PhotoCategory(searchTerm)}";
             try
             {
                 bytes=PhotoBytes(url,variant,searchTerm);
