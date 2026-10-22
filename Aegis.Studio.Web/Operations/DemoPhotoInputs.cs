@@ -73,7 +73,7 @@ internal static partial class DemoDataExpansion
         {
             string[] files=LocalPhotos(category);
             if(files.Length==0)
-                throw new InvalidOperationException($"The local demo photo library has no usable photos for category '{category}' at '{Path.Combine(photoLibraryRoot,category)}'. Run the published installer: sudo bash /path/to/published/app/Demo/Prepare-Kratos-Demo-Photo-Library.sh /tmp/Bryans-Studio-Demo-Photo-Library.zip. Demo generation does not download images.");
+                throw new InvalidOperationException($"The local demo photo library has no usable photos for category '{category}' at '{Path.Combine(photoLibraryRoot,category)}'. Run the published installer: sudo bash /opt/aegis/studio/Demo/Prepare-Kratos-Demo-Photo-Library.sh /tmp/Bryans-Studio-Demo-Photo-Library.zip. Demo generation does not download images.");
         }
     }
 
