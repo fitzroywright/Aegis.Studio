@@ -104,21 +104,25 @@
   const expanded=options.expanded||new Set(),model=visible(graph,expanded),baseModel=visible(graph,new Set()),states=new Map((options.evaluation?.nodes||[]).map(n=>[n.id,n]));
   for(const n of baseModel.nodes.filter(n=>n.kind==='Subflow')){const children=[...states.values()].filter(s=>s.id.startsWith(n.id+'/'));if(children.length)states.set(n.id,{status:children.every(s=>s.status==='Inactive')?'Inactive':children.every(s=>['Completed','Skipped','Inactive'].includes(s.status))?'Completed':children.some(s=>s.status==='InProgress')?'InProgress':children.some(s=>s.status==='Available')?'Available':'Blocked'});}
   const layoutModel=options.summary?{nodes:baseModel.nodes.filter(n=>n.kind!=='Start'&&n.kind!=='End'),edges:baseModel.edges.filter(e=>baseModel.nodes.some(n=>n.id===e.from&&n.kind!=='Start'&&n.kind!=='End')&&baseModel.nodes.some(n=>n.id===e.to&&n.kind!=='Start'&&n.kind!=='End'))}:baseModel;
-  const layout=new dagre.graphlib.Graph({multigraph:true}).setGraph({rankdir:'LR',nodesep:options.summary?30:46,ranksep:options.summary?46:80,marginx:24,marginy:28}).setDefaultEdgeLabel(()=>({}));
+  const availableWidth=host.clientWidth||host.parentElement?.clientWidth||0;
+  const ranks=new Map(layoutModel.nodes.map(n=>[n.id,0]));
+  if(options.summary)for(let i=0;i<layoutModel.nodes.length;i++)for(const edge of layoutModel.edges)if(ranks.has(edge.from)&&ranks.has(edge.to))ranks.set(edge.to,Math.max(ranks.get(edge.to),ranks.get(edge.from)+1));
+  const rankCount=options.summary?Math.max(1,...ranks.values())+1:1,summaryRanksep=availableWidth>0&&rankCount>1?Math.max(30,Math.floor((availableWidth-48)/(rankCount-1)-30)):46;
+  const layout=new dagre.graphlib.Graph({multigraph:true}).setGraph({rankdir:'LR',nodesep:options.summary?30:46,ranksep:options.summary?summaryRanksep:80,marginx:24,marginy:28}).setDefaultEdgeLabel(()=>({}));
   for(const n of layoutModel.nodes)layout.setNode(n.id,{width:options.summary?24:180,height:options.summary?24:74});
   for(const e of layoutModel.edges)if(layout.hasNode(e.from)&&layout.hasNode(e.to))layout.setEdge(e.from,e.to,{width:e.label?Math.min(240,e.label.length*6):0,height:e.label?22:0},e.id);
   dagre.layout(layout);
   const expandedNodes=layoutModel.nodes.filter(n=>n.kind==='Subflow'&&n.subflow&&expanded.has(n.id));
   const naturalWidth=Math.max(layout.graph().width||400,400,...expandedNodes.map(n=>layout.node(n.id).x+200));
   const height=Math.max(layout.graph().height||100,100,...expandedNodes.map(n=>layout.node(n.id).y+220));
-  const availableWidth=host.clientWidth||host.parentElement?.clientWidth||0;
-  const width=(expandedNodes.length||options.summary)&&availableWidth>0&&naturalWidth>availableWidth?availableWidth:naturalWidth;
+  const width=options.summary&&availableWidth>0?availableWidth:(expandedNodes.length&&availableWidth>0&&naturalWidth>availableWidth?availableWidth:naturalWidth);
   const marker='graph-arrow-'+crypto.randomUUID(),positions=new Map();
   host.classList.remove(options.summary?'studio-graph':'sg-summary');host.classList.add(options.summary?'sg-summary':'studio-graph');
   const svgMarkup=layoutModel.edges.map(e=>renderEdgeMarkup(e,layout,layoutModel,states,expanded,marker,options)).join('')+layoutModel.nodes.map(n=>renderNodeMarkup(n,layout,layoutModel,model,states,positions,expanded,marker,options)).join('');
   const toolsMarkup=options.summary?'':`<div class="sg-tools"><button type="button" data-zoom="1.2" aria-label="Zoom in">＋</button><button type="button" data-zoom="0.83" aria-label="Zoom out">−</button><button type="button" data-fit>Fit</button><button type="button" data-layout>Auto layout</button><span>${options.editable?'Drag nodes or connect the right port to a left port.':'Drag empty space to pan. Select a task to view details.'}</span></div>`;
   const svgStyle=options.summary?` style="width:${width}px;height:${height}px"`:'';
-  host.innerHTML=toolsMarkup+`<div class="sg-viewport" tabindex="0" aria-label="Workflow graph canvas"><svg role="img" aria-label="Connected workflow"${svgStyle} viewBox="0 0 ${width} ${height}"><defs><marker id="${marker}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><g class="sg-world">${svgMarkup}</g></svg></div>`;
+  const viewportStyle=options.summary?` style="height:${height}px"`:'';
+  host.innerHTML=toolsMarkup+`<div class="sg-viewport" tabindex="0" aria-label="Workflow graph canvas"${viewportStyle}><svg role="img" aria-label="Connected workflow"${svgStyle} viewBox="0 0 ${width} ${height}"><defs><marker id="${marker}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><g class="sg-world">${svgMarkup}</g></svg></div>`;
   const viewport=host.querySelector('.sg-viewport'),svg=host.querySelector('svg');let box={x:0,y:0,w:width,h:height};
   const update=()=>svg.setAttribute('viewBox',`${box.x} ${box.y} ${box.w} ${box.h}`);
   if(options.editable&&viewport.clientWidth>0&&viewport.clientHeight>0){box={x:0,y:(height-viewport.clientHeight)/2,w:Math.min(width,viewport.clientWidth),h:viewport.clientHeight};update();}
