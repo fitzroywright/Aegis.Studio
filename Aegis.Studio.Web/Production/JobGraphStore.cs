@@ -6,7 +6,7 @@ using static Aegis.Studio.Web.Production.CommercialTemplateStore;
 namespace Aegis.Studio.Web.Production;
 
 public sealed record GraphTask(Guid Id, string NodeId, string Title, string Status, string? AssignedTo, string? Role,
-    string Eligibility, string[] Dependencies, bool Optional, string? Reason, string[]? DependencyLabels = null, string? ActivityType = null);
+    string Eligibility, string[] Dependencies, bool Optional, string? Reason, string[]? DependencyLabels = null, string? ActivityType = null, DateTimeOffset? StartedAtUtc = null);
 public sealed record JobGraphView(Guid JobId, Guid TemplateId, int TemplateVersion, long Revision,
     WorkflowGraph Graph, GraphEvaluation Evaluation, GraphTask[] Tasks, object[] History);
 public sealed record TemplateImpact(string[] Remain, string[] Added, string[] Removed, string[] CompletedAffected,
@@ -105,10 +105,10 @@ public sealed class JobGraphStore(StudioDatabase database)
             var steps = DefaultSteps();
             var graph = WorkflowGraphEngine.FromSteps(steps);
             var states = Statuses(c, tx, job);
-            var activityRows = new Dictionary<string, (Guid Id, string? AssignedTo)>();
-            using (var activities = Command(c, tx, "select workflow_node_id,id,assigned_to from studio_job_activities where job_id=$1 and workflow_node_id is not null", job))
+            var activityRows = new Dictionary<string, (Guid Id, string? AssignedTo, DateTimeOffset? StartedAtUtc)>();
+            using (var activities = Command(c, tx, "select workflow_node_id,id,assigned_to,started_at_utc from studio_job_activities where job_id=$1 and workflow_node_id is not null", job))
             using (var reader = activities.ExecuteReader())
-                while (reader.Read()) activityRows[reader.GetString(0)] = (reader.GetGuid(1), reader.IsDBNull(2) ? null : reader.GetString(2));
+                while (reader.Read()) activityRows[reader.GetString(0)] = (reader.GetGuid(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? (DateTimeOffset?)null : reader.GetFieldValue<DateTimeOffset>(3));
             foreach (var step in steps) if (!states.ContainsKey(step.Key)) states[step.Key] = "NotStarted";
             var evaluation = WorkflowGraphEngine.Evaluate(graph, states, new HashSet<Guid>());
             var flat = WorkflowGraphEngine.Flatten(graph).Nodes.ToDictionary(n => n.Id);
@@ -117,7 +117,7 @@ public sealed class JobGraphStore(StudioDatabase database)
             {
                 var state = evaluationStates[step.Key]; var activity = activityRows.GetValueOrDefault(step.Key);
                 return new GraphTask(activity.Id, step.Key, step.Title, states[step.Key], activity.AssignedTo, null, state.Status,
-                    state.Dependencies, false, state.Reason, state.Dependencies.Select(id => flat[id].Label).ToArray(), step.ActivityType);
+                    state.Dependencies, false, state.Reason, state.Dependencies.Select(id => flat[id].Label).ToArray(), step.ActivityType, activity.StartedAtUtc);
             }).ToArray();
             tx.Commit();
             return new(job, template, version, revision, graph, evaluation, tasks, []);
@@ -127,8 +127,8 @@ public sealed class JobGraphStore(StudioDatabase database)
         var customGraph = Graph(definition); var customEvaluation = WorkflowGraphEngine.Evaluate(customGraph, Statuses(c, tx, job), Services(c, tx, job));
         var nodes = WorkflowGraphEngine.Flatten(customGraph).Nodes.ToDictionary(n => n.Id); var statesById = customEvaluation.Nodes.ToDictionary(n => n.Id);
         var customTasks = new List<GraphTask>();
-        using (var q = Command(c, tx, "select id,workflow_node_id,title,status,assigned_to,optional_step,blocked_reason,activity_type from studio_job_activities where job_id=$1 and workflow_node_id is not null order by step_order", job))
-        { using var r = q.ExecuteReader(); while (r.Read()) { var id = r.GetString(1); var state = statesById[id]; customTasks.Add(new(r.GetGuid(0), id, r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), nodes[id].Role, state.Status, state.Dependencies, r.GetBoolean(5), r.IsDBNull(6) ? state.Reason : r.GetString(6), state.Dependencies.Select(p=>nodes[p].Label).ToArray(), r.GetString(7))); } }
+        using (var q = Command(c, tx, "select id,workflow_node_id,title,status,assigned_to,optional_step,blocked_reason,activity_type,started_at_utc from studio_job_activities where job_id=$1 and workflow_node_id is not null order by step_order", job))
+        { using var r = q.ExecuteReader(); while (r.Read()) { var id = r.GetString(1); var state = statesById[id]; customTasks.Add(new(r.GetGuid(0), id, r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), nodes[id].Role, state.Status, state.Dependencies, r.GetBoolean(5), r.IsDBNull(6) ? state.Reason : r.GetString(6), state.Dependencies.Select(p=>nodes[p].Label).ToArray(), r.GetString(7), r.IsDBNull(8) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(8))); } }
         var history = new List<object>();
         using (var q = Command(c, tx, "select title,status,assigned_to,completed_at_utc from studio_job_activities where job_id=$1 and workflow_node_id is null and template_step_key is not null and work_order_id is null order by created_at_utc", job))
         { using var r = q.ExecuteReader(); while (r.Read()) history.Add(new { title = r.GetString(0), status = r.GetString(1), assignedTo = r.IsDBNull(2) ? null : r.GetString(2), completedAtUtc = r.IsDBNull(3) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(3) }); }
