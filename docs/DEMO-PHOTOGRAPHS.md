@@ -1,34 +1,9 @@
-# Studio demo photograph catalogue
+# Studio demo photographs
 
-Aegis.Studio demonstration data uses real photographs. It does not generate synthetic photographs.
+Demo generation uses only the local Kratos demo photo library at `/var/lib/aegis-studio/demo-photos` (or the path configured by `AEGIS_STUDIO_DEMO_PHOTOS`). It makes no online image requests.
 
-The demo loader downloads a curated set of photographs from Wikimedia Commons and stores them through Common.Storage. The original Commons file URL is retained in storage metadata (DemoSourceUrl) so provenance remains available after seeding.
+The supplied Bryan's Photo Studios presentation photographs are copied from the demo-library ZIP into category folders: people, wedding, graduation, family, sports, and product. The seed selects from the matching folder and reuses those source photos as needed to populate the larger demo galleries. Each demo asset remains a separate Studio media record and storage object.
 
-Only photographs verified as CC0 or public domain are included in the curated catalogue.
+Before deleting or recreating demo records, Studio validates the image files and confirms each required category has at least one usable local image. If a category is missing or empty, generation stops with an actionable error and leaves the existing demo data intact.
 
-| Demo use | Wikimedia Commons file | Rights used by demo |
-| --- | --- | --- |
-| Graduation / school | Graduating pupils.jpg | CC0 |
-| Graduation / school | Graduating Students (GN11751).jpg | CC0 |
-| Graduation / school | Graduation pictures.jpg | CC0 |
-| Graduation / school | Ceremony graduation.jpg | CC0 |
-| Corporate / ID | Headshot.Corporate.2023.jpg | CC0 |
-| Corporate / ID | Woman (headshot).jpg | Public domain release |
-| Family / baby | Parents and their baby.jpg | CC0 |
-| Newborn | New born baby with father.jpg | CC0 |
-| Sports / groups | Team picture time.jpg | CC0 |
-| Product / commercial | Product photo.jpg | CC0 |
-| Wedding | People at Wedding ceremony.jpg | CC0 |
-| Wedding | A group picture together with the groom at Wedding ceremony.jpg | CC0 |
-| Family portrait | Family portrait.jpg | U.S. federal government public domain |
-
-The existing Carter Wedding catalogue also uses Wikimedia Commons photographs and records the Commons source URL in Common.Storage metadata.
-
-## Seed behavior
-
-The full demo adds 27 interconnected jobs and over 1,000 media records so Media, Subjects, production queues, dashboards and counts behave like a working studio. The loader downloads a limited curated set of real source photographs and caches the downloaded source bytes. Each asset version receives its own Common.Storage object and path; JPEG derivatives are constrained to 1200 pixels to keep the demo manageable.
-
-This is intentional demo-data behavior. The records are distinct Studio assets, while the source photographs are a reusable licensed demonstration corpus.
-
-Do not replace these photographs with AI-generated, procedurally generated or placeholder imagery.
-
+The nine supplied photographs are approved for Studio demo-seed use. Do not republish them outside that demo context without the rights holder's permission.

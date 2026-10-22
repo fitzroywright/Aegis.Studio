@@ -7,7 +7,7 @@ namespace Aegis.Studio.Web.Tests;
 public sealed class DemoImageTests
 {
     [Fact]
-    public void EveryDemoGalleryFitsTheSmallerFlagFreeSourceCatalogue()
+    public void EveryDemoGalleryUsesTheLocalPhotoLibrary()
     {
         Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoFullStudioData")!;
         var jobs=(System.Collections.IEnumerable)seed.GetField("Jobs",BindingFlags.NonPublic|BindingFlags.Static)!.GetValue(null)!;
@@ -15,36 +15,26 @@ public sealed class DemoImageTests
         var source=seed.GetMethod("PortraitSource",BindingFlags.NonPublic|BindingFlags.Static)!;
         foreach(var job in jobs)
         {
-            int assets=(int)count.Invoke(null,new[]{job})!;
-            Assert.True(assets>=40);
-            for(int i=0;i<assets;i++)
-            {
-                string? url=(string?)source.Invoke(null,new object[]{job,i});
-                if(url is not null)Assert.Contains(DemoPortraitCatalogue.Photos,p=>p.Url==url);
-            }
+            Assert.True((int)count.Invoke(null,new[]{job})! >= 40);
+            Assert.Null(source.Invoke(null,new object[]{job,0}));
         }
     }
 
     [Fact]
-    public void DemoPhotosUseFreeSyntheticPortraitsAndContextualWikimediaSources()
+    public void DemoPhotoCategoriesMatchTheInstalledLocalLibrary()
     {
         Type seed=typeof(DemoDataEndpoints).Assembly.GetType("Aegis.Studio.Web.Operations.DemoDataExpansion")!;
-        FieldInfo catalogue=seed.GetField("realPhotoUrls",BindingFlags.NonPublic|BindingFlags.Static)!;
-        string[] urls=(string[])catalogue.GetValue(null)!;
-
-        Assert.True(urls.Length>=10);
-        Assert.All(urls,url=>{
-            Assert.StartsWith("https://commons.wikimedia.org/wiki/Special:Redirect/file/",url,StringComparison.Ordinal);
-            Assert.True(url.EndsWith(".jpg",StringComparison.OrdinalIgnoreCase)||url.EndsWith(".png",StringComparison.OrdinalIgnoreCase));
-        });
         MethodInfo category=seed.GetMethod("PhotoCategory",BindingFlags.NonPublic|BindingFlags.Static)!;
         Assert.Equal("people",category.Invoke(null,new object?[]{"Corporate Headshots"}));
         Assert.Equal("people",category.Invoke(null,new object?[]{"Passport / Visa"}));
         Assert.Equal("people",category.Invoke(null,new object?[]{"Portrait"}));
         Assert.Equal("wedding",category.Invoke(null,new object?[]{"Wedding"}));
+        Assert.Equal("wedding",category.Invoke(null,new object?[]{"Engagement"}));
         Assert.Equal("graduation",category.Invoke(null,new object?[]{"Graduation"}));
-        string assetRoot=(string)seed.GetField("OpenPeopleAssetUrl",BindingFlags.NonPublic|BindingFlags.Static)!.GetRawConstantValue()!;
-        Assert.StartsWith("https://raw.githubusercontent.com/Prompt-Haus/OpenPeople/",assetRoot,StringComparison.Ordinal);
+        Assert.Equal("family",category.Invoke(null,new object?[]{"Newborn"}));
+        Assert.Equal("family",category.Invoke(null,new object?[]{"Family Portrait"}));
+        Assert.Equal("sports",category.Invoke(null,new object?[]{"Sports Team"}));
+        Assert.Equal("product",category.Invoke(null,new object?[]{"Commercial Campaign"}));
     }
     [Fact]
     public void DemoWorkerRoleStatusRulesFollowJobStages()

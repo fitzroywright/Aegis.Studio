@@ -14,7 +14,6 @@ if [[ -z "$photo_zip" || ! -f "$photo_zip" ]]; then
   exit 2
 fi
 command -v systemctl >/dev/null
-command -v curl >/dev/null
 command -v file >/dev/null
 command -v unzip >/dev/null
 
@@ -57,25 +56,6 @@ if [[ "$installed" -eq 0 ]]; then
   exit 1
 fi
 
-people_dir="$photo_root/people"
-install -d -o "$service_user" -g "$service_group" -m 0750 "$people_dir"
-for person in $(seq 1 100); do
-  destination="$people_dir/OpenPeople-P$(printf '%03d' "$person").jpg"
-  [[ -s "$destination" ]] && continue
-  url="$(printf 'https://raw.githubusercontent.com/Prompt-Haus/OpenPeople/main/openpeople/data/curated/P%03d/assets/studio_portrait.jpg' "$person")"
-  part="$destination.part"
-  echo "Downloading free demo portrait $person/100"
-  curl --fail --location --silent --show-error --retry 3 --connect-timeout 15 "$url" --output "$part"
-  mime="$(file --brief --mime-type "$part")"
-  size="$(stat -c '%s' "$part")"
-  if [[ "$mime" != image/* || "$size" -le 10000 ]]; then
-    rm -f "$part"
-    echo "OpenPeople portrait $person failed image validation." >&2
-    exit 1
-  fi
-  install -o "$service_user" -g "$service_group" -m 0640 "$part" "$destination"
-  rm -f "$part"
-done
 
 count="$(find "$photo_root" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | wc -l | xargs)"
-echo "Studio demo photo library ready: $photo_root ($count image files; includes supplied photos and up to 100 free OpenPeople portraits)."
+echo "Studio demo photo library ready: $photo_root ($count local image files). Demo generation uses only these installed photos."

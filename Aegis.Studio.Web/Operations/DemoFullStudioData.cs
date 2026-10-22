@@ -285,7 +285,7 @@ internal static class DemoFullStudioData
         int sourceCount=PhysicalSourceCount(job);
         for(int i=0;i<count;i++)
         {
-            report?.Invoke(new(32 + (int)(63 * (ordinal-1 + (double)i / count) / Jobs.Length), "Studio photographs", i, count, $"Job {ordinal}/{Jobs.Length}: {job.Title} — downloading and storing photo {i+1}/{count}."));
+            report?.Invoke(new(32 + (int)(63 * (ordinal-1 + (double)i / count) / Jobs.Length), "Studio photographs", i, count, $"Job {ordinal}/{Jobs.Length}: {job.Title} — loading and storing photo {i+1}/{count}."));
             string key=$"demo-full/{job.Number}/asset-{i+1:000}";
             Guid versionId=MediaId(64,job.Number,i);
             // Stable asset IDs and counts are independent of the smaller reviewed photograph set.
@@ -353,16 +353,8 @@ internal static class DemoFullStudioData
         job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase);
     private static string? PortraitSource(DemoJob job,int asset)
     {
-        // Use curated category photographs for these jobs rather than generic portraits.
-        if(job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)||
-           job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)||
-           job.Type.Contains("Product",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)||
-           job.Type.Contains("Family",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)||
-           job.Type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||
-           job.Type.Contains("Team",StringComparison.OrdinalIgnoreCase))return null;
-        if(!IsPortraitCorpus(job))return DemoPortraitCatalogue.Url(asset%DemoPortraitCatalogue.Photos.Count);
-        int offset=job.Number switch{106=>0,301=>180,303=>300,401=>400,_=>641+Array.FindIndex(Jobs.Where(j=>IsPortraitCorpus(j)&&j.Number is not(106 or 301 or 303 or 401)).ToArray(),j=>j.Number==job.Number)*8};
-        return DemoPortraitCatalogue.Url((offset+asset)%DemoPortraitCatalogue.Photos.Count);
+        // Demo photos are selected from the matching local Kratos library folder.
+        return null;
     }
 
     private static int PhysicalSourceCount(DemoJob job)

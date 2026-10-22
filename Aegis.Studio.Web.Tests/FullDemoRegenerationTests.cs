@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Workflow;
@@ -77,15 +76,17 @@ public class FullDemoRegenerationTests
         var storage=new LocalFileStorage(ctx.Root);
         using(var old=new MemoryStream([1,2,3]))await storage.StoreAsync(new("old-demo.txt",old,"text/plain","old-demo.txt","Admin"));
         Sql(ctx.Connection,"insert into studio_state(key,value,updated_at_utc) values('demo-job-workflow-graphs-v1','old',now()),('provider-contract','preserved',now())");
-        var cache=(ConcurrentDictionary<string,byte[]>)DemoType.GetField("weddingPhotoCache",BindingFlags.Static|BindingFlags.NonPublic)!.GetValue(null)!;
-        var original=cache.ToDictionary(x=>x.Key,x=>x.Value);
+        string? previousPhotoRoot=Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS");
+        string photoRoot=Path.Combine(Path.GetTempPath(),"aegis-demo-photo-library-"+Guid.NewGuid().ToString("N"));
         byte[] photo=await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory,"Fixtures","portrait.jpg"));
+        foreach(string category in new[]{"people","wedding","graduation","family","sports","product"})
+        {
+            string directory=Path.Combine(photoRoot,category);Directory.CreateDirectory(directory);
+            await File.WriteAllBytesAsync(Path.Combine(directory,"fixture.jpg"),photo);
+        }
+        Environment.SetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS",photoRoot);
         try
         {
-            // Reuse the genuine repository photo fixture to test the complete pipeline without network downloads.
-            foreach(var field in new[]{"realPhotoUrls","weddingPhotoUrls"})
-            foreach(var url in (string[])DemoType.GetField(field,BindingFlags.Static|BindingFlags.NonPublic)!.GetValue(null)!)cache[url]=photo;
-            foreach(var item in DemoPortraitCatalogue.Photos)cache[item.Url]=photo;
             var configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Storage:FactoryResetExclusiveRoot","true"}}).Build();
             if(tracked)
             {
@@ -119,7 +120,7 @@ public class FullDemoRegenerationTests
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_photographers"))>=4);
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_frontdesk_requests"))>0);
         }
-        finally{cache.Clear();foreach(var item in original)cache[item.Key]=item.Value;}
+        finally{Environment.SetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS",previousPhotoRoot);if(Directory.Exists(photoRoot))Directory.Delete(photoRoot,true);}
     }
     private class TestEnvironment(string root):IWebHostEnvironment
     {
