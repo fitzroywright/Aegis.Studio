@@ -24,6 +24,7 @@
     <None Update="Media/raw_preview.py;Media/raw-preview-requirements.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Demo/portrait-catalogue.json" />
     <EmbeddedResource Include="Workflow/WorkflowSchema.sql" />
+    <EmbeddedResource Include="Workers/WorkerSchema.sql" />
     <EmbeddedResource Include="Reminders/ClientReminders.sql" />
     <EmbeddedResource Include="Messaging/UnifiedMessagingSchema.sql" />
     <EmbeddedResource Include="Email/EmailAssociations.sql" />
