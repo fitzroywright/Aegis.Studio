@@ -53,13 +53,13 @@
  function drawSubflow(host,node,states){
   const expansion=host.querySelector('.jd-workflow-expansion');if(!expansion)return;
   const width=Math.max(240,host.clientWidth||760),hostRect=host.getBoundingClientRect();
-  const centerOf=selector=>{const rect=host.querySelector(selector)?.getBoundingClientRect();return rect?.width?rect.left-hostRect.left+rect.width/2:null;};
-  const center=centerOf('[data-expanded-stage]')??width/2,sx=centerOf('[data-endpoint="start"]')??center-70,ex=centerOf('[data-endpoint="end"]')??center+70;
-  const steps=(node.subflow.nodes||[]).filter(n=>!['Start','End'].includes(n.kind)),laneLeft=Math.min(sx,ex)+38,laneRight=Math.max(sx,ex)-38;
-  const gap=steps.length>1?Math.max(1,(laneRight-laneLeft)/(steps.length-1)):0,stepX=i=>steps.length>1?laneLeft+gap*i:(sx+ex)/2;
-  const firstX=steps.length?stepX(0):center,lastX=steps.length?stepX(steps.length-1):center,rowY=101,detour=Math.min(54,Math.max(24,(ex-sx)*.28)),left=sx-detour,right=ex+detour;
-  const incoming='M'+sx+' 24 V39 C'+sx+' 53 '+left+' 51 '+left+' 65 V84 C'+left+' 95 '+(left+6)+' '+rowY+' '+(left+18)+' '+rowY+' H'+(firstX-10);
-  const outgoing='M'+(lastX+10)+' '+rowY+' H'+(right-18)+' C'+(right-6)+' '+rowY+' '+right+' 95 '+right+' 84 V65 C'+right+' 51 '+ex+' 53 '+ex+' 39 V24';
+  const point=selector=>{const rect=host.querySelector(selector)?.getBoundingClientRect();return rect?.width?{x:rect.left-hostRect.left+rect.width/2,y:rect.top-hostRect.top+rect.height/2}:null;};
+  const center=point('[data-expanded-stage]')||{x:width/2,y:36},start=point('[data-endpoint="start"]')||{x:center.x-70,y:center.y},end=point('[data-endpoint="end"]')||{x:center.x+70,y:center.y};
+  const sx=start.x,sy=start.y,ex=end.x,ey=end.y,steps=(node.subflow.nodes||[]).filter(n=>!['Start','End'].includes(n.kind));
+  const laneLeft=Math.min(sx,ex)+38,laneRight=Math.max(sx,ex)-38,gap=steps.length>1?Math.max(1,(laneRight-laneLeft)/(steps.length-1)):0,stepX=i=>steps.length>1?laneLeft+gap*i:(sx+ex)/2;
+  const firstX=steps.length?stepX(0):center.x,lastX=steps.length?stepX(steps.length-1):center.x,rowY=Math.max(103,sy+66),detour=Math.min(54,Math.max(24,(ex-sx)*.28)),left=sx-detour,right=ex+detour;
+  const incoming='M'+sx+' '+(sy+12)+' V'+(sy+23)+' C'+sx+' '+(sy+38)+' '+left+' '+(rowY-16)+' '+left+' '+(rowY-16)+' V'+(rowY-12)+' Q'+left+' '+rowY+' '+(left+12)+' '+rowY+' H'+(firstX-10);
+  const outgoing='M'+(lastX+10)+' '+rowY+' H'+(right-12)+' Q'+right+' '+rowY+' '+right+' '+(rowY-12)+' V'+(ey+44)+' C'+right+' '+(ey+32)+' '+ex+' '+(ey+34)+' '+ex+' '+(ey+22)+' V'+(ey+12);
   const stepLinks=steps.slice(0,-1).map((_,i)=>'<path class="jd-subflow-route" d="M'+(stepX(i)+10)+' '+rowY+' H'+(stepX(i+1)-10)+'"/>').join('');
   const labels=steps.map((step,i)=>{const state=states.taskState(node.id+'/'+step.id),klass=state.toLowerCase(),x=stepX(i);return '<g class="jd-subflow-step '+klass+'" aria-label="'+esc(step.label)+' · '+state+'" transform="translate('+x+' '+rowY+')"><circle r="10"/><text class="jd-subflow-glyph" x="0" y="4" text-anchor="middle">'+icon(state)+'</text><text class="jd-subflow-label" x="0" y="28" text-anchor="middle">'+esc(step.label)+'</text></g>';}).join('');
   const marker='jd-subflow-arrow-'+String(node.id).replace(/[^a-zA-Z0-9_-]/g,'-');
