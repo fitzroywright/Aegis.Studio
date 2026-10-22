@@ -37,8 +37,7 @@ while IFS= read -r -d '' source; do
   case "$lower" in
     *wedding*|*engagement*) category=wedding ;;
     *graduation*|*school*) category=graduation ;;
-    *newborn*) category=newborn ;;
-    *family*) category=family ;;
+    *family*|*newborn*) category=family ;;
     *corporate*) category=people ;;
     *sport*|*athlete*|*team*) category=sports ;;
     *product*|*commercial*) category=product ;;
