@@ -10,7 +10,7 @@ internal static partial class DemoDataExpansion
     private sealed record PhotoInput(string Url, string Source, string License, string Page);
     private static readonly string inputDirectory = Path.Combine(Path.GetTempPath(), "aegis-studio-photo-inputs");
 
-    private static readonly string aiPhotoRoot = Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_AI_PHOTOS") ?? "/var/lib/aegis-studio/demo-ai-photos";
+    private static readonly string aiPhotoRoot = Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_AI_PHOTOS") ?? Path.Combine(Path.GetTempPath(), "aegis-studio-demo-ai-photos");
     private const int OpenPeoplePhotoCount = 100;
     private const string OpenPeopleAssetUrl = "https://raw.githubusercontent.com/Prompt-Haus/OpenPeople/main/openpeople/data/curated/P{0:000}/assets/studio_portrait.jpg";
     private const string OpenPeoplePageUrl = "https://github.com/Prompt-Haus/OpenPeople";
