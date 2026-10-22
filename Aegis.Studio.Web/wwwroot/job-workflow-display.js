@@ -16,7 +16,7 @@
   host.innerHTML='<div class="jd-workflow-display" role="list" aria-label="Job workflow">'+items+'</div><div class="jd-workflow-expansion" hidden></div>';
   host.querySelectorAll('[data-stage]').forEach(button=>button.onclick=()=>{
    const id=button.dataset.stage,node=nodes.find(n=>n.id===id),expandable=node?.kind==='Subflow'&&Array.isArray(node.subflow?.nodes);
-   if(expandable){host.dataset.expanded=id;render(host,view,onSelect);drawSubflow(host,view,node,onSelect);return;}
+   if(expandable){host.dataset.expanded=id;render(host,view,onSelect);return;}
    delete host.dataset.expanded;render(host,view,onSelect);onSelect?.(id);
   });
   host.querySelectorAll('[data-collapse]').forEach(button=>button.onclick=()=>{delete host.dataset.expanded;render(host,view,onSelect);});
@@ -31,7 +31,7 @@
   const steps=node.subflow.nodes.filter(n=>!['Start','End'].includes(n.kind)),states=new Map((view.evaluation?.nodes||[]).map(n=>[n.id,n.status])),rowY=101;
   const left=Math.min(sx,ex)+38,right=Math.max(sx,ex)-38,gap=steps.length>1?Math.max(32,(right-left)/(steps.length-1)):0,first=steps.length>1?left:(sx+ex)/2;
   const stepX=i=>steps.length>1?first+i*gap:first;
-  const firstX=steps.length?stepX(0):center,lastX=steps.length?stepX(steps.length-1):center,marker='jd-subflow-arrow-'+Math.random().toString(36).slice(2);
+  const firstX=steps.length?stepX(0):center,lastX=steps.length?stepX(steps.length-1):center,marker='jd-subflow-arrow-'+String(node.id).replace(/[^a-zA-Z0-9_-]/g,'-');
   const incoming='M'+sx+' 24 V39 C'+sx+' 50 '+(sx-8)+' 54 '+(sx-20)+' 54 H'+(sx-38)+' C'+(sx-50)+' 54 '+(sx-54)+' 62 '+(sx-54)+' 74 V88 Q'+(sx-54)+' 98 '+(sx-42)+' 98 H'+(firstX-10);
   const outgoing='M'+(lastX+10)+' '+rowY+' H'+(ex+42)+' Q'+(ex+54)+' '+rowY+' '+(ex+54)+' 89 V73 Q'+(ex+54)+' 60 '+(ex+42)+' 60 H'+(ex+20)+' C'+(ex+8)+' 60 '+ex+' 52 '+ex+' 40 V24';
   const stageLinks=steps.slice(0,-1).map((_,i)=>'<path class="jd-subflow-route" d="M'+(stepX(i)+10)+' '+rowY+' H'+(stepX(i+1)-10)+'"/>').join('');
