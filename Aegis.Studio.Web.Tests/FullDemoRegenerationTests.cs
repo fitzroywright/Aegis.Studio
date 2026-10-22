@@ -47,6 +47,7 @@ public class FullDemoRegenerationTests
         new GlobalOperationalRoleStore(ctx.Database).EnsureSchema();
         new StudioEmployeeDirectoryStore(ctx.Database).EnsureSchema();
         Sql(ctx.Connection,"insert into studio_employees(user_name,display_name) values('kept.staff','Kept Staff')");
+        Sql(ctx.Connection,"insert into studio_worker_types(code,display_name,can_be_primary) values('CUSTOM_ROLE','Custom Role',false)");
         Sql(ctx.Connection,"insert into studio_state(key,value,updated_at_utc) values('demo-job-workflow-graphs-v1','seeded',now()),('provider-contract','preserved',now())");
         Sql(ctx.Connection,"create table studio_demo_seed_runs(run_id uuid primary key,status text)");
         Sql(ctx.Connection,"insert into studio_demo_seed_runs values($1,'Running'),($2,'Completed')",Guid.NewGuid(),Guid.NewGuid());
@@ -56,6 +57,7 @@ public class FullDemoRegenerationTests
         Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_state where key like 'demo-job-workflow-graphs-%'"));
         Assert.Equal("preserved",Scalar(ctx.Connection,"select value from studio_state where key='provider-contract'"));
         Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_employees where user_name='kept.staff'"));
+        Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_worker_types where code='CUSTOM_ROLE'"));
         Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_demo_seed_runs where status='Running'"));
         Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_demo_seed_runs where status='Completed'"));
     }
