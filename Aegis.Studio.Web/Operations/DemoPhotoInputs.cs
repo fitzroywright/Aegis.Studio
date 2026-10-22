@@ -21,7 +21,7 @@ internal static partial class DemoDataExpansion
         if (type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return "wedding";
         if (type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||type.Contains("School",StringComparison.OrdinalIgnoreCase)) return "graduation";
         if (type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)) return "family";
-        if (type.Contains("Family",StringComparison.OrdinalIgnoreCase)) return "family";
+        if (type.Contains("Family",StringComparison.OrdinalIgnoreCase)||type.Contains("Maternity",StringComparison.OrdinalIgnoreCase)) return "family";
         if (type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||type.Contains("Team",StringComparison.OrdinalIgnoreCase)) return "sports";
         if (type.Contains("Product",StringComparison.OrdinalIgnoreCase)||type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)||type.Contains("Campaign",StringComparison.OrdinalIgnoreCase)) return "product";
         return "people";
