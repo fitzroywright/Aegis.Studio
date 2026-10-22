@@ -11,6 +11,7 @@ internal static class DemoFullStudioData
     private sealed record DemoWorkspace(int Number,string Name);
     private sealed record DemoClient(int Number,string Name,string Email,string Phone);
     private sealed record DemoJob(int Number,int Workspace,int Client,string Title,string Status,int DayOffset,string Location,decimal Price,decimal Paid,string Photographer,string Type);
+    private sealed record DemoRoleAssignment(string Role,string Worker,string Responsibility,string Status);
 
     private static readonly DemoWorkspace[] Workspaces =
     [
@@ -119,6 +120,7 @@ internal static class DemoFullStudioData
                 "insert into studio_jobs(id,workspace_id,conversation_id,title,client_name,status,event_date,created_at_utc,assigned_to,job_lead,client_id) values($1,$2,$3,$4,$5,$6,$7,now()-($8 || ' days')::interval,$9,$9,$10) on conflict(id) do update set workspace_id=excluded.workspace_id,conversation_id=excluded.conversation_id,title=excluded.title,client_name=excluded.client_name,status=excluded.status,event_date=excluded.event_date,assigned_to=excluded.assigned_to,job_lead=excluded.job_lead,client_id=excluded.client_id",
                 jobId,workspaceId,conversationId,job.Title,client.Name,NormalizeStatus(job.Status),DateOnly.FromDateTime(start.UtcDateTime),Math.Abs(job.DayOffset)+5,job.Photographer,clientId);
 
+            SeedJobRoleAssignments(connection,transaction,job,jobId,start,end,ordinal);
             Execute(connection,transaction,"update studio_conversations set job_id=$2 where id=$1",conversationId,jobId);
 
             SeedConversation(connection,transaction,job,client,conversationId,ordinal);
@@ -151,6 +153,17 @@ internal static class DemoFullStudioData
             ("demo.anna","Anna Clarke","PartTime",new[]{"Newborn","School","Events"}),
             ("demo.michael","Michael Grant","Contractor",new[]{"Commercial","Corporate","Events"})
         };
+        var roleTypes=new[]
+        {
+            ("PHOTOGRAPHER","Photographer",true),
+            ("EDITOR","Editor",false),
+            ("RETOUCHER","Retoucher",false),
+            ("REVIEWER","Reviewer",false),
+            ("DELIVERY","Delivery",false)
+        };
+        foreach(var role in roleTypes)
+            Execute(c,tx,"insert into studio_worker_types(code,display_name,can_be_primary,is_active,updated_at_utc) values($1,$2,$3,true,now()) on conflict(code) do nothing",role.Item1,role.Item2,role.Item3);
+
         int i=0;
         foreach(var p in people)
         {
@@ -159,6 +172,17 @@ internal static class DemoFullStudioData
             Execute(c,tx,"insert into studio_schedule_resources(id,name,resource_type,is_active,notes,created_at_utc) values($1,$2,'Staff',true,'DEMO photographer',now()) on conflict(id) do update set name=excluded.name,is_active=true",resource,p.Item2);
             Execute(c,tx,"insert into studio_photographers(user_name,display_name,employment_type,is_active,skills,default_equipment_notes,schedule_resource_id,created_at_utc,updated_at_utc) values($1,$2,$3,true,$4,'DEMO kit', $5,now(),now()) on conflict(user_name) do update set display_name=excluded.display_name,employment_type=excluded.employment_type,is_active=true,skills=excluded.skills,schedule_resource_id=excluded.schedule_resource_id,updated_at_utc=now()",p.Item1,p.Item2,p.Item3,p.Item4,resource);
         }
+
+        Execute(c,tx,"insert into studio_workers(user_name,display_name,worker_type_code,is_active,updated_at_utc) select user_name,display_name,'PHOTOGRAPHER',is_active,now() from studio_photographers where user_name like 'demo.%' on conflict(user_name) do update set display_name=excluded.display_name,worker_type_code=excluded.worker_type_code,is_active=excluded.is_active,updated_at_utc=now()");
+        var supportWorkers=new[]
+        {
+            ("demo.editor","Demo Editor","EDITOR"),
+            ("demo.retoucher","Demo Retoucher","RETOUCHER"),
+            ("demo.reviewer","Demo Reviewer","REVIEWER"),
+            ("demo.delivery","Demo Delivery","DELIVERY")
+        };
+        foreach(var worker in supportWorkers)
+            Execute(c,tx,"insert into studio_workers(user_name,display_name,worker_type_code,is_active,updated_at_utc) values($1,$2,$3,true,now()) on conflict(user_name) do update set display_name=excluded.display_name,worker_type_code=excluded.worker_type_code,is_active=true,updated_at_utc=now()",worker.Item1,worker.Item2,worker.Item3);
 
         Execute(c,tx,"insert into studio_photographer_availability(id,user_name,starts_at_utc,ends_at_utc,availability_type,note,created_at_utc) values($1,'demo.anna',date_trunc('day',now())+interval '1 day',date_trunc('day',now())+interval '2 day','Unavailable','Day off',now()) on conflict(id) do nothing",Id(44,1));
         Execute(c,tx,"insert into studio_photographer_availability(id,user_name,starts_at_utc,ends_at_utc,availability_type,note,created_at_utc) values($1,'demo.jason',date_trunc('day',now())+interval '3 day 8 hours',date_trunc('day',now())+interval '3 day 13 hours','Unavailable','External assignment',now()) on conflict(id) do nothing",Id(44,2));
@@ -175,6 +199,55 @@ internal static class DemoFullStudioData
         };
         foreach(var r in resources)
             Execute(c,tx,"insert into studio_schedule_resources(id,name,resource_type,is_active,notes,created_at_utc) values($1,$2,$3,true,$4,now()) on conflict(id) do update set name=excluded.name,resource_type=excluded.resource_type,is_active=true,notes=excluded.notes",Id(43,r.Item1),r.Item2,r.Item3,r.Item4);
+    }
+
+    private static void SeedJobRoleAssignments(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,DateTimeOffset start,DateTimeOffset end,int ordinal)
+    {
+        string stage=NormalizeStatus(job.Status);
+        var roles=new List<DemoRoleAssignment>
+        {
+            new("PHOTOGRAPHER",job.Photographer,"Primary photographer",RoleStatus(job,"PHOTOGRAPHER",stage,ordinal))
+        };
+        bool cancelled=job.Status.Equals("Cancelled",StringComparison.OrdinalIgnoreCase);
+        if(!cancelled)
+        {
+            roles.Add(new("EDITOR","demo.editor","Prepare and edit the selected images",RoleStatus(job,"EDITOR",stage,ordinal)));
+            if(ordinal%2==0 || stage is "In Production" or "Changes Requested" or "Needs Review" or "Ready for Client")
+                roles.Add(new("RETOUCHER","demo.retoucher","Retouch selected images",RoleStatus(job,"RETOUCHER",stage,ordinal)));
+            if(ordinal%3!=0 || stage is "Needs Review" or "Ready for Client" or "Completed")
+                roles.Add(new("REVIEWER","demo.reviewer","Review production quality",RoleStatus(job,"REVIEWER",stage,ordinal)));
+            if(ordinal%4==0 || job.Status is "Printing" or "Ready for Delivery" or "Completed")
+                roles.Add(new("DELIVERY","demo.delivery","Prepare and hand off the finished order",RoleStatus(job,"DELIVERY",stage,ordinal)));
+        }
+
+        // Replace demo-owned assignments while preserving one primary assignment per seeded job.
+        Execute(c,tx,"update studio_job_worker_assignments set is_primary=false,updated_at_utc=now() where job_id=$1",jobId);
+        for(int index=0;index<roles.Count;index++)
+        {
+            var role=roles[index];
+            string status=role.Status;
+            DateTimeOffset? accepted=status is "Accepted" or "Completed" ? start.AddHours(-1) : null;
+            DateTimeOffset? completed=status=="Completed" ? end : null;
+            DateTimeOffset? starts=index==0?start:null;
+            DateTimeOffset? ends=index==0?end:null;
+            Execute(c,tx,"insert into studio_job_worker_assignments(id,job_id,worker_user_name,worker_type_code,responsibility,is_primary,status,starts_at_utc,ends_at_utc,accepted_at_utc,completed_at_utc,created_at_utc,updated_at_utc) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now()) on conflict(id) do update set worker_user_name=excluded.worker_user_name,worker_type_code=excluded.worker_type_code,responsibility=excluded.responsibility,is_primary=excluded.is_primary,status=excluded.status,starts_at_utc=excluded.starts_at_utc,ends_at_utc=excluded.ends_at_utc,accepted_at_utc=excluded.accepted_at_utc,completed_at_utc=excluded.completed_at_utc,updated_at_utc=now()",
+                Id(74,job.Number*10+index),jobId,role.Worker,role.Role,role.Responsibility,index==0,status,(object?)starts??DBNull.Value,(object?)ends??DBNull.Value,(object?)accepted??DBNull.Value,(object?)completed??DBNull.Value);
+        }
+    }
+
+    private static string RoleStatus(DemoJob job,string role,string stage,int ordinal)
+    {
+        if(job.Status.Equals("Cancelled",StringComparison.OrdinalIgnoreCase))return "Cancelled";
+        if(job.Status.Equals("Completed",StringComparison.OrdinalIgnoreCase))return "Completed";
+        return role switch
+        {
+            "PHOTOGRAPHER" => job.DayOffset < 0 ? "Completed" : ordinal%2==0 ? "Accepted" : "Assigned",
+            "EDITOR" => stage is "In Production" or "Changes Requested" or "Needs Review" or "Ready for Client" ? "Accepted" : "Assigned",
+            "RETOUCHER" => stage is "Needs Review" or "Ready for Client" ? "Completed" : ordinal%2==0 ? "Accepted" : "Assigned",
+            "REVIEWER" => stage is "In Production" or "Needs Review" or "Ready for Client" ? "Accepted" : "Assigned",
+            "DELIVERY" => stage is "Ready for Client" ? "Accepted" : stage is "In Production" && job.Status=="Printing" ? "Accepted" : "Assigned",
+            _ => "Assigned"
+        };
     }
 
     private static void SeedSubjectsAndCollections(NpgsqlConnection c,NpgsqlTransaction tx,DemoJob job,Guid jobId,int ordinal,DateTimeOffset scheduled)
