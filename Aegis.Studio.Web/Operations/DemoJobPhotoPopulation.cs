@@ -35,7 +35,7 @@ internal static class DemoJobPhotoPopulation
             {
                 report?.Invoke(new(96+3*ordinal/Math.Max(1,jobs.Count),"Photos for every job",ordinal,jobs.Count,$"Job {ordinal+1}/{jobs.Count}: checking people photograph {photo+1}/{target}."));
                 string key=$"demo-people/{photo+1:000}";
-                DemoDataExpansion.AddImage(connection,transaction,versions,job,key,Id(job,key+"/version"),1,photo,null,login,sourceUrl:DemoPortraitCatalogue.Url(photo%DemoPortraitCatalogue.Photos.Count),searchTerm:"portrait");
+                DemoDataExpansion.AddImage(connection,transaction,versions,job,key,Id(job,key+"/version"),1,photo,null,login,searchTerm:"portrait");
                 Guid asset=Id(job,key+"/asset");
                 Execute(connection,transaction,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status) values($1,$2,$2,$3,'Needs Sorting') on conflict(job_id,asset_key) do nothing",asset,job,key);
                 Execute(connection,transaction,"insert into studio_job_asset_collections(job_id,asset_key,collection_name) values($1,$2,'Unclassified') on conflict do nothing",job,key);
