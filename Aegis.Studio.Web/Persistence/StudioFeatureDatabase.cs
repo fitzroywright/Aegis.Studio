@@ -160,7 +160,13 @@ public sealed class StudioFeatureDatabase
             alter table studio_outbound_email add column if not exists lease_until_utc timestamptz;
             """;
 
-        await using NpgsqlCommand command = dataSource.CreateCommand(sql + Aegis.Studio.Web.Operations.JobWorkspaceParticipation.Schema);
+        using Stream? workerSchemaStream = typeof(StudioFeatureDatabase).Assembly.GetManifestResourceStream("Aegis.Studio.Web.Workers.WorkerSchema.sql")
+            ?? throw new InvalidOperationException("Worker schema migration resource missing.");
+        using var workerSchemaReader = new StreamReader(workerSchemaStream);
+        string workerSchema = await workerSchemaReader.ReadToEndAsync(cancellationToken);
+
+        await using NpgsqlCommand command = dataSource.CreateCommand(
+            sql + Aegis.Studio.Web.Operations.JobWorkspaceParticipation.Schema + workerSchema);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }
