@@ -18,7 +18,7 @@
   host.dataset.state=complete?'completed':current?.status==='Blocked'?'blocked':current?'ready':'waiting';
   const label=complete?'Workflow Complete':'Next Required Action';
   const detail=complete?'All configured workflow tasks are complete.':task?[current.status==='Blocked'?'Blocked: '+(task.reason||'A prerequisite must be resolved.'):task.reason,task.assignedTo?'Assigned to '+task.assignedTo:null,task.role?'Role: '+task.role:null].filter(Boolean).join(' · '):'No active task is available in this workflow.';
-  host.innerHTML='<div class="jd-next-step-copy"><p><strong>'+label+'</strong> · '+escape(detail)+'</p></div>'+(current?'<button type="button" class="jd-link jd-next-step-action-link" data-next-step-action>'+escape(task.title)+' <span aria-hidden="true">→</span></button>':'');
+  host.innerHTML='<div class="jd-next-step-copy"><p><strong>'+label+'</strong> · '+escape(detail)+'</p></div>'+(current?'<button type="button" class="jd-link jd-next-step-action-link" data-next-step-action>'+escape(task.description||task.title)+' <span aria-hidden="true">→</span></button>':'');
   host.querySelector('[data-next-step-action]')?.addEventListener('click',()=>activate(current.nodeId));
  }
  async function media(job,host,selectedHost,isCurrent,onCounts){
