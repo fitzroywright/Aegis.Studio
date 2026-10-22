@@ -253,7 +253,7 @@ async function openPipelineMove(jobId){
     };
 }
 async function advancePipelineJob(jobId){
-    return window.StudioJobGraph.open(jobId);
+    return window.StudioJobGraph.launchTask(jobId);
 }
 function installPipelineDrag(entries,tasks){
     const scheduleMap=new Map(entries.map(item=>[item.id,item])),taskMap=new Map(tasks.map(item=>[item.id,item]));
