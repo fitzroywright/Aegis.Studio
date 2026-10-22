@@ -352,8 +352,10 @@ function mergeJobMessages(teamMessages, clientMessages) {
             };
             const refreshWorkflow=async()=>{
                 const request=++workflowRequest;
+                const controller=new AbortController();
+                const timeout=setTimeout(()=>controller.abort(),20000);
                 try{
-                    const graphView=await json('/api/jobs/'+job.id+'/workflow-graph');
+                    const graphView=await json('/api/jobs/'+job.id+'/workflow-graph',{signal:controller.signal});
                     if(!current()||request!==workflowRequest)return;
                     workflow=graphView;
                     const action=window.StudioJobDetails.workflowAction(graphView),task=action?.task;
@@ -377,14 +379,23 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     updateAge();
                 }catch(error){
                     if(current()&&request===workflowRequest){
+                        const message=error?.name==='AbortError'?'Workflow request timed out after 20 seconds.':error?.message||String(error);
                         console.error('[Studio Job Details] Failed to load workflow graph for job '+job.id,error);
                         const nextStep=header.querySelector('.jd-next-step');
                         StudioJobDetails.nextStep(nextStep,null,()=>refreshWorkflow());
-                        nextStep.querySelector('.jd-next-step-copy p').textContent='Workflow graph could not be loaded: '+(error?.message||String(error));
+                        nextStep.querySelector('.jd-next-step-copy p').textContent='Workflow graph could not be loaded: '+message;
                         header.querySelector('[data-stage-age]').textContent='Workflow unavailable';
-                        header.querySelector('.jd-attention-items').replaceChildren();
+                        const attentionItems=header.querySelector('.jd-attention-items');
+                        attentionItems.replaceChildren();
+                        const status=document.createElement('p');
+                        status.setAttribute('role','status');
+                        status.textContent='Workflow unavailable: '+message;
+                        attentionItems.append(status);
+                        const retry=header.querySelector('[data-view-workflow]');
+                        retry.textContent='Retry workflow →';
+                        retry.onclick=()=>refreshWorkflow();
                     }
-                }
+                }finally{clearTimeout(timeout);}
             };
                         // No detached panel retains a running clock.
             const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);
