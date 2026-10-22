@@ -65,6 +65,7 @@ body[data-studio-view="schedule"] .studio-context-rail [data-rail-card="workspac
 .st-pipeline-content .pipeline-filters{margin-inline:-8px}
 @media(max-width:1100px){.st-pipeline-content .pipeline-calendar-toolbar{flex-wrap:wrap}.st-pipeline-content .pipeline-toolbar-left{flex-wrap:wrap}:is(.ps-page,.st-pipeline-content,.pp-page) :is(.ps-filters,.pipeline-filters,.pp-filters){flex-wrap:wrap;gap:8px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-filter{flex:1 1 200px}:is(.ps-page,.st-pipeline-content,.pp-page) .ps-header-search{flex:1 1 260px}}
 
+.ps-heading{display:flex;flex-direction:column;gap:3px;padding:10px 12px 4px}.ps-heading h1{margin:0;color:#142f49;font-size:24px;line-height:1.2}.ps-heading p{margin:0;color:#5c6874;font-size:11px;line-height:1.45}
 .ps-role-filter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#fff;border-bottom:1px solid #dfe3e8}
 .ps-role-filter button{min-height:31px;padding:5px 14px;border:1px solid #dedbd8;border-radius:999px;background:#fff;color:#26394b;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer}
 .ps-role-filter button.active{background:#986c55;border-color:#986c55;color:#fff;box-shadow:0 1px 2px #422d201f}
