@@ -249,9 +249,7 @@ async function openPipelineMove(jobId){
     return openWorkspaceJob(jobId);
 }
 async function advancePipelineJob(jobId){
-    // Stages depend on the job's workflow; there is no direct status write from Pipeline.
-    if(window.StudioWorkflow?.open)return StudioWorkflow.open(jobId);
-    return openWorkspaceJob(jobId);
+    return window.StudioJobGraph.open(jobId);
 }
 function installPipelineDrag(entries,tasks){
     const scheduleMap=new Map(entries.map(item=>[item.id,item])),taskMap=new Map(tasks.map(item=>[item.id,item]));
