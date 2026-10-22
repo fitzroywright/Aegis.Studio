@@ -36,7 +36,9 @@ internal static class ConnectedWorkflowDemo
             "studio_workflow_thresholds","studio_workflow_audiences",
             "studio_workflow_migrations","studio_global_operational_roles",
             "studio_global_operational_role_members","studio_global_operational_role_permissions",
-            "studio_directory_group_roles","studio_security_roles","studio_demo_seed_runs"
+            "studio_directory_group_roles","studio_security_roles","studio_demo_seed_runs",
+            // Job roles are configurable application data required before worker seeding.
+            "studio_worker_types"
         };
         string schema;
         using(var current=new NpgsqlCommand("select current_schema()",c,tx))schema=(string)current.ExecuteScalar()!;
