@@ -11,15 +11,11 @@
   const current=open.find(x=>x.status==='InProgress')||open.find(x=>x.status==='Available')||open[0]||null;
   return current?{nodeId:current.id,task:current.task,status:current.status}:null;
  }
- function nextStep(host,view,activate){
+ function nextActionLink(host,view,activate){
   if(!host)return;
-  if(!view){host.dataset.state='unavailable';host.innerHTML='<div class="jd-next-step-copy"><p><strong>Next Required Action</strong> · Workflow could not be loaded.</p></div><button type="button" class="action" data-next-step-action>Retry workflow</button>';host.querySelector('button').onclick=()=>activate(null);return;}
-  const current=workflowAction(view),task=current?.task,complete=(view.tasks||[]).length>0&&!current;
-  host.dataset.state=complete?'completed':current?.status==='Blocked'?'blocked':current?'ready':'waiting';
-  const label=complete?'Workflow Complete':'Next Required Action';
-  const detail=complete?'All configured workflow tasks are complete.':task?[current.status==='Blocked'?'Blocked: '+(task.reason||'A prerequisite must be resolved.'):task.reason,task.assignedTo?'Assigned to '+task.assignedTo:null,task.role?'Role: '+task.role:null].filter(Boolean).join(' · '):'No active task is available in this workflow.';
-  host.innerHTML='<div class="jd-next-step-copy"><p><strong>'+label+'</strong> · '+escape(detail)+'</p></div>'+(current?'<button type="button" class="jd-link jd-next-step-action-link" data-next-step-action>'+escape(task.description||task.title)+' <span aria-hidden="true">→</span></button>':'');
-  host.querySelector('[data-next-step-action]')?.addEventListener('click',()=>activate(current.nodeId));
+  const current=workflowAction(view),task=current?.task;
+  host.innerHTML=current?'<button type="button" class="jd-link jd-next-action-link" data-next-action>'+escape(task.description||task.title)+' <span aria-hidden="true">→</span></button>':'';
+  host.querySelector('[data-next-action]')?.addEventListener('click',()=>activate(current.nodeId));
  }
  async function media(job,host,selectedHost,isCurrent,onCounts){
   let disposed=false,request=0,selectedId='',data=null,canEdit=false,uploading=false,search='',list=false;
@@ -169,6 +165,6 @@
   host.studioJobMedia?.dispose();host.studioJobMedia=controller;
   await load();return controller;
  }
- root.StudioJobDetails={media,nextStep,workflowAction};
+ root.StudioJobDetails={media,nextActionLink,workflowAction};
 })(window);
 
