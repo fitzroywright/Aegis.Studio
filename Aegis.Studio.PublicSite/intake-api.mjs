@@ -47,7 +47,7 @@ export function createIntakeApi(env,readBody,json) {
   }
   return {store,async handle(req,res,url){
     const route=url.pathname, method=req.method;
-    const keyCollection='/api/public-site/v1/admin/integration-keys',keyItem=route.match(/^\\/api\\/public-site\\/v1\\/admin\\/integration-keys\\/([0-9a-f-]{36})$/i);
+    const keyCollection='/api/public-site/v1/admin/integration-keys',keyItem=route.match(/^\/api\/public-site\/v1\/admin\/integration-keys\/([0-9a-f-]{36})$/i);
     if(route===keyCollection&&['GET','POST'].includes(method)){
       authenticateProvisioning(req);
       if(method==='GET'){json(res,200,{items:store.listApiCredentials()});return true;}
@@ -56,6 +56,15 @@ export function createIntakeApi(env,readBody,json) {
     if(keyItem&&method==='DELETE'){
       authenticateProvisioning(req);if(!store.revokeApiCredential(keyItem[1]))fail(404,'not_found','Integration key not found.');
       json(res,200,{id:keyItem[1],status:'Revoked'});return true;
+    }
+    if(route==='/api/public-site/v1/admin/client-link-proofs'&&method==='POST'){
+      authenticateProvisioning(req);const p=await input(req,4096),proof=store.createClientLinkChallenge(p.clientId);
+      json(res,201,{id:proof.id,code:proof.code,expiresAt:proof.expiresAt},{'Cache-Control':'no-store'});return true;
+    }
+    const linkProof=route.match(/^\/api\/public-site\/v1\/admin\/client-link-proofs\/([0-9a-f-]{36})$/i);
+    if(linkProof&&method==='DELETE'){
+      authenticateProvisioning(req);const n=store.db.prepare('UPDATE client_link_challenges SET revoked_at=COALESCE(revoked_at,?) WHERE id=?').run(new Date().toISOString(),linkProof[1]);
+      if(!n.changes)fail(404,'not_found','Client link proof not found.');json(res,200,{id:linkProof[1],status:'Revoked'});return true;
     }
     if(route==='/api/intake-session'&&method==='GET'){
       const csrf=randomUUID();json(res,200,{csrf},{'Set-Cookie':`intake_csrf=${csrf}; Path=/; HttpOnly; SameSite=Strict${env.NODE_ENV==='production'?'; Secure':''}`});return true;
@@ -135,3 +144,4 @@ export function createIntakeApi(env,readBody,json) {
     fail(404,'not_found','Operation not found.');
   }};
 }
+
