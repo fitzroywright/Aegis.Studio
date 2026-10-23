@@ -15,12 +15,17 @@ export function createIntakeApi(env,readBody,json) {
   const rates=new Map();
   function authenticate(req,scope){
     const token=(req.headers.authorization||'').replace(/^Bearer /,'');
+    const managed=store.authenticateApiCredential(token,scope);if(managed)return managed;
     const c=credentials.find(x=>x.secret?.length>=32&&equal(token,x.secret));
     if(!c)fail(401,'unauthorized','A valid integration credential is required.');
     if(!Array.isArray(c.scopes)||!c.scopes.includes(scope))fail(403,'wrong_scope','Credential lacks the required scope.');
     const minute=Math.floor(Date.now()/60000),key=`${c.id}:${minute}`,n=(rates.get(key)||0)+1;rates.set(key,n);
     if(rates.size>2000)for(const k of rates.keys())if(!k.endsWith(`:${minute}`))rates.delete(k);
     if(n>120)fail(429,'rate_limited','Retry after the current minute.');return c.id;
+  }
+  function authenticateProvisioning(req){
+    const expected=env.PUBLIC_API_PROVISIONING_TOKEN||'',supplied=String(req.headers['x-site-provisioning-token']||'');
+    if(expected.length<32||!equal(supplied,expected))fail(401,'provisioning_unauthorized','Valid server-side provisioning credentials are required.');
   }
   async function input(req,limit){try{const p=JSON.parse((await readBody(req,limit)).toString('utf8'));if(!p||typeof p!=='object'||Array.isArray(p))fail(400,'invalid_json','A JSON object is required.');return p;}catch(e){if(e.status)throw e;fail(400,'invalid_json','Supply valid JSON.');}}
   async function sameOrigin(req,url){const origin=req.headers.origin;try{if(!origin||new URL(origin).host!==req.headers.host)throw Error();}catch{fail(403,'origin_rejected','Same-origin browser request required.');}
@@ -42,6 +47,16 @@ export function createIntakeApi(env,readBody,json) {
   }
   return {store,async handle(req,res,url){
     const route=url.pathname, method=req.method;
+    const keyCollection='/api/public-site/v1/admin/integration-keys',keyItem=route.match(/^\\/api\\/public-site\\/v1\\/admin\\/integration-keys\\/([0-9a-f-]{36})$/i);
+    if(route===keyCollection&&['GET','POST'].includes(method)){
+      authenticateProvisioning(req);
+      if(method==='GET'){json(res,200,{items:store.listApiCredentials()});return true;}
+      const p=await input(req,16384),created=store.createApiCredential(p.name,p.scopes);json(res,201,created);return true;
+    }
+    if(keyItem&&method==='DELETE'){
+      authenticateProvisioning(req);if(!store.revokeApiCredential(keyItem[1]))fail(404,'not_found','Integration key not found.');
+      json(res,200,{id:keyItem[1],status:'Revoked'});return true;
+    }
     if(route==='/api/intake-session'&&method==='GET'){
       const csrf=randomUUID();json(res,200,{csrf},{'Set-Cookie':`intake_csrf=${csrf}; Path=/; HttpOnly; SameSite=Strict${env.NODE_ENV==='production'?'; Secure':''}`});return true;
     }
