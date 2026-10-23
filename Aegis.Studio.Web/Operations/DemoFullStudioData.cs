@@ -275,7 +275,7 @@ internal static class DemoFullStudioData
 
     private static void SeedMedia(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,DemoJob job,Guid jobId,string login,int ordinal,Action<DemoSeedProgress>? report)
     {
-        int count=MediaCount(job);
+        int count=Math.Min(MediaCount(job),DemoDataExpansion.PhotoCount(job.Type));
         string[] statuses=["Needs Sorting","Needs Editing","Needs Review","Needs Approval","Ready","Ready for Production","Needs Print","Needs QC","Needs Delivery","Completed","Blocked","Needs Retake"];
         string[] collections=job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
             job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Roster","Stage","Groups","Unclassified"]:
@@ -290,7 +290,7 @@ internal static class DemoFullStudioData
             Guid versionId=MediaId(64,job.Number,i);
             // Stable asset IDs and counts are independent of the smaller reviewed photograph set.
             // Revisions preserve the same photograph and stable asset identity.
-            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount)+i*32,null,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
+            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,i,null,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
             if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,SelectPhotoVariant(job,i%sourceCount)+i*32,original,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
             Guid assetId=MediaId(65,job.Number,i);
             string status=statuses[(ordinal+i)%statuses.Length];
@@ -319,7 +319,7 @@ internal static class DemoFullStudioData
             401 => 241, // large roster
             _ => MinimumDemoImagesPerJob
         };
-        return Math.Max(MinimumDemoImagesPerJob, requested);
+        return requested;
     }
 
     private static int DemoSubjectCount(DemoJob job)
