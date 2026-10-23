@@ -54,13 +54,8 @@ public sealed class InboundEmailWorker : BackgroundService
                         graphEmail.Body,
                         graphEmail.ReceivedAtUtc,
                         graphEmail.FileAttachments.Select(a => new InboundEmailAttachment(a.FileName, a.ContentType, a.Content, a.IsInline)).ToList(), graphEmail.ProviderMessageId);
-                    string correlationId = email.MessageId;
-                    operationsFlows.TryEnqueueInbound(correlationId, "Mailbox");
-                    var result=await intake.ReceiveAsync(email,stoppingToken);
-                    operationsFlows.TryEnqueueInbound(correlationId,"Router",businessId:(result.ConversationId??result.ReviewId)?.ToString("D"),
-                        detail:result.Routed?"Associated":"Review",failed:!result.Routed);
-                    logger.LogInformation("Inbound email {MessageId}: routed {Routed}, conversation {ConversationId}, review {ReviewId}",
-                        email.MessageId,result.Routed,result.ConversationId,result.ReviewId);
+                    await RouteReceivedAsync(email, (received, token) => intake.ReceiveAsync(received, token),
+                        operationsFlows, logger, stoppingToken);
                 }
 
                 if (!string.IsNullOrWhiteSpace(batch.DeltaLink))
@@ -79,11 +74,46 @@ public sealed class InboundEmailWorker : BackgroundService
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Microsoft Graph email ingestion cycle failed.");
+                logger.LogError("Microsoft Graph email ingestion cycle failed. FailureType={FailureType}", exception.GetType().Name);
             }
 
             await Task.Delay(graphClient.PollInterval, stoppingToken);
         }
     }
+
+    internal static async Task<StudioEmailIntakeResult> RouteReceivedAsync(
+        InboundEmail email,
+        Func<InboundEmail, CancellationToken, Task<StudioEmailIntakeResult>> receive,
+        StudioOperationsFlowPublisher flows,
+        ILogger<InboundEmailWorker> log,
+        CancellationToken token)
+    {
+        // Explicit fields render in the default systemd console log, without requiring scopes.
+        // Never serialize the inbound envelope: it contains bodies, headers and attachment bytes.
+        log.LogInformation("Inbound email received from Microsoft Graph. MessageId={MessageId} ProviderMessageId={ProviderMessageId} CorrelationId={CorrelationId} Sender={Sender} Subject={Subject} ReceivedAtUtc={ReceivedAtUtc:O} AttachmentCount={AttachmentCount}",
+            email.MessageId, email.ProviderMessageId, email.MessageId, email.FromAddress,
+            email.Subject, email.ReceivedAt.ToUniversalTime(), email.FileAttachments.Count);
+        flows.TryEnqueueInbound(email.MessageId, "Mailbox");
+        StudioEmailIntakeResult result;
+        try
+        {
+            result = await receive(email, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (Exception exception)
+        {
+            flows.TryEnqueueInbound(email.MessageId, "Router", detail:exception.GetType().Name, failed:true);
+            log.LogError("Inbound email routing failed. MessageId={MessageId} ProviderMessageId={ProviderMessageId} CorrelationId={CorrelationId} FailureType={FailureType}",
+                email.MessageId, email.ProviderMessageId, email.MessageId, exception.GetType().Name);
+            throw;
+        }
+        flows.TryEnqueueInbound(email.MessageId, "Router", businessId:(result.ConversationId ?? result.ReviewId)?.ToString("D"),
+            detail:result.Routed ? "Associated" : "Review", failed:!result.Routed);
+        log.LogInformation("Inbound email routing completed. MessageId={MessageId} ProviderMessageId={ProviderMessageId} CorrelationId={CorrelationId} Routed={Routed} ConversationId={ConversationId} ReviewId={ReviewId} WasDuplicate={WasDuplicate}",
+            email.MessageId, email.ProviderMessageId, email.MessageId, result.Routed,
+            result.ConversationId, result.ReviewId, result.WasDuplicate);
+        return result;
+    }
 }
+
 

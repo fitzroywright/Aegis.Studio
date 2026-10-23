@@ -4,6 +4,7 @@
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Aegis.Studio.Web.Tests" />
     <ProjectReference Include="../Aegis.Studio.Application/Aegis.Studio.Application.csproj" />
     <ProjectReference Include="../Aegis.Studio.Domain/Aegis.Studio.Domain.csproj" />
     <ProjectReference Include="../Aegis.Studio.Infrastructure/Aegis.Studio.Infrastructure.csproj" />
@@ -82,6 +83,7 @@
            Text="Authentication plugin was not staged to $(PublishDir)plugins." />
   </Target>
 </Project>
+
 
 
 
