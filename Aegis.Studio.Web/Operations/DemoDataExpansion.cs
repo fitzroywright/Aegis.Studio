@@ -9,6 +9,12 @@ namespace Aegis.Studio.Web.Operations;
 internal static partial class DemoDataExpansion
 {
     internal static readonly int[] JobNumbers = [1,2,4,5,7,8];
+    private static string JobTitle(NpgsqlConnection connection,NpgsqlTransaction transaction,Guid job)
+    {
+        using var command=new NpgsqlCommand("select title from studio_jobs where id=$1",connection,transaction);
+        command.Parameters.AddWithValue(job);
+        return command.ExecuteScalar() as string ?? "Portrait";
+    }
     internal static Guid Id(int group,int number) => Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
 
     internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IFileStorage storage,Action<DemoSeedProgress>? report=null)
@@ -85,7 +91,7 @@ internal static partial class DemoDataExpansion
                     Execute(connection,transaction,"insert into studio_job_subjects(id,job_id,name,reference,notes,updated_by) values($1,$2,$3,$4,'Fictional demo subject',$5)",Id(25,number*10+subject),job,names[(index+subject)%names.Length],$"DEMO-{number}-{subject+1:00}",login);
             }
 
-            int assetCount=number==4?5:4;
+            int assetCount=Math.Min(number==4?5:4,PhotoCount(JobTitle(connection,transaction,job)));
             for(int asset=0;asset<assetCount;asset++)
             {
                 report?.Invoke(new(10 + (int)(20 * (index + (double)asset / assetCount) / JobNumbers.Length), "Legacy photographs", asset, assetCount, $"Job {index+1}/{JobNumbers.Length}: loading and storing photo {asset+1}/{assetCount}."));
@@ -93,11 +99,11 @@ internal static partial class DemoDataExpansion
                 Guid requestedOriginal=Id(26,number*100+asset);
                 Guid original=number==4
                     ? AddWeddingPhoto(connection,transaction,versionStorage,job,key,requestedOriginal,1,asset,null,login)
-                    : AddImage(connection,transaction,versionStorage,job,key,requestedOriginal,1,index*16+asset,null,login);
+                    : AddImage(connection,transaction,versionStorage,job,key,requestedOriginal,1,asset,null,login,searchTerm:JobTitle(connection,transaction,job));
                 if(asset==0)
                 {
-                    if(number==4) AddWeddingPhoto(connection,transaction,versionStorage,job,key,Id(27,number),2,asset+1,original,login);
-                    else AddImage(connection,transaction,versionStorage,job,key,Id(27,number),2,index*16+asset+1,original,login);
+                    if(number==4) AddWeddingPhoto(connection,transaction,versionStorage,job,key,Id(27,number),2,asset,original,login);
+                    else AddImage(connection,transaction,versionStorage,job,key,Id(27,number),2,asset,original,login,searchTerm:JobTitle(connection,transaction,job));
                 }
                 string collection=number==4
                     ? asset<8?"Getting Ready":asset<22?"Ceremony":asset<38?"Portraits":"Reception"

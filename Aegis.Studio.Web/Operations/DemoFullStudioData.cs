@@ -275,23 +275,21 @@ internal static class DemoFullStudioData
 
     private static void SeedMedia(NpgsqlConnection c,NpgsqlTransaction tx,IFileStorage storage,DemoJob job,Guid jobId,string login,int ordinal,Action<DemoSeedProgress>? report)
     {
-        int count=MediaCount(job);
+        int count=Math.Min(MediaCount(job),DemoDataExpansion.PhotoCount(job.Type));
         string[] statuses=["Needs Sorting","Needs Editing","Needs Review","Needs Approval","Ready","Ready for Production","Needs Print","Needs QC","Needs Delivery","Completed","Blocked","Needs Retake"];
         string[] collections=job.Type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)?["Getting Ready","Ceremony","Portraits","Reception"]:
             job.Type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("School",StringComparison.OrdinalIgnoreCase)?["Roster","Stage","Groups","Unclassified"]:
             job.Type.Contains("Corporate",StringComparison.OrdinalIgnoreCase)||job.Type.Contains("Headshot",StringComparison.OrdinalIgnoreCase)?["Executives","Team","Selects","Unclassified"]:
             ["Selects","Proofs","Finals","Unclassified"];
 
-        int sourceCount=PhysicalSourceCount(job);
         for(int i=0;i<count;i++)
         {
             report?.Invoke(new(32 + (int)(63 * (ordinal-1 + (double)i / count) / Jobs.Length), "Studio photographs", i, count, $"Job {ordinal}/{Jobs.Length}: {job.Title} — loading and storing photo {i+1}/{count}."));
             string key=$"demo-full/{job.Number}/asset-{i+1:000}";
             Guid versionId=MediaId(64,job.Number,i);
-            // Stable asset IDs and counts are independent of the smaller reviewed photograph set.
-            // Revisions preserve the same photograph and stable asset identity.
-            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,SelectPhotoVariant(job,i%sourceCount)+i*32,null,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
-            if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,SelectPhotoVariant(job,i%sourceCount)+i*32,original,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
+            // Asset counts are capped to the available category photos. Revisions preserve the same photograph.
+            Guid original=DemoDataExpansion.AddImage(c,tx,storage,jobId,key,versionId,1,i,null,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
+            if(i%50==0)DemoDataExpansion.AddImage(c,tx,storage,jobId,key,MediaId(66,job.Number,i),2,i,original,login,sourceUrl:PortraitSource(job,i),searchTerm:job.Type);
             Guid assetId=MediaId(65,job.Number,i);
             string status=statuses[(ordinal+i)%statuses.Length];
             assetId=ExecuteGuid(c,tx,"insert into studio_media_assets(id,job_id,gallery_id,asset_key,production_status,assigned_to,capture_at_utc) values($1,$2,$2,$3,$4,$5,now()-($6 || ' hours')::interval) on conflict(job_id,asset_key) do update set production_status=excluded.production_status,assigned_to=excluded.assigned_to,capture_at_utc=excluded.capture_at_utc returning id",
@@ -319,7 +317,7 @@ internal static class DemoFullStudioData
             401 => 241, // large roster
             _ => MinimumDemoImagesPerJob
         };
-        return Math.Max(MinimumDemoImagesPerJob, requested);
+        return requested;
     }
 
     private static int DemoSubjectCount(DemoJob job)
