@@ -1,5 +1,5 @@
 # Replace host, secrets and observed IDs locally. These are placeholders, not a deployed sandbox.
-@base = https://PUBLIC_SITE_HOST/api/public-site/v1
+@base = https://PUBLIC_SITE_HOST/api/v1
 @submit = SUBMISSION_TOKEN
 @studio = STUDIO_TOKEN
 @payment = VERIFIED_ADAPTER_TOKEN
