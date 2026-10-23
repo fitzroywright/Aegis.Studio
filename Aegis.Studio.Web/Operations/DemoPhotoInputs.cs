@@ -15,19 +15,19 @@ internal static partial class DemoDataExpansion
     private static readonly ConcurrentDictionary<string,string> demoPhotoLicenseCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string,string> demoPhotoPageCache = new(StringComparer.OrdinalIgnoreCase);
 
-    private static string PhotoCategory(string? type)
+    internal static string PhotoCategory(string? type)
     {
         type ??= "";
         if (type.Contains("Wedding",StringComparison.OrdinalIgnoreCase)||type.Contains("Engagement",StringComparison.OrdinalIgnoreCase)) return "wedding";
-        if (type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||type.Contains("School",StringComparison.OrdinalIgnoreCase)) return "graduation";
+        if (type.Contains("Graduation",StringComparison.OrdinalIgnoreCase)||type.Contains("School",StringComparison.OrdinalIgnoreCase)||type.Contains("Class / Group",StringComparison.OrdinalIgnoreCase)||type.Contains("Class Group",StringComparison.OrdinalIgnoreCase)) return "graduation";
         if (type.Contains("Newborn",StringComparison.OrdinalIgnoreCase)) return "family";
         if (type.Contains("Family",StringComparison.OrdinalIgnoreCase)||type.Contains("Maternity",StringComparison.OrdinalIgnoreCase)) return "family";
-        if (type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||type.Contains("Team",StringComparison.OrdinalIgnoreCase)) return "sports";
+        if (type.Contains("Sports",StringComparison.OrdinalIgnoreCase)||type.Contains("Athlete",StringComparison.OrdinalIgnoreCase)||type.Contains("Team",StringComparison.OrdinalIgnoreCase)||type.Contains("Dance",StringComparison.OrdinalIgnoreCase)) return "sports";
         if (type.Contains("Product",StringComparison.OrdinalIgnoreCase)||type.Contains("Commercial",StringComparison.OrdinalIgnoreCase)||type.Contains("Campaign",StringComparison.OrdinalIgnoreCase)) return "product";
         return "people";
     }
 
-    private static string[] LocalPhotos(string category)
+    internal static string[] LocalPhotos(string category)
     {
         string directory=Path.Combine(photoLibraryRoot,category);
         return Directory.Exists(directory)
@@ -44,7 +44,8 @@ internal static partial class DemoDataExpansion
         string category=PhotoCategory(type);
         string[] files=LocalPhotos(category);
         if(files.Length==0) return false;
-        string file=files[Math.Abs(variant % files.Length)];
+        int photoIndex=((variant%files.Length)+files.Length)%files.Length;
+        string file=files[photoIndex];
         try
         {
             using var decoded=StudioImageProcessor.DecodeOriented(File.OpenRead(file));
@@ -64,6 +65,8 @@ internal static partial class DemoDataExpansion
             return false;
         }
     }
+
+    internal static int PhotoCount(string? type)=>LocalPhotos(PhotoCategory(type)).Length;
 
     internal static void PreparePhotos(Action<DemoSeedProgress>? report)
     {
