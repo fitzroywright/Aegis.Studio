@@ -37,7 +37,7 @@ public sealed class PublicSiteClient : IDisposable
     public async Task PutFile(string path,Stream content,string type,CancellationToken ct)
     {using var body=new StreamContent(content);body.Headers.ContentType=new(type);using var r=await http.PutAsync(path,body,ct);r.EnsureSuccessStatusCode();}
     public async Task<byte[]> File(Guid id,CancellationToken ct)
-    {using var r=await http.GetAsync($"/api/public-site/v1/attachments/{id:D}",HttpCompletionOption.ResponseHeadersRead,ct);r.EnsureSuccessStatusCode();if(r.Content.Headers.ContentLength>2_500_000)throw new InvalidOperationException("Attachment exceeds limit.");await using var s=await r.Content.ReadAsStreamAsync(ct);using var m=new MemoryStream();var buffer=new byte[8192];int n;while((n=await s.ReadAsync(buffer,ct))>0){if(m.Length+n>2_500_000)throw new InvalidOperationException("Attachment exceeds limit.");m.Write(buffer,0,n);}return m.ToArray();}
+    {using var r=await http.GetAsync($"/api/v1/attachments/{id:D}",HttpCompletionOption.ResponseHeadersRead,ct);r.EnsureSuccessStatusCode();if(r.Content.Headers.ContentLength>2_500_000)throw new InvalidOperationException("Attachment exceeds limit.");await using var s=await r.Content.ReadAsStreamAsync(ct);using var m=new MemoryStream();var buffer=new byte[8192];int n;while((n=await s.ReadAsync(buffer,ct))>0){if(m.Length+n>2_500_000)throw new InvalidOperationException("Attachment exceeds limit.");m.Write(buffer,0,n);}return m.ToArray();}
     public void Dispose()=>http.Dispose();
 }
 public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore workspaces,IConfiguration configuration)
@@ -147,7 +147,7 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                 if((bool)gate.ExecuteScalar()!)try
                 {
                     string cursor=WorkflowStore.Scalar(c,null,"select cursor from studio_website_cursor where source=$1",source) as string??"";
-                    var feed=await site.Get("/api/public-site/v1/changes?cursor="+Uri.EscapeDataString(cursor),ct);
+                    var feed=await site.Get("/api/v1/changes?cursor="+Uri.EscapeDataString(cursor),ct);
                     var importer=new WebsiteIntakeStore(database,workspaces,configuration);
                     var retries=new List<JsonElement>();
                     using(var q=WorkflowStore.Command(c,null,"select payload::text from studio_website_import_errors where source=$1 and payload is not null order by updated_at_utc limit 25",source))using(var r=q.ExecuteReader())while(r.Read())retries.Add(JsonSerializer.Deserialize<JsonElement>(r.GetString(0)));
@@ -158,7 +158,7 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                       {
                         Guid cv=importer.Import(source,p);
                         // Only approved API IDs are fetched; unavailable files do not prevent metadata import.
-                        await site.Post($"/api/public-site/v1/intakes/{p.GetProperty("id").GetGuid():D}/ack",new{revision=p.GetProperty("revision").GetInt64()},ct);
+                        await site.Post($"/api/v1/intakes/{p.GetProperty("id").GetGuid():D}/ack",new{revision=p.GetProperty("revision").GetInt64()},ct);
                         logger.LogInformation("Website intake imported. ConversationId={ConversationId} Reference={IntakeReference} Revision={Revision}",cv,WebsiteIntakeStore.Text(p,"intakeReference"),p.GetProperty("revision").GetInt64());
                         WorkflowStore.Sql(c,null,"delete from studio_website_import_errors where source=$1 and external_id=$2",source,p.GetProperty("id").GetGuid());
                       }
@@ -178,7 +178,7 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                     using(var q=WorkflowStore.Command(c,null,"select i.external_id,i.revision,coalesce(j.status,'Inquiry'),coalesce(e.status,'NotQueued') from studio_website_imports i join studio_conversations v on v.id=i.conversation_id left join studio_jobs j on j.id=v.job_id left join lateral(select status from studio_outbound_email where conversation_id=v.id and kind='Acknowledgement' order by created_at_utc limit 1)e on true where i.source=$1 and coalesce(i.last_status,'')<>coalesce(j.status,'Inquiry')||'|'||coalesce(e.status,'NotQueued') order by i.external_id limit 50",source))using(var r=q.ExecuteReader())while(r.Read())statuses.Add((r.GetGuid(0),r.GetInt64(1),r.GetString(2),r.GetString(3)));
                     foreach(var s in statuses)
                     {
-                        await site.Post($"/api/public-site/v1/intakes/{s.External:D}/ack",new{revision=s.Revision,bookingStatus=s.Booking,reviewStatus=s.Booking is "Pending" or "Inquiry"?"AwaitingReview":s.Booking,acknowledgmentStatus=s.Ack},ct);
+                        await site.Post($"/api/v1/intakes/{s.External:D}/ack",new{revision=s.Revision,bookingStatus=s.Booking,reviewStatus=s.Booking is "Pending" or "Inquiry"?"AwaitingReview":s.Booking,acknowledgmentStatus=s.Ack},ct);
                         WorkflowStore.Sql(c,null,"update studio_website_imports set last_status=$3 where source=$1 and external_id=$2",source,s.External,s.Booking+"|"+s.Ack);
                     }
                 }finally{WorkflowStore.Sql(c,null,"select pg_advisory_unlock(hashtextextended($1,0))","public-site-poll:"+source);}
