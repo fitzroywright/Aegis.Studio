@@ -53,7 +53,17 @@ internal static class DemoDatasetFinalizer
         }
         Check("select count(*) from studio_jobs j where j.job_lead is not null and not exists(select 1 from studio_job_owner_assignments a where a.id=j.owner_assignment_id and a.job_id=j.id)", "Demo ownership is incomplete.");
         Check("select count(*) from studio_jobs j where not exists(select 1 from studio_job_template_instances t where t.job_id=j.id)", "Demo template coverage is incomplete.");
-        Check("select count(*) from studio_jobs j where (select count(*) from studio_media_assets m where m.job_id=j.id)<40", "A demo Job has fewer than 40 photographs.");
+        using (var command=new NpgsqlCommand("select j.id,j.title,count(m.asset_key)::int from studio_jobs j left join studio_media_assets m on m.job_id=j.id group by j.id,j.title order by j.id",connection))
+        using (var reader=command.ExecuteReader())
+            while(reader.Read())
+            {
+                Guid jobId=reader.GetGuid(0);
+                string title=reader.GetString(1);
+                int actual=reader.GetInt32(2);
+                int expected=DemoFullStudioData.ExpectedPhotoCount(jobId,title);
+                if(actual<expected)
+                    throw new InvalidOperationException($"Demo job '{title}' has {actual} photographs; its local photo category provides {expected} unique photographs.");
+            }
         Check("select count(*) from studio_media_assets m where not exists(select 1 from studio_asset_versions v where v.job_id=m.job_id and v.asset_key=m.asset_key and v.size_bytes>0)", "A demo photograph has no stored version.");
         using (var command = new NpgsqlCommand("select count(*) from studio_production_items where source_version_id is not null", connection))
             if ((long)command.ExecuteScalar()! == 0) throw new InvalidOperationException("Approved-photo production examples are missing.");
