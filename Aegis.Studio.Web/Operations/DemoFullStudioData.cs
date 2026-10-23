@@ -320,6 +320,14 @@ internal static class DemoFullStudioData
         return requested;
     }
 
+    internal static int ExpectedPhotoCount(Guid jobId,string title)
+    {
+        DemoJob? seeded=Jobs.FirstOrDefault(job=>Id(41,job.Number)==jobId);
+        int requested=seeded is null?MinimumDemoImagesPerJob:MediaCount(seeded);
+        string type=seeded?.Type??title;
+        return Math.Min(requested,DemoDataExpansion.PhotoCount(type));
+    }
+
     private static int DemoSubjectCount(DemoJob job)
     {
         return job.Number switch
