@@ -95,7 +95,7 @@ export function createServer(env = process.env) {
       let user = readSession(req, secret);
       if(user){const binding=JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];if(binding){const candidates=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).filter(r=>JSON.parse(r.payload).published);if(candidates.length)user={...user,galleryReference:candidates.at(-1).id};}}
       if (req.method === 'GET' && url.pathname === '/api/session') { json(res, 200, { demo, user: user ? { name: user.name, provider: user.provider, email: user.email, galleryReference: user.galleryReference } : null }); return; }
-      if (req.method==='POST'&&url.pathname==='/api/public-site/v1/client-link-proofs/redeem') {
+      if (req.method==='POST'&&url.pathname==='/api/v1/client-link-proofs/redeem') {
         requireSameOrigin(req,url);
         if(!user){json(res,401,{message:'Sign in with the provider account to redeem this link proof.'});return;}
         const p=JSON.parse((await readBody(req,4096)).toString('utf8'));
