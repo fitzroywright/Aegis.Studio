@@ -42,11 +42,35 @@ export class IntakeStore {
       CREATE TABLE IF NOT EXISTS replays(owner TEXT,key TEXT,hash TEXT,result TEXT,PRIMARY KEY(owner,key));
       CREATE TABLE IF NOT EXISTS attachments(id TEXT PRIMARY KEY,intake_id TEXT,metadata TEXT,content BLOB,state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS galleries(id TEXT PRIMARY KEY,client_id TEXT NOT NULL,payload TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS api_credentials(id TEXT PRIMARY KEY,name TEXT NOT NULL,secret_hash TEXT NOT NULL UNIQUE,scopes TEXT NOT NULL,created_at TEXT NOT NULL,last_used_at TEXT,revoked_at TEXT);
       CREATE TABLE IF NOT EXISTS media(gallery_id TEXT,id TEXT,type TEXT,content BLOB,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS selections(gallery_id TEXT,id TEXT,selected INTEGER,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS payment_events(id TEXT PRIMARY KEY,intake_id TEXT NOT NULL,hash TEXT NOT NULL,payload TEXT NOT NULL);`);
   }
   transaction(action) { this.db.exec('BEGIN IMMEDIATE'); try { const result = action(); this.db.exec('COMMIT'); return result; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
+  createApiCredential(name, scopes) {
+    if(typeof name!=='string'||!name.trim()||name.trim().length>100) fail(400,'invalid_key_name','Provide a key name up to 100 characters.');
+    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','gallery:publish','gallery:read','client:link','attachment:scan','payment:verified']);
+    if(!Array.isArray(scopes)||!scopes.length||scopes.some(x=>!allowed.has(x))||new Set(scopes).size!==scopes.length) fail(400,'invalid_scopes','Choose one or more supported, unique scopes.');
+    const id=randomUUID(),secret=randomBytes(32).toString('base64url'),createdAt=this.now().toISOString();
+    this.db.prepare('INSERT INTO api_credentials(id,name,secret_hash,scopes,created_at) VALUES(?,?,?,?,?)').run(id,name.trim(),createHash('sha256').update(secret).digest('hex'),JSON.stringify(scopes),createdAt);
+    return {id,name:name.trim(),scopes,createdAt,secret};
+  }
+  listApiCredentials() {
+    return this.db.prepare('SELECT id,name,scopes,created_at,last_used_at,revoked_at FROM api_credentials ORDER BY created_at DESC').all().map(x=>({...x,scopes:JSON.parse(x.scopes),status:x.revoked_at?'Revoked':'Active'}));
+  }
+  revokeApiCredential(id) {
+    const result=this.db.prepare('UPDATE api_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?').run(this.now().toISOString(),id);
+    return result.changes>0;
+  }
+  authenticateApiCredential(secret, scope) {
+    const hash=createHash('sha256').update(String(secret||'')).digest('hex');
+    const row=this.db.prepare('SELECT * FROM api_credentials WHERE secret_hash=? AND revoked_at IS NULL').get(hash);
+    if(!row)return null;
+    const scopes=JSON.parse(row.scopes);if(!scopes.includes(scope))fail(403,'wrong_scope','Credential lacks the required scope.');
+    this.db.prepare('UPDATE api_credentials SET last_used_at=? WHERE id=?').run(this.now().toISOString(),row.id);
+    return row.id;
+  }
   replay(owner, key, payload, action) {
     if (!/^[A-Za-z0-9._-]{1,100}$/.test(key || '')) fail(400, 'idempotency_required', 'Provide Idempotency-Key (1–100 letters, digits, dots, underscores or dashes).');
     return this.transaction(() => {
