@@ -47,7 +47,7 @@ export function createIntakeApi(env,readBody,json) {
   }
   return {store,async handle(req,res,url){
     const route=url.pathname, method=req.method;
-    const keyCollection='/api/v1/admin/integration-keys',keyItem=route.match(/^\/api\/public-site\/v1\/admin\/integration-keys\/([0-9a-f-]{36})$/i);
+    const keyCollection='/api/v1/admin/integration-keys',keyItem=route.match(/^\/api\/v1\/admin\/integration-keys\/([0-9a-f-]{36})$/i);
     if(route===keyCollection&&['GET','POST'].includes(method)){
       authenticateProvisioning(req);
       if(method==='GET'){json(res,200,{items:store.listApiCredentials()});return true;}
@@ -61,7 +61,7 @@ export function createIntakeApi(env,readBody,json) {
       authenticateProvisioning(req);const p=await input(req,4096),proof=store.createClientLinkChallenge(p.clientId);
       json(res,201,{id:proof.id,code:proof.code,expiresAt:proof.expiresAt},{'Cache-Control':'no-store'});return true;
     }
-    const linkProof=route.match(/^\/api\/public-site\/v1\/admin\/client-link-proofs\/([0-9a-f-]{36})$/i);
+    const linkProof=route.match(/^\/api\/v1\/admin\/client-link-proofs\/([0-9a-f-]{36})$/i);
     if(linkProof&&method==='DELETE'){
       authenticateProvisioning(req);const n=store.db.prepare('UPDATE client_link_challenges SET revoked_at=COALESCE(revoked_at,?) WHERE id=?').run(new Date().toISOString(),linkProof[1]);
       if(!n.changes)fail(404,'not_found','Client link proof not found.');json(res,200,{id:linkProof[1],status:'Revoked'});return true;
@@ -98,7 +98,7 @@ export function createIntakeApi(env,readBody,json) {
       const result=store.create(owner,String(req.headers['idempotency-key']||''),value,browser?'Form':'Api');json(res,201,result);return true;
     }
     if(route==='/api/v1/changes'&&method==='GET'){authenticate(req,'intake:pull');json(res,200,store.feed(url.searchParams.get('cursor')||''));return true;}
-    const match=route.match(/^\/api\/public-site\/v1\/intakes\/([0-9a-f-]{36})(?:\/(ack|status|roster|attachments|payments))?$/i)||route.match(/^\/api\/(?:bookings|inquiries)\/([0-9a-f-]{36}|\d{4}-(?:BR|W)-\d{6})(?:\/(roster|attachments))?$/i);
+    const match=route.match(/^\/api\/v1\/intakes\/([0-9a-f-]{36})(?:\/(ack|status|roster|attachments|payments))?$/i)||route.match(/^\/api\/(?:bookings|inquiries)\/([0-9a-f-]{36}|\d{4}-(?:BR|W)-\d{6})(?:\/(roster|attachments))?$/i);
     if(match){
       const id=match[1],action=match[2],token=String(req.headers['x-intake-token']||'');
       if(action==='ack'&&method==='POST'){authenticate(req,'intake:ack');const p=await input(req);const statuses={};for(const k of ['reviewStatus','bookingStatus','acknowledgmentStatus','paymentStatus'])if(p[k]!==undefined){if(typeof p[k]!=='string'||p[k].length>100)fail(400,'invalid_status','Invalid status.');statuses[k]=p[k];}json(res,200,store.ack(id,p.revision,statuses));return true;}
@@ -116,24 +116,24 @@ export function createIntakeApi(env,readBody,json) {
         json(res,201,file);return true;
       }
     }
-    const rescan=route.match(/^\/api\/public-site\/v1\/attachments\/([0-9a-f-]{36})\/rescan$/i);
+    const rescan=route.match(/^\/api\/v1\/attachments\/([0-9a-f-]{36})\/rescan$/i);
     if(rescan&&method==='POST'){
       authenticate(req,'attachment:scan');const r=store.db.prepare('SELECT * FROM attachments WHERE id=?').get(rescan[1]);if(!r)fail(404,'not_found','Attachment not found.');const m=JSON.parse(r.metadata),result=await scan(Buffer.from(r.content),m.fileName);m.state=result.state;
       store.transaction(()=>{store.db.prepare('UPDATE attachments SET state=?,metadata=? WHERE id=?').run(m.state,JSON.stringify(m),m.id);const row=store.db.prepare('SELECT payload FROM intakes WHERE id=?').get(r.intake_id),p=JSON.parse(row.payload);p.attachments=p.attachments.map(x=>x.id===m.id?m:x);p.revision++;store.db.prepare('UPDATE intakes SET payload=?,revision=? WHERE id=?').run(JSON.stringify(p),p.revision,p.id);store.change(p);});json(res,200,m);return true;
     }
-    const file=route.match(/^\/api\/public-site\/v1\/attachments\/([0-9a-f-]{36})$/i);
+    const file=route.match(/^\/api\/v1\/attachments\/([0-9a-f-]{36})$/i);
     if(file&&method==='GET'){authenticate(req,'intake:pull');const r=store.db.prepare("SELECT metadata,content FROM attachments WHERE id=? AND state='Clean'").get(file[1]);if(!r)fail(404,'unavailable','Attachment is unavailable or quarantined.');const m=JSON.parse(r.metadata);res.writeHead(200,{'Content-Type':m.contentType,'Cache-Control':'no-store','Content-Disposition':'attachment'});res.end(r.content);return true;}
     if(route==='/api/v1/galleries'&&method==='POST'){
       authenticate(req,'gallery:publish');const p=await input(req,1_000_000);if(!/^[0-9a-f-]{36}$/i.test(p.id)||!p.clientId||!Array.isArray(p.items)||p.items.length>10000||!p.title)fail(400,'invalid_gallery','Gallery ID, client ID, title and items required.');
       store.transaction(()=>{const old=store.db.prepare('SELECT client_id FROM galleries WHERE id=?').get(p.id);if(old&&old.client_id!==p.clientId)fail(409,'gallery_owner','Cannot change gallery owner.');store.db.prepare('INSERT INTO galleries VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').run(p.id,p.clientId,JSON.stringify({...p,published:false}));});json(res,200,{reference:p.id,provider:'PublicSite',storedVersionIds:store.db.prepare('SELECT id FROM media WHERE gallery_id=?').all(p.id).map(x=>x.id)});return true;
     }
-    const publication=route.match(/^\/api\/public-site\/v1\/galleries\/([0-9a-f-]{36})\/(publish|revoke)$/i);
+    const publication=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/(publish|revoke)$/i);
     if(publication&&method==='POST'){
       authenticate(req,'gallery:publish');store.transaction(()=>{const row=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(publication[1]);if(!row)fail(404,'not_found','Gallery not found.');const p=JSON.parse(row.payload);
         if(publication[2]==='publish'&&p.items.some(x=>!store.db.prepare('SELECT 1 FROM media WHERE gallery_id=? AND id=?').get(p.id,x.versionId)))fail(409,'media_pending','All media must be stored before publishing.');
         p.published=publication[2]==='publish';store.db.prepare('UPDATE galleries SET payload=? WHERE id=?').run(JSON.stringify(p),p.id);});json(res,200,{state:publication[2]==='publish'?'Published':'Revoked'});return true;
     }
-    const media=route.match(/^\/api\/public-site\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})$/i);
+    const media=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})$/i);
     if(media&&method==='PUT'){
       authenticate(req,'gallery:publish');const r=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(media[1]);if(!r||!JSON.parse(r.payload).items.some(x=>x.versionId===media[2]))fail(404,'not_found','Gallery item not registered.');
       const bytes=await readBody(req,30_000_000),type=String(req.headers['content-type']||'application/octet-stream');
