@@ -9,6 +9,12 @@ namespace Aegis.Studio.Web.Operations;
 internal static partial class DemoDataExpansion
 {
     internal static readonly int[] JobNumbers = [1,2,4,5,7,8];
+    private static string JobTitle(NpgsqlConnection connection,NpgsqlTransaction transaction,Guid job)
+    {
+        using var command=new NpgsqlCommand("select title from studio_jobs where id=$1",connection,transaction);
+        command.Parameters.AddWithValue(job);
+        return command.ExecuteScalar() as string ?? "Portrait";
+    }
     internal static Guid Id(int group,int number) => Guid.Parse($"de000000-0000-4000-{group:0000}-{number:000000000000}");
 
     internal static bool Seed(NpgsqlConnection connection,NpgsqlTransaction transaction,string login,IFileStorage storage,Action<DemoSeedProgress>? report=null)
@@ -93,11 +99,11 @@ internal static partial class DemoDataExpansion
                 Guid requestedOriginal=Id(26,number*100+asset);
                 Guid original=number==4
                     ? AddWeddingPhoto(connection,transaction,versionStorage,job,key,requestedOriginal,1,asset,null,login)
-                    : AddImage(connection,transaction,versionStorage,job,key,requestedOriginal,1,index*16+asset,null,login);
+                    : AddImage(connection,transaction,versionStorage,job,key,requestedOriginal,1,asset,null,login,searchTerm:JobTitle(connection,transaction,job));
                 if(asset==0)
                 {
-                    if(number==4) AddWeddingPhoto(connection,transaction,versionStorage,job,key,Id(27,number),2,asset+1,original,login);
-                    else AddImage(connection,transaction,versionStorage,job,key,Id(27,number),2,index*16+asset+1,original,login);
+                    if(number==4) AddWeddingPhoto(connection,transaction,versionStorage,job,key,Id(27,number),2,asset,original,login);
+                    else AddImage(connection,transaction,versionStorage,job,key,Id(27,number),2,asset,original,login,searchTerm:JobTitle(connection,transaction,job));
                 }
                 string collection=number==4
                     ? asset<8?"Getting Ready":asset<22?"Ceremony":asset<38?"Portraits":"Reception"
