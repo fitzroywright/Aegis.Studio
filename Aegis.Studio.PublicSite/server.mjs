@@ -95,6 +95,13 @@ export function createServer(env = process.env) {
       let user = readSession(req, secret);
       if(user){const binding=JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];if(binding){const candidates=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).filter(r=>JSON.parse(r.payload).published);if(candidates.length)user={...user,galleryReference:candidates.at(-1).id};}}
       if (req.method === 'GET' && url.pathname === '/api/session') { json(res, 200, { demo, user: user ? { name: user.name, provider: user.provider, email: user.email, galleryReference: user.galleryReference } : null }); return; }
+      if (req.method==='POST'&&url.pathname==='/api/public-site/v1/client-link-proofs/redeem') {
+        requireSameOrigin(req,url);
+        if(!user){json(res,401,{message:'Sign in with the provider account to redeem this link proof.'});return;}
+        const p=JSON.parse((await readBody(req,4096)).toString('utf8'));
+        const linked=intake.store.redeemClientLinkChallenge(p.code,user.provider,user.id);
+        json(res,200,{status:'Linked',provider:linked.provider,verifiedAt:linked.verifiedAt});return;
+      }
       if (await intake.handle(req,res,url)) return;
       if (['POST','PUT','DELETE'].includes(req.method)) requireSameOrigin(req, url);
       if (req.method === 'POST' && url.pathname === '/api/demo-login') {
@@ -132,7 +139,7 @@ export function createServer(env = process.env) {
         }
         // Serve only locally stored copies. The identity binding is configured server-side,
         // never accepted from an email address or a caller-supplied client ID.
-        const binding=JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user?.id];
+        const binding=intake.store.clientForIdentity(user?.provider,user?.id)||JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user?.id];
         const row=intake.store.db.prepare('SELECT client_id,payload FROM galleries WHERE id=?').get(reference);
         if(!user||!binding||!row||row.client_id!==binding){json(res,404,{message:'Gallery not found.'});return;}
         const gallery=JSON.parse(row.payload);if(!gallery.published){json(res,404,{message:'Gallery unavailable.'});return;}
@@ -169,4 +176,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const server = createServer();
   server.listen(Number(process.env.PORT || 8080), '0.0.0.0', () => console.log(`Aegis Studio Public Site listening on ${process.env.PORT || 8080}`));
 }
+
 
