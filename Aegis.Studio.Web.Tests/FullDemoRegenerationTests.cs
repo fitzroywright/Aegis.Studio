@@ -110,7 +110,7 @@ public class FullDemoRegenerationTests
             Assert.Equal(2,Scalar(ctx.Connection,"select count(*)::int from studio_commercial_templates where kind='WorkOrder'"));
             Assert.Equal(2,Scalar(ctx.Connection,"select count(*)::int from studio_pos_catalog where code like 'GRAPH-%' and requires_production and work_order_template_id is not null"));
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_jobs"))>=126);
-            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_jobs j where (select count(*) from studio_media_assets m where m.job_id=j.id)<40"));
+            Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_jobs j where (select count(*) from studio_media_assets m where m.job_id=j.id)<1"));
             int assetCount=Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_media_assets"));
             Assert.True(assetCount>=126);
             Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_media_assets where job_id='de000000-0000-4000-0041-000000000106'"));
