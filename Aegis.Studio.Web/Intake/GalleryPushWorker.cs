@@ -34,10 +34,10 @@ public sealed class GalleryPushWorker(StudioDatabase database,IFileStorage stora
                             var media=new List<(Guid Version,string Name,string Path,string Type)>();
                             using(var q=WorkflowStore.Command(c,null,"select v.id,v.file_name,v.stored_path,v.content_type from jsonb_array_elements($2::jsonb) x join studio_asset_versions v on v.id=(x->>'versionId')::uuid and v.job_id=$1",p.Job,p.Manifest))using(var r=q.ExecuteReader())while(r.Read())media.Add((r.GetGuid(0),r.GetString(1),r.GetString(2),r.GetString(3)));
                             if(media.Count==0||media.Count!=JsonSerializer.Deserialize<JsonElement>(p.Manifest).GetArrayLength())throw new InvalidOperationException("Pinned media unavailable.");
-                            var staged=await site.PostJson("/api/public-site/v1/galleries",new{id=p.Id,clientId=p.Client.ToString("D"),title=p.Title,finalDeliveryAvailable=true,items=media.Select(m=>new{versionId=m.Version,fileName=m.Name}).ToArray()},ct);
+                            var staged=await site.PostJson("/api/v1/galleries",new{id=p.Id,clientId=p.Client.ToString("D"),title=p.Title,finalDeliveryAvailable=true,items=media.Select(m=>new{versionId=m.Version,fileName=m.Name}).ToArray()},ct);
                             var stored=staged.TryGetProperty("storedVersionIds",out var versions)?versions.EnumerateArray().Select(x=>x.GetGuid()).ToHashSet():new HashSet<Guid>();
-                            foreach(var m in media.Where(m=>!stored.Contains(m.Version))){await using var file=await storage.OpenReadAsync("VersionStore/"+m.Path,ct);await site.PutFile($"/api/public-site/v1/galleries/{p.Id:D}/media/{m.Version:D}",file,m.Type,ct);}
-                            await site.Post($"/api/public-site/v1/galleries/{p.Id:D}/publish",new{},ct);
+                            foreach(var m in media.Where(m=>!stored.Contains(m.Version))){await using var file=await storage.OpenReadAsync("VersionStore/"+m.Path,ct);await site.PutFile($"/api/v1/galleries/{p.Id:D}/media/{m.Version:D}",file,m.Type,ct);}
+                            await site.Post($"/api/v1/galleries/{p.Id:D}/publish",new{},ct);
                             WorkflowStore.Sql(c,null,"insert into studio_gallery_exports values($1,'Published',null,now()) on conflict(publication_id) do update set state='Published',last_error=null,updated_at_utc=now()",p.Id);
                             logger.LogInformation("Public gallery published. PublicationId={PublicationId} JobId={JobId}",p.Id,p.Job);
                         }
@@ -45,7 +45,7 @@ public sealed class GalleryPushWorker(StudioDatabase database,IFileStorage stora
                         {WorkflowStore.Sql(c,null,"insert into studio_gallery_exports values($1,'Failed',$2,now()) on conflict(publication_id) do update set state='Failed',last_error=$2,updated_at_utc=now()",p.Id,ex.GetType().Name);logger.LogWarning("Public gallery export retained for retry. PublicationId={PublicationId} ErrorType={ErrorType}",p.Id,ex.GetType().Name);}
                     }
                     var revoked=new List<Guid>();using(var q=WorkflowStore.Command(c,null,"select e.publication_id from studio_gallery_exports e join studio_workflow_publications p on p.id=e.publication_id join studio_workflow_submissions s on s.id=p.submission_id join studio_jobs j on j.id=p.job_id where e.state='Published' and (s.status<>'Approved' or j.status not in ('Ready for Delivery','Delivered','Completed'))"))using(var r=q.ExecuteReader())while(r.Read())revoked.Add(r.GetGuid(0));
-                    foreach(var id in revoked){await site.Post($"/api/public-site/v1/galleries/{id:D}/revoke",new{},ct);WorkflowStore.Sql(c,null,"update studio_gallery_exports set state='Revoked',updated_at_utc=now() where publication_id=$1",id);}
+                    foreach(var id in revoked){await site.Post($"/api/v1/galleries/{id:D}/revoke",new{},ct);WorkflowStore.Sql(c,null,"update studio_gallery_exports set state='Revoked',updated_at_utc=now() where publication_id=$1",id);}
                 }finally{WorkflowStore.Sql(c,null,"select pg_advisory_unlock(72919349)");}
             }
             catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
