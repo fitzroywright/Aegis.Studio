@@ -54,7 +54,7 @@ test('public booking is durably saved without calling internal Studio and replay
  const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),session=await fetch(`${origin}/api/intake-session`),csrf=(await session.json()).csrf,cookie=session.headers.get('set-cookie').split(';')[0];
  const body=JSON.stringify({clientName:'Test Client',clientEmail:'client@example.test',sessionType:'Portrait',startsAt:'2026-11-01T15:00:00Z',endsAt:'2026-11-01T16:00:00Z'});
  const options={method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf,'Idempotency-Key':'booking-1'},body};
- const first=await fetch(`${origin}/api/bookings`,options),receipt=await first.json();assert.equal(first.status,201);assert.match(receipt.intakeReference,/^\d{4}-W-\d{6}$/);
+ const first=await fetch(`${origin}/api/bookings`,options),receipt=await first.json();assert.equal(first.status,201);assert.match(receipt.intakeReference,/^\d{4}-BR-\d{6}$/);
  const replay=await(await fetch(`${origin}/api/bookings`,options)).json();assert.equal(receipt.id,replay.id);assert.equal(receipt.accessToken,replay.accessToken);
  const noAccess=await fetch(`${origin}/api/bookings/${receipt.id}`);assert.equal(noAccess.status,404);
  const status=await(await fetch(`${origin}/api/bookings/${receipt.id}`,{headers:{'X-Intake-Token':receipt.accessToken}})).json();assert.equal(status.importStatus,'Pending');
@@ -116,3 +116,21 @@ test('server provisions one-time integration keys, enforces scopes, and revokes 
   const afterRevoke=await fetch(`${origin}/api/public-site/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'two','Content-Type':'application/json'},body:JSON.stringify(booking)});
   assert.equal(afterRevoke.status,401);
 });
+
+test('client link proof is single use, bound to authenticated provider subject, and scopes galleries by Studio client UUID',async t=>{
+ const provision='client-link-provisioning-secret-long-enough',client='22222222-2222-4222-8222-222222222222';
+ const origin=await fixture(t,{PUBLIC_API_PROVISIONING_TOKEN:provision,CLIENT_BINDINGS_JSON:'{}'});
+ const created=await fetch(origin+'/api/public-site/v1/admin/client-link-proofs',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({clientId:client})});assert.equal(created.status,201);const proof=await created.json();
+ const login=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity:'maya'})}),cookie=login.headers.get('set-cookie').split(';')[0];
+ const redeem=await fetch(origin+'/api/public-site/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})});assert.equal(redeem.status,200);
+ assert.equal((await fetch(origin+'/api/public-site/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})})).status,404);
+ const gallery='11111111-1111-4111-8111-111111111111',version='33333333-3333-4333-8333-333333333333',key='gallery-publish-test-secret-0123456789';
+ const api=origin+'/api/public-site/v1',auth={Authorization:'Bearer '+key,'Content-Type':'application/json'};
+ const provisioned=await fetch(api+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Gallery Publisher',scopes:['gallery:publish']})});const publisher=(await provisioned.json()).secret;
+ const ph={Authorization:'Bearer '+publisher,'Content-Type':'application/json'};
+ await fetch(api+'/galleries',{method:'POST',headers:ph,body:JSON.stringify({id:gallery,clientId:client,title:'Linked client gallery',items:[{versionId:version,fileName:'proof.jpg'}]})});
+ await fetch(api+`/galleries/${gallery}/media/${version}`,{method:'PUT',headers:{Authorization:'Bearer '+publisher,'Content-Type':'image/jpeg'},body:Buffer.from([255,216,255,217])});
+ await fetch(api+`/galleries/${gallery}/publish`,{method:'POST',headers:ph,body:'{}'});
+ assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:cookie}})).status,200);
+});
+
