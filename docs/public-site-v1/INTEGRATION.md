@@ -1,6 +1,6 @@
 # Public website integration
 
-The authoritative contract is `Aegis.Studio.PublicSite/public-site-v1.openapi.json`. It is also served at `/api/public-site/v1/openapi.json`. This contract belongs to the public website, not the legacy Studio `/api/public/v1` endpoints. No deployed sandbox is implied.
+The authoritative contract is `Aegis.Studio.PublicSite/public-site-v1.openapi.json`. It is also served at `/api/public-site/v1/openapi.json`. This contract belongs to the public website, not the legacy Studio `/api/public/v1` endpoints. The production API is `https://api.bryanstudiosltd.com/api/public-site/v1`.
 
 The website stores inquiries and booking requests independently. Its browser form and external submissions share one durable intake service and reference allocator. Studio connects outbound every 60 seconds, imports changes, then acknowledges the exact imported revision. Studio never needs an inbound booking port.
 
@@ -20,7 +20,7 @@ Studio currently uses one configured integration token; it can carry the three S
 
 ## Submission and receipt
 
-POST `/intakes` using bearer authentication, JSON, and `Idempotency-Key`. See `booking-example.json`. For an inquiry, use `kind: Inquiry`, contact details and notes; service and times are optional. Bookings require email, service and a valid start/end range. Times use ISO 8601 with explicit offsets and an IANA `timeZone`. Brian's default is `America/Jamaica`.
+POST `/intakes` using bearer authentication, JSON, and `Idempotency-Key`. See `booking-example.json`. For an inquiry, use `kind: Inquiry`, contact details and notes; service and times are optional. Bookings require email, service and a valid start/end range. Times use ISO 8601 with explicit offsets and an IANA `timeZone`. Bryan's default is `America/Jamaica`.
 
 The response includes an immutable UUID `id`, the legacy UUID `reference`, the client-facing `intakeReference` such as `2026-BR-000001`, a creation time, initial receipt/import state and a private per-intake `accessToken`. Never replace a UUID field with the short reference. The reference is not a credential. Browser status requests use `X-Intake-Token`; authenticated submission integrations can read only their own intake records. Bookings receive `YYYY-BR-######`; inquiries retain `YYYY-W-######`. Each prefix has a separate sequence that restarts at `000001` in the Jamaica calendar year. Idempotent retries return the original reference. The intake reference and original integration reference remain separate.
 
