@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://api.bryanstudiosltd.com/api/public-site/v1",
+      "url": "https://api.bryanstudiosltd.com/api/v1",
       "description": "Bryan’s Public Site production API."
     }
   ],
