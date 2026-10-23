@@ -52,9 +52,9 @@ test('live mode disables fake social sign-in and rejects non-HTTPS Studio upstre
 });
 test('public booking is durably saved without calling internal Studio and replays safely',async t=>{
  const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),session=await fetch(`${origin}/api/intake-session`),csrf=(await session.json()).csrf,cookie=session.headers.get('set-cookie').split(';')[0];
- const body=JSON.stringify({clientName:'Test Client',clientEmail:'client@example.test',sessionType:'Portrait',startsAt:'2026-11-01T15:00:00Z',endsAt:'2026-11-01T16:00:00Z'});
+ const body=JSON.stringify({clientName:'Test Client',clientEmail:'client@example.test',sessionType:'Portrait',locationCode:'BK',startsAt:'2026-11-01T15:00:00Z',endsAt:'2026-11-01T16:00:00Z'});
  const options={method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf,'Idempotency-Key':'booking-1'},body};
- const first=await fetch(`${origin}/api/bookings`,options),receipt=await first.json();assert.equal(first.status,201);assert.match(receipt.intakeReference,/^\d{4}-BR-\d{6}$/);
+ const first=await fetch(`${origin}/api/bookings`,options),receipt=await first.json();assert.equal(first.status,201);assert.match(receipt.intakeReference,/^\d{4}-BK-\d{6}$/);
  const replay=await(await fetch(`${origin}/api/bookings`,options)).json();assert.equal(receipt.id,replay.id);assert.equal(receipt.accessToken,replay.accessToken);
  const noAccess=await fetch(`${origin}/api/bookings/${receipt.id}`);assert.equal(noAccess.status,404);
  const status=await(await fetch(`${origin}/api/bookings/${receipt.id}`,{headers:{'X-Intake-Token':receipt.accessToken}})).json();assert.equal(status.importStatus,'Pending');
@@ -106,7 +106,7 @@ test('server provisions one-time integration keys, enforces scopes, and revokes 
   const key=await created.json();assert.match(key.secret,/^[A-Za-z0-9_-]{40,}$/);assert.equal(key.name,'Booking website');
   const listed=await(await fetch(`${origin}/api/v1/admin/integration-keys`,{headers:adminHeaders})).json();
   assert.equal(listed.items.length,1);assert.equal('secret' in listed.items[0],false);assert.equal('secret_hash' in listed.items[0],false);
-  const booking={kind:'Booking',clientName:'Test Client',clientEmail:'test@example.invalid',sessionType:'Portrait',startsAt:'2026-11-01T10:00:00-05:00',endsAt:'2026-11-01T11:00:00-05:00'};
+  const booking={kind:'Booking',clientName:'Test Client',clientEmail:'test@example.invalid',sessionType:'Portrait',locationCode:'BK',startsAt:'2026-11-01T10:00:00-05:00',endsAt:'2026-11-01T11:00:00-05:00'};
   const submission=await fetch(`${origin}/api/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'one','Content-Type':'application/json'},body:JSON.stringify(booking)});
   assert.equal(submission.status,201);
   const galleryScope=await fetch(`${origin}/api/v1/changes`,{headers:{Authorization:`Bearer ${key.secret}`}});

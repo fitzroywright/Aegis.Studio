@@ -98,7 +98,7 @@ export function createIntakeApi(env,readBody,json) {
       const result=store.create(owner,String(req.headers['idempotency-key']||''),value,browser?'Form':'Api');json(res,201,result);return true;
     }
     if(route==='/api/v1/changes'&&method==='GET'){authenticate(req,'intake:pull');json(res,200,store.feed(url.searchParams.get('cursor')||''));return true;}
-    const match=route.match(/^\/api\/v1\/intakes\/([0-9a-f-]{36})(?:\/(ack|status|roster|attachments|payments))?$/i)||route.match(/^\/api\/(?:bookings|inquiries)\/([0-9a-f-]{36}|\d{4}-(?:BR|W)-\d{6})(?:\/(roster|attachments))?$/i);
+    const match=route.match(/^\/api\/v1\/intakes\/([0-9a-f-]{36})(?:\/(ack|status|roster|attachments|payments))?$/i)||route.match(/^\/api\/(?:bookings|inquiries)\/([0-9a-f-]{36}|\d{4}-(?:BK|BE|BR|W)-\d{6})(?:\/(roster|attachments))?$/i);
     if(match){
       const id=match[1],action=match[2],token=String(req.headers['x-intake-token']||'');
       if(action==='ack'&&method==='POST'){authenticate(req,'intake:ack');const p=await input(req);const statuses={};for(const k of ['reviewStatus','bookingStatus','acknowledgmentStatus','paymentStatus'])if(p[k]!==undefined){if(typeof p[k]!=='string'||p[k].length>100)fail(400,'invalid_status','Invalid status.');statuses[k]=p[k];}json(res,200,store.ack(id,p.revision,statuses));return true;}

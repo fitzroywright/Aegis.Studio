@@ -105,21 +105,21 @@ export class IntakeStore {
     return this.replay(owner, key, input, () => {
       const kind = input.kind || 'Booking'; if (!['Inquiry','Booking'].includes(kind)) fail(400, 'invalid_kind', 'Choose Inquiry or Booking.');
       const p = { kind, source: 'Website', submissionMethod: method, externalSource: owner };
-      const limits={clientName:200,clientEmail:320,clientPhone:80,sessionType:200,startsAt:50,endsAt:50,timeZone:100,location:500,notes:4000,destination:200,externalReference:200};
-      for (const name of ['clientName','clientEmail','clientPhone','sessionType','startsAt','endsAt','timeZone','location','notes','destination','externalReference']) {
+      const limits={clientName:200,clientEmail:320,clientPhone:80,sessionType:200,locationCode:2,startsAt:50,endsAt:50,timeZone:100,location:500,notes:4000,destination:200,externalReference:200};
+      for (const name of ['clientName','clientEmail','clientPhone','sessionType','locationCode','startsAt','endsAt','timeZone','location','notes','destination','externalReference']) {
         if (input[name] !== undefined && (typeof input[name] !== 'string' || input[name].length > limits[name])) fail(400, 'invalid_field', 'Invalid text field.', { [name]: 'Invalid type or length.' });
         p[name] = input[name]?.trim() || '';
       }
       if (!p.clientName) fail(400, 'invalid_field', 'Client name is required.', { clientName: 'Required.' });
       if (p.clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.clientEmail)) fail(400, 'invalid_field', 'Valid email required.', { clientEmail: 'Invalid email.' });
       p.timeZone ||= 'America/Jamaica'; try { new Intl.DateTimeFormat('en', { timeZone: p.timeZone }); } catch { fail(400,'invalid_timezone','Use an IANA timezone.'); }
-      if (kind === 'Booking' && (!p.sessionType || !p.startsAt || !p.endsAt || !p.clientEmail)) fail(400,'invalid_booking','Service, email and session times are required.');
+      if (kind === 'Booking' && (!p.sessionType || !['BK','BE'].includes(p.locationCode) || !p.startsAt || !p.endsAt || !p.clientEmail)) fail(400,'invalid_booking','Session, location, email and session times are required.', { locationCode: 'Choose Kings Plaza (BK) or East Queen Street (BE).' });
       if ((p.startsAt || p.endsAt) && (!/T.*(?:Z|[+-]\d\d:\d\d)$/.test(p.startsAt) || !/T.*(?:Z|[+-]\d\d:\d\d)$/.test(p.endsAt) || !Number.isFinite(Date.parse(p.startsAt)) || !(Date.parse(p.endsAt) > Date.parse(p.startsAt)))) fail(400,'invalid_schedule','Use ISO timestamps with offsets and end after start.');
       // Reject financial claims rather than accidentally treating them as verification.
       if (['payment','payments','paid','paymentStatus','confirmed','requiredDeposit'].some(k => k in input)) fail(400,'untrusted_payment','Payment and confirmation fields are not accepted on intake.');
       p.roster = validateRoster(input.roster); p.attachments = []; p.paymentEvents = [];
       const now = this.now(), year = Number(new Intl.DateTimeFormat('en', { timeZone: 'America/Jamaica', year: 'numeric' }).format(now));
-      const referencePrefix = kind === 'Booking' ? 'BR' : 'W';
+      const referencePrefix = kind === 'Booking' ? p.locationCode : 'W';
       const next = this.db.prepare('INSERT INTO counters VALUES(?,?,1) ON CONFLICT(year,source) DO UPDATE SET value=value+1 RETURNING value').get(year,referencePrefix).value;
       if (next > 999999) fail(503,'reference_exhausted','Intake reference capacity exhausted. Contact staff.');
       p.id = randomUUID(); p.intakeReference = `${year}-${referencePrefix}-${String(next).padStart(6,'0')}`; p.createdAtUtc = now.toISOString(); p.revision = 1;

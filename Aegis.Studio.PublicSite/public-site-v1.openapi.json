@@ -138,12 +138,21 @@
             "items": {
               "$ref": "#/components/schemas/RosterRow"
             }
+          },
+          "locationCode": {
+            "type": "string",
+            "enum": [
+              "BK",
+              "BE"
+            ],
+            "description": "Required for bookings: BK is Kings Plaza; BE is East Queen Street.",
+            "maxLength": 2
           }
         },
         "required": [
           "clientName"
         ],
-        "description": "Booking additionally requires clientEmail, sessionType, startsAt and endsAt. Timestamp offsets are mandatory; endsAt must follow startsAt. Contact presence does not enable pickup notifications. Paid/confirmation claims are rejected. Omitted optional text becomes empty. Inquiry does not create a permanent Studio client."
+        "description": "Booking additionally requires clientEmail, sessionType, locationCode (BK for Kings Plaza or BE for East Queen Street), startsAt and endsAt. Timestamp offsets are mandatory; endsAt must follow startsAt. Contact presence does not enable pickup notifications. Paid/confirmation claims are rejected. Omitted optional text becomes empty. Inquiry does not create a permanent Studio client."
       },
       "Receipt": {
         "type": "object",
@@ -159,7 +168,7 @@
           },
           "intakeReference": {
             "type": "string",
-            "pattern": "^\\d{4}-(?:BR|W)-\\d{6}$"
+            "pattern": "^\\d{4}-(?:BK|BE|BR|W)-\\d{6}$"
           },
           "status": {
             "type": "string",

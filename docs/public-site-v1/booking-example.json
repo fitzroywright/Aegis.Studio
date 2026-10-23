@@ -3,6 +3,7 @@
   "clientName": "Test Client",
   "clientEmail": "test-recipient@example.invalid",
   "sessionType": "Graduation",
+  "locationCode": "BK",
   "startsAt": "2026-11-01T10:00:00-05:00",
   "endsAt": "2026-11-01T11:00:00-05:00",
   "timeZone": "America/Jamaica",

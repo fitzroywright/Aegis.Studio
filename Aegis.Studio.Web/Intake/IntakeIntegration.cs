@@ -46,7 +46,7 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
     public Guid Import(string source,JsonElement p)
     {
         Guid external=p.GetProperty("id").GetGuid();long revision=p.GetProperty("revision").GetInt64();string reference=Text(p,"intakeReference");
-        if(revision<1||!Regex.IsMatch(reference,@"^\d{4}-(?:BR|W)-\d{6}$"))throw new ArgumentException("Invalid website revision or intake reference.");
+        if(revision<1||!Regex.IsMatch(reference,@"^\d{4}-(?:BK|BE|BR|W)-\d{6}$"))throw new ArgumentException("Invalid website revision or intake reference.");
         var destination=Text(p,"destination");var w=workspaces.FindByRouteKey(destination)??workspaces.FindByAddress(destination);
         if(w is null||!w.IsEnabled)w=workspaces.Get(WorkflowRules.UnassignedWorkspaceId)??throw new InvalidOperationException("Unassigned workspace unavailable.");
         var rows=p.GetProperty("roster");IntakeRosterStore.Validate(rows);
@@ -69,7 +69,7 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
             if(kind=="Booking")
             {
                 var start=p.GetProperty("startsAt").GetDateTimeOffset();var end=p.GetProperty("endsAt").GetDateTimeOffset();
-                var pending=new PendingBookingRequest(w.Id,name,email,title,DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start,TimeZoneInfo.FindSystemTimeZoneById(Text(p,"timeZone","America/Jamaica"))).DateTime),Math.Max(0,configuration.GetValue<decimal?>("BookingApi:RequiredDeposit")??0),"JMD",Text(p,"notes"),ConversationId:cv,ExternalBookingId:source+":"+external,StartsAtUtc:start,EndsAtUtc:end,Location:Text(p,"location"),ClientPhone:Text(p,"clientPhone"),Destination:destination,BookingSource:"Website");
+                var pending=new PendingBookingRequest(w.Id,name,email,title,DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start,TimeZoneInfo.FindSystemTimeZoneById(Text(p,"timeZone","America/Jamaica"))).DateTime),Math.Max(0,configuration.GetValue<decimal?>("BookingApi:RequiredDeposit")??0),"JMD",Text(p,"notes"),ConversationId:cv,ExternalBookingId:source+":"+external,StartsAtUtc:start,EndsAtUtc:end,Location:string.IsNullOrWhiteSpace(Text(p,"location"))?Text(p,"locationCode") switch {"BK"=>"Kings Plaza","BE"=>"East Queen Street",_=>""}:Text(p,"location"),ClientPhone:Text(p,"clientPhone"),Destination:destination,BookingSource:"Website");
                 FrontDeskRequestRules.Validate(pending);
                 Guid job=FrontDeskBookingRequestStore.CreatePendingJob(c,tx,pending,"Website import",false);
                 requestId=Guid.NewGuid();WorkflowStore.Sql(c,tx,"insert into studio_frontdesk_requests(id,workspace_id,payload,created_by,job_id) values($1,$2,$3::jsonb,'Website import',$4)",requestId,w.Id,JsonSerializer.Serialize(pending,PublicApi.PublicV1Store.Json),job);

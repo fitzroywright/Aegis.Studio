@@ -50,11 +50,11 @@ const publicRoster=StudioRosterEditor.open(rosterHost,{...draftData,readFile:asy
  const result=await api('/api/roster-drafts'+(draftReceipt?'/'+draftReceipt.id:''),{method:draftReceipt?'PUT':'POST',headers:{'X-CSRF-Token':intakeCsrf,...(draftReceipt?{'X-Intake-Token':draftReceipt.accessToken}:{})},body:JSON.stringify(value)});
  if(!draftReceipt){draftReceipt={id:result.id,accessToken:result.accessToken};sessionStorage.setItem('roster-draft',JSON.stringify(draftReceipt));}return result;
 }});
-kindSelect.onchange=()=>{const booking=kindSelect.value==='Booking';for(const name of ['clientEmail','sessionType','startsAt','preferredTime'])if(bookingForm.elements[name])bookingForm.elements[name].required=booking;};
+kindSelect.onchange=()=>{const booking=kindSelect.value==='Booking';for(const name of ['clientEmail','locationCode','sessionType','startsAt','preferredTime'])if(bookingForm.elements[name])bookingForm.elements[name].required=booking;};
 $('booking-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type=submit]');button.disabled=true;
  try{
-  const f=Object.fromEntries(new FormData(form)),payload={kind:f.intakeKind,clientName:f.clientName,clientEmail:f.clientEmail||'',clientPhone:f.clientPhone||'',sessionType:f.sessionType||'',notes:f.notes||'',timeZone:'America/Jamaica',roster:publicRoster.getRows()};
+  const f=Object.fromEntries(new FormData(form)),payload={kind:f.intakeKind,clientName:f.clientName,clientEmail:f.clientEmail||'',clientPhone:f.clientPhone||'',sessionType:f.sessionType||'',locationCode:f.locationCode||'',notes:f.notes||'',timeZone:'America/Jamaica',roster:publicRoster.getRows()};
   if(f.startsAt){const start=new Date(`${f.startsAt}T${f.preferredTime||'10:00'}:00-05:00`);payload.startsAt=start.toISOString();payload.endsAt=new Date(start.getTime()+3600000).toISOString();}
   const encoded=JSON.stringify(payload);let draft=JSON.parse(sessionStorage.getItem('intake-submit')||'null');if(!draft||draft.body!==encoded){draft={key:crypto.randomUUID(),body:encoded};sessionStorage.setItem('intake-submit',JSON.stringify(draft));}
   const receipt=await api('/api/bookings',{method:'POST',headers:{'Idempotency-Key':draft.key,'X-CSRF-Token':intakeCsrf},body:draft.body});
