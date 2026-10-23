@@ -47,7 +47,7 @@ export function createIntakeApi(env,readBody,json) {
   }
   return {store,async handle(req,res,url){
     const route=url.pathname, method=req.method;
-    const keyCollection='/api/public-site/v1/admin/integration-keys',keyItem=route.match(/^\/api\/public-site\/v1\/admin\/integration-keys\/([0-9a-f-]{36})$/i);
+    const keyCollection='/api/v1/admin/integration-keys',keyItem=route.match(/^\/api\/public-site\/v1\/admin\/integration-keys\/([0-9a-f-]{36})$/i);
     if(route===keyCollection&&['GET','POST'].includes(method)){
       authenticateProvisioning(req);
       if(method==='GET'){json(res,200,{items:store.listApiCredentials()});return true;}
@@ -57,7 +57,7 @@ export function createIntakeApi(env,readBody,json) {
       authenticateProvisioning(req);if(!store.revokeApiCredential(keyItem[1]))fail(404,'not_found','Integration key not found.');
       json(res,200,{id:keyItem[1],status:'Revoked'});return true;
     }
-    if(route==='/api/public-site/v1/admin/client-link-proofs'&&method==='POST'){
+    if(route==='/api/v1/admin/client-link-proofs'&&method==='POST'){
       authenticateProvisioning(req);const p=await input(req,4096),proof=store.createClientLinkChallenge(p.clientId);
       json(res,201,{id:proof.id,code:proof.code,expiresAt:proof.expiresAt},{'Cache-Control':'no-store'});return true;
     }
@@ -69,7 +69,7 @@ export function createIntakeApi(env,readBody,json) {
     if(route==='/api/intake-session'&&method==='GET'){
       const csrf=randomUUID();json(res,200,{csrf},{'Set-Cookie':`intake_csrf=${csrf}; Path=/; HttpOnly; SameSite=Strict${env.NODE_ENV==='production'?'; Secure':''}`});return true;
     }
-    if(route==='/api/public-site/v1/openapi.json'&&method==='GET'){
+    if(route==='/api/v1/openapi.json'&&method==='GET'){
       const {readFile}=await import('node:fs/promises');json(res,200,JSON.parse(await readFile(new URL('./public-site-v1.openapi.json',import.meta.url),'utf8')));return true;
     }
     const draft=route.match(/^\/api\/roster-drafts(?:\/([0-9a-f-]{36}))?$/i);
@@ -88,16 +88,16 @@ export function createIntakeApi(env,readBody,json) {
       // Return the text to the same reusable editor for column mapping and explicit commit.
       json(res,200,{csv});return true;
     }
-    if(!route.startsWith('/api/public-site/v1/')&&!/^\/api\/(bookings|inquiries)(\/|$)/.test(route))return false;
+    if(!route.startsWith('/api/v1/')&&!/^\/api\/(bookings|inquiries)(\/|$)/.test(route))return false;
     const browser=/^\/api\/(bookings|inquiries)/.test(route);
     if(browser&&['POST','PUT','DELETE'].includes(method))await sameOrigin(req,url);
-    const submit=route==='/api/bookings'||route==='/api/inquiries'||route==='/api/public-site/v1/intakes';
+    const submit=route==='/api/bookings'||route==='/api/inquiries'||route==='/api/v1/intakes';
     if(submit&&method==='POST'){
       const owner=browser?'reference-site-form':authenticate(req,'intake:submit');
       const value=await input(req,2_000_000);if(route==='/api/inquiries')value.kind='Inquiry';
       const result=store.create(owner,String(req.headers['idempotency-key']||''),value,browser?'Form':'Api');json(res,201,result);return true;
     }
-    if(route==='/api/public-site/v1/changes'&&method==='GET'){authenticate(req,'intake:pull');json(res,200,store.feed(url.searchParams.get('cursor')||''));return true;}
+    if(route==='/api/v1/changes'&&method==='GET'){authenticate(req,'intake:pull');json(res,200,store.feed(url.searchParams.get('cursor')||''));return true;}
     const match=route.match(/^\/api\/public-site\/v1\/intakes\/([0-9a-f-]{36})(?:\/(ack|status|roster|attachments|payments))?$/i)||route.match(/^\/api\/(?:bookings|inquiries)\/([0-9a-f-]{36}|\d{4}-(?:BR|W)-\d{6})(?:\/(roster|attachments))?$/i);
     if(match){
       const id=match[1],action=match[2],token=String(req.headers['x-intake-token']||'');
@@ -123,7 +123,7 @@ export function createIntakeApi(env,readBody,json) {
     }
     const file=route.match(/^\/api\/public-site\/v1\/attachments\/([0-9a-f-]{36})$/i);
     if(file&&method==='GET'){authenticate(req,'intake:pull');const r=store.db.prepare("SELECT metadata,content FROM attachments WHERE id=? AND state='Clean'").get(file[1]);if(!r)fail(404,'unavailable','Attachment is unavailable or quarantined.');const m=JSON.parse(r.metadata);res.writeHead(200,{'Content-Type':m.contentType,'Cache-Control':'no-store','Content-Disposition':'attachment'});res.end(r.content);return true;}
-    if(route==='/api/public-site/v1/galleries'&&method==='POST'){
+    if(route==='/api/v1/galleries'&&method==='POST'){
       authenticate(req,'gallery:publish');const p=await input(req,1_000_000);if(!/^[0-9a-f-]{36}$/i.test(p.id)||!p.clientId||!Array.isArray(p.items)||p.items.length>10000||!p.title)fail(400,'invalid_gallery','Gallery ID, client ID, title and items required.');
       store.transaction(()=>{const old=store.db.prepare('SELECT client_id FROM galleries WHERE id=?').get(p.id);if(old&&old.client_id!==p.clientId)fail(409,'gallery_owner','Cannot change gallery owner.');store.db.prepare('INSERT INTO galleries VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').run(p.id,p.clientId,JSON.stringify({...p,published:false}));});json(res,200,{reference:p.id,provider:'PublicSite',storedVersionIds:store.db.prepare('SELECT id FROM media WHERE gallery_id=?').all(p.id).map(x=>x.id)});return true;
     }
