@@ -16,6 +16,12 @@ test('Jamaica year rollover and exhaustion never reuse references',()=>{
  assert.equal(s.create('form','1',inquiry).intakeReference,'2026-W-000001');now=new Date('2027-01-01T05:00:00Z');assert.equal(s.create('api','2',inquiry).intakeReference,'2027-W-000001');
  s.db.prepare("UPDATE counters SET value=999999 WHERE year=2027").run();assert.throws(()=>s.create('api','3',inquiry),e=>e.code==='reference_exhausted');s.close();
 });
+test('booking references use the yearly BR sequence, remain idempotent, and are distinct from inquiry references',()=>{
+ const booking={...inquiry,kind:'Booking',sessionType:'Portrait',startsAt:'2026-11-01T10:00:00-05:00',endsAt:'2026-11-01T11:00:00-05:00'};
+ let now=new Date('2027-01-01T04:59:59Z');const s=new IntakeStore(':memory:',()=>now);
+ const first=s.create('form','booking-1',booking);assert.equal(first.intakeReference,'2026-BR-000001');assert.equal(s.create('form','booking-1',booking).intakeReference,'2026-BR-000001');
+ now=new Date('2027-01-01T05:00:00Z');assert.equal(s.create('api','booking-2',booking).intakeReference,'2027-BR-000001');assert.equal(s.create('api','inquiry-2',inquiry).intakeReference,'2027-W-000001');s.close();
+});
 test('lost acknowledgments, changed rosters and old acknowledgments preserve newer revisions',()=>{
  const s=new IntakeStore(':memory:'),r=s.create('a','1',inquiry),first=s.feed(),row={name:'Subject',reference:'one',contactEmail:'p@example.invalid',pickupNotification:'None'};
  s.roster(r.id,'a','',1,[row]);s.ack(r.id,1,{reviewStatus:'AwaitingReview'});assert.equal(s.status(r.id,'a','').pendingChanges,true);
