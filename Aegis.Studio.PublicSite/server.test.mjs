@@ -99,7 +99,7 @@ test('server provisions one-time integration keys, enforces scopes, and revokes 
   const provisioning='provisioning-secret-that-is-long-enough-for-tests';
   const origin=await fixture(t,{PUBLIC_API_PROVISIONING_TOKEN:provisioning});
   const adminHeaders={'X-Site-Provisioning-Token':provisioning,'Content-Type':'application/json'};
-  const denied=await fetch(`${origin}/api/public-site/v1/admin/integration-keys');
+  const denied=await fetch(`${origin}/api/public-site/v1/admin/integration-keys`);
   assert.equal(denied.status,401);
   const created=await fetch(`${origin}/api/public-site/v1/admin/integration-keys`,{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'Booking website',scopes:['intake:submit']})});
   assert.equal(created.status,201);
