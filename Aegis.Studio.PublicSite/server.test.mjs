@@ -94,3 +94,25 @@ test('local published media is isolated by client binding and revocation',async 
  assert.equal((await fetch(base+`/galleries/${gallery}/revoke`,{method:'POST',headers,body:'{}'})).status,200);
  assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:own}})).status,404);
 });
+
+test('server provisions one-time integration keys, enforces scopes, and revokes them', async t => {
+  const provisioning='provisioning-secret-that-is-long-enough-for-tests';
+  const origin=await fixture(t,{PUBLIC_API_PROVISIONING_TOKEN:provisioning});
+  const adminHeaders={'X-Site-Provisioning-Token':provisioning,'Content-Type':'application/json'};
+  const denied=await fetch(`${origin}/api/public-site/v1/admin/integration-keys');
+  assert.equal(denied.status,401);
+  const created=await fetch(`${origin}/api/public-site/v1/admin/integration-keys`,{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'Booking website',scopes:['intake:submit']})});
+  assert.equal(created.status,201);
+  const key=await created.json();assert.match(key.secret,/^[A-Za-z0-9_-]{40,}$/);assert.equal(key.name,'Booking website');
+  const listed=await(await fetch(`${origin}/api/public-site/v1/admin/integration-keys`,{headers:adminHeaders})).json();
+  assert.equal(listed.items.length,1);assert.equal('secret' in listed.items[0],false);assert.equal('secret_hash' in listed.items[0],false);
+  const booking={kind:'Booking',clientName:'Test Client',clientEmail:'test@example.invalid',sessionType:'Portrait',startsAt:'2026-11-01T10:00:00-05:00',endsAt:'2026-11-01T11:00:00-05:00'};
+  const submission=await fetch(`${origin}/api/public-site/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'one','Content-Type':'application/json'},body:JSON.stringify(booking)});
+  assert.equal(submission.status,201);
+  const galleryScope=await fetch(`${origin}/api/public-site/v1/changes`,{headers:{Authorization:`Bearer ${key.secret}`}});
+  assert.equal(galleryScope.status,403);
+  const revoked=await fetch(`${origin}/api/public-site/v1/admin/integration-keys/${key.id}`,{method:'DELETE',headers:{'X-Site-Provisioning-Token':provisioning}});
+  assert.equal(revoked.status,200);
+  const afterRevoke=await fetch(`${origin}/api/public-site/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'two','Content-Type':'application/json'},body:JSON.stringify(booking)});
+  assert.equal(afterRevoke.status,401);
+});
