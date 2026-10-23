@@ -125,7 +125,7 @@ function renderFrontDesk(){
     const queueJobs=frontDeskJobs.filter(j=>frontDeskColumnFilters.status==='Completed'?j.status==='Completed':['Ready for Client','Ready for Delivery','Published'].includes(j.status));
     const intakeEntries=[
         ...enquiries.map(e=>({kind:'enquiry',id:e.id,created:e.createdAtUtc,name:e.contactName||'New inquiry',title:e.subject||'Inquiry',date:null,status:'New',source:e.channel||'Inquiry',conversationId:e.id})),
-        ...frontDeskRequests.filter(Boolean).map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Client',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:'Booking',request:x}))
+        ...frontDeskRequests.filter(Boolean).map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Client',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:/^website(v1)?$/i.test(String(x.request?.bookingSource||''))?'Web site':x.request?.bookingSource==='FrontDesk'?'Front Desk':x.request?.bookingSource||'Booking',request:x}))
     ].sort((a,b)=>new Date(b.created||0)-new Date(a.created||0));
     const entries=jobQueue?queueJobs.map(j=>({kind:'job',id:j.id,jobId:j.id,created:j.createdAtUtc,name:j.clientName||'Client',title:j.title,date:j.eventDate,status:j.status,source:'Job'})):intakeEntries;
     const entryType=e=>e.kind==='enquiry'?'Inquiry':e.kind==='job'?'Job':'Booking';
