@@ -69,7 +69,7 @@ test('serves standalone client assets and an operational health endpoint', async
 });
 test('server integrations do not require Origin and scopes isolate submission from polling and payment',async t=>{
  const keys=[{id:'external',secret:'external-test-secret-01234567890123456789',scopes:['intake:submit']},{id:'studio',secret:'studio-test-secret-01234567890123456789',scopes:['intake:pull','intake:ack']},{id:'other',secret:'other-test-secret-01234567890123456789',scopes:['intake:submit']}];
- const origin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify(keys)}),base=origin+'/api/public-site/v1';
+ const origin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify(keys)}),base=origin+'/api/v1';
  const response=await fetch(base+'/intakes',{method:'POST',headers:{Authorization:'Bearer '+keys[0].secret,'Idempotency-Key':'api-1','Content-Type':'application/json'},body:JSON.stringify({kind:'Inquiry',clientName:'Test Client'})});assert.equal(response.status,201);const receipt=await response.json();
  assert.equal((await fetch(base+'/changes',{headers:{Authorization:'Bearer '+keys[0].secret}})).status,403);
  assert.equal((await fetch(base+'/intakes/'+receipt.id,{headers:{Authorization:'Bearer '+keys[2].secret}})).status,404);
@@ -80,7 +80,7 @@ test('server integrations do not require Origin and scopes isolate submission fr
 });
 test('local published media is isolated by client binding and revocation',async t=>{
  const secret='publication-test-secret-01234567890123456789',gallery='11111111-1111-4111-8111-111111111111',version='33333333-3333-4333-8333-333333333333',client='22222222-2222-4222-8222-222222222222';
- const origin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify([{id:'studio',secret,scopes:['gallery:publish']}]),CLIENT_BINDINGS_JSON:JSON.stringify({'demo-google-maya':client})}),base=origin+'/api/public-site/v1';
+ const origin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify([{id:'studio',secret,scopes:['gallery:publish']}]),CLIENT_BINDINGS_JSON:JSON.stringify({'demo-google-maya':client})}),base=origin+'/api/v1';
  const headers={Authorization:'Bearer '+secret,'Content-Type':'application/json'};
  assert.equal((await fetch(base+'/galleries',{method:'POST',headers,body:JSON.stringify({id:gallery,clientId:client,title:'Local gallery',finalDeliveryAvailable:true,items:[{versionId:version,fileName:'portrait.jpg'}]})})).status,200);
  assert.equal((await fetch(base+`/galleries/${gallery}/publish`,{method:'POST',headers,body:'{}'})).status,409);
@@ -99,33 +99,33 @@ test('server provisions one-time integration keys, enforces scopes, and revokes 
   const provisioning='provisioning-secret-that-is-long-enough-for-tests';
   const origin=await fixture(t,{PUBLIC_API_PROVISIONING_TOKEN:provisioning});
   const adminHeaders={'X-Site-Provisioning-Token':provisioning,'Content-Type':'application/json'};
-  const denied=await fetch(`${origin}/api/public-site/v1/admin/integration-keys`);
+  const denied=await fetch(`${origin}/api/v1/admin/integration-keys`);
   assert.equal(denied.status,401);
-  const created=await fetch(`${origin}/api/public-site/v1/admin/integration-keys`,{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'Booking website',scopes:['intake:submit']})});
+  const created=await fetch(`${origin}/api/v1/admin/integration-keys`,{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'Booking website',scopes:['intake:submit']})});
   assert.equal(created.status,201);
   const key=await created.json();assert.match(key.secret,/^[A-Za-z0-9_-]{40,}$/);assert.equal(key.name,'Booking website');
-  const listed=await(await fetch(`${origin}/api/public-site/v1/admin/integration-keys`,{headers:adminHeaders})).json();
+  const listed=await(await fetch(`${origin}/api/v1/admin/integration-keys`,{headers:adminHeaders})).json();
   assert.equal(listed.items.length,1);assert.equal('secret' in listed.items[0],false);assert.equal('secret_hash' in listed.items[0],false);
   const booking={kind:'Booking',clientName:'Test Client',clientEmail:'test@example.invalid',sessionType:'Portrait',startsAt:'2026-11-01T10:00:00-05:00',endsAt:'2026-11-01T11:00:00-05:00'};
-  const submission=await fetch(`${origin}/api/public-site/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'one','Content-Type':'application/json'},body:JSON.stringify(booking)});
+  const submission=await fetch(`${origin}/api/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'one','Content-Type':'application/json'},body:JSON.stringify(booking)});
   assert.equal(submission.status,201);
-  const galleryScope=await fetch(`${origin}/api/public-site/v1/changes`,{headers:{Authorization:`Bearer ${key.secret}`}});
+  const galleryScope=await fetch(`${origin}/api/v1/changes`,{headers:{Authorization:`Bearer ${key.secret}`}});
   assert.equal(galleryScope.status,403);
-  const revoked=await fetch(`${origin}/api/public-site/v1/admin/integration-keys/${key.id}`,{method:'DELETE',headers:{'X-Site-Provisioning-Token':provisioning}});
+  const revoked=await fetch(`${origin}/api/v1/admin/integration-keys/${key.id}`,{method:'DELETE',headers:{'X-Site-Provisioning-Token':provisioning}});
   assert.equal(revoked.status,200);
-  const afterRevoke=await fetch(`${origin}/api/public-site/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'two','Content-Type':'application/json'},body:JSON.stringify(booking)});
+  const afterRevoke=await fetch(`${origin}/api/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'two','Content-Type':'application/json'},body:JSON.stringify(booking)});
   assert.equal(afterRevoke.status,401);
 });
 
 test('client link proof is single use, bound to authenticated provider subject, and scopes galleries by Studio client UUID',async t=>{
  const provision='client-link-provisioning-secret-long-enough',client='22222222-2222-4222-8222-222222222222';
  const origin=await fixture(t,{PUBLIC_API_PROVISIONING_TOKEN:provision,CLIENT_BINDINGS_JSON:'{}'});
- const created=await fetch(origin+'/api/public-site/v1/admin/client-link-proofs',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({clientId:client})});assert.equal(created.status,201);const proof=await created.json();
+ const created=await fetch(origin+'/api/v1/admin/client-link-proofs',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({clientId:client})});assert.equal(created.status,201);const proof=await created.json();
  const login=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity:'maya'})}),cookie=login.headers.get('set-cookie').split(';')[0];
- const redeem=await fetch(origin+'/api/public-site/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})});assert.equal(redeem.status,200);
- assert.equal((await fetch(origin+'/api/public-site/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})})).status,404);
+ const redeem=await fetch(origin+'/api/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})});assert.equal(redeem.status,200);
+ assert.equal((await fetch(origin+'/api/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})})).status,404);
  const gallery='11111111-1111-4111-8111-111111111111',version='33333333-3333-4333-8333-333333333333',key='gallery-publish-test-secret-0123456789';
- const api=origin+'/api/public-site/v1',auth={Authorization:'Bearer '+key,'Content-Type':'application/json'};
+ const api=origin+'/api/v1',auth={Authorization:'Bearer '+key,'Content-Type':'application/json'};
  const provisioned=await fetch(api+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Gallery Publisher',scopes:['gallery:publish']})});const publisher=(await provisioned.json()).secret;
  const ph={Authorization:'Bearer '+publisher,'Content-Type':'application/json'};
  await fetch(api+'/galleries',{method:'POST',headers:ph,body:JSON.stringify({id:gallery,clientId:client,title:'Linked client gallery',items:[{versionId:version,fileName:'proof.jpg'}]})});
