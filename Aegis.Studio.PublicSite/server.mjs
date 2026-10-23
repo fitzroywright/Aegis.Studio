@@ -174,7 +174,8 @@ export function createServer(env = process.env) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const server = createServer();
-  server.listen(Number(process.env.PORT || 8080), '0.0.0.0', () => console.log(`Aegis Studio Public Site listening on ${process.env.PORT || 8080}`));
+  const host=process.env.HOST||'127.0.0.1',port=Number(process.env.PORT||8080);
+  server.listen(port,host,()=>console.log(`Aegis Studio Public Site listening on ${host}:${port}`));
 }
 
 
