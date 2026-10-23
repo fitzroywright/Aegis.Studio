@@ -33,6 +33,7 @@ public sealed class InboundEmailWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            bool processingMessage = false;
             try
             {
                 using var operation = Aegis.Studio.Web.Operations.DemoMaintenance.TryEnterOperation(database);
@@ -54,13 +55,10 @@ public sealed class InboundEmailWorker : BackgroundService
                         graphEmail.Body,
                         graphEmail.ReceivedAtUtc,
                         graphEmail.FileAttachments.Select(a => new InboundEmailAttachment(a.FileName, a.ContentType, a.Content, a.IsInline)).ToList(), graphEmail.ProviderMessageId);
-                    string correlationId = email.MessageId;
-                    operationsFlows.TryEnqueueInbound(correlationId, "Mailbox");
-                    var result=await intake.ReceiveAsync(email,stoppingToken);
-                    operationsFlows.TryEnqueueInbound(correlationId,"Router",businessId:(result.ConversationId??result.ReviewId)?.ToString("D"),
-                        detail:result.Routed?"Associated":"Review",failed:!result.Routed);
-                    logger.LogInformation("Inbound email {MessageId}: routed {Routed}, conversation {ConversationId}, review {ReviewId}",
-                        email.MessageId,result.Routed,result.ConversationId,result.ReviewId);
+                    processingMessage = true;
+                    await ProcessMessageAsync(email, (message, token) => intake.ReceiveAsync(message, token),
+                        operationsFlows, logger, stoppingToken);
+                    processingMessage = false;
                 }
 
                 if (!string.IsNullOrWhiteSpace(batch.DeltaLink))
@@ -79,11 +77,46 @@ public sealed class InboundEmailWorker : BackgroundService
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Microsoft Graph email ingestion cycle failed.");
+                // Message failures are already logged with their identifiers. Do not duplicate them.
+                if (!processingMessage)
+                    logger.LogError("Microsoft Graph email ingestion cycle failed. ErrorType={ErrorType}", exception.GetType().Name);
             }
 
             await Task.Delay(graphClient.PollInterval, stoppingToken);
         }
     }
-}
 
+    // Keep the receipt and routing boundary together so failures cannot hide a retrieved email.
+    internal static async Task ProcessMessageAsync(InboundEmail email,
+        Func<InboundEmail, CancellationToken, Task<StudioEmailIntakeResult>> receive,
+        StudioOperationsFlowPublisher flows, ILogger logger, CancellationToken token)
+    {
+        string correlationId = email.MessageId;
+        logger.LogInformation(new EventId(22101, "InboundEmailReceived"),
+            "Inbound email received from Microsoft Graph. MessageId={MessageId} ProviderMessageId={ProviderMessageId} CorrelationId={CorrelationId} Sender={Sender} Subject={Subject} ReceivedAtUtc={ReceivedAtUtc} AttachmentCount={AttachmentCount}",
+            email.MessageId, email.ProviderMessageId, correlationId, email.FromAddress, email.Subject,
+            email.ReceivedAt.ToUniversalTime(), email.FileAttachments.Count);
+        try
+        {
+            flows.TryEnqueueInbound(correlationId, "Mailbox");
+            var result = await receive(email, token);
+            flows.TryEnqueueInbound(correlationId, "Router",
+                businessId: (result.ConversationId ?? result.ReviewId)?.ToString("D"),
+                detail: result.Routed ? "Associated" : "Review", failed: !result.Routed);
+            logger.LogInformation(new EventId(22102, "InboundEmailRoutingCompleted"),
+                "Inbound email routing completed. MessageId={MessageId} ProviderMessageId={ProviderMessageId} CorrelationId={CorrelationId} Routed={Routed} ConversationId={ConversationId} ReviewId={ReviewId} WorkspaceId={WorkspaceId} WasDuplicate={WasDuplicate}",
+                email.MessageId, email.ProviderMessageId, correlationId, result.Routed,
+                result.ConversationId, result.ReviewId, result.WorkspaceId, result.WasDuplicate);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (Exception exception)
+        {
+            flows.TryEnqueueInbound(correlationId, "Router", detail: exception.GetType().Name, failed: true);
+            // Provider/storage exception text may contain email content. Log only the error type.
+            logger.LogError(new EventId(22103, "InboundEmailRoutingFailed"),
+                "Inbound email routing failed. MessageId={MessageId} ProviderMessageId={ProviderMessageId} CorrelationId={CorrelationId} ErrorType={ErrorType}",
+                email.MessageId, email.ProviderMessageId, correlationId, exception.GetType().Name);
+            throw; // Abort the batch and retain its delta checkpoint for retry.
+        }
+    }
+}
