@@ -43,6 +43,8 @@ export class IntakeStore {
       CREATE TABLE IF NOT EXISTS attachments(id TEXT PRIMARY KEY,intake_id TEXT,metadata TEXT,content BLOB,state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS galleries(id TEXT PRIMARY KEY,client_id TEXT NOT NULL,payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS api_credentials(id TEXT PRIMARY KEY,name TEXT NOT NULL,secret_hash TEXT NOT NULL UNIQUE,scopes TEXT NOT NULL,created_at TEXT NOT NULL,last_used_at TEXT,revoked_at TEXT);
+      CREATE TABLE IF NOT EXISTS client_link_challenges(id TEXT PRIMARY KEY,code_hash TEXT NOT NULL UNIQUE,client_id TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT,revoked_at TEXT,created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS client_identity_links(provider TEXT NOT NULL,subject TEXT NOT NULL,client_id TEXT NOT NULL,verified_at TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(provider,subject));
       CREATE TABLE IF NOT EXISTS media(gallery_id TEXT,id TEXT,type TEXT,content BLOB,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS selections(gallery_id TEXT,id TEXT,selected INTEGER,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS payment_events(id TEXT PRIMARY KEY,intake_id TEXT NOT NULL,hash TEXT NOT NULL,payload TEXT NOT NULL);`);
@@ -71,6 +73,26 @@ export class IntakeStore {
     this.db.prepare('UPDATE api_credentials SET last_used_at=? WHERE id=?').run(this.now().toISOString(),row.id);
     return row.id;
   }
+  createClientLinkChallenge(clientId, ttlMinutes = 15) {
+    if(!/^[0-9a-f-]{36}$/i.test(String(clientId||''))) fail(400,'invalid_client_id','A Studio client UUID is required.');
+    const id=randomUUID(),code=randomBytes(24).toString('base64url'),created=this.now(),expires=new Date(created.getTime()+ttlMinutes*60000).toISOString();
+    this.db.prepare('INSERT INTO client_link_challenges(id,code_hash,client_id,expires_at,created_at) VALUES(?,?,?,?,?)').run(id,createHash('sha256').update(code).digest('hex'),clientId,expires,created.toISOString());
+    return {id,code,expiresAt:expires};
+  }
+  redeemClientLinkChallenge(code,provider,subject) {
+    if(typeof code!=='string'||code.length<20||!['Google','Facebook','Apple'].includes(provider)||typeof subject!=='string'||subject.length<1||subject.length>300) fail(400,'invalid_link_proof','A valid provider and stable authenticated provider subject are required.');
+    return this.transaction(()=>{
+      const row=this.db.prepare('SELECT * FROM client_link_challenges WHERE code_hash=?').get(createHash('sha256').update(code).digest('hex'));
+      if(!row||row.used_at||row.revoked_at||Date.parse(row.expires_at)<=this.now().getTime()) fail(404,'link_proof_unavailable','Link proof is invalid, expired, used, or revoked.');
+      const existing=this.db.prepare('SELECT client_id FROM client_identity_links WHERE provider=? AND subject=? AND revoked_at IS NULL').get(provider,subject);
+      if(existing&&existing.client_id!==row.client_id) fail(409,'identity_already_linked','This sign-in identity is already linked to another client.');
+      this.db.prepare('UPDATE client_link_challenges SET used_at=? WHERE id=? AND used_at IS NULL AND revoked_at IS NULL').run(this.now().toISOString(),row.id);
+      this.db.prepare('INSERT INTO client_identity_links(provider,subject,client_id,verified_at) VALUES(?,?,?,?) ON CONFLICT(provider,subject) DO UPDATE SET client_id=excluded.client_id,verified_at=excluded.verified_at,revoked_at=NULL').run(provider,subject,row.client_id,this.now().toISOString());
+      return {clientId:row.client_id,provider,verifiedAt:this.now().toISOString()};
+    });
+  }
+  clientForIdentity(provider,subject) { return this.db.prepare('SELECT client_id FROM client_identity_links WHERE provider=? AND subject=? AND revoked_at IS NULL').get(provider,subject)?.client_id||null; }
+  revokeClientIdentity(provider,subject) { return this.db.prepare('UPDATE client_identity_links SET revoked_at=? WHERE provider=? AND subject=? AND revoked_at IS NULL').run(this.now().toISOString(),provider,subject).changes>0; }
   replay(owner, key, payload, action) {
     if (!/^[A-Za-z0-9._-]{1,100}$/.test(key || '')) fail(400, 'idempotency_required', 'Provide Idempotency-Key (1–100 letters, digits, dots, underscores or dashes).');
     return this.transaction(() => {
@@ -147,3 +169,4 @@ export class IntakeStore {
   }
   close() { this.db.close(); }
 }
+
