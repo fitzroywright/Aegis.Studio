@@ -3,14 +3,14 @@ namespace Aegis.Studio.Web.Production;
 public static class WorkflowGraphExamples
 {
     public static WorkflowGraph Linear() => WorkflowGraphEngine.FromSteps([
-        new("review", "Confirm the job brief"), new("produce", "Job closed the ordered work", DependsOn: ["review"]),
+        new("review", "Confirm the job brief"), new("produce", "Complete the ordered work", DependsOn: ["review"]),
         new("delivery", "Deliver the gallery and order", "Delivery", DependsOn: ["produce"])]);
     public static WorkflowGraph Graduation(Guid retouch, Guid print)
     {
         var nested = WorkflowGraphEngine.FromSteps([new("shoot", "Photograph scheduled subjects", "Shoot"), new("ingest", "Verify and organize the files", "FileIngest", DependsOn: ["shoot"])]);
         WorkflowNode Task(string id, string label, string type = "Other", string area = "Editing", bool optional = false) => new(id, label, Task: new(id, label, type, area, Optional: optional));
         return new([
-            new("start", "Job accepted", "Job accepted"), Task("review", "Confirm the job brief"), new("capture", "Capture and ingest photographs", "Subflow", Subflow: nested),
+            new("start", "Job accepted", "Start"), Task("review", "Confirm the job brief"), new("capture", "Capture and ingest photographs", "Subflow", Subflow: nested),
             new("services", "Confirm ordered services", "Decision"), Task("digital", "Edit and prepare the client gallery"), Task("retouch", "Retouch selected photographs", "Retouch"),
             Task("print", "Produce ordered prints", "Print", "Printing"), new("join", "All selected work complete", "Join"),
             Task("quality", "Quality check and approve the work", "QC", "Quality Control"), Task("delivery", "Deliver the gallery and order", "Delivery"), new("end", "Job closed", "End")
