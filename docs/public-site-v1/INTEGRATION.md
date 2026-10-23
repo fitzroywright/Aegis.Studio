@@ -1,6 +1,6 @@
 # Public website integration
 
-The authoritative contract is `Aegis.Studio.PublicSite/public-site-v1.openapi.json`. It is also served at `/api/public-site/v1/openapi.json`. This contract belongs to the public website, not the legacy Studio `/api/public/v1` endpoints. The production API is `https://api.bryanstudiosltd.com/api/public-site/v1`.
+The authoritative contract is `Aegis.Studio.PublicSite/public-site-v1.openapi.json`. It is also served at `/api/v1/openapi.json`. This contract belongs to the public website, not the legacy Studio `/api/public/v1` endpoints. The production API is `https://api.bryanstudiosltd.com/api/v1`.
 
 The website stores inquiries and booking requests independently. Its browser form and external submissions share one durable intake service and reference allocator. Studio connects outbound every 60 seconds, imports changes, then acknowledges the exact imported revision. Studio never needs an inbound booking port.
 
