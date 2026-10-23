@@ -1,18 +1,14 @@
 # Client intake implementation and validation handoff
 
-The feature branch implements independent public-site intake, one-minute Studio polling, intake references, acknowledgment status, roster staging and review, subject communication and optional pickup reminders, provider acceptance persistence, and background gallery copying. Restore, build, tests and live acceptance are reserved for the MacBook and the controlled runtime. Source preparation is not deployment or operational proof.
+Aegis.Studio main includes independent public-site intake, one-minute Studio polling, intake references, acknowledgment status, roster staging and review, subject communication and optional pickup reminders, provider acceptance persistence, and background gallery copying. The public API is served at `https://api.bryanstudiosltd.com/api/v1`. Restore, build, tests and live acceptance are run on the MacBook and controlled runtime; a source change alone is not deployment or operational proof.
 
-## Get the branch on the MacBook
+## Update the MacBook checkout
 
-Run inside the existing Aegis.Studio checkout, with the existing Common repositories available through `CommonRoot`:
+Run inside the existing Aegis.Studio checkout, with the existing Common repositories available through `CommonRoot`. Keep using `main`:
 
 ```bash
-git fetch origin
-git switch feature/client-intake-outbound-completion
-git pull --ff-only origin feature/client-intake-outbound-completion
+git pull --ff-only origin main
 ```
-
-Do not discard local edits to switch branches. Review the branch before merging. The implementation has not been merged to main.
 
 ## Local validation
 
@@ -43,7 +39,7 @@ Manual browser acceptance must also exercise pasted cells, column mapping, error
 ```text
 PublicSite__PollingEnabled=true
 PublicSite__GalleryPushEnabled=true
-PublicSite__BaseUrl=https://YOUR_PUBLIC_SITE_HOST/
+PublicSite__BaseUrl=https://api.bryanstudiosltd.com/
 PublicSite__IntegrationToken=PROVISION_THROUGH_THE_EXISTING_SECRET_STORE
 PublicSite__MalwareScannerPath=/usr/bin/clamscan
 ```
@@ -66,7 +62,7 @@ The legacy Studio `/api/public/v1` interface remains for compatibility. It is no
 
 ## Kratos deployment
 
-Use the existing MacBook Studio build/deploy workflow for this branch after local validation. Keep its existing service account, storage permissions, secret files and service unit. This repository does not contain the organization-level Kratos deployment script, so no replacement service installer is introduced here.
+Use the existing MacBook Studio build/deploy workflow from `main` after local validation. Keep its existing service account, storage permissions, secret files and service unit. This repository does not contain the organization-level Kratos deployment script, so no replacement service installer is introduced here.
 
 1. Back up PostgreSQL and the public site's SQLite volume. Stop old public-site forwarding before enabling the new independent intake mode; do not run mixed old/new booking ingestion.
 2. Build Studio and the public-site image on the MacBook. Use a revision-specific image tag and transfer that built image to the public host. Do not point the public site at internal Studio.
