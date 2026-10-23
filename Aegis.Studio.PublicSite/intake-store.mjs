@@ -42,11 +42,57 @@ export class IntakeStore {
       CREATE TABLE IF NOT EXISTS replays(owner TEXT,key TEXT,hash TEXT,result TEXT,PRIMARY KEY(owner,key));
       CREATE TABLE IF NOT EXISTS attachments(id TEXT PRIMARY KEY,intake_id TEXT,metadata TEXT,content BLOB,state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS galleries(id TEXT PRIMARY KEY,client_id TEXT NOT NULL,payload TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS api_credentials(id TEXT PRIMARY KEY,name TEXT NOT NULL,secret_hash TEXT NOT NULL UNIQUE,scopes TEXT NOT NULL,created_at TEXT NOT NULL,last_used_at TEXT,revoked_at TEXT);
+      CREATE TABLE IF NOT EXISTS client_link_challenges(id TEXT PRIMARY KEY,code_hash TEXT NOT NULL UNIQUE,client_id TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT,revoked_at TEXT,created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS client_identity_links(provider TEXT NOT NULL,subject TEXT NOT NULL,client_id TEXT NOT NULL,verified_at TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(provider,subject));
       CREATE TABLE IF NOT EXISTS media(gallery_id TEXT,id TEXT,type TEXT,content BLOB,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS selections(gallery_id TEXT,id TEXT,selected INTEGER,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS payment_events(id TEXT PRIMARY KEY,intake_id TEXT NOT NULL,hash TEXT NOT NULL,payload TEXT NOT NULL);`);
   }
   transaction(action) { this.db.exec('BEGIN IMMEDIATE'); try { const result = action(); this.db.exec('COMMIT'); return result; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
+  createApiCredential(name, scopes) {
+    if(typeof name!=='string'||!name.trim()||name.trim().length>100) fail(400,'invalid_key_name','Provide a key name up to 100 characters.');
+    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','gallery:publish','gallery:read','client:link','attachment:scan','payment:verified']);
+    if(!Array.isArray(scopes)||!scopes.length||scopes.some(x=>!allowed.has(x))||new Set(scopes).size!==scopes.length) fail(400,'invalid_scopes','Choose one or more supported, unique scopes.');
+    const id=randomUUID(),secret=randomBytes(32).toString('base64url'),createdAt=this.now().toISOString();
+    this.db.prepare('INSERT INTO api_credentials(id,name,secret_hash,scopes,created_at) VALUES(?,?,?,?,?)').run(id,name.trim(),createHash('sha256').update(secret).digest('hex'),JSON.stringify(scopes),createdAt);
+    return {id,name:name.trim(),scopes,createdAt,secret};
+  }
+  listApiCredentials() {
+    return this.db.prepare('SELECT id,name,scopes,created_at,last_used_at,revoked_at FROM api_credentials ORDER BY created_at DESC').all().map(x=>({...x,scopes:JSON.parse(x.scopes),status:x.revoked_at?'Revoked':'Active'}));
+  }
+  revokeApiCredential(id) {
+    const result=this.db.prepare('UPDATE api_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?').run(this.now().toISOString(),id);
+    return result.changes>0;
+  }
+  authenticateApiCredential(secret, scope) {
+    const hash=createHash('sha256').update(String(secret||'')).digest('hex');
+    const row=this.db.prepare('SELECT * FROM api_credentials WHERE secret_hash=? AND revoked_at IS NULL').get(hash);
+    if(!row)return null;
+    const scopes=JSON.parse(row.scopes);if(!scopes.includes(scope))fail(403,'wrong_scope','Credential lacks the required scope.');
+    this.db.prepare('UPDATE api_credentials SET last_used_at=? WHERE id=?').run(this.now().toISOString(),row.id);
+    return row.id;
+  }
+  createClientLinkChallenge(clientId, ttlMinutes = 15) {
+    if(!/^[0-9a-f-]{36}$/i.test(String(clientId||''))) fail(400,'invalid_client_id','A Studio client UUID is required.');
+    const id=randomUUID(),code=randomBytes(24).toString('base64url'),created=this.now(),expires=new Date(created.getTime()+ttlMinutes*60000).toISOString();
+    this.db.prepare('INSERT INTO client_link_challenges(id,code_hash,client_id,expires_at,created_at) VALUES(?,?,?,?,?)').run(id,createHash('sha256').update(code).digest('hex'),clientId,expires,created.toISOString());
+    return {id,code,expiresAt:expires};
+  }
+  redeemClientLinkChallenge(code,provider,subject) {
+    if(typeof code!=='string'||code.length<20||!['Google','Facebook','Apple'].includes(provider)||typeof subject!=='string'||subject.length<1||subject.length>300) fail(400,'invalid_link_proof','A valid provider and stable authenticated provider subject are required.');
+    return this.transaction(()=>{
+      const row=this.db.prepare('SELECT * FROM client_link_challenges WHERE code_hash=?').get(createHash('sha256').update(code).digest('hex'));
+      if(!row||row.used_at||row.revoked_at||Date.parse(row.expires_at)<=this.now().getTime()) fail(404,'link_proof_unavailable','Link proof is invalid, expired, used, or revoked.');
+      const existing=this.db.prepare('SELECT client_id FROM client_identity_links WHERE provider=? AND subject=? AND revoked_at IS NULL').get(provider,subject);
+      if(existing&&existing.client_id!==row.client_id) fail(409,'identity_already_linked','This sign-in identity is already linked to another client.');
+      this.db.prepare('UPDATE client_link_challenges SET used_at=? WHERE id=? AND used_at IS NULL AND revoked_at IS NULL').run(this.now().toISOString(),row.id);
+      this.db.prepare('INSERT INTO client_identity_links(provider,subject,client_id,verified_at) VALUES(?,?,?,?) ON CONFLICT(provider,subject) DO UPDATE SET client_id=excluded.client_id,verified_at=excluded.verified_at,revoked_at=NULL').run(provider,subject,row.client_id,this.now().toISOString());
+      return {clientId:row.client_id,provider,verifiedAt:this.now().toISOString()};
+    });
+  }
+  clientForIdentity(provider,subject) { return this.db.prepare('SELECT client_id FROM client_identity_links WHERE provider=? AND subject=? AND revoked_at IS NULL').get(provider,subject)?.client_id||null; }
+  revokeClientIdentity(provider,subject) { return this.db.prepare('UPDATE client_identity_links SET revoked_at=? WHERE provider=? AND subject=? AND revoked_at IS NULL').run(this.now().toISOString(),provider,subject).changes>0; }
   replay(owner, key, payload, action) {
     if (!/^[A-Za-z0-9._-]{1,100}$/.test(key || '')) fail(400, 'idempotency_required', 'Provide Idempotency-Key (1–100 letters, digits, dots, underscores or dashes).');
     return this.transaction(() => {
@@ -73,9 +119,10 @@ export class IntakeStore {
       if (['payment','payments','paid','paymentStatus','confirmed','requiredDeposit'].some(k => k in input)) fail(400,'untrusted_payment','Payment and confirmation fields are not accepted on intake.');
       p.roster = validateRoster(input.roster); p.attachments = []; p.paymentEvents = [];
       const now = this.now(), year = Number(new Intl.DateTimeFormat('en', { timeZone: 'America/Jamaica', year: 'numeric' }).format(now));
-      const next = this.db.prepare("INSERT INTO counters VALUES(?,'W',1) ON CONFLICT(year,source) DO UPDATE SET value=value+1 RETURNING value").get(year).value;
+      const referencePrefix = kind === 'Booking' ? 'BR' : 'W';
+      const next = this.db.prepare('INSERT INTO counters VALUES(?,?,1) ON CONFLICT(year,source) DO UPDATE SET value=value+1 RETURNING value').get(year,referencePrefix).value;
       if (next > 999999) fail(503,'reference_exhausted','Intake reference capacity exhausted. Contact staff.');
-      p.id = randomUUID(); p.intakeReference = `${year}-W-${String(next).padStart(6,'0')}`; p.createdAtUtc = now.toISOString(); p.revision = 1;
+      p.id = randomUUID(); p.intakeReference = `${year}-${referencePrefix}-${String(next).padStart(6,'0')}`; p.createdAtUtc = now.toISOString(); p.revision = 1;
       const token = randomBytes(32).toString('base64url');
       this.db.prepare('INSERT INTO intakes(id,reference,owner,payload,revision,created_at,access_hash) VALUES(?,?,?,?,?,?,?)').run(p.id,p.intakeReference,owner,JSON.stringify(p),1,p.createdAtUtc,fingerprint(token));
       this.change(p);
@@ -122,3 +169,4 @@ export class IntakeStore {
   }
   close() { this.db.close(); }
 }
+

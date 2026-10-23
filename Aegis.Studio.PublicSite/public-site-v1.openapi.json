@@ -159,7 +159,7 @@
           },
           "intakeReference": {
             "type": "string",
-            "pattern": "^\\d{4}-W-\\d{6}$"
+            "pattern": "^\\d{4}-(?:BR|W)-\\d{6}$"
           },
           "status": {
             "type": "string",

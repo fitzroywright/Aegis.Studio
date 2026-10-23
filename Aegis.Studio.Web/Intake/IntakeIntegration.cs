@@ -46,7 +46,7 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
     public Guid Import(string source,JsonElement p)
     {
         Guid external=p.GetProperty("id").GetGuid();long revision=p.GetProperty("revision").GetInt64();string reference=Text(p,"intakeReference");
-        if(revision<1||!Regex.IsMatch(reference,@"^\d{4}-W-\d{6}$"))throw new ArgumentException("Invalid website revision or intake reference.");
+        if(revision<1||!Regex.IsMatch(reference,@"^\d{4}-(?:BR|W)-\d{6}$"))throw new ArgumentException("Invalid website revision or intake reference.");
         var destination=Text(p,"destination");var w=workspaces.FindByRouteKey(destination)??workspaces.FindByAddress(destination);
         if(w is null||!w.IsEnabled)w=workspaces.Get(WorkflowRules.UnassignedWorkspaceId)??throw new InvalidOperationException("Unassigned workspace unavailable.");
         var rows=p.GetProperty("roster");IntakeRosterStore.Validate(rows);
