@@ -60,7 +60,7 @@ async function showFrontDesk() {
     [frontDeskJobs,frontDeskRequests,frontDeskEnquiries,frontDeskWorkspaces,frontDeskClients,frontDeskSchedule,frontDeskInvoices]=arrays;
     try{
         renderFrontDesk();
-        const referenceButton=document.createElement('button');referenceButton.type='button';referenceButton.textContent='Find intake reference';referenceButton.onclick=async()=>{const value=prompt('Intake reference, for example 2026-W-000001');if(!value)return;try{const found=await json('/api/intake/lookup/'+encodeURIComponent(value.trim()));if(found.jobId)await openFrontDeskJob(found.jobId);else await openIntakeDeliveryStatus(found.conversationId);}catch(e){alert(e.message);}};genericView.querySelector('.fd-overview-toolbar')?.append(referenceButton);
+        const referenceButton=document.createElement('button');referenceButton.type='button';referenceButton.textContent='Find intake reference';referenceButton.onclick=async()=>{const value=prompt('Intake reference, for example 2026-BR-000001');if(!value)return;try{const found=await json('/api/intake/lookup/'+encodeURIComponent(value.trim()));if(found.jobId)await openFrontDeskJob(found.jobId);else await openIntakeDeliveryStatus(found.conversationId);}catch(e){alert(e.message);}};genericView.querySelector('.fd-overview-toolbar')?.append(referenceButton);
 
         if(errors.length){
             const notice=document.createElement('div');
