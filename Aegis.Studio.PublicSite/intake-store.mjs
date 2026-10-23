@@ -73,9 +73,10 @@ export class IntakeStore {
       if (['payment','payments','paid','paymentStatus','confirmed','requiredDeposit'].some(k => k in input)) fail(400,'untrusted_payment','Payment and confirmation fields are not accepted on intake.');
       p.roster = validateRoster(input.roster); p.attachments = []; p.paymentEvents = [];
       const now = this.now(), year = Number(new Intl.DateTimeFormat('en', { timeZone: 'America/Jamaica', year: 'numeric' }).format(now));
-      const next = this.db.prepare("INSERT INTO counters VALUES(?,'W',1) ON CONFLICT(year,source) DO UPDATE SET value=value+1 RETURNING value").get(year).value;
+      const referencePrefix = kind === 'Booking' ? 'BR' : 'W';
+      const next = this.db.prepare('INSERT INTO counters VALUES(?,?,1) ON CONFLICT(year,source) DO UPDATE SET value=value+1 RETURNING value').get(year,referencePrefix).value;
       if (next > 999999) fail(503,'reference_exhausted','Intake reference capacity exhausted. Contact staff.');
-      p.id = randomUUID(); p.intakeReference = `${year}-W-${String(next).padStart(6,'0')}`; p.createdAtUtc = now.toISOString(); p.revision = 1;
+      p.id = randomUUID(); p.intakeReference = `${year}-${referencePrefix}-${String(next).padStart(6,'0')}`; p.createdAtUtc = now.toISOString(); p.revision = 1;
       const token = randomBytes(32).toString('base64url');
       this.db.prepare('INSERT INTO intakes(id,reference,owner,payload,revision,created_at,access_hash) VALUES(?,?,?,?,?,?,?)').run(p.id,p.intakeReference,owner,JSON.stringify(p),1,p.createdAtUtc,fingerprint(token));
       this.change(p);
