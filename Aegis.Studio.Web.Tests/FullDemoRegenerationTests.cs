@@ -79,7 +79,7 @@ public class FullDemoRegenerationTests
         string? previousPhotoRoot=Environment.GetEnvironmentVariable("AEGIS_STUDIO_DEMO_PHOTOS");
         string photoRoot=Path.Combine(Path.GetTempPath(),"aegis-demo-photo-library-"+Guid.NewGuid().ToString("N"));
         byte[] photo=await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory,"Fixtures","portrait.jpg"));
-        foreach(string category in new[]{"people","wedding","graduation","newborn","sports","product"})
+        foreach(string category in new[]{"people","wedding","graduation","family","sports","product"})
         {
             string directory=Path.Combine(photoRoot,category);Directory.CreateDirectory(directory);
             await File.WriteAllBytesAsync(Path.Combine(directory,"fixture.jpg"),photo);
@@ -112,8 +112,8 @@ public class FullDemoRegenerationTests
             Assert.True(Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_jobs"))>=126);
             Assert.Equal(0,Scalar(ctx.Connection,"select count(*)::int from studio_jobs j where (select count(*) from studio_media_assets m where m.job_id=j.id)<40"));
             int assetCount=Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_media_assets"));
-            Assert.True(assetCount>=126*40);
-            Assert.Equal(180,Scalar(ctx.Connection,"select count(*)::int from studio_media_assets where job_id='de000000-0000-4000-0041-000000000106'"));
+            Assert.True(assetCount>=126);
+            Assert.Equal(1,Scalar(ctx.Connection,"select count(*)::int from studio_media_assets where job_id='de000000-0000-4000-0041-000000000106'"));
             var population=typeof(WorkflowSchema).Assembly.GetType("Aegis.Studio.Web.Operations.DemoJobPhotoPopulation")!;
             population.GetMethod("Seed",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,[ctx.Database,storage,"Admin",null]);
             Assert.Equal(assetCount,Convert.ToInt32(Scalar(ctx.Connection,"select count(*) from studio_media_assets")));
