@@ -94,6 +94,12 @@ export function mapWorkDayStudioPath(pathname,method){
     allowed=(parts[5]==='sending-identities'&&method==='GET')||(parts[5]==='messages'&&method==='POST');
   return allowed?pathname.replace('/api/v1','/api'):null;
 }
+export function workDayProxyRequestHeaders(pathname,incoming,upstreamHost,remoteAddress=''){
+  const forwarded={host:upstreamHost,'x-forwarded-host':incoming.host||'','x-forwarded-proto':'https','x-forwarded-for':remoteAddress};
+  for(const name of ['accept','accept-encoding','content-type','content-length','transfer-encoding','cookie','idempotency-key','user-agent'])if(incoming[name])forwarded[name]=incoming[name];
+  if(pathname.startsWith('/api/v1/workday/')&&incoming['x-aegis-workday-token'])forwarded['x-aegis-workday-token']=incoming['x-aegis-workday-token'];
+  return forwarded;
+}
 function proxyWorkDay(req,res,url,env){
   const upstreamText=String(env.WORKDAY_STUDIO_ORIGIN||'');
   let origin;
@@ -101,9 +107,7 @@ function proxyWorkDay(req,res,url,env){
   catch{json(res,503,{code:'workday_upstream_unavailable',message:'WorkDay is not connected to Studio.'});return;}
   const studioPath=mapWorkDayStudioPath(url.pathname,req.method);
   if(!studioPath){json(res,404,{code:'not_found',message:'WorkDay operation not found.'});return;}
-  const forwarded={host:origin.host,'x-forwarded-host':req.headers.host||'','x-forwarded-proto':'https','x-forwarded-for':req.socket.remoteAddress||''};
-  for(const name of ['accept','accept-encoding','content-type','content-length','transfer-encoding','cookie','authorization','idempotency-key','user-agent'])if(req.headers[name])forwarded[name]=req.headers[name];
-  if(url.pathname.startsWith('/api/v1/workday/')&&req.headers['x-aegis-workday-token'])forwarded['x-aegis-workday-token']=req.headers['x-aegis-workday-token'];
+  const forwarded=workDayProxyRequestHeaders(url.pathname,req.headers,origin.host,req.socket.remoteAddress||'');
   const connectAddress=String(env.WORKDAY_STUDIO_CONNECT_ADDRESS||'').trim();
   let timedOut=false;
   const upstream=https.request({hostname:origin.hostname,port:origin.port||443,servername:origin.hostname,method:req.method,path:studioPath+url.search,headers:forwarded,
