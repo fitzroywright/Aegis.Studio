@@ -87,6 +87,16 @@ export function createIntakeApi(env,readBody,json) {
     if(workdayResult&&method==='POST'){
       authenticate(req,'workday:sync');json(res,200,workdayStore.completeUpdate(workdayResult[1],await input(req,65536)));return true;
     }
+    if(route==='/api/v1/workday/device-session'&&method==='POST'){
+      const user=requireWorkday(req),p=await input(req,8192);
+      if(typeof p.deviceId!=='string'||!p.deviceId.trim())fail(400,'invalid_device','Device ID is required.');
+      const result=workdayStore.issueDeviceSession(user.user_name,p.deviceId);
+      json(res,200,{sessionId:randomUUID(),token:result.token,expiresAtUtc:result.expiresAtUtc},{'Cache-Control':'no-store'});return true;
+    }
+    if(route==='/api/v1/workday/device-session/revoke'&&method==='POST'){
+      const user=requireWorkday(req),p=await input(req,8192);
+      workdayStore.revokeDevice(user.user_name,p.deviceId);json(res,204,{});return true;
+    }
     if(route==='/api/v1/workday/bootstrap'&&method==='GET'){
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
       if(!snapshot)fail(503,'workday_snapshot_pending','Studio has not published this WorkDay account yet.');
