@@ -196,21 +196,26 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                     string cursor=WorkflowStore.Scalar(c,null,"select cursor from studio_website_cursor where source=$1",source) as string??"";
                     var feed=await site.Get("/api/v1/changes?cursor="+Uri.EscapeDataString(cursor),ct);
                     var importer=new WebsiteIntakeStore(database,workspaces,configuration);
-                    var galleryRequests=await site.Get("/api/v1/gallery-access-requests?limit=100",ct);
-                    foreach(var request in galleryRequests.GetProperty("items").EnumerateArray())
+                    try
                     {
-                        try
+                        var galleryRequests=await site.Get("/api/v1/gallery-access-requests?limit=100",ct);
+                        foreach(var request in galleryRequests.GetProperty("items").EnumerateArray())
                         {
-                            Guid conversation=importer.ImportGalleryAccessRequest(source,request);
-                            Guid external=request.GetProperty("id").GetGuid();
-                            await site.Post($"/api/v1/gallery-access-requests/{external:D}/ack",new{},ct);
-                            logger.LogInformation("Gallery access request imported to Front Desk. ConversationId={ConversationId} RequestId={RequestId}",conversation,external);
-                        }
-                        catch(Exception ex)when(ex is not OperationCanceledException)
-                        {
-                            logger.LogError("Gallery access request held for retry. RequestId={RequestId} ErrorType={ErrorType}",request.GetProperty("id"),ex.GetType().Name);
+                            try
+                            {
+                                Guid conversation=importer.ImportGalleryAccessRequest(source,request);
+                                Guid external=request.GetProperty("id").GetGuid();
+                                await site.Post($"/api/v1/gallery-access-requests/{external:D}/ack",new{},ct);
+                                logger.LogInformation("Gallery access request imported to Front Desk. ConversationId={ConversationId} RequestId={RequestId}",conversation,external);
+                            }
+                            catch(Exception ex)when(ex is not OperationCanceledException)
+                            {
+                                logger.LogError("Gallery access request held for retry. RequestId={RequestId} ErrorType={ErrorType}",request.GetProperty("id"),ex.GetType().Name);
+                            }
                         }
                     }
+                    catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
+                    catch(Exception ex){logger.LogWarning("Gallery access request polling failed; existing intake polling will continue. ErrorType={ErrorType}",ex.GetType().Name);}
                     var retries=new List<JsonElement>();
                     using(var q=WorkflowStore.Command(c,null,"select payload::text from studio_website_import_errors where source=$1 and payload is not null order by updated_at_utc limit 25",source))using(var r=q.ExecuteReader())while(r.Read())retries.Add(JsonSerializer.Deserialize<JsonElement>(r.GetString(0)));
                     var batch=retries.Concat(feed.GetProperty("items").EnumerateArray()).GroupBy(p=>p.GetProperty("id").GetGuid()).Select(g=>g.OrderByDescending(p=>p.GetProperty("revision").GetInt64()).First());
