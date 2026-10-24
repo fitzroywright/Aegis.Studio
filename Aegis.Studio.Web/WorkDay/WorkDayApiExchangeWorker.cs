@@ -45,6 +45,7 @@ public sealed class WorkDayApiExchangeWorker(
                 await ProvisionAccountsAsync(http,stoppingToken);
                 await PublishSnapshotsAsync(http,stoppingToken);
                 await PullOperationsAsync(http,stoppingToken);
+                await PullThreadCreatesAsync(http,stoppingToken);
                 await PullThreadMessagesAsync(http,stoppingToken);
                 await Task.Delay(TimeSpan.FromSeconds(10),stoppingToken);
             }
@@ -177,6 +178,40 @@ public sealed class WorkDayApiExchangeWorker(
                 $"admin/workday/updates/{update.OperationId:D}/result",
                 new { state=result.State.ToString(), message=result.Message, serverVersion=result.ServerVersion, acknowledgedAtUtc=result.AcknowledgedAtUtc },
                 ct);
+            ack.EnsureSuccessStatusCode();
+        }
+    }
+
+    private async Task PullThreadCreatesAsync(HttpClient http,CancellationToken ct)
+    {
+        using var response=await http.GetAsync("admin/workday/updates?after=0&limit=100&kind=ThreadCreate",ct);
+        response.EnsureSuccessStatusCode();
+        var batch=await response.Content.ReadFromJsonAsync<WorkDayUpdateBatch>(JsonOptions,ct)
+            ??throw new InvalidOperationException("The API Site returned an empty WorkDay thread batch.");
+        foreach(WorkDayUpdate update in batch.Items)
+        {
+            ct.ThrowIfCancellationRequested();
+            string state="Acknowledged",message="Message thread synchronized to Studio.";
+            object? thread=null;
+            try
+            {
+                string scopeType=update.Payload.GetProperty("scopeType").GetString()??"";
+                Guid scopeId=update.Payload.GetProperty("scopeId").GetGuid();
+                ClaimsPrincipal principal=new(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier,update.UserName),
+                    new Claim("login_name",update.UserName),
+                    new Claim(ClaimTypes.Name,update.UserName)
+                ],"WorkDayExchange"));
+                using IServiceScope scope=scopes.CreateScope();
+                StudioInAppMessageStore store=scope.ServiceProvider.GetRequiredService<StudioInAppMessageStore>();
+                thread=store.GetOrCreateScoped(principal,scopeType,scopeId);
+            }
+            catch(InvalidOperationException ex){state="Conflict";message=ex.Message;}
+            catch(JsonException){state="Conflict";message="WorkDay thread request is invalid.";}
+            using var ack=await http.PostAsJsonAsync(
+                $"admin/workday/updates/{update.OperationId:D}/result",
+                new{state,message,result=thread,acknowledgedAtUtc=DateTimeOffset.UtcNow},ct);
             ack.EnsureSuccessStatusCode();
         }
     }
