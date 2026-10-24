@@ -278,6 +278,18 @@ export function createIntakeApi(env,readBody,json) {
       const result=store.create(owner,String(req.headers['idempotency-key']||''),value,browser?'Form':'Api',clientApplication);json(res,201,result);return true;
     }
     if(route==='/api/v1/changes'&&method==='GET'){authenticate(req,'intake:pull');json(res,200,store.feed(url.searchParams.get('cursor')||''));return true;}
+    if(route==='/api/v1/gallery-access-requests'&&method==='POST'){
+      authenticate(req,'gallery:access:submit');const p=await input(req,8192);
+      const result=store.createGalleryAccessRequest({...p,requestKey:String(req.headers['idempotency-key']||p.requestKey||'')});
+      json(res,result.created?201:200,{id:result.id,status:'Pending',accepted:true});return true;
+    }
+    if(route==='/api/v1/gallery-access-requests'&&method==='GET'){
+      authenticate(req,'gallery:access:pull');json(res,200,{items:store.pendingGalleryAccessRequests(Math.max(1,Math.min(500,Number(url.searchParams.get('limit')||100))))});return true;
+    }
+    const galleryAccessAck=route.match(/^\\/api\\/v1\\/gallery-access-requests\\/([0-9a-f-]{36})\\/ack$/i);
+    if(galleryAccessAck&&method==='POST'){
+      authenticate(req,'gallery:access:ack');json(res,200,store.acknowledgeGalleryAccessRequest(galleryAccessAck[1]));return true;
+    }
     const match=route.match(/^\/api\/v1\/intakes\/([0-9a-f-]{36})(?:\/(ack|status|roster|attachments|payments))?$/i)||route.match(/^\/api\/(?:bookings|inquiries)\/([0-9a-f-]{36}|\d{4}-(?:BK|BE|BR|W)-\d{6})(?:\/(roster|attachments))?$/i);
     if(match){
       const id=match[1],action=match[2],token=String(req.headers['x-intake-token']||'');
