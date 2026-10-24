@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Security.Claims;
+using System.Text.Json;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Scheduling;
 using Aegis.Studio.Web.WorkDay;
@@ -39,6 +40,7 @@ public sealed class WorkDayApiExchangeWorker(
         {
             try
             {
+                await ProvisionAccountsAsync(http,stoppingToken);
                 await PublishSnapshotsAsync(http,stoppingToken);
                 await PullOperationsAsync(http,stoppingToken);
                 await Task.Delay(TimeSpan.FromSeconds(10),stoppingToken);
@@ -50,6 +52,41 @@ public sealed class WorkDayApiExchangeWorker(
                 try{await Task.Delay(TimeSpan.FromSeconds(20),stoppingToken);}
                 catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){break;}
             }
+        }
+    }
+
+    private async Task ProvisionAccountsAsync(HttpClient http,CancellationToken ct)
+    {
+        using IServiceScope scope=scopes.CreateScope();
+        StudioDatabase database=scope.ServiceProvider.GetRequiredService<StudioDatabase>();
+        foreach(PhotographerProfile profile in new PhotographerStore(database).GetAll().Where(x=>x.IsActive))
+        {
+            ct.ThrowIfCancellationRequested();
+            using var response=await http.PostAsJsonAsync("admin/workday/users",
+                new{userName=profile.UserName,displayName=profile.DisplayName},JsonOptions,ct);
+            if(!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("WorkDay account provisioning for {UserName} returned HTTP {StatusCode}.",profile.UserName,(int)response.StatusCode);
+                continue;
+            }
+            WorkDayAccountProvision? result=await response.Content.ReadFromJsonAsync<WorkDayAccountProvision>(JsonOptions,ct);
+            if(result?.EnrollmentToken is not {Length:>0} token)continue;
+
+            string path=configuration["WorkDay:EnrollmentFile"]??"/var/lib/aegis-studio/workday-enrollment-codes.json";
+            string directory=Path.GetDirectoryName(path)!;
+            Directory.CreateDirectory(directory);
+            try{File.SetUnixFileMode(directory,UnixFileMode.UserRead|UnixFileMode.UserWrite|UnixFileMode.UserExecute);}catch(PlatformNotSupportedException){}
+            List<WorkDayEnrollmentRecord> records=[];
+            if(File.Exists(path))
+            {
+                try{records=JsonSerializer.Deserialize<List<WorkDayEnrollmentRecord>>(await File.ReadAllTextAsync(path,ct))??[];}
+                catch(JsonException){logger.LogError("WorkDay enrollment file {Path} is invalid; refusing to overwrite it.",path);continue;}
+            }
+            if(records.Any(x=>x.UserName.Equals(profile.UserName,StringComparison.OrdinalIgnoreCase)))continue;
+            records.Add(new(profile.UserName,profile.DisplayName,token,result.ExpiresAt));
+            await File.WriteAllTextAsync(path,JsonSerializer.Serialize(records,new JsonSerializerOptions{WriteIndented=true}),ct);
+            try{File.SetUnixFileMode(path,UnixFileMode.UserRead|UnixFileMode.UserWrite);}catch(PlatformNotSupportedException){}
+            logger.LogInformation("Created one-time WorkDay enrollment for {UserName}; token stored in protected file {Path}.",profile.UserName,path);
         }
     }
 
@@ -135,6 +172,6 @@ public sealed class WorkDayApiExchangeWorker(
         }
     }
 
-    private sealed record WorkDayUpdateBatch(IReadOnlyList<WorkDayUpdate> Items);
+    private sealed record WorkDayAccountProvision(string UserName,string DisplayName,bool EnrollmentRequired,string? EnrollmentToken,string? ExpiresAt);\n    private sealed record WorkDayEnrollmentRecord(string UserName,string DisplayName,string Token,string? ExpiresAt);\n    private sealed record WorkDayUpdateBatch(IReadOnlyList<WorkDayUpdate> Items);
     private sealed record WorkDayUpdate(long Sequence,Guid OperationId,string UserName,string Kind,JsonElement Payload,DateTimeOffset CreatedAt);
 }
