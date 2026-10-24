@@ -89,7 +89,7 @@ export function createIntakeApi(env,readBody,json) {
       authenticate(req,'workday:sync');const after=Math.max(0,Number(url.searchParams.get('after')||0)),limit=Math.max(1,Math.min(500,Number(url.searchParams.get('limit')||100)));
       json(res,200,{items:workdayStore.pendingUpdates(after,limit,String(url.searchParams.get('kind')||''))});return true;
     }
-    const workdayResult=route.match(/^\\/api\\/v1\\/admin\\/workday\\/updates\\/([0-9a-f-]{36})\\/result$/i);
+    const workdayResult=route.match(/^\/api\/v1\/admin\/workday\/updates\/([0-9a-f-]{36})\/result$/i);
     if(workdayResult&&method==='POST'){
       authenticate(req,'workday:sync');json(res,200,workdayStore.completeUpdate(workdayResult[1],await input(req,65536)));return true;
     }
@@ -112,7 +112,7 @@ export function createIntakeApi(env,readBody,json) {
       const user=requireWorkday(req),p=await input(req,65536),result=workdayStore.enqueue(user.user_name,p.operationId,'Operation',p);
       json(res,202,result,{'Cache-Control':'no-store'});return true;
     }
-    const workdayStatus=route.match(/^\\/api\\/v1\\/workday\\/operations\\/([0-9a-f-]{36})$/i);
+    const workdayStatus=route.match(/^\/api\/v1\/workday\/operations\/([0-9a-f-]{36})$/i);
     if(workdayStatus&&method==='GET'){
       const user=requireWorkday(req),result=workdayStore.updateStatus(user.user_name,workdayStatus[1]);
       if(!result)fail(404,'not_found','WorkDay operation not found.');
@@ -151,7 +151,7 @@ export function createIntakeApi(env,readBody,json) {
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
       json(res,200,snapshot?.timeSummary||null,{'Cache-Control':'private, no-store'});return true;
     }
-    const assignmentUpload=route.match(/^\\/api\\/v1\\/workday\\/assignments\\/([0-9a-f-]{36})\\/uploads$/i);
+    const assignmentUpload=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/uploads$/i);
     if(assignmentUpload&&method==='POST'){
       const user=requireWorkday(req),bytes=await readBody(req,30_000_000);
       const request=new Request('http://localhost/upload',{method:'POST',headers:{'Content-Type':req.headers['content-type']||''},body:bytes});
@@ -161,7 +161,7 @@ export function createIntakeApi(env,readBody,json) {
       const result=workdayStore.enqueue(user.user_name,uploadId,'AssignmentUpload',{assignmentId:assignmentUpload[1],uploadId,fileName:file.name,contentType:file.type||'application/octet-stream',contentBase64:content.toString('base64')});
       json(res,202,{uploadId,attachmentId:uploadId,assignmentId:assignmentUpload[1],fileName:file.name,sizeBytes:content.length,storageStatus:result.state,acknowledgedAtUtc:new Date().toISOString()},{'Cache-Control':'no-store'});return true;
     }
-    const galleryStatus=route.match(/^\\/api\\/v1\\/workday\\/assignments\\/([0-9a-f-]{36})\\/gallery-status$/i);
+    const galleryStatus=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/gallery-status$/i);
     if(galleryStatus&&method==='GET'){
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
       json(res,200,snapshot?.galleryStatus?.[galleryStatus[1]]||{exists:false,isPublished:false,visibleItems:0},{'Cache-Control':'private, no-store'});return true;
@@ -170,7 +170,7 @@ export function createIntakeApi(env,readBody,json) {
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
       json(res,200,snapshot?.notifications||[],{'Cache-Control':'private, no-store'});return true;
     }
-    const threadCollection=route.match(/^\\/api\\/v1\\/messages\\/threads(?:\\/([0-9a-f-]{36}))?$/i);
+    const threadCollection=route.match(/^\/api\/v1\/messages\/threads(?:\/([0-9a-f-]{36}))?$/i);
     if(threadCollection&&threadCollection[1]&&method==='GET'){
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name),threadId=threadCollection[1];
       json(res,200,(snapshot?.messages||[]).filter(x=>String(x.threadId).toLowerCase()===threadId.toLowerCase()),{'Cache-Control':'private, no-store'});return true;
@@ -179,7 +179,7 @@ export function createIntakeApi(env,readBody,json) {
       const user=requireWorkday(req),p=await input(req,16384),operationId=String(req.headers['idempotency-key']||randomUUID());
       json(res,202,workdayStore.enqueue(user.user_name,operationId,'ThreadMessage',{threadId:threadCollection[1],body:p.body}));return true;
     }
-    const createThread=route.match(/^\\/api\\/v1\\/messages\\/threads\\/([A-Za-z0-9._~-]{1,40})\\/([0-9a-f-]{36})$/i);
+    const createThread=route.match(/^\/api\/v1\/messages\/threads\/([A-Za-z0-9._~-]{1,40})\/([0-9a-f-]{36})$/i);
     if(createThread&&method==='POST'){
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
       const existing=(snapshot?.threads||[]).find(x=>String(x.scopeType).toLowerCase()===createThread[1].toLowerCase()&&String(x.scopeId).toLowerCase()===createThread[2].toLowerCase());
@@ -187,12 +187,12 @@ export function createIntakeApi(env,readBody,json) {
       const operationId=String(req.headers['idempotency-key']||randomUUID());
       json(res,202,workdayStore.enqueue(user.user_name,operationId,'ThreadCreate',{scopeType:createThread[1],scopeId:createThread[2]}));return true;
     }
-    const conversationIdentities=route.match(/^\\/api\\/v1\\/conversations\\/([0-9a-f-]{36})\\/sending-identities$/i);
+    const conversationIdentities=route.match(/^\/api\/v1\/conversations\/([0-9a-f-]{36})\/sending-identities$/i);
     if(conversationIdentities&&method==='GET'){
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
       json(res,200,snapshot?.sendingIdentities?.[conversationIdentities[1]]||{defaultIdentity:'',canSendAsSelf:false,identities:[]},{'Cache-Control':'private, no-store'});return true;
     }
-    const conversationMessage=route.match(/^\\/api\\/v1\\/conversations\\/([0-9a-f-]{36})\\/messages$/i);
+    const conversationMessage=route.match(/^\/api\/v1\/conversations\/([0-9a-f-]{36})\/messages$/i);
     if(conversationMessage&&method==='POST'){
       const user=requireWorkday(req),p=await input(req,16384),operationId=String(req.headers['idempotency-key']||randomUUID());
       json(res,202,workdayStore.enqueue(user.user_name,operationId,'ConversationMessage',{conversationId:conversationMessage[1],...p}));return true;
