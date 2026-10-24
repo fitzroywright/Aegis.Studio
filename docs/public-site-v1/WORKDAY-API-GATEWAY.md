@@ -16,7 +16,7 @@ WorkDay's only server base URL is `https://api.bryanstudiosltd.com/api/v1/`. The
 | `/notifications` | GET | `/api/notifications` |
 | `/conversations/{id}/sending-identities`, `/messages` | GET, POST | Same Studio routes |
 
-The API Site rejects unlisted routes, including WorkDay fleet/management routes and Studio administration endpoints. It forwards only the session cookie, WorkDay device token, required content headers and request body. Studio remains the system of record and performs its existing authorization, idempotency, storage and audit work. The API Site does not store WorkDay passwords or duplicate field records.
+The API Site rejects unlisted routes, including WorkDay fleet/management routes and Studio administration endpoints. It forwards the session cookie and required content headers. The Studio-issued WorkDay device token is forwarded only to field routes; shared messaging, notification and conversation routes use the authenticated Studio session cookie and do not receive the device token. Studio remains the system of record and performs its existing authorization, idempotency, storage and audit work. The API Site does not store WorkDay passwords or duplicate field records.
 
 ## API Site upstream configuration
 
