@@ -30,12 +30,13 @@ public sealed class MainPage:ContentPage
         Title="My WorkDay";
         Button refresh=new(){Text="SYNC NOW"};refresh.Clicked+=async(_,_)=>await RefreshAsync();
         Button availability=new(){Text="AVAILABILITY / LEAVE"};availability.Clicked+=async(_,_)=>await Navigation.PushAsync(new WorkDayAvailabilityPage(api,store,sync,session));
+        Button messages=new(){Text="MESSAGES"};messages.Clicked+=async(_,_)=>await Navigation.PushAsync(ActivatorUtilities.CreateInstance<WorkDayMessagesPage>(services));
         Button logout=new(){Text="LOG OUT"};logout.Clicked+=async(_,_)=>await LogoutAsync();
         search.TextChanged+=async(_,_)=>RenderAssignments(await store.GetAssignmentsAsync());
         Content=new ScrollView{Content=new VerticalStackLayout{Padding=18,Spacing=12,Children={
             new Label{Text="PHOTOGRAPHER WORKDAY",FontSize=25,FontAttributes=FontAttributes.Bold},
             new Label{Text=session.DisplayName??session.UserName??"Photographer"},
-            connectivity,lastSync,pending,progress,syncing,refresh,availability,search,
+            connectivity,lastSync,pending,progress,syncing,refresh,availability,messages,search,
             new Label{Text="NEEDS ATTENTION",FontAttributes=FontAttributes.Bold},attention,
             new Label{Text="TODAY",FontSize=20,FontAttributes=FontAttributes.Bold},todayList,
             new Label{Text="UPCOMING",FontSize=20,FontAttributes=FontAttributes.Bold},upcomingList,logout
@@ -80,9 +81,11 @@ public sealed class MainPage:ContentPage
         lastSync.Text=sync.LastSuccessUtc is null?"Last successful synchronization: Never":$"Last successful synchronization: {sync.LastSuccessUtc.Value.ToLocalTime():g}";
         var reports=await store.UnacknowledgedAsync();
         var availability=(await store.GetAvailabilityAsync()).Where(x=>Aegis.Studio.WorkDay.Core.WorkDayClientRules.IsOutstanding(x.SyncState)).ToList();
-        pending.Text=$"{reports.Count} report(s) and {availability.Count} availability change(s) awaiting acknowledgement";
+        var queuedMessages=await store.UnacknowledgedMessagesAsync();
+        pending.Text=$"{reports.Count} report(s), {availability.Count} availability change(s), and {queuedMessages.Count} message(s) awaiting acknowledgement";
         attention.Text=string.Join(Environment.NewLine,reports.Take(8).Select(x=>$"{x.Kind}: {x.State} · {x.Text}{(x.LastError is null?"":" — "+x.LastError)}")
             .Concat(availability.Take(8).Select(x=>$"Availability: {x.SyncState} — {x.LastError}"))
+            .Concat(queuedMessages.Take(8).Select(x=>$"Message: {x.State} — {x.LastError}"))
             .Concat(sync.LastError is null?Array.Empty<string>():new[]{sync.LastError}));
         if(attention.Text.Length==0)attention.Text="No pending reports.";
         connectivity.Text=sync.State=="Healthy"?"ONLINE":sync.State=="Sending"?"SYNCHRONIZING":sync.State=="Degraded"?"CHANGES NEED REVIEW":"OFFLINE / WAITING — LOCAL REPORTS RETAINED";
@@ -107,10 +110,11 @@ public sealed class MainPage:ContentPage
     private async Task LogoutAsync()
     {
         int reports=(await store.UnacknowledgedAsync()).Count+(await store.GetAvailabilityAsync()).Count(x=>Aegis.Studio.WorkDay.Core.WorkDayClientRules.IsOutstanding(x.SyncState));
+        int messageCount=await store.PendingMessageCountAsync();
         int legacyFiles=await store.PendingUploadCountAsync();
-        if(reports>0||legacyFiles>0)
+        if(reports>0||legacyFiles>0||messageCount>0)
         {
-            await DisplayAlertAsync("Unsynchronized work",$"Synchronize {reports} report(s) before signing out. {legacyFiles} file(s) from the previous client remain preserved; contact Studio support to recover them.","OK");return;
+            await DisplayAlertAsync("Unsynchronized work",$"Synchronize {reports} report(s) and {messageCount} message(s) before signing out. {legacyFiles} file(s) from the previous client remain preserved; contact Studio support to recover them.","OK");return;
         }
         try{await api.RevokeDeviceSessionAsync(await device.GetAsync());}
         catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException)
