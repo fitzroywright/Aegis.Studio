@@ -10,9 +10,9 @@ Configure `PUBLIC_API_KEYS_JSON` as an array of objects with `id`, `secret`, and
 
 | Integration | Scopes |
 | --- | --- |
-| External booking website API client | `intake:submit` |
+| External booking website API client | `intake:submit`, `gallery:access:submit` |
 | Workday Mobile API client | `intake:submit` and Workday-specific scopes as those endpoints are added |
-| Studio importer and publisher | `intake:pull`, `intake:ack`, `booking:catalog:publish`, `booking:availability:publish` |
+| Studio importer and publisher | `intake:pull`, `intake:ack`, `gallery:access:pull`, `gallery:access:ack`, `booking:catalog:publish`, `booking:availability:publish` |
 | Studio gallery publisher | `gallery:publish` |
 | Studio Client ID proof administrator | `client:link` |
 | Verified payment adapter | `payment:verified` |
@@ -20,7 +20,7 @@ Configure `PUBLIC_API_KEYS_JSON` as an array of objects with `id`, `secret`, and
 
 Studio can use one configured integration token for import, booking publication, gallery publication and Client ID proof administration, with only the scopes it needs. Mark a Workday API credential's `clientApplication` as `Workday Mobile` when provisioning it; Studio records its submissions as `Workday Mobile`. The browser booking form's server-controlled route records `Web site`; callers cannot choose the source label in request JSON. External submitters must not receive payment, polling, acknowledgment or publication privileges. The verified payment adapter must verify the provider's result before using its credential. Studio and this site do not process card details. Rotate keys by adding a replacement credential, updating the consumer and verifying it, then removing the old credential. Preserve the credential `id` when rotating a secret to retain ownership and idempotency scope.
 
-For Studio to publish, configure its local environment with `PublicSite:BaseUrl=https://api.bryanstudiosltd.com`, an integration token scoped to `intake:pull`, `intake:ack`, `booking:catalog:publish`, and `booking:availability:publish`, and `PublicSite:BookingCatalogPublishingEnabled=true`. The session catalog, prices, opening hours, scheduling, and bookings stay in Studio's own database. When the API site is unreachable, Studio continues operating; publication retries in the background.
+For Studio to synchronize the Public Site, configure `PublicSite:BaseUrl=https://api.bryanstudiosltd.com` and an integration token scoped to `intake:pull`, `intake:ack`, `gallery:access:pull`, `gallery:access:ack`, `gallery:publish`, `booking:catalog:publish`, and `booking:availability:publish`. Enable `PublicSite:PollingEnabled`, `PublicSite:GalleryPushEnabled`, and `PublicSite:BookingCatalogPublishingEnabled` as required. The session catalog, prices, opening hours, scheduling, and bookings stay in Studio's own database. When the API site is unreachable, Studio continues operating; publication retries in the background.
 
 Public catalog and availability reads expose only the public session definition and open slots, so they do not require a bearer credential. The API still checks catalog revision, location, slot identity, and one-time reservation on every booking submission.
 
@@ -66,9 +66,24 @@ POST `/intakes/{id}/payments` is restricted to the verified adapter. Supply even
 
 Duplicate events do not post twice. Conflicting reuse is rejected or held for review. Amounts use integer minor units on the API and decimal JMD in Studio. Imported deposits, refunds and confirmed reversal events use the existing financial ledger. Payment metadata must be associated with a booking job; an inquiry payment enters import review. No client-submitted success flag is trusted.
 
+## Gallery access requests
+
+The existing booking and inquiry contract remains unchanged. The External Site submits a client request using a server-side credential scoped to `gallery:access:submit`:
+
+```http
+POST /api/v1/gallery-access-requests
+Authorization: Bearer <external-site-secret>
+Idempotency-Key: <unique-request-key>
+Content-Type: application/json
+```
+
+The JSON body requires `clientId`, `galleryId`, `clientName`, and `clientEmail`; `notes` are optional. The API checks that the gallery belongs to that client. The response means the request is queued, not that a gallery is published.
+
+Studio polls `GET /api/v1/gallery-access-requests` with `gallery:access:pull`, imports each request into Front Desk, and acknowledges it at `POST /api/v1/gallery-access-requests/{id}/ack` with `gallery:access:ack`. Front Desk staff publish through Studio's existing `gallery:publish` permission. The External Site never receives gallery publication permission.
+
 ## Galleries
 
-Studio stages metadata at POST `/galleries`, uploads each pinned approved image with PUT `/galleries/{id}/media/{versionId}`, then POSTs `/galleries/{id}/publish`. The site publishes only after every declared item is stored. Retries repeat the same publication/version IDs. POST `/galleries/{id}/revoke` hides a publication. Publication ownership cannot change to another client.
+Studio stages metadata at POST `/galleries`, uploads each pinned approved image with PUT `/galleries/{id}/media/{versionId}`, then places the publication in Front Desk for staff review. Staff publication calls POST `/galleries/{id}/publish`; the site publishes only after every declared item is stored. Retries repeat the same publication/version IDs. POST `/galleries/{id}/revoke` hides a publication. Publication ownership cannot change to another client. Each later approved job creates a new gallery update in Front Desk for the same client; the additions remain private until staff publish them.
 
 The site serves its own copies; it does not call internal Studio for gallery files. Studio administrators issue a short lived, single use Client ID proof from Studio Management after selecting an actual Studio client UUID. The Studio server verifies that UUID exists locally and asks the API to create the proof using a `client:link` scoped credential. Studio displays the secret once; only its hash is stored by the API. The client signs in to the public Gallery site and redeems the code there. The API binds its authenticated provider subject to the Studio client UUID; it never accepts a caller-supplied identity, email or gallery owner. Used proofs cannot be reused or revoked; identity unlinking requires identity administration. Active pending proofs can be inspected and revoked from Studio Management. Proof status never returns the secret or provider subject.
 
