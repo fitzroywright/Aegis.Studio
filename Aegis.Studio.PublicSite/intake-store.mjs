@@ -252,7 +252,7 @@ export class IntakeStore {
     if(!/^[0-9a-f-]{36}$/i.test(String(p.clientId||'')))fail(400,'invalid_gallery_access_request','A valid client ID is required.');
     if(p.galleryId&&!/^[0-9a-f-]{36}$/i.test(String(p.galleryId)))fail(400,'invalid_gallery_access_request','Gallery ID must be a UUID.');
     const name=String(p.clientName||'').trim(),email=String(p.clientEmail||'').trim(),notes=String(p.notes||'').trim(),key=String(p.requestKey||'').trim();
-    if(!name||name.length>200||!/^\\S+@\\S+\\.\\S+$/.test(email)||email.length>320||notes.length>2000||!key||key.length>200)fail(400,'invalid_gallery_access_request','Client name, valid email and unique request key are required.');
+    if(!name||name.length>200||!/^\S+@\S+\.\S+$/.test(email)||email.length>320||notes.length>2000||!key||key.length>200)fail(400,'invalid_gallery_access_request','Client name, valid email and unique request key are required.');
     const existing=this.db.prepare('SELECT id FROM gallery_access_requests WHERE request_key=?').get(key);
     if(existing)return {id:existing.id,created:false};
     const id=randomUUID(),createdAt=this.now().toISOString();
