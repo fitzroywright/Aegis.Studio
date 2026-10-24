@@ -136,7 +136,7 @@ public sealed class WorkDayApiExchangeWorker(
             var threads=messages.GetThreads(principal);
             var threadMessages=threads.SelectMany(thread=>messages.GetMessages(thread.Id,principal,200)).ToArray();
             Dictionary<string,object> sendingIdentities=[];
-            foreach(AssignmentDto assignment in bootstrap.Today.Concat(bootstrap.Upcoming))
+            foreach(WorkDayAssignment assignment in bootstrap.Today.Concat(bootstrap.Upcoming))
             {
                 if(assignment.ConversationId is not Guid conversationId)continue;
                 StudioConversation? conversation=studioStore.GetConversation(conversationId);
