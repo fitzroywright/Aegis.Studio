@@ -27,8 +27,11 @@ public sealed class WorkDayDeviceTokenMiddleware(RequestDelegate next)
         if(context.User.Identity?.AuthenticationType=="WorkDayDeviceToken")
         {
             string path=context.Request.Path.Value??"";
-            string[] reportingPaths=["/api/workday/bootstrap","/api/workday/availability","/api/workday/operations","/api/workday/device-session/revoke","/api/workday/client-observation"];
-            if(!reportingPaths.Contains(path,StringComparer.OrdinalIgnoreCase))
+            string[] reportingPaths=["/api/workday/bootstrap","/api/workday/availability","/api/workday/operations","/api/workday/device-session/revoke","/api/workday/client-observation","/api/workday/time-summary"];
+            string[] segments=path.Split('/',StringSplitOptions.RemoveEmptyEntries);
+            bool assignmentScoped=segments.Length==5&&segments[0]=="api"&&segments[1]=="workday"&&segments[2]=="assignments"
+                &&Guid.TryParse(segments[3],out _)&&segments[4] is "uploads" or "gallery-status";
+            if(!reportingPaths.Contains(path,StringComparer.OrdinalIgnoreCase)&&!assignmentScoped)
             {context.Response.StatusCode=StatusCodes.Status403Forbidden;return;}
         }
         await next(context);
