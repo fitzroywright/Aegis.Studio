@@ -15,25 +15,26 @@ public sealed class WorkDayMessagesPage:ContentPage
     private async Task LoadAsync()
     {
         list.Children.Clear();
+        IReadOnlyList<MessageThreadDto> threads;
         try
         {
-            IReadOnlyList<MessageThreadDto> threads=await api.GetThreadsAsync()??[];
-            foreach(MessageThreadDto t in threads)
-            {
-                Button b=new(){Text=$"{t.Title}\n{t.UnreadCount} unread",HeightRequest=68};
-                b.Clicked+=async(_,_)=>await Navigation.PushAsync(new WorkDayThreadPage(api,store,sync,t));
-                list.Children.Add(b);
-            }
-            if(threads.Count==0)list.Children.Add(new Label{Text="No message threads."});
-            foreach(LocalMessageSubmission pending in await store.UnacknowledgedMessagesAsync())
-                list.Children.Add(new Label{Text=$"Waiting to sync · {pending.TargetType} · {pending.CreatedAtUtc.ToLocalTime():g} · {pending.Body}"});
+            threads=await api.GetThreadsAsync()??[];
+            await store.ReplaceCachedThreadsAsync(threads);
         }
-        catch(Exception ex)
+        catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException)
         {
-            list.Children.Add(new Label{Text="Message threads are not cached on this device yet. Pending messages remain saved below. "+ex.Message});
-            foreach(LocalMessageSubmission pending in await store.UnacknowledgedMessagesAsync())
-                list.Children.Add(new Label{Text=$"Waiting to sync · {pending.TargetType} · {pending.CreatedAtUtc.ToLocalTime():g} · {pending.Body}"});
+            threads=await store.GetCachedThreadsAsync();
+            list.Children.Add(new Label{Text="Offline · showing the last messages cached on this device."});
         }
+        foreach(MessageThreadDto t in threads)
+        {
+            Button b=new(){Text=$"{t.Title}\n{t.UnreadCount} unread",HeightRequest=68};
+            b.Clicked+=async(_,_)=>await Navigation.PushAsync(new WorkDayThreadPage(api,store,sync,t));
+            list.Children.Add(b);
+        }
+        if(threads.Count==0)list.Children.Add(new Label{Text="No cached message threads."});
+        foreach(LocalMessageSubmission pending in await store.UnacknowledgedMessagesAsync())
+            list.Children.Add(new Label{Text=$"Waiting to sync · {pending.TargetType} · {pending.CreatedAtUtc.ToLocalTime():g} · {pending.Body}"});
     }
 }
 
@@ -60,16 +61,17 @@ public sealed class WorkDayThreadPage:ContentPage
         try
         {
             IReadOnlyList<MessageDto> rows=await api.GetMessagesAsync(thread.Id)??[];
+            await store.ReplaceCachedThreadMessagesAsync(thread.Id,rows);
             foreach(MessageDto m in rows)messages.Children.Add(new Border{Padding=10,Content=new VerticalStackLayout{Children={new Label{Text=m.SenderUserName,FontAttributes=FontAttributes.Bold},new Label{Text=m.Body},new Label{Text=m.CreatedAtUtc.ToLocalTime().ToString("g"),FontSize=11}}}});
-            foreach(LocalMessageSubmission pending in (await store.UnacknowledgedMessagesAsync()).Where(x=>x.TargetType=="Thread"&&x.TargetId==thread.Id))
-                messages.Children.Add(new Border{Padding=10,Content=new VerticalStackLayout{Children={new Label{Text="Saved on this device · waiting to sync",FontAttributes=FontAttributes.Bold},new Label{Text=pending.Body}}}});
         }
-        catch(Exception ex)
+        catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException)
         {
-            messages.Children.Add(new Label{Text="Showing messages saved on this device. The API connection is unavailable."});
-            foreach(LocalMessageSubmission pending in (await store.UnacknowledgedMessagesAsync()).Where(x=>x.TargetType=="Thread"&&x.TargetId==thread.Id))
-                messages.Children.Add(new Border{Padding=10,Content=new VerticalStackLayout{Children={new Label{Text="Saved on this device · waiting to sync",FontAttributes=FontAttributes.Bold},new Label{Text=pending.Body}}}});
+            messages.Children.Add(new Label{Text="Offline · showing messages last cached on this device."});
+            IReadOnlyList<MessageDto> rows=await store.GetCachedThreadMessagesAsync(thread.Id);
+            foreach(MessageDto m in rows)messages.Children.Add(new Border{Padding=10,Content=new VerticalStackLayout{Children={new Label{Text=m.SenderUserName,FontAttributes=FontAttributes.Bold},new Label{Text=m.Body},new Label{Text=m.CreatedAtUtc.ToLocalTime().ToString("g"),FontSize=11}}}});
         }
+        foreach(LocalMessageSubmission pending in (await store.UnacknowledgedMessagesAsync()).Where(x=>x.TargetType=="Thread"&&x.TargetId==thread.Id))
+            messages.Children.Add(new Border{Padding=10,Content=new VerticalStackLayout{Children={new Label{Text="Saved on this device · waiting to sync",FontAttributes=FontAttributes.Bold},new Label{Text=pending.Body}}}});
     }
     private async void Send(object? s,EventArgs e)
     {
