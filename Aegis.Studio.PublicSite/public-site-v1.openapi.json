@@ -117,16 +117,6 @@
             ],
             "default": "Booking"
           },
-          "startsAt": {
-            "type": "string",
-            "format": "date-time",
-            "maxLength": 50
-          },
-          "endsAt": {
-            "type": "string",
-            "format": "date-time",
-            "maxLength": 50
-          },
           "timeZone": {
             "type": "string",
             "default": "America/Jamaica",
@@ -147,12 +137,27 @@
             ],
             "description": "Required for bookings: BK is Kings Plaza; BE is East Queen Street.",
             "maxLength": 2
+          },
+          "sessionTypeId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "catalogRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "slotId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "pricingSnapshot": {
+            "$ref": "#/components/schemas/BookingPriceSnapshot"
           }
         },
         "required": [
           "clientName"
         ],
-        "description": "Booking additionally requires clientEmail, sessionType, locationCode (BK for Kings Plaza or BE for East Queen Street), startsAt and endsAt. Timestamp offsets are mandatory; endsAt must follow startsAt. Contact presence does not enable pickup notifications. Paid/confirmation claims are rejected. Omitted optional text becomes empty. Inquiry does not create a permanent Studio client."
+        "description": "Booking additionally requires clientEmail, sessionTypeId, catalogRevision, slotId, and locationCode. The slot must be published by Studio for that current catalog revision and is reserved atomically on submission. Studio-published price and deposit are copied into an immutable JMD minor-unit pricing snapshot. Paid or confirmation claims are rejected. Inquiry does not create a permanent Studio client."
       },
       "Receipt": {
         "type": "object",
@@ -190,12 +195,10 @@
             "type": "string",
             "description": "Private per-intake status credential; do not put in URLs or logs."
           },
-          "requiredDeposit": {
-            "type": "number",
-            "enum": [
-              0
-            ],
-            "description": "Legacy placeholder; authoritative deposit is determined at Front Desk."
+          "requiredDepositMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Deposit from the Studio-published price snapshot, in JMD minor units."
           },
           "currency": {
             "type": "string",
@@ -458,7 +461,9 @@
           "source": {
             "type": "string",
             "enum": [
-              "Website"
+              "Web site",
+              "Workday Mobile",
+              "API"
             ]
           },
           "submissionMethod": {
@@ -482,6 +487,21 @@
             "items": {
               "$ref": "#/components/schemas/PaymentEvent"
             }
+          },
+          "sessionTypeId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "catalogRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "slotId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "pricingSnapshot": {
+            "$ref": "#/components/schemas/BookingPriceSnapshot"
           }
         },
         "required": [
@@ -562,6 +582,209 @@
           "clientId",
           "title",
           "items"
+        ]
+      },
+      "BookingPriceSnapshot": {
+        "type": "object",
+        "properties": {
+          "sessionTypeId": {
+            "type": "string"
+          },
+          "sessionType": {
+            "type": "string"
+          },
+          "catalogRevision": {
+            "type": "integer"
+          },
+          "priceMinor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "depositMinor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "const": "JMD"
+          },
+          "resourceRequirements": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "required": [
+          "sessionTypeId",
+          "sessionType",
+          "catalogRevision",
+          "priceMinor",
+          "depositMinor",
+          "currency",
+          "resourceRequirements"
+        ]
+      },
+      "BookingSessionType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "durationMinutes": {
+            "type": "integer"
+          },
+          "setupBufferMinutes": {
+            "type": "integer"
+          },
+          "cleanupBufferMinutes": {
+            "type": "integer"
+          },
+          "priceMinor": {
+            "type": "integer"
+          },
+          "depositMinor": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string",
+            "const": "JMD"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "BK",
+                "BE"
+              ]
+            }
+          },
+          "resourceRequirements": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "durationMinutes",
+          "setupBufferMinutes",
+          "cleanupBufferMinutes",
+          "priceMinor",
+          "depositMinor",
+          "currency",
+          "locations",
+          "resourceRequirements",
+          "active"
+        ]
+      },
+      "BookingCatalog": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "sessionTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingSessionType"
+            }
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "revision",
+          "sessionTypes"
+        ]
+      },
+      "AvailabilitySlot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "locationCode": {
+            "type": "string",
+            "enum": [
+              "BK",
+              "BE"
+            ]
+          },
+          "sessionTypeId": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "catalogRevision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "locationCode",
+          "sessionTypeId",
+          "startsAt",
+          "endsAt",
+          "catalogRevision"
+        ]
+      },
+      "BookingAvailability": {
+        "type": "object",
+        "properties": {
+          "catalogRevision": {
+            "type": "integer"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AvailabilitySlot"
+            }
+          }
+        },
+        "required": [
+          "catalogRevision",
+          "slots"
+        ]
+      },
+      "AvailabilityPublication": {
+        "type": "object",
+        "properties": {
+          "slots": {
+            "type": "array",
+            "maxItems": 20000,
+            "items": {
+              "$ref": "#/components/schemas/AvailabilitySlot"
+            }
+          }
+        },
+        "required": [
+          "slots"
         ]
       }
     }
@@ -2361,6 +2584,169 @@
             }
           }
         ]
+      }
+    },
+    "/booking/catalog": {
+      "get": {
+        "summary": "Read Studio-published public session types and prices",
+        "operationId": "get_booking_catalog",
+        "responses": {
+          "200": {
+            "description": "Current public catalog revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingCatalog"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/booking/availability": {
+      "get": {
+        "summary": "List currently available Studio-published booking slots",
+        "operationId": "get_booking_availability",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locationCode",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionTypeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unreserved slots from the current Studio catalog revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingAvailability"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/booking/catalog": {
+      "put": {
+        "summary": "Publish Studio public session types and JMD prices",
+        "operationId": "publish_booking_catalog",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "booking:catalog:publish",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 90
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionTypes": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/BookingSessionType"
+                    }
+                  }
+                },
+                "required": [
+                  "sessionTypes"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Published catalog revision"
+          },
+          "403": {
+            "description": "Credential lacks publication scope"
+          }
+        }
+      }
+    },
+    "/admin/booking/availability": {
+      "put": {
+        "summary": "Publish slots computed from Studio scheduling and resource availability",
+        "operationId": "publish_booking_availability",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "booking:availability:publish",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 90
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvailabilityPublication"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Published slot count"
+          },
+          "403": {
+            "description": "Credential lacks publication scope"
+          }
+        }
       }
     }
   }

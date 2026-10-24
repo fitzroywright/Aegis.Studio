@@ -34,6 +34,8 @@ public sealed class PublicSiteClient : IDisposable
     public async Task Post(string path,object data,CancellationToken ct){_ = await PostJson(path,data,ct);}
     public async Task<JsonElement> PostJson(string path,object data,CancellationToken ct)
     {using var r=await http.PostAsJsonAsync(path,data,ct);r.EnsureSuccessStatusCode();return await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct);}
+    public async Task<JsonElement> PutJson(string path,object data,string idempotencyKey,CancellationToken ct)
+    {using var request=new HttpRequestMessage(HttpMethod.Put,path){Content=JsonContent.Create(data)};request.Headers.Add("Idempotency-Key",idempotencyKey);using var r=await http.SendAsync(request,ct);r.EnsureSuccessStatusCode();return await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct);}
     public async Task PutFile(string path,Stream content,string type,CancellationToken ct)
     {using var body=new StreamContent(content);body.Headers.ContentType=new(type);using var r=await http.PutAsync(path,body,ct);r.EnsureSuccessStatusCode();}
     public async Task<byte[]> File(Guid id,CancellationToken ct)
@@ -69,7 +71,15 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
             if(kind=="Booking")
             {
                 var start=p.GetProperty("startsAt").GetDateTimeOffset();var end=p.GetProperty("endsAt").GetDateTimeOffset();
-                var pending=new PendingBookingRequest(w.Id,name,email,title,DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start,TimeZoneInfo.FindSystemTimeZoneById(Text(p,"timeZone","America/Jamaica"))).DateTime),Math.Max(0,configuration.GetValue<decimal?>("BookingApi:RequiredDeposit")??0),"JMD",Text(p,"notes"),ConversationId:cv,ExternalBookingId:source+":"+external,StartsAtUtc:start,EndsAtUtc:end,Location:string.IsNullOrWhiteSpace(Text(p,"location"))?Text(p,"locationCode") switch {"BK"=>"Kings Plaza","BE"=>"East Queen Street",_=>""}:Text(p,"location"),ClientPhone:Text(p,"clientPhone"),Destination:destination,BookingSource:"Website");
+                BookingPriceSnapshot? price=null;decimal requiredDeposit=Math.Max(0,configuration.GetValue<decimal?>("BookingApi:RequiredDeposit")??0);
+                if(p.TryGetProperty("pricingSnapshot",out var quote)&&quote.ValueKind==JsonValueKind.Object)
+                {
+                    var requirements=quote.GetProperty("resourceRequirements").EnumerateObject().ToDictionary(x=>x.Name,x=>x.Value.GetInt32(),StringComparer.OrdinalIgnoreCase);
+                    price=new BookingPriceSnapshot(Text(quote,"sessionTypeId"),Text(quote,"sessionType"),quote.GetProperty("catalogRevision").GetInt64(),quote.GetProperty("priceMinor").GetInt64(),quote.GetProperty("depositMinor").GetInt64(),Text(quote,"currency"),requirements);
+                    requiredDeposit=price.DepositMinor/100m;
+                }
+                string bookingSource=Text(p,"source") switch{"Web site"=>"Web site","Workday Mobile"=>"Workday Mobile",_=>"API"};
+                var pending=new PendingBookingRequest(w.Id,name,email,title,DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start,TimeZoneInfo.FindSystemTimeZoneById(Text(p,"timeZone","America/Jamaica"))).DateTime),requiredDeposit,"JMD",Text(p,"notes"),ConversationId:cv,ExternalBookingId:source+":"+external,StartsAtUtc:start,EndsAtUtc:end,Location:string.IsNullOrWhiteSpace(Text(p,"location"))?Text(p,"locationCode") switch {"BK"=>"Kings Plaza","BE"=>"East Queen Street",_=>""}:Text(p,"location"),ClientPhone:Text(p,"clientPhone"),Destination:destination,BookingSource:bookingSource,PriceSnapshot:price);
                 FrontDeskRequestRules.Validate(pending);
                 Guid job=FrontDeskBookingRequestStore.CreatePendingJob(c,tx,pending,"Website import",false);
                 requestId=Guid.NewGuid();WorkflowStore.Sql(c,tx,"insert into studio_frontdesk_requests(id,workspace_id,payload,created_by,job_id) values($1,$2,$3::jsonb,'Website import',$4)",requestId,w.Id,JsonSerializer.Serialize(pending,PublicApi.PublicV1Store.Json),job);
@@ -206,3 +216,4 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
     }
 
 }
+

@@ -836,7 +836,19 @@
         genericView.innerHTML=StudioPage.html({title:'Studio Management',scroll:true,
             summary:StudioPage.metrics([['Managed workspaces',manageable.length],['Active roles',studioRolesCache.filter(x=>x.isActive).length]]),
             attention:'<p>Workspace access is controlled by memberships and reusable roles.</p>',
-            content:`<div class="st-admin-grid">${studioManagementCatalogCards()}<section class="admin-card admin-demo-card" id="studioDemoLoader">
+            content:`<div class="st-admin-grid">${studioManagementCatalogCards()}<section class="admin-card" id="publicBookingCatalog">
+                            <header class="admin-card-header"><div><h2>Public booking sessions</h2><p>Studio owns session descriptions, duration, JMD price, deposit, locations and resource rules. Published changes sync to the API site when external publishing is enabled.</p></div></header>
+                            <div class="admin-form-stack"><input type="hidden" data-catalog-id><label>Session name<input data-catalog-name maxlength="160"></label><label>Public description<textarea data-catalog-description maxlength="1000" rows="2"></textarea></label>
+                                <div class="admin-form-row"><label>Session minutes<input data-catalog-duration type="number" min="15" max="1440" value="60"></label><label>Setup minutes<input data-catalog-setup type="number" min="0" max="480" value="0"></label><label>Cleanup minutes<input data-catalog-cleanup type="number" min="0" max="480" value="0"></label></div>
+                                <div class="admin-form-row"><label>Price (JMD)<input data-catalog-price type="number" min="0" step="0.01"></label><label>Deposit (JMD)<input data-catalog-deposit type="number" min="0" step="0.01"></label></div>
+                                <label>Resource requirements <span class="muted">JSON resource type to count</span><input data-catalog-resources value='{"Photographer":1}'></label><small>Use Photographer for active photographers. Use location-specific types such as Room-BK or Room-BE for rooms kept at one location; other types match the resource types in Scheduling.</small>
+                                <details><summary>Public booking hours (Jamaica time)</summary><label>Weekly opening windows JSON<textarea data-catalog-hours rows="8" placeholder='[{"locationCode":"BK","dayOfWeek":1,"opensAt":"09:00","closesAt":"17:00","slotStepMinutes":30}]'></textarea></label><button class="action" type="button" data-catalog-save-hours>Save weekly hours</button><p class="muted">Day numbers: Sunday 0 through Saturday 6. Leave a day out when closed. Slots are computed against the Studio schedule and resource conflicts.</p></details>
+                                <div><span>Locations</span> <label><input type="checkbox" data-catalog-location value="BK"> Kings Plaza</label> <label><input type="checkbox" data-catalog-location value="BE"> East Queen Street</label></div>
+                                <div><label><input type="checkbox" data-catalog-active checked> Active</label> <label><input type="checkbox" data-catalog-published> Published to API site</label></div>
+                                <div><button class="primary" type="button" data-catalog-save>Save session type</button> <button class="action" type="button" data-catalog-reset>Clear form</button></div><p data-catalog-status role="status"></p>
+                                <div data-catalog-list></div>
+                            </div>
+                        </section><section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
                                 <div><h2>Demo Data</h2><p>Rebuild the complete Studio demo with job templates, workflows, genuine photographs, bookings, schedules and payments.</p></div>
                                 <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Clear and Recreate Demo Data</button><button class="primary" type="button" data-demo-reset>Reset and Regenerate</button></div>
@@ -882,6 +894,19 @@
                         </section>
 </div>`});
         StudioPage.bind(genericView,current);
+
+        const bookingCatalogPanel=document.getElementById('publicBookingCatalog');
+        if(bookingCatalogPanel){
+            let catalogRows=[];const field=name=>bookingCatalogPanel.querySelector(`[data-catalog-${name}]`),status=field('status'),list=field('list');
+            const reset=()=>{for(const name of ['id','name','description','resources'])field(name).value=name==='resources'?'{"Photographer":1}':'';field('duration').value='60';field('setup').value='0';field('cleanup').value='0';field('price').value='0';field('deposit').value='0';field('active').checked=true;field('published').checked=false;bookingCatalogPanel.querySelectorAll('[data-catalog-location]').forEach(x=>x.checked=false);};
+            const render=()=>{list.innerHTML=catalogRows.map(x=>`<article class="admin-list-row"><div><strong>${esc(x.name)}</strong><p>${esc(x.currency)} ${((x.priceMinor||0)/100).toFixed(2)} · deposit ${((x.depositMinor||0)/100).toFixed(2)} · ${x.durationMinutes} min · ${esc(x.locations.join(', '))}</p><small>${x.isPublished?'Published':'Draft'}${x.isActive?'':' · inactive'}</small></div><button class="action" type="button" data-edit="${esc(x.id)}">Edit</button><button class="action" type="button" data-remove="${esc(x.id)}">Remove</button></article>`).join('')||'<p class="muted">No public session types configured.</p>';list.querySelectorAll('[data-edit]').forEach(button=>button.onclick=()=>{const x=catalogRows.find(item=>item.id===button.dataset.edit);field('id').value=x.id;field('name').value=x.name;field('description').value=x.description||'';field('duration').value=x.durationMinutes;field('setup').value=x.setupBufferMinutes;field('cleanup').value=x.cleanupBufferMinutes;field('price').value=(x.priceMinor/100).toFixed(2);field('deposit').value=(x.depositMinor/100).toFixed(2);field('resources').value=JSON.stringify(x.resourceRequirements||{});field('active').checked=x.isActive;field('published').checked=x.isPublished;bookingCatalogPanel.querySelectorAll('[data-catalog-location]').forEach(option=>option.checked=x.locations.includes(option.value));});list.querySelectorAll('[data-remove]').forEach(button=>button.onclick=async()=>{catalogRows=catalogRows.filter(x=>x.id!==button.dataset.remove);await saveRows();});};
+            async function saveRows(){try{const result=await json('/api/admin/public-booking/session-types/',{method:'PUT',body:JSON.stringify(catalogRows)});catalogRows=result.sessionTypes||[];status.textContent=`Saved Studio catalog revision ${result.revision}. External publication will retry automatically if unavailable.`;render();}catch(error){status.textContent='Save failed: '+error.message;}}
+            field('save').onclick=async()=>{try{const id=field('id').value||crypto.randomUUID(),locations=[...bookingCatalogPanel.querySelectorAll('[data-catalog-location]:checked')].map(x=>x.value),resourceRequirements=JSON.parse(field('resources').value||'{}'),priceMinor=Math.round(Number(field('price').value)*100),depositMinor=Math.round(Number(field('deposit').value)*100);const item={id,name:field('name').value.trim(),description:field('description').value.trim(),durationMinutes:Number(field('duration').value),setupBufferMinutes:Number(field('setup').value),cleanupBufferMinutes:Number(field('cleanup').value),priceMinor,depositMinor,currency:'JMD',locations,resourceRequirements,isActive:field('active').checked,isPublished:field('published').checked};if(!item.name||!locations.length||!Number.isSafeInteger(priceMinor)||!Number.isSafeInteger(depositMinor))throw new Error('Enter a name, choose a location and provide valid JMD prices.');const index=catalogRows.findIndex(x=>x.id===id);if(index<0)catalogRows.push(item);else catalogRows[index]=item;await saveRows();reset();}catch(error){status.textContent=error.message;}};
+            field('reset').onclick=reset;
+            const hoursField=field('hours');bookingCatalogPanel.querySelector('[data-catalog-save-hours]').onclick=async()=>{try{const hours=JSON.parse(hoursField.value||'[]');const result=await json('/api/admin/public-booking/hours',{method:'PUT',body:JSON.stringify(hours)});status.textContent=`Saved Studio booking hours at catalog revision ${result.revision}.`; }catch(error){status.textContent='Hours save failed: '+error.message;}};
+            json('/api/admin/public-booking/hours').then(hours=>{hoursField.value=JSON.stringify(hours,null,2);}).catch(error=>{status.textContent='Could not load public booking hours: '+error.message;});
+            json('/api/admin/public-booking/session-types/').then(result=>{catalogRows=result.sessionTypes||[];render();status.textContent=`Studio catalog revision ${result.revision}.`;}).catch(error=>{status.textContent='Could not load session types: '+error.message;});
+        }
 
         const statusPanel=document.querySelector('[data-service-status]');
         if(statusPanel){
@@ -1081,6 +1106,7 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 
 
 

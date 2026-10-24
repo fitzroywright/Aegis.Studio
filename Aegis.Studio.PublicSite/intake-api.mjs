@@ -51,7 +51,7 @@ export function createIntakeApi(env,readBody,json) {
     if(route===keyCollection&&['GET','POST'].includes(method)){
       authenticateProvisioning(req);
       if(method==='GET'){json(res,200,{items:store.listApiCredentials()});return true;}
-      const p=await input(req,16384),created=store.createApiCredential(p.name,p.scopes);json(res,201,created);return true;
+      const p=await input(req,16384),created=store.createApiCredential(p.name,p.scopes,p.clientApplication);json(res,201,created);return true;
     }
     if(keyItem&&method==='DELETE'){
       authenticateProvisioning(req);if(!store.revokeApiCredential(keyItem[1]))fail(404,'not_found','Integration key not found.');
@@ -60,6 +60,22 @@ export function createIntakeApi(env,readBody,json) {
     if(route==='/api/v1/admin/client-link-proofs'&&method==='POST'){
       authenticateProvisioning(req);const p=await input(req,4096),proof=store.createClientLinkChallenge(p.clientId);
       json(res,201,{id:proof.id,code:proof.code,expiresAt:proof.expiresAt},{'Cache-Control':'no-store'});return true;
+    }
+    if(route==='/api/v1/admin/booking/catalog'&&method==='PUT'){
+      const owner=authenticate(req,'booking:catalog:publish'),p=await input(req,1_000_000),key=String(req.headers['idempotency-key']||'');
+      if(!/^[A-Za-z0-9._-]{1,90}$/.test(key))fail(400,'idempotency_required','Provide an Idempotency-Key for the catalog publication.');
+      json(res,200,store.replay(owner,`catalog-${key}`,p,()=>store.publishBookingCatalog(p)));return true;
+    }
+    if(route==='/api/v1/admin/booking/availability'&&method==='PUT'){
+      const owner=authenticate(req,'booking:availability:publish'),p=await input(req,3_000_000),key=String(req.headers['idempotency-key']||'');
+      if(!/^[A-Za-z0-9._-]{1,90}$/.test(key))fail(400,'idempotency_required','Provide an Idempotency-Key for the availability publication.');
+      json(res,200,store.replay(owner,`availability-${key}`,p,()=>store.publishBookingAvailability(p,true)));return true;
+    }
+    if(route==='/api/v1/booking/catalog'&&method==='GET'){
+      const catalog=store.getBookingCatalog();json(res,200,catalog,{'Cache-Control':'public, max-age=30'});return true;
+    }
+    if(route==='/api/v1/booking/availability'&&method==='GET'){
+      json(res,200,store.getBookingAvailability({from:url.searchParams.get('from'),to:url.searchParams.get('to'),locationCode:url.searchParams.get('locationCode'),sessionTypeId:url.searchParams.get('sessionTypeId')||''}),{'Cache-Control':'public, max-age=15'});return true;
     }
     const linkProof=route.match(/^\/api\/v1\/admin\/client-link-proofs\/([0-9a-f-]{36})$/i);
     if(linkProof&&method==='DELETE'){
@@ -95,7 +111,8 @@ export function createIntakeApi(env,readBody,json) {
     if(submit&&method==='POST'){
       const owner=browser?'reference-site-form':authenticate(req,'intake:submit');
       const value=await input(req,2_000_000);if(route==='/api/inquiries')value.kind='Inquiry';
-      const result=store.create(owner,String(req.headers['idempotency-key']||''),value,browser?'Form':'Api');json(res,201,result);return true;
+      const clientApplication=browser?'API':store.apiClientApplication(owner)||credentials.find(x=>x.id===owner)?.clientApplication||'API';
+      const result=store.create(owner,String(req.headers['idempotency-key']||''),value,browser?'Form':'Api',clientApplication);json(res,201,result);return true;
     }
     if(route==='/api/v1/changes'&&method==='GET'){authenticate(req,'intake:pull');json(res,200,store.feed(url.searchParams.get('cursor')||''));return true;}
     const match=route.match(/^\/api\/v1\/intakes\/([0-9a-f-]{36})(?:\/(ack|status|roster|attachments|payments))?$/i)||route.match(/^\/api\/(?:bookings|inquiries)\/([0-9a-f-]{36}|\d{4}-(?:BK|BE|BR|W)-\d{6})(?:\/(roster|attachments))?$/i);
@@ -144,4 +161,5 @@ export function createIntakeApi(env,readBody,json) {
     fail(404,'not_found','Operation not found.');
   }};
 }
+
 

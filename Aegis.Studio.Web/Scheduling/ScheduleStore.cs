@@ -196,6 +196,12 @@ public sealed class ScheduleStore
         return values;
     }
 
+    public IReadOnlyList<ScheduleResourceOccupancy> GetResourceOccupancy(DateTimeOffset from,DateTimeOffset to)
+    {
+        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select er.resource_id,coalesce(er.attendance_start_utc,e.starts_at_utc),coalesce(er.attendance_end_utc,e.ends_at_utc) from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id where e.status<>'Cancelled' and coalesce(er.attendance_start_utc,e.starts_at_utc)<$2 and coalesce(er.attendance_end_utc,e.ends_at_utc)>$1",c);
+        q.Parameters.AddWithValue(from.ToUniversalTime());q.Parameters.AddWithValue(to.ToUniversalTime());using var r=q.ExecuteReader();var values=new List<ScheduleResourceOccupancy>();while(r.Read())values.Add(new(r.GetGuid(0),r.GetFieldValue<DateTimeOffset>(1),r.GetFieldValue<DateTimeOffset>(2)));return values;
+    }
+
     public IReadOnlyList<StaffCapacitySnapshot> GetStaffCapacity(DateTimeOffset from, DateTimeOffset to)
     {
         if (to <= from) throw new InvalidOperationException("Capacity end must be after start.");
@@ -331,6 +337,7 @@ public sealed record ScheduleResourceRequest(string Name,string? ResourceType,bo
 public sealed record ScheduleEntry(Guid Id,Guid? JobId,Guid? BookingId,string Title,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? Location,string Status,string? Notes,DateTimeOffset CreatedAtUtc,IReadOnlyList<Guid> ResourceIds);
 public sealed record ScheduleEntryRequest(Guid? JobId,Guid? BookingId,string Title,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? Location,string? Status,string? Notes,IReadOnlyList<Guid>? ResourceIds,bool AllowConflicts=false);
 public sealed record ScheduleConflict(Guid EntryId,string EntryTitle,Guid ResourceId,string ResourceName,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc);
+public sealed record ScheduleResourceOccupancy(Guid ResourceId,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc);
 public sealed class ScheduleConflictException : Exception { public ScheduleConflictException(IReadOnlyList<ScheduleConflict> conflicts) : base("Schedule conflicts were detected.") { Conflicts = conflicts; } public IReadOnlyList<ScheduleConflict> Conflicts { get; } }
 
 
@@ -356,4 +363,5 @@ public sealed record ScheduleAssignmentChange(
     IReadOnlyList<Guid> PreviousResourceIds,
     IReadOnlyList<Guid> NewResourceIds,
     string? Reason);
+
 

@@ -26,8 +26,10 @@
         <div class="form-card"><div class="card-heading"><div><p class="eyebrow">YOUR SESSION</p><h3>Request a booking</h3></div><span class="step-chip">01 — 02</span></div>
           <form id="booking-form">
             <div class="field-row"><label>Your name<input name="clientName" autocomplete="name" placeholder="First and last name" maxlength="200" required></label><label>Email address<input name="clientEmail" autocomplete="email" type="email" placeholder="you@example.com" required></label></div>
-            <div class="field-row"><label>Studio location<select name="locationCode" required><option value="">Choose a location</option><option value="BK">Kings Plaza</option><option value="BE">East Queen Street</option></select></label><label>What are we photographing?<select name="sessionType" required><option value="">Choose a session</option><option>Portrait session</option><option>Wedding</option><option>Graduation</option><option>Family story</option><option>Something else</option></select></label><label>Preferred date<input name="startsAt" type="date" required></label></div>
-            <div class="field-row"><label>Preferred time<input name="preferredTime" type="time" value="10:00"></label><label>Phone <span class="optional">OPTIONAL</span><input name="clientPhone" autocomplete="tel" placeholder="(876) 555-0100"></label></div>
+            <div class="field-row"><label>Studio location<select name="locationCode" required><option value="">Choose a location</option><option value="BK">Kings Plaza</option><option value="BE">East Queen Street</option></select></label><label>What are we photographing?<select name="sessionTypeId" required><option value="">Loading Studio sessions…</option></select></label><label>Preferred date<input name="bookingDate" type="date" required></label></div>
+            <div class="field-row"><label>Available time<select name="slotId" required><option value="">Choose a session and date first</option></select></label><label>Phone <span class="optional">OPTIONAL</span><input name="clientPhone" autocomplete="tel" placeholder="(876) 555-0100"></label></div>
+            <p id="booking-catalog-note" class="form-footnote" role="status"></p>
+            <p id="booking-price-note" class="form-footnote"></p>
             <label>Tell us a little more <span class="optional">OPTIONAL</span><textarea name="notes" rows="3" placeholder="Location, people, ideas…"></textarea></label>
             <p class="form-footnote">This is a request, not a confirmed appointment. We’ll follow up to confirm availability and any deposit required.</p>
             <button class="button button-dark submit-button" type="submit">Send booking request <span>↗</span></button>
@@ -60,4 +62,5 @@
   </div>
 </body>
 </html>
+
 

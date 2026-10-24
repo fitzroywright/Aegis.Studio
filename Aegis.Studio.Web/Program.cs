@@ -226,6 +226,8 @@ builder.Services.AddHostedService<InboundEmailWorker>();
 builder.Services.AddHostedService<OutboundEmailWorker>();
 builder.Services.AddHostedService<Aegis.Studio.Web.Intake.WebsiteIntakeWorker>();
 builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GalleryPushWorker>();
+builder.Services.AddSingleton<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogStore>();
+builder.Services.AddHostedService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogPublisher>();
 builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddSingleton<WorkflowStore>();
 builder.Services.AddHostedService<Aegis.Studio.Web.PublicApi.PublicWebhookWorker>();
@@ -249,6 +251,8 @@ app.MapDiagnosticLevelRuntime();
 await app.Services.GetRequiredService<StudioDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioFeatureDatabase>().InitializeAsync();
 await app.Services.GetRequiredService<StudioMessagingDatabase>().InitializeAsync();
+Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogStore publicBookingCatalog=app.Services.GetRequiredService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogStore>();
+publicBookingCatalog.EnsureSchema();
 StudioOperationsEnhancements.EnsureSchema(
     app.Services.GetRequiredService<StudioDatabase>(),
     app.Services.GetRequiredService<WorkspaceStore>());
@@ -318,6 +322,7 @@ app.MapStudioInAppMessaging();
 app.MapStudioMessageAttachments();
 app.MapStudioOperationsEnhancements();
 app.MapStudioScheduling();
+app.MapStudioPublicBookingCatalog();
 app.MapStudioProduction();
 app.MapWorkspaceAccess();
 app.MapStudioEmployeeDirectory();
@@ -734,6 +739,7 @@ app.MapPut("/api/admin/job-roles/{code}/active", (string code, bool active, Clai
 }).RequireAuthorization();
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
+
 
 
 

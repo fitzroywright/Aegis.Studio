@@ -3,11 +3,19 @@ import assert from 'node:assert/strict';
 import { createServer, sign } from './server.mjs';
 
 async function fixture(t, extra = {}) {
-  const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', INTAKE_DB_PATH: ':memory:', ...extra };
+  const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', INTAKE_DB_PATH: ':memory:', PUBLIC_API_PROVISIONING_TOKEN:'test-site-provisioning-token-at-least-32-chars', ...extra };
   const server = createServer(env);
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   t.after(() => new Promise(resolve => server.close(resolve)));
   return `http://127.0.0.1:${server.address().port}`;
+}
+async function publishTestBooking(origin){
+ const base=origin+'/api/v1',provision='test-site-provisioning-token-at-least-32-chars';
+ const keyResponse=await fetch(base+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Studio test publisher',scopes:['booking:catalog:publish','booking:availability:publish']})});assert.equal(keyResponse.status,201);const key=(await keyResponse.json()).secret,headers={Authorization:'Bearer '+key,'Content-Type':'application/json'};
+ const published=await fetch(base+'/admin/booking/catalog',{method:'PUT',headers:{...headers,'Idempotency-Key':'test-catalog-1'},body:JSON.stringify({sessionTypes:[{id:'portrait',name:'Portrait',description:'Portrait photography',durationMinutes:60,setupBufferMinutes:15,cleanupBufferMinutes:15,priceMinor:12500,depositMinor:5000,currency:'JMD',locations:['BK','BE'],resourceRequirements:{Staff:1},active:true}]})});assert.equal(published.status,200);const catalog=await published.json();
+ const slots=['bk-1','bk-2','be-1'].map((id,i)=>({id,locationCode:id.startsWith('be')?'BE':'BK',sessionTypeId:'portrait',startsAt:`2099-01-01T${String(15+i).padStart(2,'0')}:00:00Z`,endsAt:`2099-01-01T${String(16+i).padStart(2,'0')}:00:00Z`,catalogRevision:catalog.revision}));
+ const available=await fetch(base+'/admin/booking/availability',{method:'PUT',headers:{...headers,'Idempotency-Key':'test-availability-1'},body:JSON.stringify({slots})});assert.equal(available.status,200);
+ return {revision:catalog.revision,slots};
 }
 test('signing binds method, path, exact body and idempotency key', () => {
   const body = Buffer.from('{"ok":true}');
@@ -52,12 +60,13 @@ test('live mode disables fake social sign-in and rejects non-HTTPS Studio upstre
 });
 test('public booking is durably saved without calling internal Studio and replays safely',async t=>{
  const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),session=await fetch(`${origin}/api/intake-session`),csrf=(await session.json()).csrf,cookie=session.headers.get('set-cookie').split(';')[0];
- const body=JSON.stringify({clientName:'Test Client',clientEmail:'client@example.test',sessionType:'Portrait',locationCode:'BK',startsAt:'2026-11-01T15:00:00Z',endsAt:'2026-11-01T16:00:00Z'});
+ const catalog=await publishTestBooking(origin),body=JSON.stringify({clientName:'Test Client',clientEmail:'client@example.test',sessionTypeId:'portrait',catalogRevision:catalog.revision,slotId:'bk-1',locationCode:'BK'});
  const options={method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf,'Idempotency-Key':'booking-1'},body};
  const first=await fetch(`${origin}/api/bookings`,options),receipt=await first.json();assert.equal(first.status,201);assert.match(receipt.intakeReference,/^\d{4}-BK-\d{6}$/);
  const replay=await(await fetch(`${origin}/api/bookings`,options)).json();assert.equal(receipt.id,replay.id);assert.equal(receipt.accessToken,replay.accessToken);
  const noAccess=await fetch(`${origin}/api/bookings/${receipt.id}`);assert.equal(noAccess.status,404);
  const status=await(await fetch(`${origin}/api/bookings/${receipt.id}`,{headers:{'X-Intake-Token':receipt.accessToken}})).json();assert.equal(status.importStatus,'Pending');
+ assert.equal(receipt.requiredDepositMinor,5000);assert.equal((await fetch(`${origin}/api/v1/booking/availability?from=2099-01-01&to=2099-01-01&locationCode=BK&sessionTypeId=portrait`)).status,200);
  const conflict=await fetch(`${origin}/api/bookings`,{...options,body:body.replace('Test Client','Other Client')});assert.equal(conflict.status,409);
 });
 test('serves standalone client assets and an operational health endpoint', async t => {
@@ -106,7 +115,7 @@ test('server provisions one-time integration keys, enforces scopes, and revokes 
   const key=await created.json();assert.match(key.secret,/^[A-Za-z0-9_-]{40,}$/);assert.equal(key.name,'Booking website');
   const listed=await(await fetch(`${origin}/api/v1/admin/integration-keys`,{headers:adminHeaders})).json();
   assert.equal(listed.items.length,1);assert.equal('secret' in listed.items[0],false);assert.equal('secret_hash' in listed.items[0],false);
-  const booking={kind:'Booking',clientName:'Test Client',clientEmail:'test@example.invalid',sessionType:'Portrait',locationCode:'BK',startsAt:'2026-11-01T10:00:00-05:00',endsAt:'2026-11-01T11:00:00-05:00'};
+  const catalog=await publishTestBooking(origin),booking={kind:'Booking',clientName:'Test Client',clientEmail:'test@example.invalid',sessionType:'Portrait',sessionTypeId:'portrait',catalogRevision:catalog.revision,slotId:'bk-1',locationCode:'BK'};
   const submission=await fetch(`${origin}/api/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'one','Content-Type':'application/json'},body:JSON.stringify(booking)});
   assert.equal(submission.status,201);
   const galleryScope=await fetch(`${origin}/api/v1/changes`,{headers:{Authorization:`Bearer ${key.secret}`}});
@@ -133,4 +142,5 @@ test('client link proof is single use, bound to authenticated provider subject, 
  await fetch(api+`/galleries/${gallery}/publish`,{method:'POST',headers:ph,body:'{}'});
  assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:cookie}})).status,200);
 });
+
 

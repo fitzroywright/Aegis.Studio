@@ -25,6 +25,15 @@ public sealed class FrontDeskBookingRequestTests
     public void InvalidDepositMoneyIsRejected(decimal amount,string currency)
         => Assert.Throws<ArgumentException>(()=>FrontDeskRequestRules.ValidateMoney(amount,currency));
 
+    [Fact]
+    public void PublishedPriceSnapshotMustMatchThePendingDeposit()
+    {
+        var snapshot=new BookingPriceSnapshot("portrait","Portrait",3,12500,5000,"JMD",new Dictionary<string,int>{{"Photographer",1}});
+        var request=new PendingBookingRequest(Guid.NewGuid(),"Client","client@example.invalid","Portrait",DateOnly.FromDateTime(DateTime.Today.AddDays(2)),50,"JMD",null,PriceSnapshot:snapshot);
+        FrontDeskRequestRules.Validate(request);
+        Assert.Throws<ArgumentException>(()=>FrontDeskRequestRules.Validate(request with{RequiredDeposit=49}));
+    }
+
     [StudioPostgresFact]
     public async Task PendingJobExistsBeforeDepositAndConcurrentReceiptReplayDoesNotConfirm()
     {
@@ -102,3 +111,4 @@ public sealed class StudioPostgresFactAttribute : FactAttribute
 {
     public StudioPostgresFactAttribute(){if(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STUDIO_TEST_POSTGRES")))Skip="Set STUDIO_TEST_POSTGRES to a disposable PostgreSQL test database to run transactional booking tests.";}
 }
+

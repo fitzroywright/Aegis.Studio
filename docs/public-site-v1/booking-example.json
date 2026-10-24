@@ -3,9 +3,10 @@
   "clientName": "Test Client",
   "clientEmail": "test-recipient@example.invalid",
   "sessionType": "Graduation",
+  "sessionTypeId": "graduation",
+  "catalogRevision": 1,
+  "slotId": "graduation-bk-20990101-1400",
   "locationCode": "BK",
-  "startsAt": "2026-11-01T10:00:00-05:00",
-  "endsAt": "2026-11-01T11:00:00-05:00",
   "timeZone": "America/Jamaica",
   "destination": "graduation",
   "externalReference": "external-123",
@@ -20,3 +21,4 @@
     }
   ]
 }
+

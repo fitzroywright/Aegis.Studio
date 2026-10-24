@@ -10,21 +10,32 @@ Configure `PUBLIC_API_KEYS_JSON` as an array of objects with `id`, `secret`, and
 
 | Integration | Scopes |
 | --- | --- |
-| External booking website | `intake:submit` |
-| Studio importer | `intake:pull`, `intake:ack` |
+| External booking website API client | `intake:submit` |
+| Workday Mobile API client | `intake:submit` and Workday-specific scopes as those endpoints are added |
+| Studio importer and publisher | `intake:pull`, `intake:ack`, `booking:catalog:publish`, `booking:availability:publish` |
 | Studio gallery publisher | `gallery:publish` |
 | Verified payment adapter | `payment:verified` |
 | Attachment scanner operator | `attachment:scan` |
 
-Studio currently uses one configured integration token; it can carry the three Studio scopes if polling and gallery publication run together. External submitters must not receive payment, polling, acknowledgment or publication privileges. The verified payment adapter must verify the provider's result before using its credential. Studio and this site do not process card details. Rotate keys by adding a replacement credential, updating the consumer and verifying it, then removing the old credential. Preserve the credential `id` when rotating a secret to retain ownership and idempotency scope.
+Studio can use one configured integration token for import and booking publication. Mark a Workday API credential's `clientApplication` as `Workday Mobile` when provisioning it; Studio records its submissions as `Workday Mobile`. The browser booking form's server-controlled route records `Web site`; callers cannot choose the source label in request JSON. External submitters must not receive payment, polling, acknowledgment or publication privileges. The verified payment adapter must verify the provider's result before using its credential. Studio and this site do not process card details. Rotate keys by adding a replacement credential, updating the consumer and verifying it, then removing the old credential. Preserve the credential `id` when rotating a secret to retain ownership and idempotency scope.
+
+For Studio to publish, configure its local environment with `PublicSite:BaseUrl=https://api.bryanstudiosltd.com`, an integration token scoped to `intake:pull`, `intake:ack`, `booking:catalog:publish`, and `booking:availability:publish`, and `PublicSite:BookingCatalogPublishingEnabled=true`. The session catalog, prices, opening hours, scheduling, and bookings stay in Studio's own database. When the API site is unreachable, Studio continues operating; publication retries in the background.
+
+Public catalog and availability reads expose only the public session definition and open slots, so they do not require a bearer credential. The API still checks catalog revision, location, slot identity, and one-time reservation on every booking submission.
+
+## Studio session catalog and availability
+
+Studio is the source of truth for public session types, duration, setup and cleanup buffers, JMD price/deposit, eligible location and resource requirements. The Studio Admin page also manages weekly opening hours in Jamaica time. Day numbers are Sunday 0 through Saturday 6; a closed day has no row. Studio publishes the active catalog to `PUT /admin/booking/catalog` with `booking:catalog:publish`; publication uses an `Idempotency-Key` and increments the catalog revision. The public website reads `GET /booking/catalog` and renders only the active published entries. Money is integer JMD minor units (`priceMinor`, `depositMinor`), with 100 minor units per JMD dollar.
+
+Studio derives bookable slots from its location hours, the catalog's buffers and resource requirements, existing room/equipment/staff schedule entries (including per-resource attendance windows), and photographer leave. Resource rules such as `Room-BK` and `Room-BE` keep location-specific rooms separate; `Photographer` matches active photographer schedule resources. Studio publishes stable slot IDs and the matching catalog revision to `PUT /admin/booking/availability` using `booking:availability:publish`. The browser lists unreserved slots using `GET /booking/availability?from=YYYY-MM-DD&to=YYYY-MM-DD&locationCode=BK&sessionTypeId=...`. Booking submission must carry the current `sessionTypeId`, `catalogRevision`, `locationCode`, and `slotId`; callers cannot supply their own duration or price. The API reserves a selected slot in the same durable transaction that saves the booking intake. A conflicting replay receives 409 and must choose another published slot.
 
 ## Submission and receipt
 
-POST `/intakes` using bearer authentication, JSON, and `Idempotency-Key`. See `booking-example.json`. For an inquiry, use `kind: Inquiry`, contact details and notes; service and times are optional. Bookings require email, service, location code and a valid start/end range. New location codes are `BK` (Kings Plaza) and `BE` (East Queen Street). Times use ISO 8601 with explicit offsets and an IANA `timeZone`. Bryan's default is `America/Jamaica`.
+POST `/intakes` using bearer authentication, JSON, and `Idempotency-Key`. See `booking-example.json`. For an inquiry, use `kind: Inquiry`, contact details and notes; service and times are optional. Bookings require email, a published session ID and revision, location code and an available slot ID. The API supplies the stored start/end time and immutable price/deposit snapshot from Studio's current publication. New location codes are `BK` (Kings Plaza) and `BE` (East Queen Street). Times in the intake use ISO 8601 with explicit offsets and an IANA `timeZone`. Bryan's default is `America/Jamaica`.
 
 The response includes an immutable UUID `id`, the legacy UUID `reference`, the client-facing `intakeReference` such as `2026-BK-000001`, a creation time, initial receipt/import state and a private per-intake `accessToken`. Never replace a UUID field with the short reference. The reference is not a credential. Browser status requests use `X-Intake-Token`; authenticated submission integrations can read only their own intake records. New bookings require `locationCode`: `BK` (Kings Plaza) or `BE` (East Queen Street). They receive `YYYY-BK-######` or `YYYY-BE-######`; inquiries retain `YYYY-W-######`. Each location and inquiry prefix has a separate sequence that restarts at `000001` in the Jamaica calendar year. Previously issued `YYYY-BR-######` references remain valid for status lookup and import. Idempotent retries return the original reference. The intake reference and original integration reference remain separate.
 
-Website receipt means **saved on the website, awaiting Studio import/review**. It does not confirm a booking, availability, payment or email delivery. `locationCode` identifies the requested Studio location; it does not confirm resource availability. Website intake still awaits Studio review and scheduling. The legacy `requiredDeposit: 0` is a compatibility placeholder, not a quote or waived-deposit policy. Front Desk determines the authoritative price and deposit.
+Website receipt means **saved on the website, awaiting Studio import/review**. It does not confirm payment, final approval or email delivery. The API site reserves the selected published slot atomically; Studio still validates current resource conditions before staff confirms the booking. Price and required deposit are the exact published snapshot attached to that booking; subsequent catalog changes do not rewrite prior submissions. The Studio source label is `Web site` for browser bookings.
 
 Replaying the same credential ID/key and payload returns the original result and reference, even after restart. A changed payload under the same key returns 409. Keys and results are retained durably in the site database; do not delete replay history while callers may retry. Third-party callers cannot choose reference numbers or counters.
 
@@ -64,8 +75,9 @@ The site serves its own copies; it does not call internal Studio for gallery fil
 
 Errors have `code`, `message`, `fieldErrors`, and `correlationId`. Correct 400/413 errors. Resolve 409 replay/revision conflicts by reading the current state; never silently invent a replacement identity after an uncertain request. For 429 honor `Retry-After: 60`. For network failures or 503 retry the same key/payload. Unknown outcomes require reconciliation. Do not log bearer tokens, private intake tokens, request bodies or roster contacts.
 
-Compatible additive fields may extend V1. Breaking field, behavior or authentication changes require V2 and a migration plan. Do not freeze or distribute this contract as validated until the MacBook contract tests and controlled end-to-end checks pass.
+No external developer has integrated the API yet. Keep one current V1 contract and update its examples and tests together; a parallel version is not required. Do not call the contract validated until the Mac contract tests and controlled end-to-end checks pass.
 
 ## Local setup and validation
 
 Use Node 24 and a durable writable directory. Start from `.env.example`; use unique local test credentials and no real customer data. Run `npm install` and `npm test` on the MacBook. Use `requests.http` for operation examples and `contract-example.json` as the shared site/Studio consumer fixture. Restore and run the .NET and UI suites through `scripts/Validate-ClientIntake.ps1`.
+

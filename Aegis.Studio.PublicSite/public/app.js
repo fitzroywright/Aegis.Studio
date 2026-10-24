@@ -50,20 +50,50 @@ const publicRoster=StudioRosterEditor.open(rosterHost,{...draftData,readFile:asy
  const result=await api('/api/roster-drafts'+(draftReceipt?'/'+draftReceipt.id:''),{method:draftReceipt?'PUT':'POST',headers:{'X-CSRF-Token':intakeCsrf,...(draftReceipt?{'X-Intake-Token':draftReceipt.accessToken}:{})},body:JSON.stringify(value)});
  if(!draftReceipt){draftReceipt={id:result.id,accessToken:result.accessToken};sessionStorage.setItem('roster-draft',JSON.stringify(draftReceipt));}return result;
 }});
-kindSelect.onchange=()=>{const booking=kindSelect.value==='Booking';for(const name of ['clientEmail','locationCode','sessionType','startsAt','preferredTime'])if(bookingForm.elements[name])bookingForm.elements[name].required=booking;};
+const sessionSelect=bookingForm.elements.sessionTypeId,locationSelect=bookingForm.elements.locationCode,dateSelect=bookingForm.elements.bookingDate,slotSelect=bookingForm.elements.slotId;
+let bookingCatalog=null,sessionById=new Map();
+const money=minor=>new Intl.NumberFormat('en-JM',{style:'currency',currency:'JMD',maximumFractionDigits:2}).format(minor/100);
+function renderSessionChoices(){
+ const location=locationSelect.value,items=(bookingCatalog?.sessionTypes||[]).filter(x=>x.active&&(!location||x.locations.includes(location)));
+ sessionSelect.replaceChildren(new Option(items.length?'Choose a session':'No sessions published for this location',''));
+ for(const item of items)sessionSelect.add(new Option(`${item.name} · ${money(item.priceMinor)}`,item.id));
+ sessionById=new Map(items.map(x=>[x.id,x]));$('booking-price-note').textContent='';
+}
+async function refreshBookingSlots(){
+ slotSelect.replaceChildren(new Option('Loading Studio availability…',''));
+ const session=sessionById.get(sessionSelect.value),day=dateSelect.value,location=locationSelect.value;
+ if(!session||!day||!location){slotSelect.replaceChildren(new Option('Choose a location, session and date first',''));$('booking-price-note').textContent=session?`Session price ${money(session.priceMinor)} · deposit ${money(session.depositMinor)}.`:'';return;}
+ try{
+  const query=new URLSearchParams({from:day,to:day,locationCode:location,sessionTypeId:session.id});const result=await api('/api/v1/booking/availability?'+query);
+  if(result.catalogRevision!==bookingCatalog.revision)throw new Error('Studio availability changed. Reload the booking page.');
+  slotSelect.replaceChildren(new Option(result.slots.length?'Choose an available time':'No times are published for this date',''));
+  for(const slot of result.slots){const start=new Date(slot.startsAt),label=new Intl.DateTimeFormat('en-JM',{timeZone:'America/Jamaica',hour:'numeric',minute:'2-digit'}).format(start);const option=new Option(label,slot.id);option.dataset.startsAt=slot.startsAt;option.dataset.endsAt=slot.endsAt;slotSelect.add(option);}
+  $('booking-price-note').textContent=`Session price ${money(session.priceMinor)} · deposit ${money(session.depositMinor)}.`;
+ }catch(error){slotSelect.replaceChildren(new Option('Availability could not be loaded',''));$('booking-catalog-note').textContent=error.message;}
+}
+async function loadBookingCatalog(){
+ try{bookingCatalog=await api('/api/v1/booking/catalog');renderSessionChoices();$('booking-catalog-note').textContent=bookingCatalog.revision?'Session types and prices are published by Studio. Availability is confirmed by Studio.':'Studio has not published bookable sessions yet.';}
+ catch(error){$('booking-catalog-note').textContent='Studio session information is temporarily unavailable. '+error.message;sessionSelect.replaceChildren(new Option('Sessions unavailable',''));}
+}
+const jamaicaToday=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Jamaica',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());dateSelect.min=jamaicaToday;
+kindSelect.onchange=()=>{const booking=kindSelect.value==='Booking';for(const name of ['clientEmail','locationCode','sessionTypeId','bookingDate','slotId'])if(bookingForm.elements[name])bookingForm.elements[name].required=booking;};
+locationSelect.addEventListener('change',()=>{renderSessionChoices();refreshBookingSlots();});
+sessionSelect.addEventListener('change',refreshBookingSlots);dateSelect.addEventListener('change',refreshBookingSlots);
+loadBookingCatalog();
 $('booking-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type=submit]');button.disabled=true;
  try{
-  const f=Object.fromEntries(new FormData(form)),payload={kind:f.intakeKind,clientName:f.clientName,clientEmail:f.clientEmail||'',clientPhone:f.clientPhone||'',sessionType:f.sessionType||'',locationCode:f.locationCode||'',notes:f.notes||'',timeZone:'America/Jamaica',roster:publicRoster.getRows()};
-  if(f.startsAt){const start=new Date(`${f.startsAt}T${f.preferredTime||'10:00'}:00-05:00`);payload.startsAt=start.toISOString();payload.endsAt=new Date(start.getTime()+3600000).toISOString();}
+  const f=Object.fromEntries(new FormData(form)),session=sessionById.get(f.sessionTypeId),slot=slotSelect.selectedOptions[0],payload={kind:f.intakeKind,clientName:f.clientName,clientEmail:f.clientEmail||'',clientPhone:f.clientPhone||'',sessionTypeId:f.sessionTypeId||'',sessionType:session?.name||'',catalogRevision:bookingCatalog?.revision||0,slotId:f.slotId||'',locationCode:f.locationCode||'',notes:f.notes||'',timeZone:'America/Jamaica',roster:publicRoster.getRows()};
+  if(f.intakeKind==='Booking'&&(!slot?.dataset.startsAt||!slot.dataset.endsAt))throw new Error('Choose a time that Studio has published as available.');
   const encoded=JSON.stringify(payload);let draft=JSON.parse(sessionStorage.getItem('intake-submit')||'null');if(!draft||draft.body!==encoded){draft={key:crypto.randomUUID(),body:encoded};sessionStorage.setItem('intake-submit',JSON.stringify(draft));}
   const receipt=await api('/api/bookings',{method:'POST',headers:{'Idempotency-Key':draft.key,'X-CSRF-Token':intakeCsrf},body:draft.body});
   sessionStorage.setItem('intake-receipt',JSON.stringify(receipt));sessionStorage.removeItem('intake-submit');
-  $('booking-result').hidden=false;$('booking-result').textContent=`Received — awaiting review.\nReference: ${receipt.intakeReference}\nSaved on the website; awaiting Studio import. This does not confirm availability, payment or booking.`;
+  $('booking-result').hidden=false;$('booking-result').textContent=`Received — awaiting review.\nReference: ${receipt.intakeReference}\n${receipt.requiredDepositMinor?`Published deposit: ${money(receipt.requiredDepositMinor)} JMD.\n`:''}Saved on the website; awaiting Studio import. This does not confirm payment or final booking confirmation.`;
   $('track-form').hidden=false;
  }catch(e){$('booking-result').hidden=false;$('booking-result').textContent=e.message;}finally{button.disabled=false;}
 });
 $('track-form').addEventListener('submit', async event => { event.preventDefault(); const reference = new FormData(event.currentTarget).get('reference').trim(); try { const result = await api(`/api/bookings/${encodeURIComponent(reference)}`,{headers:{'X-Intake-Token':JSON.parse(sessionStorage.getItem('intake-receipt')||'{}').accessToken||''}}); $('track-result').textContent = `Receipt: ${result.receiptStatus} · Studio: ${result.importStatus} · Review: ${result.reviewStatus||'Awaiting review'}`; } catch (error) { $('track-result').textContent = error.message; } });
 $('submit-selections').addEventListener('click', async () => { const button = $('submit-selections'); button.disabled = true; try { const result = await api(`/api/galleries/${state.user.galleryReference}/selections/submit`, { method: 'POST', headers: { 'Idempotency-Key': state.selectionKey }, body: '{}' }); $('selection-result').textContent = `${result.versionIds.length} favourite(s) sent to the Studio team.`; state.selectionKey = crypto.randomUUID(); } catch (error) { $('selection-result').textContent = error.message; } finally { button.disabled = false; } });
 try { const session = await api('/api/session'); showAuth(session.user); if (!session.demo) { document.querySelectorAll('[data-identity]').forEach(button => button.hidden = true); $('auth-note').textContent = 'Client sign-in is being connected.'; } } catch { /* The public booking form remains visible while sign-in recovers. */ }
+
 

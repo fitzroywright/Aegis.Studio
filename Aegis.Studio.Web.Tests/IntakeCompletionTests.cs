@@ -30,7 +30,7 @@ public sealed class IntakeCompletionTests
     [Fact]public void SharedContractExampleIsValidForStudioRosterConsumer()
     {
         var path=Path.Combine(AppContext.BaseDirectory,"contract-example.json");using var doc=JsonDocument.Parse(File.ReadAllText(path));
-        var p=doc.RootElement.GetProperty("changeRecord");IntakeRosterStore.Validate(p.GetProperty("roster"));Assert.Equal("Website",p.GetProperty("source").GetString());Assert.Equal("2026-BK-000001",p.GetProperty("intakeReference").GetString());
+        var p=doc.RootElement.GetProperty("changeRecord");IntakeRosterStore.Validate(p.GetProperty("roster"));Assert.Equal("API",p.GetProperty("source").GetString());Assert.Equal("2026-BK-000001",p.GetProperty("intakeReference").GetString());
     }
     [StudioPostgresFact]public void ReferenceAllocationUsesJamaicaYearAndPreservesWebsiteReference()
     {
@@ -58,3 +58,4 @@ public sealed class IntakeCompletionTests
     }
 
 }
+
