@@ -13,6 +13,7 @@ using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Storage;
 using Aegis.Studio.Web.WorkDay;
+using Npgsql;
 
 namespace Aegis.Studio.Web.WorkDay;
 
@@ -157,6 +158,7 @@ public sealed class WorkDayApiExchangeWorker(
                 bootstrap.ActiveWorkSession,bootstrap.LocationTrackingEnabled,bootstrap.LocationTrackingMode,
                 bootstrap.GeneratedAtUtc,bootstrap.FieldTargets,
                 availability=photographers.GetAvailability(profile.UserName,now.AddDays(-1),now.AddDays(90)),
+                galleryStatus=BuildGalleryStatus(bootstrap,principal,database,schedules,access),
                 timeSummary=store.GetTimeSummaries([profile.UserName],now.AddDays(-14),now,policy).Single(),
                 threads,messages=threadMessages,notifications=notifications.GetForUser(profile.UserName,100)
             };
@@ -172,6 +174,49 @@ public sealed class WorkDayApiExchangeWorker(
                 logger.LogWarning(ex,"WorkDay snapshot publication failed for {UserName}; Studio will retry.",profile.UserName);
             }
         }
+    }
+
+    private static Dictionary<string,object> BuildGalleryStatus(
+        WorkDayBootstrap bootstrap,
+        ClaimsPrincipal principal,
+        StudioDatabase database,
+        ScheduleStore schedules,
+        JobAccessService access)
+    {
+        Dictionary<string,object> result=[];
+        foreach(WorkDayAssignment assignment in bootstrap.Today.Concat(bootstrap.Upcoming))
+        {
+            if(!WorkDayEndpoints.AssignmentAllowed(principal,bootstrap.UserName,assignment.Id,database,schedules,access,"ViewAttachments"))
+                continue;
+            ScheduleEntry? entry=schedules.GetEntries(entryId:assignment.Id).SingleOrDefault();
+            Guid? jobId=entry is null?null:WorkDayEndpoints.ResolveAssignmentJobId(entry,database);
+            if(jobId is not Guid effectiveJobId)continue;
+            using NpgsqlConnection connection=database.OpenConnection();
+            using NpgsqlCommand workspace=connection.CreateCommand();
+            workspace.CommandText="select workspace_id from studio_jobs where id=$1";
+            workspace.Parameters.AddWithValue(effectiveJobId);
+            if(workspace.ExecuteScalar() is not Guid workspaceId)continue;
+            using NpgsqlCommand gallery=connection.CreateCommand();
+            gallery.CommandText="""
+                select g.id,g.title,g.is_published,g.published_at_utc,count(i.id)
+                from studio_workspace_galleries g
+                left join studio_gallery_items i on i.gallery_id=g.id and i.is_visible
+                where g.workspace_id=$1
+                group by g.id,g.title,g.is_published,g.published_at_utc
+                """;
+            gallery.Parameters.AddWithValue(workspaceId);
+            using NpgsqlDataReader reader=gallery.ExecuteReader();
+            if(!reader.Read())
+                result[assignment.Id.ToString("D")]=new{workspaceId,exists=false,galleryId=(Guid?)null,title=(string?)null,isPublished=false,publishedAtUtc=(DateTimeOffset?)null,visibleItems=0L};
+            else
+                result[assignment.Id.ToString("D")]=new
+                {
+                    workspaceId,exists=true,galleryId=reader.GetGuid(0),title=reader.GetString(1),isPublished=reader.GetBoolean(2),
+                    publishedAtUtc=reader.IsDBNull(3)?(DateTimeOffset?)null:reader.GetFieldValue<DateTimeOffset>(3),
+                    visibleItems=reader.GetInt64(4)
+                };
+        }
+        return result;
     }
 
     private async Task PullOperationsAsync(HttpClient http,CancellationToken ct)
