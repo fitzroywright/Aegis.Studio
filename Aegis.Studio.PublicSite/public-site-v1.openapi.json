@@ -1,14 +1,14 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bryan’s reference public website API",
+    "title": "Bryan\u2019s reference public website API",
     "version": "1.0.0",
     "description": "Independent public-site intake and publication contract. Studio initiates all integration requests. Submission credentials cannot poll, acknowledge, verify payment or publish galleries. This API is distinct from the legacy Studio Public V1 API."
   },
   "servers": [
     {
       "url": "https://api.bryanstudiosltd.com/api/v1",
-      "description": "Bryan’s Public Site production API."
+      "description": "Bryan\u2019s Public Site production API."
     }
   ],
   "components": {
@@ -2755,6 +2755,123 @@
           },
           "403": {
             "description": "Credential lacks publication scope"
+          }
+        }
+      }
+    },
+    "/admin/client-link-proofs": {
+      "get": {
+        "summary": "List Client ID proof status without secrets or provider subjects",
+        "operationId": "list_client_link_proofs",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "client:link",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current proof statuses"
+          },
+          "403": {
+            "description": "Credential lacks client:link scope"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a one-time, expiring proof for a Studio client UUID",
+        "operationId": "create_client_link_proof",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "client:link",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "clientId"
+                ],
+                "properties": {
+                  "clientId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Secret returned once with Cache-Control: no-store"
+          },
+          "403": {
+            "description": "Credential lacks client:link scope"
+          }
+        }
+      }
+    },
+    "/admin/client-link-proofs/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Get proof state without secret or provider subject",
+        "operationId": "get_client_link_proof",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "client:link",
+        "responses": {
+          "200": {
+            "description": "Current proof status"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Revoke an unused pending proof",
+        "operationId": "revoke_client_link_proof",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "client:link",
+        "responses": {
+          "200": {
+            "description": "Proof revoked"
+          },
+          "409": {
+            "description": "Proof is used, expired, or not revocable"
           }
         }
       }
