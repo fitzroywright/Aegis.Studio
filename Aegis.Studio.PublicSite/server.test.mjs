@@ -143,6 +143,7 @@ test('client link proof is single use, bound to authenticated provider subject, 
  await fetch(api+`/galleries/${gallery}/publish`,{method:'POST',headers:ph,body:'{}'});
  const status=await(await fetch(api+`/admin/client-link-proofs/${proof.id}`,{headers:admin})).json();assert.equal(status.status,'Used');assert.equal('code' in status,false);assert.equal('subject' in status,false);
  const session=await(await fetch(origin+'/api/session',{headers:{Cookie:cookie}})).json();assert.equal(session.user.galleryReference,gallery);
+ const galleries=await(await fetch(origin+'/api/client-galleries',{headers:{Cookie:cookie}})).json();assert.deepEqual(galleries.items,[{reference:gallery,title:'Linked client gallery'}]);
  assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:cookie}})).status,200);
  const revokeCreate=await fetch(api+'/admin/client-link-proofs',{method:'POST',headers:admin,body:JSON.stringify({clientId:client})}),revocable=await revokeCreate.json();
  assert.equal((await fetch(api+`/admin/client-link-proofs/${revocable.id}`,{method:'DELETE',headers:admin})).status,200);
