@@ -1,14 +1,14 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bryan\u2019s reference public website API",
+    "title": "Bryan’s reference public website API",
     "version": "1.0.0",
     "description": "Independent public-site intake and publication contract. Studio initiates all integration requests. Submission credentials cannot poll, acknowledge, verify payment or publish galleries. This API is distinct from the legacy Studio Public V1 API."
   },
   "servers": [
     {
       "url": "https://api.bryanstudiosltd.com/api/v1",
-      "description": "Bryan\u2019s Public Site production API."
+      "description": "Bryan’s Public Site production API."
     }
   ],
   "components": {
@@ -2872,6 +2872,200 @@
           },
           "409": {
             "description": "Proof is used, expired, or not revocable"
+          }
+        }
+      }
+    },
+    "/gallery-access-requests": {
+      "post": {
+        "summary": "Submit a client request for gallery access",
+        "operationId": "submit_gallery_access_request",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:access:submit",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "clientId",
+                  "clientName",
+                  "clientEmail"
+                ],
+                "properties": {
+                  "clientId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "galleryId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "clientName": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "clientEmail": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 320
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Request queued for Studio review"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Invalid credential"
+          },
+          "403": {
+            "description": "Credential lacks gallery:access:submit"
+          },
+          "409": {
+            "description": "Idempotency conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      },
+      "get": {
+        "summary": "Poll pending gallery access requests (Studio)",
+        "operationId": "poll_gallery_access_requests",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:access:pull",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "clientId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "galleryId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "clientName": {
+                            "type": "string"
+                          },
+                          "clientEmail": {
+                            "type": "string",
+                            "format": "email"
+                          },
+                          "notes": {
+                            "type": "string"
+                          },
+                          "createdAtUtc": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credential"
+          },
+          "403": {
+            "description": "Credential lacks gallery:access:pull"
+          }
+        }
+      }
+    },
+    "/gallery-access-requests/{id}/ack": {
+      "post": {
+        "summary": "Acknowledge an imported gallery access request",
+        "operationId": "ack_gallery_access_request",
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:access:ack",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Request acknowledged"
+          },
+          "401": {
+            "description": "Invalid credential"
+          },
+          "403": {
+            "description": "Credential lacks gallery:access:ack"
+          },
+          "404": {
+            "description": "Request not found"
           }
         }
       }
