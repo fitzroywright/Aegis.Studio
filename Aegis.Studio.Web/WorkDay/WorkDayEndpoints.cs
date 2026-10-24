@@ -403,7 +403,7 @@ public static class WorkDayEndpoints
         }).RequireAuthorization();
     }
 
-    private static bool AssignmentAllowed(
+    internal static bool AssignmentAllowed(
         ClaimsPrincipal user,
         string userName,
         Guid assignmentId,
@@ -442,7 +442,7 @@ public static class WorkDayEndpoints
         return MapAssignment(entry,db,store,profile.UserName);
     }
 
-    private static Guid? ResolveAssignmentJobId(ScheduleEntry entry,StudioDatabase db)
+    internal static Guid? ResolveAssignmentJobId(ScheduleEntry entry,StudioDatabase db)
     {
         if(entry.JobId is Guid jobId) return jobId;
         if(entry.BookingId is not Guid bookingId) return null;
