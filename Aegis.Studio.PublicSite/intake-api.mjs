@@ -280,8 +280,10 @@ export function createIntakeApi(env,readBody,json) {
     if(route==='/api/v1/changes'&&method==='GET'){authenticate(req,'intake:pull');json(res,200,store.feed(url.searchParams.get('cursor')||''));return true;}
     if(route==='/api/v1/gallery-access-requests'&&method==='POST'){
       const owner=authenticate(req,'gallery:access:submit');const p=await input(req,8192);
-      const key=String(req.headers['idempotency-key']||p.requestKey||'');
-      const result=store.createGalleryAccessRequest({...p,requestKey:owner+':'+key});
+      const key=String(req.headers['idempotency-key']||'').trim();
+      if(!key||key.length>200)fail(400,'invalid_idempotency_key','A unique Idempotency-Key of at most 200 characters is required.');
+      const requestKey=createHash('sha256').update(owner+':'+key).digest('hex');
+      const result=store.createGalleryAccessRequest({...p,requestKey});
       json(res,result.created?201:200,{id:result.id,status:'Pending',accepted:true});return true;
     }
     if(route==='/api/v1/gallery-access-requests'&&method==='GET'){
