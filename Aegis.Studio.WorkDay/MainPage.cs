@@ -82,7 +82,8 @@ public sealed class MainPage:ContentPage
         var reports=await store.UnacknowledgedAsync();
         var availability=(await store.GetAvailabilityAsync()).Where(x=>Aegis.Studio.WorkDay.Core.WorkDayClientRules.IsOutstanding(x.SyncState)).ToList();
         var queuedMessages=await store.UnacknowledgedMessagesAsync();
-        pending.Text=$"{reports.Count} report(s), {availability.Count} availability change(s), and {queuedMessages.Count} message(s) awaiting acknowledgement";
+        int queuedFiles=await store.PendingUploadCountAsync();
+        pending.Text=$"{reports.Count} report(s), {availability.Count} availability change(s), {queuedMessages.Count} message(s), and {queuedFiles} file(s) awaiting acknowledgement";
         attention.Text=string.Join(Environment.NewLine,reports.Take(8).Select(x=>$"{x.Kind}: {x.State} · {x.Text}{(x.LastError is null?"":" — "+x.LastError)}")
             .Concat(availability.Take(8).Select(x=>$"Availability: {x.SyncState} — {x.LastError}"))
             .Concat(queuedMessages.Take(8).Select(x=>$"Message: {x.State} — {x.LastError}"))
