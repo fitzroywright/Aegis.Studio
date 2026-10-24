@@ -7,13 +7,31 @@ public sealed class LoginPage:ContentPage
     private readonly WorkDayApiClient api; private readonly WorkDaySessionContext session; private readonly IServiceProvider services; private readonly WorkDayDeviceIdentity device; private readonly WorkDayCredentialStore credentials;
     private readonly Entry user=new(){Placeholder="User name"};
     private readonly Entry password=new(){Placeholder="Password",IsPassword=true};
+    private readonly Entry enrollmentCode=new(){Placeholder="First-time setup code",Autocapitalization=TextAutocapitalizationType.None};
     private readonly Label status=new(){Text="Authenticate through Bryan’s API Site. Signing in for work happens separately."};
     public LoginPage(WorkDayApiClient api,WorkDaySessionContext session,IServiceProvider services,WorkDayDeviceIdentity device,WorkDayCredentialStore credentials)
     {
         this.api=api;this.session=session;this.services=services;this.device=device;this.credentials=credentials;Title="WorkDay Login";
         Button login=new(){Text="LOGIN",HeightRequest=58,FontSize=18};login.Clicked+=Login;
-        Content=new ScrollView{Content=new VerticalStackLayout{Padding=24,Spacing=14,Children={new Label{Text="AEGIS STUDIO WORKDAY",FontSize=28,FontAttributes=FontAttributes.Bold},new Label{Text="Secure field access · connected through api.bryanstudiosltd.com"},user,password,login,status}}};
+        Button enroll=new(){Text="SET PASSWORD WITH SETUP CODE"};enroll.Clicked+=Enroll;
+        Content=new ScrollView{Content=new VerticalStackLayout{Padding=24,Spacing=14,Children={new Label{Text="AEGIS STUDIO WORKDAY",FontSize=28,FontAttributes=FontAttributes.Bold},new Label{Text="Secure field access · connected through api.bryanstudiosltd.com"},user,password,login,new Label{Text="First-time account setup"},enrollmentCode,enroll,status}}};
     }
+    private async void Enroll(object? sender,EventArgs e)
+    {
+        if(sender is Button button)button.IsEnabled=false;
+        try
+        {
+            if(string.IsNullOrWhiteSpace(enrollmentCode.Text)||string.IsNullOrWhiteSpace(password.Text))
+                throw new InvalidOperationException("Enter the one-time setup code and a new password of at least 12 characters.");
+            api.SetServer(WorkDayApiClient.ApiBaseUri);
+            await api.EnrollAsync(enrollmentCode.Text.Trim(),password.Text);
+            status.Text="Password created. Sign in with your WorkDay user name and new password.";
+            enrollmentCode.Text="";
+        }
+        catch(Exception ex){status.Text="Account setup failed: "+ex.Message;}
+        finally{if(sender is Button finished)finished.IsEnabled=true;}
+    }
+
     private async void Login(object? sender,EventArgs e)
     {
         if(sender is Button button)button.IsEnabled=false;
