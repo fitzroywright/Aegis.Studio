@@ -377,6 +377,7 @@ app.MapAegisHealth(
 app.MapStudioEngineeringDiagnostics();
 app.MapStudioPosHardening();
 app.MapStudioGalleries();
+app.MapClientGalleryLinkAdmin();
 Aegis.Studio.Web.PublicApi.PublicV1Endpoints.MapPublicV1(app);
 Aegis.Studio.Web.PublicApi.PublicWebhookWorker.EnsureSchema(app.Services.GetRequiredService<StudioDatabase>());
 
