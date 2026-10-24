@@ -289,7 +289,7 @@ export function createIntakeApi(env,readBody,json) {
     if(route==='/api/v1/gallery-access-requests'&&method==='GET'){
       authenticate(req,'gallery:access:pull');json(res,200,{items:store.pendingGalleryAccessRequests(Math.max(1,Math.min(500,Number(url.searchParams.get('limit')||100))))});return true;
     }
-    const galleryAccessAck=route.match(/^\\/api\\/v1\\/gallery-access-requests\\/([0-9a-f-]{36})\\/ack$/i);
+    const galleryAccessAck=route.match(/^\/api\/v1\/gallery-access-requests\/([0-9a-f-]{36})\/ack$/i);
     if(galleryAccessAck&&method==='POST'){
       authenticate(req,'gallery:access:ack');json(res,200,store.acknowledgeGalleryAccessRequest(galleryAccessAck[1]));return true;
     }
