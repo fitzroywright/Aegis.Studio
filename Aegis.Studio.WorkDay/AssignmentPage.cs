@@ -9,15 +9,16 @@ public sealed class AssignmentPage:ContentPage
     private readonly WorkDaySyncEngine sync;
     private readonly WorkDayDeviceIdentity device;
     private readonly WorkDayApiClient api;
+    private readonly WorkDayUploadService uploads;
     private readonly Label status=new();
     private readonly Label roster=new();
     private bool reporting;
     private readonly Label syncStatus=new();
     private bool observing;
 
-    public AssignmentPage(LocalAssignment assignment,WorkDayLocalStore store,WorkDaySyncEngine sync,WorkDayDeviceIdentity device,WorkDayApiClient api)
+    public AssignmentPage(LocalAssignment assignment,WorkDayLocalStore store,WorkDaySyncEngine sync,WorkDayDeviceIdentity device,WorkDayApiClient api,WorkDayUploadService uploads)
     {
-        this.assignment=assignment;this.store=store;this.sync=sync;this.device=device;this.api=api;Title=assignment.Title;
+        this.assignment=assignment;this.store=store;this.sync=sync;this.device=device;this.api=api;this.uploads=uploads;Title=assignment.Title;
         Button communication=Action("CLIENT COMMUNICATION",async()=>
         {
             if(assignment.ConversationId is Guid conversationId)
@@ -40,6 +41,21 @@ public sealed class AssignmentPage:ContentPage
             Action("ADD NOTE",async()=>{string? text=await DisplayPromptAsync("Operational note","Note for the Job Owner and Workspace Manager");if(!string.IsNullOrWhiteSpace(text))await ReportAsync("AddNote",text);}),
             Action("REPORT A PROBLEM",async()=>{string? text=await DisplayPromptAsync("Report a problem","Describe the problem");if(!string.IsNullOrWhiteSpace(text))await ReportAsync("RecordException",text,"Other");}),
             Action("NAVIGATE",NavigateAsync),Action("CONTACT",ContactAsync),
+            Action("UPLOAD FILE",async()=>
+            {
+                LocalUpload? upload=await uploads.PickAndQueueAsync(assignment.Id);
+                if(upload is null)return;
+                try
+                {
+                    await sync.SynchronizeAsync();
+                    await uploads.ProcessAsync();
+                    await DisplayAlertAsync("Upload","The file was saved to Studio.","OK");
+                }
+                catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+                {
+                    await DisplayAlertAsync("Saved offline","The file is queued on this device and will sync when connectivity returns. "+ex.Message,"OK");
+                }
+            }),
             new Label{Text="Roster and collections",FontAttributes=FontAttributes.Bold},roster,
             new Label{Text="Use Complete Session to finish actual attendance after recording the roster. The Job Owner can schedule the remainder. Upload photographs in Studio after the session."}
         }}};
