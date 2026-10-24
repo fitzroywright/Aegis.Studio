@@ -140,6 +140,33 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
         WorkflowStore.Sql(c,tx,"insert into studio_financial_events(id,job_id,kind,amount,note,recorded_by,created_at_utc) values($1,$2,$3,$4,$5,'Verified website payment',now())",Guid.NewGuid(),jobId,kind=="Dispute"?"Reversal":kind,kind=="Deposit"?amount/100m:-amount/100m,Text(e,"provider")+" / "+Text(e,"transactionReference"));
         if(kind=="Deposit")WorkflowStore.Sql(c,tx,"insert into studio_frontdesk_deposits(id,request_id,amount,currency,provider,reference,recorded_by) select $1,r.id,$2,'JMD',$3,$4,'Verified website payment' from studio_frontdesk_requests r where r.job_id=$5 on conflict(provider,reference) do nothing",Guid.NewGuid(),amount/100m,source+":"+Text(e,"provider"),id,jobId);
     }
+    public Guid ImportGalleryAccessRequest(string source,JsonElement p)
+    {
+        Guid external=p.GetProperty("id").GetGuid(),client=p.GetProperty("clientId").GetGuid();
+        Guid? gallery=p.TryGetProperty("galleryId",out var galleryValue)&&galleryValue.ValueKind==JsonValueKind.String?galleryValue.GetGuid():null;
+        string name=Text(p,"clientName"),email=Text(p,"clientEmail"),notes=Text(p,"notes");
+        if(string.IsNullOrWhiteSpace(name)||name.Length>200||!System.Net.Mail.MailAddress.TryCreate(email,out _)||email.Length>320||notes.Length>2000)
+            throw new ArgumentException("Invalid gallery access request details.");
+        using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        WorkflowStore.Sql(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","website-gallery-access:"+source+":"+external);
+        var prior=WorkflowStore.Scalar(c,tx,"select conversation_id from studio_website_gallery_access_requests where source=$1 and external_id=$2",source,external);
+        if(prior is Guid existing){tx.Commit();return existing;}
+        if(WorkflowStore.Scalar(c,tx,"select id from studio_clients where id=$1",client) is not Guid)
+            throw new ArgumentException("Gallery access request refers to an unknown Studio client.");
+        Guid conversation=Guid.NewGuid(),workspace=WorkflowRules.UnassignedWorkspaceId;
+        string subject=gallery.HasValue?"Gallery access request":"Client gallery access request";
+        string body=gallery.HasValue?$"The client requested access to gallery {gallery:D}.": "The client requested access to their Studio photo galleries.";
+        if(!string.IsNullOrWhiteSpace(notes))body+="\n\nClient note: "+notes;
+        WorkflowStore.Sql(c,tx,"""
+          insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc,client_id)
+          values($1,$2,$3,$4,$5,'Website Gallery',false,$6,$7)
+          """,conversation,workspace,subject,name,email,p.GetProperty("createdAtUtc").GetDateTimeOffset(),client);
+        WorkflowStore.Sql(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,author_user_name,visibility,body,created_at_utc,external_message_id) values($1,$2,$3,$4,'External',$5,$6,$7)",
+            Guid.NewGuid(),conversation,name,email,body,p.GetProperty("createdAtUtc").GetDateTimeOffset(),"gallery-access:"+source+":"+external);
+        WorkflowStore.Sql(c,tx,"insert into studio_website_gallery_access_requests(source,external_id,client_id,gallery_id,conversation_id,payload) values($1,$2,$3,$4,$5,$6::jsonb)",source,external,client,gallery,conversation,p.GetRawText());
+        WorkflowStore.Sql(c,tx,"insert into studio_intake_activity(conversation_id) values($1) on conflict do nothing",conversation);
+        tx.Commit();return conversation;
+    }
     public static void QueueAcknowledgment(NpgsqlConnection c,NpgsqlTransaction tx,Guid cv)
     {
         WorkflowStore.Sql(c,tx,"""
@@ -169,6 +196,21 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                     string cursor=WorkflowStore.Scalar(c,null,"select cursor from studio_website_cursor where source=$1",source) as string??"";
                     var feed=await site.Get("/api/v1/changes?cursor="+Uri.EscapeDataString(cursor),ct);
                     var importer=new WebsiteIntakeStore(database,workspaces,configuration);
+                    var galleryRequests=await site.Get("/api/v1/gallery-access-requests?limit=100",ct);
+                    foreach(var request in galleryRequests.GetProperty("items").EnumerateArray())
+                    {
+                        try
+                        {
+                            Guid conversation=importer.ImportGalleryAccessRequest(source,request);
+                            Guid external=request.GetProperty("id").GetGuid();
+                            await site.Post($"/api/v1/gallery-access-requests/{external:D}/ack",new{},ct);
+                            logger.LogInformation("Gallery access request imported to Front Desk. ConversationId={ConversationId} RequestId={RequestId}",conversation,external);
+                        }
+                        catch(Exception ex)when(ex is not OperationCanceledException)
+                        {
+                            logger.LogError("Gallery access request held for retry. RequestId={RequestId} ErrorType={ErrorType}",request.GetProperty("id"),ex.GetType().Name);
+                        }
+                    }
                     var retries=new List<JsonElement>();
                     using(var q=WorkflowStore.Command(c,null,"select payload::text from studio_website_import_errors where source=$1 and payload is not null order by updated_at_utc limit 25",source))using(var r=q.ExecuteReader())while(r.Read())retries.Add(JsonSerializer.Deserialize<JsonElement>(r.GetString(0)));
                     var batch=retries.Concat(feed.GetProperty("items").EnumerateArray()).GroupBy(p=>p.GetProperty("id").GetGuid()).Select(g=>g.OrderByDescending(p=>p.GetProperty("revision").GetInt64()).First());
