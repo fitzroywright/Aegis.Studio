@@ -175,8 +175,11 @@ export function createIntakeApi(env,readBody,json) {
     }
     const createThread=route.match(/^\\/api\\/v1\\/messages\\/threads\\/([A-Za-z0-9._~-]{1,40})\\/([0-9a-f-]{36})$/i);
     if(createThread&&method==='POST'){
-      const user=requireWorkday(req),id=randomUUID();
-      json(res,200,{id,scopeType:createThread[1],scopeId:createThread[2],title:'',createdBy:user.user_name,createdAtUtc:new Date().toISOString(),unreadCount:0});return true;
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      const existing=(snapshot?.threads||[]).find(x=>String(x.scopeType).toLowerCase()===createThread[1].toLowerCase()&&String(x.scopeId).toLowerCase()===createThread[2].toLowerCase());
+      if(existing){json(res,200,existing);return true;}
+      const operationId=String(req.headers['idempotency-key']||randomUUID());
+      json(res,202,workdayStore.enqueue(user.user_name,operationId,'ThreadCreate',{scopeType:createThread[1],scopeId:createThread[2]}));return true;
     }
     const conversationIdentities=route.match(/^\\/api\\/v1\\/conversations\\/([0-9a-f-]{36})\\/sending-identities$/i);
     if(conversationIdentities&&method==='GET'){
