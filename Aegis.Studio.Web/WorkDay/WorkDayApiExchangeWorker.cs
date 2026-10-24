@@ -51,7 +51,7 @@ public sealed class WorkDayApiExchangeWorker(
 
     private async Task PullOperationsAsync(HttpClient http,CancellationToken ct)
     {
-        using var response=await http.GetAsync("admin/workday/updates?after=0&limit=100",ct);
+        using var response=await http.GetAsync("admin/workday/updates?after=0&limit=100&kind=Operation",ct);
         response.EnsureSuccessStatusCode();
         var batch=await response.Content.ReadFromJsonAsync<WorkDayUpdateBatch>(JsonOptions,ct)
             ??throw new InvalidOperationException("The API Site returned an empty WorkDay update batch.");
