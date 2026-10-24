@@ -182,20 +182,35 @@ public sealed class StudioInAppMessageStore
         return values;
     }
 
-    public StudioInAppMessage AddMessage(Guid threadId, ClaimsPrincipal user, string body)
+    public StudioInAppMessage AddMessage(Guid threadId, ClaimsPrincipal user, string body, Guid? stableMessageId = null)
     {
         AssertThreadAccess(threadId, user);
         string current = CurrentUser(user);
         string text = body.Trim();
         if (string.IsNullOrWhiteSpace(text)) throw new InvalidOperationException("Message body is required.");
         if (text.Length > 10000) throw new InvalidOperationException("Message body cannot exceed 10,000 characters.");
-        StudioInAppMessage message = new(Guid.NewGuid(), threadId, current, text, DateTimeOffset.UtcNow);
-        using NpgsqlConnection connection = database.OpenConnection();
-        using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "insert into studio_inapp_messages(id,thread_id,sender_user_name,body,created_at_utc) values($1,$2,$3,$4,$5)";
-        command.Parameters.AddWithValue(message.Id); command.Parameters.AddWithValue(threadId); command.Parameters.AddWithValue(current); command.Parameters.AddWithValue(text); command.Parameters.AddWithValue(message.CreatedAtUtc);
-        command.ExecuteNonQuery();
-        return message;
+        Guid id=stableMessageId??Guid.NewGuid();
+        using NpgsqlConnection connection=database.OpenConnection();
+        using NpgsqlTransaction transaction=connection.BeginTransaction();
+        using(var gate=new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1,0))",connection,transaction))
+        {gate.Parameters.AddWithValue("studio-message:"+id.ToString("D"));gate.ExecuteNonQuery();}
+        using(var prior=new NpgsqlCommand("select thread_id,sender_user_name,body,created_at_utc,subject,recipient_addresses,internet_message_id from studio_inapp_messages where id=$1",connection,transaction))
+        {
+            prior.Parameters.AddWithValue(id);using var reader=prior.ExecuteReader();
+            if(reader.Read())
+            {
+                if(reader.GetGuid(0)!=threadId||!reader.GetString(1).Equals(current,StringComparison.OrdinalIgnoreCase)||reader.GetString(2)!=text)
+                    throw new InvalidOperationException("This message ID was already used for different message content.");
+                StudioInAppMessage replay=new(id,threadId,current,text,reader.GetFieldValue<DateTimeOffset>(3),
+                    reader.IsDBNull(4)?"":reader.GetString(4),reader.IsDBNull(5)?null:reader.GetFieldValue<string[]>(5),reader.IsDBNull(6)?null:reader.GetString(6));
+                reader.Close();transaction.Commit();return replay;
+            }
+        }
+        StudioInAppMessage message=new(id,threadId,current,text,DateTimeOffset.UtcNow);
+        using NpgsqlCommand command=connection.CreateCommand();command.Transaction=transaction;
+        command.CommandText="insert into studio_inapp_messages(id,thread_id,sender_user_name,body,created_at_utc) values($1,$2,$3,$4,$5)";
+        command.Parameters.AddWithValue(message.Id);command.Parameters.AddWithValue(threadId);command.Parameters.AddWithValue(current);command.Parameters.AddWithValue(text);command.Parameters.AddWithValue(message.CreatedAtUtc);
+        command.ExecuteNonQuery();transaction.Commit();return message;
     }
 
     public IReadOnlyList<string> ResolveMentionedParticipants(Guid threadId, string senderUserName, string body)
