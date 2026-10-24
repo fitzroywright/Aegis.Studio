@@ -8,7 +8,7 @@ async function api(path, options = {}) {
 }
 function showAuth(user) {
   state.user = user; $('signed-out').hidden = Boolean(user); $('signed-in').hidden = !user;
-  if (user) { $('client-name').textContent = user.name.split(' ')[0]; $('gallery-title').textContent = user.provider + ' · ' + user.email; openGallery(user.galleryReference); }
+  if (user) { $('client-name').textContent = user.name.split(' ')[0]; $('gallery-title').textContent = user.provider + ' · ' + user.email; if(user.galleryReference)openGallery(user.galleryReference);else $('gallery-status').textContent='Your sign-in is ready. Connect the Client ID supplied by Bryan’s Studio to see published galleries.'; }
 }
 async function openGallery(reference) {
   $('gallery-status').textContent = 'Loading your private gallery…'; $('gallery-grid').replaceChildren(); state.selected.clear();
@@ -39,6 +39,7 @@ document.querySelectorAll('[data-identity]').forEach(button => button.addEventLi
   finally { button.disabled = false; }
 }));
 $('sign-out').addEventListener('click', async () => { await api('/api/logout', { method: 'POST', body: '{}' }); $('gallery-grid').replaceChildren(); showAuth(null); });
+$('client-link-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type=submit]'),result=$('client-link-result');button.disabled=true;result.textContent='';try{const code=new FormData(form).get('clientLinkCode').trim();await api('/api/v1/client-link-proofs/redeem',{method:'POST',body:JSON.stringify({code})});form.reset();const session=await api('/api/session');showAuth(session.user);result.textContent=session.user?.galleryReference?'Client connected. Your Studio galleries are shown below.':'Client connected. Galleries will appear here after Studio publishes them.';}catch(error){result.textContent=error.message;}finally{button.disabled=false;}});
 let intakeCsrf='';
 try{intakeCsrf=(await api('/api/intake-session')).csrf;}catch{}
 const bookingForm=$('booking-form');
