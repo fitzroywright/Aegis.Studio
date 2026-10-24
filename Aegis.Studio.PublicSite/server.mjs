@@ -62,18 +62,37 @@ function safeMobilePath(pathname,prefix){
   const tail=pathname.slice(prefix.length+1).split('/');
   return tail.length>0&&tail.every(part=>part.length>0&&[...part].every(ch=>/[A-Za-z0-9._~%-]/.test(ch)));
 }
+function validUuid(value){
+  const parts=String(value||'').split('-');
+  return parts.length===5&&[8,4,4,4,12].every((size,index)=>parts[index].length===size&&[...parts[index]].every(ch=>/[0-9a-f]/i.test(ch)));
+}
+function safeMobileSegment(value){return value.length>0&&[...value].every(ch=>/[A-Za-z0-9._~-]/.test(ch));}
 export function mapWorkDayStudioPath(pathname,method){
   method=String(method||'').toUpperCase();
-  if(pathname==='/api/v1/auth/login'&&method==='POST')return '/api/auth/login';
-  if(pathname==='/api/v1/auth/logout'&&method==='POST')return '/api/auth/logout';
-  if(pathname==='/api/v1/auth/me'&&method==='GET')return '/api/auth/me';
-  if(safeMobilePath(pathname,'/api/v1/workday')&&['GET','POST'].includes(method))return pathname.replace('/api/v1','/api');
-  if(safeMobilePath(pathname,'/api/v1/messages/threads')&&['GET','POST'].includes(method))return pathname.replace('/api/v1','/api');
-  if(pathname==='/api/v1/notifications'&&method==='GET')return '/api/notifications';
   const parts=pathname.split('/');
-  if(parts.length===6&&parts[1]==='api'&&parts[2]==='v1'&&parts[3]==='conversations'&&parts[4].length===36&&[...parts[4]].every(ch=>/[0-9a-f-]/i.test(ch))&&
-    ((parts[5]==='sending-identities'&&method==='GET')||(parts[5]==='messages'&&method==='POST')))return pathname.replace('/api/v1','/api');
-  return null;
+  if(parts[1]!=='api'||parts[2]!=='v1')return null;
+  let allowed=false;
+  if(parts[3]==='auth'&&parts.length===5){
+    allowed=(parts[4]==='login'&&method==='POST')||(parts[4]==='logout'&&method==='POST')||(parts[4]==='me'&&method==='GET');
+  }else if(parts[3]==='workday'){
+    const tail=parts.slice(4);
+    allowed=(tail.length===1&&tail[0]==='bootstrap'&&method==='GET')
+      ||(tail.length===1&&tail[0]==='device-session'&&method==='POST')
+      ||(tail.length===2&&tail[0]==='device-session'&&tail[1]==='revoke'&&method==='POST')
+      ||(tail.length===1&&tail[0]==='client-observation'&&method==='POST')
+      ||(tail.length===1&&tail[0]==='operations'&&method==='POST')
+      ||(tail.length===1&&tail[0]==='availability'&&['GET','POST'].includes(method))
+      ||(tail.length===1&&tail[0]==='time-summary'&&method==='GET')
+      ||(tail.length===3&&tail[0]==='assignments'&&validUuid(tail[1])&&tail[2]==='uploads'&&method==='POST')
+      ||(tail.length===3&&tail[0]==='assignments'&&validUuid(tail[1])&&tail[2]==='gallery-status'&&method==='GET');
+  }else if(parts[3]==='messages'&&parts[4]==='threads'){
+    allowed=(parts.length===5&&method==='GET')
+      ||(parts.length===6&&validUuid(parts[5])&&['GET','POST'].includes(method))
+      ||(parts.length===7&&safeMobileSegment(parts[5])&&validUuid(parts[6])&&method==='POST');
+  }else if(parts[3]==='notifications'&&parts.length===4&&method==='GET')allowed=true;
+  else if(parts[3]==='conversations'&&parts.length===6&&validUuid(parts[4]))
+    allowed=(parts[5]==='sending-identities'&&method==='GET')||(parts[5]==='messages'&&method==='POST');
+  return allowed?pathname.replace('/api/v1','/api'):null;
 }
 function proxyWorkDay(req,res,url,env){
   const upstreamText=String(env.WORKDAY_STUDIO_ORIGIN||'');
