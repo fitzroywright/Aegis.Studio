@@ -8,7 +8,7 @@ public sealed class WorkDayUploadService(WorkDayLocalStore store,WorkDayApiClien
 {
     private readonly SemaphoreSlim gate=new(1,1);
 
-    public async Task<LocalUpload?> PickAndQueueAsync(Guid assignmentId,CancellationToken ct=default)
+    public async Task<LocalUpload?> PickAndQueueAsync(Guid assignmentId,RemoteUploadDestinationDto destination,CancellationToken ct=default)
     {
         FileResult? picked=await FilePicker.Default.PickAsync(new PickOptions{PickerTitle="Select file for this session"});
         if(picked is null)return null;
@@ -17,11 +17,18 @@ public sealed class WorkDayUploadService(WorkDayLocalStore store,WorkDayApiClien
         Guid uploadId=Guid.NewGuid();
         string safe=Path.GetFileName(picked.FileName);
         string local=Path.Combine(folder,uploadId.ToString("N")+Path.GetExtension(safe));
-        await using(Stream source=await picked.OpenReadAsync())
-        await using(FileStream dest=File.Create(local))
-            await source.CopyToAsync(dest,ct);
+        string type=Path.GetExtension(safe).ToLowerInvariant() switch
+        {".jpg" or ".jpeg"=>"image/jpeg",".png"=>"image/png",".webp"=>"image/webp",".tif" or ".tiff"=>"image/tiff",_=>throw new InvalidOperationException("Choose a JPEG, PNG, WebP or TIFF photograph.")};
+        try
+        {
+            await using Stream source=await picked.OpenReadAsync();await using FileStream dest=File.Create(local);
+            var buffer=new byte[1024*1024];long count=0;int n;
+            while((n=await source.ReadAsync(buffer,ct))>0){count+=n;if(count>100_000_000)throw new InvalidOperationException("The photograph exceeds the 100 MB per-file limit.");await dest.WriteAsync(buffer.AsMemory(0,n),ct);}
+            if(count==0)throw new InvalidOperationException("Choose a nonempty photograph.");
+        }
+        catch{if(File.Exists(local))File.Delete(local);throw;}
         FileInfo info=new(local);
-        LocalUpload item=new(){UploadId=uploadId,AssignmentId=assignmentId,LocalPath=local,FileName=safe,ContentType=string.IsNullOrWhiteSpace(picked.ContentType)?"application/octet-stream":picked.ContentType,SizeBytes=info.Length,CreatedAtUtc=DateTimeOffset.UtcNow};
+        LocalUpload item=new(){DestinationJson=System.Text.Json.JsonSerializer.Serialize(destination),UploadId=uploadId,AssignmentId=assignmentId,LocalPath=local,FileName=safe,ContentType=type,SizeBytes=info.Length,CreatedAtUtc=DateTimeOffset.UtcNow};
         await store.QueueUploadAsync(item);
         return item;
     }
@@ -38,7 +45,7 @@ public sealed class WorkDayUploadService(WorkDayLocalStore store,WorkDayApiClien
                 try
                 {
                     UploadResultDto result=await api.UploadAsync(upload,ct);
-                    upload.ServerAttachmentId=result.AttachmentId;upload.State=nameof(LocalUploadState.Uploaded);upload.LastError=null;
+                    upload.ServerAttachmentId=result.AttachmentId;upload.ServerVersionId=result.VersionId;upload.State=nameof(LocalUploadState.Uploaded);upload.LastError=null;
                     await store.SaveUploadAsync(upload);
                     try{File.Delete(upload.LocalPath);}catch{}
                 }
@@ -56,4 +63,5 @@ public sealed class WorkDayUploadService(WorkDayLocalStore store,WorkDayApiClien
     }
 }
 
-public sealed record UploadResultDto(Guid UploadId,Guid AttachmentId,Guid AssignmentId,string FileName,long SizeBytes,string StorageStatus,DateTimeOffset AcknowledgedAtUtc);
+public sealed record UploadResultDto(Guid UploadId,Guid AttachmentId,Guid AssignmentId,string FileName,long SizeBytes,string StorageStatus,DateTimeOffset AcknowledgedAtUtc,Guid? VersionId=null);
+

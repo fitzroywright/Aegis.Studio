@@ -5,6 +5,7 @@ namespace Aegis.Studio.WorkDay;
 
 public sealed class LocalAssignment
 {
+    public string? MediaDestinationJson { get; set; }
     [PrimaryKey] public Guid Id { get; set; }
     public Guid? JobId { get; set; }
     public Guid? BookingId { get; set; }
@@ -69,6 +70,8 @@ public sealed class LocalWorkSession
 public sealed class LocalUpload
 {
     [PrimaryKey] public Guid UploadId { get; set; }
+    public string? DestinationJson { get; set; }
+    public Guid? ServerVersionId { get; set; }
     public Guid AssignmentId { get; set; }
     public string LocalPath { get; set; }="";
     public string FileName { get; set; }="";
@@ -462,7 +465,8 @@ public sealed class WorkDayLocalStore
     public async Task<LocalWorkSession?> ActiveSessionAsync()=>await db.Table<LocalWorkSession>().Where(x=>x.EndedAtUtc==null).OrderByDescending(x=>x.StartedAtUtc).FirstOrDefaultAsync();
 
     public async Task QueueUploadAsync(LocalUpload upload){await InitializeAsync();await db.InsertOrReplaceAsync(upload);}
-    public async Task<List<LocalUpload>> PendingUploadsAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Pending)||x.State==nameof(LocalUploadState.Failed)||x.State==nameof(LocalUploadState.Retrying)).OrderBy(x=>x.CreatedAtUtc).ToListAsync();
+    public async Task<List<LocalUpload>> PendingUploadsAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Pending)||x.State==nameof(LocalUploadState.Uploading)||x.State==nameof(LocalUploadState.Failed)||x.State==nameof(LocalUploadState.Retrying)).OrderBy(x=>x.CreatedAtUtc).ToListAsync();
+    public async Task<LocalUpload?> GetUploadAsync(Guid id)=>await db.Table<LocalUpload>().Where(x=>x.UploadId==id).FirstOrDefaultAsync();
     public Task SaveUploadAsync(LocalUpload upload)=>db.InsertOrReplaceAsync(upload);
     public async Task<int> PendingUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State!=nameof(LocalUploadState.Uploaded)).CountAsync();
     public async Task<int> FailedUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Failed)).CountAsync();
@@ -617,3 +621,4 @@ public sealed class WorkDayLocalStore
         v.ClientPhone=await protector.UnprotectAsync(v.ClientPhone);
     }
 }
+

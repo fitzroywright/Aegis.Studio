@@ -183,12 +183,13 @@ function renderFrontDesk(){
                 ${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}
             </div>
             <footer class="smc-footer fd-overview-toolbar" role="toolbar" aria-label="Overview actions">
-                <button type="button" data-new-booking>＋ Create Manual Booking →</button>
+                <button type="button" data-new-booking>＋ Create Manual Booking →</button><button type="button" data-gallery-requests>Client Gallery Requests →</button>
             </footer>
         </section>
         <section class="mw-list-panel fd-schedule" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button type="button" class="fd-card-link" data-calendar>View Calendar →</button></header><div class="mw-section-rows fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="mw-session-row fd-session"><span class="mw-session-time fd-session-time">${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))} – ${esc(new Date(s.endsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</span><span class="mw-session-main"><strong>${esc(frontDeskJobs.find(j=>String(j.id)===String(s.jobId))?.title||s.title)}</strong><small>${esc(frontDeskJobs.find(j=>String(j.id)===String(s.jobId))?.clientName||'Client name unavailable')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
         ${StudioMessageCard.html({id:'frontDeskMessageCard',body:'<div id="fdCommunicationFeed"><p>Loading messages…</p></div>',actions:'<button type="button" data-messages-all>View All →</button>',footer:'<button type="button" data-message-compose>✉ Send Message →</button>',attributes:'data-mw-region="messages" data-fd-communications'})}
       </aside></div></div>`;
+    genericView.querySelector('[data-gallery-requests]').onclick=()=>window.openGalleryExchange();
     if(preservedMessageCard)genericView.querySelector('#frontDeskMessageCard').replaceWith(preservedMessageCard);
     if(searchNode&&genericView.querySelector('#frontDeskSearch')){genericView.querySelector('#frontDeskSearch').replaceWith(searchNode);searchNode.value=frontDeskTerm;if(searchFocused){searchNode.focus({preventScroll:true});searchNode.setSelectionRange(...searchSelection);}}
     // The shared shell footer owns the visible filtered row count.
@@ -545,6 +546,7 @@ async function recordFrontDeskFulfillment(jobId){
  const dialog=frontDeskDialog('Confirm collection / delivery',`<p>${esc(job?.title||'Job')} · ${esc(job?.clientName||'')}</p><label>Method<select name="method"><option value="Collected">Client collected</option><option value="Delivered">Delivered to client</option></select></label><label>Received by<input name="recipient" required maxlength="200"></label>`);
  dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{await json(`/api/frontdesk/jobs/${jobId}/fulfillment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId,expectedRevision:workflow.revision,method:form.elements.method.value,recipient:form.elements.recipient.value})});dialog.close();await showFrontDesk();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
+
 
 
 

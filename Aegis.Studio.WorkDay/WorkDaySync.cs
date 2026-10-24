@@ -89,38 +89,46 @@ public sealed class WorkDayApiClient
 
     public async Task<UploadResultDto> UploadAsync(LocalUpload upload,CancellationToken ct=default)
     {
-        using MultipartFormDataContent form=new();
-        form.Add(new StringContent(upload.UploadId.ToString("D")),"uploadId");
-        await using FileStream fs=File.OpenRead(upload.LocalPath);
-        using StreamContent file=new(fs);
-        file.Headers.ContentType=new MediaTypeHeaderValue(upload.ContentType);
-        form.Add(file,"file",upload.FileName);
-        using HttpResponseMessage submitted=await http.PostAsync($"workday/assignments/{upload.AssignmentId:D}/uploads",form,ct);
-        submitted.EnsureSuccessStatusCode();
-        if(submitted.StatusCode!=System.Net.HttpStatusCode.Accepted)
-            return await submitted.Content.ReadFromJsonAsync<UploadResultDto>(cancellationToken:ct)
-                ??throw new InvalidOperationException("The API Site returned no upload receipt.");
-
-        DateTimeOffset deadline=DateTimeOffset.UtcNow.AddMinutes(5);
-        while(DateTimeOffset.UtcNow<deadline)
+        var destination=JsonSerializer.Deserialize<RemoteUploadDestinationDto>(upload.DestinationJson??"null",new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ??throw new HttpRequestException("Choose a collection and subject before retrying this upload.",null,System.Net.HttpStatusCode.Conflict);
+        await using FileStream file=File.OpenRead(upload.LocalPath);
+        string hash=Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(file,ct)).ToLowerInvariant();
+        var declaration=new{batchId=upload.UploadId,assignmentId=upload.AssignmentId,jobId=destination.JobId,sessionId=destination.SessionId,
+            collection=destination.Collection,subjectId=destination.SubjectId,
+            files=new[]{new{uploadId=upload.UploadId,fileName=upload.FileName,sizeBytes=upload.SizeBytes,sha256=hash,contentType=upload.ContentType}}};
+        using var declared=await http.PostAsJsonAsync("workday/remote-media/batches",declaration,ct);declared.EnsureSuccessStatusCode();
+        using var document=JsonDocument.Parse(await declared.Content.ReadAsStringAsync(ct));
+        JsonElement current=document.RootElement.GetProperty("files")[0].Clone();
+        long offset=current.GetProperty("receivedBytes").GetInt64();
+        while(current.GetProperty("state").GetString()=="Uploading"&&offset<upload.SizeBytes)
         {
-            ct.ThrowIfCancellationRequested();
-            await Task.Delay(TimeSpan.FromSeconds(3),ct);
-            using HttpResponseMessage status=await http.GetAsync($"workday/operations/{upload.UploadId:D}",ct);
-            status.EnsureSuccessStatusCode();
-            using JsonDocument payload=JsonDocument.Parse(await status.Content.ReadAsStringAsync(ct));
-            JsonElement root=payload.RootElement;
-            string state=root.TryGetProperty("state",out JsonElement stateElement)?stateElement.GetString()??"Pending":"Pending";
-            if(state=="Conflict")
-            {
-                string message=root.TryGetProperty("result",out JsonElement failure)&&failure.TryGetProperty("message",out JsonElement detail)
-                    ?detail.GetString()??"Studio rejected the upload.":"Studio rejected the upload.";
-                throw new HttpRequestException(message,null,System.Net.HttpStatusCode.Conflict);
-            }
-            if(state=="Acknowledged"&&root.TryGetProperty("result",out JsonElement stored)&&stored.TryGetProperty("result",out JsonElement value))
-                return value.Deserialize<UploadResultDto>()??throw new InvalidOperationException("Studio returned no saved upload.");
+            file.Position=offset;byte[] bytes=new byte[(int)Math.Min(4_000_000,upload.SizeBytes-offset)];await file.ReadExactlyAsync(bytes,ct);
+            using var chunk=new HttpRequestMessage(HttpMethod.Put,$"workday/remote-media/{upload.UploadId:D}/chunks"){Content=new ByteArrayContent(bytes)};
+            chunk.Headers.Add("X-Upload-Offset",offset.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            chunk.Headers.Add("X-Content-Sha256",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant());
+            using var response=await http.SendAsync(chunk,ct);response.EnsureSuccessStatusCode();
+            current=await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct);offset=current.GetProperty("receivedBytes").GetInt64();
         }
-        throw new HttpRequestException("The API Site has stored this upload and is waiting for Studio to save it.");
+        if(current.GetProperty("state").GetString() is "Uploading" or "Quarantined")
+        {
+            using var completed=await http.PostAsJsonAsync($"workday/remote-media/{upload.UploadId:D}/complete",new{},ct);completed.EnsureSuccessStatusCode();
+            current=await completed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct);
+        }
+        DateTimeOffset deadline=DateTimeOffset.UtcNow.AddMinutes(5);
+        while(true)
+        {
+            string state=current.GetProperty("state").GetString()??"";
+            if(state is "Imported" or "Purged")
+            {
+                var result=current.GetProperty("result");return new(upload.UploadId,result.GetProperty("assetId").GetGuid(),upload.AssignmentId,
+                    upload.FileName,upload.SizeBytes,"Imported",result.GetProperty("appliedAt").GetDateTimeOffset(),result.GetProperty("versionId").GetGuid());
+            }
+            if(state is "NeedsReview" or "Cancelled" or "Expired")throw new HttpRequestException("Studio import needs review: "+state,null,System.Net.HttpStatusCode.Conflict);
+            if(state=="Quarantined")throw new HttpRequestException("Received by API; awaiting file safety scan. Local copy retained.");
+            if(DateTimeOffset.UtcNow>=deadline)throw new HttpRequestException("Received by API; waiting for Studio import. Local copy retained.");
+            await Task.Delay(TimeSpan.FromSeconds(3),ct);
+            current=await http.GetFromJsonAsync<JsonElement>($"workday/remote-media/{upload.UploadId:D}",ct);
+        }
     }
 
     public Task<WorkDayTimeSummaryDto?> GetTimeSummaryAsync(DateTimeOffset? from=null,DateTimeOffset? to=null,CancellationToken ct=default)
@@ -354,7 +362,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
             Id=x.Id,JobId=x.JobId,BookingId=x.BookingId,WorkspaceId=x.WorkspaceId,ConversationId=x.ConversationId,
             Title=x.Title,StartsAtUtc=x.StartsAtUtc,EndsAtUtc=x.EndsAtUtc,Location=x.Location,Status=x.Status,Instructions=x.Instructions,
             ClientName=x.ClientName,ClientEmail=x.ClientEmail,ClientPhone=x.ClientPhone,Version=x.Version,
-            FieldTargetsJson=CachedFieldTargets(bootstrap,x.Id),IsCurrent=true,CachedAtUtc=DateTimeOffset.UtcNow
+            FieldTargetsJson=CachedFieldTargets(bootstrap,x.Id),MediaDestinationJson=bootstrap.MediaDestinations is { } destinations&&destinations.TryGetValue(x.Id,out var destination)?JsonSerializer.Serialize(destination):null,IsCurrent=true,CachedAtUtc=DateTimeOffset.UtcNow
         }),authoritative:true);
     }
 
@@ -376,7 +384,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
     private static string OperationStatus(string kind,string? category,string current)=>WorkDayClientRules.AssignmentStatus(kind,category,current);
 }
 
-public sealed record WorkDayBootstrapDto(string UserName,string DisplayName,DateTimeOffset ServerTimeUtc,IReadOnlyList<AssignmentDto> Today,IReadOnlyList<AssignmentDto> Upcoming,WorkSessionDto? ActiveWorkSession,bool LocationTrackingEnabled,string LocationTrackingMode,DateTimeOffset GeneratedAtUtc,IReadOnlyDictionary<Guid,IReadOnlyList<FieldTargetDto>>? FieldTargets=null);
+public sealed record WorkDayBootstrapDto(string UserName,string DisplayName,DateTimeOffset ServerTimeUtc,IReadOnlyList<AssignmentDto> Today,IReadOnlyList<AssignmentDto> Upcoming,WorkSessionDto? ActiveWorkSession,bool LocationTrackingEnabled,string LocationTrackingMode,DateTimeOffset GeneratedAtUtc,IReadOnlyDictionary<Guid,IReadOnlyList<FieldTargetDto>>? FieldTargets=null,IReadOnlyDictionary<Guid,RemoteMediaDestinationDto>? MediaDestinations=null);
 public sealed record AssignmentDto(Guid Id,Guid? JobId,Guid? BookingId,string Title,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? Location,string Status,string? Instructions,Guid? WorkspaceId,Guid? ConversationId,string? ClientName,string? ClientEmail,string? ClientPhone,long Version);
 public sealed record WorkSessionDto(Guid Id,string UserName,DateTimeOffset StartedAtUtc,DateTimeOffset? EndedAtUtc,string DeviceId,bool StartedOffline,bool? EndedOffline,string Source,DateTimeOffset UpdatedAtUtc);
 public sealed record OperationResultDto(Guid OperationId,string State,DateTimeOffset AcknowledgedAtUtc,string? Message,long? ServerVersion);
@@ -400,3 +408,8 @@ public sealed record WorkDayTimeSummaryDto(string UserName,DateTimeOffset FromUt
 
 public sealed record FieldTargetDto(string TargetId,string Scope,string Name,string SourceFingerprint,long Version,string? Status,string? Collection=null,string? Reference=null,string? Instructions=null);
 public sealed record FieldStatusDto(string TargetId,string Status,string SourceFingerprint,long ExpectedTargetVersion,string? Reason=null);
+
+
+public sealed record RemoteMediaSubjectDto(Guid Id,string Name,string Collection);
+public sealed record RemoteMediaDestinationDto(Guid JobId,string Title,Guid? SessionId,IReadOnlyList<string> Collections,IReadOnlyList<RemoteMediaSubjectDto> Subjects);
+public sealed record RemoteUploadDestinationDto(Guid JobId,Guid? SessionId,string Collection,Guid? SubjectId);

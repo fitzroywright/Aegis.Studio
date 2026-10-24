@@ -71,7 +71,9 @@ public sealed class WorkDayApiExchangeWorker(
     {
         using IServiceScope scope=scopes.CreateScope();
         StudioDatabase database=scope.ServiceProvider.GetRequiredService<StudioDatabase>();
-        foreach(PhotographerProfile profile in new PhotographerStore(database).GetAll().Where(x=>x.IsActive))
+        var active=new PhotographerStore(database).GetAll().Where(x=>x.IsActive).ToArray();
+        using(var reconciled=await http.PostAsJsonAsync("admin/workday/accounts/reconcile",new{userNames=active.Select(x=>x.UserName).ToArray()},ct))reconciled.EnsureSuccessStatusCode();
+        foreach(PhotographerProfile profile in active)
         {
             ct.ThrowIfCancellationRequested();
             using var response=await http.PostAsJsonAsync("admin/workday/users",
@@ -157,6 +159,7 @@ public sealed class WorkDayApiExchangeWorker(
             {
                 bootstrap.UserName,bootstrap.DisplayName,bootstrap.ServerTimeUtc,bootstrap.Today,bootstrap.Upcoming,
                 sendingIdentities,
+                mediaDestinations=WorkDayMediaDestinations.Build(bootstrap,principal,database,schedules,access),
                 bootstrap.ActiveWorkSession,bootstrap.LocationTrackingEnabled,bootstrap.LocationTrackingMode,
                 bootstrap.GeneratedAtUtc,bootstrap.FieldTargets,
                 availability=photographers.GetAvailability(profile.UserName,now.AddDays(-1),now.AddDays(90)),
@@ -472,3 +475,4 @@ public sealed class WorkDayApiExchangeWorker(
     private sealed record WorkDayUpdateBatch(IReadOnlyList<WorkDayUpdate> Items);
     private sealed record WorkDayUpdate(long Sequence,Guid OperationId,string UserName,string Kind,JsonElement Payload,DateTimeOffset CreatedAt);
 }
+

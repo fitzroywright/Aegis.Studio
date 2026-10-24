@@ -145,11 +145,14 @@ public sealed class StudioVersionStore
         command.ExecuteNonQuery();
     }
 
+    internal static bool AllowsMediaChange(string status)
+        =>status is not ("Ready for Delivery" or "Delivered" or "Awaiting Approval" or "Awaiting Production Review" or "Ready for Client" or "Published" or "Completed" or "Closed" or "Cancelled");
+
     internal static void LockJobForMediaChange(NpgsqlConnection connection,NpgsqlTransaction transaction,Guid jobId)
     {
         using var command=new NpgsqlCommand("select status from studio_jobs where id=$1 for update",connection,transaction);command.Parameters.AddWithValue(jobId);
         string status=command.ExecuteScalar() as string??throw new KeyNotFoundException("Job was not found.");
-        if(status is "Ready for Delivery" or "Delivered" or "Awaiting Approval" or "Awaiting Production Review" or "Ready for Client" or "Published" or "Completed" or "Closed" or "Cancelled")
+        if(!AllowsMediaChange(status))
             throw new ArgumentException("This job's approved media is closed for changes. Request changes before uploading a revision.");
     }
 
@@ -168,5 +171,6 @@ public sealed class StudioVersionStore
 }
 
 public sealed record StudioAssetVersion(Guid Id, Guid JobId, string AssetKey, int VersionNumber, string FileName, string ContentType, long SizeBytes, string Sha256, string StoredPath, string CreatedBy, DateTimeOffset CreatedAtUtc, Guid? SourceVersionId, string? Note);
+
 
 

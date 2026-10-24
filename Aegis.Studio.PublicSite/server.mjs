@@ -1,4 +1,6 @@
 import { createIntakeApi } from './intake-api.mjs';
+import { createReferenceGallery } from './reference-gallery.mjs';
+import { json,readBody } from './http-helpers.mjs';
 import http from 'node:http';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -25,10 +27,6 @@ export function sign(secret, method, path, timestamp, nonce, body, key = '') {
   const digest = createHash('sha256').update(body).digest('hex');
   return createHmac('sha256', secret).update([method.toUpperCase(), path, timestamp, nonce, digest, key].join('\n')).digest('hex');
 }
-function json(res, status, value, headers = {}) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers });
-  res.end(JSON.stringify(value));
-}
 function cookieFlags(env) { return `Path=/; HttpOnly; SameSite=Lax; Max-Age=28800${env.NODE_ENV === 'production' ? '; Secure' : ''}`; }
 function issueSession(user, secret) {
   const payload = Buffer.from(JSON.stringify({ id: user.id, exp: Date.now() + 8 * 60 * 60 * 1000 })).toString('base64url');
@@ -50,11 +48,6 @@ function readSession(req, secret) {
     if (value.exp <= Date.now()) return null;
     return Object.values(DEMO_USERS).find(user => user.id === value.id) || null;
   } catch { return null; }
-}
-async function readBody(req, limit = 65536) {
-  const chunks = []; let size = 0;
-  for await (const chunk of req) { size += chunk.length; if (size > limit) throw Object.assign(new Error('Request is too large.'), { status: 413 }); chunks.push(chunk); }
-  return Buffer.concat(chunks);
 }
 function requireSameOrigin(req, url) {
   const origin = req.headers.origin;
@@ -80,6 +73,7 @@ export function createServer(env = process.env) {
   const demo = env.PUBLIC_DEMO_MODE === 'true';
   const demoSelections = new Map();
   const intake=createIntakeApi(env,readBody,json);
+  const referenceGallery=createReferenceGallery(env,readBody,json);
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -87,11 +81,13 @@ export function createServer(env = process.env) {
     res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     try {
       if (req.method === 'GET' && url.pathname === '/health') { res.writeHead(200, { 'Cache-Control': 'no-store' }).end('ok'); return; }
+      if(req.method==='GET'&&['/workday','/gallery-requests'].includes(url.pathname)){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(await readFile(new URL(url.pathname==='/workday'?'workday.html':'gallery-requests.html',ROOT)));return;}
       if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(await readFile(new URL('index.html', ROOT))); return; }
-      if (req.method === 'GET' && ['/styles.css', '/app.js', '/roster-editor.js'].includes(url.pathname)) {
+      if (req.method === 'GET' && ['/styles.css', '/app.js', '/roster-editor.js','/workday.js','/exchange.css','/gallery-requests.js'].includes(url.pathname)) {
         const type = url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
         res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=300' }); res.end(await readFile(new URL(url.pathname.slice(1), ROOT))); return;
       }
+      if(await referenceGallery.handle(req,res,url))return;
       let user = readSession(req, secret);
       if(user){const binding=intake.store.clientForIdentity(user.provider,user.id)||JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];if(binding){const candidates=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).filter(r=>JSON.parse(r.payload).published);if(candidates.length)user={...user,galleryReference:candidates.at(-1).id};}}
       if (req.method === 'GET' && url.pathname === '/api/session') { json(res, 200, { demo, user: user ? { name: user.name, provider: user.provider, email: user.email, galleryReference: user.galleryReference } : null }); return; }
@@ -174,7 +170,8 @@ export function createServer(env = process.env) {
       else res.end();
     }
   });
-  server.on('close',()=>{intake.workdayStore.close();intake.store.close();});
+  server.on('listening',()=>referenceGallery.start());
+  server.on('close',()=>{void referenceGallery.close();intake.workdayStore.close();intake.store.close();});
   return server;
 }
 
@@ -183,5 +180,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const host=process.env.HOST||'127.0.0.1',port=Number(process.env.PORT||8080);
   server.listen(port,host,()=>console.log(`Aegis Studio Public Site listening on ${host}:${port}`));
 }
+
 
 

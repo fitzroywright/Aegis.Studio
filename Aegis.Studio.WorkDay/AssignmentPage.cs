@@ -43,13 +43,27 @@ public sealed class AssignmentPage:ContentPage
             Action("NAVIGATE",NavigateAsync),Action("CONTACT",ContactAsync),
             Action("UPLOAD FILE",async()=>
             {
-                LocalUpload? upload=await uploads.PickAndQueueAsync(assignment.Id);
+                LocalAssignment cached=await store.GetAssignmentAsync(assignment.Id)??assignment;
+                var destination=System.Text.Json.JsonSerializer.Deserialize<RemoteMediaDestinationDto>(cached.MediaDestinationJson??"null",new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+                if(destination is null)throw new InvalidOperationException("Synchronize this assignment once to obtain authorized media destinations.");
+                string collection=await DisplayActionSheetAsync("Upload collection","Cancel",null,destination.Collections.ToArray());
+                if(collection=="Cancel"||string.IsNullOrWhiteSpace(collection))return;
+                var subjects=destination.Subjects.Where(x=>x.Collection==collection).ToArray();Guid? subjectId=null;
+                if(subjects.Length>0)
+                {
+                    var labels=subjects.Select(x=>x.Name+" · "+x.Id.ToString("D")).ToArray();
+                    string chosen=await DisplayActionSheetAsync("Upload subject","Cancel",null,new[]{"No specific subject"}.Concat(labels).ToArray());
+                    if(chosen=="Cancel"||string.IsNullOrWhiteSpace(chosen))return;
+                    int index=Array.IndexOf(labels,chosen);if(index>=0)subjectId=subjects[index].Id;
+                }
+                LocalUpload? upload=await uploads.PickAndQueueAsync(assignment.Id,new(destination.JobId,destination.SessionId,collection,subjectId));
                 if(upload is null)return;
                 try
                 {
                     await sync.SynchronizeAsync();
                     await uploads.ProcessAsync();
-                    await DisplayAlertAsync("Upload","The file was saved to Studio.","OK");
+                    var currentUpload=await store.GetUploadAsync(upload.UploadId);
+                    await DisplayAlertAsync("Upload",currentUpload?.State==nameof(LocalUploadState.Uploaded)?"Imported into Studio.":"Upload retained until Studio confirms import. See synchronization status.","OK");
                 }
                 catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
                 {
@@ -150,4 +164,5 @@ public sealed class AssignmentPage:ContentPage
         await Launcher.Default.OpenAsync($"{(selected.Contains('@')?"mailto":"tel")}:{Uri.EscapeDataString(selected)}");
     }
 }
+
 

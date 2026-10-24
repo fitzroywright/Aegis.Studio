@@ -99,6 +99,8 @@
    subjectControl.onchange=async()=>{if(subjectControl.value==='__details'){subjectControl.value=subject;await host.studioOpenSubjects?.();return;}await change({subject:subjectControl.value});};
    host.querySelectorAll('[data-filter]').forEach(button=>{button.onclick=()=>change({collection:button.dataset.filter});if(canEdit){button.ondragover=e=>{if(e.dataTransfer?.types?.includes('Files'))e.preventDefault();};button.ondrop=async e=>{e.preventDefault();e.stopPropagation();await upload(await studioDroppedPhotos(e.dataTransfer),button.dataset.filter||'Unclassified');};}});
    const clear=host.querySelector('[data-clear-subject]');if(clear)clear.onclick=()=>change({subject:''});
+   const remoteUploadsButton=document.createElement('button');remoteUploadsButton.type='button';remoteUploadsButton.textContent='Remote uploads';remoteUploadsButton.onclick=()=>root.openRemoteMediaReview(job.id);host.querySelector('.jd-gallery-toolbar')?.append(remoteUploadsButton);
+   const galleryRequestsButton=document.createElement('button');galleryRequestsButton.type='button';galleryRequestsButton.textContent='Client Gallery Requests';galleryRequestsButton.onclick=()=>root.openGalleryExchange(job.id);host.querySelector('.jd-gallery-toolbar')?.append(galleryRequestsButton);
    const rosterButton=document.createElement('button');rosterButton.type='button';rosterButton.textContent='Subjects / roster';rosterButton.onclick=()=>root.openIntakeRoster(job.conversationId);host.querySelector('.jd-gallery-toolbar')?.append(rosterButton);
    host.querySelector('[data-media-search]').oninput=e=>{search=e.target.value;renderTiles();};
    host.querySelector('[data-job-tasks]').onclick=event=>host.studioOpenTasks?.(event);
@@ -167,4 +169,5 @@
  }
  root.StudioJobDetails={media,nextActionLink,workflowAction};
 })(window);
+
 

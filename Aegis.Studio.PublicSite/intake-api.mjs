@@ -2,6 +2,9 @@ import { randomUUID, randomBytes, timingSafeEqual, createHash } from 'node:crypt
 import { readRosterFile } from './roster-file.mjs';
 import { IntakeStore, validateRoster, fail } from './intake-store.mjs';
 import { WorkDayExchangeStore } from './workday-exchange-store.mjs';
+import { createRemoteMediaApi } from './remote-media-api.mjs';
+import { createGalleryExchangeApi } from './gallery-exchange-api.mjs';
+import { issueCsrf } from './http-helpers.mjs';
 import { join } from 'node:path';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -11,7 +14,7 @@ const run = promisify(execFile);
 const equal=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&timingSafeEqual(x,y);};
 export function createIntakeApi(env,readBody,json) {
   const store=new IntakeStore(env.INTAKE_DB_PATH || './data/intake.sqlite');
-  const workdayStore=new WorkDayExchangeStore(env.WORKDAY_EXCHANGE_DB_PATH||env.INTAKE_DB_PATH||'./data/intake.sqlite');
+  const workdayStore=new WorkDayExchangeStore(env.WORKDAY_EXCHANGE_DB_PATH||env.INTAKE_DB_PATH||'./data/intake.sqlite', undefined, env);
   function workdayToken(req){
     const header=String(req.headers['x-aegis-workday-token']||'');
     if(header)return header;
@@ -55,8 +58,24 @@ export function createIntakeApi(env,readBody,json) {
     try{const path=join(dir,'upload');await writeFile(path,bytes,{mode:0o600});await run(env.MALWARE_SCANNER_PATH,['--no-summary',path],{timeout:30000,maxBuffer:4096});return {state:'Clean',type};}
     catch{return {state:'Quarantined',type};}finally{await rm(dir,{recursive:true,force:true});}
   }
+  async function scanPath(path){
+    if(!env.MALWARE_SCANNER_PATH)return false;
+    try{await run(env.MALWARE_SCANNER_PATH,['--no-summary',path],{timeout:120000,maxBuffer:4096});return true;}catch{return false;}
+  }
+  const remote=createRemoteMediaApi({store,workdayStore,env,authenticate,requireWorkday,input,readBody,json,scanPath});
+  const galleries=createGalleryExchangeApi({store,env,authenticate,input,readBody,json});
   return {store,workdayStore,async handle(req,res,url){
     const route=url.pathname, method=req.method;
+    if(['POST','PUT','DELETE'].includes(method)&&
+       (route.startsWith('/api/v1/workday/')||route.startsWith('/api/v1/auth/'))&&
+       (req.headers.origin||req.headers['sec-fetch-site'])&&!req.headers['x-aegis-workday-token'])
+      await sameOrigin(req,url);
+    if(await remote.handle(req,res,url))return true;
+    if(await galleries.handle(req,res,url))return true;
+    if(route==='/api/v1/admin/workday/accounts/reconcile'&&method==='POST'){
+      authenticate(req,'workday:sync');const p=await input(req,1000000);
+      json(res,200,workdayStore.reconcileAccounts(p.userNames));return true;
+    }
     if(route==='/api/v1/auth/login'&&method==='POST'){
       const p=await input(req,8192);
       const minute=Math.floor(Date.now()/60000),identity=String(p.userName||'').trim().toLowerCase().slice(0,200);
@@ -246,7 +265,7 @@ export function createIntakeApi(env,readBody,json) {
       json(res,200,{id:linkProof[1],status:'Revoked'});return true;
     }
     if(route==='/api/intake-session'&&method==='GET'){
-      const csrf=randomUUID();json(res,200,{csrf},{'Set-Cookie':`intake_csrf=${csrf}; Path=/; HttpOnly; SameSite=Strict${env.NODE_ENV==='production'?'; Secure':''}`});return true;
+      issueCsrf(res,env);return true;
     }
     if(route==='/api/v1/openapi.json'&&method==='GET'){
       const {readFile}=await import('node:fs/promises');json(res,200,JSON.parse(await readFile(new URL('./public-site-v1.openapi.json',import.meta.url),'utf8')));return true;
@@ -324,5 +343,6 @@ export function createIntakeApi(env,readBody,json) {
     fail(404,'not_found','Operation not found.');
   }};
 }
+
 
 

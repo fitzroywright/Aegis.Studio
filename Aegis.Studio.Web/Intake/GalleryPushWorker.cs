@@ -9,7 +9,7 @@ public sealed class GalleryPushWorker(StudioDatabase database,IFileStorage stora
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        if(!configuration.GetValue<bool>("PublicSite:GalleryPushEnabled"))return;
+        if(configuration.GetValue<bool>("PublicSite:GalleryExchangeEnabled")||!configuration.GetValue<bool>("PublicSite:GalleryPushEnabled"))return;
         using var site=new PublicSiteClient(configuration);
         while(!ct.IsCancellationRequested)
         {
@@ -54,3 +54,4 @@ public sealed class GalleryPushWorker(StudioDatabase database,IFileStorage stora
         }
     }
 }
+

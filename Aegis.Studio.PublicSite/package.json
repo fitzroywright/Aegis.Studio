@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "start:gallery-reference": "node --env-file-if-exists=.env reference-server.mjs"
   },
   "dependencies": {
     "exceljs": "4.4.0"

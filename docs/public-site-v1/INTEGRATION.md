@@ -66,7 +66,13 @@ POST `/intakes/{id}/payments` is restricted to the verified adapter. Supply even
 
 Duplicate events do not post twice. Conflicting reuse is rejected or held for review. Amounts use integer minor units on the API and decimal JMD in Studio. Imported deposits, refunds and confirmed reversal events use the existing financial ledger. Payment metadata must be associated with a booking job; an inquiry payment enters import review. No client-submitted success flag is trusted.
 
-## Galleries
+## Request-bound Gallery exchange and WorkDay media
+
+The current client-initiated Gallery flow and WorkDay web/media additions are defined in [WORKDAY-GALLERY-COMPLETION.md](WORKDAY-GALLERY-COMPLETION.md) and the same OpenAPI contract. External gallery consumers need gallery:request and gallery:transfer, with a dedicated stable integration ID. Studio alone receives gallery:publish; WorkDay exchange uses workday:sync. Website identity is separate from Studio entitlement verification.
+
+## Legacy automatic galleries and client bindings
+
+These routes remain for compatibility. Enabling PublicSite:GalleryExchangeEnabled suppresses automatic GalleryPushWorker publication and uses the verified request-bound transfer flow instead.
 
 Studio stages metadata at POST `/galleries`, uploads each pinned approved image with PUT `/galleries/{id}/media/{versionId}`, then POSTs `/galleries/{id}/publish`. The site publishes only after every declared item is stored. Retries repeat the same publication/version IDs. POST `/galleries/{id}/revoke` hides a publication. Publication ownership cannot change to another client.
 
@@ -83,4 +89,5 @@ No external developer has integrated the API yet. Keep one current V1 contract a
 ## Local setup and validation
 
 Use Node 24 and a durable writable directory. Start from `.env.example`; use unique local test credentials and no real customer data. Run `npm install` and `npm test` on the MacBook. Use `requests.http` for operation examples and `contract-example.json` as the shared site/Studio consumer fixture. Restore and run the .NET and UI suites through `scripts/Validate-ClientIntake.ps1`.
+
 

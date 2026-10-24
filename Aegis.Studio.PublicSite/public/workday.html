@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WorkDay · Brian’s</title><link rel="stylesheet" href="/exchange.css"><script src="/workday.js" defer></script></head>
+<body><header><a href="/">Brian’s</a><h1>WorkDay</h1><span id="identity"></span><button id="logout" hidden>Sign out</button></header><main>
+<p id="notice" role="status" aria-live="polite"></p>
+<section id="login-panel"><h2>Staff sign-in</h2><form id="login"><label>User name<input name="userName" required autocomplete="username" maxlength="200"></label><label>Password<input name="password" type="password" required autocomplete="current-password" maxlength="200"></label><button>Sign in</button></form>
+<details><summary>First-time enrollment</summary><form id="enroll"><label>One-time enrollment code<input name="enrollmentToken" required autocomplete="off"></label><label>New WorkDay password<input name="password" type="password" required minlength="12" maxlength="200" autocomplete="new-password"></label><button>Activate account</button></form><p>Use your privately supplied enrollment code and a new WorkDay password.</p></details></section>
+<div id="workspace" hidden><nav><button id="jobs-tab" aria-pressed="true">My jobs &amp; uploads</button><button id="uploads-tab" aria-pressed="false">My Uploads</button></nav>
+<section id="jobs-panel"><h2>My jobs and sessions</h2><p id="snapshot-time"></p><form id="upload-form">
+<label>Job / session<select id="job" required></select></label><label>Collection<select id="collection" required></select></label><label>Subject<select id="subject"><option value="">No specific subject</option></select></label>
+<div id="drop" tabindex="0" role="button" aria-label="Choose or drop photographs"><p>Drop photographs here or choose files.</p><input id="files" type="file" multiple accept="image/jpeg,image/png,image/webp,image/tiff"></div>
+<p id="destination"></p><p id="selection"></p><button id="upload">Upload selected files</button><button id="pause" type="button" disabled>Pause transfer</button>
+</form><p>Up to 100 MB per photograph. Interrupted uploads resume from confirmed chunks when you select the same files and destination again. Received by API means Studio has not yet confirmed import.</p></section>
+<section id="uploads-panel"><h2>My Uploads</h2><button id="refresh">Refresh status</button><div class="table-scroll"><table><thead><tr><th>File / destination</th><th>Transfer</th><th>Studio status</th><th>Last activity</th><th>Action</th></tr></thead><tbody id="uploads"></tbody></table></div></section>
+</div></main><footer>Brian’s · WorkDay</footer></body></html>

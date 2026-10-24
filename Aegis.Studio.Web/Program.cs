@@ -216,6 +216,9 @@ builder.Services.AddSingleton<ProductionStore>();
 builder.Services.AddSingleton<PerformanceMetricsStore>();
 builder.Services.AddSingleton<WorkDayStore>();
 builder.Services.AddHostedService<WorkDayApiExchangeWorker>();
+builder.Services.AddHostedService<RemoteMediaImportWorker>();
+builder.Services.AddSingleton<Aegis.Studio.Web.Galleries.GalleryExchangeStore>();
+builder.Services.AddHostedService<Aegis.Studio.Web.Galleries.GalleryExchangeWorker>();
 builder.Services.AddSingleton<StudioPosStore>();
 builder.Services.AddStudioPosHardening();
 builder.Services.AddSingleton<AttachmentStore>();
@@ -352,6 +355,9 @@ app.MapStudioEmailAssociations();
 app.MapStudioFulfillment();
 Aegis.Studio.Web.Reminders.ClientReminderEndpoints.MapClientReminders(app);
 Aegis.Studio.Web.Intake.IntakeSchema.Ensure(app.Services.GetRequiredService<StudioDatabase>());
+Aegis.Studio.Web.Galleries.GalleryExchangeStore.Ensure(app.Services.GetRequiredService<StudioDatabase>());
+app.MapGalleryExchange();
+app.MapRemoteMediaReview();
 Aegis.Studio.Web.Intake.IntakeRosterStore.Map(app);
 Aegis.Studio.Web.Intake.SubjectMessages.Map(app);
 app.MapStudioQuotes();
@@ -743,6 +749,7 @@ app.MapPut("/api/admin/job-roles/{code}/active", (string code, bool active, Clai
 }).RequireAuthorization();
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
+
 
 
 

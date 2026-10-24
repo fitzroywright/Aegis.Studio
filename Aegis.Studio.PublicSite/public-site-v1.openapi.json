@@ -1,14 +1,14 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bryan\u2019s reference public website API",
+    "title": "Bryan’s reference public website API",
     "version": "1.0.0",
-    "description": "Independent public-site intake and publication contract. Studio initiates all integration requests. Submission credentials cannot poll, acknowledge, verify payment or publish galleries. This API is distinct from the legacy Studio Public V1 API."
+    "description": "Independent public-site intake and publication contract. Studio initiates all integration requests. Submission credentials cannot poll, acknowledge, verify payment or publish galleries. This API is distinct from the legacy Studio Public V1 API. Gallery exchange is request-bound and independent of website sign-in. Manifest digests use UTF-8 JSON with recursively sorted object keys and preserved array order. Studio initiates synchronization; API receipt is distinct from Studio import or external completion."
   },
   "servers": [
     {
       "url": "https://api.bryanstudiosltd.com/api/v1",
-      "description": "Bryan\u2019s Public Site production API."
+      "description": "Bryan’s Public Site production API."
     }
   ],
   "components": {
@@ -17,6 +17,17 @@
         "type": "http",
         "scheme": "bearer",
         "description": "Dedicated secret of at least 32 characters; required scope is x-required-scope on each operation."
+      },
+      "WorkDayToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Aegis-WorkDay-Token"
+      },
+      "WorkDayCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "aegis_workday_session",
+        "description": "8-hour staff web session. Browser mutations require same Origin and X-CSRF-Token from /api/intake-session."
       }
     },
     "schemas": {
@@ -796,6 +807,295 @@
         "required": [
           "slots"
         ]
+      },
+      "RemoteMediaFile": {
+        "type": "object",
+        "required": [
+          "uploadId",
+          "fileName",
+          "sizeBytes",
+          "sha256",
+          "contentType"
+        ],
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000000
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "image/tiff"
+            ]
+          }
+        }
+      },
+      "RemoteMediaBatch": {
+        "type": "object",
+        "required": [
+          "batchId",
+          "assignmentId",
+          "jobId",
+          "collection",
+          "files"
+        ],
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "assignmentId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "jobId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "collection": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "items": {
+              "$ref": "#/components/schemas/RemoteMediaFile"
+            }
+          }
+        }
+      },
+      "GalleryRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "externalReference",
+          "requesterReference",
+          "hints"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "externalReference": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "requesterReference": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Opaque website account association; never a credential."
+          },
+          "hints": {
+            "type": "object",
+            "description": "Lookup hints only; staff entitlement verification is still required."
+          }
+        }
+      },
+      "GalleryManifestItem": {
+        "type": "object",
+        "required": [
+          "itemId",
+          "versionId",
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "sha256"
+        ],
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "versionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "image/tiff"
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000000
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "GalleryTransfer": {
+        "type": "object",
+        "required": [
+          "id",
+          "requestId",
+          "galleryId",
+          "version",
+          "title",
+          "decisionVersion",
+          "items"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "galleryId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Equals the verified gallery request ID.",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "decisionVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "republishApproval": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10000,
+            "items": {
+              "$ref": "#/components/schemas/GalleryManifestItem"
+            }
+          }
+        }
+      },
+      "GalleryImportAck": {
+        "type": "object",
+        "required": [
+          "state",
+          "version",
+          "digest",
+          "occurredAt"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "Imported"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "GalleryRevocationAck": {
+        "type": "object",
+        "required": [
+          "state",
+          "galleryId",
+          "requestId",
+          "occurredAt",
+          "limitations",
+          "throughVersion"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "Received",
+              "Completed",
+              "Failed"
+            ]
+          },
+          "galleryId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "limitations": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "throughVersion": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
       }
     }
   },
@@ -2872,6 +3172,1769 @@
           },
           "409": {
             "description": "Proof is used, expired, or not revocable"
+          }
+        }
+      }
+    },
+    "/workday/destinations": {
+      "get": {
+        "operationId": "getWorkdayDestinations",
+        "summary": "Authorized job, session, collection and subject destinations",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "WorkDayToken": []
+          },
+          {
+            "WorkDayCookie": []
+          }
+        ]
+      }
+    },
+    "/workday/remote-media": {
+      "get": {
+        "operationId": "getWorkdayRemoteMedia",
+        "summary": "List own uploaded files and batch import counts",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "WorkDayToken": []
+          },
+          {
+            "WorkDayCookie": []
+          }
+        ]
+      }
+    },
+    "/workday/remote-media/batches": {
+      "post": {
+        "operationId": "postWorkdayRemoteMediaBatches",
+        "summary": "Declare an immutable multi-file destination batch",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "WorkDayToken": []
+          },
+          {
+            "WorkDayCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteMediaBatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workday/remote-media/{id}": {
+      "get": {
+        "operationId": "getWorkdayRemoteMediaId",
+        "summary": "Read own upload offset and Studio import status",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "WorkDayToken": []
+          },
+          {
+            "WorkDayCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteWorkdayRemoteMediaId",
+        "summary": "Cancel an unfinished upload",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "WorkDayToken": []
+          },
+          {
+            "WorkDayCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ]
+      }
+    },
+    "/workday/remote-media/{id}/complete": {
+      "post": {
+        "operationId": "postWorkdayRemoteMediaIdComplete",
+        "summary": "Verify full file and scan; receipt is not Studio import",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "WorkDayToken": []
+          },
+          {
+            "WorkDayCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ]
+      }
+    },
+    "/workday/remote-media/{id}/activity": {
+      "get": {
+        "operationId": "getWorkdayRemoteMediaIdActivity",
+        "summary": "Read own upload activity",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "WorkDayToken": []
+          },
+          {
+            "WorkDayCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/admin/workday/remote-media": {
+      "get": {
+        "operationId": "getAdminWorkdayRemoteMedia",
+        "summary": "Poll complete scanned media awaiting Studio import",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "workday:sync"
+      }
+    },
+    "/admin/workday/remote-media/{id}/content": {
+      "get": {
+        "operationId": "getAdminWorkdayRemoteMediaIdContent",
+        "summary": "Download staged file for checksum-verified Studio import",
+        "responses": {
+          "200": {
+            "description": "Authorized file bytes",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "X-Content-Sha256": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "workday:sync",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/workday/remote-media/{id}/result": {
+      "post": {
+        "operationId": "postAdminWorkdayRemoteMediaIdResult",
+        "summary": "Acknowledge imported asset/version or hold for review",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "workday:sync",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "state",
+                  "appliedAt"
+                ],
+                "properties": {
+                  "state": {
+                    "enum": [
+                      "Imported",
+                      "NeedsReview"
+                    ]
+                  },
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+                  },
+                  "versionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "appliedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/workday/remote-media/{id}/retry": {
+      "post": {
+        "operationId": "postAdminWorkdayRemoteMediaIdRetry",
+        "summary": "Approve retry after correcting the original destination",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "workday:sync",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "retryId",
+                  "actor",
+                  "reason"
+                ],
+                "properties": {
+                  "retryId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+                  },
+                  "actor": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/workday/accounts/reconcile": {
+      "post": {
+        "operationId": "postAdminWorkdayAccountsReconcile",
+        "summary": "Revoke accounts absent from complete authoritative active list",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "workday:sync",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "userNames"
+                ],
+                "properties": {
+                  "userNames": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gallery-requests": {
+      "post": {
+        "operationId": "postGalleryRequests",
+        "summary": "Submit client-initiated gallery request",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:request",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gallery-requests/changes": {
+      "get": {
+        "operationId": "getGalleryRequestsChanges",
+        "summary": "Studio polls new requests by sequence",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:publish",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/gallery-requests/{id}": {
+      "get": {
+        "operationId": "getGalleryRequestsId",
+        "summary": "Read originating integration request status",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:request",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ]
+      }
+    },
+    "/gallery-requests/{id}/activity": {
+      "get": {
+        "operationId": "getGalleryRequestsIdActivity",
+        "summary": "Read own request activity",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:request",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/gallery-requests/{id}/decision": {
+      "post": {
+        "operationId": "postGalleryRequestsIdDecision",
+        "summary": "Apply ordered verified staff decision",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:publish",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "state",
+                  "version",
+                  "reason"
+                ],
+                "properties": {
+                  "state": {
+                    "enum": [
+                      "Approved",
+                      "Held",
+                      "Rejected"
+                    ]
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "jobId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true,
+                    "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+                  },
+                  "clientId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true,
+                    "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+                  },
+                  "entitlementVerified": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gallery-transfers": {
+      "post": {
+        "operationId": "postGalleryTransfers",
+        "summary": "Stage an immutable approved publication/update manifest",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:publish",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryTransfer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gallery-transfers/{id}": {
+      "get": {
+        "operationId": "getGalleryTransfersId",
+        "summary": "Read current authorized transfer manifest and digest",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:transfer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ]
+      }
+    },
+    "/gallery-transfers/{id}/activate": {
+      "post": {
+        "operationId": "postGalleryTransfersIdActivate",
+        "summary": "Make complete immutable transfer available",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:publish",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ]
+      }
+    },
+    "/gallery-transfers/{id}/ack": {
+      "post": {
+        "operationId": "postGalleryTransfersIdAck",
+        "summary": "Confirm complete external import of exact version and digest",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:transfer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryImportAck"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gallery-transfers/{id}/files/{versionId}": {
+      "get": {
+        "operationId": "getGalleryTransfersIdFilesVersionId",
+        "summary": "Download approved file; single Range supported",
+        "responses": {
+          "200": {
+            "description": "Authorized file bytes",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "X-Content-Sha256": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "206": {
+            "description": "Requested byte range",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:transfer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "example": "bytes=4000000-"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putGalleryTransfersIdFilesVersionId",
+        "summary": "Store a complete immutable approved file matching size and SHA-256",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:publish",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gallery-events": {
+      "get": {
+        "operationId": "getGalleryEvents",
+        "summary": "Replay own publication and withdrawal events by sequence",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:transfer",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/gallery-revocations": {
+      "post": {
+        "operationId": "postGalleryRevocations",
+        "summary": "Immediately block retrieval and queue external withdrawal",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:publish",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "galleryId",
+                  "requestId",
+                  "reason",
+                  "throughVersion"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+                  },
+                  "galleryId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+                  },
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "throughVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Withdraw through this publication version; later explicitly approved versions are outside this instruction."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gallery-revocations/{id}/ack": {
+      "post": {
+        "operationId": "postGalleryRevocationsIdAck",
+        "summary": "Report withdrawal receipt, completion or failure separately",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:transfer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryRevocationAck"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/gallery-exchange/state": {
+      "get": {
+        "operationId": "getAdminGalleryExchangeState",
+        "summary": "Read Studio exchange state and activity after sequence",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          }
+        },
+        "security": [
+          {
+            "IntegrationBearer": []
+          }
+        ],
+        "x-required-scope": "gallery:publish",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          }
+        ]
+      }
+    },
+    "/workday/remote-media/{id}/chunks": {
+      "put": {
+        "operationId": "putWorkdayRemoteMediaIdChunks",
+        "summary": "Append or replay a checksum-verified chunk, maximum 4,000,000 bytes",
+        "responses": {
+          "200": {
+            "description": "Current durable state or result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Permission or scope denied"
+          },
+          "404": {
+            "description": "Not found within caller scope"
+          },
+          "409": {
+            "description": "Identity, version or state conflict"
+          },
+          "410": {
+            "description": "Withdrawn, superseded or expired transfer"
+          },
+          "422": {
+            "description": "Integrity validation failed"
+          },
+          "201": {
+            "description": "New durable record"
+          },
+          "202": {
+            "description": "Received; Studio application/import is still pending"
+          }
+        },
+        "security": [
+          {
+            "WorkDayToken": []
+          },
+          {
+            "WorkDayCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "X-Upload-Offset",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "X-Content-Sha256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
           }
         }
       }
