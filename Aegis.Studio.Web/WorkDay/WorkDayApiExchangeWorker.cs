@@ -95,8 +95,10 @@ public sealed class WorkDayApiExchangeWorker(
                 try{records=JsonSerializer.Deserialize<List<WorkDayEnrollmentRecord>>(await File.ReadAllTextAsync(path,ct))??[];}
                 catch(JsonException){logger.LogError("WorkDay enrollment file {Path} is invalid; refusing to overwrite it.",path);continue;}
             }
-            if(records.Any(x=>x.UserName.Equals(profile.UserName,StringComparison.OrdinalIgnoreCase)))continue;
-            records.Add(new(profile.UserName,profile.DisplayName,token,result.ExpiresAt));
+            WorkDayEnrollmentRecord replacement=new(profile.UserName,profile.DisplayName,token,result.ExpiresAt);
+            int existingIndex=records.FindIndex(x=>x.UserName.Equals(profile.UserName,StringComparison.OrdinalIgnoreCase));
+            if(existingIndex>=0)records[existingIndex]=replacement;
+            else records.Add(replacement);
             await File.WriteAllTextAsync(path,JsonSerializer.Serialize(records,new JsonSerializerOptions{WriteIndented=true}),ct);
             try{File.SetUnixFileMode(path,UnixFileMode.UserRead|UnixFileMode.UserWrite);}catch(PlatformNotSupportedException){}
             logger.LogInformation("Created one-time WorkDay enrollment for {UserName}; token stored in protected file {Path}.",profile.UserName,path);
