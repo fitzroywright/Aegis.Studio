@@ -230,25 +230,41 @@ public static class FrontDeskBookingRequestEndpoints
         group.MapPost("/gallery-access-requests/{conversationId:guid}/publish",async(Guid conversationId,ClaimsPrincipal user,StudioDatabase db,IConfiguration configuration,CancellationToken ct)=>
         {
             if(!Allowed(user,db))return Results.Forbid();
-            Guid? galleryId;
+            Guid? galleryId=null;bool publicationUpdate=false;
             using(var c=db.OpenConnection())
-            using(var q=new NpgsqlCommand("select gallery_id from studio_website_gallery_access_requests where conversation_id=$1",c))
             {
-                q.Parameters.AddWithValue(conversationId);var value=q.ExecuteScalar();
-                if(value is null)return Results.NotFound();
-                galleryId=value is DBNull?null:(Guid?)value;
+                using(var q=new NpgsqlCommand("select publication_id from studio_gallery_exports where conversation_id=$1 and state='PendingReview'",c))
+                {q.Parameters.AddWithValue(conversationId);if(q.ExecuteScalar() is Guid publication){galleryId=publication;publicationUpdate=true;}}
+                if(galleryId is null)
+                {
+                    using var q=new NpgsqlCommand("select gallery_id from studio_website_gallery_access_requests where conversation_id=$1",c);
+                    q.Parameters.AddWithValue(conversationId);var value=q.ExecuteScalar();
+                    if(value is null)return Results.NotFound();
+                    galleryId=value is DBNull?null:(Guid?)value;
+                }
             }
-            if(galleryId is null)return Results.BadRequest(new{error="This gallery access request has no linked gallery. Link the gallery in Studio before publishing."});
+            if(galleryId is null)return Results.BadRequest(new{error="This request has no linked gallery. Link a gallery in Studio before publishing."});
             try
             {
                 using var site=new PublicSiteClient(configuration);
                 await site.Post($"/api/v1/galleries/{galleryId.Value:D}/publish",new{},ct);
                 using var c=db.OpenConnection();
-                using var q=new NpgsqlCommand("update studio_website_gallery_access_requests set reviewed_by=$2,reviewed_at_utc=now() where conversation_id=$1",c);
-                q.Parameters.AddWithValue(conversationId);q.Parameters.AddWithValue(user.FindFirstValue("login_name")??user.Identity?.Name??"Front Desk");q.ExecuteNonQuery();
+                if(publicationUpdate)
+                {
+                    using var q=new NpgsqlCommand("update studio_gallery_exports set state='Published',last_error=null,updated_at_utc=now() where publication_id=$1 and state='PendingReview'; update studio_conversations set is_closed=true where id=$2",c);
+                    q.Parameters.AddWithValue(galleryId.Value);q.Parameters.AddWithValue(conversationId);q.ExecuteNonQuery();
+                }
+                else
+                {
+                    using var q=new NpgsqlCommand("update studio_website_gallery_access_requests set reviewed_by=$2,reviewed_at_utc=now() where conversation_id=$1; update studio_conversations set is_closed=true where id=$1",c);
+                    q.Parameters.AddWithValue(conversationId);q.Parameters.AddWithValue(user.FindFirstValue("login_name")??user.Identity?.Name??"Front Desk");q.ExecuteNonQuery();
+                }
                 return Results.Ok(new{published=true,galleryId});
             }
-            catch(HttpRequestException ex){return Results.Json(new{error="The Public Site could not publish the gallery. Check that all gallery media is staged, then retry."},statusCode:502);}
+            catch(HttpRequestException)
+            {
+                return Results.Json(new{error="The Public Site could not publish the gallery. Check that all gallery media is staged, then retry."},statusCode:502);
+            }
         });
         group.MapGet("/workspaces",(ClaimsPrincipal user,StudioDatabase db)=>
         {
