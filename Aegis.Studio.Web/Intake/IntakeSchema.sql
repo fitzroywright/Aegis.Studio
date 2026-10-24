@@ -72,3 +72,13 @@ create table if not exists studio_website_gallery_access_requests(
  primary key(source,external_id)
 );
 create index if not exists ix_website_gallery_access_client on studio_website_gallery_access_requests(client_id, imported_at_utc desc);
+
+create table if not exists studio_gallery_exports(
+ publication_id uuid primary key,
+ state text not null,
+ last_error text,
+ updated_at_utc timestamptz not null default now(),
+ conversation_id uuid null references studio_conversations(id),
+ job_id uuid null,
+ client_id uuid null references studio_clients(id)
+);
