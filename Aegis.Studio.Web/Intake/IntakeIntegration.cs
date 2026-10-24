@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Aegis.Studio.Web.FrontDesk;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Scheduling;
 using Aegis.Studio.Web.Workflow;
 using Npgsql;
 namespace Aegis.Studio.Web.Intake;
@@ -75,13 +76,18 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
                 if(p.TryGetProperty("pricingSnapshot",out var quote)&&quote.ValueKind==JsonValueKind.Object)
                 {
                     var requirements=quote.GetProperty("resourceRequirements").EnumerateObject().ToDictionary(x=>x.Name,x=>x.Value.GetInt32(),StringComparer.OrdinalIgnoreCase);
-                    price=new BookingPriceSnapshot(Text(quote,"sessionTypeId"),Text(quote,"sessionType"),quote.GetProperty("catalogRevision").GetInt64(),quote.GetProperty("priceMinor").GetInt64(),quote.GetProperty("depositMinor").GetInt64(),Text(quote,"currency"),requirements);
+                    price=new BookingPriceSnapshot(Text(quote,"sessionTypeId"),Text(quote,"sessionType"),quote.GetProperty("catalogRevision").GetInt64(),quote.GetProperty("priceMinor").GetInt64(),quote.GetProperty("depositMinor").GetInt64(),Text(quote,"currency"),requirements,
+                        quote.TryGetProperty("setupBufferMinutes",out var setup)?setup.GetInt32():0,
+                        quote.TryGetProperty("cleanupBufferMinutes",out var cleanup)?cleanup.GetInt32():0);
                     requiredDeposit=price.DepositMinor/100m;
                 }
                 string bookingSource=Text(p,"source") switch{"Web site"=>"Web site","Workday Mobile"=>"Workday Mobile",_=>"API"};
                 var pending=new PendingBookingRequest(w.Id,name,email,title,DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start,TimeZoneInfo.FindSystemTimeZoneById(Text(p,"timeZone","America/Jamaica"))).DateTime),requiredDeposit,"JMD",Text(p,"notes"),ConversationId:cv,ExternalBookingId:source+":"+external,StartsAtUtc:start,EndsAtUtc:end,Location:string.IsNullOrWhiteSpace(Text(p,"location"))?Text(p,"locationCode") switch {"BK"=>"Kings Plaza","BE"=>"East Queen Street",_=>""}:Text(p,"location"),ClientPhone:Text(p,"clientPhone"),Destination:destination,BookingSource:bookingSource,PriceSnapshot:price);
                 FrontDeskRequestRules.Validate(pending);
                 Guid job=FrontDeskBookingRequestStore.CreatePendingJob(c,tx,pending,"Website import",false);
+                ExternalBookingResourceHolds.CreateForImportedBooking(c,tx,source+":"+external,job,title,pending.Location,
+                    Text(p,"locationCode"),start,end,price?.SetupBufferMinutes??0,price?.CleanupBufferMinutes??0,
+                    price?.ResourceRequirements??new Dictionary<string,int>());
                 requestId=Guid.NewGuid();WorkflowStore.Sql(c,tx,"insert into studio_frontdesk_requests(id,workspace_id,payload,created_by,job_id) values($1,$2,$3::jsonb,'Website import',$4)",requestId,w.Id,JsonSerializer.Serialize(pending,PublicApi.PublicV1Store.Json),job);
             }
         }

@@ -608,6 +608,16 @@
             "type": "string",
             "const": "JMD"
           },
+          "setupBufferMinutes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 480
+          },
+          "cleanupBufferMinutes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 480
+          },
           "resourceRequirements": {
             "type": "object",
             "additionalProperties": {

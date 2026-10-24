@@ -177,7 +177,7 @@ export class IntakeStore {
         const slot=this.db.prepare('SELECT * FROM booking_slots WHERE slot_id=?').get(p.slotId);
         if(!slot||slot.catalog_revision!==catalog.revision||slot.location_code!==p.locationCode||slot.session_type_id!==session.id)fail(409,'slot_unavailable','That time is no longer available. Choose another time.');
         p.startsAt=slot.starts_at;p.endsAt=slot.ends_at;
-        p.sessionType=session.name;p.catalogRevision=catalog.revision;p.pricingSnapshot={sessionTypeId:session.id,sessionType:session.name,catalogRevision:catalog.revision,priceMinor:session.priceMinor,depositMinor:session.depositMinor,currency:session.currency,resourceRequirements:session.resourceRequirements};
+        p.sessionType=session.name;p.catalogRevision=catalog.revision;p.pricingSnapshot={sessionTypeId:session.id,sessionType:session.name,catalogRevision:catalog.revision,priceMinor:session.priceMinor,depositMinor:session.depositMinor,currency:session.currency,resourceRequirements:session.resourceRequirements,setupBufferMinutes:session.setupBufferMinutes,cleanupBufferMinutes:session.cleanupBufferMinutes};
       }
       if ((p.startsAt || p.endsAt) && (!/T.*(?:Z|[+-]\d\d:\d\d)$/.test(p.startsAt) || !/T.*(?:Z|[+-]\d\d:\d\d)$/.test(p.endsAt) || !Number.isFinite(Date.parse(p.startsAt)) || !(Date.parse(p.endsAt) > Date.parse(p.startsAt)))) fail(400,'invalid_schedule','Use ISO timestamps with offsets and end after start.');
       // Reject financial claims rather than accidentally treating them as verification.

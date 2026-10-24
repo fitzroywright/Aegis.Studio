@@ -28,10 +28,11 @@ public sealed class FrontDeskBookingRequestTests
     [Fact]
     public void PublishedPriceSnapshotMustMatchThePendingDeposit()
     {
-        var snapshot=new BookingPriceSnapshot("portrait","Portrait",3,12500,5000,"JMD",new Dictionary<string,int>{{"Photographer",1}});
+        var snapshot=new BookingPriceSnapshot("portrait","Portrait",3,12500,5000,"JMD",new Dictionary<string,int>{{"Photographer",1}},15,15);
         var request=new PendingBookingRequest(Guid.NewGuid(),"Client","client@example.invalid","Portrait",DateOnly.FromDateTime(DateTime.Today.AddDays(2)),50,"JMD",null,PriceSnapshot:snapshot);
         FrontDeskRequestRules.Validate(request);
         Assert.Throws<ArgumentException>(()=>FrontDeskRequestRules.Validate(request with{RequiredDeposit=49}));
+        Assert.Throws<ArgumentException>(()=>FrontDeskRequestRules.Validate(request with{PriceSnapshot=snapshot with{SetupBufferMinutes=481}}));
     }
 
     [StudioPostgresFact]

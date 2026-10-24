@@ -339,6 +339,8 @@ app.MapJobWorkflowGraphs();
 app.MapFrontDeskPosLaunch();
 app.MapJobLifecycle();
 new FrontDeskBookingRequestStore(app.Services.GetRequiredService<StudioDatabase>()).EnsureSchema();
+Aegis.Studio.Web.Scheduling.ExternalBookingResourceHolds.EnsureSchema(app.Services.GetRequiredService<StudioDatabase>());
+Aegis.Studio.Web.Scheduling.ExternalBookingResourceHolds.MapAdminEndpoints(app);
 Aegis.Studio.Web.Workflow.WorkflowSchema.Ensure(app.Services.GetRequiredService<StudioDatabase>());
 app.MapFrontDeskBookingRequests();
 app.MapConnectedWorkflow();

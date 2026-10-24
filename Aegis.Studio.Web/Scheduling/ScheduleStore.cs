@@ -93,7 +93,7 @@ public sealed class ScheduleStore
         LockJob(connection,transaction,request.JobId);
         LockScheduleResources(connection,transaction,request.ResourceIds);
         CheckAvailability(connection,transaction,request.ResourceIds,request.StartsAtUtc,request.EndsAtUtc);
-        IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, null);
+        IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, null,request.JobId);
         if (conflicts.Count > 0) throw new ScheduleConflictException(conflicts);
         using (NpgsqlCommand command = connection.CreateCommand())
         {
@@ -122,7 +122,7 @@ public sealed class ScheduleStore
         Guid[] existing=GetAssignedResources(connection,transaction,id);
         LockScheduleResources(connection,transaction,existing.Concat(request.ResourceIds??[]));
         CheckAvailability(connection,transaction,request.ResourceIds,request.StartsAtUtc,request.EndsAtUtc);
-        IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, id);
+        IReadOnlyList<ScheduleConflict> conflicts = FindConflicts(request.StartsAtUtc, request.EndsAtUtc, request.ResourceIds, id,request.JobId);
         if (conflicts.Count > 0) throw new ScheduleConflictException(conflicts);
         using (NpgsqlCommand command = connection.CreateCommand())
         {
@@ -173,7 +173,7 @@ public sealed class ScheduleStore
         return ids.ToArray();
     }
 
-    public IReadOnlyList<ScheduleConflict> FindConflicts(DateTimeOffset startsAtUtc, DateTimeOffset endsAtUtc, IReadOnlyList<Guid>? resourceIds, Guid? excludingEntryId)
+    public IReadOnlyList<ScheduleConflict> FindConflicts(DateTimeOffset startsAtUtc, DateTimeOffset endsAtUtc, IReadOnlyList<Guid>? resourceIds, Guid? excludingEntryId,Guid? excludingJobId=null)
     {
         if (resourceIds is null || resourceIds.Count == 0) return [];
         using NpgsqlConnection connection = database.OpenConnection();
@@ -190,15 +190,36 @@ public sealed class ScheduleStore
             order by e.starts_at_utc
             """;
         command.Parameters.AddWithValue(resourceIds.ToArray()); command.Parameters.AddWithValue(startsAtUtc.ToUniversalTime()); command.Parameters.AddWithValue(endsAtUtc.ToUniversalTime()); command.Parameters.AddWithValue((object?)excludingEntryId ?? DBNull.Value);
-        using NpgsqlDataReader reader = command.ExecuteReader();
         List<ScheduleConflict> values = [];
-        while (reader.Read()) values.Add(new ScheduleConflict(reader.GetGuid(0),reader.GetString(1),reader.GetGuid(2),reader.GetString(3),reader.GetFieldValue<DateTimeOffset>(4),reader.GetFieldValue<DateTimeOffset>(5)));
+        using(var reader=command.ExecuteReader())
+            while (reader.Read()) values.Add(new ScheduleConflict(reader.GetGuid(0),reader.GetString(1),reader.GetGuid(2),reader.GetString(3),reader.GetFieldValue<DateTimeOffset>(4),reader.GetFieldValue<DateTimeOffset>(5)));
+        using var holds=connection.CreateCommand();
+        holds.CommandText="""
+            select h.id,h.title,r.id,r.name,h.starts_at_utc,h.ends_at_utc
+            from studio_external_booking_holds h join studio_schedule_resources r on r.id=any(h.resource_ids)
+            join studio_jobs j on j.id=h.job_id
+            where h.status='Active' and j.status not in ('Cancelled','Completed') and r.id=any($1)
+              and h.busy_starts_at_utc<$3 and h.busy_ends_at_utc>$2
+              and ($4::uuid is null or h.job_id<>$4)
+            order by h.starts_at_utc
+            """;
+        holds.Parameters.AddWithValue(resourceIds.ToArray());holds.Parameters.AddWithValue(startsAtUtc.ToUniversalTime());holds.Parameters.AddWithValue(endsAtUtc.ToUniversalTime());holds.Parameters.AddWithValue((object?)excludingJobId??DBNull.Value);
+        using(var reader=holds.ExecuteReader())
+            while(reader.Read())values.Add(new ScheduleConflict(reader.GetGuid(0),reader.GetString(1),reader.GetGuid(2),reader.GetString(3),reader.GetFieldValue<DateTimeOffset>(4),reader.GetFieldValue<DateTimeOffset>(5)));
         return values;
     }
 
     public IReadOnlyList<ScheduleResourceOccupancy> GetResourceOccupancy(DateTimeOffset from,DateTimeOffset to)
     {
-        using var c=database.OpenConnection();using var q=new NpgsqlCommand("select er.resource_id,coalesce(er.attendance_start_utc,e.starts_at_utc),coalesce(er.attendance_end_utc,e.ends_at_utc) from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id where e.status<>'Cancelled' and coalesce(er.attendance_start_utc,e.starts_at_utc)<$2 and coalesce(er.attendance_end_utc,e.ends_at_utc)>$1",c);
+        using var c=database.OpenConnection();using var q=new NpgsqlCommand("""
+            select er.resource_id,coalesce(er.attendance_start_utc,e.starts_at_utc),coalesce(er.attendance_end_utc,e.ends_at_utc)
+            from studio_schedule_entries e join studio_schedule_entry_resources er on er.entry_id=e.id
+            where e.status<>'Cancelled' and coalesce(er.attendance_start_utc,e.starts_at_utc)<$2 and coalesce(er.attendance_end_utc,e.ends_at_utc)>$1
+            union all
+            select unnest(h.resource_ids),h.busy_starts_at_utc,h.busy_ends_at_utc
+            from studio_external_booking_holds h join studio_jobs j on j.id=h.job_id
+            where h.status='Active' and j.status not in ('Cancelled','Completed') and h.busy_starts_at_utc<$2 and h.busy_ends_at_utc>$1
+            """,c);
         q.Parameters.AddWithValue(from.ToUniversalTime());q.Parameters.AddWithValue(to.ToUniversalTime());using var r=q.ExecuteReader();var values=new List<ScheduleResourceOccupancy>();while(r.Read())values.Add(new(r.GetGuid(0),r.GetFieldValue<DateTimeOffset>(1),r.GetFieldValue<DateTimeOffset>(2)));return values;
     }
 
@@ -262,7 +283,7 @@ public sealed class ScheduleStore
         Guid[] previous=GetAssignedResources(connection,tx,entryId);
         LockScheduleResources(connection,tx,previous.Concat(next));
         CheckAvailability(connection,tx,next,current.StartsAtUtc,current.EndsAtUtc);
-        IReadOnlyList<ScheduleConflict> conflicts=FindConflicts(current.StartsAtUtc,current.EndsAtUtc,next,entryId);
+        IReadOnlyList<ScheduleConflict> conflicts=FindConflicts(current.StartsAtUtc,current.EndsAtUtc,next,entryId,current.JobId);
         if(conflicts.Count>0) throw new ScheduleConflictException(conflicts);
         using(NpgsqlCommand delete=connection.CreateCommand())
         {
@@ -301,6 +322,8 @@ public sealed class ScheduleStore
         var store=new Aegis.Studio.Web.Production.PhotographerStore(database);
         if(status=="Cancelled"){new Aegis.Studio.Web.WorkDay.WorkDaySchedulingService(database,store).Cancel(job,id,actor);return true;}
         if(status!="Scheduled")throw new InvalidOperationException("Use Scheduled or Cancelled for an unstarted photography assignment; field completion comes from WorkDay.");
+        IReadOnlyList<ScheduleConflict> holdConflicts=FindConflicts(start,end,resources,entry,job);
+        if(holdConflicts.Count>0)throw new ScheduleConflictException(holdConflicts);
         var people=store.GetByScheduleResourceIds(resources).Where(p=>p.IsActive).ToArray();
         var primary=people.FirstOrDefault(p=>p.UserName.Equals(photographer,StringComparison.OrdinalIgnoreCase))??people.FirstOrDefault()??throw new InvalidOperationException("A photography assignment requires an active photographer.");
         var secondary=people.FirstOrDefault(p=>!p.UserName.Equals(primary.UserName,StringComparison.OrdinalIgnoreCase)&&p.UserName.Equals(assistant,StringComparison.OrdinalIgnoreCase))??people.FirstOrDefault(p=>!p.UserName.Equals(primary.UserName,StringComparison.OrdinalIgnoreCase));

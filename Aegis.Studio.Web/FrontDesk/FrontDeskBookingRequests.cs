@@ -8,7 +8,7 @@ using Aegis.Studio.Web.Production;
 
 namespace Aegis.Studio.Web.FrontDesk;
 
-public sealed record BookingPriceSnapshot(string SessionTypeId,string SessionType,long CatalogRevision,long PriceMinor,long DepositMinor,string Currency,IReadOnlyDictionary<string,int> ResourceRequirements);
+public sealed record BookingPriceSnapshot(string SessionTypeId,string SessionType,long CatalogRevision,long PriceMinor,long DepositMinor,string Currency,IReadOnlyDictionary<string,int> ResourceRequirements,int SetupBufferMinutes=0,int CleanupBufferMinutes=0);
 public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null,string? ExternalBookingId=null,DateTimeOffset? StartsAtUtc=null,DateTimeOffset? EndsAtUtc=null,string? Location=null,string? ClientPhone=null,string? Destination=null,string BookingSource="FrontDesk",Guid? JobTemplateId=null,Guid[]? SelectedServiceIds=null,BookingPriceSnapshot? PriceSnapshot=null);
 public sealed record VerifiedDepositRequest(decimal Amount,string Currency,string Provider,string Reference);
 public sealed record FrontDeskRequest(Guid Id,PendingBookingRequest Request,string Status,Guid? JobId,decimal RecordedDeposit,DateTimeOffset CreatedAtUtc);
@@ -25,7 +25,7 @@ public static class FrontDeskRequestRules
         if(request.StartsAtUtc.HasValue != request.EndsAtUtc.HasValue || (request.StartsAtUtc.HasValue && request.EndsAtUtc<=request.StartsAtUtc))throw new ArgumentException("Choose a valid booking time range.");
         if(request.RequiredDeposit<0 || request.RequiredDeposit>999999999 || decimal.Round(request.RequiredDeposit,2)!=request.RequiredDeposit)throw new ArgumentException("Required deposit metadata must be nonnegative.");
         if(!string.Equals(request.Currency.Trim(),"JMD",StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("The current Studio deposit ledger supports JMD only.");
-        if(request.PriceSnapshot is { } price && (string.IsNullOrWhiteSpace(price.SessionTypeId)||price.SessionTypeId.Length>100||string.IsNullOrWhiteSpace(price.SessionType)||price.SessionType.Length>160||price.CatalogRevision<1||price.PriceMinor<0||price.PriceMinor>99_999_999_900||price.DepositMinor<0||price.DepositMinor>price.PriceMinor||price.Currency!="JMD"||request.RequiredDeposit!=price.DepositMinor/100m||price.ResourceRequirements is null||price.ResourceRequirements.Any(x=>string.IsNullOrWhiteSpace(x.Key)||x.Value is <0 or >20)))throw new ArgumentException("The published session price snapshot is invalid.");
+        if(request.PriceSnapshot is { } price && (string.IsNullOrWhiteSpace(price.SessionTypeId)||price.SessionTypeId.Length>100||string.IsNullOrWhiteSpace(price.SessionType)||price.SessionType.Length>160||price.CatalogRevision<1||price.PriceMinor<0||price.PriceMinor>99_999_999_900||price.DepositMinor<0||price.DepositMinor>price.PriceMinor||price.Currency!="JMD"||request.RequiredDeposit!=price.DepositMinor/100m||price.SetupBufferMinutes is <0 or >480||price.CleanupBufferMinutes is <0 or >480||price.ResourceRequirements is null||price.ResourceRequirements.Any(x=>string.IsNullOrWhiteSpace(x.Key)||x.Value is <0 or >20)))throw new ArgumentException("The published session price snapshot is invalid.");
     }
     public static void ValidateMoney(decimal amount,string currency)
     {
