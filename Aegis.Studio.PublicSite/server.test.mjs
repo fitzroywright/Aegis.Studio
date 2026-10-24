@@ -1,22 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer, sign, mapWorkDayStudioPath, workDayProxyRequestHeaders } from './server.mjs';
+import { createServer, sign } from './server.mjs';
 
-test('WorkDay mobile paths stay on the API Site gateway and map only to approved Studio field routes',()=>{
- assert.equal(mapWorkDayStudioPath('/api/v1/auth/login','POST'),'/api/auth/login');
- assert.equal(mapWorkDayStudioPath('/api/v1/workday/bootstrap','GET'),'/api/workday/bootstrap');
- assert.equal(mapWorkDayStudioPath('/api/v1/workday/assignments/123e4567-e89b-12d3-a456-426614174000/uploads','POST'),'/api/workday/assignments/123e4567-e89b-12d3-a456-426614174000/uploads');
- assert.equal(mapWorkDayStudioPath('/api/v1/messages/threads/123e4567-e89b-12d3-a456-426614174000','GET'),'/api/messages/threads/123e4567-e89b-12d3-a456-426614174000');
- assert.equal(mapWorkDayStudioPath('/api/v1/notifications','GET'),'/api/notifications');
- assert.equal(mapWorkDayStudioPath('/api/v1/workday/fleet','GET'),null);
- assert.equal(mapWorkDayStudioPath('/api/v1/admin/integration-keys','GET'),null);
- assert.equal(mapWorkDayStudioPath('/api/v1/conversations/not-a-guid/messages','POST'),null);
- const input={host:'api.bryanstudiosltd.com',cookie:'studio-cookie',authorization:'must-not-forward','x-aegis-workday-token':'device-token'};
- const field=workDayProxyRequestHeaders('/api/v1/workday/bootstrap',input,'studio.bryanstudiosltd.com','127.0.0.1');
- const message=workDayProxyRequestHeaders('/api/v1/messages/threads',input,'studio.bryanstudiosltd.com','127.0.0.1');
- assert.equal(field['x-aegis-workday-token'],'device-token');assert.equal(message['x-aegis-workday-token'],undefined);
- assert.equal(field.authorization,undefined);assert.equal(message.cookie,'studio-cookie');
-});
 async function fixture(t, extra = {}) {
   const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', INTAKE_DB_PATH: ':memory:', PUBLIC_API_PROVISIONING_TOKEN:'test-site-provisioning-token-at-least-32-chars', ...extra };
   const server = createServer(env);
@@ -32,6 +17,31 @@ async function publishTestBooking(origin,provision='test-site-provisioning-token
  const available=await fetch(base+'/admin/booking/availability',{method:'PUT',headers:{...headers,'Idempotency-Key':'test-availability-1'},body:JSON.stringify({slots})});assert.equal(available.status,200);
  return {revision:catalog.revision,slots};
 }
+test('WorkDay mobile writes to the API exchange and Studio synchronizes outbound',async t=>{
+ const origin=await fixture(t),base=origin+'/api/v1',provision='test-site-provisioning-token-at-least-32-chars';
+ const createdKey=await fetch(base+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Studio WorkDay Sync',clientApplication:'Studio',scopes:['workday:sync']})});
+ assert.equal(createdKey.status,201);const secret=(await createdKey.json()).secret,studio={Authorization:'Bearer '+secret,'Content-Type':'application/json'};
+ const provisioned=await fetch(base+'/admin/workday/users',{method:'POST',headers:studio,body:JSON.stringify({userName:'photographer.one',displayName:'Photographer One'})});
+ assert.equal(provisioned.status,201);const account=await provisioned.json();assert.ok(account.enrollmentToken);
+ const enrolled=await fetch(base+'/workday/enroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enrollmentToken:account.enrollmentToken,password:'workday-passphrase-1'})});
+ assert.equal(enrolled.status,200);
+ const login=await fetch(base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:'photographer.one',password:'workday-passphrase-1'})});
+ assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0];
+ const snapshot={userName:'photographer.one',displayName:'Photographer One',serverTimeUtc:new Date().toISOString(),today:[],upcoming:[],activeWorkSession:null,locationTrackingEnabled:false,locationTrackingMode:'Disabled',generatedAtUtc:new Date().toISOString(),availability:[],timeSummary:null};
+ const published=await fetch(base+'/admin/workday/snapshots',{method:'PUT',headers:studio,body:JSON.stringify({userName:'photographer.one',revision:1,snapshot})});assert.equal(published.status,200);
+ const device=await fetch(base+'/workday/device-session',{method:'POST',headers:{Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({deviceId:'test-device'})});
+ assert.equal(device.status,200);const deviceToken=(await device.json()).token;
+ const bootstrap=await fetch(base+'/workday/bootstrap',{headers:{'X-Aegis-WorkDay-Token':deviceToken}});assert.equal(bootstrap.status,200);assert.equal((await bootstrap.json()).displayName,'Photographer One');
+ const operationId='33333333-3333-4333-8333-333333333333',operation={operationId,kind:'Arrive',assignmentId:'44444444-4444-4444-8444-444444444444',occurredAtUtc:new Date().toISOString(),deviceId:'test-device'};
+ const sent=await fetch(base+'/workday/operations',{method:'POST',headers:{'X-Aegis-WorkDay-Token':deviceToken,'Content-Type':'application/json'},body:JSON.stringify(operation)});
+ assert.equal(sent.status,202);assert.equal((await sent.json()).state,'Pending');
+ const pending=await fetch(base+'/admin/workday/updates?after=0&limit=100&kind=Operation',{headers:{Authorization:'Bearer '+secret}});
+ assert.equal(pending.status,200);assert.equal((await pending.json()).items[0].operationId,operationId);
+ const acknowledged=await fetch(base+'/admin/workday/updates/'+operationId+'/result',{method:'POST',headers:studio,body:JSON.stringify({state:'Acknowledged',message:'Saved in Studio',serverVersion:2})});
+ assert.equal(acknowledged.status,200);
+ const status=await fetch(base+'/workday/operations/'+operationId,{headers:{'X-Aegis-WorkDay-Token':deviceToken}});
+ assert.equal((await status.json()).state,'Acknowledged');
+});
 test('signing binds method, path, exact body and idempotency key', () => {
   const body = Buffer.from('{"ok":true}');
   const expected = sign('secret', 'POST', '/api/public/v1/bookings', '1', 'nonce', body, 'booking-1');
