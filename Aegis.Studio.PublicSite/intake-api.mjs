@@ -1,6 +1,7 @@
 import { randomUUID, randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import { readRosterFile } from './roster-file.mjs';
 import { IntakeStore, validateRoster, fail } from './intake-store.mjs';
+import { WorkDayExchangeStore } from './workday-exchange-store.mjs';
 import { join } from 'node:path';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,6 +11,15 @@ const run = promisify(execFile);
 const equal=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&timingSafeEqual(x,y);};
 export function createIntakeApi(env,readBody,json) {
   const store=new IntakeStore(env.INTAKE_DB_PATH || './data/intake.sqlite');
+  const workdayStore=new WorkDayExchangeStore(env.WORKDAY_EXCHANGE_DB_PATH||env.INTAKE_DB_PATH||'./data/intake.sqlite');
+  function workdayToken(req){
+    const header=String(req.headers['x-aegis-workday-token']||'');
+    if(header)return header;
+    const cookie=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('aegis_workday_session='));
+    return cookie?cookie.slice('aegis_workday_session='.length):'';
+  }
+  function requireWorkday(req){const identity=workdayStore.authenticate(workdayToken(req));if(!identity)fail(401,'workday_unauthorized','Sign in to WorkDay again.');return identity;}
+
   let credentials;try{credentials=JSON.parse(env.PUBLIC_API_KEYS_JSON || '[]');}catch{throw Error('Invalid PUBLIC_API_KEYS_JSON');}
   if(!Array.isArray(credentials)||credentials.some(c=>!c.id||typeof c.id!=='string'||typeof c.secret!=='string'||c.secret.length<32||!Array.isArray(c.scopes))||new Set(credentials.map(c=>c.id)).size!==credentials.length)throw Error('Configure unique integration credential IDs, secrets of at least 32 characters, and scopes.');
   const rates=new Map();
@@ -45,8 +55,77 @@ export function createIntakeApi(env,readBody,json) {
     try{const path=join(dir,'upload');await writeFile(path,bytes,{mode:0o600});await run(env.MALWARE_SCANNER_PATH,['--no-summary',path],{timeout:30000,maxBuffer:4096});return {state:'Clean',type};}
     catch{return {state:'Quarantined',type};}finally{await rm(dir,{recursive:true,force:true});}
   }
-  return {store,async handle(req,res,url){
+  return {store,workdayStore,async handle(req,res,url){
     const route=url.pathname, method=req.method;
+    if(route==='/api/v1/auth/login'&&method==='POST'){
+      const p=await input(req,8192),result=workdayStore.login(p.userName,p.password,p.deviceId||'');
+      json(res,200,{userName:result.userName,displayName:result.displayName,expiresAt:result.expiresAt},{'Set-Cookie':`aegis_workday_session=${result.token}; Path=/api/v1/; HttpOnly; SameSite=Lax; Max-Age=28800${env.NODE_ENV==='production'?'; Secure':''}`,'Cache-Control':'no-store'});return true;
+    }
+    if(route==='/api/v1/auth/logout'&&method==='POST'){
+      workdayStore.revoke(workdayToken(req));json(res,200,{signedOut:true},{'Set-Cookie':'aegis_workday_session=; Path=/api/v1/; HttpOnly; SameSite=Lax; Max-Age=0'});return true;
+    }
+    if(route==='/api/v1/auth/me'&&method==='GET'){
+      const user=requireWorkday(req);json(res,200,{userName:user.user_name,displayName:user.display_name});return true;
+    }
+    if(route==='/api/v1/workday/enroll'&&method==='POST'){
+      const p=await input(req,8192),user=workdayStore.enroll(p.enrollmentToken,p.password);
+      json(res,200,user,{'Cache-Control':'no-store'});return true;
+    }
+    if(route==='/api/v1/admin/workday/users'&&method==='POST'){
+      authenticate(req,'workday:sync');const result=workdayStore.provisionAccount(await input(req,16384));
+      json(res,201,result,{'Cache-Control':'no-store'});return true;
+    }
+    if(route==='/api/v1/admin/workday/snapshots'&&method==='PUT'){
+      authenticate(req,'workday:sync');const p=await input(req,5_000_000);
+      json(res,200,workdayStore.publishSnapshot(p.userName,p.revision,p.snapshot));return true;
+    }
+    if(route==='/api/v1/admin/workday/updates'&&method==='GET'){
+      authenticate(req,'workday:sync');const after=Math.max(0,Number(url.searchParams.get('after')||0)),limit=Math.max(1,Math.min(500,Number(url.searchParams.get('limit')||100)));
+      json(res,200,{items:workdayStore.pendingUpdates(after,limit)});return true;
+    }
+    const workdayResult=route.match(/^\\/api\\/v1\\/admin\\/workday\\/updates\\/([0-9a-f-]{36})\\/result$/i);
+    if(workdayResult&&method==='POST'){
+      authenticate(req,'workday:sync');json(res,200,workdayStore.completeUpdate(workdayResult[1],await input(req,65536)));return true;
+    }
+    if(route==='/api/v1/workday/bootstrap'&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      if(!snapshot)fail(503,'workday_snapshot_pending','Studio has not published this WorkDay account yet.');
+      json(res,200,snapshot,{'Cache-Control':'private, no-store'});return true;
+    }
+    if(route==='/api/v1/workday/operations'&&method==='POST'){
+      const user=requireWorkday(req),p=await input(req,65536),result=workdayStore.enqueue(user.user_name,p.operationId,p.kind,p);
+      json(res,202,result,{'Cache-Control':'no-store'});return true;
+    }
+    const workdayStatus=route.match(/^\\/api\\/v1\\/workday\\/operations\\/([0-9a-f-]{36})$/i);
+    if(workdayStatus&&method==='GET'){
+      const user=requireWorkday(req),result=workdayStore.updateStatus(user.user_name,workdayStatus[1]);
+      if(!result)fail(404,'not_found','WorkDay operation not found.');
+      json(res,200,result,{'Cache-Control':'no-store'});return true;
+    }
+    if(route==='/api/v1/workday/client-observation'&&method==='POST'){
+      const user=requireWorkday(req),p=await input(req,16384);
+      if(typeof p.deviceId!=='string'||!p.deviceId||p.deviceId.length>200)fail(400,'invalid_observation','Device ID is required.');
+      workdayStore.observe(user.user_name,p.deviceId,p);json(res,202,{accepted:true});return true;
+    }
+    if(route==='/api/v1/workday/availability'&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      if(!snapshot)fail(503,'workday_snapshot_pending','Studio has not published availability yet.');
+      json(res,200,snapshot.availability||[],{'Cache-Control':'private, no-store'});return true;
+    }
+    if(route==='/api/v1/workday/time-summary'&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      if(!snapshot)fail(503,'workday_snapshot_pending','Studio has not published time summaries yet.');
+      json(res,200,snapshot.timeSummary||null,{'Cache-Control':'private, no-store'});return true;
+    }
+    if(route==='/api/v1/notifications'&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      json(res,200,snapshot?.notifications||[],{'Cache-Control':'private, no-store'});return true;
+    }
+    if(route==='/api/v1/messages/threads'&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      json(res,200,snapshot?.threads||[],{'Cache-Control':'private, no-store'});return true;
+    }
+
     const keyCollection='/api/v1/admin/integration-keys',keyItem=route.match(/^\/api\/v1\/admin\/integration-keys\/([0-9a-f-]{36})$/i);
     if(route===keyCollection&&['GET','POST'].includes(method)){
       authenticateProvisioning(req);
