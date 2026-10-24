@@ -55,7 +55,11 @@ export class WorkDayExchangeStore {
     if(!account)throw Object.assign(new Error('WorkDay account is not active.'),{status:404,code:'account_not_found'});
     const token=randomBytes(32).toString('base64url'),now=this.now(),expires=new Date(now.getTime()+90*24*60*60*1000).toISOString();
     this.db.prepare('INSERT INTO workday_sessions(token_hash,user_key,device_id,created_at,expires_at) VALUES(?,?,?,?,?)').run(hash(token),key,String(deviceId||'').slice(0,200),now.toISOString(),expires);
-    return {sessionId:randomUUID(),token,expiresAt:expires,userName:account.user_name,displayName:account.display_name};
+    return {sessionId:randomUUID(),token,expiresAtUtc:expires,userName:account.user_name,displayName:account.display_name};
+  }
+  revokeDevice(userName,deviceId) {
+    const key=String(userName||'').trim().toLowerCase();
+    return this.db.prepare("UPDATE workday_sessions SET revoked_at=? WHERE user_key=? AND device_id=? AND revoked_at IS NULL").run(this.now().toISOString(),key,String(deviceId||'')).changes>0;
   }
   revoke(token) { return this.db.prepare('UPDATE workday_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL').run(this.now().toISOString(),hash(token)).changes>0; }
   publishSnapshot(userName,revision,payload) {
