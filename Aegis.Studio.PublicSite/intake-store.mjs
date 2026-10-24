@@ -43,7 +43,7 @@ export class IntakeStore {
       CREATE TABLE IF NOT EXISTS attachments(id TEXT PRIMARY KEY,intake_id TEXT,metadata TEXT,content BLOB,state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS galleries(id TEXT PRIMARY KEY,client_id TEXT NOT NULL,payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS api_credentials(id TEXT PRIMARY KEY,name TEXT NOT NULL,secret_hash TEXT NOT NULL UNIQUE,scopes TEXT NOT NULL,created_at TEXT NOT NULL,last_used_at TEXT,revoked_at TEXT,client_application TEXT NOT NULL DEFAULT 'API');
-      CREATE TABLE IF NOT EXISTS client_link_challenges(id TEXT PRIMARY KEY,code_hash TEXT NOT NULL UNIQUE,client_id TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT,revoked_at TEXT,created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS client_link_challenges(id TEXT PRIMARY KEY,code_hash TEXT NOT NULL UNIQUE,client_id TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT,revoked_at TEXT,created_at TEXT NOT NULL,provider TEXT);
       CREATE TABLE IF NOT EXISTS client_identity_links(provider TEXT NOT NULL,subject TEXT NOT NULL,client_id TEXT NOT NULL,verified_at TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(provider,subject));
       CREATE TABLE IF NOT EXISTS media(gallery_id TEXT,id TEXT,type TEXT,content BLOB,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS selections(gallery_id TEXT,id TEXT,selected INTEGER,PRIMARY KEY(gallery_id,id));
@@ -52,6 +52,7 @@ export class IntakeStore {
       CREATE TABLE IF NOT EXISTS booking_slots(slot_id TEXT PRIMARY KEY,location_code TEXT NOT NULL,session_type_id TEXT NOT NULL,starts_at TEXT NOT NULL,ends_at TEXT NOT NULL,catalog_revision INTEGER NOT NULL,published_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS booking_slot_reservations(slot_id TEXT PRIMARY KEY REFERENCES booking_slots(slot_id),intake_id TEXT NOT NULL UNIQUE REFERENCES intakes(id),reserved_at TEXT NOT NULL);`);
     if(!this.db.prepare('PRAGMA table_info(api_credentials)').all().some(x=>x.name==='client_application'))this.db.exec("ALTER TABLE api_credentials ADD COLUMN client_application TEXT NOT NULL DEFAULT 'API'");
+    if(!this.db.prepare('PRAGMA table_info(client_link_challenges)').all().some(x=>x.name==='provider'))this.db.exec('ALTER TABLE client_link_challenges ADD COLUMN provider TEXT');
   }
   transaction(action) { this.db.exec('BEGIN IMMEDIATE'); try { const result = action(); this.db.exec('COMMIT'); return result; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
   createApiCredential(name, scopes, clientApplication='API') {
@@ -141,12 +142,21 @@ export class IntakeStore {
       if(!row||row.used_at||row.revoked_at||Date.parse(row.expires_at)<=this.now().getTime()) fail(404,'link_proof_unavailable','Link proof is invalid, expired, used, or revoked.');
       const existing=this.db.prepare('SELECT client_id FROM client_identity_links WHERE provider=? AND subject=? AND revoked_at IS NULL').get(provider,subject);
       if(existing&&existing.client_id!==row.client_id) fail(409,'identity_already_linked','This sign-in identity is already linked to another client.');
-      this.db.prepare('UPDATE client_link_challenges SET used_at=? WHERE id=? AND used_at IS NULL AND revoked_at IS NULL').run(this.now().toISOString(),row.id);
+      this.db.prepare('UPDATE client_link_challenges SET used_at=?,provider=? WHERE id=? AND used_at IS NULL AND revoked_at IS NULL').run(this.now().toISOString(),provider,row.id);
       this.db.prepare('INSERT INTO client_identity_links(provider,subject,client_id,verified_at) VALUES(?,?,?,?) ON CONFLICT(provider,subject) DO UPDATE SET client_id=excluded.client_id,verified_at=excluded.verified_at,revoked_at=NULL').run(provider,subject,row.client_id,this.now().toISOString());
       return {clientId:row.client_id,provider,verifiedAt:this.now().toISOString()};
     });
   }
   clientForIdentity(provider,subject) { return this.db.prepare('SELECT client_id FROM client_identity_links WHERE provider=? AND subject=? AND revoked_at IS NULL').get(provider,subject)?.client_id||null; }
+  clientLinkProofs(clientId) {
+    const rows=this.db.prepare('SELECT id,client_id,created_at,expires_at,used_at,revoked_at,provider FROM client_link_challenges WHERE (? IS NULL OR client_id=?) ORDER BY created_at DESC').all(clientId||null,clientId||null);
+    return rows.map(r=>({id:r.id,clientId:r.client_id,createdAt:r.created_at,expiresAt:r.expires_at,usedAt:r.used_at||null,revokedAt:r.revoked_at||null,provider:r.provider||null,status:r.revoked_at?'Revoked':r.used_at?'Used':Date.parse(r.expires_at)<=this.now().getTime()?'Expired':'Pending'}));
+  }
+  clientLinkProof(id) { return this.clientLinkProofs(null).find(x=>x.id===id)||null; }
+  revokeClientLinkProof(id) {
+    const r=this.db.prepare('UPDATE client_link_challenges SET revoked_at=? WHERE id=? AND used_at IS NULL AND revoked_at IS NULL AND expires_at>?').run(this.now().toISOString(),id,this.now().toISOString());
+    return r.changes>0;
+  }
   revokeClientIdentity(provider,subject) { return this.db.prepare('UPDATE client_identity_links SET revoked_at=? WHERE provider=? AND subject=? AND revoked_at IS NULL').run(this.now().toISOString(),provider,subject).changes>0; }
   replay(owner, key, payload, action) {
     if (!/^[A-Za-z0-9._-]{1,100}$/.test(key || '')) fail(400, 'idempotency_required', 'Provide Idempotency-Key (1–100 letters, digits, dots, underscores or dashes).');
