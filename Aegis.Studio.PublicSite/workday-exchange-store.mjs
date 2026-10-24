@@ -23,10 +23,16 @@ export class WorkDayExchangeStore {
   provisionAccount(input) {
     if(!input||typeof input.userName!=='string'||!input.userName.trim()||input.userName.length>200||typeof input.displayName!=='string'||input.displayName.length>200)throw Object.assign(new Error('A user name and display name are required.'),{status:400,code:'invalid_account'});
     const userKey=input.userName.trim().toLowerCase(),userName=input.userName.trim(),displayName=input.displayName.trim();
-    const existing=this.db.prepare('SELECT password_hash FROM workday_accounts WHERE user_key=?').get(userKey),now=this.now();
+    const existing=this.db.prepare('SELECT password_hash,enrollment_expires FROM workday_accounts WHERE user_key=?').get(userKey),now=this.now();
     if(existing){
       this.db.prepare('UPDATE workday_accounts SET user_name=?,display_name=?,active=1,updated_at=? WHERE user_key=?').run(userName,displayName,now.toISOString(),userKey);
-      return {userName,displayName,enrollmentRequired:!existing.password_hash};
+      if(existing.password_hash)return {userName,displayName,enrollmentRequired:false};
+      if(existing.enrollment_expires&&Date.parse(existing.enrollment_expires)>now.getTime())
+        return {userName,displayName,enrollmentRequired:true};
+      const enrollmentToken=randomBytes(32).toString('base64url'),expires=new Date(now.getTime()+24*60*60*1000).toISOString();
+      this.db.prepare('UPDATE workday_accounts SET enrollment_hash=?,enrollment_expires=?,updated_at=? WHERE user_key=?')
+        .run(hash(enrollmentToken),expires,now.toISOString(),userKey);
+      return {userName,displayName,enrollmentRequired:true,enrollmentToken,expiresAt:expires};
     }
     const enrollmentToken=randomBytes(32).toString('base64url'),expires=new Date(now.getTime()+24*60*60*1000).toISOString();
     this.db.prepare('INSERT INTO workday_accounts(user_key,user_name,display_name,active,enrollment_hash,enrollment_expires,created_at,updated_at) VALUES(?,?,?,1,?,?,?,?)').run(userKey,userName,displayName,hash(enrollmentToken),expires,now.toISOString(),now.toISOString());
