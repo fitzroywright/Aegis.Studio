@@ -1,5 +1,6 @@
 using Aegis.Studio.WorkDay.Core;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Net.Http.Json;
 
 namespace Aegis.Studio.WorkDay;
@@ -114,9 +115,24 @@ public sealed class WorkDayApiClient
 
     public async Task<PhotographerAvailabilityDto> AddAvailabilityAsync(DateTimeOffset startsAtUtc,DateTimeOffset endsAtUtc,string availabilityType,string? note,Guid? operationId=null,CancellationToken ct=default)
     {
-        using HttpResponseMessage r=await http.PostAsJsonAsync("workday/availability",new{startsAtUtc,endsAtUtc,availabilityType,note,operationId},ct);
-        if(!r.IsSuccessStatusCode)throw new HttpRequestException(await ErrorAsync(r,ct),null,r.StatusCode);
-        return await r.Content.ReadFromJsonAsync<PhotographerAvailabilityDto>(cancellationToken:ct)??throw new InvalidOperationException("Studio did not return the availability entry.");
+        Guid id=operationId??Guid.NewGuid();
+        using HttpResponseMessage response=await http.PostAsJsonAsync("workday/availability",new{startsAtUtc,endsAtUtc,availabilityType,note,operationId=id},ct);
+        if(!response.IsSuccessStatusCode)throw new HttpRequestException(await ErrorAsync(response,ct),null,response.StatusCode);
+        if(response.StatusCode!=System.Net.HttpStatusCode.Accepted)
+            return await response.Content.ReadFromJsonAsync<PhotographerAvailabilityDto>(cancellationToken:ct)
+                ??throw new InvalidOperationException("The API Site returned no availability receipt.");
+        DateTimeOffset deadline=DateTimeOffset.UtcNow.AddMinutes(2);
+        while(DateTimeOffset.UtcNow<deadline)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3),ct);
+            using HttpResponseMessage status=await http.GetAsync($"workday/operations/{id:D}",ct);status.EnsureSuccessStatusCode();
+            using JsonDocument payload=JsonDocument.Parse(await status.Content.ReadAsStringAsync(ct));
+            JsonElement root=payload.RootElement;string state=root.GetProperty("state").GetString()??"Pending";
+            if(state=="Conflict")throw new HttpRequestException(root.TryGetProperty("result",out var failure)&&failure.TryGetProperty("message",out var detail)?detail.GetString():"Studio rejected availability.",null,System.Net.HttpStatusCode.Conflict);
+            if(state=="Acknowledged"&&root.TryGetProperty("result",out var stored)&&stored.TryGetProperty("result",out var value))
+                return value.Deserialize<PhotographerAvailabilityDto>()??throw new InvalidOperationException("Studio returned no saved availability.");
+        }
+        throw new HttpRequestException("Studio has not processed this availability update; the API Site will keep it for retry.");
     }
 
     private static async Task<string> ErrorAsync(HttpResponseMessage response,CancellationToken ct)
