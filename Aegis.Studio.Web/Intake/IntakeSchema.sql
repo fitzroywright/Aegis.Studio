@@ -67,6 +67,8 @@ create table if not exists studio_website_gallery_access_requests(
  conversation_id uuid not null references studio_conversations(id),
  payload jsonb not null,
  imported_at_utc timestamptz not null default now(),
+ reviewed_by text,
+ reviewed_at_utc timestamptz,
  primary key(source,external_id)
 );
 create index if not exists ix_website_gallery_access_client on studio_website_gallery_access_requests(client_id, imported_at_utc desc);
