@@ -848,6 +848,9 @@
                                 <div><button class="primary" type="button" data-catalog-save>Save session type</button> <button class="action" type="button" data-catalog-reset>Clear form</button></div><p data-catalog-status role="status"></p>
                                 <div data-catalog-list></div>
                             </div>
+                        </section><section class="admin-card" id="galleryClientLinkAdmin">
+                            <header class="admin-card-header"><div><h2>Client gallery identity proofs</h2><p>Issue a single use code for a real Studio client. The client enters it after signing in to the public Gallery site.</p></div></header>
+                            <div class="admin-form-stack"><label>Studio Client ID<input data-link-client-id placeholder="Client UUID"></label><button class="primary" type="button" data-link-create>Create proof</button><p data-link-status role="status"></p><label data-link-code-wrap hidden>Show this code to the client now<input data-link-code readonly></label><button class="action" type="button" data-link-copy hidden>Copy code</button><div data-link-list></div></div>
                         </section><section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
                                 <div><h2>Demo Data</h2><p>Rebuild the complete Studio demo with job templates, workflows, genuine photographs, bookings, schedules and payments.</p></div>
@@ -906,6 +909,14 @@
             const hoursField=field('hours');bookingCatalogPanel.querySelector('[data-catalog-save-hours]').onclick=async()=>{try{const hours=JSON.parse(hoursField.value||'[]');const result=await json('/api/admin/public-booking/hours',{method:'PUT',body:JSON.stringify(hours)});status.textContent=`Saved Studio booking hours at catalog revision ${result.revision}.`; }catch(error){status.textContent='Hours save failed: '+error.message;}};
             json('/api/admin/public-booking/hours').then(hours=>{hoursField.value=JSON.stringify(hours,null,2);}).catch(error=>{status.textContent='Could not load public booking hours: '+error.message;});
             json('/api/admin/public-booking/session-types/').then(result=>{catalogRows=result.sessionTypes||[];render();status.textContent=`Studio catalog revision ${result.revision}.`;}).catch(error=>{status.textContent='Could not load session types: '+error.message;});
+        }
+
+        const linkPanel=document.getElementById('galleryClientLinkAdmin');
+        if(linkPanel){
+            const status=linkPanel.querySelector('[data-link-status]'),list=linkPanel.querySelector('[data-link-list]'),code=linkPanel.querySelector('[data-link-code]'),copy=linkPanel.querySelector('[data-link-copy]');
+            const refresh=async()=>{try{const result=await json('/api/admin/gallery-client-links/');list.innerHTML=(result.items||[]).map(x=>`<article class="admin-list-row"><div><strong>${esc(x.clientId)}</strong><p>${esc(x.status)} · expires ${esc(x.expiresAt)}${x.provider?' · '+esc(x.provider):''}</p></div>${x.status==='Pending'?`<button type="button" class="action" data-revoke="${esc(x.id)}">Revoke</button>`:''}</article>`).join('')||'<p class="muted">No client identity proofs yet.</p>';list.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{try{await json('/api/admin/gallery-client-links/'+b.dataset.revoke,{method:'DELETE'});await refresh();}catch(e){status.textContent='Revoke failed: '+e.message;}});}catch(e){list.textContent='Proof status unavailable: '+e.message;}};
+            linkPanel.querySelector('[data-link-create]').onclick=async()=>{const clientId=linkPanel.querySelector('[data-link-client-id]').value.trim();status.textContent='';code.value='';linkPanel.querySelector('[data-link-code-wrap]').hidden=true;copy.hidden=true;try{const proof=await json('/api/admin/gallery-client-links/',{method:'POST',body:JSON.stringify({clientId})});code.value=proof.code;linkPanel.querySelector('[data-link-code-wrap]').hidden=false;copy.hidden=false;status.textContent=`Proof expires ${proof.expiresAt}. This code is shown once; give it directly to the client.`;await refresh();}catch(e){status.textContent='Could not create proof: '+e.message;}};
+            copy.onclick=async()=>{await navigator.clipboard.writeText(code.value);status.textContent='Code copied. Give it directly to the client.';};refresh();
         }
 
         const statusPanel=document.querySelector('[data-service-status]');
