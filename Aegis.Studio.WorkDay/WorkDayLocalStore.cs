@@ -159,10 +159,14 @@ public sealed class WorkDayLocalStore
         finally{initialization.Release();}
     }
 
+    private static string AccountServer(Uri server)=>server.Host.Equals("api.bryanstudiosltd.com",StringComparison.OrdinalIgnoreCase)
+        ?"https://studio.bryanstudiosltd.com":server.GetLeftPart(UriPartial.Authority);
+    private static string AccountServer(string server)=>Uri.TryCreate(server,UriKind.Absolute,out Uri? parsed)?AccountServer(parsed):server.TrimEnd('/');
+
     public async Task BindAccountAsync(Uri server,string userName)
     {
         await InitializeAsync();
-        string scope=server.AbsoluteUri.TrimEnd('/')+"|"+userName.Trim().ToLowerInvariant();
+        string accountServer=AccountServer(server);string scope=accountServer+"|"+userName.Trim().ToLowerInvariant();
         LocalMetadata? current=await db.Table<LocalMetadata>().Where(x=>x.Key=="AccountScope").FirstOrDefaultAsync();
         if(current is not null&&current.Value!=scope)
             throw new InvalidOperationException("This device contains another Studio account's offline data. Recover that account's reports before changing device enrollment.");
@@ -170,7 +174,7 @@ public sealed class WorkDayLocalStore
         {
             string previousUser=Preferences.Default.Get("WorkDay.UserName","");
             string previousServer=Preferences.Default.Get("WorkDay.ServerUrl","").TrimEnd('/');
-            if(previousUser.Length>0&&(!previousUser.Equals(userName,StringComparison.OrdinalIgnoreCase)||previousServer!=server.AbsoluteUri.TrimEnd('/')))
+            if(previousUser.Length>0&&(!previousUser.Equals(userName,StringComparison.OrdinalIgnoreCase)||AccountServer(previousServer)!=accountServer))
                 throw new InvalidOperationException("Recover the previous account's cached reports before changing this device's Studio account.");
             await db.InsertOrReplaceAsync(new LocalMetadata{Key="AccountScope",Value=scope});
         }
