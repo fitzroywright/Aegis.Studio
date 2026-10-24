@@ -77,7 +77,7 @@ Idempotency-Key: <unique-request-key>
 Content-Type: application/json
 ```
 
-The JSON body contains `clientId`, `clientName`, and `clientEmail`; `galleryId` and `notes` are optional. The response means the request is queued, not that a gallery is published.
+The JSON body requires `clientId`, `galleryId`, `clientName`, and `clientEmail`; `notes` are optional. The API checks that the gallery belongs to that client. The response means the request is queued, not that a gallery is published.
 
 Studio polls `GET /api/v1/gallery-access-requests` with `gallery:access:pull`, imports each request into Front Desk, and acknowledges it at `POST /api/v1/gallery-access-requests/{id}/ack` with `gallery:access:ack`. Front Desk staff publish through Studio's existing `gallery:publish` permission. The External Site never receives gallery publication permission.
 
