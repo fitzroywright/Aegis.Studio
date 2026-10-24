@@ -37,7 +37,7 @@ public sealed class OutboundEmailWorker : BackgroundService
                 {
                     Guid lease=Guid.NewGuid();var message=outbox.ClaimNext(channels.Keys.ToArray(),lease);if(message is null)break;
                     bool providerAccepted=false;
-                    logger.LogInformation("Outbound delivery attempt started. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} Attempt={Attempt} Sender={Sender}", message.Id, message.DeliveryChannel, message.ToAddress, message.Attempts, message.FromAddress);
+                    logger.LogInformation(new EventId(22110, "OutboundDeliveryAttemptStarted"), "Outbound delivery attempt started. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} Attempt={Attempt} Sender={Sender} ConversationId={ConversationId} StudioMessageId={StudioMessageId} CorrelationId={CorrelationId}", message.Id, message.DeliveryChannel, message.ToAddress, message.Attempts, message.FromAddress, message.ConversationId, message.StudioMessageId, message.Id.ToString("D"));
                     try
                     {
                         var transport=channels[message.DeliveryChannel];
@@ -79,17 +79,17 @@ public sealed class OutboundEmailWorker : BackgroundService
                         }
                         var request=new MessageRequest{RecipientIds=[message.ToAddress],Title=subject,Body=body,BodyIsHtml=false,Channels=channel,Source="Aegis.Studio",CorrelationId=message.Id.ToString("D"),Attachments=files,Metadata=metadata};
                         DateTimeOffset sendingAt=DateTimeOffset.UtcNow.AddMinutes(-1);
-                        logger.LogInformation("Submitting outbound delivery to provider. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} CorrelationId={CorrelationId}", message.Id, message.DeliveryChannel, message.ToAddress, request.CorrelationId);
+                        logger.LogInformation(new EventId(22111, "OutboundDeliverySubmitting"), "Submitting outbound delivery to provider. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} CorrelationId={CorrelationId} InternetMessageId={InternetMessageId} InReplyTo={InReplyTo} ConversationId={ConversationId} StudioMessageId={StudioMessageId} Attempt={Attempt}", message.Id, message.DeliveryChannel, message.ToAddress, request.CorrelationId, rfcId, metadata.GetValueOrDefault("Email.InReplyTo"), message.ConversationId, message.StudioMessageId, message.Attempts);
                         await transport.SendAsync(recipient,request,message.Id,stoppingToken);
                         providerAccepted=true;
-                        logger.LogInformation("Outbound provider accepted delivery request. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient}", message.Id, message.DeliveryChannel, message.ToAddress);
+                        logger.LogInformation(new EventId(22112, "OutboundProviderAccepted"), "Outbound provider accepted delivery request. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} ConversationId={ConversationId} StudioMessageId={StudioMessageId} Attempt={Attempt} CorrelationId={CorrelationId}", message.Id, message.DeliveryChannel, message.ToAddress, message.ConversationId, message.StudioMessageId, message.Attempts, message.Id.ToString("D"));
                         // Persist acceptance BEFORE the independent Sent Items lookup. Never replay
                         // an accepted delivery because threading evidence is delayed or unavailable.
                         if(outbox.MarkProviderAccepted(message.Id,null,lease) is null)
                             throw new InvalidOperationException("Provider accepted, but acceptance persistence requires reconciliation.");
                         flows.TryEnqueueOutbound(message.ConversationId.ToString("D"),"Provider",businessId:message.Id.ToString("D"),detail:"ProviderAccepted");
                         flows.TryEnqueueOutboundUnknown(message.ConversationId.ToString("D"),"Recipient",businessId:message.Id.ToString("D"),detail:"DeliveryReceiptUnavailable");
-                        logger.LogInformation("Outbound acceptance persisted. DeliveryId={DeliveryId} ConversationId={ConversationId}",message.Id,message.ConversationId);
+                        logger.LogInformation("Outbound acceptance persisted. DeliveryId={DeliveryId} ConversationId={ConversationId} StudioMessageId={StudioMessageId} Attempt={Attempt} CorrelationId={CorrelationId}",message.Id,message.ConversationId, message.StudioMessageId, message.Attempts, message.Id.ToString("D"));
                         string? providerId=null;
                         if(channel==MessageChannel.MsEmail)
                         {
@@ -97,24 +97,24 @@ public sealed class OutboundEmailWorker : BackgroundService
                                 throw new InvalidOperationException("This email transport cannot verify its actual Internet Message-ID.");
                             var verifier=new StudioGraphSentMessageVerifier(http,configuration,secrets,delegatedSession);
                             var verified=await verifier.VerifyAsync(message,metadata.GetValueOrDefault("Studio.MessageId",message.Id.ToString("D")),metadata["Email.ReplyTo"],sendingAt,stoppingToken);
-                            outbox.RecordVerifiedInternetId(message.Id,null,verified);providerId=verified.ProviderId;
+                            outbox.RecordVerifiedInternetId(message.Id,null,verified);providerId=verified.ProviderId;rfcId=verified.InternetMessageId;
                         }
-                        logger.LogInformation("Outbound threading verification completed. DeliveryId={DeliveryId} ProviderMessageId={ProviderMessageId}",message.Id,providerId);
+                        logger.LogInformation("Outbound threading verification completed. DeliveryId={DeliveryId} ProviderMessageId={ProviderMessageId} InternetMessageId={InternetMessageId} ConversationId={ConversationId} StudioMessageId={StudioMessageId} Attempt={Attempt} CorrelationId={CorrelationId}",message.Id,providerId,rfcId, message.ConversationId, message.StudioMessageId, message.Attempts, message.Id.ToString("D"));
                     }
                     catch(StudioMailReconnectRequiredException) when(!providerAccepted)
                     {
                         outbox.MarkAttention(message.Id,lease,"OutboundMailboxReconnectRequired");
-                        logger.LogWarning("Outbound mailbox authorization requires administrator reconnection. DeliveryId={DeliveryId}; no submission occurred",message.Id);
+                        logger.LogWarning("Outbound mailbox authorization requires administrator reconnection. DeliveryId={DeliveryId}; no submission occurred ConversationId={ConversationId} StudioMessageId={StudioMessageId} Attempt={Attempt} CorrelationId={CorrelationId}",message.Id, message.ConversationId, message.StudioMessageId, message.Attempts, message.Id.ToString("D"));
                     }
                     catch(ExternalDeliveryOutcomeUnknownException ex) when(!providerAccepted)
                     {
                         outbox.MarkAttention(message.Id,lease,"ProviderOutcomeUncertain: reconcile sent items or message trace before resending.");
-                        logger.LogError(ex,"Outbound provider outcome is uncertain. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient}", message.Id, message.DeliveryChannel, message.ToAddress);
+                        logger.LogError("Outbound provider outcome is uncertain. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} ErrorType={ErrorType} ConversationId={ConversationId} StudioMessageId={StudioMessageId} Attempt={Attempt} CorrelationId={CorrelationId}", message.Id, message.DeliveryChannel, message.ToAddress, ex.GetType().Name, message.ConversationId, message.StudioMessageId, message.Attempts, message.Id.ToString("D"));
                     }
                     catch(HttpRequestException ex) when(!providerAccepted && (ex.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.NotFound))
                     {
                         outbox.MarkAttention(message.Id,lease,"ProviderRejected:"+(int)ex.StatusCode.Value);
-                        logger.LogError(ex,"Outbound provider rejected delivery. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} HttpStatus={HttpStatus}", message.Id, message.DeliveryChannel, message.ToAddress, (int)ex.StatusCode.Value);
+                        logger.LogError(new EventId(22113, "OutboundProviderRejected"), "Outbound provider rejected delivery. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} HttpStatus={HttpStatus} ConversationId={ConversationId} StudioMessageId={StudioMessageId} Attempt={Attempt} CorrelationId={CorrelationId}", message.Id, message.DeliveryChannel, message.ToAddress, (int)ex.StatusCode.Value, message.ConversationId, message.StudioMessageId, message.Attempts, message.Id.ToString("D"));
                     }
                     catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){throw;}
                     catch(Exception ex)
@@ -122,22 +122,20 @@ public sealed class OutboundEmailWorker : BackgroundService
                         if(providerAccepted)
                         {
                             outbox.MarkVerificationFailure(message.Id,ex.GetType().Name);
-                            logger.LogError(ex,"Outbound accepted delivery needs threading verification. DeliveryId={DeliveryId}; acceptance is retained and no resend is scheduled",message.Id);
+                            logger.LogError("Outbound accepted delivery needs threading verification. DeliveryId={DeliveryId} ErrorType={ErrorType}; acceptance is retained and no resend is scheduled ConversationId={ConversationId} StudioMessageId={StudioMessageId} Attempt={Attempt} CorrelationId={CorrelationId}",message.Id,ex.GetType().Name, message.ConversationId, message.StudioMessageId, message.Attempts, message.Id.ToString("D"));
                             continue;
                         }
                         var updated=outbox.MarkFailure(message.Id,ex.GetType().Name,DateTimeOffset.UtcNow.AddSeconds(Math.Min(300,5*Math.Pow(2,Math.Min(message.Attempts,6)))),lease);
-                        logger.LogError(ex,"Outbound delivery attempt failed before provider acceptance. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} RetryState={RetryState} Attempt={Attempt}", message.Id, message.DeliveryChannel, message.ToAddress, updated?.Status, message.Attempts);
+                        logger.LogError(new EventId(22114, "OutboundDeliveryAttemptFailed"), "Outbound delivery attempt failed before provider acceptance. DeliveryId={DeliveryId} Channel={Channel} Recipient={Recipient} RetryState={RetryState} Attempt={Attempt} ErrorType={ErrorType} ConversationId={ConversationId} StudioMessageId={StudioMessageId} CorrelationId={CorrelationId}", message.Id, message.DeliveryChannel, message.ToAddress, updated?.Status, message.Attempts, ex.GetType().Name, message.ConversationId, message.StudioMessageId, message.Id.ToString("D"));
                         flows.TryEnqueueOutbound(message.ConversationId.ToString("D"),"Provider",businessId:message.Id.ToString("D"),detail:updated?.Status=="Failed"?"RetryExhausted":ex.GetType().Name,failed:true);
-                        logger.LogError(ex,"Outbound {Channel} message {MessageId} failed; queued retry state {State}",message.DeliveryChannel,message.Id,updated?.Status);
                     }
                 }
             }
             catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){break;}
-            catch(Exception ex){logger.LogError(ex,"Outbound message processing cycle failed");}
+            catch(Exception ex){logger.LogError("Outbound message processing cycle failed. ErrorType={ErrorType}",ex.GetType().Name);}
             try{await Task.Delay(interval,stoppingToken);}catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){break;}
         }
     }
     public override void Dispose(){http.Dispose();base.Dispose();}
 }
-
 
