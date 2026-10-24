@@ -253,8 +253,11 @@ export class IntakeStore {
     if(p.galleryId&&!/^[0-9a-f-]{36}$/i.test(String(p.galleryId)))fail(400,'invalid_gallery_access_request','Gallery ID must be a UUID.');
     const name=String(p.clientName||'').trim(),email=String(p.clientEmail||'').trim(),notes=String(p.notes||'').trim(),key=String(p.requestKey||'').trim();
     if(!name||name.length>200||!/^\S+@\S+\.\S+$/.test(email)||email.length>320||notes.length>2000||!key||key.length>200)fail(400,'invalid_gallery_access_request','Client name, valid email and unique request key are required.');
-    const existing=this.db.prepare('SELECT id FROM gallery_access_requests WHERE request_key=?').get(key);
-    if(existing)return {id:existing.id,created:false};
+    const existing=this.db.prepare('SELECT id,client_id,gallery_id,client_name,client_email,notes FROM gallery_access_requests WHERE request_key=?').get(key);
+    if(existing){
+      if(existing.client_id!==p.clientId||existing.gallery_id!==(p.galleryId||null)||existing.client_name!==name||existing.client_email!==email||existing.notes!==notes)fail(409,'idempotency_conflict','Request key was already used with different request details.');
+      return {id:existing.id,created:false};
+    }
     const id=randomUUID(),createdAt=this.now().toISOString();
     this.db.prepare('INSERT INTO gallery_access_requests(id,client_id,gallery_id,client_name,client_email,notes,request_key,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id,p.clientId,p.galleryId||null,name,email,notes,key,createdAt);
     return {id,created:true};
