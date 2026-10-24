@@ -85,8 +85,8 @@ export class WorkDayExchangeStore {
     this.db.prepare('INSERT INTO workday_updates(operation_id,user_key,kind,payload,created_at) VALUES(?,?,?,?,?)').run(operationId,key,kind,encoded,this.now().toISOString());
     return {operationId,state:'Pending',result:null,replayed:false};
   }
-  pendingUpdates(after=0,limit=100) {
-    return this.db.prepare(`SELECT sequence,operation_id AS operationId,user_key AS userName,kind,payload,created_at AS createdAt FROM workday_updates WHERE state='Pending' AND sequence>? ORDER BY sequence LIMIT ?`).all(after,Math.max(1,Math.min(500,limit))).map(x=>({...x,payload:JSON.parse(x.payload)}));
+  pendingUpdates(after=0,limit=100,kind='') {
+    return this.db.prepare(`SELECT sequence,operation_id AS operationId,user_key AS userName,kind,payload,created_at AS createdAt FROM workday_updates WHERE state='Pending' AND sequence>? AND (?='' OR kind=?) ORDER BY sequence LIMIT ?`).all(after,kind,kind,Math.max(1,Math.min(500,limit))).map(x=>({...x,payload:JSON.parse(x.payload)}));
   }
   completeUpdate(operationId,result) {
     const row=this.db.prepare('SELECT state FROM workday_updates WHERE operation_id=?').get(operationId);if(!row)throw Object.assign(new Error('WorkDay update not found.'),{status:404,code:'not_found'});
