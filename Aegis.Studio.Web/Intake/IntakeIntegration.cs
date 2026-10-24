@@ -35,6 +35,10 @@ public sealed class PublicSiteClient : IDisposable
     public async Task Post(string path,object data,CancellationToken ct){_ = await PostJson(path,data,ct);}
     public async Task<JsonElement> PostJson(string path,object data,CancellationToken ct)
     {using var r=await http.PostAsJsonAsync(path,data,ct);r.EnsureSuccessStatusCode();return await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct);}
+    public async Task<JsonElement> PostJson(string path,object data,string idempotencyKey,CancellationToken ct)
+    {using var request=new HttpRequestMessage(HttpMethod.Post,path){Content=JsonContent.Create(data)};request.Headers.Add("Idempotency-Key",idempotencyKey);using var r=await http.SendAsync(request,ct);r.EnsureSuccessStatusCode();return await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct);}
+    public async Task<JsonElement> DeleteJson(string path,CancellationToken ct)
+    {using var r=await http.DeleteAsync(path,ct);r.EnsureSuccessStatusCode();return await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct);}
     public async Task<JsonElement> PutJson(string path,object data,string idempotencyKey,CancellationToken ct)
     {using var request=new HttpRequestMessage(HttpMethod.Put,path){Content=JsonContent.Create(data)};request.Headers.Add("Idempotency-Key",idempotencyKey);using var r=await http.SendAsync(request,ct);r.EnsureSuccessStatusCode();return await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct);}
     public async Task PutFile(string path,Stream content,string type,CancellationToken ct)
