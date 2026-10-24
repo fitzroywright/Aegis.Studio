@@ -8,15 +8,22 @@ public sealed class AssignmentPage:ContentPage
     private readonly WorkDayLocalStore store;
     private readonly WorkDaySyncEngine sync;
     private readonly WorkDayDeviceIdentity device;
+    private readonly WorkDayApiClient api;
     private readonly Label status=new();
     private readonly Label roster=new();
     private bool reporting;
     private readonly Label syncStatus=new();
     private bool observing;
 
-    public AssignmentPage(LocalAssignment assignment,WorkDayLocalStore store,WorkDaySyncEngine sync,WorkDayDeviceIdentity device)
+    public AssignmentPage(LocalAssignment assignment,WorkDayLocalStore store,WorkDaySyncEngine sync,WorkDayDeviceIdentity device,WorkDayApiClient api)
     {
-        this.assignment=assignment;this.store=store;this.sync=sync;this.device=device;Title=assignment.Title;
+        this.assignment=assignment;this.store=store;this.sync=sync;this.device=device;this.api=api;Title=assignment.Title;
+        Button communication=Action("CLIENT COMMUNICATION",async()=>
+        {
+            if(assignment.ConversationId is Guid conversationId)
+                await Navigation.PushAsync(new WorkDayConversationPage(api,store,sync,conversationId,assignment.ClientName??"Client communication"));
+        });
+        communication.IsVisible=assignment.ConversationId.HasValue;
         Content=new ScrollView{Content=new VerticalStackLayout{Padding=18,Spacing=12,Children={
             new Label{Text=assignment.Title,FontSize=25,FontAttributes=FontAttributes.Bold},
             new Label{Text=assignment.ClientName??""},
@@ -24,6 +31,7 @@ public sealed class AssignmentPage:ContentPage
             new Label{Text=assignment.Location??"Location not set"},new Label{Text=assignment.Instructions??"No special instructions."},status,syncStatus,
             Action("SYNC NOW",async()=>{await sync.SynchronizeAsync();await RefreshStatusAsync();}),
             Action("SESSION / COLLECTION / ROSTER STATUS",ReportFieldStatusAsync),
+            communication,
             Action("REVIEW REPORTS / RESOLVE CONFLICT",()=>Navigation.PushAsync(new WorkDayRecoveryPage(assignment.Id,store,sync))),
             Action("ACCEPT ASSIGNMENT",()=>ReportAsync("AcceptAssignment")),
             Action("DECLINE ASSIGNMENT",async()=>{string? reason=await DisplayPromptAsync("Decline assignment","Reason (required)");if(!string.IsNullOrWhiteSpace(reason))await ReportAsync("DeclineAssignment",reason);}),
