@@ -99,6 +99,22 @@ public sealed class LocalAvailability
     public DateTimeOffset? ResolvedAtUtc { get; set; }
 }
 
+public sealed class LocalMessageSubmission
+{
+    [PrimaryKey] public Guid OperationId { get; set; }
+    public Guid TargetId { get; set; }
+    public string TargetType { get; set; }="";
+    [Ignore] public string Body { get; set; }="";
+    public string? BodyCiphertext { get; set; }
+    public string? SendingIdentity { get; set; }
+    public bool IsInternal { get; set; }
+    public string State { get; set; }="Pending";
+    public int AttemptCount { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset? LastAttemptUtc { get; set; }
+    public string? LastError { get; set; }
+}
+
 public sealed class LocalMetadata
 {
     [PrimaryKey] public string Key { get; set; }="";
@@ -152,6 +168,7 @@ public sealed class WorkDayLocalStore
         await db.CreateTableAsync<LocalWorkSession>();
         await db.CreateTableAsync<LocalUpload>();
         await db.CreateTableAsync<LocalAvailability>();
+        await db.CreateTableAsync<LocalMessageSubmission>();
         await db.CreateTableAsync<LocalLocationObservation>();
         await MigrateAsync();
             initialized=true;
@@ -424,6 +441,43 @@ public sealed class WorkDayLocalStore
     public Task SaveUploadAsync(LocalUpload upload)=>db.InsertOrReplaceAsync(upload);
     public async Task<int> PendingUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State!=nameof(LocalUploadState.Uploaded)).CountAsync();
     public async Task<int> FailedUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Failed)).CountAsync();
+    public async Task QueueMessageAsync(LocalMessageSubmission message)
+    {
+        await InitializeAsync();
+        message.BodyCiphertext=await protector.ProtectAsync(message.Body);
+        message.Body="";
+        message.State="Pending";
+        await db.InsertOrReplaceAsync(message);
+    }
+    public async Task<List<LocalMessageSubmission>> PendingMessagesAsync()
+    {
+        await InitializeAsync();
+        List<LocalMessageSubmission> values=await db.Table<LocalMessageSubmission>()
+            .Where(x=>x.State=="Pending"||x.State=="Failed"||x.State=="Sending")
+            .OrderBy(x=>x.CreatedAtUtc).ToListAsync();
+        foreach(LocalMessageSubmission value in values)
+            value.Body=await protector.UnprotectAsync(value.BodyCiphertext)??"";
+        return values;
+    }
+    public async Task<List<LocalMessageSubmission>> UnacknowledgedMessagesAsync()
+    {
+        await InitializeAsync();
+        List<LocalMessageSubmission> values=await db.Table<LocalMessageSubmission>()
+            .Where(x=>x.State!="Acknowledged"&&x.State!="Resolved").OrderBy(x=>x.CreatedAtUtc).ToListAsync();
+        foreach(LocalMessageSubmission value in values)
+            value.Body=await protector.UnprotectAsync(value.BodyCiphertext)??"";
+        return values;
+    }
+    public async Task SaveMessageAsync(LocalMessageSubmission message)
+    {
+        await InitializeAsync();
+        if(!string.IsNullOrEmpty(message.Body))message.BodyCiphertext=await protector.ProtectAsync(message.Body);
+        message.Body="";
+        await db.InsertOrReplaceAsync(message);
+    }
+    public async Task<int> PendingMessageCountAsync()=>
+        await db.Table<LocalMessageSubmission>().Where(x=>x.State!="Acknowledged"&&x.State!="Resolved").CountAsync();
+
 
     public async Task SaveLocationAsync(LocalLocationObservation location)
     {
