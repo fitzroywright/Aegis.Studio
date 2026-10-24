@@ -4,7 +4,7 @@ namespace Aegis.Studio.WorkDay;
 
 // Mobile platforms suspend apps: sync on reconnect while active, and on resume.
 // Periodic retries also handle reachable Wi-Fi whose Studio server was unavailable.
-public sealed class WorkDayAutoSync(WorkDaySyncEngine sync,WorkDaySessionContext session,ILogger<WorkDayAutoSync> logger)
+public sealed class WorkDayAutoSync(WorkDaySyncEngine sync,WorkDayUploadService uploads,WorkDaySessionContext session,ILogger<WorkDayAutoSync> logger)
 {
     private CancellationTokenSource? active;
     public void Resume()
@@ -37,7 +37,11 @@ public sealed class WorkDayAutoSync(WorkDaySyncEngine sync,WorkDaySessionContext
     private async Task AttemptAsync(CancellationToken ct)
     {
         if(!session.IsAuthenticated||Connectivity.Current.NetworkAccess!=NetworkAccess.Internet)return;
-        try{await sync.SynchronizeAsync(ct);}
+        try
+        {
+            await sync.SynchronizeAsync(ct);
+            await uploads.ProcessAsync(ct);
+        }
         catch(OperationCanceledException) when(ct.IsCancellationRequested) { }
         catch(Exception ex){logger.LogWarning(ex,"Automatic WorkDay synchronization failed; local updates retained for retry");}
     }
