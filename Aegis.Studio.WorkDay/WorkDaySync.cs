@@ -55,17 +55,29 @@ public sealed class WorkDayApiClient
         object? location=op.Latitude.HasValue&&op.Longitude.HasValue
             ? new{observationId=op.LocationObservationId??op.OperationId,latitude=op.Latitude.Value,longitude=op.Longitude.Value,accuracyMetres=op.AccuracyMetres,observedAtUtc=op.LocationObservedAtUtc??op.OccurredAtUtc,source=op.LocationSource,mockLocation=(bool?)null}
             : null;
-        using HttpResponseMessage r=await http.PostAsJsonAsync("workday/operations",new{operationId=op.OperationId,kind=op.Kind,assignmentId=op.AssignmentId,occurredAtUtc=op.OccurredAtUtc,deviceId=op.DeviceId,text=op.Text,category=op.Category,location,expectedVersion=op.ExpectedVersion},ct);
-        if(r.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
+        using HttpResponseMessage submitted=await http.PostAsJsonAsync("workday/operations",new{operationId=op.OperationId,kind=op.Kind,assignmentId=op.AssignmentId,occurredAtUtc=op.OccurredAtUtc,deviceId=op.DeviceId,text=op.Text,category=op.Category,location,expectedVersion=op.ExpectedVersion},ct);
+        if(submitted.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
         {
-            string message=await ErrorAsync(r,ct);
+            string message=await ErrorAsync(submitted,ct);
             return new(op.OperationId,"Conflict",DateTimeOffset.UtcNow,message,null);
         }
-        if(r.StatusCode!=System.Net.HttpStatusCode.Conflict)r.EnsureSuccessStatusCode();
-        OperationResultDto? result=await r.Content.ReadFromJsonAsync<OperationResultDto>(cancellationToken:ct);
-        if(result is null||result.OperationId!=op.OperationId||result.State is not ("Acknowledged" or "Conflict"))
-            throw new InvalidOperationException("Studio did not return a valid acknowledgement for this operation.");
-        return result;
+        submitted.EnsureSuccessStatusCode();
+        if(submitted.StatusCode!=System.Net.HttpStatusCode.Accepted)
+            return await submitted.Content.ReadFromJsonAsync<OperationResultDto>(cancellationToken:ct)
+                ??throw new InvalidOperationException("The API Site returned no WorkDay operation receipt.");
+
+        DateTimeOffset deadline=DateTimeOffset.UtcNow.AddMinutes(2);
+        while(DateTimeOffset.UtcNow<deadline)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.Delay(TimeSpan.FromSeconds(3),ct);
+            using HttpResponseMessage status=await http.GetAsync($"workday/operations/{op.OperationId:D}",ct);
+            status.EnsureSuccessStatusCode();
+            OperationResultDto result=await status.Content.ReadFromJsonAsync<OperationResultDto>(cancellationToken:ct)
+                ??throw new InvalidOperationException("The API Site returned no WorkDay operation status.");
+            if(result.State is "Acknowledged" or "Conflict")return result;
+        }
+        throw new HttpRequestException("The API Site has stored this update and is waiting for Studio to process it.");
     }
 
     public async Task<UploadResultDto> UploadAsync(LocalUpload upload,CancellationToken ct=default)
