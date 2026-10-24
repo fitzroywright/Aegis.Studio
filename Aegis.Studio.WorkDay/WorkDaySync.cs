@@ -6,6 +6,7 @@ namespace Aegis.Studio.WorkDay;
 
 public sealed class WorkDayApiClient
 {
+    public static readonly Uri ApiBaseUri=new("https://api.bryanstudiosltd.com/api/v1/");
     private readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(15)};
     public Uri? Server=>http.BaseAddress;
     public void SetServer(Uri server)=>http.BaseAddress=server;
@@ -17,30 +18,30 @@ public sealed class WorkDayApiClient
 
     public async Task LoginAsync(string user,string password,CancellationToken ct=default)
     {
-        using HttpResponseMessage r=await http.PostAsJsonAsync("api/auth/login",new{userName=user,password},ct);
+        using HttpResponseMessage r=await http.PostAsJsonAsync("auth/login",new{userName=user,password},ct);
         if(r.StatusCode==System.Net.HttpStatusCode.Unauthorized) throw new InvalidOperationException("Authentication failed.");
         r.EnsureSuccessStatusCode();
     }
 
     public Task<WorkDayBootstrapDto?> BootstrapAsync(CancellationToken ct=default)=>
-        http.GetFromJsonAsync<WorkDayBootstrapDto>("api/workday/bootstrap",ct);
+        http.GetFromJsonAsync<WorkDayBootstrapDto>("workday/bootstrap",ct);
 
     public async Task<DeviceSessionDto> IssueDeviceSessionAsync(string deviceId,CancellationToken ct=default)
     {
-        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/device-session",new{deviceId},ct);
+        using HttpResponseMessage r=await http.PostAsJsonAsync("workday/device-session",new{deviceId},ct);
         r.EnsureSuccessStatusCode();
         return await r.Content.ReadFromJsonAsync<DeviceSessionDto>(cancellationToken:ct) ?? throw new InvalidOperationException("Studio did not issue a device session.");
     }
 
     public async Task RevokeDeviceSessionAsync(string deviceId,CancellationToken ct=default)
     {
-        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/device-session/revoke",new{deviceId},ct);
+        using HttpResponseMessage r=await http.PostAsJsonAsync("workday/device-session/revoke",new{deviceId},ct);
         r.EnsureSuccessStatusCode();
     }
 
     public async Task PublishObservationAsync(WorkDayClientObservationDto observation,CancellationToken ct=default)
     {
-        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/client-observation",observation,ct);
+        using HttpResponseMessage r=await http.PostAsJsonAsync("workday/client-observation",observation,ct);
         r.EnsureSuccessStatusCode();
     }
 
@@ -49,7 +50,7 @@ public sealed class WorkDayApiClient
         object? location=op.Latitude.HasValue&&op.Longitude.HasValue
             ? new{observationId=op.LocationObservationId??op.OperationId,latitude=op.Latitude.Value,longitude=op.Longitude.Value,accuracyMetres=op.AccuracyMetres,observedAtUtc=op.LocationObservedAtUtc??op.OccurredAtUtc,source=op.LocationSource,mockLocation=(bool?)null}
             : null;
-        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/operations",new{operationId=op.OperationId,kind=op.Kind,assignmentId=op.AssignmentId,occurredAtUtc=op.OccurredAtUtc,deviceId=op.DeviceId,text=op.Text,category=op.Category,location,expectedVersion=op.ExpectedVersion},ct);
+        using HttpResponseMessage r=await http.PostAsJsonAsync("workday/operations",new{operationId=op.OperationId,kind=op.Kind,assignmentId=op.AssignmentId,occurredAtUtc=op.OccurredAtUtc,deviceId=op.DeviceId,text=op.Text,category=op.Category,location,expectedVersion=op.ExpectedVersion},ct);
         if(r.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
         {
             string message=await ErrorAsync(r,ct);
@@ -70,14 +71,14 @@ public sealed class WorkDayApiClient
         using StreamContent file=new(fs);
         file.Headers.ContentType=new MediaTypeHeaderValue(upload.ContentType);
         form.Add(file,"file",upload.FileName);
-        using HttpResponseMessage r=await http.PostAsync($"api/workday/assignments/{upload.AssignmentId:D}/uploads",form,ct);
+        using HttpResponseMessage r=await http.PostAsync($"workday/assignments/{upload.AssignmentId:D}/uploads",form,ct);
         r.EnsureSuccessStatusCode();
         return await r.Content.ReadFromJsonAsync<UploadResultDto>(cancellationToken:ct) ?? throw new InvalidOperationException("Studio did not acknowledge the upload.");
     }
 
     public Task<WorkDayTimeSummaryDto?> GetTimeSummaryAsync(DateTimeOffset? from=null,DateTimeOffset? to=null,CancellationToken ct=default)
     {
-        string query="api/workday/time-summary";
+        string query="workday/time-summary";
         List<string> parts=[];
         if(from.HasValue) parts.Add("from="+Uri.EscapeDataString(from.Value.ToString("O")));
         if(to.HasValue) parts.Add("to="+Uri.EscapeDataString(to.Value.ToString("O")));
@@ -86,11 +87,11 @@ public sealed class WorkDayApiClient
     }
 
     public Task<List<PhotographerAvailabilityDto>?> GetAvailabilityAsync(DateTimeOffset from,DateTimeOffset to,CancellationToken ct=default)=>
-        http.GetFromJsonAsync<List<PhotographerAvailabilityDto>>($"api/workday/availability?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}",ct);
+        http.GetFromJsonAsync<List<PhotographerAvailabilityDto>>($"workday/availability?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}",ct);
 
     public async Task<PhotographerAvailabilityDto> AddAvailabilityAsync(DateTimeOffset startsAtUtc,DateTimeOffset endsAtUtc,string availabilityType,string? note,Guid? operationId=null,CancellationToken ct=default)
     {
-        using HttpResponseMessage r=await http.PostAsJsonAsync("api/workday/availability",new{startsAtUtc,endsAtUtc,availabilityType,note,operationId},ct);
+        using HttpResponseMessage r=await http.PostAsJsonAsync("workday/availability",new{startsAtUtc,endsAtUtc,availabilityType,note,operationId},ct);
         if(!r.IsSuccessStatusCode)throw new HttpRequestException(await ErrorAsync(r,ct),null,r.StatusCode);
         return await r.Content.ReadFromJsonAsync<PhotographerAvailabilityDto>(cancellationToken:ct)??throw new InvalidOperationException("Studio did not return the availability entry.");
     }
@@ -106,19 +107,19 @@ public sealed class WorkDayApiClient
         return $"Studio rejected this report ({(int)response.StatusCode}). Review it with the Job Owner.";
     }
 
-    public Task<List<MessageThreadDto>?> GetThreadsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageThreadDto>>("api/messages/threads",ct);
+    public Task<List<MessageThreadDto>?> GetThreadsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageThreadDto>>("messages/threads",ct);
     public async Task<MessageThreadDto> GetOrCreateThreadAsync(string scopeType,Guid scopeId,CancellationToken ct=default)
     {
-        using HttpResponseMessage r=await http.PostAsync($"api/messages/threads/{Uri.EscapeDataString(scopeType)}/{scopeId:D}",null,ct);
+        using HttpResponseMessage r=await http.PostAsync($"messages/threads/{Uri.EscapeDataString(scopeType)}/{scopeId:D}",null,ct);
         r.EnsureSuccessStatusCode();
         return await r.Content.ReadFromJsonAsync<MessageThreadDto>(cancellationToken:ct)??throw new InvalidOperationException("Studio did not return the message thread.");
     }
-    public Task<List<MessageDto>?> GetMessagesAsync(Guid threadId,CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageDto>>($"api/messages/threads/{threadId:D}",ct);
-    public async Task SendThreadMessageAsync(Guid threadId,string body,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"api/messages/threads/{threadId:D}",new{body},ct);r.EnsureSuccessStatusCode();}
-    public Task<List<NotificationDto>?> GetNotificationsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<NotificationDto>>("api/notifications?count=50",ct);
-    public Task<AssignmentGalleryStatusDto?> GetAssignmentGalleryStatusAsync(Guid assignmentId,CancellationToken ct=default)=>http.GetFromJsonAsync<AssignmentGalleryStatusDto>($"api/workday/assignments/{assignmentId:D}/gallery-status",ct);
-    public Task<SendingIdentityOptionsDto?> GetSendingIdentitiesAsync(Guid conversationId,CancellationToken ct=default)=>http.GetFromJsonAsync<SendingIdentityOptionsDto>($"api/conversations/{conversationId:D}/sending-identities",ct);
-    public async Task ReplyConversationAsync(Guid conversationId,string body,string identity,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"api/conversations/{conversationId:D}/messages",new{body,isInternal=false,sendingIdentity=identity},ct);r.EnsureSuccessStatusCode();}
+    public Task<List<MessageDto>?> GetMessagesAsync(Guid threadId,CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageDto>>($"messages/threads/{threadId:D}",ct);
+    public async Task SendThreadMessageAsync(Guid threadId,string body,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"messages/threads/{threadId:D}",new{body},ct);r.EnsureSuccessStatusCode();}
+    public Task<List<NotificationDto>?> GetNotificationsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<NotificationDto>>("notifications?count=50",ct);
+    public Task<AssignmentGalleryStatusDto?> GetAssignmentGalleryStatusAsync(Guid assignmentId,CancellationToken ct=default)=>http.GetFromJsonAsync<AssignmentGalleryStatusDto>($"workday/assignments/{assignmentId:D}/gallery-status",ct);
+    public Task<SendingIdentityOptionsDto?> GetSendingIdentitiesAsync(Guid conversationId,CancellationToken ct=default)=>http.GetFromJsonAsync<SendingIdentityOptionsDto>($"conversations/{conversationId:D}/sending-identities",ct);
+    public async Task ReplyConversationAsync(Guid conversationId,string body,string identity,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"conversations/{conversationId:D}/messages",new{body,isInternal=false,sendingIdentity=identity},ct);r.EnsureSuccessStatusCode();}
 }
 
 public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient api)
