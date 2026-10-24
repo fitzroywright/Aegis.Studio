@@ -45,6 +45,7 @@ public sealed class WorkDayApiExchangeWorker(
                 await ProvisionAccountsAsync(http,stoppingToken);
                 await PublishSnapshotsAsync(http,stoppingToken);
                 await PullOperationsAsync(http,stoppingToken);
+                await PullAvailabilityAsync(http,stoppingToken);
                 await PullThreadCreatesAsync(http,stoppingToken);
                 await PullThreadMessagesAsync(http,stoppingToken);
                 await Task.Delay(TimeSpan.FromSeconds(10),stoppingToken);
@@ -178,6 +179,35 @@ public sealed class WorkDayApiExchangeWorker(
                 $"admin/workday/updates/{update.OperationId:D}/result",
                 new { state=result.State.ToString(), message=result.Message, serverVersion=result.ServerVersion, acknowledgedAtUtc=result.AcknowledgedAtUtc },
                 ct);
+            ack.EnsureSuccessStatusCode();
+        }
+    }
+
+    private async Task PullAvailabilityAsync(HttpClient http,CancellationToken ct)
+    {
+        using var response=await http.GetAsync("admin/workday/updates?after=0&limit=100&kind=AvailabilityUpsert",ct);
+        response.EnsureSuccessStatusCode();
+        var batch=await response.Content.ReadFromJsonAsync<WorkDayUpdateBatch>(JsonOptions,ct)
+            ??throw new InvalidOperationException("The API Site returned an empty WorkDay availability batch.");
+        foreach(WorkDayUpdate update in batch.Items)
+        {
+            ct.ThrowIfCancellationRequested();
+            string state="Acknowledged",message="Availability synchronized to Studio.";
+            object? availability=null;
+            try
+            {
+                PhotographerAvailabilityRequest request=update.Payload.Deserialize<PhotographerAvailabilityRequest>(JsonOptions)
+                    ??throw new InvalidOperationException("Availability payload is empty.");
+                using IServiceScope scope=scopes.CreateScope();
+                StudioDatabase database=scope.ServiceProvider.GetRequiredService<StudioDatabase>();
+                availability=new PhotographerStore(database).AddAvailability(update.UserName,request);
+            }
+            catch(InvalidOperationException ex){state="Conflict";message=ex.Message;}
+            catch(KeyNotFoundException ex){state="Conflict";message=ex.Message;}
+            catch(JsonException){state="Conflict";message="WorkDay availability payload is invalid.";}
+            using var ack=await http.PostAsJsonAsync(
+                $"admin/workday/updates/{update.OperationId:D}/result",
+                new{state,message,result=availability,acknowledgedAtUtc=DateTimeOffset.UtcNow},ct);
             ack.EnsureSuccessStatusCode();
         }
     }
