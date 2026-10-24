@@ -61,7 +61,8 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
         var ids=new HashSet<string>(StringComparer.OrdinalIgnoreCase);var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach(var x in items)
         {
-            if(!Regex.IsMatch(x.Id??"",@"^[A-Za-z0-9._-]{1,100}$")||!ids.Add(x.Id))throw new ArgumentException("Session type IDs must be unique stable values.");
+            string id=x.Id??"";
+            if(!Regex.IsMatch(id,@"^[A-Za-z0-9._-]{1,100}$")||!ids.Add(id))throw new ArgumentException("Session type IDs must be unique stable values.");
             if(string.IsNullOrWhiteSpace(x.Name)||x.Name.Trim().Length>160||!names.Add(x.Name.Trim()))throw new ArgumentException("Session names must be unique and are limited to 160 characters.");
             if(x.Description?.Length>1000||x.DurationMinutes is <15 or >1440||x.SetupBufferMinutes is <0 or >480||x.CleanupBufferMinutes is <0 or >480||x.PriceMinor<0||x.DepositMinor<0||x.DepositMinor>x.PriceMinor||x.Currency!="JMD")throw new ArgumentException("Set a JMD price and deposit, a valid duration, and buffers of no more than eight hours.");
             if(x.Locations is null||x.Locations.Count==0||x.Locations.Any(l=>l is not ("BK" or "BE"))||x.Locations.Distinct().Count()!=x.Locations.Count)throw new ArgumentException("Choose Kings Plaza (BK), East Queen Street (BE), or both.");

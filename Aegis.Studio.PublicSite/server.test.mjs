@@ -9,8 +9,8 @@ async function fixture(t, extra = {}) {
   t.after(() => new Promise(resolve => server.close(resolve)));
   return `http://127.0.0.1:${server.address().port}`;
 }
-async function publishTestBooking(origin){
- const base=origin+'/api/v1',provision='test-site-provisioning-token-at-least-32-chars';
+async function publishTestBooking(origin,provision='test-site-provisioning-token-at-least-32-chars'){
+ const base=origin+'/api/v1';
  const keyResponse=await fetch(base+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Studio test publisher',scopes:['booking:catalog:publish','booking:availability:publish']})});assert.equal(keyResponse.status,201);const key=(await keyResponse.json()).secret,headers={Authorization:'Bearer '+key,'Content-Type':'application/json'};
  const published=await fetch(base+'/admin/booking/catalog',{method:'PUT',headers:{...headers,'Idempotency-Key':'test-catalog-1'},body:JSON.stringify({sessionTypes:[{id:'portrait',name:'Portrait',description:'Portrait photography',durationMinutes:60,setupBufferMinutes:15,cleanupBufferMinutes:15,priceMinor:12500,depositMinor:5000,currency:'JMD',locations:['BK','BE'],resourceRequirements:{Staff:1},active:true}]})});assert.equal(published.status,200);const catalog=await published.json();
  const slots=['bk-1','bk-2','be-1'].map((id,i)=>({id,locationCode:id.startsWith('be')?'BE':'BK',sessionTypeId:'portrait',startsAt:`2099-01-01T${String(15+i).padStart(2,'0')}:00:00Z`,endsAt:`2099-01-01T${String(16+i).padStart(2,'0')}:00:00Z`,catalogRevision:catalog.revision}));
@@ -115,7 +115,7 @@ test('server provisions one-time integration keys, enforces scopes, and revokes 
   const key=await created.json();assert.match(key.secret,/^[A-Za-z0-9_-]{40,}$/);assert.equal(key.name,'Booking website');
   const listed=await(await fetch(`${origin}/api/v1/admin/integration-keys`,{headers:adminHeaders})).json();
   assert.equal(listed.items.length,1);assert.equal('secret' in listed.items[0],false);assert.equal('secret_hash' in listed.items[0],false);
-  const catalog=await publishTestBooking(origin),booking={kind:'Booking',clientName:'Test Client',clientEmail:'test@example.invalid',sessionType:'Portrait',sessionTypeId:'portrait',catalogRevision:catalog.revision,slotId:'bk-1',locationCode:'BK'};
+  const catalog=await publishTestBooking(origin,provisioning),booking={kind:'Booking',clientName:'Test Client',clientEmail:'test@example.invalid',sessionType:'Portrait',sessionTypeId:'portrait',catalogRevision:catalog.revision,slotId:'bk-1',locationCode:'BK'};
   const submission=await fetch(`${origin}/api/v1/intakes`,{method:'POST',headers:{Authorization:`Bearer ${key.secret}`,'Idempotency-Key':'one','Content-Type':'application/json'},body:JSON.stringify(booking)});
   assert.equal(submission.status,201);
   const galleryScope=await fetch(`${origin}/api/v1/changes`,{headers:{Authorization:`Bearer ${key.secret}`}});
