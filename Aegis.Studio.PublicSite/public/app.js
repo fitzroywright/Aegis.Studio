@@ -8,7 +8,7 @@ async function api(path, options = {}) {
 }
 function showAuth(user) {
   state.user = user; $('signed-out').hidden = Boolean(user); $('signed-in').hidden = !user;
-  if (user) { $('client-name').textContent = user.name.split(' ')[0]; $('gallery-title').textContent = user.provider + ' · ' + user.email; if(user.galleryReference)openGallery(user.galleryReference);else $('gallery-status').textContent='Your sign-in is ready. Connect the Client ID supplied by Bryan’s Studio to see published galleries.'; }
+  if (user) { $('client-name').textContent = user.name.split(' ')[0]; $('gallery-title').textContent = user.provider + ' · ' + user.email; if(user.galleryReference)openGallery(user.galleryReference);else $('gallery-status').textContent='Your sign-in is ready. Connect the Client ID supplied by Bryan’s Studio to see published galleries.'; loadClientGalleries(); }
 }
 async function openGallery(reference) {
   $('gallery-status').textContent = 'Loading your private gallery…'; $('gallery-grid').replaceChildren(); state.selected.clear();
@@ -31,6 +31,8 @@ async function openGallery(reference) {
     $('submit-selections').hidden = state.selected.size === 0;
   } catch (error) { $('gallery-status').textContent = error.message; }
 }
+async function loadClientGalleries(){try{const result=await api('/api/client-galleries'),picker=$('client-gallery-picker'),select=$('client-gallery-select'),items=result.items||[];select.replaceChildren();for(const item of items)select.add(new Option(item.title,item.reference));picker.hidden=items.length<2;if(items.length&&!items.some(x=>x.reference===state.user?.galleryReference)){state.user.galleryReference=items[0].reference;openGallery(items[0].reference);}if(items.length===1&&state.user?.galleryReference!==items[0].reference){state.user.galleryReference=items[0].reference;openGallery(items[0].reference);}}catch{/* Keep the signed-in state usable if gallery listing is temporarily unavailable. */}}
+document.getElementById('client-gallery-select').addEventListener('change',event=>{const reference=event.currentTarget.value;if(reference&&state.user){state.user.galleryReference=reference;openGallery(reference);}});
 
 document.querySelectorAll('[data-identity]').forEach(button => button.addEventListener('click', async () => {
   button.disabled = true;
