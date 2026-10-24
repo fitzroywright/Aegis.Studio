@@ -8,7 +8,7 @@ WorkDay Mobile connects only to `https://api.bryanstudiosltd.com/api/v1/`. Studi
 - Studio publishes each photographer's current assignments, availability, time summary, messages, notifications, and reply sender options to the API Site.
 - WorkDay Mobile reads its account snapshot from the API Site and submits field reports, availability changes, uploads, and messages there.
 - The API Site persists submissions in its SQLite exchange database. Studio polls the queue, applies each update locally, and posts an acknowledgement or conflict result back to the API Site.
-- The mobile app keeps its local assignment cache, field-operation outbox, availability queue, and upload files. Those are retained when connectivity is unavailable and synchronized when connectivity returns. Online messaging uses a durable API queue; device-side offline message composition is not currently included.
+- The mobile app keeps its local assignment cache, field-operation outbox, availability queue, upload files, and encrypted message/thread cache. Messages and client replies composed offline are saved in an encrypted local outbox with stable operation IDs, then synchronized automatically when connectivity returns. Uploaded files remain on the device until Studio acknowledges storage. Offline reads use the last locally cached snapshot.
 
 ## Exchange routes
 
