@@ -95,6 +95,12 @@ export function createServer(env = process.env) {
       let user = readSession(req, secret);
       if(user){const binding=intake.store.clientForIdentity(user.provider,user.id)||JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];if(binding){const candidates=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).filter(r=>JSON.parse(r.payload).published);if(candidates.length)user={...user,galleryReference:candidates.at(-1).id};}}
       if (req.method === 'GET' && url.pathname === '/api/session') { json(res, 200, { demo, user: user ? { name: user.name, provider: user.provider, email: user.email, galleryReference: user.galleryReference } : null }); return; }
+      if(req.method==='GET'&&url.pathname==='/api/client-galleries'){
+        if(!user){json(res,401,{message:'Sign in to view client galleries.'});return;}
+        const binding=intake.store.clientForIdentity(user.provider,user.id)||JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];
+        if(binding){const items=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).map(r=>JSON.parse(r.payload)).filter(g=>g.published).map(g=>({reference:g.id,title:g.title}));json(res,200,{items});return;}
+        const gallery=demo&&DEMO_GALLERIES[user.galleryReference];json(res,200,{items:gallery?[{reference:user.galleryReference,title:gallery.title}]:[]});return;
+      }
       if (req.method==='POST'&&url.pathname==='/api/v1/client-link-proofs/redeem') {
         requireSameOrigin(req,url);
         if(!user){json(res,401,{message:'Sign in with the provider account to redeem this link proof.'});return;}
