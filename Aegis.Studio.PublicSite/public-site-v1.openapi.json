@@ -2905,6 +2905,7 @@
                 "type": "object",
                 "required": [
                   "clientId",
+                  "galleryId",
                   "clientName",
                   "clientEmail"
                 ],
@@ -2915,7 +2916,8 @@
                   },
                   "galleryId": {
                     "type": "string",
-                    "format": "uuid"
+                    "format": "uuid",
+                    "description": "Gallery the client is requesting access to. It must belong to clientId."
                   },
                   "clientName": {
                     "type": "string",
