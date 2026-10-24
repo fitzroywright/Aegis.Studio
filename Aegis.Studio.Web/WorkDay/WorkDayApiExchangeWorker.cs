@@ -3,9 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Security.Claims;
-using System.Text.Json;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Scheduling;
+using Aegis.Studio.Web.Production;
 using Aegis.Studio.Web.WorkDay;
 
 namespace Aegis.Studio.Web.WorkDay;
@@ -70,7 +70,8 @@ public sealed class WorkDayApiExchangeWorker(
                 continue;
             }
             WorkDayAccountProvision? result=await response.Content.ReadFromJsonAsync<WorkDayAccountProvision>(JsonOptions,ct);
-            if(result?.EnrollmentToken is not {Length:>0} token)continue;
+            string? token=result?.EnrollmentToken;
+            if(string.IsNullOrWhiteSpace(token))continue;
 
             string path=configuration["WorkDay:EnrollmentFile"]??"/var/lib/aegis-studio/workday-enrollment-codes.json";
             string directory=Path.GetDirectoryName(path)!;
@@ -172,6 +173,8 @@ public sealed class WorkDayApiExchangeWorker(
         }
     }
 
-    private sealed record WorkDayAccountProvision(string UserName,string DisplayName,bool EnrollmentRequired,string? EnrollmentToken,string? ExpiresAt);\n    private sealed record WorkDayEnrollmentRecord(string UserName,string DisplayName,string Token,string? ExpiresAt);\n    private sealed record WorkDayUpdateBatch(IReadOnlyList<WorkDayUpdate> Items);
+    private sealed record WorkDayAccountProvision(string UserName,string DisplayName,bool EnrollmentRequired,string? EnrollmentToken,string? ExpiresAt);
+    private sealed record WorkDayEnrollmentRecord(string UserName,string DisplayName,string Token,string? ExpiresAt);
+    private sealed record WorkDayUpdateBatch(IReadOnlyList<WorkDayUpdate> Items);
     private sealed record WorkDayUpdate(long Sequence,Guid OperationId,string UserName,string Kind,JsonElement Payload,DateTimeOffset CreatedAt);
 }
