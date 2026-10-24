@@ -25,6 +25,18 @@ public sealed class OutboundEmailStore
             conversation.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? conversation.Subject : "Re: " + conversation.Subject,
             sendingIdentity: sendingIdentity);
 
+    public OutboundEmail QueueIdempotent(
+        StudioConversation conversation,
+        string body,
+        StudioSendingIdentity? sendingIdentity,
+        Guid deliveryId)
+        => QueueMessage(
+            conversation,
+            body,
+            conversation.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? conversation.Subject : "Re: " + conversation.Subject,
+            sendingIdentity: sendingIdentity,
+            idempotencyId: deliveryId);
+
     public OutboundEmail QueueNotification(StudioConversation conversation, string subject, string body)
         => QueueMessage(conversation, body, subject, "Notification");
 
@@ -198,7 +210,8 @@ public sealed class OutboundEmailStore
         string body,
         string subject,
         string kind = "Reply",
-        StudioSendingIdentity? sendingIdentity = null)
+        StudioSendingIdentity? sendingIdentity = null,
+        Guid? idempotencyId = null)
     {
         StudioWorkspaceDefinition workspace = workspaces.Get(conversation.WorkspaceId) ?? throw new InvalidOperationException("The conversation workspace no longer exists.");
         if (string.IsNullOrWhiteSpace(workspace.EmailAddress)) throw new InvalidOperationException("The conversation workspace has no outbound email identity configured.");
@@ -207,7 +220,7 @@ public sealed class OutboundEmailStore
             new StudioSendingIdentity(StudioSendingIdentityType.Workspace, workspace.EmailAddress, null);
 
         OutboundEmail message = new(
-            Guid.NewGuid(),
+            idempotencyId ?? Guid.NewGuid(),
             conversation.Id,
             identity.FromAddress,
             conversation.ContactAddress,
@@ -258,8 +271,8 @@ public sealed class OutboundEmailStore
             message.DeliveryMetadata
         ];
         foreach (object? value in values) command.Parameters.AddWithValue(value ?? DBNull.Value);
-        command.ExecuteNonQuery();
-        return message;
+        int inserted = command.ExecuteNonQuery();
+        return inserted == 0 ? Get(message.Id) ?? throw new InvalidOperationException("The idempotent outbound email was not found.") : message;
     }
 
     private static OutboundEmail Read(NpgsqlDataReader r) => new(
