@@ -6,6 +6,8 @@ using System.Security.Claims;
 using Aegis.Studio.Web.Persistence;
 using Aegis.Studio.Web.Scheduling;
 using Aegis.Studio.Web.Production;
+using Aegis.Studio.Web.Messaging;
+using Aegis.Studio.Web.Notifications;
 using Aegis.Studio.Web.WorkDay;
 
 namespace Aegis.Studio.Web.WorkDay;
@@ -43,6 +45,7 @@ public sealed class WorkDayApiExchangeWorker(
                 await ProvisionAccountsAsync(http,stoppingToken);
                 await PublishSnapshotsAsync(http,stoppingToken);
                 await PullOperationsAsync(http,stoppingToken);
+                await PullThreadMessagesAsync(http,stoppingToken);
                 await Task.Delay(TimeSpan.FromSeconds(10),stoppingToken);
             }
             catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){break;}
@@ -100,6 +103,8 @@ public sealed class WorkDayApiExchangeWorker(
         WorkDayStore store=services.GetRequiredService<WorkDayStore>();
         IConfiguration config=services.GetRequiredService<IConfiguration>();
         JobAccessService access=services.GetRequiredService<JobAccessService>();
+        StudioInAppMessageStore messages=services.GetRequiredService<StudioInAppMessageStore>();
+        NotificationService notifications=services.GetRequiredService<NotificationService>();
         PhotographerStore photographers=new(database);
         DateTimeOffset now=DateTimeOffset.UtcNow;
         WorkDayTimePolicy policy=WorkDayTimeSemantics.FromConfiguration(config);
@@ -114,13 +119,16 @@ public sealed class WorkDayApiExchangeWorker(
             ],"WorkDayExchange"));
             WorkDayBootstrap? bootstrap=WorkDayEndpoints.BuildBootstrap(principal,database,schedules,store,config,access);
             if(bootstrap is null)continue;
+            var threads=messages.GetThreads(principal);
+            var threadMessages=threads.SelectMany(thread=>messages.GetMessages(thread.Id,principal,200)).ToArray();
             var snapshot=new
             {
                 bootstrap.UserName,bootstrap.DisplayName,bootstrap.ServerTimeUtc,bootstrap.Today,bootstrap.Upcoming,
                 bootstrap.ActiveWorkSession,bootstrap.LocationTrackingEnabled,bootstrap.LocationTrackingMode,
                 bootstrap.GeneratedAtUtc,bootstrap.FieldTargets,
                 availability=photographers.GetAvailability(profile.UserName,now.AddDays(-1),now.AddDays(90)),
-                timeSummary=store.GetTimeSummaries([profile.UserName],now.AddDays(-14),now,policy).Single()
+                timeSummary=store.GetTimeSummaries([profile.UserName],now.AddDays(-14),now,policy).Single(),
+                threads,messages=threadMessages,notifications=notifications.GetForUser(profile.UserName,100)
             };
             try
             {
@@ -169,6 +177,39 @@ public sealed class WorkDayApiExchangeWorker(
                 $"admin/workday/updates/{update.OperationId:D}/result",
                 new { state=result.State.ToString(), message=result.Message, serverVersion=result.ServerVersion, acknowledgedAtUtc=result.AcknowledgedAtUtc },
                 ct);
+            ack.EnsureSuccessStatusCode();
+        }
+    }
+
+    private async Task PullThreadMessagesAsync(HttpClient http,CancellationToken ct)
+    {
+        using var response=await http.GetAsync("admin/workday/updates?after=0&limit=100&kind=ThreadMessage",ct);
+        response.EnsureSuccessStatusCode();
+        var batch=await response.Content.ReadFromJsonAsync<WorkDayUpdateBatch>(JsonOptions,ct)
+            ??throw new InvalidOperationException("The API Site returned an empty WorkDay message batch.");
+        foreach(WorkDayUpdate update in batch.Items)
+        {
+            ct.ThrowIfCancellationRequested();
+            string state="Acknowledged",message="Message synchronized to Studio.";
+            try
+            {
+                Guid threadId=update.Payload.GetProperty("threadId").GetGuid();
+                string body=update.Payload.GetProperty("body").GetString()??"";
+                ClaimsPrincipal principal=new(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier,update.UserName),
+                    new Claim("login_name",update.UserName),
+                    new Claim(ClaimTypes.Name,update.UserName)
+                ],"WorkDayExchange"));
+                using IServiceScope scope=scopes.CreateScope();
+                StudioInAppMessageStore store=scope.ServiceProvider.GetRequiredService<StudioInAppMessageStore>();
+                store.AddMessage(threadId,principal,body,update.OperationId);
+            }
+            catch(InvalidOperationException ex){state="Conflict";message=ex.Message;}
+            catch(JsonException){state="Conflict";message="WorkDay message payload is invalid.";}
+            using var ack=await http.PostAsJsonAsync(
+                $"admin/workday/updates/{update.OperationId:D}/result",
+                new{state,message,acknowledgedAtUtc=DateTimeOffset.UtcNow},ct);
             ack.EnsureSuccessStatusCode();
         }
     }
