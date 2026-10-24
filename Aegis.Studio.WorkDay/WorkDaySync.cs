@@ -133,9 +133,27 @@ public sealed class WorkDayApiClient
     public Task<List<MessageThreadDto>?> GetThreadsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageThreadDto>>("messages/threads",ct);
     public async Task<MessageThreadDto> GetOrCreateThreadAsync(string scopeType,Guid scopeId,CancellationToken ct=default)
     {
-        using HttpResponseMessage r=await http.PostAsync($"messages/threads/{Uri.EscapeDataString(scopeType)}/{scopeId:D}",null,ct);
-        r.EnsureSuccessStatusCode();
-        return await r.Content.ReadFromJsonAsync<MessageThreadDto>(cancellationToken:ct)??throw new InvalidOperationException("Studio did not return the message thread.");
+        Guid operationId=Guid.NewGuid();
+        using HttpRequestMessage request=new(HttpMethod.Post,$"messages/threads/{Uri.EscapeDataString(scopeType)}/{scopeId:D}");
+        request.Headers.TryAddWithoutValidation("Idempotency-Key",operationId.ToString("D"));
+        using HttpResponseMessage response=await http.SendAsync(request,ct);
+        response.EnsureSuccessStatusCode();
+        if(response.StatusCode!=System.Net.HttpStatusCode.Accepted)
+            return await response.Content.ReadFromJsonAsync<MessageThreadDto>(cancellationToken:ct)
+                ??throw new InvalidOperationException("The API Site returned no message thread.");
+        DateTimeOffset deadline=DateTimeOffset.UtcNow.AddMinutes(2);
+        while(DateTimeOffset.UtcNow<deadline)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3),ct);
+            using HttpResponseMessage status=await http.GetAsync($"workday/operations/{operationId:D}",ct);
+            status.EnsureSuccessStatusCode();
+            using System.Text.Json.JsonDocument payload=System.Text.Json.JsonDocument.Parse(await status.Content.ReadAsStringAsync(ct));
+            var root=payload.RootElement;string state=root.GetProperty("state").GetString()??"Pending";
+            if(state=="Conflict")throw new InvalidOperationException(root.TryGetProperty("result",out var failure)&&failure.TryGetProperty("message",out var detail)?detail.GetString():"Studio rejected the message thread.");
+            if(state=="Acknowledged"&&root.TryGetProperty("result",out var stored)&&stored.TryGetProperty("result",out var thread))
+                return thread.Deserialize<MessageThreadDto>()??throw new InvalidOperationException("Studio returned no message thread.");
+        }
+        throw new HttpRequestException("Studio has not created the message thread yet; the API Site will keep the request for retry.");
     }
     public Task<List<MessageDto>?> GetMessagesAsync(Guid threadId,CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageDto>>($"messages/threads/{threadId:D}",ct);
     public async Task SendThreadMessageAsync(Guid threadId,string body,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"messages/threads/{threadId:D}",new{body},ct);r.EnsureSuccessStatusCode();}
