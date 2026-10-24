@@ -1,7 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer, sign } from './server.mjs';
+import { createServer, sign, mapWorkDayStudioPath } from './server.mjs';
 
+test('WorkDay mobile paths stay on the API Site gateway and map only to approved Studio field routes',()=>{
+ assert.equal(mapWorkDayStudioPath('/api/v1/auth/login','POST'),'/api/auth/login');
+ assert.equal(mapWorkDayStudioPath('/api/v1/workday/bootstrap','GET'),'/api/workday/bootstrap');
+ assert.equal(mapWorkDayStudioPath('/api/v1/workday/assignments/123e4567-e89b-12d3-a456-426614174000/uploads','POST'),'/api/workday/assignments/123e4567-e89b-12d3-a456-426614174000/uploads');
+ assert.equal(mapWorkDayStudioPath('/api/v1/messages/threads/123e4567-e89b-12d3-a456-426614174000','GET'),'/api/messages/threads/123e4567-e89b-12d3-a456-426614174000');
+ assert.equal(mapWorkDayStudioPath('/api/v1/notifications','GET'),'/api/notifications');
+ assert.equal(mapWorkDayStudioPath('/api/v1/workday/fleet','GET'),null);
+ assert.equal(mapWorkDayStudioPath('/api/v1/admin/integration-keys','GET'),null);
+ assert.equal(mapWorkDayStudioPath('/api/v1/conversations/not-a-guid/messages','POST'),null);
+});
 async function fixture(t, extra = {}) {
   const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', INTAKE_DB_PATH: ':memory:', PUBLIC_API_PROVISIONING_TOKEN:'test-site-provisioning-token-at-least-32-chars', ...extra };
   const server = createServer(env);
