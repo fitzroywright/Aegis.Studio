@@ -1,5 +1,6 @@
 import { createIntakeApi } from './intake-api.mjs';
 import http from 'node:http';
+import https from 'node:https';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -56,6 +57,48 @@ async function readBody(req, limit = 65536) {
   for await (const chunk of req) { size += chunk.length; if (size > limit) throw Object.assign(new Error('Request is too large.'), { status: 413 }); chunks.push(chunk); }
   return Buffer.concat(chunks);
 }
+function safeMobilePath(pathname,prefix){
+  if(!pathname.startsWith(prefix+'/'))return false;
+  const tail=pathname.slice(prefix.length+1).split('/');
+  return tail.length>0&&tail.every(part=>part.length>0&&[...part].every(ch=>/[A-Za-z0-9._~%-]/.test(ch)));
+}
+export function mapWorkDayStudioPath(pathname,method){
+  method=String(method||'').toUpperCase();
+  if(pathname==='/api/v1/auth/login'&&method==='POST')return '/api/auth/login';
+  if(pathname==='/api/v1/auth/logout'&&method==='POST')return '/api/auth/logout';
+  if(pathname==='/api/v1/auth/me'&&method==='GET')return '/api/auth/me';
+  if(safeMobilePath(pathname,'/api/v1/workday')&&['GET','POST'].includes(method))return pathname.replace('/api/v1','/api');
+  if(safeMobilePath(pathname,'/api/v1/messages/threads')&&['GET','POST'].includes(method))return pathname.replace('/api/v1','/api');
+  if(pathname==='/api/v1/notifications'&&method==='GET')return '/api/notifications';
+  const parts=pathname.split('/');
+  if(parts.length===6&&parts[1]==='api'&&parts[2]==='v1'&&parts[3]==='conversations'&&parts[4].length===36&&[...parts[4]].every(ch=>/[0-9a-f-]/i.test(ch))&&
+    ((parts[5]==='sending-identities'&&method==='GET')||(parts[5]==='messages'&&method==='POST')))return pathname.replace('/api/v1','/api');
+  return null;
+}
+function proxyWorkDay(req,res,url,env){
+  const upstreamText=String(env.WORKDAY_STUDIO_ORIGIN||'');
+  let origin;
+  try{origin=new URL(upstreamText);if(origin.protocol!=='https:'||origin.pathname!=='/'||origin.search||origin.hash||origin.username||origin.password)throw Error();}
+  catch{json(res,503,{code:'workday_upstream_unavailable',message:'WorkDay is not connected to Studio.'});return;}
+  const studioPath=mapWorkDayStudioPath(url.pathname,req.method);
+  if(!studioPath){json(res,404,{code:'not_found',message:'WorkDay operation not found.'});return;}
+  const forwarded={host:origin.host,'x-forwarded-host':req.headers.host||'','x-forwarded-proto':'https','x-forwarded-for':req.socket.remoteAddress||''};
+  for(const name of ['accept','accept-encoding','content-type','content-length','transfer-encoding','cookie','authorization','x-aegis-workday-token','idempotency-key','user-agent'])if(req.headers[name])forwarded[name]=req.headers[name];
+  const connectAddress=String(env.WORKDAY_STUDIO_CONNECT_ADDRESS||'').trim();
+  let timedOut=false;
+  const upstream=https.request({hostname:origin.hostname,port:origin.port||443,servername:origin.hostname,method:req.method,path:studioPath+url.search,headers:forwarded,
+    ...(connectAddress?{lookup:(_host,_options,callback)=>callback(null,connectAddress,connectAddress.includes(':')?6:4)}:{})},response=>{
+      const headers={};
+      for(const name of ['content-type','content-length','content-encoding','content-disposition','cache-control','etag','last-modified','retry-after','set-cookie','location','vary'])if(response.headers[name]!==undefined)headers[name]=response.headers[name];
+      headers['Cache-Control']=headers['cache-control']||'no-store';headers['X-Content-Type-Options']='nosniff';
+      res.writeHead(response.statusCode||502,headers);response.pipe(res);
+    });
+  upstream.setTimeout(Number(env.WORKDAY_STUDIO_TIMEOUT_MS||120000),()=>{timedOut=true;upstream.destroy(new Error('WorkDay upstream timeout'));});
+  upstream.on('error',error=>{if(!res.headersSent)json(res,timedOut?504:503,{code:timedOut?'workday_upstream_timeout':'workday_upstream_unavailable',message:timedOut?'Studio did not answer the WorkDay request in time.':'Studio WorkDay service is temporarily unavailable.'});else res.destroy(error);});
+  req.on('aborted',()=>upstream.destroy());
+  req.pipe(upstream);
+}
+
 function requireSameOrigin(req, url) {
   const origin = req.headers.origin;
   if (!origin || new URL(origin).host !== req.headers.host) throw Object.assign(new Error('Request origin was rejected.'), { status: 403 });
@@ -108,6 +151,7 @@ export function createServer(env = process.env) {
         const linked=intake.store.redeemClientLinkChallenge(p.code,user.provider,user.id);
         json(res,200,{status:'Linked',provider:linked.provider,verifiedAt:linked.verifiedAt});return;
       }
+      if(mapWorkDayStudioPath(url.pathname,req.method)){proxyWorkDay(req,res,url,env);return;}
       if (await intake.handle(req,res,url)) return;
       if (['POST','PUT','DELETE'].includes(req.method)) requireSameOrigin(req, url);
       if (req.method === 'POST' && url.pathname === '/api/demo-login') {
