@@ -115,6 +115,29 @@ public sealed class LocalMessageSubmission
     public string? LastError { get; set; }
 }
 
+public sealed class CachedMessageThread
+{
+    [PrimaryKey] public Guid Id { get; set; }
+    public string ScopeType { get; set; }="";
+    public Guid? ScopeId { get; set; }
+    [Ignore] public string Title { get; set; }="";
+    public string? TitleCiphertext { get; set; }
+    public string CreatedBy { get; set; }="";
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset? LastMessageAtUtc { get; set; }
+    public long UnreadCount { get; set; }
+}
+
+public sealed class CachedThreadMessage
+{
+    [PrimaryKey] public Guid Id { get; set; }
+    public Guid ThreadId { get; set; }
+    public string SenderUserName { get; set; }="";
+    [Ignore] public string Body { get; set; }="";
+    public string? BodyCiphertext { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
 public sealed class LocalMetadata
 {
     [PrimaryKey] public string Key { get; set; }="";
@@ -169,6 +192,8 @@ public sealed class WorkDayLocalStore
         await db.CreateTableAsync<LocalUpload>();
         await db.CreateTableAsync<LocalAvailability>();
         await db.CreateTableAsync<LocalMessageSubmission>();
+        await db.CreateTableAsync<CachedMessageThread>();
+        await db.CreateTableAsync<CachedThreadMessage>();
         await db.CreateTableAsync<LocalLocationObservation>();
         await MigrateAsync();
             initialized=true;
@@ -441,6 +466,54 @@ public sealed class WorkDayLocalStore
     public Task SaveUploadAsync(LocalUpload upload)=>db.InsertOrReplaceAsync(upload);
     public async Task<int> PendingUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State!=nameof(LocalUploadState.Uploaded)).CountAsync();
     public async Task<int> FailedUploadCountAsync()=>await db.Table<LocalUpload>().Where(x=>x.State==nameof(LocalUploadState.Failed)).CountAsync();
+    public async Task ReplaceCachedThreadsAsync(IEnumerable<MessageThreadDto> threads)
+    {
+        await InitializeAsync();
+        List<CachedMessageThread> rows=[];
+        foreach(MessageThreadDto thread in threads)
+            rows.Add(new CachedMessageThread
+            {
+                Id=thread.Id,ScopeType=thread.ScopeType,ScopeId=thread.ScopeId,
+                TitleCiphertext=await protector.ProtectAsync(thread.Title),CreatedBy=thread.CreatedBy,
+                CreatedAtUtc=thread.CreatedAtUtc,LastMessageAtUtc=thread.LastMessageAtUtc,UnreadCount=thread.UnreadCount
+            });
+        await db.RunInTransactionAsync(connection=>
+        {
+            connection.DeleteAll<CachedMessageThread>();
+            foreach(CachedMessageThread row in rows)connection.InsertOrReplace(row);
+        });
+    }
+    public async Task<List<MessageThreadDto>> GetCachedThreadsAsync()
+    {
+        await InitializeAsync();
+        List<CachedMessageThread> rows=await db.Table<CachedMessageThread>().OrderByDescending(x=>x.LastMessageAtUtc).ToListAsync();
+        List<MessageThreadDto> result=[];
+        foreach(CachedMessageThread row in rows)
+            result.Add(new(row.Id,row.ScopeType,row.ScopeId,await protector.UnprotectAsync(row.TitleCiphertext)??"",row.CreatedBy,row.CreatedAtUtc,row.LastMessageAtUtc,row.UnreadCount));
+        return result;
+    }
+    public async Task ReplaceCachedThreadMessagesAsync(Guid threadId,IEnumerable<MessageDto> messages)
+    {
+        await InitializeAsync();
+        List<CachedThreadMessage> rows=[];
+        foreach(MessageDto message in messages)
+            rows.Add(new CachedThreadMessage{Id=message.Id,ThreadId=threadId,SenderUserName=message.SenderUserName,BodyCiphertext=await protector.ProtectAsync(message.Body),CreatedAtUtc=message.CreatedAtUtc});
+        await db.RunInTransactionAsync(connection=>
+        {
+            connection.Execute("delete from CachedThreadMessage where ThreadId=?",threadId);
+            foreach(CachedThreadMessage row in rows)connection.InsertOrReplace(row);
+        });
+    }
+    public async Task<List<MessageDto>> GetCachedThreadMessagesAsync(Guid threadId)
+    {
+        await InitializeAsync();
+        List<CachedThreadMessage> rows=await db.Table<CachedThreadMessage>().Where(x=>x.ThreadId==threadId).OrderBy(x=>x.CreatedAtUtc).ToListAsync();
+        List<MessageDto> result=[];
+        foreach(CachedThreadMessage row in rows)
+            result.Add(new(row.Id,row.ThreadId,row.SenderUserName,await protector.UnprotectAsync(row.BodyCiphertext)??"",row.CreatedAtUtc));
+        return result;
+    }
+
     public async Task QueueMessageAsync(LocalMessageSubmission message)
     {
         await InitializeAsync();
