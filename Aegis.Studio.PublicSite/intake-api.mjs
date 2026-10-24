@@ -58,7 +58,13 @@ export function createIntakeApi(env,readBody,json) {
   return {store,workdayStore,async handle(req,res,url){
     const route=url.pathname, method=req.method;
     if(route==='/api/v1/auth/login'&&method==='POST'){
-      const p=await input(req,8192),result=workdayStore.login(p.userName,p.password,p.deviceId||'');
+      const p=await input(req,8192);
+      const minute=Math.floor(Date.now()/60000),identity=String(p.userName||'').trim().toLowerCase().slice(0,200);
+      const key=`workday-login:${req.socket?.remoteAddress||'unknown'}:${identity}:${minute}`;
+      const attempts=(rates.get(key)||0)+1;rates.set(key,attempts);
+      if(rates.size>2000)for(const candidate of rates.keys())if(!candidate.endsWith(`:${minute}`))rates.delete(candidate);
+      if(attempts>10)fail(429,'rate_limited','Too many sign-in attempts. Retry after the current minute.');
+      const result=workdayStore.login(p.userName,p.password,p.deviceId||'');
       json(res,200,{userName:result.userName,displayName:result.displayName,expiresAt:result.expiresAt},{'Set-Cookie':`aegis_workday_session=${result.token}; Path=/api/v1/; HttpOnly; SameSite=Lax; Max-Age=28800${env.NODE_ENV==='production'?'; Secure':''}`,'Cache-Control':'no-store'});return true;
     }
     if(route==='/api/v1/auth/logout'&&method==='POST'){
@@ -95,7 +101,7 @@ export function createIntakeApi(env,readBody,json) {
     }
     if(route==='/api/v1/workday/device-session/revoke'&&method==='POST'){
       const user=requireWorkday(req),p=await input(req,8192);
-      workdayStore.revokeDevice(user.user_name,p.deviceId);json(res,204,{});return true;
+      workdayStore.revokeDevice(user.user_name,p.deviceId);res.writeHead(204).end();return true;
     }
     if(route==='/api/v1/workday/bootstrap'&&method==='GET'){
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
