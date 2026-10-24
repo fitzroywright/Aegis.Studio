@@ -2,6 +2,9 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Security.Claims;
+using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Scheduling;
 using Aegis.Studio.Web.WorkDay;
 
 namespace Aegis.Studio.Web.WorkDay;
@@ -36,6 +39,7 @@ public sealed class WorkDayApiExchangeWorker(
         {
             try
             {
+                await PublishSnapshotsAsync(http,stoppingToken);
                 await PullOperationsAsync(http,stoppingToken);
                 await Task.Delay(TimeSpan.FromSeconds(10),stoppingToken);
             }
@@ -45,6 +49,51 @@ public sealed class WorkDayApiExchangeWorker(
                 logger.LogError(ex,"WorkDay API exchange failed; Studio will retry.");
                 try{await Task.Delay(TimeSpan.FromSeconds(20),stoppingToken);}
                 catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){break;}
+            }
+        }
+    }
+
+    private async Task PublishSnapshotsAsync(HttpClient http,CancellationToken ct)
+    {
+        using IServiceScope scope=scopes.CreateScope();
+        IServiceProvider services=scope.ServiceProvider;
+        StudioDatabase database=services.GetRequiredService<StudioDatabase>();
+        ScheduleStore schedules=services.GetRequiredService<ScheduleStore>();
+        WorkDayStore store=services.GetRequiredService<WorkDayStore>();
+        IConfiguration config=services.GetRequiredService<IConfiguration>();
+        JobAccessService access=services.GetRequiredService<JobAccessService>();
+        PhotographerStore photographers=new(database);
+        DateTimeOffset now=DateTimeOffset.UtcNow;
+        WorkDayTimePolicy policy=WorkDayTimeSemantics.FromConfiguration(config);
+        foreach(PhotographerProfile profile in photographers.GetAll().Where(x=>x.IsActive))
+        {
+            ct.ThrowIfCancellationRequested();
+            ClaimsPrincipal principal=new(new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier,profile.UserName),
+                new Claim("login_name",profile.UserName),
+                new Claim(ClaimTypes.Name,profile.DisplayName)
+            ],"WorkDayExchange"));
+            WorkDayBootstrap? bootstrap=WorkDayEndpoints.BuildBootstrap(principal,database,schedules,store,config,access);
+            if(bootstrap is null)continue;
+            var snapshot=new
+            {
+                bootstrap.UserName,bootstrap.DisplayName,bootstrap.ServerTimeUtc,bootstrap.Today,bootstrap.Upcoming,
+                bootstrap.ActiveWorkSession,bootstrap.LocationTrackingEnabled,bootstrap.LocationTrackingMode,
+                bootstrap.GeneratedAtUtc,bootstrap.FieldTargets,
+                availability=photographers.GetAvailability(profile.UserName,now.AddDays(-1),now.AddDays(90)),
+                timeSummary=store.GetTimeSummaries([profile.UserName],now.AddDays(-14),now,policy).Single()
+            };
+            try
+            {
+                using var published=await http.PutAsJsonAsync("admin/workday/snapshots",
+                    new{userName=profile.UserName,revision=now.ToUnixTimeMilliseconds(),snapshot},JsonOptions,ct);
+                if(!published.IsSuccessStatusCode)
+                    logger.LogWarning("WorkDay snapshot publication for {UserName} returned HTTP {StatusCode}.",profile.UserName,(int)published.StatusCode);
+            }
+            catch(HttpRequestException ex)
+            {
+                logger.LogWarning(ex,"WorkDay snapshot publication failed for {UserName}; Studio will retry.",profile.UserName);
             }
         }
     }
