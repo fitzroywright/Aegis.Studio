@@ -6,7 +6,9 @@ Aegis Studio WorkDay is the Android/iOS field execution client for Aegis.Studio.
 
 ## Architecture
 
-WorkDay -> authenticated Studio API -> Aegis.Studio -> existing Studio services.
+WorkDay -> HTTPS API Site at https://api.bryanstudiosltd.com/api/v1 -> private TLS Studio upstream -> existing Studio services.
+
+The mobile app has no Studio host setting and sends every WorkDay request to the API Site. The API Site proxies only the allowlisted WorkDay authentication, field, messaging, notification and assignment-gallery routes. It forwards authentication cookies and Studio-issued device tokens to Studio; Studio remains authoritative and keeps all existing authorization, scheduling, messaging, storage and audit rules. The proxy does not create a second WorkDay database or queue. The app's encrypted SQLite cache and outbox remain the offline record.
 
 On the device:
 - MAUI presentation
@@ -20,7 +22,7 @@ Server-side WorkDay data lives in the authoritative Studio PostgreSQL database.
 
 ## Authentication and device sessions
 
-LOGIN authenticates the user to Studio.
+LOGIN authenticates the user through the API Site; the API Site forwards the request to Studio over validated HTTPS. The credential is not saved by the API Site. Session cookies and Studio-issued device tokens pass through the gateway to Studio.
 SIGN IN FOR WORK starts a WorkDay work session. They are different events.
 
 After normal Studio authentication, WorkDay requests a device session. The raw device token is returned once and stored in platform SecureStorage. Studio stores only a SHA-256 token hash. Device sessions are revocable and expire according to WorkDay:DeviceSessionDays.
@@ -49,7 +51,7 @@ Pending -> Sending -> Acknowledged
 
 The server treats OperationId as the idempotency key. Version-sensitive assignment changes include ExpectedVersion. Ambiguous version conflicts are retained as Conflict rather than silently overwriting server state.
 
-WorkDay must never show a local operation as synchronized until Studio acknowledges it.
+WorkDay must never show a local operation as synchronized until Studio acknowledges it. The mobile transport always targets `https://api.bryanstudiosltd.com/api/v1`; requests are relayed to Studio and retain Studio's existing idempotency and authorization behavior.
 
 ## Upload queue
 
@@ -166,18 +168,20 @@ Stop accepting new field actions that cannot be durably persisted. Tell the user
 ## Deployment
 
 Server:
-1. deploy the updated Aegis.Studio.Web;
-2. ensure PostgreSQL migrations/schema initialization completes;
-3. configure WorkDay policy keys, including LocationTrackingMode, DeviceSessionDays, TelemetryStaleSeconds and LocationRetentionDays;
-4. ensure Aegis.Operations URL/registration identity is valid;
-5. verify /api/workday/bootstrap after authentication.
+1. deploy the Public Site gateway and updated Aegis.Studio.Web;
+2. configure `/etc/aegis/public-site.env` with `WORKDAY_STUDIO_ORIGIN=https://studio.bryanstudiosltd.com`, `WORKDAY_STUDIO_CONNECT_ADDRESS=127.0.0.1`, and `WORKDAY_STUDIO_TIMEOUT_MS=120000`; the API Site connects to the local Nginx listener using Studio's HTTPS certificate;
+3. ensure the API Nginx upload limit permits WorkDay files (at least 32 MB; increase it if Studio accepts larger uploads);
+4. ensure PostgreSQL migrations/schema initialization completes;
+5. configure WorkDay policy keys, including LocationTrackingMode, DeviceSessionDays, TelemetryStaleSeconds and LocationRetentionDays;
+6. ensure Aegis.Operations URL/registration identity is valid;
+7. verify the API Site gateway by signing into WorkDay and completing an online bootstrap/sync.
 
 Mobile:
-1. configure only the HTTPS Studio service URL;
-2. authenticate normally;
-3. allow WorkDay to issue a device session;
-4. grant location permission only if organizational policy uses location evidence;
-5. verify an online sync before field use.
+1. WorkDay is locked to `https://api.bryanstudiosltd.com/api/v1`; it does not connect directly to the Studio host;
+2. authenticate normally and allow WorkDay to issue a device session;
+3. grant location permission only if organizational policy uses location evidence;
+4. verify an online sync before field use.
+
 
 No database, OpenBao, SMTP, Slack, Teams, Microsoft Graph or storage-provider secret belongs on the device.
 
