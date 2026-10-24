@@ -23,10 +23,14 @@ export class WorkDayExchangeStore {
   provisionAccount(input) {
     if(!input||typeof input.userName!=='string'||!input.userName.trim()||input.userName.length>200||typeof input.displayName!=='string'||input.displayName.length>200)throw Object.assign(new Error('A user name and display name are required.'),{status:400,code:'invalid_account'});
     const userKey=input.userName.trim().toLowerCase(),userName=input.userName.trim(),displayName=input.displayName.trim();
-    const now=this.now(),enrollmentToken=randomBytes(32).toString('base64url'),expires=new Date(now.getTime()+24*60*60*1000).toISOString();
-    this.db.prepare(`INSERT INTO workday_accounts(user_key,user_name,display_name,active,enrollment_hash,enrollment_expires,created_at,updated_at) VALUES(?,?,?,1,?,?,?,?)
-      ON CONFLICT(user_key) DO UPDATE SET user_name=excluded.user_name,display_name=excluded.display_name,active=1,updated_at=excluded.updated_at`).run(userKey,userName,displayName,hash(enrollmentToken),expires,now.toISOString(),now.toISOString());
-    return {userName,displayName,enrollmentToken,expiresAt:expires};
+    const existing=this.db.prepare('SELECT password_hash FROM workday_accounts WHERE user_key=?').get(userKey),now=this.now();
+    if(existing){
+      this.db.prepare('UPDATE workday_accounts SET user_name=?,display_name=?,active=1,updated_at=? WHERE user_key=?').run(userName,displayName,now.toISOString(),userKey);
+      return {userName,displayName,enrollmentRequired:!existing.password_hash};
+    }
+    const enrollmentToken=randomBytes(32).toString('base64url'),expires=new Date(now.getTime()+24*60*60*1000).toISOString();
+    this.db.prepare('INSERT INTO workday_accounts(user_key,user_name,display_name,active,enrollment_hash,enrollment_expires,created_at,updated_at) VALUES(?,?,?,1,?,?,?,?)').run(userKey,userName,displayName,hash(enrollmentToken),expires,now.toISOString(),now.toISOString());
+    return {userName,displayName,enrollmentRequired:true,enrollmentToken,expiresAt:expires};
   }
   enroll(token,password) {
     if(typeof token!=='string'||token.length<32||typeof password!=='string'||password.length<12||password.length>200)throw Object.assign(new Error('Use a valid enrollment code and a password of at least 12 characters.'),{status:400,code:'invalid_enrollment'});
