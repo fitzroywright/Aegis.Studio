@@ -82,3 +82,6 @@ create table if not exists studio_gallery_exports(
  job_id uuid null,
  client_id uuid null references studio_clients(id)
 );
+alter table studio_gallery_exports add column if not exists conversation_id uuid null references studio_conversations(id);
+alter table studio_gallery_exports add column if not exists job_id uuid null;
+alter table studio_gallery_exports add column if not exists client_id uuid null references studio_clients(id);
