@@ -85,11 +85,9 @@ public sealed class WorkDayApiExchangeWorker(
             string? token=result?.EnrollmentToken;
             if(string.IsNullOrWhiteSpace(token))continue;
 
-            string path=configuration["WorkDay:EnrollmentFile"]??"/var/lib/aegis-studio/workday-enrollment-codes.json";
+            string path=configuration["WorkDay:EnrollmentFile"]??"/var/lib/aegis/studio/workday-enrollment-codes.json";
             string directory=Path.GetDirectoryName(path)!;
             Directory.CreateDirectory(directory);
-            if(!OperatingSystem.IsWindows())
-                File.SetUnixFileMode(directory,UnixFileMode.UserRead|UnixFileMode.UserWrite|UnixFileMode.UserExecute);
             List<WorkDayEnrollmentRecord> records=[];
             if(File.Exists(path))
             {
