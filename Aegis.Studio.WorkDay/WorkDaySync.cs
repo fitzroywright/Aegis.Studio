@@ -95,9 +95,32 @@ public sealed class WorkDayApiClient
         using StreamContent file=new(fs);
         file.Headers.ContentType=new MediaTypeHeaderValue(upload.ContentType);
         form.Add(file,"file",upload.FileName);
-        using HttpResponseMessage r=await http.PostAsync($"workday/assignments/{upload.AssignmentId:D}/uploads",form,ct);
-        r.EnsureSuccessStatusCode();
-        return await r.Content.ReadFromJsonAsync<UploadResultDto>(cancellationToken:ct) ?? throw new InvalidOperationException("Studio did not acknowledge the upload.");
+        using HttpResponseMessage submitted=await http.PostAsync($"workday/assignments/{upload.AssignmentId:D}/uploads",form,ct);
+        submitted.EnsureSuccessStatusCode();
+        if(submitted.StatusCode!=System.Net.HttpStatusCode.Accepted)
+            return await submitted.Content.ReadFromJsonAsync<UploadResultDto>(cancellationToken:ct)
+                ??throw new InvalidOperationException("The API Site returned no upload receipt.");
+
+        DateTimeOffset deadline=DateTimeOffset.UtcNow.AddMinutes(5);
+        while(DateTimeOffset.UtcNow<deadline)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.Delay(TimeSpan.FromSeconds(3),ct);
+            using HttpResponseMessage status=await http.GetAsync($"workday/operations/{upload.UploadId:D}",ct);
+            status.EnsureSuccessStatusCode();
+            using JsonDocument payload=JsonDocument.Parse(await status.Content.ReadAsStringAsync(ct));
+            JsonElement root=payload.RootElement;
+            string state=root.TryGetProperty("state",out JsonElement stateElement)?stateElement.GetString()??"Pending":"Pending";
+            if(state=="Conflict")
+            {
+                string message=root.TryGetProperty("result",out JsonElement failure)&&failure.TryGetProperty("message",out JsonElement detail)
+                    ?detail.GetString()??"Studio rejected the upload.":"Studio rejected the upload.";
+                throw new HttpRequestException(message,null,System.Net.HttpStatusCode.Conflict);
+            }
+            if(state=="Acknowledged"&&root.TryGetProperty("result",out JsonElement stored)&&stored.TryGetProperty("result",out JsonElement value))
+                return value.Deserialize<UploadResultDto>()??throw new InvalidOperationException("Studio returned no saved upload.");
+        }
+        throw new HttpRequestException("The API Site has stored this upload and is waiting for Studio to save it.");
     }
 
     public Task<WorkDayTimeSummaryDto?> GetTimeSummaryAsync(DateTimeOffset? from=null,DateTimeOffset? to=null,CancellationToken ct=default)
