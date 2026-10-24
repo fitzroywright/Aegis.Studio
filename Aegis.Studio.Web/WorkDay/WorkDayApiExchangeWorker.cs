@@ -8,6 +8,8 @@ using Aegis.Studio.Web.Scheduling;
 using Aegis.Studio.Web.Production;
 using Aegis.Studio.Web.Messaging;
 using Aegis.Studio.Web.Notifications;
+using Aegis.Studio.Web.Operations;
+using Aegis.Studio.Web.Storage;
 using Aegis.Studio.Web.WorkDay;
 
 namespace Aegis.Studio.Web.WorkDay;
@@ -46,6 +48,7 @@ public sealed class WorkDayApiExchangeWorker(
                 await PublishSnapshotsAsync(http,stoppingToken);
                 await PullOperationsAsync(http,stoppingToken);
                 await PullAvailabilityAsync(http,stoppingToken);
+                await PullUploadsAsync(http,stoppingToken);
                 await PullThreadCreatesAsync(http,stoppingToken);
                 await PullThreadMessagesAsync(http,stoppingToken);
                 await Task.Delay(TimeSpan.FromSeconds(10),stoppingToken);
@@ -211,6 +214,67 @@ public sealed class WorkDayApiExchangeWorker(
             ack.EnsureSuccessStatusCode();
         }
     }
+
+    private async Task PullUploadsAsync(HttpClient http,CancellationToken ct)
+    {
+        using var response=await http.GetAsync("admin/workday/updates?after=0&limit=20&kind=AssignmentUpload",ct);
+        response.EnsureSuccessStatusCode();
+        var batch=await response.Content.ReadFromJsonAsync<WorkDayUpdateBatch>(JsonOptions,ct)
+            ??throw new InvalidOperationException("The API Site returned an empty WorkDay upload batch.");
+        foreach(WorkDayUpdate update in batch.Items)
+        {
+            ct.ThrowIfCancellationRequested();
+            string state="Acknowledged",message="Upload synchronized to Studio.";
+            object? uploadResult=null;
+            try
+            {
+                Guid assignmentId=update.Payload.GetProperty("assignmentId").GetGuid();
+                Guid uploadId=update.Payload.GetProperty("uploadId").GetGuid();
+                string fileName=update.Payload.GetProperty("fileName").GetString()??"upload";
+                string contentType=update.Payload.GetProperty("contentType").GetString()??"application/octet-stream";
+                byte[] bytes=Convert.FromBase64String(update.Payload.GetProperty("contentBase64").GetString()??"");
+                if(bytes.Length is 0 or >25_000_000)throw new InvalidOperationException("WorkDay upload size is invalid.");
+                ClaimsPrincipal principal=CreateFieldPrincipal(update.UserName);
+                using IServiceScope scope=scopes.CreateScope();
+                IServiceProvider services=scope.ServiceProvider;
+                StudioDatabase database=services.GetRequiredService<StudioDatabase>();
+                ScheduleStore schedules=services.GetRequiredService<ScheduleStore>();
+                JobAccessService access=services.GetRequiredService<JobAccessService>();
+                StudioStore studio=services.GetRequiredService<StudioStore>();
+                AttachmentStore attachments=services.GetRequiredService<AttachmentStore>();
+                StudioOperationsFlowPublisher flows=services.GetRequiredService<StudioOperationsFlowPublisher>();
+                if(!WorkDayEndpoints.AssignmentAllowed(principal,update.UserName,assignmentId,database,schedules,access,"AddAttachments"))
+                    throw new InvalidOperationException("Photographer is not authorized to upload to this assignment.");
+                ScheduleEntry? entry=schedules.GetEntries(entryId:assignmentId).SingleOrDefault();
+                Guid? jobId=entry is null?null:WorkDayEndpoints.ResolveAssignmentJobId(entry,database);
+                if(jobId is not Guid id||studio.GetJob(id) is not { } job)
+                    throw new InvalidOperationException("Assignment no longer belongs to an active Studio Job.");
+                await using MemoryStream content=new(bytes);
+                FormFile file=new(content,0,content.Length,"file",Path.GetFileName(fileName))
+                {Headers=new HeaderDictionary(),ContentType=contentType};
+                string correlation=uploadId.ToString("D");
+                flows.TryEnqueueWorkDayUpload(correlation,"Upload",assignmentId.ToString("D"));
+                StudioAttachment stored=await attachments.AddAsync(job.ConversationId,file,"Internal",update.UserName,ct,$"workday:{uploadId:D}");
+                flows.TryEnqueueWorkDayUpload(correlation,"Storage",stored.Id.ToString("D"));
+                flows.TryEnqueueWorkDayUpload(correlation,"MetadataAssociation",assignmentId.ToString("D"));
+                flows.TryEnqueueWorkDayUpload(correlation,"Acknowledged",stored.Id.ToString("D"));
+                uploadResult=new WorkDayUploadResult(uploadId,stored.Id,assignmentId,stored.FileName,stored.Size,stored.StorageStatus,DateTimeOffset.UtcNow);
+            }
+            catch(InvalidOperationException ex){state="Conflict";message=ex.Message;}
+            catch(FormatException){state="Conflict";message="WorkDay upload payload is invalid.";}
+            using var ack=await http.PostAsJsonAsync(
+                $"admin/workday/updates/{update.OperationId:D}/result",
+                new{state,message,result=uploadResult,acknowledgedAtUtc=DateTimeOffset.UtcNow},ct);
+            ack.EnsureSuccessStatusCode();
+        }
+    }
+
+    private static ClaimsPrincipal CreateFieldPrincipal(string userName)=>new(new ClaimsIdentity(
+    [
+        new Claim(ClaimTypes.NameIdentifier,userName),
+        new Claim("login_name",userName),
+        new Claim(ClaimTypes.Name,userName)
+    ],"WorkDayExchange"));
 
     private async Task PullThreadCreatesAsync(HttpClient http,CancellationToken ct)
     {
