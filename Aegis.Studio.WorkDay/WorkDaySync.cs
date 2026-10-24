@@ -28,6 +28,12 @@ public sealed class WorkDayApiClient
         r.EnsureSuccessStatusCode();
     }
 
+    public async Task EnrollAsync(string enrollmentToken,string password,CancellationToken ct=default)
+    {
+        using HttpResponseMessage r=await http.PostAsJsonAsync("workday/enroll",new{enrollmentToken,password},ct);
+        if(!r.IsSuccessStatusCode)throw new HttpRequestException(await ErrorAsync(r,ct),null,r.StatusCode);
+    }
+
     public Task<WorkDayBootstrapDto?> BootstrapAsync(CancellationToken ct=default)=>
         http.GetFromJsonAsync<WorkDayBootstrapDto>("workday/bootstrap",ct);
 
