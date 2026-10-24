@@ -12,8 +12,9 @@ public sealed class WorkDayDeviceBoundaryTests
     [InlineData("/api/workday/operations",true)]
     [InlineData("/api/workday/availability",true)]
     [InlineData("/api/workday/device-session",false)]
-    [InlineData("/api/workday/assignments/11111111-1111-1111-1111-111111111111/uploads",false)]
-    [InlineData("/api/workday/time-summary",false)]
+    [InlineData("/api/workday/assignments/11111111-1111-1111-1111-111111111111/uploads",true)]
+    [InlineData("/api/workday/assignments/11111111-1111-1111-1111-111111111111/gallery-status",true)]
+    [InlineData("/api/workday/time-summary",true)]
     [InlineData("/api/jobs",false)]
     [InlineData("/api/production/orders",false)]
     public async Task PhotographerDeviceCannotBecomeAGeneralStudioSession(string path,bool allowed)
