@@ -252,6 +252,7 @@ public sealed class OutboundEmailStore
             insert into studio_outbound_email
             (id,conversation_id,from_address,to_address,subject,body,thread_id,status,created_at_utc,provider_message_id,kind,sent_by_user_name,sending_identity_type,delivery_metadata)
             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb)
+            on conflict (id) do nothing
             """;
         object?[] values =
         [
