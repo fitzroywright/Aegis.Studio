@@ -472,7 +472,6 @@ public sealed class WorkDayLocalStore
     {
         await InitializeAsync();
         if(!string.IsNullOrEmpty(message.Body))message.BodyCiphertext=await protector.ProtectAsync(message.Body);
-        message.Body="";
         await db.InsertOrReplaceAsync(message);
     }
     public async Task<int> PendingMessageCountAsync()=>
