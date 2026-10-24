@@ -264,7 +264,7 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
         {
             await LoadStatusAsync();
             LastAttemptUtc=DateTimeOffset.UtcNow;State="Sending";LastError=null;CompletedUpdates=0;
-            TotalUpdates=(await store.PendingAsync()).Count+(await store.GetAvailabilityAsync()).Count(x=>x.SyncState is "Pending" or "Failed" or "Sending");Publish();
+            TotalUpdates=(await store.PendingAsync()).Count+(await store.GetAvailabilityAsync()).Count(x=>x.SyncState is "Pending" or "Failed" or "Sending")+(await store.PendingMessagesAsync()).Count;Publish();
             await RefreshAssignmentsCoreAsync(ct);
             foreach(var availability in (await store.GetAvailabilityAsync()).Where(x=>x.SyncState is "Pending" or "Failed" or "Sending"))
             {
@@ -305,9 +305,36 @@ public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient a
                 }
                 await store.SaveOperationAsync(op);CompletedUpdates++;Publish();
             }
+            foreach(LocalMessageSubmission message in await store.PendingMessagesAsync())
+            {
+                message.State="Sending";message.AttemptCount++;message.LastAttemptUtc=DateTimeOffset.UtcNow;await store.SaveMessageAsync(message);
+                try
+                {
+                    if(message.TargetType=="Thread")
+                        await api.SendThreadMessageAsync(message.TargetId,message.Body,message.OperationId,ct);
+                    else if(message.TargetType=="Conversation")
+                        await api.ReplyConversationAsync(message.TargetId,message.Body,message.SendingIdentity??"Workspace",message.IsInternal,message.OperationId,ct);
+                    else throw new InvalidOperationException("The saved WorkDay message has an unknown destination.");
+                    message.State="Acknowledged";message.LastError=null;
+                }
+                catch(HttpRequestException ex) when(ex.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
+                {
+                    message.State="Conflict";message.LastError=ex.Message;
+                }
+                catch(InvalidOperationException ex)
+                {
+                    message.State="Conflict";message.LastError=ex.Message;
+                }
+                catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+                {
+                    message.State="Failed";message.LastError=ex.Message;await store.SaveMessageAsync(message);State="Waiting";LastError=ex.Message;Publish();return;
+                }
+                await store.SaveMessageAsync(message);CompletedUpdates++;Publish();
+            }
+
             await RefreshAssignmentsCoreAsync(ct);
             var remaining=await store.UnacknowledgedAsync();
-            bool outstanding=remaining.Count>0||(await store.GetAvailabilityAsync()).Any(x=>WorkDayClientRules.IsOutstanding(x.SyncState));
+            bool outstanding=remaining.Count>0||(await store.GetAvailabilityAsync()).Any(x=>WorkDayClientRules.IsOutstanding(x.SyncState))||(await store.UnacknowledgedMessagesAsync()).Count>0;
             State=outstanding?"Degraded":"Healthy";
             if(!outstanding){LastSuccessUtc=DateTimeOffset.UtcNow;await store.SetMetadataAsync("LastSuccessfulSyncUtc",LastSuccessUtc.Value.ToString("O"));}
             else LastError="Some changes need review. Open Review reports / resolve conflict; original reports remain on this device.";
