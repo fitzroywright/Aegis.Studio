@@ -52,7 +52,7 @@
           <div id="signed-in" hidden>
             <div class="gallery-welcome"><div><p class="eyebrow">YOUR PRIVATE SPACE</p><h3>Hello, <span id="client-name">friend</span>.</h3><p id="gallery-title" class="muted">Your photographs are ready when you are.</p></div><button id="sign-out" class="text-button">Sign out ×</button></div>
             <form id="client-link-form" class="track-form"><label>Connect your Studio client account<input name="clientLinkCode" autocomplete="one-time-code" minlength="20" maxlength="128" placeholder="Enter the one-time code from Bryan’s Studio" required></label><button class="button button-dark" type="submit">Connect client ID <span>↗</span></button><p id="client-link-result" role="status"></p></form>
-            <div id="gallery-status" class="gallery-status" role="status"></div><div id="gallery-grid" class="proof-grid"></div>
+            <label id="client-gallery-picker" hidden>Published galleries<select id="client-gallery-select"></select></label><div id="gallery-status" class="gallery-status" role="status"></div><div id="gallery-grid" class="proof-grid"></div>
             <div class="gallery-actions"><button id="submit-selections" class="button button-dark" hidden>Send my favourites <span>↗</span></button><p id="selection-result" role="status"></p></div>
           </div>
         </div>
