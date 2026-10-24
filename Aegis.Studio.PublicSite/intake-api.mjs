@@ -284,7 +284,7 @@ export function createIntakeApi(env,readBody,json) {
       if(!key||key.length>200)fail(400,'invalid_idempotency_key','A unique Idempotency-Key of at most 200 characters is required.');
       const requestKey=createHash('sha256').update(owner+':'+key).digest('hex');
       const result=store.createGalleryAccessRequest({...p,requestKey});
-      json(res,result.created?201:200,{id:result.id,status:'Pending',accepted:true});return true;
+      json(res,result.created?201:200,{id:result.id,status:result.status,accepted:true});return true;
     }
     if(route==='/api/v1/gallery-access-requests'&&method==='GET'){
       authenticate(req,'gallery:access:pull');json(res,200,{items:store.pendingGalleryAccessRequests(Math.max(1,Math.min(500,Number(url.searchParams.get('limit')||100))))});return true;
