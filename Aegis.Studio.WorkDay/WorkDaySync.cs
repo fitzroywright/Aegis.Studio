@@ -195,18 +195,22 @@ public sealed class WorkDayApiClient
         throw new HttpRequestException("Studio has not created the message thread yet; the API Site will keep the request for retry.");
     }
     public Task<List<MessageDto>?> GetMessagesAsync(Guid threadId,CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageDto>>($"messages/threads/{threadId:D}",ct);
-    public async Task SendThreadMessageAsync(Guid threadId,string body,CancellationToken ct=default)
+    public Task SendThreadMessageAsync(Guid threadId,string body,CancellationToken ct=default)=>
+        SendThreadMessageAsync(threadId,body,Guid.NewGuid(),ct);
+
+    public async Task SendThreadMessageAsync(Guid threadId,string body,Guid operationId,CancellationToken ct=default)
     {
-        Guid operationId=Guid.NewGuid();
         await SubmitAndWaitAsync($"messages/threads/{threadId:D}",new{body},operationId,ct);
     }
     public Task<List<NotificationDto>?> GetNotificationsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<NotificationDto>>("notifications?count=50",ct);
     public Task<AssignmentGalleryStatusDto?> GetAssignmentGalleryStatusAsync(Guid assignmentId,CancellationToken ct=default)=>http.GetFromJsonAsync<AssignmentGalleryStatusDto>($"workday/assignments/{assignmentId:D}/gallery-status",ct);
     public Task<SendingIdentityOptionsDto?> GetSendingIdentitiesAsync(Guid conversationId,CancellationToken ct=default)=>http.GetFromJsonAsync<SendingIdentityOptionsDto>($"conversations/{conversationId:D}/sending-identities",ct);
-    public async Task ReplyConversationAsync(Guid conversationId,string body,string identity,CancellationToken ct=default)
+    public Task ReplyConversationAsync(Guid conversationId,string body,string identity,CancellationToken ct=default)=>
+        ReplyConversationAsync(conversationId,body,identity,false,Guid.NewGuid(),ct);
+
+    public async Task ReplyConversationAsync(Guid conversationId,string body,string identity,bool isInternal,Guid operationId,CancellationToken ct=default)
     {
-        Guid operationId=Guid.NewGuid();
-        await SubmitAndWaitAsync($"conversations/{conversationId:D}/messages",new{body,isInternal=false,sendingIdentity=identity},operationId,ct);
+        await SubmitAndWaitAsync($"conversations/{conversationId:D}/messages",new{body,isInternal,sendingIdentity=identity},operationId,ct);
     }
 
     private async Task<OperationResultDto> SubmitAndWaitAsync<T>(string path,T payload,Guid operationId,CancellationToken ct)
