@@ -42,6 +42,7 @@ export class IntakeStore {
       CREATE TABLE IF NOT EXISTS replays(owner TEXT,key TEXT,hash TEXT,result TEXT,PRIMARY KEY(owner,key));
       CREATE TABLE IF NOT EXISTS attachments(id TEXT PRIMARY KEY,intake_id TEXT,metadata TEXT,content BLOB,state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS galleries(id TEXT PRIMARY KEY,client_id TEXT NOT NULL,payload TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS gallery_access_requests(id TEXT PRIMARY KEY,client_id TEXT NOT NULL,gallery_id TEXT,client_name TEXT NOT NULL,client_email TEXT NOT NULL,notes TEXT NOT NULL,request_key TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'Pending',acknowledged_at TEXT);
       CREATE TABLE IF NOT EXISTS api_credentials(id TEXT PRIMARY KEY,name TEXT NOT NULL,secret_hash TEXT NOT NULL UNIQUE,scopes TEXT NOT NULL,created_at TEXT NOT NULL,last_used_at TEXT,revoked_at TEXT,client_application TEXT NOT NULL DEFAULT 'API');
       CREATE TABLE IF NOT EXISTS client_link_challenges(id TEXT PRIMARY KEY,code_hash TEXT NOT NULL UNIQUE,client_id TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT,revoked_at TEXT,created_at TEXT NOT NULL,provider TEXT);
       CREATE TABLE IF NOT EXISTS client_identity_links(provider TEXT NOT NULL,subject TEXT NOT NULL,client_id TEXT NOT NULL,verified_at TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(provider,subject));
@@ -57,7 +58,7 @@ export class IntakeStore {
   transaction(action) { this.db.exec('BEGIN IMMEDIATE'); try { const result = action(); this.db.exec('COMMIT'); return result; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
   createApiCredential(name, scopes, clientApplication='API') {
     if(typeof name!=='string'||!name.trim()||name.trim().length>100) fail(400,'invalid_key_name','Provide a key name up to 100 characters.');
-    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','booking:catalog:publish','booking:availability:publish','gallery:publish','gallery:read','client:link','attachment:scan','payment:verified','workday:sync']);
+    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','booking:catalog:publish','booking:availability:publish','gallery:publish','gallery:read','client:link','attachment:scan','payment:verified','workday:sync','gallery:access:submit','gallery:access:pull','gallery:access:ack']);
     if(!Array.isArray(scopes)||!scopes.length||scopes.some(x=>!allowed.has(x))||new Set(scopes).size!==scopes.length) fail(400,'invalid_scopes','Choose one or more supported, unique scopes.');
     if(!['API','Workday Mobile','Studio'].includes(clientApplication))fail(400,'invalid_client_application','Choose API, Workday Mobile or Studio as the credential application.');
     const id=randomUUID(),secret=randomBytes(32).toString('base64url'),createdAt=this.now().toISOString();
@@ -246,6 +247,25 @@ export class IntakeStore {
       this.db.prepare('INSERT INTO payment_events VALUES(?,?,?,?)').run(event.eventId,id,hash,JSON.stringify(event));
       const p=JSON.parse(r.payload);p.paymentEvents.push(event);p.revision++;this.db.prepare('UPDATE intakes SET payload=?,revision=? WHERE id=?').run(JSON.stringify(p),p.revision,id);this.change(p);return {eventId:event.eventId};
     });
+  }
+  createGalleryAccessRequest(p) {
+    if(!/^[0-9a-f-]{36}$/i.test(String(p.clientId||'')))fail(400,'invalid_gallery_access_request','A valid client ID is required.');
+    if(p.galleryId&&!/^[0-9a-f-]{36}$/i.test(String(p.galleryId)))fail(400,'invalid_gallery_access_request','Gallery ID must be a UUID.');
+    const name=String(p.clientName||'').trim(),email=String(p.clientEmail||'').trim(),notes=String(p.notes||'').trim(),key=String(p.requestKey||'').trim();
+    if(!name||name.length>200||!/^\\S+@\\S+\\.\\S+$/.test(email)||email.length>320||notes.length>2000||!key||key.length>200)fail(400,'invalid_gallery_access_request','Client name, valid email and unique request key are required.');
+    const existing=this.db.prepare('SELECT id FROM gallery_access_requests WHERE request_key=?').get(key);
+    if(existing)return {id:existing.id,created:false};
+    const id=randomUUID(),createdAt=this.now().toISOString();
+    this.db.prepare('INSERT INTO gallery_access_requests(id,client_id,gallery_id,client_name,client_email,notes,request_key,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id,p.clientId,p.galleryId||null,name,email,notes,key,createdAt);
+    return {id,created:true};
+  }
+  pendingGalleryAccessRequests(limit=100) {
+    return this.db.prepare("SELECT id,client_id,gallery_id,client_name,client_email,notes,created_at FROM gallery_access_requests WHERE status='Pending' ORDER BY created_at,id LIMIT ?").all(Math.max(1,Math.min(500,limit))).map(x=>({...x,clientId:x.client_id,galleryId:x.gallery_id,clientName:x.client_name,clientEmail:x.client_email,notes:x.notes,createdAtUtc:x.created_at}));
+  }
+  acknowledgeGalleryAccessRequest(id) {
+    const r=this.db.prepare("UPDATE gallery_access_requests SET status='Imported',acknowledged_at=? WHERE id=? AND status='Pending'").run(this.now().toISOString(),id);
+    if(!r.changes&&!this.db.prepare('SELECT 1 FROM gallery_access_requests WHERE id=? AND status=\'Imported\'').get(id))fail(404,'not_found','Gallery access request not found.');
+    return {id,status:'Imported'};
   }
   close() { this.db.close(); }
 }
