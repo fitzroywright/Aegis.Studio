@@ -9,6 +9,27 @@ namespace Aegis.Studio.Web.WorkDay;
 
 public static class WorkDayEndpoints
 {
+    public static WorkDayBootstrap? BuildBootstrap(ClaimsPrincipal user,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,IConfiguration configuration,JobAccessService access)
+    {
+        string userName=UserName(user);
+        PhotographerProfile? profile=new PhotographerStore(db).Get(userName);
+        if(profile is null||!profile.IsActive)return null;
+        DateTimeOffset now=DateTimeOffset.UtcNow;
+        TimeZoneInfo zone=TimeZoneInfo.FindSystemTimeZoneById(configuration["Studio:TimeZoneId"]??"America/Jamaica");
+        DateTime localDate=TimeZoneInfo.ConvertTime(now,zone).Date;
+        DateTimeOffset todayStart=new DateTimeOffset(localDate,zone.GetUtcOffset(localDate)).ToUniversalTime(),todayEnd=todayStart.AddDays(1);
+        WorkDayAssignment[] all=schedules.GetEntries(todayStart.AddDays(-1),todayEnd.AddDays(30))
+            .Where(x=>x.ResourceIds.Contains(profile.ScheduleResourceId))
+            .Select(x=>EnsureAndMapAssignmentAccess(user,profile,x,db,store,access)).Where(x=>x is not null).Select(x=>x!).ToArray();
+        using var rosterConnection=db.OpenConnection();
+        var fieldTargets=all.ToDictionary(x=>x.Id,x=>WorkDayFieldReports.Targets(rosterConnection,null,x.Id));
+        return new WorkDayBootstrap(userName,profile.DisplayName,now,
+            all.Where(x=>x.StartsAtUtc<todayEnd&&x.EndsAtUtc>todayStart).ToArray(),
+            all.Where(x=>x.StartsAtUtc>=todayEnd).ToArray(),store.GetActiveSession(userName),
+            configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled")??false,
+            (configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled")??false)?ParseTrackingMode(configuration["WorkDay:LocationTrackingMode"]):WorkDayLocationTrackingMode.Disabled,
+            now,fieldTargets);
+    }
     public static void MapStudioWorkDay(this WebApplication app)
     {
         RouteGroupBuilder group=app.MapGroup("/api/workday").RequireAuthorization();
@@ -33,36 +54,8 @@ public static class WorkDayEndpoints
 
         group.MapGet("/bootstrap",(ClaimsPrincipal user,StudioDatabase db,ScheduleStore schedules,WorkDayStore store,IConfiguration configuration,JobAccessService access)=>
         {
-            string userName=UserName(user);
-            PhotographerProfile? profile=new PhotographerStore(db).Get(userName);
-            if(profile is null || !profile.IsActive) return Results.NotFound(new{error="No active Studio field profile is linked to this account."});
-
-            DateTimeOffset now=DateTimeOffset.UtcNow;
-            TimeZoneInfo zone=TimeZoneInfo.FindSystemTimeZoneById(configuration["Studio:TimeZoneId"]??"America/Jamaica");
-            DateTime localDate=TimeZoneInfo.ConvertTime(now,zone).Date;
-            DateTimeOffset todayStart=new DateTimeOffset(localDate,zone.GetUtcOffset(localDate)).ToUniversalTime();
-            DateTimeOffset todayEnd=todayStart.AddDays(1);
-            WorkDayAssignment[] all=schedules.GetEntries(todayStart.AddDays(-1),todayEnd.AddDays(30))
-                .Where(x=>x.ResourceIds.Contains(profile.ScheduleResourceId))
-                .Select(x=>EnsureAndMapAssignmentAccess(user,profile,x,db,store,access))
-                .Where(x=>x is not null)
-                .Select(x=>x!)
-                .ToArray();
-
-            using var rosterConnection=db.OpenConnection();
-            var fieldTargets=all.ToDictionary(x=>x.Id,x=>WorkDayFieldReports.Targets(rosterConnection,null,x.Id));
-            return Results.Ok(new WorkDayBootstrap(
-                userName,
-                profile.DisplayName,
-                now,
-                all.Where(x=>x.StartsAtUtc<todayEnd&&x.EndsAtUtc>todayStart).ToArray(),
-                all.Where(x=>x.StartsAtUtc>=todayEnd).ToArray(),
-                store.GetActiveSession(userName),
-                configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled") ?? false,
-                (configuration.GetValue<bool?>("WorkDay:LocationTrackingEnabled") ?? false)
-                    ? ParseTrackingMode(configuration["WorkDay:LocationTrackingMode"])
-                    : WorkDayLocationTrackingMode.Disabled,
-                now,fieldTargets));
+            WorkDayBootstrap? bootstrap=BuildBootstrap(user,db,schedules,store,configuration,access);
+            return bootstrap is null?Results.NotFound(new{error="No active Studio field profile is linked to this account."}):Results.Ok(bootstrap);
         });
 
         group.MapGet("/availability",(ClaimsPrincipal user,DateTimeOffset? from,DateTimeOffset? to,StudioDatabase db)=>
