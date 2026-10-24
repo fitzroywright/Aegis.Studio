@@ -57,3 +57,16 @@ alter table studio_website_import_errors add column if not exists payload jsonb;
 create table if not exists studio_intake_activity(conversation_id uuid primary key references studio_conversations(id),published boolean not null default false,created_at_utc timestamptz not null default now());
 
 alter table studio_website_imports add column if not exists last_status text;
+
+-- Dedicated gallery access inbox; kept separate from the booking and inquiry intake contract.
+create table if not exists studio_website_gallery_access_requests(
+ source text not null,
+ external_id uuid not null,
+ client_id uuid not null references studio_clients(id),
+ gallery_id uuid null,
+ conversation_id uuid not null references studio_conversations(id),
+ payload jsonb not null,
+ imported_at_utc timestamptz not null default now(),
+ primary key(source,external_id)
+);
+create index if not exists ix_website_gallery_access_client on studio_website_gallery_access_requests(client_id, imported_at_utc desc);
