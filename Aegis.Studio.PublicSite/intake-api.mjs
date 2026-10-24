@@ -136,6 +136,59 @@ export function createIntakeApi(env,readBody,json) {
       json(res,200,snapshot?.threads||[],{'Cache-Control':'private, no-store'});return true;
     }
 
+    if(route==='/api/v1/workday/availability'&&method==='POST'){
+      const user=requireWorkday(req),p=await input(req,16384),operationId=p.operationId||randomUUID();
+      const result=workdayStore.enqueue(user.user_name,operationId,'AvailabilityUpsert',{...p,operationId});
+      json(res,202,{id:operationId,userName:user.user_name,startsAtUtc:p.startsAtUtc,endsAtUtc:p.endsAtUtc,availabilityType:p.availabilityType,note:p.note,createdAtUtc:new Date().toISOString(),syncState:result.state});return true;
+    }
+    if(route==='/api/v1/workday/time-summary'&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      json(res,200,snapshot?.timeSummary||null,{'Cache-Control':'private, no-store'});return true;
+    }
+    const assignmentUpload=route.match(/^\\/api\\/v1\\/workday\\/assignments\\/([0-9a-f-]{36})\\/uploads$/i);
+    if(assignmentUpload&&method==='POST'){
+      const user=requireWorkday(req),bytes=await readBody(req,30_000_000);
+      const request=new Request('http://localhost/upload',{method:'POST',headers:{'Content-Type':req.headers['content-type']||''},body:bytes});
+      const form=await request.formData(),file=form.get('file'),uploadId=String(form.get('uploadId')||'');
+      if(!file||typeof file==='string'||!/^[0-9a-f-]{36}$/i.test(uploadId))fail(400,'invalid_upload','Upload ID and file are required.');
+      const content=Buffer.from(await file.arrayBuffer());
+      const result=workdayStore.enqueue(user.user_name,uploadId,'AssignmentUpload',{assignmentId:assignmentUpload[1],uploadId,fileName:file.name,contentType:file.type||'application/octet-stream',contentBase64:content.toString('base64')});
+      json(res,202,{uploadId,attachmentId:uploadId,assignmentId:assignmentUpload[1],fileName:file.name,sizeBytes:content.length,storageStatus:result.state,acknowledgedAtUtc:new Date().toISOString()},{'Cache-Control':'no-store'});return true;
+    }
+    const galleryStatus=route.match(/^\\/api\\/v1\\/workday\\/assignments\\/([0-9a-f-]{36})\\/gallery-status$/i);
+    if(galleryStatus&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      json(res,200,snapshot?.galleryStatus?.[galleryStatus[1]]||{exists:false,isPublished:false,visibleItems:0},{'Cache-Control':'private, no-store'});return true;
+    }
+    if(route==='/api/v1/notifications'&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      json(res,200,snapshot?.notifications||[],{'Cache-Control':'private, no-store'});return true;
+    }
+    const threadCollection=route.match(/^\\/api\\/v1\\/messages\\/threads(?:\\/([0-9a-f-]{36}))?$/i);
+    if(threadCollection&&threadCollection[1]&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name),threadId=threadCollection[1];
+      json(res,200,(snapshot?.messages||[]).filter(x=>String(x.threadId).toLowerCase()===threadId.toLowerCase()),{'Cache-Control':'private, no-store'});return true;
+    }
+    if(threadCollection&&threadCollection[1]&&method==='POST'){
+      const user=requireWorkday(req),p=await input(req,16384),operationId=String(req.headers['idempotency-key']||randomUUID());
+      json(res,202,workdayStore.enqueue(user.user_name,operationId,'ThreadMessage',{threadId:threadCollection[1],body:p.body}));return true;
+    }
+    const createThread=route.match(/^\\/api\\/v1\\/messages\\/threads\\/([A-Za-z0-9._~-]{1,40})\\/([0-9a-f-]{36})$/i);
+    if(createThread&&method==='POST'){
+      const user=requireWorkday(req),id=randomUUID();
+      json(res,200,{id,scopeType:createThread[1],scopeId:createThread[2],title:'',createdBy:user.user_name,createdAtUtc:new Date().toISOString(),unreadCount:0});return true;
+    }
+    const conversationIdentities=route.match(/^\\/api\\/v1\\/conversations\\/([0-9a-f-]{36})\\/sending-identities$/i);
+    if(conversationIdentities&&method==='GET'){
+      const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
+      json(res,200,snapshot?.sendingIdentities?.[conversationIdentities[1]]||{defaultIdentity:'',canSendAsSelf:false,identities:[]},{'Cache-Control':'private, no-store'});return true;
+    }
+    const conversationMessage=route.match(/^\\/api\\/v1\\/conversations\\/([0-9a-f-]{36})\\/messages$/i);
+    if(conversationMessage&&method==='POST'){
+      const user=requireWorkday(req),p=await input(req,16384),operationId=String(req.headers['idempotency-key']||randomUUID());
+      json(res,202,workdayStore.enqueue(user.user_name,operationId,'ConversationMessage',{conversationId:conversationMessage[1],...p}));return true;
+    }
+
     const keyCollection='/api/v1/admin/integration-keys',keyItem=route.match(/^\/api\/v1\/admin\/integration-keys\/([0-9a-f-]{36})$/i);
     if(route===keyCollection&&['GET','POST'].includes(method)){
       authenticateProvisioning(req);
