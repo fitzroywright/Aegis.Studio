@@ -115,7 +115,13 @@ public sealed class WorkDayConversationPage:ContentPage
             identity.SelectedIndex=workspace>=0?workspace:0;
             UpdateIdentityLabel();
         }
-        catch(Exception ex){identityState.Text="Sending identities unavailable: "+ex.Message;}
+        catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException)
+        {
+            options=[new SendingIdentityOptionDto("Workspace","Workspace identity (verify when online)","",true)];
+            identity.ItemsSource=options.Select(x=>x.Label).ToList();
+            identity.SelectedIndex=0;
+            identityState.Text="Offline · the reply will be saved and Studio will validate the Workspace sender when it syncs.";
+        }
     }
 
     private void UpdateIdentityLabel()
