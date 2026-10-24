@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer, sign, mapWorkDayStudioPath } from './server.mjs';
+import { createServer, sign, mapWorkDayStudioPath, workDayProxyRequestHeaders } from './server.mjs';
 
 test('WorkDay mobile paths stay on the API Site gateway and map only to approved Studio field routes',()=>{
  assert.equal(mapWorkDayStudioPath('/api/v1/auth/login','POST'),'/api/auth/login');
@@ -11,6 +11,11 @@ test('WorkDay mobile paths stay on the API Site gateway and map only to approved
  assert.equal(mapWorkDayStudioPath('/api/v1/workday/fleet','GET'),null);
  assert.equal(mapWorkDayStudioPath('/api/v1/admin/integration-keys','GET'),null);
  assert.equal(mapWorkDayStudioPath('/api/v1/conversations/not-a-guid/messages','POST'),null);
+ const input={host:'api.bryanstudiosltd.com',cookie:'studio-cookie',authorization:'must-not-forward','x-aegis-workday-token':'device-token'};
+ const field=workDayProxyRequestHeaders('/api/v1/workday/bootstrap',input,'studio.bryanstudiosltd.com','127.0.0.1');
+ const message=workDayProxyRequestHeaders('/api/v1/messages/threads',input,'studio.bryanstudiosltd.com','127.0.0.1');
+ assert.equal(field['x-aegis-workday-token'],'device-token');assert.equal(message['x-aegis-workday-token'],undefined);
+ assert.equal(field.authorization,undefined);assert.equal(message.cookie,'studio-cookie');
 });
 async function fixture(t, extra = {}) {
   const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', INTAKE_DB_PATH: ':memory:', PUBLIC_API_PROVISIONING_TOKEN:'test-site-provisioning-token-at-least-32-chars', ...extra };
