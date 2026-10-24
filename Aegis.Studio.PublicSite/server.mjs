@@ -102,7 +102,8 @@ function proxyWorkDay(req,res,url,env){
   const studioPath=mapWorkDayStudioPath(url.pathname,req.method);
   if(!studioPath){json(res,404,{code:'not_found',message:'WorkDay operation not found.'});return;}
   const forwarded={host:origin.host,'x-forwarded-host':req.headers.host||'','x-forwarded-proto':'https','x-forwarded-for':req.socket.remoteAddress||''};
-  for(const name of ['accept','accept-encoding','content-type','content-length','transfer-encoding','cookie','authorization','x-aegis-workday-token','idempotency-key','user-agent'])if(req.headers[name])forwarded[name]=req.headers[name];
+  for(const name of ['accept','accept-encoding','content-type','content-length','transfer-encoding','cookie','authorization','idempotency-key','user-agent'])if(req.headers[name])forwarded[name]=req.headers[name];
+  if(url.pathname.startsWith('/api/v1/workday/')&&req.headers['x-aegis-workday-token'])forwarded['x-aegis-workday-token']=req.headers['x-aegis-workday-token'];
   const connectAddress=String(env.WORKDAY_STUDIO_CONNECT_ADDRESS||'').trim();
   let timedOut=false;
   const upstream=https.request({hostname:origin.hostname,port:origin.port||443,servername:origin.hostname,method:req.method,path:studioPath+url.search,headers:forwarded,
