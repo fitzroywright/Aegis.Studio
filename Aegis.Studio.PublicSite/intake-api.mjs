@@ -58,8 +58,13 @@ export function createIntakeApi(env,readBody,json) {
       json(res,200,{id:keyItem[1],status:'Revoked'});return true;
     }
     if(route==='/api/v1/admin/client-link-proofs'&&method==='POST'){
-      authenticateProvisioning(req);const p=await input(req,4096),proof=store.createClientLinkChallenge(p.clientId);
+      authenticate(req,'client:link');const p=await input(req,4096),proof=store.createClientLinkChallenge(p.clientId);
       json(res,201,{id:proof.id,code:proof.code,expiresAt:proof.expiresAt},{'Cache-Control':'no-store'});return true;
+    }
+    if(route==='/api/v1/admin/client-link-proofs'&&method==='GET'){
+      authenticate(req,'client:link');const clientId=url.searchParams.get('clientId');
+      if(clientId&&!/^[0-9a-f-]{36}$/i.test(clientId))fail(400,'invalid_client_id','A Studio client UUID is required.');
+      json(res,200,{items:store.clientLinkProofs(clientId)});return true;
     }
     if(route==='/api/v1/admin/booking/catalog'&&method==='PUT'){
       const owner=authenticate(req,'booking:catalog:publish'),p=await input(req,1_000_000),key=String(req.headers['idempotency-key']||'');
@@ -78,9 +83,16 @@ export function createIntakeApi(env,readBody,json) {
       json(res,200,store.getBookingAvailability({from:url.searchParams.get('from'),to:url.searchParams.get('to'),locationCode:url.searchParams.get('locationCode'),sessionTypeId:url.searchParams.get('sessionTypeId')||''}),{'Cache-Control':'public, max-age=15'});return true;
     }
     const linkProof=route.match(/^\/api\/v1\/admin\/client-link-proofs\/([0-9a-f-]{36})$/i);
+    if(linkProof&&method==='GET'){
+      authenticate(req,'client:link');const proof=store.clientLinkProof(linkProof[1]);
+      if(!proof)fail(404,'not_found','Client link proof not found.');json(res,200,proof);return true;
+    }
     if(linkProof&&method==='DELETE'){
-      authenticateProvisioning(req);const n=store.db.prepare('UPDATE client_link_challenges SET revoked_at=COALESCE(revoked_at,?) WHERE id=?').run(new Date().toISOString(),linkProof[1]);
-      if(!n.changes)fail(404,'not_found','Client link proof not found.');json(res,200,{id:linkProof[1],status:'Revoked'});return true;
+      authenticate(req,'client:link');const proof=store.clientLinkProof(linkProof[1]);
+      if(!proof)fail(404,'not_found','Client link proof not found.');
+      if(proof.status==='Used')fail(409,'proof_already_used','A used proof cannot be revoked; revoke the linked identity through identity administration.');
+      if(!store.revokeClientLinkProof(linkProof[1]))fail(409,'proof_not_revocable','Only active pending proofs can be revoked.');
+      json(res,200,{id:linkProof[1],status:'Revoked'});return true;
     }
     if(route==='/api/intake-session'&&method==='GET'){
       const csrf=randomUUID();json(res,200,{csrf},{'Set-Cookie':`intake_csrf=${csrf}; Path=/; HttpOnly; SameSite=Strict${env.NODE_ENV==='production'?'; Secure':''}`});return true;
