@@ -4,6 +4,8 @@ Implementation branch: `feature/studio-complete-workflow-20261011`. Update Studi
 
 ## Behavior
 
+WorkDay mobile acceptance uses `https://api.bryanstudiosltd.com/api/v1` as its only network base URL. The Public Site gateway forwards the existing operations to Studio's internal `/api/workday` routes. Studio-native acceptance checks may call the internal Studio routes directly; do not configure the mobile app with the Studio URL.
+
 WorkDay retains assignment progress, session/collection/roster photography status and operational notes in its encrypted local outbox. Home and assignment details provide Sync Now, progress, outstanding changes, last fully successful synchronization and failure/conflict feedback. The successful timestamp survives restart and does not advance while conflicts remain.
 
 With WorkDay active, internet reconnection starts sync automatically. Active retries occur every 30 seconds, including when Wi-Fi is available but Studio was unavailable. Returning to WorkDay starts synchronization after mobile suspension. No guarantee is made that a killed/suspended iOS or Android application executes background tasks.
