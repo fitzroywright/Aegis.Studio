@@ -13,14 +13,15 @@ public sealed class StartupPage:ContentPage
     }
     private async Task StartAsync()
     {
-        string url=Preferences.Default.Get("WorkDay.ServerUrl","");
         string user=Preferences.Default.Get("WorkDay.UserName","");
         string display=Preferences.Default.Get("WorkDay.DisplayName",user);
         var saved=await credentials.GetAsync();
-        if(saved is null||!Uri.TryCreate(url,UriKind.Absolute,out Uri? server))
+        Uri server=WorkDayApiClient.ApiBaseUri;
+        if(saved is null)
         {
             Application.Current!.Windows[0].Page=new NavigationPage(services.GetRequiredService<LoginPage>());return;
         }
+        Preferences.Default.Set("WorkDay.ServerUrl",server.ToString());
         api.SetServer(server);api.SetDeviceToken(saved.Value.Token);
         session.UserName=user;session.DisplayName=display;session.Server=server;session.IsAuthenticated=true;
         try
