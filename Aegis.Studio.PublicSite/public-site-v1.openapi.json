@@ -1,14 +1,14 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bryan’s reference public website API",
+    "title": "Bryan\u2019s reference public website API",
     "version": "1.0.0",
     "description": "Independent public-site intake and publication contract. Studio initiates all integration requests. Submission credentials cannot poll, acknowledge, verify payment or publish galleries. This API is distinct from the legacy Studio Public V1 API."
   },
   "servers": [
     {
       "url": "https://api.bryanstudiosltd.com/api/v1",
-      "description": "Bryan’s Public Site production API."
+      "description": "Bryan\u2019s Public Site production API."
     }
   ],
   "components": {
