@@ -42,6 +42,10 @@ public sealed class WorkDayUploadService(WorkDayLocalStore store,WorkDayApiClien
                     await store.SaveUploadAsync(upload);
                     try{File.Delete(upload.LocalPath);}catch{}
                 }
+                catch(HttpRequestException ex) when(ex.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
+                {
+                    upload.State=nameof(LocalUploadState.Conflict);upload.LastError=ex.Message;await store.SaveUploadAsync(upload);
+                }
                 catch(Exception ex) when(ex is HttpRequestException or TaskCanceledException or IOException)
                 {
                     upload.State=nameof(LocalUploadState.Retrying);upload.LastError=ex.Message;await store.SaveUploadAsync(upload);break;
