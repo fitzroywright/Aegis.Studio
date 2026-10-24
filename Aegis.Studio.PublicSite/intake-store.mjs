@@ -250,7 +250,7 @@ export class IntakeStore {
   }
   createGalleryAccessRequest(p) {
     if(!/^[0-9a-f-]{36}$/i.test(String(p.clientId||'')))fail(400,'invalid_gallery_access_request','A valid client ID is required.');
-    if(p.galleryId&&!/^[0-9a-f-]{36}$/i.test(String(p.galleryId)))fail(400,'invalid_gallery_access_request','Gallery ID must be a UUID.');
+    if(!/^[0-9a-f-]{36}$/i.test(String(p.galleryId||'')))fail(400,'invalid_gallery_access_request','A gallery ID is required.');
     if(p.galleryId){
       const gallery=this.db.prepare('SELECT client_id FROM galleries WHERE id=?').get(p.galleryId);
       if(!gallery||gallery.client_id!==p.clientId)fail(404,'gallery_not_found','Gallery not found for this client.');
