@@ -277,7 +277,7 @@ The former Aegis.Studio.Photographer MAUI client has been retired. Its functiona
 - offline schedule cache and WorkDay outbox;
 - messaging, gallery status, uploads, notifications and diagnostics.
 
-The legacy /api/mobile/photographer route surface has been retired. WorkDay uses /api/workday as the mobile field API. The server-side PhotographerStore/profile and availability data model remain because WorkDay and Studio scheduling use them; only the obsolete standalone client/API surface was removed.
+The legacy /api/mobile/photographer route surface has been retired. The WorkDay mobile app uses the Public Site gateway at https://api.bryanstudiosltd.com/api/v1; the gateway proxies the allowlisted field routes to Studio's internal /api/workday endpoints. WorkDay has no direct Studio service URL. The server-side PhotographerStore/profile and availability data model remain because WorkDay and Studio scheduling use them; only the obsolete standalone client/API surface was removed.
 
 
 ## Cross-workspace photographer access model
