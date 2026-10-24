@@ -31,7 +31,7 @@ Set the server-side integration key in `/etc/aegis/studio.env`:
 WorkDay__ApiSyncKey=<integration key with workday:sync scope>
 ```
 
-The Studio service account must be able to write the enrollment file, defaulting to `/var/lib/aegis-studio/workday-enrollment-codes.json`. Protect that file as a secret. Deliver each one-time enrollment code through the studio's approved private channel; never put codes in source control or logs.
+The enrollment file defaults to `/var/lib/aegis/studio/workday-enrollment-codes.json`, inside Studio's persistent, service-owned state directory. The worker creates the file with owner-only permissions. Protect that file as a secret. Deliver each one-time enrollment code through the studio's approved private channel; never put codes in source control or logs.
 
 After changing the environment:
 
