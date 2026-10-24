@@ -251,8 +251,14 @@ public static class FrontDeskBookingRequestEndpoints
                 using var c=db.OpenConnection();
                 if(publicationUpdate)
                 {
-                    using var q=new NpgsqlCommand("update studio_gallery_exports set state='Published',last_error=null,updated_at_utc=now() where publication_id=$1 and state='PendingReview'; update studio_conversations set is_closed=true where id=$2",c);
-                    q.Parameters.AddWithValue(galleryId.Value);q.Parameters.AddWithValue(conversationId);q.ExecuteNonQuery();
+                    using(var q=new NpgsqlCommand("update studio_gallery_exports set state='Published',last_error=null,updated_at_utc=now() where publication_id=$1 and state='PendingReview'",c))
+                    {q.Parameters.AddWithValue(galleryId.Value);q.ExecuteNonQuery();}
+                    using(var q=new NpgsqlCommand("update studio_conversations set is_closed=true where id=$1",c))
+                    {q.Parameters.AddWithValue(conversationId);q.ExecuteNonQuery();}
+                    using(var q=new NpgsqlCommand("update studio_website_gallery_access_requests set reviewed_by=$2,reviewed_at_utc=now() where gallery_id=$1 and reviewed_at_utc is null",c))
+                    {q.Parameters.AddWithValue(galleryId.Value);q.Parameters.AddWithValue(user.FindFirstValue("login_name")??user.Identity?.Name??"Front Desk");q.ExecuteNonQuery();}
+                    using(var q=new NpgsqlCommand("update studio_conversations set is_closed=true where id in (select conversation_id from studio_website_gallery_access_requests where gallery_id=$1)",c))
+                    {q.Parameters.AddWithValue(galleryId.Value);q.ExecuteNonQuery();}
                 }
                 else
                 {
