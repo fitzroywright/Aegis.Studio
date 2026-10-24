@@ -4,6 +4,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Security.Claims;
 using Aegis.Studio.Web.Persistence;
+using Aegis.Studio.Web.Email;
+using Aegis.Studio.Application.EmailRouting;
 using Aegis.Studio.Web.Scheduling;
 using Aegis.Studio.Web.Production;
 using Aegis.Studio.Web.Messaging;
@@ -51,6 +53,7 @@ public sealed class WorkDayApiExchangeWorker(
                 await PullUploadsAsync(http,stoppingToken);
                 await PullThreadCreatesAsync(http,stoppingToken);
                 await PullThreadMessagesAsync(http,stoppingToken);
+                await PullConversationMessagesAsync(http,stoppingToken);
                 await Task.Delay(TimeSpan.FromSeconds(10),stoppingToken);
             }
             catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested){break;}
@@ -108,6 +111,9 @@ public sealed class WorkDayApiExchangeWorker(
         WorkDayStore store=services.GetRequiredService<WorkDayStore>();
         IConfiguration config=services.GetRequiredService<IConfiguration>();
         JobAccessService access=services.GetRequiredService<JobAccessService>();
+        WorkspaceAccessService workspaceAccess=services.GetRequiredService<WorkspaceAccessService>();
+        WorkspaceStore workspaceStore=services.GetRequiredService<WorkspaceStore>();
+        StudioStore studioStore=services.GetRequiredService<StudioStore>();
         StudioInAppMessageStore messages=services.GetRequiredService<StudioInAppMessageStore>();
         NotificationService notifications=services.GetRequiredService<NotificationService>();
         PhotographerStore photographers=new(database);
@@ -126,9 +132,28 @@ public sealed class WorkDayApiExchangeWorker(
             if(bootstrap is null)continue;
             var threads=messages.GetThreads(principal);
             var threadMessages=threads.SelectMany(thread=>messages.GetMessages(thread.Id,principal,200)).ToArray();
+            Dictionary<string,object> sendingIdentities=[];
+            foreach(AssignmentDto assignment in bootstrap.Today.Concat(bootstrap.Upcoming))
+            {
+                if(assignment.ConversationId is not Guid conversationId)continue;
+                StudioConversation? conversation=studioStore.GetConversation(conversationId);
+                if(conversation is null)continue;
+                bool canReply=workspaceAccess.HasPermission(principal,conversation.WorkspaceId,"ReplyRequester") ||
+                    (conversation.JobId is Guid jobId&&access.HasPermission(principal,jobId,"ReplyRequester"));
+                if(!canReply)continue;
+                StudioWorkspaceDefinition? workspace=workspaceStore.Get(conversation.WorkspaceId);
+                if(string.IsNullOrWhiteSpace(workspace?.EmailAddress))continue;
+                sendingIdentities[conversationId.ToString("D")]=new
+                {
+                    defaultIdentity="Workspace",
+                    canSendAsSelf=false,
+                    identities=new[]{new{type="Workspace",label=$"Workspace — {workspace.EmailAddress}",fromAddress=workspace.EmailAddress,isDefault=true}}
+                };
+            }
             var snapshot=new
             {
                 bootstrap.UserName,bootstrap.DisplayName,bootstrap.ServerTimeUtc,bootstrap.Today,bootstrap.Upcoming,
+                sendingIdentities,
                 bootstrap.ActiveWorkSession,bootstrap.LocationTrackingEnabled,bootstrap.LocationTrackingMode,
                 bootstrap.GeneratedAtUtc,bootstrap.FieldTargets,
                 availability=photographers.GetAvailability(profile.UserName,now.AddDays(-1),now.AddDays(90)),
@@ -336,6 +361,58 @@ public sealed class WorkDayApiExchangeWorker(
             }
             catch(InvalidOperationException ex){state="Conflict";message=ex.Message;}
             catch(JsonException){state="Conflict";message="WorkDay message payload is invalid.";}
+            using var ack=await http.PostAsJsonAsync(
+                $"admin/workday/updates/{update.OperationId:D}/result",
+                new{state,message,acknowledgedAtUtc=DateTimeOffset.UtcNow},ct);
+            ack.EnsureSuccessStatusCode();
+        }
+    }
+
+    private async Task PullConversationMessagesAsync(HttpClient http,CancellationToken ct)
+    {
+        using var response=await http.GetAsync("admin/workday/updates?after=0&limit=100&kind=ConversationMessage",ct);
+        response.EnsureSuccessStatusCode();
+        var batch=await response.Content.ReadFromJsonAsync<WorkDayUpdateBatch>(JsonOptions,ct)
+            ??throw new InvalidOperationException("The API Site returned an empty WorkDay conversation message batch.");
+        foreach(WorkDayUpdate update in batch.Items)
+        {
+            ct.ThrowIfCancellationRequested();
+            string state="Acknowledged",message="Conversation reply synchronized to Studio.";
+            try
+            {
+                Guid conversationId=update.Payload.GetProperty("conversationId").GetGuid();
+                string body=update.Payload.GetProperty("body").GetString()??"";
+                bool isInternal=update.Payload.TryGetProperty("isInternal",out JsonElement internalValue)&&internalValue.GetBoolean();
+                string? requestedIdentity=update.Payload.TryGetProperty("sendingIdentity",out JsonElement identityValue)?identityValue.GetString():null;
+                if(string.IsNullOrWhiteSpace(body)||body.Length>16000)throw new InvalidOperationException("Conversation message must contain 1 to 16000 characters.");
+                using IServiceScope scope=scopes.CreateScope();
+                IServiceProvider services=scope.ServiceProvider;
+                StudioStore store=services.GetRequiredService<StudioStore>();
+                WorkspaceAccessService workspaceAccess=services.GetRequiredService<WorkspaceAccessService>();
+                JobAccessService jobAccess=services.GetRequiredService<JobAccessService>();
+                WorkspaceStore workspaces=services.GetRequiredService<WorkspaceStore>();
+                StudioConversation conversation=store.GetConversation(conversationId)
+                    ??throw new InvalidOperationException("Conversation was not found.");
+                ClaimsPrincipal principal=CreateFieldPrincipal(update.UserName);
+                bool allowed=workspaceAccess.HasPermission(principal,conversation.WorkspaceId,"ReplyRequester")||
+                    (conversation.JobId is Guid jobId&&jobAccess.HasPermission(principal,jobId,"ReplyRequester"));
+                if(!allowed)throw new InvalidOperationException("Photographer is not authorized to reply to this conversation.");
+                bool externalEmailReply=!isInternal&&conversation.Channel.Equals("Email",StringComparison.OrdinalIgnoreCase);
+                StudioSendingIdentity? identity=null;
+                if(externalEmailReply)
+                {
+                    StudioWorkspaceDefinition workspace=workspaces.Get(conversation.WorkspaceId)
+                        ??throw new InvalidOperationException("The conversation workspace no longer exists.");
+                    string[] allowedDomains=[];
+                    identity=StudioSendingIdentityResolver.Resolve(requestedIdentity,workspace.EmailAddress??string.Empty,update.UserName,string.Empty,false,allowedDomains);
+                }
+                StudioConversation updated=store.AddMessage(conversationId,new AddMessageRequest(body,isInternal,requestedIdentity),principal,update.OperationId);
+                if(externalEmailReply)
+                    services.GetRequiredService<OutboundEmailStore>().QueueIdempotent(updated,body,identity,update.OperationId);
+            }
+            catch(InvalidOperationException ex){state="Conflict";message=ex.Message;}
+            catch(UnauthorizedAccessException ex){state="Conflict";message=ex.Message;}
+            catch(JsonException){state="Conflict";message="WorkDay conversation message payload is invalid.";}
             using var ack=await http.PostAsJsonAsync(
                 $"admin/workday/updates/{update.OperationId:D}/result",
                 new{state,message,acknowledgedAtUtc=DateTimeOffset.UtcNow},ct);
