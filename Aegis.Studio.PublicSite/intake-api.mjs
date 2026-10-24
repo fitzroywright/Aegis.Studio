@@ -81,7 +81,7 @@ export function createIntakeApi(env,readBody,json) {
     }
     if(route==='/api/v1/admin/workday/updates'&&method==='GET'){
       authenticate(req,'workday:sync');const after=Math.max(0,Number(url.searchParams.get('after')||0)),limit=Math.max(1,Math.min(500,Number(url.searchParams.get('limit')||100)));
-      json(res,200,{items:workdayStore.pendingUpdates(after,limit)});return true;
+      json(res,200,{items:workdayStore.pendingUpdates(after,limit,String(url.searchParams.get('kind')||''))});return true;
     }
     const workdayResult=route.match(/^\\/api\\/v1\\/admin\\/workday\\/updates\\/([0-9a-f-]{36})\\/result$/i);
     if(workdayResult&&method==='POST'){
@@ -103,7 +103,7 @@ export function createIntakeApi(env,readBody,json) {
       json(res,200,snapshot,{'Cache-Control':'private, no-store'});return true;
     }
     if(route==='/api/v1/workday/operations'&&method==='POST'){
-      const user=requireWorkday(req),p=await input(req,65536),result=workdayStore.enqueue(user.user_name,p.operationId,p.kind,p);
+      const user=requireWorkday(req),p=await input(req,65536),result=workdayStore.enqueue(user.user_name,p.operationId,'Operation',p);
       json(res,202,result,{'Cache-Control':'no-store'});return true;
     }
     const workdayStatus=route.match(/^\\/api\\/v1\\/workday\\/operations\\/([0-9a-f-]{36})$/i);
