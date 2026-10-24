@@ -1,42 +1,44 @@
-# WorkDay mobile API gateway
+# WorkDay API exchange
 
-WorkDay's only server base URL is `https://api.bryanstudiosltd.com/api/v1/`. The app no longer accepts a configurable Studio hostname. The Public Site gateway permits only these WorkDay client operations and relays them to the existing Studio API over HTTPS:
+WorkDay Mobile connects only to `https://api.bryanstudiosltd.com/api/v1/`. Studio never exposes an inbound WorkDay API for the Public Site to call. Studio's hosted exchange worker makes outbound HTTPS requests to the API Site, publishes account snapshots, and polls for pending mobile submissions.
 
-| API Site path | Methods | Studio path |
-| --- | --- | --- |
-| `/auth/login`, `/auth/me`, `/auth/logout` | POST, GET, POST | `/api/auth/...` |
-| `/workday/bootstrap` | GET | `/api/workday/bootstrap` |
-| `/workday/device-session`, `/workday/device-session/revoke` | POST | Same Studio routes |
-| `/workday/availability` | GET, POST | Same Studio route |
-| `/workday/time-summary` | GET | Same Studio route |
-| `/workday/operations`, `/workday/client-observation` | POST | Same Studio routes |
-| `/workday/assignments/{id}/uploads` | POST multipart | Same Studio route |
-| `/workday/assignments/{id}/gallery-status` | GET | Same Studio route |
-| `/messages/threads...` | GET, POST | `/api/messages/threads...` |
-| `/notifications` | GET | `/api/notifications` |
-| `/conversations/{id}/sending-identities`, `/messages` | GET, POST | Same Studio routes |
+## Data flow
 
-The API Site rejects unlisted routes, including WorkDay fleet/management routes and Studio administration endpoints. It forwards the session cookie and required content headers. The Studio-issued WorkDay device token is forwarded only to field routes; shared messaging, notification and conversation routes use the authenticated Studio session cookie and do not receive the device token. Studio remains the system of record and performs its existing authorization, idempotency, storage and audit work. The API Site does not store WorkDay passwords or duplicate field records.
+- Studio provisions WorkDay accounts from active photographer profiles using the `workday:sync` integration credential.
+- Studio publishes each photographer's current assignments, availability, time summary, messages, notifications, and reply sender options to the API Site.
+- WorkDay Mobile reads its account snapshot from the API Site and submits field reports, availability changes, uploads, and messages there.
+- The API Site persists submissions in its SQLite exchange database. Studio polls the queue, applies each update locally, and posts an acknowledgement or conflict result back to the API Site.
+- The mobile app keeps its local assignment cache, field-operation outbox, availability queue, and upload files. Those are retained when connectivity is unavailable and synchronized when connectivity returns. Online messaging uses a durable API queue; device-side offline message composition is not currently included.
 
-## API Site upstream configuration
+## Exchange routes
 
-Set these root-owned values in `/etc/aegis/public-site.env` on Kratos:
+Mobile routes are under `/api/v1`: authentication and enrollment, `/workday/bootstrap`, `/workday/operations`, `/workday/availability`, `/workday/assignments/{id}/uploads`, `/messages/threads`, `/conversations/{id}/messages`, `/notifications`, and `/workday/assignments/{id}/gallery-status`.
+
+Studio uses the integration credential for:
+
+- `POST /admin/workday/users` to provision an account.
+- `PUT /admin/workday/snapshots` to publish the current snapshot.
+- `GET /admin/workday/updates?kind=...` to pull queued submissions.
+- `POST /admin/workday/updates/{operationId}/result` to acknowledge or reject a submission.
+
+The API Site stores passwords as scrypt hashes and session credentials as token hashes. Mobile sessions are scoped to the provisioned WorkDay account. The exchange database is durable and uses idempotent operation IDs so Studio can safely retry after connection failures.
+
+## Studio configuration
+
+Set the server-side integration key in `/etc/aegis/studio.env`:
 
 ```dotenv
-WORKDAY_STUDIO_ORIGIN=https://studio.bryanstudiosltd.com
-WORKDAY_STUDIO_CONNECT_ADDRESS=127.0.0.1
-WORKDAY_STUDIO_TIMEOUT_MS=120000
+WorkDay__ApiSyncKey=<integration key with workday:sync scope>
 ```
 
-The origin must be an HTTPS origin whose certificate validates for `studio.bryanstudiosltd.com`. The connect address sends the request to Kratos's local Nginx listener while preserving TLS SNI and the Studio hostname. Do not set the upstream to the public API hostname; that would loop back into the gateway.
+The Studio service account must be able to write the enrollment file, defaulting to `/var/lib/aegis-studio/workday-enrollment-codes.json`. Protect that file as a secret. Deliver each one-time enrollment code through the studio's approved private channel; never put codes in source control or logs.
 
-The WorkDay mobile app keeps its protected local SQLite cache, operation outbox, upload queue and offline behavior. If the API Site or Studio upstream cannot be reached, requests fail as unsynchronized and queued work remains available for retry. Studio's internal workflows do not use this gateway.
-
-After changing the environment file, restart the API service:
+After changing the environment:
 
 ```sh
-sudo systemctl restart aegis-public-site
-sudo systemctl is-active aegis-public-site
+sudo systemctl restart aegis-studio
+sudo systemctl is-active aegis-studio
+sudo journalctl -u aegis-studio -n 100 --no-pager
 ```
 
-Then sign in from WorkDay and confirm bootstrap, an operation acknowledgement, availability read/write, messaging and one upload. Never test using production client data.
+Confirm that the exchange worker is running, a provisioned account receives its one-time code, first-time enrollment succeeds, snapshots appear in WorkDay Mobile, and an operation is acknowledged after Studio polls it. Test uploads and conversation replies with non-production data. Builds and automated tests should run on the developer Mac before deployment.
