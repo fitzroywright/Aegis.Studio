@@ -154,14 +154,28 @@ public sealed class StudioStore
     }
 
     public StudioConversation AddMessage(Guid id, AddMessageRequest request, ClaimsPrincipal user)
+        => AddMessage(id, request, user, Guid.NewGuid());
+
+    public StudioConversation AddMessage(Guid id, AddMessageRequest request, ClaimsPrincipal user, Guid messageId)
     {
         StudioConversation conversation = GetConversation(id) ?? throw new KeyNotFoundException("Conversation was not found.");
         string userName = user.FindFirstValue("login_name") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.Identity?.Name ?? "unknown";
         string displayName = user.Identity?.Name ?? userName;
-        StudioMessage message = new(Guid.NewGuid(), displayName, request.IsInternal ? "Internal" : "External", request.Body.Trim(), DateTimeOffset.UtcNow, null, userName);
+        StudioMessage message = new(messageId, displayName, request.IsInternal ? "Internal" : "External", request.Body.Trim(), DateTimeOffset.UtcNow, null, userName);
         using NpgsqlConnection connection = database.OpenConnection();
         using NpgsqlTransaction transaction = connection.BeginTransaction();
-        InsertMessage(connection, transaction, message, conversation.Id);
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "insert into studio_messages(id, conversation_id, author_user_name, author_display_name, visibility, body, created_at_utc, external_message_id) values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict (id) do nothing";
+        command.Parameters.AddWithValue(message.Id);
+        command.Parameters.AddWithValue(conversation.Id);
+        command.Parameters.AddWithValue((object?)message.AuthorUserName ?? DBNull.Value);
+        command.Parameters.AddWithValue(message.Author);
+        command.Parameters.AddWithValue(message.Visibility);
+        command.Parameters.AddWithValue(message.Body);
+        command.Parameters.AddWithValue(message.CreatedAt);
+        command.Parameters.AddWithValue(DBNull.Value);
+        command.ExecuteNonQuery();
         transaction.Commit();
         return GetConversation(id)!;
     }
