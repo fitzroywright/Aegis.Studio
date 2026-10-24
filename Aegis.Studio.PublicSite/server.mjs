@@ -1,6 +1,5 @@
 import { createIntakeApi } from './intake-api.mjs';
 import http from 'node:http';
-import https from 'node:https';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -57,72 +56,6 @@ async function readBody(req, limit = 65536) {
   for await (const chunk of req) { size += chunk.length; if (size > limit) throw Object.assign(new Error('Request is too large.'), { status: 413 }); chunks.push(chunk); }
   return Buffer.concat(chunks);
 }
-function safeMobilePath(pathname,prefix){
-  if(!pathname.startsWith(prefix+'/'))return false;
-  const tail=pathname.slice(prefix.length+1).split('/');
-  return tail.length>0&&tail.every(part=>part.length>0&&[...part].every(ch=>/[A-Za-z0-9._~%-]/.test(ch)));
-}
-function validUuid(value){
-  const parts=String(value||'').split('-');
-  return parts.length===5&&[8,4,4,4,12].every((size,index)=>parts[index].length===size&&[...parts[index]].every(ch=>/[0-9a-f]/i.test(ch)));
-}
-function safeMobileSegment(value){return value.length>0&&[...value].every(ch=>/[A-Za-z0-9._~-]/.test(ch));}
-export function mapWorkDayStudioPath(pathname,method){
-  method=String(method||'').toUpperCase();
-  const parts=pathname.split('/');
-  if(parts[1]!=='api'||parts[2]!=='v1')return null;
-  let allowed=false;
-  if(parts[3]==='auth'&&parts.length===5){
-    allowed=(parts[4]==='login'&&method==='POST')||(parts[4]==='logout'&&method==='POST')||(parts[4]==='me'&&method==='GET');
-  }else if(parts[3]==='workday'){
-    const tail=parts.slice(4);
-    allowed=(tail.length===1&&tail[0]==='bootstrap'&&method==='GET')
-      ||(tail.length===1&&tail[0]==='device-session'&&method==='POST')
-      ||(tail.length===2&&tail[0]==='device-session'&&tail[1]==='revoke'&&method==='POST')
-      ||(tail.length===1&&tail[0]==='client-observation'&&method==='POST')
-      ||(tail.length===1&&tail[0]==='operations'&&method==='POST')
-      ||(tail.length===1&&tail[0]==='availability'&&['GET','POST'].includes(method))
-      ||(tail.length===1&&tail[0]==='time-summary'&&method==='GET')
-      ||(tail.length===3&&tail[0]==='assignments'&&validUuid(tail[1])&&tail[2]==='uploads'&&method==='POST')
-      ||(tail.length===3&&tail[0]==='assignments'&&validUuid(tail[1])&&tail[2]==='gallery-status'&&method==='GET');
-  }else if(parts[3]==='messages'&&parts[4]==='threads'){
-    allowed=(parts.length===5&&method==='GET')
-      ||(parts.length===6&&validUuid(parts[5])&&['GET','POST'].includes(method))
-      ||(parts.length===7&&safeMobileSegment(parts[5])&&validUuid(parts[6])&&method==='POST');
-  }else if(parts[3]==='notifications'&&parts.length===4&&method==='GET')allowed=true;
-  else if(parts[3]==='conversations'&&parts.length===6&&validUuid(parts[4]))
-    allowed=(parts[5]==='sending-identities'&&method==='GET')||(parts[5]==='messages'&&method==='POST');
-  return allowed?pathname.replace('/api/v1','/api'):null;
-}
-export function workDayProxyRequestHeaders(pathname,incoming,upstreamHost,remoteAddress=''){
-  const forwarded={host:upstreamHost,'x-forwarded-host':incoming.host||'','x-forwarded-proto':'https','x-forwarded-for':remoteAddress};
-  for(const name of ['accept','accept-encoding','content-type','content-length','transfer-encoding','cookie','idempotency-key','user-agent'])if(incoming[name])forwarded[name]=incoming[name];
-  if(pathname.startsWith('/api/v1/workday/')&&incoming['x-aegis-workday-token'])forwarded['x-aegis-workday-token']=incoming['x-aegis-workday-token'];
-  return forwarded;
-}
-function proxyWorkDay(req,res,url,env){
-  const upstreamText=String(env.WORKDAY_STUDIO_ORIGIN||'');
-  let origin;
-  try{origin=new URL(upstreamText);if(origin.protocol!=='https:'||origin.pathname!=='/'||origin.search||origin.hash||origin.username||origin.password)throw Error();}
-  catch{json(res,503,{code:'workday_upstream_unavailable',message:'WorkDay is not connected to Studio.'});return;}
-  const studioPath=mapWorkDayStudioPath(url.pathname,req.method);
-  if(!studioPath){json(res,404,{code:'not_found',message:'WorkDay operation not found.'});return;}
-  const forwarded=workDayProxyRequestHeaders(url.pathname,req.headers,origin.host,req.socket.remoteAddress||'');
-  const connectAddress=String(env.WORKDAY_STUDIO_CONNECT_ADDRESS||'').trim();
-  let timedOut=false;
-  const upstream=https.request({hostname:origin.hostname,port:origin.port||443,servername:origin.hostname,method:req.method,path:studioPath+url.search,headers:forwarded,
-    ...(connectAddress?{lookup:(_host,_options,callback)=>callback(null,connectAddress,connectAddress.includes(':')?6:4)}:{})},response=>{
-      const headers={};
-      for(const name of ['content-type','content-length','content-encoding','content-disposition','cache-control','etag','last-modified','retry-after','set-cookie','location','vary'])if(response.headers[name]!==undefined)headers[name]=response.headers[name];
-      headers['Cache-Control']=headers['cache-control']||'no-store';headers['X-Content-Type-Options']='nosniff';
-      res.writeHead(response.statusCode||502,headers);response.pipe(res);
-    });
-  upstream.setTimeout(Number(env.WORKDAY_STUDIO_TIMEOUT_MS||120000),()=>{timedOut=true;upstream.destroy(new Error('WorkDay upstream timeout'));});
-  upstream.on('error',error=>{if(!res.headersSent)json(res,timedOut?504:503,{code:timedOut?'workday_upstream_timeout':'workday_upstream_unavailable',message:timedOut?'Studio did not answer the WorkDay request in time.':'Studio WorkDay service is temporarily unavailable.'});else res.destroy(error);});
-  req.on('aborted',()=>upstream.destroy());
-  req.pipe(upstream);
-}
-
 function requireSameOrigin(req, url) {
   const origin = req.headers.origin;
   if (!origin || new URL(origin).host !== req.headers.host) throw Object.assign(new Error('Request origin was rejected.'), { status: 403 });
@@ -175,7 +108,6 @@ export function createServer(env = process.env) {
         const linked=intake.store.redeemClientLinkChallenge(p.code,user.provider,user.id);
         json(res,200,{status:'Linked',provider:linked.provider,verifiedAt:linked.verifiedAt});return;
       }
-      if(mapWorkDayStudioPath(url.pathname,req.method)){proxyWorkDay(req,res,url,env);return;}
       if (await intake.handle(req,res,url)) return;
       if (['POST','PUT','DELETE'].includes(req.method)) requireSameOrigin(req, url);
       if (req.method === 'POST' && url.pathname === '/api/demo-login') {
@@ -242,7 +174,7 @@ export function createServer(env = process.env) {
       else res.end();
     }
   });
-  server.on('close',()=>intake.store.close());
+  server.on('close',()=>{intake.workdayStore.close();intake.store.close();});
   return server;
 }
 
