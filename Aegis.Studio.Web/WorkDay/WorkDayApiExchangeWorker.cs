@@ -88,19 +88,21 @@ public sealed class WorkDayApiExchangeWorker(
             string path=configuration["WorkDay:EnrollmentFile"]??"/var/lib/aegis-studio/workday-enrollment-codes.json";
             string directory=Path.GetDirectoryName(path)!;
             Directory.CreateDirectory(directory);
-            try{File.SetUnixFileMode(directory,UnixFileMode.UserRead|UnixFileMode.UserWrite|UnixFileMode.UserExecute);}catch(PlatformNotSupportedException){}
+            if(!OperatingSystem.IsWindows())
+                File.SetUnixFileMode(directory,UnixFileMode.UserRead|UnixFileMode.UserWrite|UnixFileMode.UserExecute);
             List<WorkDayEnrollmentRecord> records=[];
             if(File.Exists(path))
             {
                 try{records=JsonSerializer.Deserialize<List<WorkDayEnrollmentRecord>>(await File.ReadAllTextAsync(path,ct))??[];}
                 catch(JsonException){logger.LogError("WorkDay enrollment file {Path} is invalid; refusing to overwrite it.",path);continue;}
             }
-            WorkDayEnrollmentRecord replacement=new(profile.UserName,profile.DisplayName,token,result.ExpiresAt);
+            WorkDayEnrollmentRecord replacement=new(profile.UserName,profile.DisplayName,token,result?.ExpiresAt);
             int existingIndex=records.FindIndex(x=>x.UserName.Equals(profile.UserName,StringComparison.OrdinalIgnoreCase));
             if(existingIndex>=0)records[existingIndex]=replacement;
             else records.Add(replacement);
             await File.WriteAllTextAsync(path,JsonSerializer.Serialize(records,new JsonSerializerOptions{WriteIndented=true}),ct);
-            try{File.SetUnixFileMode(path,UnixFileMode.UserRead|UnixFileMode.UserWrite);}catch(PlatformNotSupportedException){}
+            if(!OperatingSystem.IsWindows())
+                File.SetUnixFileMode(path,UnixFileMode.UserRead|UnixFileMode.UserWrite);
             logger.LogInformation("Created one-time WorkDay enrollment for {UserName}; token stored in protected file {Path}.",profile.UserName,path);
         }
     }
