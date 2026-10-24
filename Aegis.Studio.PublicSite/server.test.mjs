@@ -129,18 +129,25 @@ test('server provisions one-time integration keys, enforces scopes, and revokes 
 test('client link proof is single use, bound to authenticated provider subject, and scopes galleries by Studio client UUID',async t=>{
  const provision='client-link-provisioning-secret-long-enough',client='22222222-2222-4222-8222-222222222222';
  const origin=await fixture(t,{PUBLIC_API_PROVISIONING_TOKEN:provision,CLIENT_BINDINGS_JSON:'{}'});
- const created=await fetch(origin+'/api/v1/admin/client-link-proofs',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({clientId:client})});assert.equal(created.status,201);const proof=await created.json();
+ const api=origin+'/api/v1',keyResponse=await fetch(api+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Studio Client Link Admin',scopes:['client:link']})});assert.equal(keyResponse.status,201);const adminSecret=(await keyResponse.json()).secret,admin={Authorization:'Bearer '+adminSecret,'Content-Type':'application/json'};
+ const denied=await fetch(api+'/admin/client-link-proofs',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({clientId:client})});assert.equal(denied.status,401);
+ const created=await fetch(api+'/admin/client-link-proofs',{method:'POST',headers:admin,body:JSON.stringify({clientId:client})});assert.equal(created.status,201);const proof=await created.json();assert.ok(proof.code);assert.equal(created.headers.get('cache-control'),'no-store');
  const login=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity:'maya'})}),cookie=login.headers.get('set-cookie').split(';')[0];
  const redeem=await fetch(origin+'/api/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})});assert.equal(redeem.status,200);
  assert.equal((await fetch(origin+'/api/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})})).status,404);
- const gallery='11111111-1111-4111-8111-111111111111',version='33333333-3333-4333-8333-333333333333',key='gallery-publish-test-secret-0123456789';
- const api=origin+'/api/v1',auth={Authorization:'Bearer '+key,'Content-Type':'application/json'};
+ const gallery='11111111-1111-4111-8111-111111111111',version='33333333-3333-4333-8333-333333333333';
  const provisioned=await fetch(api+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Gallery Publisher',scopes:['gallery:publish']})});const publisher=(await provisioned.json()).secret;
  const ph={Authorization:'Bearer '+publisher,'Content-Type':'application/json'};
  await fetch(api+'/galleries',{method:'POST',headers:ph,body:JSON.stringify({id:gallery,clientId:client,title:'Linked client gallery',items:[{versionId:version,fileName:'proof.jpg'}]})});
  await fetch(api+`/galleries/${gallery}/media/${version}`,{method:'PUT',headers:{Authorization:'Bearer '+publisher,'Content-Type':'image/jpeg'},body:Buffer.from([255,216,255,217])});
  await fetch(api+`/galleries/${gallery}/publish`,{method:'POST',headers:ph,body:'{}'});
+ const status=await(await fetch(api+`/admin/client-link-proofs/${proof.id}`,{headers:admin})).json();assert.equal(status.status,'Used');assert.equal('code' in status,false);assert.equal('subject' in status,false);
+ const session=await(await fetch(origin+'/api/session',{headers:{Cookie:cookie}})).json();assert.equal(session.user.galleryReference,gallery);
  assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:cookie}})).status,200);
+ const revokeCreate=await fetch(api+'/admin/client-link-proofs',{method:'POST',headers:admin,body:JSON.stringify({clientId:client})}),revocable=await revokeCreate.json();
+ assert.equal((await fetch(api+`/admin/client-link-proofs/${revocable.id}`,{method:'DELETE',headers:admin})).status,200);
+ assert.equal((await(await fetch(api+`/admin/client-link-proofs/${revocable.id}`,{headers:admin})).json()).status,'Revoked');
+ assert.equal((await fetch(api+`/admin/client-link-proofs/${proof.id}`,{method:'DELETE',headers:admin})).status,409);
 });
 
 
