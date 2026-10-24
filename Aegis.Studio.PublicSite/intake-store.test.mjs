@@ -49,4 +49,11 @@ test('published contract example uses the same importer shape as the site change
 test('booking slot reservation is atomic and replay does not reserve twice',()=>{
  const s=new IntakeStore(':memory:'),revision=seedCatalog(s),first=booking(revision,'BK','bk-1');const created=s.create('site','same-slot',first);assert.deepEqual(s.create('site','same-slot',first),created);const imported=s.feed().items[0];assert.equal(imported.pricingSnapshot.setupBufferMinutes,15);assert.equal(imported.pricingSnapshot.cleanupBufferMinutes,15);assert.throws(()=>s.create('other','other-key',first),e=>e.code==='slot_unavailable');assert.equal(s.getBookingAvailability({from:'2099-01-01',to:'2099-01-01',locationCode:'BK',sessionTypeId:'portrait'}).slots.some(x=>x.id==='bk-1'),false);s.ack(created.id,1,{bookingStatus:'Cancelled'});assert.equal(s.getBookingAvailability({from:'2099-01-01',to:'2099-01-01',locationCode:'BK',sessionTypeId:'portrait'}).slots.some(x=>x.id==='bk-1'),true);s.close();
 });
+test('client gallery proofs keep only a hash, expire, record provider, and revoke only while pending',()=>{
+ let now=new Date('2026-10-24T12:00:00Z');const s=new IntakeStore(':memory:',()=>now),client='22222222-2222-4222-8222-222222222222';
+ const proof=s.createClientLinkChallenge(client);const stored=s.db.prepare('SELECT * FROM client_link_challenges WHERE id=?').get(proof.id);
+ assert.notEqual(stored.code_hash,proof.code);assert.equal('code_hash' in s.clientLinkProof(proof.id),false);assert.equal(s.clientLinkProof(proof.id).status,'Pending');
+ const linked=s.redeemClientLinkChallenge(proof.code,'Google','stable-provider-subject');assert.equal(linked.clientId,client);assert.equal(s.clientLinkProof(proof.id).status,'Used');assert.equal(s.clientLinkProof(proof.id).provider,'Google');assert.equal(s.revokeClientLinkProof(proof.id),false);
+ const expiring=s.createClientLinkChallenge(client);now=new Date(now.getTime()+16*60000);assert.equal(s.clientLinkProof(expiring.id).status,'Expired');assert.equal(s.revokeClientLinkProof(expiring.id),false);s.close();
+});
 
