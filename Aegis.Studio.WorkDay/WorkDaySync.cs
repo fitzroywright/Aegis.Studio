@@ -195,11 +195,43 @@ public sealed class WorkDayApiClient
         throw new HttpRequestException("Studio has not created the message thread yet; the API Site will keep the request for retry.");
     }
     public Task<List<MessageDto>?> GetMessagesAsync(Guid threadId,CancellationToken ct=default)=>http.GetFromJsonAsync<List<MessageDto>>($"messages/threads/{threadId:D}",ct);
-    public async Task SendThreadMessageAsync(Guid threadId,string body,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"messages/threads/{threadId:D}",new{body},ct);r.EnsureSuccessStatusCode();}
+    public async Task SendThreadMessageAsync(Guid threadId,string body,CancellationToken ct=default)
+    {
+        Guid operationId=Guid.NewGuid();
+        await SubmitAndWaitAsync($"messages/threads/{threadId:D}",new{body},operationId,ct);
+    }
     public Task<List<NotificationDto>?> GetNotificationsAsync(CancellationToken ct=default)=>http.GetFromJsonAsync<List<NotificationDto>>("notifications?count=50",ct);
     public Task<AssignmentGalleryStatusDto?> GetAssignmentGalleryStatusAsync(Guid assignmentId,CancellationToken ct=default)=>http.GetFromJsonAsync<AssignmentGalleryStatusDto>($"workday/assignments/{assignmentId:D}/gallery-status",ct);
     public Task<SendingIdentityOptionsDto?> GetSendingIdentitiesAsync(Guid conversationId,CancellationToken ct=default)=>http.GetFromJsonAsync<SendingIdentityOptionsDto>($"conversations/{conversationId:D}/sending-identities",ct);
-    public async Task ReplyConversationAsync(Guid conversationId,string body,string identity,CancellationToken ct=default){using HttpResponseMessage r=await http.PostAsJsonAsync($"conversations/{conversationId:D}/messages",new{body,isInternal=false,sendingIdentity=identity},ct);r.EnsureSuccessStatusCode();}
+    public async Task ReplyConversationAsync(Guid conversationId,string body,string identity,CancellationToken ct=default)
+    {
+        Guid operationId=Guid.NewGuid();
+        await SubmitAndWaitAsync($"conversations/{conversationId:D}/messages",new{body,isInternal=false,sendingIdentity=identity},operationId,ct);
+    }
+
+    private async Task<OperationResultDto> SubmitAndWaitAsync<T>(string path,T payload,Guid operationId,CancellationToken ct)
+    {
+        using HttpRequestMessage request=new(HttpMethod.Post,path){Content=JsonContent.Create(payload)};
+        request.Headers.TryAddWithoutValidation("Idempotency-Key",operationId.ToString("D"));
+        using HttpResponseMessage submitted=await http.SendAsync(request,ct);
+        submitted.EnsureSuccessStatusCode();
+        if(submitted.StatusCode!=System.Net.HttpStatusCode.Accepted)
+            return await submitted.Content.ReadFromJsonAsync<OperationResultDto>(cancellationToken:ct)
+                ??throw new InvalidOperationException("The API Site returned no message receipt.");
+        DateTimeOffset deadline=DateTimeOffset.UtcNow.AddMinutes(2);
+        while(DateTimeOffset.UtcNow<deadline)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.Delay(TimeSpan.FromSeconds(3),ct);
+            using HttpResponseMessage status=await http.GetAsync($"workday/operations/{operationId:D}",ct);
+            status.EnsureSuccessStatusCode();
+            OperationResultDto result=await status.Content.ReadFromJsonAsync<OperationResultDto>(cancellationToken:ct)
+                ??throw new InvalidOperationException("The API Site returned no message status.");
+            if(result.State=="Conflict")throw new InvalidOperationException(result.Message??"Studio rejected the message.");
+            if(result.State=="Acknowledged")return result;
+        }
+        throw new HttpRequestException("The API Site has stored this message and is waiting for Studio to process it.");
+    }
 }
 
 public sealed class WorkDaySyncEngine(WorkDayLocalStore store,WorkDayApiClient api)
