@@ -9,7 +9,12 @@ public sealed class WorkDayApiClient
     public static readonly Uri ApiBaseUri=new("https://api.bryanstudiosltd.com/api/v1/");
     private readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(15)};
     public Uri? Server=>http.BaseAddress;
-    public void SetServer(Uri server)=>http.BaseAddress=server;
+    public void SetServer(Uri server)
+    {
+        if(server.Scheme!="https"||!server.Host.Equals("api.bryanstudiosltd.com",StringComparison.OrdinalIgnoreCase)||server.AbsolutePath!="/api/v1/")
+            throw new ArgumentException("WorkDay can connect only through the Bryan's API Site.",nameof(server));
+        http.BaseAddress=ApiBaseUri;
+    }
     public void SetDeviceToken(string? token)
     {
         http.DefaultRequestHeaders.Remove("X-Aegis-WorkDay-Token");
