@@ -61,7 +61,7 @@ export function createServer(env = process.env) {
     const url = new URL(req.url, 'http://localhost');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' blob: data: https://images-pw.pixieset.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     try {
       const host=hostname(req);
       if(!host){json(res,421,{message:'Unrecognized website hostname.'});return;}
@@ -73,6 +73,26 @@ export function createServer(env = process.env) {
       if (req.method === 'GET' && ['/styles.css', '/app.js', '/roster-editor.js', '/workday-web.js'].includes(url.pathname)) {
         const type = url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
         res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=300' }); res.end(await readFile(new URL(url.pathname.slice(1), ROOT))); return;
+      }
+      if (req.method === 'GET' && [
+        '/assets/photography/hero-portrait.jpg',
+        '/assets/photography/family-portrait.jpg',
+        '/assets/photography/graduation-portrait.jpg'
+      ].includes(url.pathname)) {
+        try {
+          const asset = await readFile(new URL('.' + url.pathname, ROOT));
+          res.writeHead(200, {
+            'Content-Type': 'image/jpeg',
+            'Content-Length': asset.length,
+            'Cache-Control': 'public, max-age=3600',
+            'X-Content-Type-Options': 'nosniff'
+          });
+          res.end(asset);
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          json(res, 404, { message: 'Portal photograph is not installed.' });
+        }
+        return;
       }
       if(await clientAuth.handle(req,res,url,host,json))return;
       const user=clientAuth.current(req);
