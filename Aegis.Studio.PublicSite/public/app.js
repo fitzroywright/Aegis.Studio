@@ -34,14 +34,26 @@ async function openGallery(reference) {
 async function loadClientGalleries(){try{const result=await api('/api/client-galleries'),picker=$('client-gallery-picker'),select=$('client-gallery-select'),items=result.items||[];select.replaceChildren();for(const item of items)select.add(new Option(item.title,item.reference));picker.hidden=items.length<2;if(items.length&&!items.some(x=>x.reference===state.user?.galleryReference)){state.user.galleryReference=items[0].reference;openGallery(items[0].reference);}if(items.length===1&&state.user?.galleryReference!==items[0].reference){state.user.galleryReference=items[0].reference;openGallery(items[0].reference);}if(state.user?.galleryReference)select.value=state.user.galleryReference;}catch{/* Keep the signed-in state usable if gallery listing is temporarily unavailable. */}}
 document.getElementById('client-gallery-select').addEventListener('change',event=>{const reference=event.currentTarget.value;if(reference&&state.user){state.user.galleryReference=reference;openGallery(reference);}});
 
-document.querySelectorAll('[data-identity]').forEach(button => button.addEventListener('click', async () => {
-  button.disabled = true;
-  try { const result = await api('/api/demo-login', { method: 'POST', body: JSON.stringify({ identity: button.dataset.identity }) }); showAuth((await api('/api/session')).user); }
-  catch (error) { $('auth-note').textContent = error.message; }
-  finally { button.disabled = false; }
-}));
 $('sign-out').addEventListener('click', async () => { await api('/api/logout', { method: 'POST', body: '{}' }); $('gallery-grid').replaceChildren(); showAuth(null); });
 $('client-link-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type=submit]'),result=$('client-link-result');button.disabled=true;result.textContent='';try{const code=new FormData(form).get('clientLinkCode').trim();await api('/api/v1/client-link-proofs/redeem',{method:'POST',body:JSON.stringify({code})});form.reset();const session=await api('/api/session');showAuth(session.user);result.textContent=session.user?.galleryReference?'Client connected. Your Studio galleries are shown below.':'Client connected. Galleries will appear here after Studio publishes them.';}catch(error){result.textContent=error.message;}finally{button.disabled=false;}});
+document.getElementById('gallery-request-form').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget,button=form.querySelector('button[type=submit]'),result=document.getElementById('gallery-request-result');
+  if(!form.reportValidity())return;
+  const data=new FormData(form);
+  const payload=Object.fromEntries(['clientName','clientEmail','telephone','bookingReference','notes'].map(name=>[name,String(data.get(name)||'').trim()]));
+  // Retain the key across network failures so retrying cannot duplicate requests.
+  const fingerprint=JSON.stringify(payload),prior=JSON.parse(sessionStorage.getItem('gallery-request-draft')||'null');
+  const key=prior?.fingerprint===fingerprint?prior.key:crypto.randomUUID();
+  sessionStorage.setItem('gallery-request-draft',JSON.stringify({fingerprint,key}));
+  button.disabled=true;result.textContent='Submitting gallery request…';
+  try{
+    const response=await api('/api/gallery-requests',{method:'POST',headers:{'X-CSRF-Token':intakeCsrf,'Idempotency-Key':key},body:JSON.stringify(payload)});
+    result.textContent='Request received. Reference: '+response.requestReference+'. Bryan\'s Front Desk will verify your identity before photographs are released.';
+    sessionStorage.removeItem('gallery-request-draft');form.reset();
+  }catch(error){result.textContent='Request could not be confirmed: '+error.message+'. Retry without changing the details.';}
+  finally{button.disabled=false;}
+});
 let intakeCsrf='';
 try{intakeCsrf=(await api('/api/intake-session')).csrf;}catch{}
 const bookingForm=$('booking-form');

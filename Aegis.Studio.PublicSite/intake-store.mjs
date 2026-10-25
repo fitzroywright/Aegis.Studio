@@ -42,7 +42,7 @@ export class IntakeStore {
       CREATE TABLE IF NOT EXISTS replays(owner TEXT,key TEXT,hash TEXT,result TEXT,PRIMARY KEY(owner,key));
       CREATE TABLE IF NOT EXISTS attachments(id TEXT PRIMARY KEY,intake_id TEXT,metadata TEXT,content BLOB,state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS galleries(id TEXT PRIMARY KEY,client_id TEXT NOT NULL,payload TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS gallery_access_requests(id TEXT PRIMARY KEY,client_id TEXT NOT NULL,gallery_id TEXT,client_name TEXT NOT NULL,client_email TEXT NOT NULL,notes TEXT NOT NULL,request_key TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'Pending',acknowledged_at TEXT);
+      CREATE TABLE IF NOT EXISTS gallery_access_requests(id TEXT PRIMARY KEY,client_id TEXT,gallery_id TEXT,client_name TEXT NOT NULL,client_email TEXT NOT NULL,client_phone TEXT NOT NULL DEFAULT '',booking_reference TEXT,notes TEXT NOT NULL,request_key TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'Pending',acknowledged_at TEXT);
       CREATE TABLE IF NOT EXISTS api_credentials(id TEXT PRIMARY KEY,name TEXT NOT NULL,secret_hash TEXT NOT NULL UNIQUE,scopes TEXT NOT NULL,created_at TEXT NOT NULL,last_used_at TEXT,revoked_at TEXT,client_application TEXT NOT NULL DEFAULT 'API');
       CREATE TABLE IF NOT EXISTS client_link_challenges(id TEXT PRIMARY KEY,code_hash TEXT NOT NULL UNIQUE,client_id TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT,revoked_at TEXT,created_at TEXT NOT NULL,provider TEXT);
       CREATE TABLE IF NOT EXISTS client_identity_links(provider TEXT NOT NULL,subject TEXT NOT NULL,client_id TEXT NOT NULL,verified_at TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(provider,subject));
@@ -53,8 +53,22 @@ export class IntakeStore {
     this.db.exec(`CREATE TABLE IF NOT EXISTS booking_catalog(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,payload TEXT NOT NULL,published_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS booking_slots(slot_id TEXT PRIMARY KEY,location_code TEXT NOT NULL,session_type_id TEXT NOT NULL,starts_at TEXT NOT NULL,ends_at TEXT NOT NULL,catalog_revision INTEGER NOT NULL,published_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS booking_slot_reservations(slot_id TEXT PRIMARY KEY REFERENCES booking_slots(slot_id),intake_id TEXT NOT NULL UNIQUE REFERENCES intakes(id),reserved_at TEXT NOT NULL);`);
+    // Existing installations used a NOT NULL client_id. Rebuild the small request
+    // table transactionally so unidentified gallery requests can be stored.
+    if(this.db.prepare('PRAGMA table_info(gallery_access_requests)').all().some(x=>x.name==='client_id'&&x.notnull===1)){
+      this.transaction(()=>{
+        this.db.exec(`ALTER TABLE gallery_access_requests RENAME TO gallery_access_requests_old;
+          CREATE TABLE gallery_access_requests(id TEXT PRIMARY KEY,client_id TEXT,gallery_id TEXT,client_name TEXT NOT NULL,client_email TEXT NOT NULL,client_phone TEXT NOT NULL DEFAULT '',booking_reference TEXT,notes TEXT NOT NULL,request_key TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'Pending',acknowledged_at TEXT);
+          INSERT INTO gallery_access_requests(id,client_id,gallery_id,client_name,client_email,client_phone,booking_reference,notes,request_key,created_at,status,acknowledged_at)
+          SELECT id,client_id,gallery_id,client_name,client_email,'',NULL,notes,request_key,created_at,status,acknowledged_at FROM gallery_access_requests_old;
+          DROP TABLE gallery_access_requests_old;`);
+      });
+    }
     if(!this.db.prepare('PRAGMA table_info(api_credentials)').all().some(x=>x.name==='client_application'))this.db.exec("ALTER TABLE api_credentials ADD COLUMN client_application TEXT NOT NULL DEFAULT 'API'");
     if(!this.db.prepare('PRAGMA table_info(client_link_challenges)').all().some(x=>x.name==='provider'))this.db.exec('ALTER TABLE client_link_challenges ADD COLUMN provider TEXT');
+    for(const [column,definition] of [['client_phone',"TEXT NOT NULL DEFAULT ''"],['booking_reference','TEXT']])
+      if(!this.db.prepare('PRAGMA table_info(gallery_access_requests)').all().some(x=>x.name===column))
+        this.db.exec('ALTER TABLE gallery_access_requests ADD COLUMN '+column+' '+definition);
   }
   transaction(action) { this.db.exec('BEGIN IMMEDIATE'); try { const result = action(); this.db.exec('COMMIT'); return result; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
   createApiCredential(name, scopes, clientApplication='API') {
@@ -250,25 +264,34 @@ export class IntakeStore {
     });
   }
   createGalleryAccessRequest(p) {
-    if(!/^[0-9a-f-]{36}$/i.test(String(p.clientId||'')))fail(400,'invalid_gallery_access_request','A valid client ID is required.');
-    if(!/^[0-9a-f-]{36}$/i.test(String(p.galleryId||'')))fail(400,'invalid_gallery_access_request','A gallery ID is required.');
-    if(p.galleryId){
-      const gallery=this.db.prepare('SELECT client_id FROM galleries WHERE id=?').get(p.galleryId);
-      if(!gallery||gallery.client_id!==p.clientId)fail(404,'gallery_not_found','Gallery not found for this client.');
-    }
-    const name=String(p.clientName||'').trim(),email=String(p.clientEmail||'').trim(),notes=String(p.notes||'').trim(),key=String(p.requestKey||'').trim();
-    if(!name||name.length>200||!/^\S+@\S+\.\S+$/.test(email)||email.length>320||notes.length>2000||!key||key.length>200)fail(400,'invalid_gallery_access_request','Client name, valid email and unique request key are required.');
-    const existing=this.db.prepare('SELECT id,client_id,gallery_id,client_name,client_email,notes,status FROM gallery_access_requests WHERE request_key=?').get(key);
-    if(existing){
-      if(existing.client_id!==p.clientId||existing.gallery_id!==(p.galleryId||null)||existing.client_name!==name||existing.client_email!==email||existing.notes!==notes)fail(409,'idempotency_conflict','Request key was already used with different request details.');
-      return {id:existing.id,created:false,status:existing.status};
-    }
-    const id=randomUUID(),createdAt=this.now().toISOString();
-    this.db.prepare('INSERT INTO gallery_access_requests(id,client_id,gallery_id,client_name,client_email,notes,request_key,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id,p.clientId,p.galleryId||null,name,email,notes,key,createdAt);
-    return {id,created:true,status:'Pending'};
+    // Contact details are matching hints, never evidence of client ownership.
+    // The external site must not select a Studio client or gallery identifier.
+    if(p.clientId!=null||p.galleryId!=null)fail(400,'internal_identifiers_forbidden','Submit contact details and optional booking reference; Studio resolves the client.');
+    const name=String(p.clientName||'').trim(),email=String(p.clientEmail||'').trim().toLowerCase();
+    const phone=String(p.telephone||p.clientPhone||'').trim(),booking=String(p.bookingReference||'').trim().toUpperCase();
+    const notes=String(p.notes||'').trim(),key=String(p.requestKey||'').trim();
+    if(!name||name.length>200||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>320||
+       !/^\+?[0-9 ()-]{7,30}$/.test(phone)||notes.length>2000||key.length!==64||
+       (booking&&!/^[0-9]{4}-(?:BK|BE|BR|W|S)-[0-9]{6}$/.test(booking)))
+      fail(400,'invalid_gallery_access_request','Name, email and telephone are required; booking reference is optional.');
+    return this.transaction(()=>{
+      const existing=this.db.prepare('SELECT * FROM gallery_access_requests WHERE request_key=?').get(key);
+      if(existing){
+        if(existing.client_name!==name||existing.client_email!==email||existing.client_phone!==phone||
+           (existing.booking_reference||'')!==booking||existing.notes!==notes)
+          fail(409,'idempotency_conflict','Request key was already used with different details.');
+        return {id:existing.id,created:false,status:existing.status};
+      }
+      const id=randomUUID();
+      this.db.prepare('INSERT INTO gallery_access_requests(id,client_id,gallery_id,client_name,client_email,client_phone,booking_reference,notes,request_key,created_at) VALUES(?,NULL,NULL,?,?,?,?,?,?,?)')
+        .run(id,name,email,phone,booking||null,notes,key,this.now().toISOString());
+      return {id,created:true,status:'Pending'};
+    });
   }
   pendingGalleryAccessRequests(limit=100) {
-    return this.db.prepare("SELECT id,client_id,gallery_id,client_name,client_email,notes,created_at FROM gallery_access_requests WHERE status='Pending' ORDER BY created_at,id LIMIT ?").all(Math.max(1,Math.min(500,limit))).map(x=>({...x,clientId:x.client_id,galleryId:x.gallery_id,clientName:x.client_name,clientEmail:x.client_email,notes:x.notes,createdAtUtc:x.created_at}));
+    return this.db.prepare("SELECT id,client_id,gallery_id,client_name,client_email,client_phone,booking_reference,notes,created_at FROM gallery_access_requests WHERE status='Pending' ORDER BY created_at,id LIMIT ?")
+      .all(Math.max(1,Math.min(500,limit)))
+      .map(x=>({id:x.id,clientId:x.client_id,galleryId:x.gallery_id,clientName:x.client_name,clientEmail:x.client_email,telephone:x.client_phone,bookingReference:x.booking_reference,notes:x.notes,createdAtUtc:x.created_at}));
   }
   acknowledgeGalleryAccessRequest(id) {
     const r=this.db.prepare("UPDATE gallery_access_requests SET status='Imported',acknowledged_at=? WHERE id=? AND status='Pending'").run(this.now().toISOString(),id);

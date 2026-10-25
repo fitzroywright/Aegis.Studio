@@ -152,28 +152,32 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
     }
     public Guid ImportGalleryAccessRequest(string source,JsonElement p)
     {
-        Guid external=p.GetProperty("id").GetGuid(),client=p.GetProperty("clientId").GetGuid();
-        Guid? gallery=p.TryGetProperty("galleryId",out var galleryValue)&&galleryValue.ValueKind==JsonValueKind.String?galleryValue.GetGuid():null;
-        string name=Text(p,"clientName"),email=Text(p,"clientEmail"),notes=Text(p,"notes");
-        if(string.IsNullOrWhiteSpace(name)||name.Length>200||!System.Net.Mail.MailAddress.TryCreate(email,out _)||email.Length>320||notes.Length>2000)
-            throw new ArgumentException("Invalid gallery access request details.");
+        Guid external=p.GetProperty("id").GetGuid();
+        string name=Text(p,"clientName"),email=Text(p,"clientEmail"),phone=Text(p,"telephone"),booking=Text(p,"bookingReference"),notes=Text(p,"notes");
+        if(string.IsNullOrWhiteSpace(name)||name.Length>200||!System.Net.Mail.MailAddress.TryCreate(email,out _)||email.Length>320||
+           (!string.IsNullOrWhiteSpace(phone)&&!System.Text.RegularExpressions.Regex.IsMatch(phone,@"^\+?[0-9 ()-]{7,30}$"))||
+           booking.Length>40||notes.Length>2000)
+            throw new ArgumentException("Invalid gallery request contact information.");
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         WorkflowStore.Sql(c,tx,"select pg_advisory_xact_lock(hashtextextended($1,0))","website-gallery-access:"+source+":"+external);
-        var prior=WorkflowStore.Scalar(c,tx,"select conversation_id from studio_website_gallery_access_requests where source=$1 and external_id=$2",source,external);
-        if(prior is Guid existing){tx.Commit();return existing;}
-        if(WorkflowStore.Scalar(c,tx,"select id from studio_clients where id=$1",client) is not Guid)
-            throw new ArgumentException("Gallery access request refers to an unknown Studio client.");
-        Guid conversation=Guid.NewGuid(),workspace=WorkflowRules.UnassignedWorkspaceId;
-        string subject=gallery.HasValue?"Gallery access request":"Client gallery access request";
-        string body=gallery.HasValue?$"The client requested access to gallery {gallery:D}.": "The client requested access to their Studio photo galleries.";
-        if(!string.IsNullOrWhiteSpace(notes))body+="\n\nClient note: "+notes;
+        if(WorkflowStore.Scalar(c,tx,"select conversation_id from studio_website_gallery_access_requests where source=$1 and external_id=$2",source,external) is Guid prior)
+        {tx.Commit();return prior;}
+        // Contact information is a staff matching hint, not identity verification.
+        // Do not populate client_id automatically even when one record matches.
+        Guid conversation=Guid.NewGuid();
+        var subject=string.IsNullOrWhiteSpace(booking)?"Client gallery request":"Client gallery request — "+booking;
+        string body="Client requested a photograph gallery.\nEmail: "+email+"\nTelephone: "+(string.IsNullOrWhiteSpace(phone)?"Not supplied (legacy request)":phone);
+        if(!string.IsNullOrWhiteSpace(booking))body+="\nBooking reference: "+booking;
+        if(!string.IsNullOrWhiteSpace(notes))body+="\nClient note: "+notes;
+        body+="\nClient identity and Job must be verified by Front Desk before publication.";
         WorkflowStore.Sql(c,tx,"""
-          insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc,client_id)
-          values($1,$2,$3,$4,$5,'Website Gallery',false,$6,$7)
-          """,conversation,workspace,subject,name,email,p.GetProperty("createdAtUtc").GetDateTimeOffset(),client);
+          insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc)
+          values($1,$2,$3,$4,$5,'Website Gallery',false,$6)
+          """,conversation,WorkflowRules.UnassignedWorkspaceId,subject,name,email,p.GetProperty("createdAtUtc").GetDateTimeOffset());
         WorkflowStore.Sql(c,tx,"insert into studio_messages(id,conversation_id,author_display_name,author_user_name,visibility,body,created_at_utc,external_message_id) values($1,$2,$3,$4,'External',$5,$6,$7)",
             Guid.NewGuid(),conversation,name,email,body,p.GetProperty("createdAtUtc").GetDateTimeOffset(),"gallery-access:"+source+":"+external);
-        WorkflowStore.Sql(c,tx,"insert into studio_website_gallery_access_requests(source,external_id,client_id,gallery_id,conversation_id,payload) values($1,$2,$3,$4,$5,$6::jsonb)",source,external,client,gallery,conversation,p.GetRawText());
+        WorkflowStore.Sql(c,tx,"insert into studio_website_gallery_access_requests(source,external_id,client_id,gallery_id,conversation_id,payload,resolution_status) values($1,$2,null,null,$3,$4::jsonb,'Unidentified')",
+            source,external,conversation,p.GetRawText());
         WorkflowStore.Sql(c,tx,"insert into studio_intake_activity(conversation_id) values($1) on conflict do nothing",conversation);
         tx.Commit();return conversation;
     }

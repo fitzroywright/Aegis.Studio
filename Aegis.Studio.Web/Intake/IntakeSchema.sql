@@ -62,7 +62,7 @@ alter table studio_website_imports add column if not exists last_status text;
 create table if not exists studio_website_gallery_access_requests(
  source text not null,
  external_id uuid not null,
- client_id uuid not null references studio_clients(id),
+ client_id uuid null references studio_clients(id),
  gallery_id uuid null,
  conversation_id uuid not null references studio_conversations(id),
  payload jsonb not null,
@@ -71,6 +71,11 @@ create table if not exists studio_website_gallery_access_requests(
  reviewed_at_utc timestamptz,
  primary key(source,external_id)
 );
+alter table studio_website_gallery_access_requests alter column client_id drop not null;
+alter table studio_website_gallery_access_requests add column if not exists resolution_status text not null default 'Unidentified';
+alter table studio_website_gallery_access_requests add column if not exists resolution_note text;
+alter table studio_website_gallery_access_requests add column if not exists resolved_by text;
+alter table studio_website_gallery_access_requests add column if not exists resolved_at_utc timestamptz;
 create index if not exists ix_website_gallery_access_client on studio_website_gallery_access_requests(client_id, imported_at_utc desc);
 
 create table if not exists studio_gallery_exports(
