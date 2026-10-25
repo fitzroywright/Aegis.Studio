@@ -75,7 +75,7 @@ export class IntakeStore {
   transaction(action) { this.db.exec('BEGIN IMMEDIATE'); try { const result = action(); this.db.exec('COMMIT'); return result; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
   createApiCredential(name, scopes, clientApplication='API') {
     if(typeof name!=='string'||!name.trim()||name.trim().length>100) fail(400,'invalid_key_name','Provide a key name up to 100 characters.');
-    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','booking:catalog:publish','booking:availability:publish','gallery:publish','gallery:read','client:link','attachment:scan','payment:verified','workday:sync','gallery:access:submit','gallery:access:pull','gallery:access:ack','gallery:selections:pull','gallery:selections:ack']);
+    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','booking:catalog:publish','booking:availability:publish','gallery:publish','gallery:read','gallery:original:read','client:link','attachment:scan','payment:verified','workday:sync','gallery:access:submit','gallery:access:pull','gallery:access:ack','gallery:selections:pull','gallery:selections:ack']);
     if(!Array.isArray(scopes)||!scopes.length||scopes.some(x=>!allowed.has(x))||new Set(scopes).size!==scopes.length) fail(400,'invalid_scopes','Choose one or more supported, unique scopes.');
     if(!['API','Workday Mobile','Studio'].includes(clientApplication))fail(400,'invalid_client_application','Choose API, Workday Mobile or Studio as the credential application.');
     const id=randomUUID(),secret=randomBytes(32).toString('base64url'),createdAt=this.now().toISOString();
