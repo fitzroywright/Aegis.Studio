@@ -272,7 +272,7 @@ export class IntakeStore {
     const notes=String(p.notes||'').trim(),key=String(p.requestKey||'').trim();
     if(!name||name.length>200||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>320||
        !/^\+?[0-9 ()-]{7,30}$/.test(phone)||notes.length>2000||key.length!==64||
-       (booking&&!/^[0-9]{4}-(?:BK|BE|BR|W)-[0-9]{6}$/.test(booking)))
+       (booking&&!/^[0-9]{4}-(?:BK|BE|BR|W|S)-[0-9]{6}$/.test(booking)))
       fail(400,'invalid_gallery_access_request','Name, email and telephone are required; booking reference is optional.');
     return this.transaction(()=>{
       const existing=this.db.prepare('SELECT * FROM gallery_access_requests WHERE request_key=?').get(key);
