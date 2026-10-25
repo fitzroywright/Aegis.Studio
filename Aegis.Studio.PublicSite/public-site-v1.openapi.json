@@ -2970,7 +2970,7 @@
                   },
                   "bookingReference": {
                     "type": "string",
-                    "pattern": "^[0-9]{4}-(BK|BE|BR|W)-[0-9]{6}$",
+                    "pattern": "^[0-9]{4}-(BK|BE|BR|W|S)-[0-9]{6}$",
                     "description": "Optional booking reference to assist Studio with locating a Job."
                   },
                   "notes": {
