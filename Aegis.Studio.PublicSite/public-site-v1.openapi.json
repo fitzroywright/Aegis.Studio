@@ -1,14 +1,14 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Bryan\u2019s reference public website API",
+    "title": "Bryan’s reference public website API",
     "version": "1.0.0",
     "description": "Independent public-site intake and publication contract. Studio initiates all integration requests. Submission credentials cannot poll, acknowledge, verify payment or publish galleries. This API is distinct from the legacy Studio Public V1 API."
   },
   "servers": [
     {
       "url": "https://api.bryanstudiosltd.com/api/v1",
-      "description": "Bryan\u2019s Public Site production API."
+      "description": "Bryan’s Public Site production API."
     }
   ],
   "components": {
@@ -2948,21 +2948,11 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "clientId",
-                  "galleryId",
                   "clientName",
-                  "clientEmail"
+                  "clientEmail",
+                  "telephone"
                 ],
                 "properties": {
-                  "clientId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "galleryId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "description": "Gallery the client is requesting access to. It must belong to clientId."
-                  },
                   "clientName": {
                     "type": "string",
                     "maxLength": 200
@@ -2972,11 +2962,23 @@
                     "format": "email",
                     "maxLength": 320
                   },
+                  "telephone": {
+                    "type": "string",
+                    "minLength": 7,
+                    "maxLength": 30,
+                    "description": "Telephone number supplied for matching; not proof of identity."
+                  },
+                  "bookingReference": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-(BK|BE|BR|W)-[0-9]{6}$",
+                    "description": "Optional booking reference to assist Studio with locating a Job."
+                  },
                   "notes": {
                     "type": "string",
                     "maxLength": 2000
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -3000,7 +3002,8 @@
           "429": {
             "description": "Rate limited"
           }
-        }
+        },
+        "description": "Accept contact details and optional booking reference without requiring a Studio Client ID or Gallery ID. Studio Front Desk verifies ownership before publication or private access. Never grant access based solely on matching email/telephone."
       },
       "get": {
         "summary": "Poll pending gallery access requests (Studio)",
