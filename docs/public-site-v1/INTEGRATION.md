@@ -78,7 +78,23 @@ Idempotency-Key: <unique-request-key>
 Content-Type: application/json
 ```
 
-The JSON body requires `clientId`, `galleryId`, `clientName`, and `clientEmail`; `notes` are optional. The API checks that the gallery belongs to that client. The response means the request is queued, not that a gallery is published.
+The JSON body requires `clientName`, `clientEmail`, and `telephone`. `bookingReference` and `notes` are optional. External callers **must not supply** `clientId` or `galleryId`. The API stores a durable request, returns a UUID request reference, and delivers it to Studio when Studio polls. The response means only **received**, never ownership verified or gallery published.
+
+Example:
+
+```json
+{
+  "clientName": "Jane Brown",
+  "clientEmail": "jane@example.com",
+  "telephone": "+18765550123",
+  "bookingReference": "2026-BK-000001",
+  "notes": "Please make my graduation photographs available."
+}
+```
+
+The Reference Website uses the same request store with `POST /api/gallery-requests`, CSRF cookie/header protection, and an idempotency key. A third-party website sends requests server-to-server to `POST /api/v1/gallery-access-requests` with a scoped bearer token.
+
+Studio imports all requests into Front Desk, including those with no matching Client record. The staff-only `GET /api/frontdesk/gallery-access-requests/unresolved` returns requests and **candidate** Clients suggested by email or normalized telephone; candidates are never automatically accepted. Staff verify identity and Job independently, then use `POST /api/frontdesk/gallery-access-requests/{conversationId}/resolve` with `{"clientId":"<verified UUID>","publicationId":"<optional existing publication UUID>","note":"<optional verification note>"}`. If production is not ready, the request remains awaiting production. A publication must belong to the verified client. Requests and Studio-initiated publications ultimately use the same gallery publication IDs and Front Desk publish endpoint. Private gallery access still requires independently verified website authentication and Client ID linking.
 
 Studio polls `GET /api/v1/gallery-access-requests` with `gallery:access:pull`, imports each request into Front Desk, and acknowledges it at `POST /api/v1/gallery-access-requests/{id}/ack` with `gallery:access:ack`. Front Desk staff publish through `POST /api/frontdesk/gallery-access-requests/{conversationId}/publish`; Studio requires an authenticated Administrator or both global `ViewAllJobs` and `Billing` permissions. Studio's outbound API credential requires `gallery:publish`. The External Site never receives gallery publication permission.
 
