@@ -155,7 +155,7 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
         Guid external=p.GetProperty("id").GetGuid();
         string name=Text(p,"clientName"),email=Text(p,"clientEmail"),phone=Text(p,"telephone"),booking=Text(p,"bookingReference"),notes=Text(p,"notes");
         if(string.IsNullOrWhiteSpace(name)||name.Length>200||!System.Net.Mail.MailAddress.TryCreate(email,out _)||email.Length>320||
-           !System.Text.RegularExpressions.Regex.IsMatch(phone,@"^\+?[0-9 ()-]{7,30}$")||
+           (!string.IsNullOrWhiteSpace(phone)&&!System.Text.RegularExpressions.Regex.IsMatch(phone,@"^\+?[0-9 ()-]{7,30}$"))||
            booking.Length>40||notes.Length>2000)
             throw new ArgumentException("Invalid gallery request contact information.");
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
@@ -166,7 +166,7 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
         // Do not populate client_id automatically even when one record matches.
         Guid conversation=Guid.NewGuid();
         var subject=string.IsNullOrWhiteSpace(booking)?"Client gallery request":"Client gallery request — "+booking;
-        string body="Client requested a photograph gallery.\nEmail: "+email+"\nTelephone: "+phone;
+        string body="Client requested a photograph gallery.\nEmail: "+email+"\nTelephone: "+(string.IsNullOrWhiteSpace(phone)?"Not supplied (legacy request)":phone);
         if(!string.IsNullOrWhiteSpace(booking))body+="\nBooking reference: "+booking;
         if(!string.IsNullOrWhiteSpace(notes))body+="\nClient note: "+notes;
         body+="\nClient identity and Job must be verified by Front Desk before publication.";
