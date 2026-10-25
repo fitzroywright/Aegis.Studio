@@ -377,10 +377,15 @@ export function createIntakeApi(env,readBody,json) {
       const gallery=JSON.parse(row.payload);
       const requestedLimit=Number(url.searchParams.get('limit')||2);
       const limit=Number.isSafeInteger(requestedLimit)?Math.max(1,Math.min(5,requestedLimit)):2;
+      const refresh=url.searchParams.get('refresh')==='true';
+      const after=url.searchParams.get('after');
+      const afterIndex=after?gallery.items.findIndex(x=>x.versionId===after):-1;
+      if(after&&afterIndex<0)fail(400,'invalid_cursor','Unknown photograph cursor.');
+      const candidates=gallery.items.slice(afterIndex+1).filter(x=>refresh||
+        !store.db.prepare('SELECT 1 FROM gallery_previews WHERE gallery_id=? AND id=?').get(gallery.id,x.versionId));
+      const batch=candidates.slice(0,limit);
       let processed=0;
-      for(const item of gallery.items){
-        if(processed>=limit)break;
-        if(store.db.prepare('SELECT 1 FROM gallery_previews WHERE gallery_id=? AND id=?').get(gallery.id,item.versionId))continue;
+      for(const item of batch){
         const legacy=store.db.prepare('SELECT content,type FROM media WHERE gallery_id=? AND id=?').get(gallery.id,item.versionId);
         const original=await mediaStorage.get(gallery.id,item.versionId,'original')||legacy;
         if(!original)continue;
@@ -396,14 +401,15 @@ export function createIntakeApi(env,readBody,json) {
         const preview=await createPreview(bytes,env);
         const stored=await mediaStorage.storeObject(gallery.id,item.versionId,'preview',preview.type,preview.content);
         store.transaction(()=>{
-          store.db.prepare('INSERT INTO gallery_previews(gallery_id,id,type,content,content_hash) VALUES(?,?,?,?,?) ON CONFLICT(gallery_id,id) DO NOTHING')
+          store.db.prepare('INSERT INTO gallery_previews(gallery_id,id,type,content,content_hash) VALUES(?,?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content,content_hash=excluded.content_hash')
             .run(gallery.id,item.versionId,preview.type,mediaStorage.s3?Buffer.alloc(0):preview.content,preview.contentHash);
           mediaStorage.remember(gallery.id,item.versionId,'preview',preview.type,stored);
         });
         processed++;
       }
-      const remaining=gallery.items.filter(x=>!store.db.prepare('SELECT 1 FROM gallery_previews WHERE gallery_id=? AND id=?').get(gallery.id,x.versionId)).length;
-      json(res,200,{publicationId:gallery.id,processed,remaining});return true;
+      const nextCursor=candidates.length>batch.length?batch.at(-1).versionId:null;
+      const remaining=candidates.length-batch.length;
+      json(res,200,{publicationId:gallery.id,processed,remaining,nextCursor,refresh});return true;
     }
     const originalDownload=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})\/original$/i);
     if(originalDownload&&method==='GET'){
