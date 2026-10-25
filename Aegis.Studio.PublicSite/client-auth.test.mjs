@@ -64,3 +64,61 @@ test('validated Yahoo OIDC callback links only its verified provider subject to 
     assert.equal(auth.current({headers:{cookie:sessionCookie}}),null);
   }finally{globalThis.fetch=originalFetch;store.close();}
 });
+
+test('Microsoft common authority accepts personal and external tenants but isolates identities and rejects wrong signing-key issuer',async()=>{
+  const store=new IntakeStore(':memory:');
+  const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+  const personal='9188040d-6c67-4c5b-b112-36a304b66dad';
+  const companyA='11111111-1111-4111-8111-111111111111';
+  const companyB='33333333-3333-4333-8333-333333333333';
+  const issuer=tid=>'https://login.microsoftonline.com/'+tid+'/v2.0';
+  const template='https://login.microsoftonline.com/{tenantid}/v2.0';
+  const jwk={...publicKey.export({format:'jwk'}),kid:'ms-test-key',alg:'RS256',use:'sig',issuer:template};
+  const auth=new ClientAuthentication({MICROSOFT_CLIENT_ID:'bryans-client',
+    MICROSOFT_CLIENT_SECRET:'fake-secret',MICROSOFT_TENANT_ID:'common',PUBLIC_WEB_ORIGIN:'http://localhost:8080'},store);
+  const originalFetch=globalThis.fetch;
+  let tid=personal, keyIssuer=template, badIssuer=false;
+  function token(nonce){
+    const now=Math.floor(Date.now()/1000);
+    const head=Buffer.from(JSON.stringify({alg:'RS256',kid:'ms-test-key'})).toString('base64url');
+    const claims={iss:badIssuer?issuer(companyB):issuer(tid),tid,aud:'bryans-client',
+      sub:'same-subject',name:'Example client',nonce,iat:now,exp:now+600};
+    const body=Buffer.from(JSON.stringify(claims)).toString('base64url');
+    return head+'.'+body+'.'+sign('sha256',Buffer.from(head+'.'+body),privateKey).toString('base64url');
+  }
+  globalThis.fetch=async(url,options)=>{
+    const target=String(url);
+    if(target.endsWith('/.well-known/openid-configuration'))return {ok:true,json:async()=>({
+      issuer:template,authorization_endpoint:'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+      token_endpoint:'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+      jwks_uri:'https://login.microsoftonline.com/common/discovery/v2.0/keys'})};
+    if(target.endsWith('/discovery/v2.0/keys'))return {ok:true,json:async()=>({keys:[{...jwk,issuer:keyIssuer}]})};
+    if(target.endsWith('/oauth2/v2.0/token'))return {ok:true,json:async()=>({
+      id_token:token(store.db.prepare('SELECT nonce FROM client_auth_states LIMIT 1').get().nonce)})};
+    throw Error('Unexpected fetch '+target);
+  };
+  async function signIn(){
+    auth.cache.clear();
+    const started=fakeResponse();await auth.begin('microsoft',started);
+    assert.equal(new URL(started.headers.Location).pathname,'/common/oauth2/v2.0/authorize');
+    const state=new URL(started.headers.Location).searchParams.get('state');
+    const callback=fakeResponse();
+    await auth.finish('microsoft',new URL('http://localhost:8080/auth/microsoft/callback?code=ok&state='+state),
+      callback,{headers:{cookie:'bryans_auth_state='+state}});
+    const cookie=callback.headers['Set-Cookie'][1].split(';')[0];
+    return auth.current({headers:{cookie}});
+  }
+  try{
+    const person=await signIn();assert.equal(person.subject,'same-subject');
+    tid=companyA;const company=await signIn();
+    assert.equal(company.subject,companyA+':same-subject');
+    tid=companyB;const other=await signIn();
+    assert.equal(other.subject,companyB+':same-subject');
+    const proof=store.createClientLinkChallenge('22222222-2222-4222-8222-222222222222');
+    store.redeemClientLinkChallenge(proof.code,'microsoft',company.subject);
+    assert.equal(store.clientForIdentity('microsoft',other.subject),null);
+    badIssuer=true;await assert.rejects(signIn(),/issuer/);badIssuer=false;
+    keyIssuer=issuer(companyB);tid=companyA;
+    await assert.rejects(signIn(),/signing key/);
+  }finally{globalThis.fetch=originalFetch;store.close();}
+});
