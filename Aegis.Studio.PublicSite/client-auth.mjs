@@ -8,7 +8,7 @@ async function requestJson(url,options={}){
   if(!r.ok)throw reject(502,'Identity provider request failed.');
   return r.json();
 }
-function verifyToken(token,metadata,keys,clientId,nonce,provider){
+function verifyToken(token,metadata,keys,clientId,nonce,provider,msTenant){
   const parts=String(token||'').split('.');if(parts.length!==3)throw reject(401,'Invalid identity token.');
   let head,claims;
   try{head=JSON.parse(Buffer.from(parts[0],'base64url'));claims=JSON.parse(Buffer.from(parts[1],'base64url'));}
@@ -24,9 +24,9 @@ function verifyToken(token,metadata,keys,clientId,nonce,provider){
   if(!claims.sub||claims.aud!==clientId||claims.exp<=now||claims.iat>now+60||!equal(claims.nonce,nonce))
     throw reject(401,'Invalid identity claims.');
   if(provider==='microsoft'){
-    const tenant='9188040d-6c67-4c5b-b112-36a304b66dad';
+    const tenant=msTenant==='consumers'?'9188040d-6c67-4c5b-b112-36a304b66dad':msTenant;
     if(claims.tid!==tenant||claims.iss!=='https://login.microsoftonline.com/'+tenant+'/v2.0')
-      throw reject(401,'Only personal Microsoft identities are currently enabled.');
+      throw reject(401,'Microsoft identity is not issued by the configured tenant.');
   }else if(claims.iss!==metadata.issuer)throw reject(401,'Invalid identity issuer.');
   return claims;
 }
@@ -38,8 +38,12 @@ export class ClientAuthentication {
     if(u.pathname!=='/'||u.search||u.hash||(this.secure&&u.protocol!=='https:'))
       throw Error('PUBLIC_WEB_ORIGIN must be an origin and HTTPS in production.');
     this.host=u.hostname.toLowerCase();
+    this.msTenant=String(env.MICROSOFT_TENANT_ID||'consumers').toLowerCase();
+    if(this.msTenant!=='consumers'&&!/^[0-9a-f-]{36}$/.test(this.msTenant))
+      throw Error('MICROSOFT_TENANT_ID must be consumers or a specific organization tenant UUID.');
     this.config={
-      microsoft:{id:env.MICROSOFT_CLIENT_ID,secret:env.MICROSOFT_CLIENT_SECRET,discovery:'https://login.microsoftonline.com/consumers/v2.0/.well-known/openid-configuration'},
+      microsoft:{id:env.MICROSOFT_CLIENT_ID,secret:env.MICROSOFT_CLIENT_SECRET,
+        discovery:'https://login.microsoftonline.com/'+this.msTenant+'/v2.0/.well-known/openid-configuration'},
       yahoo:{id:env.YAHOO_CLIENT_ID,secret:env.YAHOO_CLIENT_SECRET,discovery:'https://api.login.yahoo.com/.well-known/openid-configuration'},
       facebook:{id:env.FACEBOOK_APP_ID,secret:env.FACEBOOK_APP_SECRET}
     };
@@ -117,7 +121,7 @@ export class ClientAuthentication {
         body:new URLSearchParams({grant_type:'authorization_code',client_id:c.id,client_secret:c.secret,
           redirect_uri:callback,code,code_verifier:row.verifier}).toString()
       });
-      const claims=verifyToken(token.id_token,metadata,keys,c.id,row.nonce,provider);
+      const claims=verifyToken(token.id_token,metadata,keys,c.id,row.nonce,provider,this.msTenant);
       identity={subject:String(claims.sub),name:String(claims.name||claims.preferred_username||'Client'),
         email:claims.email||claims.preferred_username||null};
     }
