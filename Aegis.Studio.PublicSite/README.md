@@ -12,6 +12,8 @@ npm start
 
 The website accepts inquiries and bookings through its browser form and authenticated submission API. It saves before returning a receipt. Form and API share the intake store and annual location reference allocator (BK/BE bookings, W inquiries). Acknowledgment, import, booking and payment states remain distinct. Rosters can be entered, pasted or uploaded as CSV/XLSX, reviewed and saved. Attachments remain quarantined until scanning passes.
 
+ExcelJS stays pinned to 4.4.0. A targeted npm override replaces its `uuid@^8.3.0` dependency with 11.1.1 to fix [GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq). ExcelJS uses only `require('uuid').v4()` for extended conditional-formatting IDs; UUID 11.1.1 preserves that CommonJS API and includes the advisory fix. The roster tests serialize real XLSX workbooks, exercise this ID generation, and read them through the production worker. Reassess the override when upgrading ExcelJS.
+
 See [the API guide](../docs/public-site-v1/INTEGRATION.md), [OpenAPI](public-site-v1.openapi.json), and [deployment and live proof runbook](../docs/CLIENT-INTAKE-HANDOFF.md).
 
 ## Storage and hosting
