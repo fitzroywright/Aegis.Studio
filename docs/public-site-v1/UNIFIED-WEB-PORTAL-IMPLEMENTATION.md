@@ -76,7 +76,7 @@ Microsoft consumer authority is used for Hotmail, Outlook.com and Live.com accou
 - Integration-only original: GET /api/v1/galleries/{publicationId}/media/{versionId}/original using a dedicated gallery:original:read bearer credential.
 - Do not give gallery:original:read to the external website's browser or public JavaScript. Giving any external server originals means that server can distribute them, so provision explicitly.
 - Use private no-store responses; never expose S3 URLs in browser responses.
-- Existing pre-watermark published galleries need derivative backfill before client preview works. Use scoped POST /api/v1/galleries/{publicationId}/previews/backfill?limit=2 (gallery:publish) repeatedly until remaining=0, against a test gallery first. Do NOT expose old SQLite originals as fallback previews. If watermark configuration changes, regenerate the derivatives in an approved maintenance workflow before serving new previews.
+- Existing pre-watermark published galleries need derivative backfill before client preview works. Use scoped POST /api/v1/galleries/{publicationId}/previews/backfill?limit=2 (gallery:publish) repeatedly until remaining=0, against a test gallery first. Do NOT expose old SQLite originals as fallback previews. If watermark configuration changes, bump GALLERY_WATERMARK_VERSION and call the same backfill endpoint with refresh=true and the returned nextCursor as after=... until nextCursor is null; it replaces derivatives but never originals.
 
 ### WorkDay upload acceptance
 
