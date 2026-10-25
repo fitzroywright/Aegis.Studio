@@ -36,7 +36,10 @@ test('WorkDay mobile writes to the API exchange and Studio synchronizes outbound
  const published=await fetch(base+'/admin/workday/snapshots',{method:'PUT',headers:studio,body:JSON.stringify({userName:'photographer.one',revision:1,snapshot})});assert.equal(published.status,200);
  const device=await fetch(base+'/workday/device-session',{method:'POST',headers:{Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({deviceId:'test-device'})});
  assert.equal(device.status,200);const deviceToken=(await device.json()).token;
- const bootstrap=await fetch(base+'/workday/bootstrap',{headers:{'X-Aegis-WorkDay-Token':deviceToken}});assert.equal(bootstrap.status,200);assert.equal((await bootstrap.json()).displayName,'Photographer One');
+  const deniedUpload=await fetch(base+'/workday/assignments/44444444-4444-4444-8444-444444444444/uploads',{
+   method:'POST',headers:{Cookie:cookie},body:new FormData()});
+ assert.equal(deniedUpload.status,403);
+const bootstrap=await fetch(base+'/workday/bootstrap',{headers:{'X-Aegis-WorkDay-Token':deviceToken}});assert.equal(bootstrap.status,200);assert.equal((await bootstrap.json()).displayName,'Photographer One');
  const operationId='33333333-3333-4333-8333-333333333333',operation={operationId,kind:'Arrive',assignmentId:'44444444-4444-4444-8444-444444444444',occurredAtUtc:new Date().toISOString(),deviceId:'test-device'};
  const sent=await fetch(base+'/workday/operations',{method:'POST',headers:{'X-Aegis-WorkDay-Token':deviceToken,'Content-Type':'application/json'},body:JSON.stringify(operation)});
  assert.equal(sent.status,202);assert.equal((await sent.json()).state,'Pending');
@@ -126,6 +129,47 @@ test('gallery requests accept contacts and optional booking reference, without k
   assert.equal((await(await fetch(origin+'/api/v1/gallery-access-requests',{headers:auth})).json()).items.length,0);
 });
 
+test('real client provider metadata is disabled without configured secrets',async t=>{
+ const origin=await fixture(t);
+ const response=await fetch(origin+'/api/auth/providers');
+ assert.equal(response.status,200);
+ assert.deepEqual((await response.json()).providers,[]);
+ assert.equal((await fetch(origin+'/api/client-galleries')).status,401);
+});
+test('private original retrieval needs its own integration credential and honors revocation',async t=>{
+ const origin=await fixture(t),base=origin+'/api/v1';
+ const keys=[{id:'publish',secret:'publisher-012345678901234567890123456789',scopes:['gallery:publish']},
+  {id:'original',secret:'original-reader-012345678901234567890123456',scopes:['gallery:original:read']}];
+ // Existing fixed integration credentials preserve scope isolation.
+ const gallery='11111111-1111-4111-8111-111111111111',client='22222222-2222-4222-8222-222222222222',
+ version='33333333-3333-4333-8333-333333333333';
+ const pub={Authorization:'Bearer '+keys[0].secret,'Content-Type':'application/json'};
+ const envOrigin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify(keys)});
+ const api=envOrigin+'/api/v1',bytes=Buffer.from([255,216,255,217]);
+ assert.equal((await fetch(api+'/galleries',{method:'POST',headers:pub,
+  body:JSON.stringify({id:gallery,clientId:client,title:'Secure original test',items:[{versionId:version,fileName:'portrait.jpg'}]})})).status,200);
+ assert.equal((await fetch(api+'/galleries/'+gallery+'/media/'+version,{method:'PUT',
+  headers:{Authorization:'Bearer '+keys[0].secret,'Content-Type':'image/jpeg'},body:bytes})).status,200);
+ assert.equal((await fetch(api+'/galleries/'+gallery+'/publish',{method:'POST',headers:pub,body:'{}'})).status,200);
+ const path=api+'/galleries/'+gallery+'/media/'+version+'/original';
+ assert.equal((await fetch(path)).status,401);
+ assert.equal((await fetch(path,{headers:pub})).status,403);
+ const authorized=await fetch(path,{headers:{Authorization:'Bearer '+keys[1].secret}});
+ assert.equal(authorized.status,200);
+ assert.deepEqual(Buffer.from(await authorized.arrayBuffer()),bytes);
+ assert.equal(authorized.headers.get('cache-control'),'private, no-store');
+ assert.equal((await fetch(api+'/galleries/'+gallery+'/revoke',{method:'POST',headers:pub,body:'{}'})).status,200);
+ assert.equal((await fetch(path,{headers:{Authorization:'Bearer '+keys[1].secret}})).status,404);
+});
+test('production hostnames require an explicit allowlist',()=>{
+ assert.throws(()=>createServer({SESSION_SECRET:'test-only-session-secret-at-least-32-chars',
+  NODE_ENV:'production',PUBLIC_WEB_ORIGIN:'https://web.bryanstudiosltd.com',INTAKE_DB_PATH:':memory:'}),
+  /PUBLIC_ALLOWED_HOSTS/);
+ const server=createServer({SESSION_SECRET:'test-only-session-secret-at-least-32-chars',
+  NODE_ENV:'production',PUBLIC_WEB_ORIGIN:'https://web.bryanstudiosltd.com',
+  PUBLIC_ALLOWED_HOSTS:'web.bryanstudiosltd.com,api.bryanstudiosltd.com',INTAKE_DB_PATH:':memory:'});
+ server.close();
+});
 test('public booking is durably saved without calling internal Studio and replays safely',async t=>{
  const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),session=await fetch(`${origin}/api/intake-session`),csrf=(await session.json()).csrf,cookie=session.headers.get('set-cookie').split(';')[0];
  const catalog=await publishTestBooking(origin),body=JSON.stringify({clientName:'Test Client',clientEmail:'client@example.test',sessionTypeId:'portrait',catalogRevision:catalog.revision,slotId:'bk-1',locationCode:'BK'});
