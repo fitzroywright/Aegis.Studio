@@ -14,6 +14,8 @@ public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,st
 public sealed record VerifiedDepositRequest(decimal Amount,string Currency,string Provider,string Reference);
 public sealed record FrontDeskRequest(Guid Id,PendingBookingRequest Request,string Status,Guid? JobId,decimal RecordedDeposit,DateTimeOffset CreatedAtUtc,string? IntakeReference=null);
 
+public sealed record GalleryRequestResolution(Guid ClientId,Guid? PublicationId=null,string? Note=null);
+
 public static class FrontDeskRequestRules
 {
     public static void Validate(PendingBookingRequest request)
@@ -227,6 +229,79 @@ public static class FrontDeskBookingRequestEndpoints
     {
         var group=app.MapGroup("/api/frontdesk").RequireAuthorization();
         group.MapGet("/booking-requests",(ClaimsPrincipal user,StudioDatabase db)=>Allowed(user,db)?Results.Ok(new FrontDeskBookingRequestStore(db).GetAll()):Results.Forbid());
+        // Contact matches are suggestions only; they never establish ownership.
+        group.MapGet("/gallery-access-requests/unresolved",(ClaimsPrincipal user,StudioDatabase db)=>
+        {
+            if(!Allowed(user,db))return Results.Forbid();
+            using var c=db.OpenConnection();
+            using var q=new NpgsqlCommand("""
+              select r.conversation_id,r.external_id,r.payload::text,r.resolution_status,
+                coalesce((select jsonb_agg(jsonb_build_object('id',cl.id,'name',cl.display_name,'email',cl.email,'phone',cl.phone,
+                  'emailMatch',lower(btrim(coalesce(cl.email,'')))=lower(btrim(coalesce(r.payload->>'clientEmail',''))),
+                  'phoneMatch',regexp_replace(coalesce(cl.phone,''),'[^0-9]','','g')=regexp_replace(coalesce(r.payload->>'telephone',''),'[^0-9]','','g')))
+                  from studio_clients cl
+                  where (nullif(btrim(coalesce(r.payload->>'clientEmail','')),'') is not null and lower(btrim(coalesce(cl.email,'')))=lower(btrim(r.payload->>'clientEmail')))
+                     or (length(regexp_replace(coalesce(r.payload->>'telephone',''),'[^0-9]','','g'))>=7
+                       and regexp_replace(coalesce(cl.phone,''),'[^0-9]','','g')=regexp_replace(r.payload->>'telephone','[^0-9]','','g'))),'[]'::jsonb)::text
+              from studio_website_gallery_access_requests r
+              where r.resolution_status in ('Unidentified','AwaitingProduction','ReadyToPublish')
+              order by r.imported_at_utc desc limit 100
+              """,c);
+            using var reader=q.ExecuteReader();var items=new List<object>();
+            while(reader.Read())items.Add(new{conversationId=reader.GetGuid(0),requestId=reader.GetGuid(1),
+                request=JsonDocument.Parse(reader.GetString(2)).RootElement.Clone(),
+                status=reader.GetString(3),candidateClients=JsonDocument.Parse(reader.GetString(4)).RootElement.Clone()});
+            return Results.Ok(items);
+        });
+        group.MapPost("/gallery-access-requests/{conversationId:guid}/resolve",
+            (Guid conversationId,GalleryRequestResolution request,ClaimsPrincipal user,StudioDatabase db)=>
+        {
+            if(!Allowed(user,db))return Results.Forbid();
+            if(request.ClientId==Guid.Empty||request.Note?.Length>1000)return Results.BadRequest(new{error="Provide an identified Studio client and an optional short note."});
+            using var c=db.OpenConnection();using var tx=c.BeginTransaction();
+            using(var cl=new NpgsqlCommand("select 1 from studio_clients where id=$1",c,tx))
+            {cl.Parameters.AddWithValue(request.ClientId);if(cl.ExecuteScalar() is null)return Results.BadRequest(new{error="Studio Client not found."});}
+            Guid? priorClient;string status;
+            using(var current=new NpgsqlCommand("select client_id,resolution_status from studio_website_gallery_access_requests where conversation_id=$1 for update",c,tx))
+            {
+                current.Parameters.AddWithValue(conversationId);
+                using var reader=current.ExecuteReader();
+                if(!reader.Read())return Results.NotFound();
+                priorClient=reader.IsDBNull(0)?null:reader.GetGuid(0);status=reader.GetString(1);
+            }
+            if(status=="Published"||priorClient.HasValue&&priorClient!=request.ClientId)return Results.Conflict(new{error="This request has already been resolved to another client or published."});
+            string state="AwaitingProduction";
+            if(request.PublicationId.HasValue)
+            {
+                using var publication=new NpgsqlCommand("""
+                  select e.state from studio_gallery_exports e
+                  join studio_workflow_publications p on p.id=e.publication_id
+                  join studio_jobs j on j.id=p.job_id
+                  where e.publication_id=$1 and e.client_id=$2 and j.client_id=$2
+                  """,c,tx);
+                publication.Parameters.AddWithValue(request.PublicationId.Value);publication.Parameters.AddWithValue(request.ClientId);
+                var value=publication.ExecuteScalar() as string;
+                if(value is null)return Results.BadRequest(new{error="No gallery publication belongs to the identified client."});
+                state=value=="Published"?"Published":value=="PendingReview"?"ReadyToPublish":"AwaitingProduction";
+                if(value=="Failed"||value=="Revoked")return Results.Conflict(new{error="The gallery publication is not available."});
+            }
+            using(var update=new NpgsqlCommand("""
+              update studio_website_gallery_access_requests set client_id=$2,gallery_id=$3,
+              resolution_status=$4,resolution_note=$5,resolved_by=$6,resolved_at_utc=now()
+              where conversation_id=$1
+              """,c,tx))
+            {
+                update.Parameters.AddWithValue(conversationId);update.Parameters.AddWithValue(request.ClientId);
+                update.Parameters.AddWithValue((object?)request.PublicationId??DBNull.Value);
+                update.Parameters.AddWithValue(state);
+                update.Parameters.AddWithValue((object?)request.Note??DBNull.Value);
+                update.Parameters.AddWithValue(Name(user));update.ExecuteNonQuery();
+            }
+            using(var cv=new NpgsqlCommand("update studio_conversations set client_id=$2,is_closed=$3 where id=$1",c,tx))
+            {cv.Parameters.AddWithValue(conversationId);cv.Parameters.AddWithValue(request.ClientId);cv.Parameters.AddWithValue(state=="Published");cv.ExecuteNonQuery();}
+            tx.Commit();
+            return Results.Ok(new{conversationId,clientId=request.ClientId,publicationId=request.PublicationId,status=state});
+        });
         group.MapPost("/gallery-access-requests/{conversationId:guid}/publish",async(Guid conversationId,ClaimsPrincipal user,StudioDatabase db,IConfiguration configuration,CancellationToken ct)=>
         {
             if(!Allowed(user,db))return Results.Forbid();
