@@ -32,11 +32,22 @@ test('WorkDay mobile writes to the API exchange and Studio synchronizes outbound
  assert.equal(enrolled.status,200);
  const login=await fetch(base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:'photographer.one',password:'workday-passphrase-1'})});
  assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0];
- const snapshot={userName:'photographer.one',displayName:'Photographer One',serverTimeUtc:new Date().toISOString(),today:[],upcoming:[],activeWorkSession:null,locationTrackingEnabled:false,locationTrackingMode:'Disabled',generatedAtUtc:new Date().toISOString(),availability:[],timeSummary:null};
+ const snapshot={userName:'photographer.one',displayName:'Photographer One',serverTimeUtc:new Date().toISOString(),today:[{id:'44444444-4444-4444-8444-444444444444',title:'Authorized WorkDay Job'}],upcoming:[],activeWorkSession:null,locationTrackingEnabled:false,locationTrackingMode:'Disabled',generatedAtUtc:new Date().toISOString(),availability:[],timeSummary:null};
  const published=await fetch(base+'/admin/workday/snapshots',{method:'PUT',headers:studio,body:JSON.stringify({userName:'photographer.one',revision:1,snapshot})});assert.equal(published.status,200);
  const device=await fetch(base+'/workday/device-session',{method:'POST',headers:{Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({deviceId:'test-device'})});
  assert.equal(device.status,200);const deviceToken=(await device.json()).token;
-  const deniedUpload=await fetch(base+'/workday/assignments/44444444-4444-4444-8444-444444444444/uploads',{
+  const uploadForm=new FormData();
+ const photoId='55555555-5555-4555-8555-555555555555';
+ uploadForm.append('uploadId',photoId);
+ uploadForm.append('file',new Blob([Uint8Array.from([255,216,255,217])],{type:'image/jpeg'}),'studio-test.jpg');
+ const uploaded=await fetch(base+'/workday/assignments/44444444-4444-4444-8444-444444444444/uploads',{
+   method:'POST',headers:{Cookie:cookie},body:uploadForm});
+ assert.equal(uploaded.status,202);
+ assert.equal((await uploaded.json()).uploadId,photoId);
+ const queued=await fetch(base+'/admin/workday/updates?after=0&limit=100&kind=AssignmentUpload',{headers:{Authorization:'Bearer '+secret}});
+ assert.equal(queued.status,200);
+ assert.equal((await queued.json()).items[0].operationId,photoId);
+ const deniedUpload=await fetch(base+'/workday/assignments/66666666-6666-4666-8666-666666666666/uploads',{
    method:'POST',headers:{Cookie:cookie},body:new FormData()});
  assert.equal(deniedUpload.status,403);
 const bootstrap=await fetch(base+'/workday/bootstrap',{headers:{'X-Aegis-WorkDay-Token':deviceToken}});assert.equal(bootstrap.status,200);assert.equal((await bootstrap.json()).displayName,'Photographer One');
