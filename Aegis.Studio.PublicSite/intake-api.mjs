@@ -375,7 +375,8 @@ export function createIntakeApi(env,readBody,json) {
       const row=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(backfill[1]);
       if(!row)fail(404,'not_found','Gallery not found.');
       const gallery=JSON.parse(row.payload);
-      const limit=Math.max(1,Math.min(5,Number(url.searchParams.get('limit')||2)));
+      const requestedLimit=Number(url.searchParams.get('limit')||2);
+      const limit=Number.isSafeInteger(requestedLimit)?Math.max(1,Math.min(5,requestedLimit)):2;
       let processed=0;
       for(const item of gallery.items){
         if(processed>=limit)break;
