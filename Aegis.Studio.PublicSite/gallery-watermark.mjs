@@ -9,7 +9,22 @@ export function watermarkConfig(env){
     throw Error('Invalid gallery watermark configuration.');
   return {text,opacity,maxWidth,version:String(env.GALLERY_WATERMARK_VERSION||'v1')};
 }
+let active=0;
+const waiting=[];
+async function withCapacity(env,operation){
+  const max=Math.max(1,Math.min(4,Number(env.GALLERY_PREVIEW_CONCURRENCY||2)));
+  if(!Number.isSafeInteger(max))throw Error('Invalid gallery preview concurrency.');
+  if(active>=max){
+    if(waiting.length>=20)throw Object.assign(new Error('Gallery processor busy.'),{status:503});
+    await new Promise(resolve=>waiting.push(resolve));
+  }else active++;
+  try{return await operation();}
+  finally{const next=waiting.shift();if(next)next();else active--;}
+}
 export async function createPreview(original,env) {
+  return withCapacity(env,()=>processPreview(original,env));
+}
+async function processPreview(original,env) {
   const settings=watermarkConfig(env);
   // Sharp is installed on the development Mac with npm install sharp; no
   // remote image processor or browser overlay is used.
