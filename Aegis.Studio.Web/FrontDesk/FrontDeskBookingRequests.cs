@@ -235,7 +235,7 @@ public static class FrontDeskBookingRequestEndpoints
             if(!Allowed(user,db))return Results.Forbid();
             using var c=db.OpenConnection();
             using var q=new NpgsqlCommand("""
-              select r.conversation_id,r.external_id,r.payload::text,r.resolution_status,
+              select r.conversation_id,r.external_id,r.payload::text,r.resolution_status,r.client_id,r.gallery_id,
                 coalesce((select jsonb_agg(jsonb_build_object('id',cl.id,'name',cl.display_name,'email',cl.email,'phone',cl.phone,
                   'emailMatch',lower(btrim(coalesce(cl.email,'')))=lower(btrim(coalesce(r.payload->>'clientEmail',''))),
                   'phoneMatch',regexp_replace(coalesce(cl.phone,''),'[^0-9]','','g')=regexp_replace(coalesce(r.payload->>'telephone',''),'[^0-9]','','g')))
@@ -250,7 +250,9 @@ public static class FrontDeskBookingRequestEndpoints
             using var reader=q.ExecuteReader();var items=new List<object>();
             while(reader.Read())items.Add(new{conversationId=reader.GetGuid(0),requestId=reader.GetGuid(1),
                 request=JsonDocument.Parse(reader.GetString(2)).RootElement.Clone(),
-                status=reader.GetString(3),candidateClients=JsonDocument.Parse(reader.GetString(4)).RootElement.Clone()});
+                status=reader.GetString(3),clientId=reader.IsDBNull(4)?(Guid?)null:reader.GetGuid(4),
+                publicationId=reader.IsDBNull(5)?(Guid?)null:reader.GetGuid(5),
+                candidateClients=JsonDocument.Parse(reader.GetString(6)).RootElement.Clone()});
             return Results.Ok(items);
         });
         group.MapGet("/gallery-publications",(Guid clientId,ClaimsPrincipal user,StudioDatabase db)=>
