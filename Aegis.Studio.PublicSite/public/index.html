@@ -44,6 +44,21 @@
       <section id="galleries" class="gallery-section section-grid">
         <div class="section-intro"><p class="eyebrow">02 / CLIENT GALLERIES</p><h2>Your story,<br><em>beautifully kept.</em></h2><p>Come back to your photographs, choose your favourites, and revisit the day just as it felt.</p><div class="gallery-stamp"><span>PRIVATE</span><span>BY<br>DESIGN</span></div></div>
         <div class="gallery-card">
+          <div class="sign-in-panel">
+            <div class="card-heading"><div><p class="eyebrow">REQUEST YOUR PHOTOGRAPHS</p><h3>Request a Client Gallery</h3></div></div>
+            <p class="muted">Give Bryan's your contact details so our Front Desk team can identify the correct Job. A request does not grant access to private photographs.</p>
+            <form id="gallery-request-form" class="track-form">
+              <label>Full name<input name="clientName" required maxlength="200" autocomplete="name"></label>
+              <label>Email address<input name="clientEmail" type="email" required maxlength="320" autocomplete="email"></label>
+              <label>Telephone<input name="telephone" type="tel" required maxlength="30" autocomplete="tel" placeholder="+1 876 555 0100"></label>
+              <label>Booking Reference (optional)<input name="bookingReference" maxlength="18" placeholder="2026-BK-000001"></label>
+              <label>Notes (optional)<textarea name="notes" maxlength="2000" rows="3" placeholder="Tell us which photographs you need"></textarea></label>
+              <button type="submit" class="button button-dark">Submit gallery request <span>↗</span></button>
+              <p id="gallery-request-result" role="status" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+        <div class="gallery-card">
           <div id="signed-out" class="sign-in-panel"><div class="card-heading"><div><p class="eyebrow">A PLACE FOR YOU</p><h3>Step into your gallery</h3></div><span class="lock-icon">⌑</span></div><p class="muted">Sign in with the account connected to your session to see your private photographs.</p>
             <button class="social-button" data-identity="maya"><span class="google-g">G</span><span>Continue with Google <small>Maya Chen · demo account</small></span><b>↗</b></button>
             <button class="social-button" data-identity="jordan"><span class="facebook-f">f</span><span>Continue with Facebook <small>Jordan Lee · demo account</small></span><b>↗</b></button>
