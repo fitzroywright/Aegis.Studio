@@ -114,6 +114,29 @@ test('Studio pulls and acknowledges durable selections with dedicated scopes and
  assert.equal((await fetch(base+'/galleries',{method:'POST',headers:h(publisher),body:JSON.stringify(metadata)})).status,200);
  assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:cookie}})).status,200);
 });
+test('gallery requests accept contacts and optional booking reference, without knowing Studio IDs',async t=>{
+  const origin=await fixture(t);
+  const csrfResponse=await fetch(origin+'/api/intake-session'),csrf=(await csrfResponse.json()).csrf,cookie=csrfResponse.headers.get('set-cookie').split(';')[0];
+  const body=JSON.stringify({clientName:'Jane Brown',clientEmail:'Jane@Example.com',telephone:'+1 876 555 0123',bookingReference:'2026-BK-000001',notes:'Graduation photographs'});
+  const opts={method:'POST',headers:{Origin:origin,Cookie:cookie,'X-CSRF-Token':csrf,'Idempotency-Key':'gallery-request-1','Content-Type':'application/json'},body};
+  const first=await fetch(origin+'/api/gallery-requests',opts);assert.equal(first.status,201);const receipt=await first.json();
+  assert.equal(receipt.status,'Pending');assert.match(receipt.requestReference,/^[0-9a-f-]{36}$/i);
+  assert.equal((await fetch(origin+'/api/gallery-requests',opts)).status,200);
+  const persisted=await fetch(origin+'/api/gallery-requests',{...opts,body:body.replace('Jane Brown','Other Person')});
+  assert.equal(persisted.status,409);
+  const unauthorized=await fetch(origin+'/api/gallery-requests',{...opts,headers:{...opts.headers,'X-CSRF-Token':'wrong'}});
+  assert.equal(unauthorized.status,403);
+  const forbidden=await fetch(origin+'/api/gallery-requests',{...opts,headers:{...opts.headers,'Idempotency-Key':'gallery-request-2'},body:JSON.stringify({...JSON.parse(body),clientId:'22222222-2222-4222-8222-222222222222'})});
+  assert.equal(forbidden.status,400);
+  const keyResponse=await fetch(origin+'/api/v1/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':'test-site-provisioning-token-at-least-32-chars','Content-Type':'application/json'},body:JSON.stringify({name:'External gallery website',scopes:['gallery:access:submit','gallery:access:pull','gallery:access:ack']})});
+  assert.equal(keyResponse.status,201);const token=(await keyResponse.json()).secret,auth={Authorization:'Bearer '+token};
+  const pending=await fetch(origin+'/api/v1/gallery-access-requests',{headers:auth});assert.equal(pending.status,200);const items=(await pending.json()).items;
+  assert.equal(items.length,1);assert.equal(items[0].clientId,null);assert.equal(items[0].galleryId,null);
+  assert.equal(items[0].telephone,'+1 876 555 0123');assert.equal(items[0].bookingReference,'2026-BK-000001');
+  assert.equal((await fetch(origin+'/api/v1/gallery-access-requests/'+receipt.id+'/ack',{method:'POST',headers:{...auth,'Content-Type':'application/json'},body:'{}'})).status,200);
+  assert.equal((await(await fetch(origin+'/api/v1/gallery-access-requests',{headers:auth})).json()).items.length,0);
+});
+
 test('public booking is durably saved without calling internal Studio and replays safely',async t=>{
  const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),session=await fetch(`${origin}/api/intake-session`),csrf=(await session.json()).csrf,cookie=session.headers.get('set-cookie').split(';')[0];
  const catalog=await publishTestBooking(origin),body=JSON.stringify({clientName:'Test Client',clientEmail:'client@example.test',sessionTypeId:'portrait',catalogRevision:catalog.revision,slotId:'bk-1',locationCode:'BK'});
