@@ -2,43 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#172b33"><title>Bryan's — Booking, Client Galleries & WorkDay</title>
+  <meta name="theme-color" content="#f6f2eb"><title>Bryan's — Booking, Client Galleries & WorkDay</title>
   <link rel="stylesheet" href="/styles.css"><script src="/roster-editor.js" defer></script>
 <script type="module" src="/app.js"></script><script type="module" src="/workday-web.js"></script>
 </head>
 <body>
   <div class="site-shell">
-    <div class="heritage-strip"><span>BRYAN’S STUDIOS · JAMAICA · EST. 1927</span><a href="https://www.bryanstudiosltd.com/" rel="noopener noreferrer">Visit our main website ↗</a></div>
     <header class="topbar">
       <a class="brand" href="#home" aria-label="Bryan’s Studio home"><span class="brand-words">BRYAN’S <i>STUDIOS</i></span></a>
       <nav aria-label="Main navigation"><a href="#home">Home</a><a href="#booking">Book a session</a><a href="#galleries">Client galleries</a><a href="#workday">WorkDay</a></nav>
-      <a class="top-cta" href="#booking">Book a session <span>↗</span></a>
+      <a class="top-cta" href="#galleries">SIGN IN</a>
     </header>
 
     <main id="home">
       <section class="hero" aria-labelledby="hero-heading">
         <div class="hero-image">
-          <img src="/assets/photography/hero-portrait.jpg" alt="AI-generated demonstration photograph of a wedding couple" fetchpriority="high">
+          <img src="/assets/photography/hero-portrait.jpg" alt="Illustrative portrait of a wedding couple at golden hour" fetchpriority="high">
           <div class="hero-shade"></div>
         </div>
         <div class="hero-content">
-          <div class="hero-label"><span class="gold-rule"></span> JAMAICA'S PHOTOGRAPHY STORY SINCE 1927</div>
-          <h1 id="hero-heading">Your moments.<br><em>Our legacy.</em></h1>
-          <p>Portraits, celebrations and milestones, thoughtfully captured by Bryan's Studios.</p>
-          <div class="hero-actions">
-            <a class="button button-gold" href="#booking">Book your session <span aria-hidden="true">↗</span></a>
-            <a class="hero-text-link" href="#galleries">Access your gallery <span aria-hidden="true">→</span></a>
-          </div>
+          <p class="hero-categories">PORTRAITS <span>·</span> WEDDINGS <span>·</span> FAMILIES <span>·</span> GENERATIONS</p>
+          <h1 id="hero-heading">More Than<br>Photographs</h1>
+          <p class="hero-legacy"><span class="gold-rule"></span> A JAMAICAN LEGACY SINCE 1927</p>
+          <p class="hero-description">For nearly a century, Bryan’s Studios has captured the people, moments and milestones that matter most.</p>
+          <a class="button button-gold" href="#booking">BOOK A SESSION <span aria-hidden="true">→</span></a>
         </div>
-        <div class="hero-bottom"><span>BRYAN'S STUDIOS LIMITED</span><span>PHOTOGRAPHY &amp; IMAGING · KINGSTON, JAMAICA</span><a href="#story" aria-label="Scroll to our story">SCROLL TO DISCOVER ↓</a></div>
       </section>
-      <section class="editorial-intro" id="story">
-        <div class="intro-kicker"><span class="eyebrow">THE BRYAN'S EXPERIENCE</span><span class="intro-number">01 / 04</span></div>
-        <div class="intro-copy"><h2>Every photograph<br>has <em>a story to tell.</em></h2><div><p>For generations, Bryan's has helped families, graduates, professionals and couples keep the moments that matter. From the first appointment to the finished image, we're here to make it memorable.</p><a href="#booking" class="inline-link">Plan your visit <span aria-hidden="true">↗</span></a></div></div>
-      </section>
-      <section class="photo-editorial" aria-label="Explore photography at Bryan's">
-        <div class="photo-tile tile-large"><img src="/assets/photography/family-portrait.jpg" alt="AI-generated demonstration portrait of a child" loading="lazy"><div class="tile-caption"><span>THE ART OF REMEMBERING</span><strong>Portraits &amp; people</strong></div></div>
-        <div class="photo-tile tile-small"><img src="/assets/photography/studio-photographer.jpg" alt="AI-generated demonstration photograph of a studio photographer at work" loading="lazy"><div class="tile-caption"><span>YOUR NEXT CHAPTER</span><strong>Occasions &amp; celebrations</strong></div></div>
+      <section class="experience-links" aria-label="Explore Bryan's Studios services">
+        <article class="experience-card">
+          <a href="#booking" class="experience-image"><img src="/assets/photography/family-portrait.jpg" alt="Illustrative portrait of a smiling child" loading="lazy"></a>
+          <div class="experience-body"><p class="eyebrow">BOOK A SESSION <span></span></p><h2>Create Your Next Portrait</h2><p>Choose a session type, location and time that works for you.</p><a class="experience-action" href="#booking">BOOK NOW <span aria-hidden="true">→</span></a></div>
+        </article>
+        <article class="experience-card">
+          <a href="#galleries" class="experience-image"><img src="/assets/photography/hero-portrait.jpg" alt="Illustrative wedding photography for private client galleries" loading="lazy"></a>
+          <div class="experience-body"><p class="eyebrow">CLIENT GALLERIES <span></span></p><h2>View Your Photographs</h2><p>Sign in to view your private gallery and select your favourite images.</p><a class="experience-action" href="#galleries">GO TO GALLERIES <span aria-hidden="true">→</span></a></div>
+        </article>
+        <article class="experience-card">
+          <a href="#workday" class="experience-image"><img src="/assets/photography/studio-photographer.jpg" alt="Illustrative photographer working in a professional studio" loading="lazy"></a>
+          <div class="experience-body"><p class="eyebrow">WORKDAY <span></span></p><h2>Studio WorkDay</h2><p>Secure access for Bryan’s team to manage assignments and upload photographs.</p><a class="experience-action" href="#workday">OPEN WORKDAY <span aria-hidden="true">→</span></a></div>
+        </article>
       </section>
       <section id="booking" class="booking-section section-grid">
         <div class="section-intro"><p class="eyebrow">01 / YOUR NEXT CHAPTER</p><h2>A moment worth<br><em>remembering.</em></h2><p>Choose a studio, session and available time. Our Front Desk team will help you take it from there.</p><div class="small-note"><span class="note-dot"></span> Every session starts with a conversation.</div></div>
