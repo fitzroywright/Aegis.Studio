@@ -2,27 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#f6f4ef"><title>Bryan's — Booking, Client Galleries & WorkDay</title>
+  <meta name="theme-color" content="#f7f4ed"><title>Bryan’s Studios — More Than Photographs</title>
+  <meta name="description" content="Portraits, weddings, families, generations. A Jamaican legacy since 1927. Book a session, revisit your private gallery, or sign in to WorkDay.">
+  <link rel="icon" href="/assets/brand.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css"><script src="/roster-editor.js" defer></script>
 <script type="module" src="/app.js"></script><script type="module" src="/workday-web.js"></script>
 </head>
 <body>
   <div class="site-shell">
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <header class="topbar">
-      <a class="brand" href="#home" aria-label="Bryan’s Studio home"><span class="brand-mark">B</span><span>BRYAN'S <i>STUDIO</i></span></a>
-      <nav aria-label="Main navigation"><a href="#booking">Booking</a><a href="#galleries">Client Galleries</a><a href="#workday">WorkDay</a></nav>
-      <a class="top-cta" href="#booking">Book a session <span>↗</span></a>
+      <a class="brand" href="#home" aria-label="Bryan’s Studios home"><span class="brand-name">Bryan’s<span class="brand-flourish">.</span></span><span class="brand-subtitle">STUDIOS <span>EST. 1927</span></span></a>
+      <nav aria-label="Main navigation"><a href="#home">Home</a><a href="#booking">Book a Session</a><a href="#galleries">Client Galleries</a><a href="#workday">WorkDay</a></nav>
+      <a class="button sign-in" href="#galleries">Sign In <span aria-hidden="true">↗</span></a>
     </header>
-
-    <main id="home">
-      <section class="hero">
-        <div class="hero-copy"><p class="eyebrow">PORTRAITS · WEDDINGS · STORIES</p><h1>Make room for<br><em>the moments</em><br>that matter.</h1><p class="hero-text">From the first hello to the photographs you’ll keep, we make every part feel considered.</p><a class="button button-dark" href="#booking">Explore booking <span>↓</span></a></div>
-        <div class="hero-art" aria-label="Abstract portrait artwork"><div class="sun"></div><div class="arch arch-back"></div><div class="arch arch-front"><div class="art-person"><span></span></div></div><span class="art-note">A LITTLE LIGHT<br>TO KEEP FOREVER</span><span class="art-number">NO. 024</span></div>
-        <div class="hero-index"><span>01</span><span class="index-line"></span><span>02</span><span class="index-line"></span><span>03</span></div>
-      </section>
-
-      <section id="booking" class="booking-section section-grid">
-        <div class="section-intro"><p class="eyebrow">01 / BOOKING</p><h2>Start with a<br><em>good feeling.</em></h2><p>Tell us what you’re imagining. Our Front Desk team will review your request and get back to you with the next steps.</p><div class="small-note"><span class="note-dot"></span> Every session starts with a conversation.</div></div>
+    <main id="main-content" tabindex="-1">
+      <div id="home" data-page>
+        <section class="hero" aria-labelledby="hero-title">
+          <picture class="hero-photo"><source media="(max-width: 600px)" srcset="/assets/photography/wedding-mobile.webp" width="780" height="1000"><img src="/assets/photography/wedding-hero.webp" alt="A wedding couple sharing a quiet moment together" width="1448" height="1086" fetchpriority="high"></picture>
+          <div class="hero-copy"><p class="eyebrow">PORTRAITS · WEDDINGS · FAMILIES · GENERATIONS</p><h1 id="hero-title">More Than<br><em>Photographs</em></h1><p class="hero-legacy">A JAMAICAN LEGACY SINCE 1927</p><a class="button" href="#booking">BOOK A SESSION <span aria-hidden="true">↗</span></a></div>
+          <span class="hero-caption">Life, beautifully remembered.</span>
+        </section>
+        <section class="features" aria-label="Your experience at Bryan’s Studios">
+          <a class="feature" href="#booking"><div class="feature-image"><img src="/assets/photography/family-portrait.webp" alt="A warm family portrait" width="800" height="960" loading="lazy"><span class="feature-number">01</span></div><div class="feature-heading"><h2>Book a Session</h2><span aria-hidden="true">↗</span></div><p>For the moments that become your memories.</p><span class="feature-link">LET’S MAKE SOMETHING TIMELESS</span></a>
+          <a class="feature" href="#galleries"><div class="feature-image"><img src="/assets/photography/client-portrait.webp" alt="A bride holding her bouquet beside a window" width="425" height="510" loading="lazy"><span class="feature-number">02</span></div><div class="feature-heading"><h2>Client Galleries</h2><span aria-hidden="true">↗</span></div><p>Your photographs. Your story. Yours to revisit.</p><span class="feature-link">FIND YOUR PHOTOGRAPHS</span></a>
+          <a class="feature" href="#workday"><div class="feature-image"><img src="/assets/photography/photographer-at-work.webp" alt="A photographer reviewing photographs on his camera" width="425" height="510" loading="lazy"><span class="feature-number">03</span></div><div class="feature-heading"><h2>WorkDay</h2><span aria-hidden="true">↗</span></div><p>Behind every photograph, a thoughtful team.</p><span class="feature-link">YOUR DAY, IN FOCUS</span></a>
+        </section>
+        <section class="legacy"><p class="eyebrow">ROOTED IN JAMAICA. REMEMBERED FOR GENERATIONS.</p><h2>Some moments pass.<br><em>Some stay with you.</em></h2><p>From a family’s newest chapter to the day you say “I do”,<br>we’re here to help you keep what matters.</p><a class="text-button" href="#booking">Begin your story <span aria-hidden="true">↗</span></a></section>
+      </div>
+      <section id="booking" data-page hidden class="booking-section section-grid">
+        <div class="section-intro"><p class="eyebrow">01 / BOOKING</p><h2>A moment today.<br><em>A memory forever.</em></h2><p>Tell us what you’re imagining. Our Front Desk team will review your request and get back to you with the next steps.</p><img class="section-photo" src="/assets/photography/family-portrait.webp" alt="Family portrait from our photography collection" width="800" height="960" loading="lazy"><p class="small-note">Every session starts with a conversation.</p></div>
         <div class="form-card"><div class="card-heading"><div><p class="eyebrow">YOUR SESSION</p><h3>Request a booking</h3></div><span class="step-chip">01 — 02</span></div>
           <form id="booking-form">
             <div class="field-row"><label>Your name<input name="clientName" autocomplete="name" placeholder="First and last name" maxlength="200" required></label><label>Email address<input name="clientEmail" autocomplete="email" type="email" placeholder="you@example.com" required></label></div>
@@ -32,19 +41,24 @@
             <p id="booking-price-note" class="form-footnote"></p>
             <label>Tell us a little more <span class="optional">OPTIONAL</span><textarea name="notes" rows="3" placeholder="Location, people, ideas…"></textarea></label>
             <p class="form-footnote">This is a request, not a confirmed appointment. We’ll follow up to confirm availability and any deposit required.</p>
-            <button class="button button-dark submit-button" type="submit">Send booking request <span>↗</span></button>
+            <button class="button submit-button" type="submit">Send booking request <span>↗</span></button>
           </form>
           <div id="booking-result" class="result-box" role="status" hidden></div>
           <form id="track-form" class="track-form" hidden><label>Already have a reference? <span><input name="reference" placeholder="Booking reference" required><button class="text-button">Check status →</button></span></label><div id="track-result" role="status"></div></form>
         </div>
       </section>
 
-      <section class="interlude"><p class="eyebrow">FROM SESSION TO STORY</p><p class="interlude-quote">“The best photographs don’t ask you to pose.<br><em>They let you be there.</em>”</p><span>— BRYAN’S STUDIO</span></section>
-
-      <section id="galleries" class="gallery-section section-grid">
-        <div class="section-intro"><p class="eyebrow">02 / CLIENT GALLERIES</p><h2>Your story,<br><em>beautifully kept.</em></h2><p>Come back to your photographs, choose your favourites, and revisit the day just as it felt.</p><div class="gallery-stamp"><span>PRIVATE</span><span>BY<br>DESIGN</span></div></div>
+      <section id="galleries" data-page hidden class="gallery-section section-grid">
+        <div class="section-intro"><p class="eyebrow">02 / CLIENT GALLERIES</p><h2>Your story,<br><em>beautifully kept.</em></h2><p>Come back to your photographs, choose your favourites, and revisit the day just as it felt.</p><img class="section-photo" src="/assets/photography/client-portrait.webp" alt="A bride holding her bouquet beside a window" width="425" height="510" loading="lazy"><p class="small-note">Your photographs are personal. We keep them that way.</p></div>
         <div class="gallery-card">
-          <div class="sign-in-panel">
+          <div id="signed-out" class="sign-in-panel"><div class="card-heading"><div><p class="eyebrow">PRIVATE CLIENT GALLERIES</p><h3>Secure gallery access</h3></div><span class="lock-icon" aria-hidden="true">◇</span></div><p class="muted">Sign in with your verified account to revisit your photographs. Need help finding your session? Request a gallery below and our Front Desk team will help.</p><div id="client-provider-links" class="gallery-actions"></div><p id="auth-note" class="privacy-note">Private photo viewing requires verified client identification. Contact details alone do not grant access.</p></div>
+          <div id="signed-in" hidden>
+            <div class="gallery-welcome"><div><p class="eyebrow">YOUR PRIVATE SPACE</p><h3>Hello, <span id="client-name">friend</span>.</h3><p id="gallery-title" class="muted">Your photographs are ready when you are.</p></div><button id="sign-out" class="text-button">Sign out ×</button></div>
+            <form id="client-link-form" class="track-form"><label>Connect your Studio client account<input name="clientLinkCode" autocomplete="one-time-code" minlength="20" maxlength="128" placeholder="Enter the one-time code from Bryan’s Studio" required></label><button class="button" type="submit">Connect client ID <span>↗</span></button><p id="client-link-result" role="status"></p></form>
+            <label id="client-gallery-picker" hidden>Published galleries<select id="client-gallery-select"></select></label><div id="gallery-status" class="gallery-status" role="status"></div><div id="gallery-grid" class="proof-grid"></div>
+            <div class="gallery-actions"><button id="submit-selections" class="button" hidden>Send my favourites <span>↗</span></button><p id="selection-result" role="status"></p></div>
+          </div>
+          <details class="gallery-request"><summary>Looking for your photographs? Request a gallery <span aria-hidden="true">+</span></summary><div class="request-content">
             <div class="card-heading"><div><p class="eyebrow">REQUEST YOUR PHOTOGRAPHS</p><h3>Request a Client Gallery</h3></div></div>
             <p class="muted">Give Bryan's your contact details so our Front Desk team can identify the correct Job. A request does not grant access to private photographs.</p>
             <form id="gallery-request-form" class="track-form">
@@ -53,25 +67,17 @@
               <label>Telephone<input name="telephone" type="tel" required maxlength="30" autocomplete="tel" placeholder="+1 876 555 0100"></label>
               <label>Booking Reference (optional)<input name="bookingReference" maxlength="18" placeholder="2026-BK-000001"></label>
               <label>Notes (optional)<textarea name="notes" maxlength="2000" rows="3" placeholder="Tell us which photographs you need"></textarea></label>
-              <button type="submit" class="button button-dark">Submit gallery request <span>↗</span></button>
+              <button type="submit" class="button">Submit gallery request <span>↗</span></button>
               <p id="gallery-request-result" role="status" aria-live="polite"></p>
             </form>
           </div>
-        </div>
-        <div class="gallery-card">
-          <div id="signed-out" class="sign-in-panel"><div class="card-heading"><div><p class="eyebrow">PRIVATE CLIENT GALLERIES</p><h3>Secure gallery access</h3></div><span class="lock-icon">⌑</span></div><p class="muted">Gallery access is being configured. You can request your photographs using the form above; our Front Desk will identify your Job before anything is published.</p><div id="client-provider-links" class="gallery-actions"></div><p id="auth-note" class="privacy-note">Private photo viewing requires verified client identification. Contact details alone do not grant access.</p></div>
-          <div id="signed-in" hidden>
-            <div class="gallery-welcome"><div><p class="eyebrow">YOUR PRIVATE SPACE</p><h3>Hello, <span id="client-name">friend</span>.</h3><p id="gallery-title" class="muted">Your photographs are ready when you are.</p></div><button id="sign-out" class="text-button">Sign out ×</button></div>
-            <form id="client-link-form" class="track-form"><label>Connect your Studio client account<input name="clientLinkCode" autocomplete="one-time-code" minlength="20" maxlength="128" placeholder="Enter the one-time code from Bryan’s Studio" required></label><button class="button button-dark" type="submit">Connect client ID <span>↗</span></button><p id="client-link-result" role="status"></p></form>
-            <label id="client-gallery-picker" hidden>Published galleries<select id="client-gallery-select"></select></label><div id="gallery-status" class="gallery-status" role="status"></div><div id="gallery-grid" class="proof-grid"></div>
-            <div class="gallery-actions"><button id="submit-selections" class="button button-dark" hidden>Send my favourites <span>↗</span></button><p id="selection-result" role="status"></p></div>
-          </div>
+          </details>
         </div>
       </section>
-      <section id="workday" class="gallery-section section-grid" aria-label="WorkDay photo uploads">
+      <section id="workday" data-page hidden class="workday-section section-grid" aria-label="WorkDay photo uploads">
         <div class="section-intro"><p class="eyebrow">03 / BRYAN'S WORKDAY</p>
           <h2>Your assignments,<br><em>one place.</em></h2>
-          <p>Use your existing Studio-provisioned WorkDay account to review assignments and upload photographs for authorized Jobs.</p>
+          <p>A considered space for the people behind the photographs. Sign in with your Studio account to view your assignments and upload your work.</p><img class="section-photo" src="/assets/photography/photographer-at-work.webp" alt="A photographer reviewing photographs on his camera" width="425" height="510" loading="lazy">
         </div>
         <div class="gallery-card">
           <div id="workday-login" class="sign-in-panel">
@@ -79,7 +85,7 @@
             <form id="workday-signin" class="track-form">
               <label>WorkDay username<input name="userName" autocomplete="username" required></label>
               <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-              <button type="submit" class="button button-dark">Sign in to WorkDay</button>
+              <button type="submit" class="button">Sign in to WorkDay</button>
             </form>
           </div>
           <div id="workday-panel" hidden>
@@ -88,16 +94,15 @@
             <form id="workday-upload-form" class="track-form">
               <label>Assigned Job<select name="assignmentId" id="workday-assignment" required></select></label>
               <label>Photographs<input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required></label>
-              <button type="submit" class="button button-dark">Upload photographs</button>
+              <button type="submit" class="button">Upload photographs</button>
             </form>
             <p class="privacy-note">Uploads are queued for Studio processing; uploading does not publish client galleries.</p>
           </div>
           <p id="workday-status" role="status" aria-live="polite"></p>
         </div>
       </section>
-      <section class="closing"><div class="closing-orbit">A</div><p class="eyebrow">WE’D LOVE TO HEAR YOUR STORY</p><h2>A good photograph<br>can <em>take you back.</em></h2><a href="#booking" class="button button-light">Let’s begin <span>↗</span></a></section>
     </main>
-    <footer><a class="brand" href="#home"><span class="brand-mark">B</span><span>BRYAN'S <i>STUDIO</i></span></a><span>Thoughtfully captured. Beautifully remembered.</span><a href="#home">Back to top ↑</a></footer>
+    <footer><a class="brand" href="#home"><span class="brand-name">Bryan’s<span class="brand-flourish">.</span></span><span class="brand-subtitle">STUDIOS <span>EST. 1927</span></span></a><p>More than photographs. A part of your story.</p><span class="footer-location">JAMAICA · SINCE 1927</span></footer>
   </div>
 </body>
 </html>

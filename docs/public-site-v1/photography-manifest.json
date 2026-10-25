@@ -1,0 +1,58 @@
+{
+  "library": "/var/lib/aegis-studio/demo-photos",
+  "host": "Kratos",
+  "context": "Demo imagery for review; library source filenames identify generated demo images. No AWS deployment.",
+  "encoding": {
+    "format": "webp",
+    "quality": 82,
+    "metadata": "stripped",
+    "upscaling": false
+  },
+  "images": [
+    {
+      "file": "wedding-hero.webp",
+      "source": "wedding/BryansStudio-ai-demo-wedding-countryside-couple.jpg",
+      "sourceSha256": "a177e664f4b7d0bf51c7cfbea9d452d4f3e1c3baa856f9f34279c11617f1068f",
+      "sha256": "9318bbea9aa4f5a8907d917c48a19604e3a60dab2ee0b1ef626725d83a7e1f3a",
+      "width": 1448,
+      "height": 1086,
+      "bytes": 172492
+    },
+    {
+      "file": "wedding-mobile.webp",
+      "source": "wedding/BryansStudio-ai-demo-wedding-countryside-couple.jpg",
+      "sourceSha256": "a177e664f4b7d0bf51c7cfbea9d452d4f3e1c3baa856f9f34279c11617f1068f",
+      "sha256": "0d3cee3761ca49fc5473887b4832811fb1ccba72404eaa140c91be02e15ec672",
+      "width": 780,
+      "height": 1000,
+      "bytes": 83930
+    },
+    {
+      "file": "family-portrait.webp",
+      "source": "family/BryansStudio-ai-demo-family-beach-portrait.jpg",
+      "sourceSha256": "54c699b20bb1d6cc5bfba30ca6af6c626210391be414bfc92072c6d48a9fd72b",
+      "sha256": "ad77cd415b11577e28c9df7e169f774175255a113de1fecaa38a5e3fe48bdb62",
+      "width": 800,
+      "height": 960,
+      "bytes": 69606
+    },
+    {
+      "file": "client-portrait.webp",
+      "source": "wedding/BryansStudio-ai-demo-wedding-batch03-04.jpg",
+      "sourceSha256": "24919c2764046e16aa96bb6e1862385cbbe18cb491eeb451b74399ce0fc6bdd2",
+      "sha256": "611700062b75ccd249107525d24aac4aceca066cc6d72a45d3a57b5325169390",
+      "width": 425,
+      "height": 510,
+      "bytes": 22800
+    },
+    {
+      "file": "photographer-at-work.webp",
+      "source": "wedding/BryansStudio-ai-demo-wedding-batch01-06.jpg",
+      "sourceSha256": "18374a8427d89079be02ca0b053275f8d00e6e7a92d1720b425ab64df65bd336",
+      "sha256": "cdffdbec4d39c7fda5aaa71ac0499c9e04e0622f8798a490be94bc2ace0dec7b",
+      "width": 425,
+      "height": 510,
+      "bytes": 15112
+    }
+  ]
+}
