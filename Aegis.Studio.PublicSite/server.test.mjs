@@ -137,7 +137,6 @@ test('real client provider metadata is disabled without configured secrets',asyn
  assert.equal((await fetch(origin+'/api/client-galleries')).status,401);
 });
 test('private original retrieval needs its own integration credential and honors revocation',async t=>{
- const origin=await fixture(t),base=origin+'/api/v1';
  const keys=[{id:'publish',secret:'publisher-012345678901234567890123456789',scopes:['gallery:publish']},
   {id:'original',secret:'original-reader-012345678901234567890123456',scopes:['gallery:original:read']}];
  // Existing fixed integration credentials preserve scope isolation.
@@ -168,7 +167,7 @@ test('production hostnames require an explicit allowlist',()=>{
  const server=createServer({SESSION_SECRET:'test-only-session-secret-at-least-32-chars',
   NODE_ENV:'production',PUBLIC_WEB_ORIGIN:'https://web.bryanstudiosltd.com',
   PUBLIC_ALLOWED_HOSTS:'web.bryanstudiosltd.com,api.bryanstudiosltd.com',INTAKE_DB_PATH:':memory:'});
- server.close();
+ server.emit('close');
 });
 test('public booking is durably saved without calling internal Studio and replays safely',async t=>{
  const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),session=await fetch(`${origin}/api/intake-session`),csrf=(await session.json()).csrf,cookie=session.headers.get('set-cookie').split(';')[0];
