@@ -49,6 +49,11 @@ export function createServer(env = process.env) {
   }
   const intake=createIntakeApi(env,readBody,json);
   const clientAuth=new ClientAuthentication(env,intake.store);
+  // Never enable authenticated client viewing in production without protected previews.
+  if(env.NODE_ENV==='production'&&clientAuth.providers().length>0&&
+     env.PUBLIC_WATERMARK_PROCESSING_ENABLED!=='true')
+    throw new Error('Watermarked previews must be enabled before production client authentication.');
+
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
