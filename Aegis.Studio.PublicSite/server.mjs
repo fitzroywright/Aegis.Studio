@@ -1,6 +1,7 @@
 import { createIntakeApi } from './intake-api.mjs';
 import { ClientAuthentication } from './client-auth.mjs';
 import http from 'node:http';
+import { pipeline } from 'node:stream/promises';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -118,9 +119,9 @@ export function createServer(env = process.env) {
           if(!gallery.items.some(x=>x.versionId===galleryItem[2])){json(res,404,{message:'Photograph not found.'});return;}
           const legacy=intake.store.db.prepare('SELECT content,type FROM gallery_previews WHERE gallery_id=? AND id=?').get(galleryId,galleryItem[2]);
           const preview=await intake.mediaStorage.get(galleryId,galleryItem[2],'preview')||legacy;
-          if(!preview||!preview.content?.length){json(res,503,{message:'Protected preview is not ready.'});return;}
+          if(!preview||(!preview.stream&&!preview.content?.length)){json(res,503,{message:'Protected preview is not ready.'});return;}
           res.writeHead(200,{'Content-Type':preview.type,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});
-          res.end(preview.content);return;
+          if(preview.stream)await pipeline(preview.stream,res);else res.end(preview.content);return;
         }
         if(selection&&req.method==='PUT'){
           const payload=JSON.parse((await readBody(req,4096)).toString());
