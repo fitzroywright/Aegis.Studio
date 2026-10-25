@@ -13,7 +13,7 @@ try {
     if ($LASTEXITCODE) { throw 'Web tests failed.' }
     Push-Location Aegis.Studio.PublicSite
     try {
-        npm install
+        npm ci
         if ($LASTEXITCODE) { throw 'Public-site dependency restore failed.' }
         npm test
         if ($LASTEXITCODE) { throw 'Public-site tests failed.' }

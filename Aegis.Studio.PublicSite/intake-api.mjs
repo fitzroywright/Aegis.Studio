@@ -319,8 +319,14 @@ export function createIntakeApi(env,readBody,json) {
     const file=route.match(/^\/api\/v1\/attachments\/([0-9a-f-]{36})$/i);
     if(file&&method==='GET'){authenticate(req,'intake:pull');const r=store.db.prepare("SELECT metadata,content FROM attachments WHERE id=? AND state='Clean'").get(file[1]);if(!r)fail(404,'unavailable','Attachment is unavailable or quarantined.');const m=JSON.parse(r.metadata);res.writeHead(200,{'Content-Type':m.contentType,'Cache-Control':'no-store','Content-Disposition':'attachment'});res.end(r.content);return true;}
     if(route==='/api/v1/galleries'&&method==='POST'){
-      authenticate(req,'gallery:publish');const p=await input(req,1_000_000);if(!/^[0-9a-f-]{36}$/i.test(p.id)||!p.clientId||!Array.isArray(p.items)||p.items.length>10000||!p.title)fail(400,'invalid_gallery','Gallery ID, client ID, title and items required.');
-      store.transaction(()=>{const old=store.db.prepare('SELECT client_id FROM galleries WHERE id=?').get(p.id);if(old&&old.client_id!==p.clientId)fail(409,'gallery_owner','Cannot change gallery owner.');store.db.prepare('INSERT INTO galleries VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload').run(p.id,p.clientId,JSON.stringify({...p,published:false}));});json(res,200,{reference:p.id,provider:'PublicSite',storedVersionIds:store.db.prepare('SELECT id FROM media WHERE gallery_id=?').all(p.id).map(x=>x.id)});return true;
+      authenticate(req,'gallery:publish');json(res,200,store.stageGallery(await input(req,1_000_000)));return true;
+    }
+    if(route==='/api/v1/gallery-selections'&&method==='GET'){
+      authenticate(req,'gallery:selections:pull');json(res,200,store.gallerySelectionFeed(url.searchParams.get('cursor')||''));return true;
+    }
+    const selectionAck=route.match(/^\/api\/v1\/gallery-selections\/([0-9a-f-]{36})\/ack$/i);
+    if(selectionAck&&method==='POST'){
+      authenticate(req,'gallery:selections:ack');json(res,200,store.acknowledgeGallerySelections(selectionAck[1]));return true;
     }
     const publication=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/(publish|revoke)$/i);
     if(publication&&method==='POST'){

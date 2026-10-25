@@ -244,6 +244,7 @@ public static class FrontDeskBookingRequestEndpoints
                 }
             }
             if(galleryId is null)return Results.BadRequest(new{error="This request has no linked gallery. Link a gallery in Studio before publishing."});
+            if(!GalleryPushWorker.CanPublish(db,galleryId.Value))return Results.Conflict(new{error="This gallery is no longer approved for this client. Review the current publication in Studio."});
             try
             {
                 using var site=new PublicSiteClient(configuration);

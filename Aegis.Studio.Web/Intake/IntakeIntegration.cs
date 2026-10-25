@@ -22,11 +22,11 @@ public static class IntakeSchema
 public sealed class PublicSiteClient : IDisposable
 {
     readonly HttpClient http;readonly Uri root;
-    public PublicSiteClient(IConfiguration config)
+    public PublicSiteClient(IConfiguration config,HttpMessageHandler? handler=null)
     {
         root=new Uri(config["PublicSite:BaseUrl"]??throw new InvalidOperationException("Configure PublicSite:BaseUrl."));
         if(root.Scheme!="https"||!string.IsNullOrEmpty(root.UserInfo)||root.AbsolutePath!="/")throw new InvalidOperationException("PublicSite:BaseUrl must be an HTTPS origin.");
-        http=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=root,Timeout=TimeSpan.FromSeconds(45)};
+        http=new HttpClient(handler??new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=root,Timeout=TimeSpan.FromSeconds(45)};
         string secret=config["PublicSite:IntegrationToken"]??"";if(secret.Length<32)throw new InvalidOperationException("Configure a scoped public site integration token.");
         http.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",secret);
     }

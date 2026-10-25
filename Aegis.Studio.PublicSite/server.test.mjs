@@ -78,10 +78,41 @@ test('demo sign-in rejects caller-chosen identities and cross-origin login', asy
   response = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'admin' }) });
   assert.equal(response.status, 400);
 });
-test('live mode disables fake social sign-in and rejects non-HTTPS Studio upstream', async t => {
+test('live mode disables fake social sign-in and ignores obsolete Studio upstream settings', async t => {
   const origin = await fixture(t, { PUBLIC_DEMO_MODE: 'false', STUDIO_BASE_URL: 'http://studio.example', STUDIO_CLIENT: 'website', STUDIO_SECRET: 'server-side-secret' });
   const response = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'maya' }) });
   assert.equal(response.status, 404);
+});
+test('production startup rejects demo identity configuration',()=>{
+ assert.throws(()=>createServer({SESSION_SECRET:'test-only-session-secret-at-least-32-chars',NODE_ENV:'production',PUBLIC_DEMO_MODE:'true'}),/PUBLIC_DEMO_MODE must be false/);
+});
+
+test('Studio pulls and acknowledges durable selections with dedicated scopes and no browser Origin',async t=>{
+ const gallery='11111111-1111-4111-8111-111111111111',client='22222222-2222-4222-8222-222222222222',version='33333333-3333-4333-8333-333333333333';
+ const origin=await fixture(t,{CLIENT_BINDINGS_JSON:JSON.stringify({'demo-google-maya':client})}),base=origin+'/api/v1';
+ async function key(scopes){const r=await fetch(base+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':'test-site-provisioning-token-at-least-32-chars','Content-Type':'application/json'},body:JSON.stringify({name:'Test',scopes})});assert.equal(r.status,201);return (await r.json()).secret;}
+ const publisher=await key(['gallery:publish']),pull=await key(['gallery:selections:pull']),ack=await key(['gallery:selections:ack']);
+ const h=token=>({Authorization:'Bearer '+token,'Content-Type':'application/json'}),metadata={id:gallery,clientId:client,title:'Client gallery',items:[{versionId:version,fileName:'Portrait.jpg'}]};
+ assert.equal((await fetch(base+'/galleries',{method:'POST',headers:h(publisher),body:JSON.stringify(metadata)})).status,200);
+ assert.equal((await fetch(base+`/galleries/${gallery}/media/${version}`,{method:'PUT',headers:{...h(publisher),'Content-Type':'image/jpeg'},body:Buffer.from([255,216,255,217])})).status,200);
+ assert.equal((await fetch(base+`/galleries/${gallery}/publish`,{method:'POST',headers:h(publisher),body:'{}'})).status,200);
+ async function login(identity){const r=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity})});return r.headers.get('set-cookie').split(';')[0];}
+ const cookie=await login('maya'),other=await login('jordan'),browser={Origin:origin,Cookie:cookie,'Content-Type':'application/json','Idempotency-Key':'selection-one'};
+ const endpoint=origin+`/api/galleries/${gallery}/selections/submit`;
+ assert.equal((await fetch(endpoint,{method:'POST',headers:{...browser,Cookie:other},body:'{}'})).status,404);
+ assert.equal((await fetch(origin+`/api/galleries/${gallery}/selections/${version}`,{method:'PUT',headers:browser,body:'{"selected":true}'})).status,200);
+ const submitted=await fetch(endpoint,{method:'POST',headers:browser,body:'{}'});assert.equal(submitted.status,200);const receipt=await submitted.json();assert.equal(receipt.importStatus,'Pending');
+ assert.deepEqual(await(await fetch(endpoint,{method:'POST',headers:browser,body:'{}'})).json(),receipt);
+ assert.equal((await fetch(base+'/gallery-selections',{headers:h(publisher)})).status,403);
+ assert.equal((await fetch(base+'/gallery-selections')).status,401);
+ assert.deepEqual((await(await fetch(base+'/gallery-selections',{headers:h(pull)})).json()).items,[receipt]);
+ const ackUrl=base+`/gallery-selections/${receipt.reference}/ack`;
+ assert.equal((await fetch(ackUrl,{method:'POST',headers:h(pull),body:'{}'})).status,403);
+ for(let i=0;i<2;i++)assert.equal((await fetch(ackUrl,{method:'POST',headers:h(ack),body:'{}'})).status,200);
+ assert.deepEqual((await(await fetch(base+'/gallery-selections',{headers:h(pull)})).json()).items,[]);
+ // Retrying metadata after a lost response must not hide a live publication.
+ assert.equal((await fetch(base+'/galleries',{method:'POST',headers:h(publisher),body:JSON.stringify(metadata)})).status,200);
+ assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:cookie}})).status,200);
 });
 test('public booking is durably saved without calling internal Studio and replays safely',async t=>{
  const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),session=await fetch(`${origin}/api/intake-session`),csrf=(await session.json()).csrf,cookie=session.headers.get('set-cookie').split(';')[0];

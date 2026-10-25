@@ -48,6 +48,7 @@ export class IntakeStore {
       CREATE TABLE IF NOT EXISTS client_identity_links(provider TEXT NOT NULL,subject TEXT NOT NULL,client_id TEXT NOT NULL,verified_at TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(provider,subject));
       CREATE TABLE IF NOT EXISTS media(gallery_id TEXT,id TEXT,type TEXT,content BLOB,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS selections(gallery_id TEXT,id TEXT,selected INTEGER,PRIMARY KEY(gallery_id,id));
+      CREATE TABLE IF NOT EXISTS gallery_selection_submissions(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,payload TEXT NOT NULL,acknowledged_at TEXT);
       CREATE TABLE IF NOT EXISTS payment_events(id TEXT PRIMARY KEY,intake_id TEXT NOT NULL,hash TEXT NOT NULL,payload TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS booking_catalog(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,payload TEXT NOT NULL,published_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS booking_slots(slot_id TEXT PRIMARY KEY,location_code TEXT NOT NULL,session_type_id TEXT NOT NULL,starts_at TEXT NOT NULL,ends_at TEXT NOT NULL,catalog_revision INTEGER NOT NULL,published_at TEXT NOT NULL);
@@ -58,7 +59,7 @@ export class IntakeStore {
   transaction(action) { this.db.exec('BEGIN IMMEDIATE'); try { const result = action(); this.db.exec('COMMIT'); return result; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
   createApiCredential(name, scopes, clientApplication='API') {
     if(typeof name!=='string'||!name.trim()||name.trim().length>100) fail(400,'invalid_key_name','Provide a key name up to 100 characters.');
-    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','booking:catalog:publish','booking:availability:publish','gallery:publish','gallery:read','client:link','attachment:scan','payment:verified','workday:sync','gallery:access:submit','gallery:access:pull','gallery:access:ack']);
+    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','booking:catalog:publish','booking:availability:publish','gallery:publish','gallery:read','client:link','attachment:scan','payment:verified','workday:sync','gallery:access:submit','gallery:access:pull','gallery:access:ack','gallery:selections:pull','gallery:selections:ack']);
     if(!Array.isArray(scopes)||!scopes.length||scopes.some(x=>!allowed.has(x))||new Set(scopes).size!==scopes.length) fail(400,'invalid_scopes','Choose one or more supported, unique scopes.');
     if(!['API','Workday Mobile','Studio'].includes(clientApplication))fail(400,'invalid_client_application','Choose API, Workday Mobile or Studio as the credential application.');
     const id=randomUUID(),secret=randomBytes(32).toString('base64url'),createdAt=this.now().toISOString();
@@ -273,6 +274,46 @@ export class IntakeStore {
     const r=this.db.prepare("UPDATE gallery_access_requests SET status='Imported',acknowledged_at=? WHERE id=? AND status='Pending'").run(this.now().toISOString(),id);
     if(!r.changes&&!this.db.prepare('SELECT 1 FROM gallery_access_requests WHERE id=? AND status=\'Imported\'').get(id))fail(404,'not_found','Gallery access request not found.');
     return {id,status:'Imported'};
+  }
+  stageGallery(p) {
+    if(!/^[0-9a-f-]{36}$/i.test(p.id)||!/^[0-9a-f-]{36}$/i.test(p.clientId)||!p.title||!Array.isArray(p.items)||!p.items.length||p.items.length>10000||p.items.some(x=>!x||!/^[0-9a-f-]{36}$/i.test(x.versionId)||typeof x.fileName!=='string')||new Set(p.items.map(x=>x.versionId)).size!==p.items.length)fail(400,'invalid_gallery','Unique gallery versions, client ID and title required.');
+    const normalize=value=>({id:value.id,clientId:value.clientId,title:value.title,finalDeliveryAvailable:value.finalDeliveryAvailable===true,items:value.items.map(x=>({versionId:x.versionId,fileName:x.fileName})).sort((a,b)=>a.versionId.localeCompare(b.versionId))});
+    const payload=normalize(p);
+    return this.transaction(()=>{
+      const old=this.db.prepare('SELECT payload FROM galleries WHERE id=?').get(p.id);
+      if(old){if(fingerprint(normalize(JSON.parse(old.payload)))!==fingerprint(payload))fail(409,'gallery_conflict','A publication ID cannot be reused for different metadata.');}
+      else this.db.prepare('INSERT INTO galleries VALUES(?,?,?)').run(p.id,p.clientId,JSON.stringify({...payload,published:false}));
+      return {reference:p.id,provider:'PublicSite',storedVersionIds:this.db.prepare('SELECT id FROM media WHERE gallery_id=?').all(p.id).map(x=>x.id)};
+    });
+  }
+  submitGallerySelections(identity,clientId,publicationId,key) {
+    return this.replay('gallery:'+identity,key,{publicationId},()=>{
+      const row=this.db.prepare('SELECT client_id,payload FROM galleries WHERE id=?').get(publicationId);
+      if(!row||row.client_id!==clientId||!JSON.parse(row.payload).published)fail(404,'not_found','Gallery unavailable.');
+      const gallery=JSON.parse(row.payload),allowed=new Set(gallery.items.map(x=>x.versionId));
+      const versionIds=this.db.prepare('SELECT id FROM selections WHERE gallery_id=? AND selected=1 ORDER BY id').all(publicationId).map(x=>x.id).filter(id=>allowed.has(id));
+      if(!versionIds.length)fail(400,'selection_required','Select at least one photograph before submitting.');
+      const result={reference:randomUUID(),publicationId,clientId,versionIds,submittedAt:this.now().toISOString(),importStatus:'Pending'};
+      this.db.prepare('INSERT INTO gallery_selection_submissions(id,payload) VALUES(?,?)').run(result.reference,JSON.stringify(result));
+      return result;
+    });
+  }
+  gallerySelectionFeed(cursor='') {
+    let after=0;
+    if(cursor){
+      const decoded=Buffer.from(cursor,'base64url').toString();after=Number(decoded);
+      if(!/^(0|[1-9][0-9]*)$/.test(decoded)||!Number.isSafeInteger(after)||Buffer.from(decoded).toString('base64url')!==cursor)fail(400,'invalid_cursor','Invalid selection cursor.');
+    }
+    // Keyset pagination survives acknowledgements removing earlier rows. Start
+    // every new Studio scan without a cursor to retry all unacknowledged rows.
+    const rows=this.db.prepare('SELECT sequence,payload FROM gallery_selection_submissions WHERE acknowledged_at IS NULL AND sequence>? ORDER BY sequence LIMIT 51').all(after);
+    const page=rows.slice(0,50);
+    return {items:page.map(x=>JSON.parse(x.payload)),nextCursor:Buffer.from(String(page.at(-1)?.sequence||after)).toString('base64url'),hasMore:rows.length>50};
+  }
+  acknowledgeGallerySelections(id) {
+    const result=this.db.prepare('UPDATE gallery_selection_submissions SET acknowledged_at=COALESCE(acknowledged_at,?) WHERE id=?').run(this.now().toISOString(),id);
+    if(!result.changes)fail(404,'not_found','Selection submission not found.');
+    return {reference:id,importStatus:'Imported'};
   }
   close() { this.db.close(); }
 }
