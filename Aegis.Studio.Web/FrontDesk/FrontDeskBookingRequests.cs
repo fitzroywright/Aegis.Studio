@@ -345,6 +345,18 @@ public static class FrontDeskBookingRequestEndpoints
                     using(var q=new NpgsqlCommand("update studio_conversations set is_closed=true where id in ($1,(select conversation_id from studio_gallery_exports where publication_id=$2))",c))
                     {q.Parameters.AddWithValue(conversationId);q.Parameters.AddWithValue(galleryId.Value);q.ExecuteNonQuery();}
                 }
+                // The exact same publication can satisfy either initiation path.
+                // Mark only verified client requests associated with this publication.
+                using(var update=new NpgsqlCommand("""
+                  update studio_website_gallery_access_requests
+                  set resolution_status='Published',reviewed_by=$2,reviewed_at_utc=now()
+                  where gallery_id=$1 and client_id=(select client_id from studio_gallery_exports where publication_id=$1)
+                  """,c))
+                {
+                    update.Parameters.AddWithValue(galleryId.Value);
+                    update.Parameters.AddWithValue(user.FindFirstValue("login_name")??user.Identity?.Name??"Front Desk");
+                    update.ExecuteNonQuery();
+                }
                 return Results.Ok(new{published=true,galleryId});
             }
             catch(HttpRequestException)
