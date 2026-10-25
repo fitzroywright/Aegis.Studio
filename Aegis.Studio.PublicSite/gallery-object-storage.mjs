@@ -43,7 +43,7 @@ export class GalleryObjectStorage {
     const {GetObjectCommand}=await import('@aws-sdk/client-s3');
     const response=await(await this.sdk()).send(new GetObjectCommand({Bucket:this.bucket,Key:row.object_key}));
     if(!response.Body)throw Error('Gallery object is missing.');
-    return {type:row.content_type,content:Buffer.from(await response.Body.transformToByteArray())};
+    return {type:row.content_type,stream:response.Body};
   }
   async delete(galleryId,photoId,representation){
     const row=this.store.db.prepare('SELECT object_key FROM gallery_media_objects WHERE gallery_id=? AND photo_id=? AND representation=?').get(galleryId,photoId,representation);
