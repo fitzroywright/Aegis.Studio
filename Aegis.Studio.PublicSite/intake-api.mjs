@@ -153,13 +153,39 @@ export function createIntakeApi(env,readBody,json) {
     }
     const assignmentUpload=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/uploads$/i);
     if(assignmentUpload&&method==='POST'){
-      const user=requireWorkday(req),bytes=await readBody(req,30_000_000);
-      const request=new Request('http://localhost/upload',{method:'POST',headers:{'Content-Type':req.headers['content-type']||''},body:bytes});
-      const form=await request.formData(),file=form.get('file'),uploadId=String(form.get('uploadId')||'');
-      if(!file||typeof file==='string'||!/^[0-9a-f-]{36}$/i.test(uploadId))fail(400,'invalid_upload','Upload ID and file are required.');
+      const user=requireWorkday(req);
+      // Studio also independently verifies AddAttachments when consuming this queue.
+      const snapshot=workdayStore.snapshot(user.user_name);
+      const allowed=[...(snapshot?.today||snapshot?.Today||[]),...(snapshot?.upcoming||snapshot?.Upcoming||[])]
+        .some(x=>String(x.id||x.Id||'').toLowerCase()===assignmentUpload[1].toLowerCase());
+      if(!allowed)fail(403,'assignment_forbidden','This assignment is not in your current WorkDay schedule.');
+      if(!String(req.headers['content-type']||'').toLowerCase().startsWith('multipart/form-data;'))
+        fail(415,'invalid_media_type','Use multipart/form-data for photograph uploads.');
+      const bytes=await readBody(req,26_000_000);
+      const multipart=new Request('http://localhost/upload',{method:'POST',
+        headers:{'Content-Type':req.headers['content-type']},body:bytes});
+      const form=await multipart.formData(),file=form.get('file'),uploadId=String(form.get('uploadId')||'');
+      if(!file||typeof file==='string'||!/^[0-9a-f-]{36}$/i.test(uploadId))
+        fail(400,'invalid_upload','A stable UUID upload ID and file are required.');
+      const name=String(file.name||'');
+      if(!name||name.length>160||name==='.'||name==='..'||name.includes('/')||name.includes('\\')||
+        /[\x00-\x1f]/.test(name))
+        fail(400,'invalid_upload_name','Choose a valid photograph filename.');
       const content=Buffer.from(await file.arrayBuffer());
-      const result=workdayStore.enqueue(user.user_name,uploadId,'AssignmentUpload',{assignmentId:assignmentUpload[1],uploadId,fileName:file.name,contentType:file.type||'application/octet-stream',contentBase64:content.toString('base64')});
-      json(res,202,{uploadId,attachmentId:uploadId,assignmentId:assignmentUpload[1],fileName:file.name,sizeBytes:content.length,storageStatus:result.state,acknowledgedAtUtc:new Date().toISOString()},{'Cache-Control':'no-store'});return true;
+      const jpeg=content.length>=4&&content[0]===255&&content[1]===216&&content[2]===255;
+      const png=content.length>=8&&content.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+      const webp=content.length>=12&&content.toString('ascii',0,4)==='RIFF'&&content.toString('ascii',8,12)==='WEBP';
+      const type=jpeg?'image/jpeg':png?'image/png':webp?'image/webp':null;
+      if(!type||content.length>25_000_000||
+        (type==='image/jpeg'&&!/\.jpe?g$/i.test(name))||
+        (type==='image/png'&&!/\.png$/i.test(name))||
+        (type==='image/webp'&&!/\.webp$/i.test(name)))
+        fail(415,'invalid_photograph','Upload JPEG, PNG or WebP photographs no larger than 25 MB.');
+      const result=workdayStore.enqueue(user.user_name,uploadId,'AssignmentUpload',
+        {assignmentId:assignmentUpload[1],uploadId,fileName:name,contentType:type,contentBase64:content.toString('base64')});
+      json(res,202,{uploadId,attachmentId:uploadId,assignmentId:assignmentUpload[1],
+        fileName:name,sizeBytes:content.length,storageStatus:result.state,
+        acknowledgedAtUtc:new Date().toISOString()},{'Cache-Control':'no-store'});return true;
     }
     const galleryStatus=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/gallery-status$/i);
     if(galleryStatus&&method==='GET'){
