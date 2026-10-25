@@ -53,7 +53,8 @@ test('client gallery proofs keep only a hash, expire, record provider, and revok
  let now=new Date('2026-10-24T12:00:00Z');const s=new IntakeStore(':memory:',()=>now),client='22222222-2222-4222-8222-222222222222';
  const proof=s.createClientLinkChallenge(client);const stored=s.db.prepare('SELECT * FROM client_link_challenges WHERE id=?').get(proof.id);
  assert.notEqual(stored.code_hash,proof.code);assert.equal('code_hash' in s.clientLinkProof(proof.id),false);assert.equal(s.clientLinkProof(proof.id).status,'Pending');
- const linked=s.redeemClientLinkChallenge(proof.code,'Google','stable-provider-subject');assert.equal(linked.clientId,client);assert.equal(s.clientLinkProof(proof.id).status,'Used');assert.equal(s.clientLinkProof(proof.id).provider,'Google');assert.equal(s.revokeClientLinkProof(proof.id),false);
+ assert.throws(()=>s.redeemClientLinkChallenge(proof.code,'Google','stable-provider-subject'),e=>e.code==='invalid_link_proof');
+ const linked=s.redeemClientLinkChallenge(proof.code,'yahoo','stable-provider-subject');assert.equal(linked.clientId,client);assert.equal(s.clientLinkProof(proof.id).status,'Used');assert.equal(s.clientLinkProof(proof.id).provider,'yahoo');assert.equal(s.clientForIdentity('yahoo','stable-provider-subject'),client);assert.equal(s.revokeClientLinkProof(proof.id),false);
  const expiring=s.createClientLinkChallenge(client);now=new Date(now.getTime()+16*60000);assert.equal(s.clientLinkProof(expiring.id).status,'Expired');assert.equal(s.revokeClientLinkProof(expiring.id),false);s.close();
 });
 
