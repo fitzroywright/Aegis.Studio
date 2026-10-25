@@ -367,6 +367,43 @@ export function createIntakeApi(env,readBody,json) {
           fail(409,'preview_pending','Protected client previews must be generated before publication.');
         p.published=publication[2]==='publish';store.db.prepare('UPDATE galleries SET payload=? WHERE id=?').run(JSON.stringify(p),p.id);});json(res,200,{state:publication[2]==='publish'?'Published':'Revoked'});return true;
     }
+    const backfill=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/previews\/backfill$/i);
+    if(backfill&&method==='POST'){
+      authenticate(req,'gallery:publish');
+      if(env.PUBLIC_WATERMARK_PROCESSING_ENABLED!=='true')
+        fail(503,'watermark_disabled','Enable protected preview generation before requesting backfill.');
+      const row=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(backfill[1]);
+      if(!row)fail(404,'not_found','Gallery not found.');
+      const gallery=JSON.parse(row.payload);
+      const limit=Math.max(1,Math.min(5,Number(url.searchParams.get('limit')||2)));
+      let processed=0;
+      for(const item of gallery.items){
+        if(processed>=limit)break;
+        if(store.db.prepare('SELECT 1 FROM gallery_previews WHERE gallery_id=? AND id=?').get(gallery.id,item.versionId))continue;
+        const legacy=store.db.prepare('SELECT content,type FROM media WHERE gallery_id=? AND id=?').get(gallery.id,item.versionId);
+        const original=await mediaStorage.get(gallery.id,item.versionId,'original')||legacy;
+        if(!original)continue;
+        let bytes;
+        if(original.stream){
+          const chunks=[];let size=0;
+          for await(const chunk of original.stream){
+            size+=chunk.length;if(size>30_000_000)fail(413,'media_too_large','Original exceeds preview processing limit.');
+            chunks.push(chunk);
+          }
+          bytes=Buffer.concat(chunks);
+        }else bytes=Buffer.from(original.content);
+        const preview=await createPreview(bytes,env);
+        const stored=await mediaStorage.storeObject(gallery.id,item.versionId,'preview',preview.type,preview.content);
+        store.transaction(()=>{
+          store.db.prepare('INSERT INTO gallery_previews(gallery_id,id,type,content,content_hash) VALUES(?,?,?,?,?) ON CONFLICT(gallery_id,id) DO NOTHING')
+            .run(gallery.id,item.versionId,preview.type,mediaStorage.s3?Buffer.alloc(0):preview.content,preview.contentHash);
+          mediaStorage.remember(gallery.id,item.versionId,'preview',preview.type,stored);
+        });
+        processed++;
+      }
+      const remaining=gallery.items.filter(x=>!store.db.prepare('SELECT 1 FROM gallery_previews WHERE gallery_id=? AND id=?').get(gallery.id,x.versionId)).length;
+      json(res,200,{publicationId:gallery.id,processed,remaining});return true;
+    }
     const originalDownload=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})\/original$/i);
     if(originalDownload&&method==='GET'){
       authenticate(req,'gallery:original:read');
