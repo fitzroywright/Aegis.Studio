@@ -14,11 +14,12 @@ export async function createPreview(original,env) {
   // Sharp is installed on the development Mac with npm install sharp; no
   // remote image processor or browser overlay is used.
   const sharp=(await import('sharp')).default;
-  const image=sharp(original,{limitInputPixels:90_000_000,failOn:'error'}).rotate();
-  const metadata=await image.metadata();
+  const metadata=await sharp(original,{limitInputPixels:90_000_000,failOn:'error'}).metadata();
   if(!['jpeg','png','webp'].includes(metadata.format))throw Error('Unsupported photograph type.');
-  const width=Math.min(metadata.width,settings.maxWidth);
-  const height=Math.max(1,Math.round(metadata.height*width/metadata.width));
+  // Resolve EXIF orientation before measuring the watermark canvas.
+  const rotated=await sharp(original,{limitInputPixels:90_000_000,failOn:'error'})
+    .rotate().resize({width:settings.maxWidth,withoutEnlargement:true}).toBuffer({resolveWithObject:true});
+  const width=rotated.info.width,height=rotated.info.height;
   const words=escapeXml(settings.text);
   const tile=340,lines=[];
   for(let y=-height;y<height*2;y+=tile){
@@ -27,8 +28,7 @@ export async function createPreview(original,env) {
     }
   }
   const svg=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="'+width+'" height="'+height+'"><g transform="rotate(-25 '+(width/2)+' '+(height/2)+')">'+lines.join('')+'</g></svg>');
-  const content=await sharp(original,{limitInputPixels:90_000_000,failOn:'error'})
-    .rotate().resize({width:settings.maxWidth,withoutEnlargement:true})
+  const content=await sharp(rotated.data)
     .composite([{input:svg}]).jpeg({quality:82,mozjpeg:true}).toBuffer();
   const contentHash=createHash('sha256').update(original).update(JSON.stringify(settings)).digest('hex');
   return {content,type:'image/jpeg',contentHash};
