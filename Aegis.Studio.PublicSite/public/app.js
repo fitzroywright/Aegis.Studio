@@ -7,8 +7,16 @@ async function api(path, options = {}) {
   return contentType.includes('json') ? response.json() : response;
 }
 function showAuth(user) {
-  state.user = user; $('signed-out').hidden = Boolean(user); $('signed-in').hidden = !user;
-  if (user) { $('client-name').textContent = user.name.split(' ')[0]; $('gallery-title').textContent = user.provider + ' · ' + user.email; if(user.galleryReference)openGallery(user.galleryReference);else $('gallery-status').textContent='Your sign-in is ready. Connect the Client ID supplied by Bryan’s Studio to see published galleries.'; loadClientGalleries(); }
+  state.user=user;
+  $('signed-out').hidden=Boolean(user);
+  $('signed-in').hidden=!user;
+  $('client-link-form').hidden=!user||Boolean(user.linked);
+  if(!user)return;
+  $('client-name').textContent=(user.name||'Client').split(' ')[0];
+  $('gallery-title').textContent=user.provider+' · '+(user.email||'Verified identity');
+  $('gallery-status').textContent=user.linked?'Loading your published galleries…':
+    'Your identity is verified. Connect your Studio Client ID with a one-time proof from Bryan\'s Front Desk.';
+  loadClientGalleries();
 }
 async function openGallery(reference) {
   $('gallery-status').textContent = 'Loading your private gallery…'; $('gallery-grid').replaceChildren(); state.selected.clear();
@@ -109,7 +117,8 @@ $('booking-form').addEventListener('submit',async event=>{
 });
 $('track-form').addEventListener('submit', async event => { event.preventDefault(); const reference = new FormData(event.currentTarget).get('reference').trim(); try { const result = await api(`/api/bookings/${encodeURIComponent(reference)}`,{headers:{'X-Intake-Token':JSON.parse(sessionStorage.getItem('intake-receipt')||'{}').accessToken||''}}); $('track-result').textContent = `Receipt: ${result.receiptStatus} · Studio: ${result.importStatus} · Review: ${result.reviewStatus||'Awaiting review'}`; } catch (error) { $('track-result').textContent = error.message; } });
 $('submit-selections').addEventListener('click', async () => { const button = $('submit-selections'); button.disabled = true; try { const result = await api(`/api/galleries/${state.user.galleryReference}/selections/submit`, { method: 'POST', headers: { 'Idempotency-Key': state.selectionKey }, body: '{}' }); $('selection-result').textContent = `${result.versionIds.length} favourite(s) saved; awaiting Studio import.`; state.selectionKey = crypto.randomUUID(); } catch (error) { $('selection-result').textContent = error.message; } finally { button.disabled = false; } });
-try { const session = await api('/api/session'); showAuth(session.user); if (!session.demo) { document.querySelectorAll('[data-identity]').forEach(button => button.hidden = true); $('auth-note').textContent = 'Client sign-in is being connected.'; } } catch { /* The public booking form remains visible while sign-in recovers. */ }
+try { const session=await api('/api/session');showAuth(session.user); }
+catch { /* Booking and gallery-request forms remain visible if sign-in is unavailable. */ }
 
 
 
