@@ -53,6 +53,17 @@ export class IntakeStore {
     this.db.exec(`CREATE TABLE IF NOT EXISTS booking_catalog(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,payload TEXT NOT NULL,published_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS booking_slots(slot_id TEXT PRIMARY KEY,location_code TEXT NOT NULL,session_type_id TEXT NOT NULL,starts_at TEXT NOT NULL,ends_at TEXT NOT NULL,catalog_revision INTEGER NOT NULL,published_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS booking_slot_reservations(slot_id TEXT PRIMARY KEY REFERENCES booking_slots(slot_id),intake_id TEXT NOT NULL UNIQUE REFERENCES intakes(id),reserved_at TEXT NOT NULL);`);
+    // Existing installations used a NOT NULL client_id. Rebuild the small request
+    // table transactionally so unidentified gallery requests can be stored.
+    if(this.db.prepare('PRAGMA table_info(gallery_access_requests)').all().some(x=>x.name==='client_id'&&x.notnull===1)){
+      this.transaction(()=>{
+        this.db.exec(`ALTER TABLE gallery_access_requests RENAME TO gallery_access_requests_old;
+          CREATE TABLE gallery_access_requests(id TEXT PRIMARY KEY,client_id TEXT,gallery_id TEXT,client_name TEXT NOT NULL,client_email TEXT NOT NULL,client_phone TEXT NOT NULL DEFAULT '',booking_reference TEXT,notes TEXT NOT NULL,request_key TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'Pending',acknowledged_at TEXT);
+          INSERT INTO gallery_access_requests(id,client_id,gallery_id,client_name,client_email,client_phone,booking_reference,notes,request_key,created_at,status,acknowledged_at)
+          SELECT id,client_id,gallery_id,client_name,client_email,'',NULL,notes,request_key,created_at,status,acknowledged_at FROM gallery_access_requests_old;
+          DROP TABLE gallery_access_requests_old;`);
+      });
+    }
     if(!this.db.prepare('PRAGMA table_info(api_credentials)').all().some(x=>x.name==='client_application'))this.db.exec("ALTER TABLE api_credentials ADD COLUMN client_application TEXT NOT NULL DEFAULT 'API'");
     if(!this.db.prepare('PRAGMA table_info(client_link_challenges)').all().some(x=>x.name==='provider'))this.db.exec('ALTER TABLE client_link_challenges ADD COLUMN provider TEXT');
     for(const [column,definition] of [['client_phone',"TEXT NOT NULL DEFAULT ''"],['booking_reference','TEXT']])
