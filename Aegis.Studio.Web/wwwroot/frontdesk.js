@@ -42,7 +42,8 @@ async function showFrontDesk() {
         ['/api/frontdesk/workspaces','workspaces'],
         ['/api/frontdesk/clients','clients'],
         ['/api/schedule/entries?from='+encodeURIComponent(dayStart.toISOString())+'&to='+encodeURIComponent(new Date(dayStart.getTime()+90*86400000).toISOString()),'schedule'],
-        ['/api/accounts/invoices','invoices']
+        ['/api/accounts/invoices','invoices'],
+        ['/api/frontdesk/gallery-access-requests/unresolved','galleryRequests']
     ];
     const results=await Promise.allSettled(sources.map(([url])=>json(url)));
     const errors=[];
@@ -57,7 +58,7 @@ async function showFrontDesk() {
         }
         return result.value;
     });
-    [frontDeskJobs,frontDeskRequests,frontDeskEnquiries,frontDeskWorkspaces,frontDeskClients,frontDeskSchedule,frontDeskInvoices]=arrays;
+    [frontDeskJobs,frontDeskRequests,frontDeskEnquiries,frontDeskWorkspaces,frontDeskClients,frontDeskSchedule,frontDeskInvoices,frontDeskGalleryRequests]=arrays;
     try{
         renderFrontDesk();
         const referenceButton=document.createElement('button');referenceButton.type='button';referenceButton.textContent='Find intake reference';referenceButton.onclick=async()=>{const value=prompt('Intake reference, for example 2026-BK-000001');if(!value)return;try{const found=await json('/api/intake/lookup/'+encodeURIComponent(value.trim()));if(found.jobId)await openFrontDeskJob(found.jobId);else await openIntakeDeliveryStatus(found.conversationId);}catch(e){alert(e.message);}};genericView.querySelector('.fd-overview-toolbar')?.append(referenceButton);
@@ -77,7 +78,7 @@ async function showFrontDesk() {
     }
 }
 
-let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskClients=[],frontDeskSchedule=[],frontDeskInvoices=[];
+let frontDeskRequests=[],frontDeskEnquiries=[],frontDeskWorkspaces=[],frontDeskClients=[],frontDeskSchedule=[],frontDeskInvoices=[],frontDeskGalleryRequests=[];
 let frontDeskTab='today',frontDeskTerm='',frontDeskClientTerm='',frontDeskSelectedClientId=null;
 function frontDeskRequestStage(item){return item.status==='Confirmed'?'Confirmed':item.status==='Cancelled'?'Cancelled':item.recordedDeposit>0?'Ready for confirmation':item.status==='AwaitingDeposit'?'Awaiting deposit':'Pending Job';}
 let frontDeskJobClickDelegationBound=false;
@@ -297,6 +298,55 @@ async function takeFrontDeskClientPayment(clientId){
     dialog.querySelectorAll('[data-payment-job]').forEach(button=>button.onclick=()=>{const id=button.dataset.paymentJob;dialog.close();openPos(id,true);});
 }
 async function checkInFrontDeskJob(jobId){try{await json('/api/frontdesk/jobs/'+jobId+'/check-in',{method:'POST'});await showFrontDesk();}catch(error){alert(error.message);}}
+async function reviewFrontDeskGalleryRequest(conversationId){
+    const request=frontDeskGalleryRequests.find(x=>x.conversationId===conversationId);
+    if(!request){alert('Gallery request was not found in the unresolved queue. Refresh Front Desk.');return;}
+    const details=request.request||{},matches=new Set((request.candidateClients||[]).map(c=>c.id));
+    const ordered=[...frontDeskClients].sort((a,b)=>Number(matches.has(b.id))-Number(matches.has(a.id))||String(a.displayName).localeCompare(String(b.displayName)));
+    const dialog=frontDeskDialog('Identify Client / Gallery Request',`
+      <p><strong>${esc(details.clientName||'Client')}</strong> · ${esc(details.clientEmail||'')} · ${esc(details.telephone||'')}</p>
+      <p>Booking Reference: ${esc(details.bookingReference||'Not supplied')}</p>
+      <p>${esc(details.notes||'')}</p>
+      <label>Studio Client (verify identity independently)<select name="clientId" required>
+        <option value="">Choose verified client</option>
+        ${ordered.map(c=>`<option value="${c.id}" ${c.id===request.clientId?'selected':''}>${matches.has(c.id)?'Possible match · ':''}${esc(c.displayName)} · ${esc(c.email||c.phone||'No contact')}</option>`).join('')}
+      </select></label>
+      <label>Available publication<select name="publicationId"><option value="">Not ready — Awaiting Production</option></select></label>
+      <label>Verification note<textarea name="note" maxlength="1000" placeholder="How was the client identity verified?"></textarea></label>
+      <label><input name="verified" type="checkbox" required> I have independently verified this client identity.</label>
+      ${request.status==='ReadyToPublish'?'<button type="button" class="action" data-gallery-publish>Publish linked gallery</button>':''}
+    `);
+    const form=dialog.querySelector('form'),client=form.elements.clientId,publication=form.elements.publicationId;
+    async function loadPublications(){
+      publication.replaceChildren(new Option('Not ready — Awaiting Production',''));
+      if(!client.value)return;
+      try{
+        const available=await json('/api/frontdesk/gallery-publications?clientId='+encodeURIComponent(client.value));
+        for(const p of available)publication.add(new Option(p.title+' · '+p.state,p.id));
+        publication.value=request.clientId===client.value?(request.publicationId||''):'';
+      }catch(error){form.querySelector('[role=alert]').textContent=error.message;}
+    }
+    client.onchange=loadPublications;await loadPublications();
+    form.querySelector('[data-gallery-publish]')?.addEventListener('click',async event=>{
+      event.currentTarget.disabled=true;
+      try{
+        await json('/api/frontdesk/gallery-access-requests/'+encodeURIComponent(conversationId)+'/publish',{method:'POST'});
+        dialog.close();await showFrontDesk();
+      }catch(error){form.querySelector('[role=alert]').textContent=error.message;event.currentTarget.disabled=false;}
+    });
+    form.onsubmit=async event=>{
+      event.preventDefault();
+      const button=form.querySelector('[type=submit]');button.disabled=true;
+      try{
+        await json('/api/frontdesk/gallery-access-requests/'+encodeURIComponent(conversationId)+'/resolve',{
+          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+            clientId:client.value,publicationId:publication.value||null,note:form.elements.note.value||null
+          })
+        });
+        dialog.close();await showFrontDesk();
+      }catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}
+    };
+}
 function renderFrontDeskRows(){
     const host=document.getElementById('frontDeskJobList'),term=frontDeskTerm.trim().toLowerCase();
     const matches=value=>JSON.stringify(value).toLowerCase().includes(term);
@@ -306,7 +356,7 @@ function renderFrontDeskRows(){
     }).join('')||'<p class="empty-state">No Pending Jobs. New requests create a Job immediately for FrontDesk review.</p>';
     else if(frontDeskTab==='enquiries'){
         const linked=new Set(frontDeskRequests.map(r=>r.request.conversationId).filter(Boolean));
-        host.innerHTML=frontDeskEnquiries.filter(e=>!linked.has(e.id)&&matches(e)).map(e=>`<article class="front-desk-row"><div><strong>${esc(e.contactName)}</strong><div>${esc(e.subject)}</div><small>${esc(e.channel)} · ${esc(new Date(e.createdAtUtc).toLocaleString())}</small></div>${e.channel==='Website Gallery'?'<button class="primary" data-publish-gallery-request="'+esc(e.id)+'">Review and publish gallery</button>':`<button class="primary" data-convert-enquiry="${e.id}">Prepare booking request</button>`}</article>`).join('')||'<p class="empty-state">No unassigned enquiries awaiting booking preparation.</p>';
+        host.innerHTML=frontDeskEnquiries.filter(e=>!linked.has(e.id)&&matches(e)).map(e=>`<article class="front-desk-row"><div><strong>${esc(e.contactName)}</strong><div>${esc(e.subject)}</div><small>${esc(e.channel)} · ${esc(new Date(e.createdAtUtc).toLocaleString())}</small></div>${e.channel==='Website Gallery'?'<button class="primary" data-review-gallery-request="'+esc(e.id)+'">Identify client / Review gallery</button>':`<button class="primary" data-convert-enquiry="${e.id}">Prepare booking request</button>`}</article>`).join('')||'<p class="empty-state">No unassigned enquiries awaiting booking preparation.</p>';
     }else{
         let jobs=frontDeskJobs.filter(matches);if(frontDeskTab==='delivery')jobs=jobs.filter(j=>['Ready for Client','Ready for Delivery','Published'].includes(j.status));else if(frontDeskTab==='completed')jobs=jobs.filter(j=>j.status==='Completed');else if(frontDeskTab==='unassigned')jobs=jobs.filter(j=>!j.assignedTo&&j.status!=='Completed');else jobs=jobs.filter(j=>j.status!=='Completed');
         host.innerHTML=jobs.map(renderFrontDeskJob).join('')||'<p class="empty-state">No jobs in this queue.</p>';
@@ -320,7 +370,7 @@ function renderFrontDeskRows(){
     host.querySelectorAll('[data-frontdesk-fulfill]').forEach(b=>b.onclick=()=>recordFrontDeskFulfillment(b.dataset.frontdeskFulfill));
     host.querySelectorAll('[data-frontdesk-pos]').forEach(b=>b.onclick=()=>openPos(b.dataset.frontdeskPos));
     host.querySelectorAll('[data-convert-enquiry]').forEach(b=>b.onclick=()=>openPendingBookingForm(frontDeskEnquiries.find(e=>e.id===b.dataset.convertEnquiry)));
-    host.querySelectorAll('[data-publish-gallery-request]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await json('/api/frontdesk/gallery-access-requests/'+encodeURIComponent(b.dataset.publishGalleryRequest)+'/publish',{method:'POST'});alert('Gallery published for client access.');await showFrontDesk();}catch(error){alert(error.message||'Gallery publication failed.');}finally{if(b.isConnected)b.disabled=false;}});
+    host.querySelectorAll('[data-review-gallery-request]').forEach(b=>b.onclick=()=>reviewFrontDeskGalleryRequest(b.dataset.reviewGalleryRequest));
     host.querySelectorAll('[data-deposit]').forEach(b=>b.onclick=()=>openVerifiedDepositForm(frontDeskRequests.find(r=>r.id===b.dataset.deposit)));
     host.querySelectorAll('[data-deposit-requested]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const channels=await json('/api/frontdesk/deposit-delivery-channels');if(!Array.isArray(channels)||!channels.length)throw Error('Configure an email or WhatsApp provider before sending a deposit request.');const chosen=channels.length===1?channels[0]:prompt('Delivery channel: '+channels.join(' or '),'Email');if(chosen===null)return;if(!channels.includes(chosen))throw Error('Choose one of the configured delivery channels.');const queued=await json(`/api/frontdesk/booking-requests/${b.dataset.depositRequested}/deposit-requested?channel=${encodeURIComponent(chosen)}`,{method:'POST'});alert(queued.state==='AlreadyQueued'?'A deposit request is already queued. Check its delivery status.':'Deposit request queued for '+(queued.channel||chosen)+' delivery. Check delivery status for provider acceptance or failures.');await showFrontDesk();}catch(e){alert(e.message);}finally{if(b.isConnected)b.disabled=false;}});
     host.querySelectorAll('[data-deposit-delivery]').forEach(b=>b.onclick=async()=>{try{const delivery=await json(`/api/frontdesk/booking-requests/${b.dataset.depositDelivery}/deposit-delivery`);alert((delivery.channel||'Delivery')+': '+delivery.state+'\nAttempts: '+delivery.attempts+(delivery.lastError?'\nError: '+delivery.lastError:'')+(delivery.providerAcceptedAtUtc?'\nProvider accepted: '+new Date(delivery.providerAcceptedAtUtc).toLocaleString():'')+'\nRecipient delivery receipt is unavailable from the configured provider.');}catch(e){alert(e.message);}});
