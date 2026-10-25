@@ -166,10 +166,10 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
         // Do not populate client_id automatically even when one record matches.
         Guid conversation=Guid.NewGuid();
         var subject=string.IsNullOrWhiteSpace(booking)?"Client gallery request":"Client gallery request — "+booking;
-        string body="Client requested a photograph gallery.\\nEmail: "+email+"\\nTelephone: "+phone;
-        if(!string.IsNullOrWhiteSpace(booking))body+="\\nBooking reference: "+booking;
-        if(!string.IsNullOrWhiteSpace(notes))body+="\\nClient note: "+notes;
-        body+="\\nClient identity and Job must be verified by Front Desk before publication.";
+        string body="Client requested a photograph gallery.\nEmail: "+email+"\nTelephone: "+phone;
+        if(!string.IsNullOrWhiteSpace(booking))body+="\nBooking reference: "+booking;
+        if(!string.IsNullOrWhiteSpace(notes))body+="\nClient note: "+notes;
+        body+="\nClient identity and Job must be verified by Front Desk before publication.";
         WorkflowStore.Sql(c,tx,"""
           insert into studio_conversations(id,workspace_id,subject,contact_name,contact_address,channel,is_closed,created_at_utc)
           values($1,$2,$3,$4,$5,'Website Gallery',false,$6)
