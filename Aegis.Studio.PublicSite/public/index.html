@@ -10,21 +10,39 @@
   <div class="site-shell">
     <div class="heritage-strip"><span>BRYAN’S STUDIOS · JAMAICA · EST. 1927</span><a href="https://www.bryanstudiosltd.com/" rel="noopener noreferrer">Visit our main website ↗</a></div>
     <header class="topbar">
-      <a class="brand" href="#home" aria-label="Bryan’s Studio home"><span class="brand-mark" aria-hidden="true">B</span><span class="brand-words">BRYAN’S <i>STUDIOS</i></span></a>
+      <a class="brand" href="#home" aria-label="Bryan’s Studio home"><span class="brand-words">BRYAN’S <i>STUDIOS</i></span></a>
       <nav aria-label="Main navigation"><a href="#home">Home</a><a href="#booking">Book a session</a><a href="#galleries">Client galleries</a><a href="#workday">WorkDay</a></nav>
       <a class="top-cta" href="#booking">Book a session <span>↗</span></a>
     </header>
 
     <main id="home">
-      <section class="hero">
-        <div class="hero-copy"><p class="eyebrow">JAMAICAN PHOTOGRAPHY SINCE 1927</p><h1>Every story<br>deserves to be<br><em>remembered.</em></h1><p class="hero-text">From milestones to everyday moments, Bryan’s brings generations of experience to the photographs you’ll treasure.</p><div class="hero-actions"><a class="button button-dark" href="#booking">Book a session <span>↗</span></a><a class="hero-secondary" href="#galleries">View your galleries <span>→</span></a></div></div>
-        <div class="hero-art" role="img" aria-label="Art-inspired composition celebrating portrait photography"><div class="sun"></div><div class="arch arch-back"></div><div class="arch arch-front"><div class="art-person"><span></span></div></div><span class="art-note">BRYAN’S STUDIOS<br>ESTABLISHED 1927</span><span class="art-number">A LEGACY IN EVERY FRAME</span></div>
-        <div class="hero-index"><span>PHOTOGRAPHY</span><span class="index-line"></span><span>FAMILY MILESTONES</span><span class="index-line"></span><span>LASTING MEMORIES</span></div>
+      <section class="hero" aria-labelledby="hero-heading">
+        <div class="hero-image">
+          <img src="https://images-pw.pixieset.com/site/NzQ3O5/6QbZLK/slider-1080x563-1-ad8112db-1500.jpg" alt="Photographic work featured on Bryan's Studios' official website" fetchpriority="high">
+          <div class="hero-shade"></div>
+        </div>
+        <div class="hero-content">
+          <div class="hero-label"><span class="gold-rule"></span> JAMAICA'S PHOTOGRAPHY STORY SINCE 1927</div>
+          <h1 id="hero-heading">Your moments.<br><em>Our legacy.</em></h1>
+          <p>Portraits, celebrations and milestones, thoughtfully captured by Bryan's Studios.</p>
+          <div class="hero-actions">
+            <a class="button button-gold" href="#booking">Book your session <span aria-hidden="true">↗</span></a>
+            <a class="hero-text-link" href="#galleries">Access your gallery <span aria-hidden="true">→</span></a>
+          </div>
+        </div>
+        <div class="hero-bottom"><span>BRYAN'S STUDIOS LIMITED</span><span>PHOTOGRAPHY &amp; IMAGING · KINGSTON, JAMAICA</span><a href="#story" aria-label="Scroll to our story">SCROLL TO DISCOVER ↓</a></div>
       </section>
-
+      <section class="editorial-intro" id="story">
+        <div class="intro-kicker"><span class="eyebrow">THE BRYAN'S EXPERIENCE</span><span class="intro-number">01 / 04</span></div>
+        <div class="intro-copy"><h2>Every photograph<br>has <em>a story to tell.</em></h2><div><p>For generations, Bryan's has helped families, graduates, professionals and couples keep the moments that matter. From the first appointment to the finished image, we're here to make it memorable.</p><a href="#booking" class="inline-link">Plan your visit <span aria-hidden="true">↗</span></a></div></div>
+      </section>
+      <section class="photo-editorial" aria-label="Explore photography at Bryan's">
+        <div class="photo-tile tile-large"><img src="https://images-pw.pixieset.com/site/NzQ3O5/dMn9oG/IMG_7372-1-768x512-fa4cfedd-1500.jpg" alt="Photography from Bryan's Studios' official portfolio" loading="lazy"><div class="tile-caption"><span>THE ART OF REMEMBERING</span><strong>Portraits &amp; people</strong></div></div>
+        <div class="photo-tile tile-small"><img src="https://images-pw.pixieset.com/site/NzQ3O5/6QbZLK/slider-1080x563-1-ad8112db-1500.jpg" alt="Featured Bryan's Studios photography" loading="lazy"><div class="tile-caption"><span>YOUR NEXT CHAPTER</span><strong>Occasions &amp; celebrations</strong></div></div>
+      </section>
       <section id="booking" class="booking-section section-grid">
-        <div class="section-intro"><p class="eyebrow">01 / YOUR NEXT CHAPTER</p><h2>Let’s capture<br><em>your moment.</em></h2><p>Tell us what you’re imagining. Our Front Desk team will review your request and get back to you with the next steps.</p><div class="small-note"><span class="note-dot"></span> Every session starts with a conversation.</div></div>
-        <div class="form-card"><div class="card-heading"><div><p class="eyebrow">BOOK WITH BRYAN’S</p><h3>Request your session</h3></div><span class="step-chip">01 — 02</span></div>
+        <div class="section-intro"><p class="eyebrow">01 / YOUR NEXT CHAPTER</p><h2>A moment worth<br><em>remembering.</em></h2><p>Choose a studio, session and available time. Our Front Desk team will help you take it from there.</p><div class="small-note"><span class="note-dot"></span> Every session starts with a conversation.</div></div>
+        <div class="form-card"><div class="card-heading"><div><p class="eyebrow">BOOK WITH BRYAN’S</p><h3>Request your session</h3></div><span class="step-chip">BRYAN’S BOOKING</span></div>
           <form id="booking-form">
             <div class="field-row"><label>Your name<input name="clientName" autocomplete="name" placeholder="First and last name" maxlength="200" required></label><label>Email address<input name="clientEmail" autocomplete="email" type="email" placeholder="you@example.com" required></label></div>
             <div class="field-row"><label>Studio location<select name="locationCode" required><option value="">Choose a location</option><option value="BK">Kings Plaza</option><option value="BE">East Queen Street</option></select></label><label>What are we photographing?<select name="sessionTypeId" required><option value="">Loading Studio sessions…</option></select></label><label>Preferred date<input name="bookingDate" type="date" required></label></div>
@@ -40,10 +58,10 @@
         </div>
       </section>
 
-      <section class="interlude"><p class="eyebrow">A JAMAICAN PHOTOGRAPHY LEGACY</p><p class="interlude-quote">Capturing today.<br><em>Preserving tomorrow.</em></p><span>BRYAN’S STUDIOS · EST. 1927</span></section>
+      <section class="interlude"><span class="eyebrow">A LEGACY BEHIND THE LENS</span><p class="interlude-quote">“Capturing the spirit of today.<br><em>Preserving the memories of tomorrow.”</em></p><span>BRYAN’S STUDIOS</span></section>
 
       <section id="galleries" class="gallery-section section-grid">
-        <div class="section-intro"><p class="eyebrow">02 / YOUR PHOTOGRAPHS</p><h2>Memories worth<br><em>coming back to.</em></h2><p>Come back to your photographs, choose your favourites, and revisit the day just as it felt.</p><div class="gallery-stamp"><span>PRIVATE</span><span>BY<br>DESIGN</span></div></div>
+        <div class="section-intro"><p class="eyebrow">02 / YOUR PHOTOGRAPHS</p><h2>Your photographs.<br><em>Your private space.</em></h2><p>Request access to your photographs, sign in securely and enjoy your published galleries.</p><div class="gallery-stamp"><span>PRIVATE</span><span>BY<br>DESIGN</span></div></div>
         <div class="gallery-card">
           <div class="sign-in-panel">
             <div class="card-heading"><div><p class="eyebrow">REQUEST YOUR PHOTOGRAPHS</p><h3>Request a Client Gallery</h3></div></div>
@@ -71,7 +89,7 @@
       </section>
       <section id="workday" class="gallery-section section-grid" aria-label="WorkDay photo uploads">
         <div class="section-intro"><p class="eyebrow">03 / STAFF ACCESS</p>
-          <h2>Your assignments,<br><em>one place.</em></h2>
+          <h2>A better way<br><em>to work.</em></h2>
           <p>Use your existing Studio-provisioned WorkDay account to review assignments and upload photographs for authorized Jobs.</p>
         </div>
         <div class="gallery-card">
