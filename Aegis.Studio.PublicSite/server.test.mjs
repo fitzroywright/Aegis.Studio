@@ -49,6 +49,21 @@ test('signing binds method, path, exact body and idempotency key', () => {
   assert.notEqual(expected, sign('secret', 'POST', '/api/public/v1/bookings', '1', 'nonce', Buffer.from('{"ok":false}'), 'booking-1'));
   assert.notEqual(expected, sign('secret', 'POST', '/api/public/v1/bookings', '1', 'nonce', body, 'booking-2'));
 });
+test('production reference demo uses fictional galleries and cannot access real published galleries',async t=>{
+  const origin=await fixture(t,{NODE_ENV:'production',PUBLIC_DEMO_MODE:'false',PUBLIC_REFERENCE_DEMO_MODE:'true'});
+  const login=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity:'maya'})});
+  assert.equal(login.status,200);
+  assert.match(login.headers.get('set-cookie'),/Secure/);
+  const cookie=login.headers.get('set-cookie').split(';')[0];
+  const session=await fetch(origin+'/api/session',{headers:{Cookie:cookie}});
+  assert.equal((await session.json()).referenceDemo,true);
+  const own=await fetch(origin+'/api/galleries/10000000-0000-4000-8000-000000000001',{headers:{Cookie:cookie}});
+  assert.equal(own.status,200);
+  const other=await fetch(origin+'/api/galleries/20000000-0000-4000-8000-000000000002',{headers:{Cookie:cookie}});
+  assert.equal(other.status,404);
+  const link=await fetch(origin+'/api/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:'invalid'})});
+  assert.equal(link.status,403);
+});
 test('demo account can open only its own gallery, even when a second reference is guessed', async t => {
   const origin = await fixture(t);
   const login = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'maya' }) });
