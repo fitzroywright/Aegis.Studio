@@ -57,3 +57,38 @@ test('client gallery proofs keep only a hash, expire, record provider, and revok
  const expiring=s.createClientLinkChallenge(client);now=new Date(now.getTime()+16*60000);assert.equal(s.clientLinkProof(expiring.id).status,'Expired');assert.equal(s.revokeClientLinkProof(expiring.id),false);s.close();
 });
 
+test('gallery staging retries preserve publication, media, and revocation and reject changed metadata',()=>{
+ const s=new IntakeStore(':memory:'),g={id:'11111111-1111-4111-8111-111111111111',clientId:'22222222-2222-4222-8222-222222222222',title:'Gallery',finalDeliveryAvailable:true,items:[{versionId:'33333333-3333-4333-8333-333333333333',fileName:'Portrait.jpg'}]};
+ s.stageGallery(g);s.db.prepare('INSERT INTO media VALUES(?,?,?,?)').run(g.id,g.items[0].versionId,'image/jpeg',Buffer.from('photo'));
+ const state=published=>s.db.prepare('UPDATE galleries SET payload=? WHERE id=?').run(JSON.stringify({...g,published}),g.id);
+ state(true);assert.deepEqual(s.stageGallery(g).storedVersionIds,[g.items[0].versionId]);assert.equal(JSON.parse(s.db.prepare('SELECT payload FROM galleries').get().payload).published,true);
+ state(false);s.stageGallery(g);assert.equal(JSON.parse(s.db.prepare('SELECT payload FROM galleries').get().payload).published,false);
+ assert.throws(()=>s.stageGallery({...g,title:'Changed'}),e=>e.code==='gallery_conflict');assert.throws(()=>s.stageGallery({...g,clientId:'44444444-4444-4444-8444-444444444444'}),e=>e.status===409);s.close();
+});
+
+test('immutable selection snapshots survive restart, lost responses, later edits and repeated acknowledgements',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'studio-selections-')),path=join(dir,'test.sqlite');let s;
+ try{
+  s=new IntakeStore(path);const g={id:'11111111-1111-4111-8111-111111111111',clientId:'22222222-2222-4222-8222-222222222222',title:'Gallery',items:[{versionId:'33333333-3333-4333-8333-333333333333',fileName:'Portrait.jpg'}]};s.stageGallery(g);
+  s.db.prepare('UPDATE galleries SET payload=?').run(JSON.stringify({...g,published:true}));
+  assert.throws(()=>s.submitGallerySelections('identity','other',g.id,'wrong-client'),e=>e.status===404);
+  assert.throws(()=>s.submitGallerySelections('identity',g.clientId,g.id,'empty'),e=>e.code==='selection_required');
+  s.db.prepare('INSERT INTO selections VALUES(?,?,1)').run(g.id,g.items[0].versionId);
+  const receipt=s.submitGallerySelections('identity',g.clientId,g.id,'one');s.close();s=new IntakeStore(path);
+  s.db.prepare('UPDATE selections SET selected=0').run();
+  assert.deepEqual(s.submitGallerySelections('identity',g.clientId,g.id,'one'),receipt);assert.deepEqual(s.gallerySelectionFeed().items,[receipt]);
+  s.acknowledgeGallerySelections(receipt.reference);s.acknowledgeGallerySelections(receipt.reference);assert.deepEqual(s.gallerySelectionFeed().items,[]);
+  s.close();s=new IntakeStore(path);assert.deepEqual(s.gallerySelectionFeed().items,[]);assert.deepEqual(s.submitGallerySelections('identity',g.clientId,g.id,'one'),receipt);
+  assert.throws(()=>s.acknowledgeGallerySelections('missing'),e=>e.status===404);
+ }finally{s?.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+
+test('selection pagination advances past unacknowledged snapshots without losing retry visibility',()=>{
+ const s=new IntakeStore(':memory:');try{
+  for(let i=1;i<=51;i++)s.db.prepare('INSERT INTO gallery_selection_submissions(id,payload) VALUES(?,?)').run(String(i),JSON.stringify({reference:String(i)}));
+  const first=s.gallerySelectionFeed();assert.equal(first.items.length,50);assert.equal(first.hasMore,true);
+  const second=s.gallerySelectionFeed(first.nextCursor);assert.deepEqual(second.items,[{reference:'51'}]);assert.equal(second.hasMore,false);
+  assert.equal(s.gallerySelectionFeed().items[0].reference,'1');assert.throws(()=>s.gallerySelectionFeed('invalid'),e=>e.status===400);
+ }finally{s.close();}
+});

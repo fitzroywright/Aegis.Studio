@@ -227,6 +227,7 @@ builder.Services.AddHostedService<InboundEmailWorker>();
 builder.Services.AddHostedService<OutboundEmailWorker>();
 builder.Services.AddHostedService<Aegis.Studio.Web.Intake.WebsiteIntakeWorker>();
 builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GalleryPushWorker>();
+builder.Services.AddHostedService<Aegis.Studio.Web.Intake.GallerySelectionWorker>();
 builder.Services.AddSingleton<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogStore>();
 builder.Services.AddHostedService<Aegis.Studio.Web.Bookings.StudioPublicBookingCatalogPublisher>();
 builder.Services.AddHostedService<NotificationDeliveryWorker>();

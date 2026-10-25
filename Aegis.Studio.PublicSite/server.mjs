@@ -78,6 +78,7 @@ export function createServer(env = process.env) {
   const secret = env.SESSION_SECRET;
   if (!secret || secret.length < 32) throw new Error('Set SESSION_SECRET to at least 32 characters.');
   const demo = env.PUBLIC_DEMO_MODE === 'true';
+  if(demo&&env.NODE_ENV==='production')throw new Error('PUBLIC_DEMO_MODE must be false in production.');
   const demoSelections = new Map();
   const intake=createIntakeApi(env,readBody,json);
   const server = http.createServer(async (req, res) => {
@@ -163,8 +164,7 @@ export function createServer(env = process.env) {
           intake.store.db.prepare('INSERT INTO selections VALUES(?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET selected=excluded.selected').run(reference,selection[2],p.selected?1:0);json(res,200,{versionId:selection[2],selected:p.selected});return;
         }
         if(submit&&req.method==='POST'){
-          const ids=intake.store.db.prepare('SELECT id FROM selections WHERE gallery_id=? AND selected=1').all(reference).map(x=>x.id);
-          const result=intake.store.replay('gallery:'+user.id,String(req.headers['idempotency-key']||''),{reference,ids},()=>({reference:randomUUID(),publicationId:reference,versionIds:ids,submittedAt:new Date().toISOString()}));json(res,200,result);return;
+          const result=intake.store.submitGallerySelections(user.provider+':'+user.id,binding,reference,String(req.headers['idempotency-key']||''));json(res,200,result);return;
         }
         json(res,405,{message:'Method not allowed.'});return;
       }

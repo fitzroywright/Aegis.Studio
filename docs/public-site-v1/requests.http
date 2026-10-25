@@ -101,3 +101,14 @@ Authorization: Bearer {{studio}}
 Content-Type: application/json
 
 {}
+
+### Studio selection poll; continue nextCursor while hasMore, start each cycle without cursor
+GET {{base}}/gallery-selections
+Authorization: Bearer {{studio}}
+
+### Acknowledge only after the snapshot and staff message commit in Studio
+POST {{base}}/gallery-selections/OBSERVED_SELECTION_SUBMISSION_UUID/ack
+Authorization: Bearer {{studio}}
+Content-Type: application/json
+
+{}

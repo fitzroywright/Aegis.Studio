@@ -19,7 +19,7 @@ $env:STUDIO_TEST_POSTGRES = '<local disposable PostgreSQL connection string>'
 pwsh -File ./scripts/Validate-ClientIntake.ps1
 ```
 
-That script restores/builds the solution, runs .NET web tests, restores and runs public-site tests, and restores/runs the UI suite. It stops on failure. The first `npm install` produces a lockfile for the added workbook dependency; review and commit it after successful local restore so future deployments can use `npm ci`.
+That script restores/builds the solution, runs .NET web tests, restores and runs public-site tests, and restores/runs the UI suite. It stops on failure. The workbook dependency has a committed lockfile; use `npm ci` for reproducible restores.
 
 Manual browser acceptance must also exercise pasted cells, column mapping, error correction, save/reload, and the Front Desk/Job Details roster controls. Test both restricted and authorized users. A recipient with conversation-only access can see message status without obtaining full job/roster access. Existing subjects are not deleted through roster import.
 
@@ -39,26 +39,28 @@ Manual browser acceptance must also exercise pasted cells, column mapping, error
 ```text
 PublicSite__PollingEnabled=true
 PublicSite__GalleryPushEnabled=true
+PublicSite__SelectionPollingEnabled=true
+PublicSite__BookingCatalogPublishingEnabled=true
 PublicSite__BaseUrl=https://api.bryanstudiosltd.com/
 PublicSite__IntegrationToken=PROVISION_THROUGH_THE_EXISTING_SECRET_STORE
 PublicSite__MalwareScannerPath=/usr/bin/clamscan
 ```
 
-The integration token needs `intake:pull`, `intake:ack`, and `gallery:publish` when both workers are enabled. Separate deployment credentials can be used when those workers run independently. Keep the existing Microsoft Graph tenant/client/secret resolver, authorized sender configuration, monitored Reply-To and Common.Storage settings. Missing scanner configuration does not block booking metadata.
+The integration token needs `intake:pull`, `intake:ack`, `gallery:access:pull`, `gallery:access:ack`, `gallery:publish`, `gallery:selections:pull`, `gallery:selections:ack`, `booking:catalog:publish`, and `booking:availability:publish` when all workers are enabled. Add `client:link` for Management identity proof administration. Keep the existing Microsoft Graph tenant/client/secret resolver, authorized sender configuration, monitored Reply-To and Common.Storage settings. Missing scanner configuration does not block booking metadata.
 
-The workers are disabled unless explicitly enabled. Neither needs an inbound Studio endpoint. Both use certificate-validated HTTPS, reject redirects, and retain durable retry state. PublicSite BaseUrl must be an HTTPS origin, not a path. Configure request size limits and HTTPS at the public ingress. Never expose integration secrets to browser code.
+The workers are disabled unless explicitly enabled. None needs an inbound Studio endpoint. Their clients use certificate-validated HTTPS, reject redirects, and retain durable retry state. PublicSite BaseUrl must be an HTTPS origin, not a path. Configure request size limits and HTTPS at the public ingress. Never expose integration secrets to browser code.
 
 ## Migration and compatibility
 
 Startup applies additive schema changes. Back up PostgreSQL before deployment. Intake adds conversation references, annual counters, website import/retry/cursor records, staged rosters, attachment metadata and payment-event history. Subject pickup preferences and a subject readiness anchor extend existing records. The reminder scheduler/outbox remain canonical.
 
-New Studio-origin conversations receive `YYYY-S-NNNNNN`; the public site issues W references. Historical conversations retain their existing references and may show Legacy intake. Existing immutable IDs and AEGIS threading references remain valid. Imported W references are preserved and can resolve replies/search without granting access.
+New Studio-origin conversations receive `YYYY-S-NNNNNN`; the public site issues BK/BE booking references and W inquiry references. Historical conversations retain their existing references and may show Legacy intake. Existing immutable IDs and AEGIS threading references remain valid. Imported W references are preserved and can resolve replies/search without granting access.
 
 Website booking import creates the existing Pending Job/request structure, not a parallel workflow. Inquiry import saves contacts, matches at most one existing client and does not create a permanent client. A recognized existing client is preserved on a pending imported job. New-client creation is an explicit Front Desk action or reviewed booking action.
 
 Subject readiness notifications use the existing subject production status **Needs Delivery**, never an assumed whole-job completion. Opt-in, valid current contacts, job state and fulfillment are checked again before dispatch. Repeated events do not create another automatic reminder. Contact/preference changes cancel pending deliveries; an already accepted email is never recalled or resent automatically. Deliberate new subject messages create separately audited operations and show selected recipients first.
 
-The legacy Studio `/api/public/v1` interface remains for compatibility. It is not the new public website contract. The reference site no longer forwards bookings or gallery reads into internal Studio.
+The legacy Studio `/api/public/v1` interface remains for compatibility. It is not the new public website contract. The reference site never forwards bookings, gallery reads or photograph selections into internal Studio. Studio polls submitted selections and acknowledges them only after its local snapshot/message transaction commits. See `docs/public-site-v1/DEPLOYMENT.md` for current AWS us-east-2 hosting prerequisites and `INTEGRATION.md` for selection routes and scopes.
 
 ## Kratos deployment
 
@@ -98,6 +100,6 @@ Use only a user-designated test recipient and test clients/subjects. No real-cli
 
 Prepared: source, migrations, candidate API contract, examples, roster template, regression tests, MacBook validation script and deployment checklist.
 
-Not executed in this environment: dependency restore, build, unit/database/UI tests, browser layout verification, deployment, provider acceptance, client mailbox receipt, payment-provider verification and live gallery isolation.
+Historical handoff verification state is superseded by recorded local test results for the reviewed revision. Production deployment, browser acceptance, provider acceptance, client mailbox receipt, payment-provider verification and real identity/gallery isolation still require separate controlled evidence.
 
 Do not describe the candidate API as validated for external developers, or intake as operationally proven, until the corresponding MacBook and controlled runtime evidence is recorded. Preserve this distinction in the pull request and operational handoff.

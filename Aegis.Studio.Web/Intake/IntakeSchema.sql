@@ -85,3 +85,15 @@ create table if not exists studio_gallery_exports(
 alter table studio_gallery_exports add column if not exists conversation_id uuid null references studio_conversations(id);
 alter table studio_gallery_exports add column if not exists job_id uuid null;
 alter table studio_gallery_exports add column if not exists client_id uuid null references studio_clients(id);
+
+-- Immutable client snapshots. A lost API acknowledgement replays the same source/submission.
+create table if not exists studio_website_gallery_selections(
+ source text not null,
+ external_id uuid not null,
+ publication_id uuid not null references studio_gallery_exports(publication_id),
+ client_id uuid not null references studio_clients(id),
+ conversation_id uuid not null references studio_conversations(id),
+ payload jsonb not null,
+ imported_at_utc timestamptz not null default now(),
+ primary key(source,external_id)
+);
