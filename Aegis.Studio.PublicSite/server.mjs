@@ -77,7 +77,7 @@ export function createServer(env = process.env) {
       if (req.method === 'GET' && [
         '/assets/photography/hero-portrait.jpg',
         '/assets/photography/family-portrait.jpg',
-        '/assets/photography/graduation-portrait.jpg'
+        '/assets/photography/studio-photographer.jpg'
       ].includes(url.pathname)) {
         try {
           const asset = await readFile(new URL('.' + url.pathname, ROOT));
