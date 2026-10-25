@@ -3,6 +3,7 @@ import { readRosterFile } from './roster-file.mjs';
 import { IntakeStore, validateRoster, fail } from './intake-store.mjs';
 import { WorkDayExchangeStore } from './workday-exchange-store.mjs';
 import { createPreview } from './gallery-watermark.mjs';
+import { GalleryObjectStorage } from './gallery-object-storage.mjs';
 import { join } from 'node:path';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -12,6 +13,7 @@ const run = promisify(execFile);
 const equal=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&timingSafeEqual(x,y);};
 export function createIntakeApi(env,readBody,json) {
   const store=new IntakeStore(env.INTAKE_DB_PATH || './data/intake.sqlite');
+  const mediaStorage=new GalleryObjectStorage(env,store);
   const workdayStore=new WorkDayExchangeStore(env.WORKDAY_EXCHANGE_DB_PATH||env.INTAKE_DB_PATH||'./data/intake.sqlite');
   function workdayToken(req){
     const header=String(req.headers['x-aegis-workday-token']||'');
@@ -56,7 +58,7 @@ export function createIntakeApi(env,readBody,json) {
     try{const path=join(dir,'upload');await writeFile(path,bytes,{mode:0o600});await run(env.MALWARE_SCANNER_PATH,['--no-summary',path],{timeout:30000,maxBuffer:4096});return {state:'Clean',type};}
     catch{return {state:'Quarantined',type};}finally{await rm(dir,{recursive:true,force:true});}
   }
-  return {store,workdayStore,async handle(req,res,url){
+  return {store,workdayStore,mediaStorage,async handle(req,res,url){
     const route=url.pathname, method=req.method;
     if(route==='/api/v1/auth/login'&&method==='POST'){
       const p=await input(req,8192);
@@ -371,9 +373,10 @@ export function createIntakeApi(env,readBody,json) {
       const gallery=galleryRow&&JSON.parse(galleryRow.payload);
       if(!gallery?.published||!gallery.items.some(x=>x.versionId===originalDownload[2]))
         fail(404,'not_found','Published photograph not found.');
-      const original=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?')
+      const legacy=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?')
         .get(originalDownload[1],originalDownload[2]);
-      if(!original)fail(404,'not_found','Original photograph not found.');
+      const original=await mediaStorage.get(originalDownload[1],originalDownload[2],'original')||legacy;
+      if(!original||!original.content?.length)fail(404,'not_found','Original photograph not found.');
       res.writeHead(200,{'Content-Type':original.type,'Cache-Control':'private, no-store',
         'X-Content-Type-Options':'nosniff','Content-Disposition':'attachment'});
       res.end(original.content);return true;
@@ -383,7 +386,8 @@ export function createIntakeApi(env,readBody,json) {
       authenticate(req,'gallery:publish');const r=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(media[1]);if(!r||!JSON.parse(r.payload).items.some(x=>x.versionId===media[2]))fail(404,'not_found','Gallery item not registered.');
       const bytes=await readBody(req,30_000_000),type=String(req.headers['content-type']||'application/octet-stream');
       if(!['image/jpeg','image/png','image/webp'].includes(type))fail(400,'invalid_type','Only raster gallery images accepted.');
-      const old=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?').get(media[1],media[2]);if(old&&(old.type!==type||!Buffer.from(old.content).equals(bytes)))fail(409,'media_conflict','A version ID cannot be reused for different bytes.');
+      const old=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?').get(media[1],media[2]);if(old&&(old.type!==type||(old.content?.length>0&&!Buffer.from(old.content).equals(bytes))))
+        fail(409,'media_conflict','A version ID cannot be reused for different bytes.');
       // Generate pixel-embedded previews during ingestion, never on public reads.
       // Until the watermark worker is configured, clients receive no preview.
       let preview=null;
@@ -391,11 +395,17 @@ export function createIntakeApi(env,readBody,json) {
         try{preview=await createPreview(bytes,env);}
         catch{fail(503,'preview_processing_failed','Could not prepare a protected preview; retry this upload.');}
       }
+      const originalObject=await mediaStorage.storeObject(media[1],media[2],'original',type,bytes);
+      const previewObject=preview?await mediaStorage.storeObject(media[1],media[2],'preview',preview.type,preview.content):null;
       store.transaction(()=>{
         store.db.prepare('INSERT INTO media VALUES(?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content')
-          .run(media[1],media[2],type,bytes);
-        if(preview)store.db.prepare('INSERT INTO gallery_previews(gallery_id,id,type,content,content_hash) VALUES(?,?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content,content_hash=excluded.content_hash')
-          .run(media[1],media[2],preview.type,preview.content,preview.contentHash);
+          .run(media[1],media[2],type,mediaStorage.s3?Buffer.alloc(0):bytes);
+        mediaStorage.remember(media[1],media[2],'original',type,originalObject);
+        if(preview){
+          store.db.prepare('INSERT INTO gallery_previews(gallery_id,id,type,content,content_hash) VALUES(?,?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content,content_hash=excluded.content_hash')
+            .run(media[1],media[2],preview.type,mediaStorage.s3?Buffer.alloc(0):preview.content,preview.contentHash);
+          mediaStorage.remember(media[1],media[2],'preview',preview.type,previewObject);
+        }
       });
       json(res,200,{stored:true,previewReady:Boolean(preview)});return true;
     }
