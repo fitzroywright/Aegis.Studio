@@ -77,8 +77,12 @@ function svgProof(reference, version) {
 export function createServer(env = process.env) {
   const secret = env.SESSION_SECRET;
   if (!secret || secret.length < 32) throw new Error('Set SESSION_SECRET to at least 32 characters.');
-  const demo = env.PUBLIC_DEMO_MODE === 'true';
-  if(demo&&env.NODE_ENV==='production')throw new Error('PUBLIC_DEMO_MODE must be false in production.');
+  const referenceDemo = env.PUBLIC_REFERENCE_DEMO_MODE === 'true';
+  if(env.PUBLIC_DEMO_MODE==='true'&&env.NODE_ENV==='production')throw new Error('PUBLIC_DEMO_MODE must be false in production.');
+  if(referenceDemo&&env.PUBLIC_DEMO_MODE==='true')throw new Error('Choose only one demo mode.');
+  // Reference demonstration mode works behind production HTTPS, but its mock
+  // identities are never authorized to access Studio-published client media.
+  const demo = referenceDemo || env.PUBLIC_DEMO_MODE === 'true';
   const demoSelections = new Map();
   const intake=createIntakeApi(env,readBody,json);
   const server = http.createServer(async (req, res) => {
@@ -94,16 +98,17 @@ export function createServer(env = process.env) {
         res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=300' }); res.end(await readFile(new URL(url.pathname.slice(1), ROOT))); return;
       }
       let user = readSession(req, secret);
-      if(user){const binding=intake.store.clientForIdentity(user.provider,user.id)||JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];if(binding){const candidates=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).filter(r=>JSON.parse(r.payload).published);if(candidates.length)user={...user,galleryReference:candidates.at(-1).id};}}
-      if (req.method === 'GET' && url.pathname === '/api/session') { json(res, 200, { demo, user: user ? { name: user.name, provider: user.provider, email: user.email, galleryReference: user.galleryReference } : null }); return; }
+      if(user&&!referenceDemo){const binding=intake.store.clientForIdentity(user.provider,user.id)||JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];if(binding){const candidates=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).filter(r=>JSON.parse(r.payload).published);if(candidates.length)user={...user,galleryReference:candidates.at(-1).id};}}
+      if (req.method === 'GET' && url.pathname === '/api/session') { json(res, 200, { demo, referenceDemo, user: user ? { name: user.name, provider: user.provider, email: user.email, galleryReference: user.galleryReference } : null }); return; }
       if(req.method==='GET'&&url.pathname==='/api/client-galleries'){
         if(!user){json(res,401,{message:'Sign in to view client galleries.'});return;}
         const binding=intake.store.clientForIdentity(user.provider,user.id)||JSON.parse(env.CLIENT_BINDINGS_JSON||'{}')[user.id];
-        if(binding){const items=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).map(r=>JSON.parse(r.payload)).filter(g=>g.published).map(g=>({reference:g.id,title:g.title}));json(res,200,{items});return;}
+        if(binding&&!referenceDemo){const items=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(binding).map(r=>JSON.parse(r.payload)).filter(g=>g.published).map(g=>({reference:g.id,title:g.title}));json(res,200,{items});return;}
         const gallery=demo&&DEMO_GALLERIES[user.galleryReference];json(res,200,{items:gallery?[{reference:user.galleryReference,title:gallery.title}]:[]});return;
       }
       if (req.method==='POST'&&url.pathname==='/api/v1/client-link-proofs/redeem') {
         requireSameOrigin(req,url);
+        if(referenceDemo){json(res,403,{message:'Client identity linking is unavailable in reference demo mode.'});return;}
         if(!user){json(res,401,{message:'Sign in with the provider account to redeem this link proof.'});return;}
         const p=JSON.parse((await readBody(req,4096)).toString('utf8'));
         const linked=intake.store.redeemClientLinkChallenge(p.code,user.provider,user.id);
@@ -124,7 +129,12 @@ export function createServer(env = process.env) {
       const selection = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/([0-9a-f-]{36})$/i);
       const submit = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/submit$/i);
       if (galleryPage || galleryItem || selection || submit) {
-        const reference = (galleryPage || galleryItem || selection || submit)[1]; const locallyPublished=intake.store.db.prepare('SELECT id FROM galleries WHERE id=?').get(reference);if(demo&&!locallyPublished)requireGallery(user, reference);
+        const reference = (galleryPage || galleryItem || selection || submit)[1];
+        // Production reference-demo sessions are restricted to bundled fictional
+        // proof galleries regardless of any client bindings or uploaded galleries.
+        if(referenceDemo)requireGallery(user,reference);
+        const locallyPublished=referenceDemo?null:intake.store.db.prepare('SELECT id FROM galleries WHERE id=?').get(reference);
+        if(demo&&!locallyPublished)requireGallery(user, reference);
         if (demo&&!locallyPublished) {
           if (!DEMO_GALLERIES[reference]) { json(res, 404, { message: 'Gallery not found.' }); return; }
           const selectionKey = `${user.id}:${reference}`;
