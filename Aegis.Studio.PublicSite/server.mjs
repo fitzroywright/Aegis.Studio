@@ -1,4 +1,5 @@
 import { createIntakeApi } from './intake-api.mjs';
+import { ClientAuthentication } from './client-auth.mjs';
 import http from 'node:http';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -47,6 +48,7 @@ export function createServer(env = process.env) {
     }catch{return null;}
   }
   const intake=createIntakeApi(env,readBody,json);
+  const clientAuth=new ClientAuthentication(env,intake.store);
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -64,28 +66,69 @@ export function createServer(env = process.env) {
         const type = url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
         res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=300' }); res.end(await readFile(new URL(url.pathname.slice(1), ROOT))); return;
       }
+      if(await clientAuth.handle(req,res,url,host,json))return;
+      const user=clientAuth.current(req);
       if(req.method==='GET'&&url.pathname==='/api/session'){
-        json(res,200,{demo:false,user:null,authenticationAvailable:false});return;
+        json(res,200,{demo:false,user:user?{name:user.name,email:user.email,provider:user.provider,linked:Boolean(user.clientId)}:null,
+          authenticationAvailable:clientAuth.providers().length>0});return;
       }
       if(req.method==='GET'&&url.pathname==='/api/client-galleries'){
-        json(res,401,{message:'Verified client sign-in is required.'});return;
+        if(!user||!user.clientId){json(res,401,{message:'Verified client identity linking is required.'});return;}
+        const rows=intake.store.db.prepare('SELECT id,payload FROM galleries WHERE client_id=?').all(user.clientId);
+        json(res,200,{items:rows.map(x=>JSON.parse(x.payload)).filter(x=>x.published).map(x=>({reference:x.id,title:x.title}))});return;
       }
       if(req.method==='POST'&&url.pathname==='/api/v1/client-link-proofs/redeem'){
-        json(res,401,{message:'Verified client sign-in is required before linking an account.'});return;
+        requireSameOrigin(req,url);
+        if(!user){json(res,401,{message:'Sign in before linking a Studio Client ID.'});return;}
+        const payload=JSON.parse((await readBody(req,4096)).toString());
+        const linked=intake.store.redeemClientLinkChallenge(payload.code,user.provider,user.subject);
+        json(res,200,{status:'Linked',verifiedAt:linked.verifiedAt});return;
       }
       if (await intake.handle(req,res,url)) return;
       if (['POST','PUT','DELETE'].includes(req.method)) requireSameOrigin(req, url);
       if(req.method==='POST'&&url.pathname==='/api/logout'){
-        json(res,200,{ok:true},{'Set-Cookie':'studio_public_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'});return;
+        clientAuth.logout(req,res);return;
       }
       const galleryPage = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})$/i);
       const galleryItem = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/items\/([0-9a-f-]{36})\/(preview|thumbnail|download)$/i);
       const selection = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/([0-9a-f-]{36})$/i);
       const submit = url.pathname.match(/^\/api\/galleries\/([0-9a-f-]{36})\/selections\/submit$/i);
       if(galleryPage||galleryItem||selection||submit){
-        // Stage/publish APIs remain available to Studio, but private client
-        // media cannot be read with an unverified or obsolete mock cookie.
-        json(res,401,{message:'Verified client sign-in is required.'});return;
+        const galleryId=(galleryPage||galleryItem||selection||submit)[1];
+        if(!user?.clientId){json(res,401,{message:'Verified client linkage required.'});return;}
+        const row=intake.store.db.prepare('SELECT client_id,payload FROM galleries WHERE id=?').get(galleryId);
+        if(!row||row.client_id!==user.clientId){json(res,404,{message:'Gallery not found.'});return;}
+        const gallery=JSON.parse(row.payload);
+        if(!gallery.published){json(res,404,{message:'Gallery is not published.'});return;}
+        if(galleryPage&&req.method==='GET'){
+          const selected=new Set(intake.store.db.prepare('SELECT id FROM selections WHERE gallery_id=? AND selected=1').all(galleryId).map(x=>x.id));
+          json(res,200,{reference:galleryId,publicationId:galleryId,title:gallery.title,finalDeliveryAvailable:false,
+            items:gallery.items.map(x=>({...x,selected:selected.has(x.versionId)})),nextCursor:null});return;
+        }
+        if(galleryItem&&req.method==='GET'){
+          // Original media must never be available using a client session.
+          if(galleryItem[3]==='download'){json(res,403,{message:'Original files require privileged integration authorization.'});return;}
+          if(!gallery.items.some(x=>x.versionId===galleryItem[2])){json(res,404,{message:'Photograph not found.'});return;}
+          const preview=intake.store.db.prepare('SELECT content,type FROM gallery_previews WHERE gallery_id=? AND id=?').get(galleryId,galleryItem[2]);
+          if(!preview){json(res,503,{message:'Protected preview is not ready.'});return;}
+          res.writeHead(200,{'Content-Type':preview.type,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});
+          res.end(preview.content);return;
+        }
+        if(selection&&req.method==='PUT'){
+          const payload=JSON.parse((await readBody(req,4096)).toString());
+          if(typeof payload.selected!=='boolean'||!gallery.items.some(x=>x.versionId===selection[2])){
+            json(res,400,{message:'Invalid photograph selection.'});return;
+          }
+          intake.store.db.prepare('INSERT INTO selections VALUES(?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET selected=excluded.selected')
+            .run(galleryId,selection[2],payload.selected?1:0);
+          json(res,200,{versionId:selection[2],selected:payload.selected});return;
+        }
+        if(submit&&req.method==='POST'){
+          const result=intake.store.submitGallerySelections(user.provider+':'+user.subject,user.clientId,galleryId,
+            String(req.headers['idempotency-key']||''));
+          json(res,200,result);return;
+        }
+        json(res,405,{message:'Method not allowed.'});return;
       }
       json(res, 404, { message: 'Not found.' });
     } catch (error) {
