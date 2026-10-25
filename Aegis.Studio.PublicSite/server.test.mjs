@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer, sign } from './server.mjs';
 
 async function fixture(t, extra = {}) {
-  const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'true', INTAKE_DB_PATH: ':memory:', PUBLIC_API_PROVISIONING_TOKEN:'test-site-provisioning-token-at-least-32-chars', ...extra };
+  const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'false', INTAKE_DB_PATH: ':memory:', PUBLIC_API_PROVISIONING_TOKEN:'test-site-provisioning-token-at-least-32-chars', ...extra };
   const server = createServer(env);
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   t.after(() => new Promise(resolve => server.close(resolve)));
@@ -49,71 +49,36 @@ test('signing binds method, path, exact body and idempotency key', () => {
   assert.notEqual(expected, sign('secret', 'POST', '/api/public/v1/bookings', '1', 'nonce', Buffer.from('{"ok":false}'), 'booking-1'));
   assert.notEqual(expected, sign('secret', 'POST', '/api/public/v1/bookings', '1', 'nonce', body, 'booking-2'));
 });
-test('demo account can open only its own gallery, even when a second reference is guessed', async t => {
-  const origin = await fixture(t);
-  const login = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'maya' }) });
-  assert.equal(login.status, 200);
-  const cookie = login.headers.get('set-cookie').split(';')[0];
-  const own = await fetch(`${origin}/api/galleries/10000000-0000-4000-8000-000000000001`, { headers: { Cookie: cookie } });
-  assert.equal(own.status, 200);
-  assert.equal((await own.json()).title, 'Maya & Daniel · Engagement');
-  const other = await fetch(`${origin}/api/galleries/20000000-0000-4000-8000-000000000002`, { headers: { Cookie: cookie } });
-  assert.equal(other.status, 404);
+test('mock sign-in is absent and private gallery endpoints fail closed',async t=>{
+ const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'});
+ const login=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{"identity":"maya"}'});
+ assert.equal(login.status,404);
+ const session=await(await fetch(origin+'/api/session')).json();
+ assert.equal(session.user,null);assert.equal(session.authenticationAvailable,false);
+ for(const path of ['/api/client-galleries','/api/galleries/10000000-0000-4000-8000-000000000001',
+ '/api/galleries/10000000-0000-4000-8000-000000000001/items/10000000-0000-4000-8000-000000000011/download'])
+   assert.equal((await fetch(origin+path,{headers:{Cookie:'studio_public_session=old-demo-token'}})).status,401);
+ assert.equal((await fetch(origin+'/api/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{"code":"fake"}'})).status,401);
 });
-test('demo selection actions update and submit only the signed-in client gallery', async t => {
-  const origin = await fixture(t);
-  const login = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'jordan' }) });
-  const cookie = login.headers.get('set-cookie').split(';')[0], reference = '20000000-0000-4000-8000-000000000002', version = '20000000-0000-4000-8000-000000000021';
-  let response = await fetch(`${origin}/api/galleries/${reference}/selections/${version}`, { method: 'PUT', headers: { Origin: origin, Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ selected: true }) });
-  assert.equal(response.status, 200);
-  response = await fetch(`${origin}/api/galleries/${reference}`, { headers: { Cookie: cookie } });
-  assert.equal((await response.json()).items[0].selected, true);
-  response = await fetch(`${origin}/api/galleries/${reference}/selections/submit`, { method: 'POST', headers: { Origin: origin, Cookie: cookie } });
-  assert.deepEqual((await response.json()).versionIds, [version]);
-});
-test('demo sign-in rejects caller-chosen identities and cross-origin login', async t => {
-  const origin = await fixture(t);
-  let response = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: 'https://attacker.example', 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'jordan' }) });
-  assert.equal(response.status, 403);
-  response = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'admin' }) });
-  assert.equal(response.status, 400);
-});
-test('live mode disables fake social sign-in and ignores obsolete Studio upstream settings', async t => {
-  const origin = await fixture(t, { PUBLIC_DEMO_MODE: 'false', STUDIO_BASE_URL: 'http://studio.example', STUDIO_CLIENT: 'website', STUDIO_SECRET: 'server-side-secret' });
-  const response = await fetch(`${origin}/api/demo-login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ identity: 'maya' }) });
-  assert.equal(response.status, 404);
-});
-test('production startup rejects demo identity configuration',()=>{
- assert.throws(()=>createServer({SESSION_SECRET:'test-only-session-secret-at-least-32-chars',NODE_ENV:'production',PUBLIC_DEMO_MODE:'true'}),/PUBLIC_DEMO_MODE must be false/);
+test('removed demo flags cannot be used to reenable insecure sign-in',()=>{
+ for(const flag of ['PUBLIC_DEMO_MODE','PUBLIC_REFERENCE_DEMO_MODE'])
+  assert.throws(()=>createServer({SESSION_SECRET:'test-only-session-secret-at-least-32-chars',[flag]:'true'}),/Mock gallery sign-in is removed/);
 });
 
-test('Studio pulls and acknowledges durable selections with dedicated scopes and no browser Origin',async t=>{
+test('Studio retains gallery publication API while private reads require verified identity',async t=>{
  const gallery='11111111-1111-4111-8111-111111111111',client='22222222-2222-4222-8222-222222222222',version='33333333-3333-4333-8333-333333333333';
- const origin=await fixture(t,{CLIENT_BINDINGS_JSON:JSON.stringify({'demo-google-maya':client})}),base=origin+'/api/v1';
- async function key(scopes){const r=await fetch(base+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':'test-site-provisioning-token-at-least-32-chars','Content-Type':'application/json'},body:JSON.stringify({name:'Test',scopes})});assert.equal(r.status,201);return (await r.json()).secret;}
- const publisher=await key(['gallery:publish']),pull=await key(['gallery:selections:pull']),ack=await key(['gallery:selections:ack']);
- const h=token=>({Authorization:'Bearer '+token,'Content-Type':'application/json'}),metadata={id:gallery,clientId:client,title:'Client gallery',items:[{versionId:version,fileName:'Portrait.jpg'}]};
- assert.equal((await fetch(base+'/galleries',{method:'POST',headers:h(publisher),body:JSON.stringify(metadata)})).status,200);
- assert.equal((await fetch(base+`/galleries/${gallery}/media/${version}`,{method:'PUT',headers:{...h(publisher),'Content-Type':'image/jpeg'},body:Buffer.from([255,216,255,217])})).status,200);
- assert.equal((await fetch(base+`/galleries/${gallery}/publish`,{method:'POST',headers:h(publisher),body:'{}'})).status,200);
- async function login(identity){const r=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity})});return r.headers.get('set-cookie').split(';')[0];}
- const cookie=await login('maya'),other=await login('jordan'),browser={Origin:origin,Cookie:cookie,'Content-Type':'application/json','Idempotency-Key':'selection-one'};
- const endpoint=origin+`/api/galleries/${gallery}/selections/submit`;
- assert.equal((await fetch(endpoint,{method:'POST',headers:{...browser,Cookie:other},body:'{}'})).status,404);
- assert.equal((await fetch(origin+`/api/galleries/${gallery}/selections/${version}`,{method:'PUT',headers:browser,body:'{"selected":true}'})).status,200);
- const submitted=await fetch(endpoint,{method:'POST',headers:browser,body:'{}'});assert.equal(submitted.status,200);const receipt=await submitted.json();assert.equal(receipt.importStatus,'Pending');
- assert.deepEqual(await(await fetch(endpoint,{method:'POST',headers:browser,body:'{}'})).json(),receipt);
- assert.equal((await fetch(base+'/gallery-selections',{headers:h(publisher)})).status,403);
- assert.equal((await fetch(base+'/gallery-selections')).status,401);
- assert.deepEqual((await(await fetch(base+'/gallery-selections',{headers:h(pull)})).json()).items,[receipt]);
- const ackUrl=base+`/gallery-selections/${receipt.reference}/ack`;
- assert.equal((await fetch(ackUrl,{method:'POST',headers:h(pull),body:'{}'})).status,403);
- for(let i=0;i<2;i++)assert.equal((await fetch(ackUrl,{method:'POST',headers:h(ack),body:'{}'})).status,200);
- assert.deepEqual((await(await fetch(base+'/gallery-selections',{headers:h(pull)})).json()).items,[]);
- // Retrying metadata after a lost response must not hide a live publication.
- assert.equal((await fetch(base+'/galleries',{method:'POST',headers:h(publisher),body:JSON.stringify(metadata)})).status,200);
- assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:cookie}})).status,200);
+ const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false'}),base=origin+'/api/v1';
+ const provision='test-site-provisioning-token-at-least-32-chars';
+ const keyResponse=await fetch(base+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Publisher',scopes:['gallery:publish','gallery:selections:pull']})});
+ const token=(await keyResponse.json()).secret,headers={Authorization:'Bearer '+token,'Content-Type':'application/json'};
+ assert.equal((await fetch(base+'/galleries',{method:'POST',headers,body:JSON.stringify({id:gallery,clientId:client,title:'Graduation',items:[{versionId:version,fileName:'Portrait.jpg'}]})})).status,200);
+ assert.equal((await fetch(base+'/galleries/'+gallery+'/media/'+version,{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'image/jpeg'},body:Buffer.from([255,216,255,217])})).status,200);
+ assert.equal((await fetch(base+'/galleries/'+gallery+'/publish',{method:'POST',headers,body:'{}'})).status,200);
+ assert.equal((await fetch(origin+'/api/galleries/'+gallery)).status,401);
+ assert.deepEqual((await(await fetch(base+'/gallery-selections',{headers})).json()).items,[]);
+ assert.equal((await fetch(base+'/galleries/'+gallery+'/revoke',{method:'POST',headers,body:'{}'})).status,200);
 });
+
 test('gallery requests accept contacts and optional booking reference, without knowing Studio IDs',async t=>{
   const origin=await fixture(t);
   const csrfResponse=await fetch(origin+'/api/intake-session'),csrf=(await csrfResponse.json()).csrf,cookie=csrfResponse.headers.get('set-cookie').split(';')[0];
@@ -166,23 +131,6 @@ test('server integrations do not require Origin and scopes isolate submission fr
  const status=await(await fetch(base+'/intakes/'+receipt.id,{headers:{Authorization:'Bearer '+keys[0].secret}})).json();assert.equal(status.importStatus,'Imported');
  const payment=await fetch(base+'/intakes/'+receipt.id+'/payments',{method:'POST',headers:{Authorization:'Bearer '+keys[0].secret,'Content-Type':'application/json'},body:'{}'});assert.equal(payment.status,403);
 });
-test('local published media is isolated by client binding and revocation',async t=>{
- const secret='publication-test-secret-01234567890123456789',gallery='11111111-1111-4111-8111-111111111111',version='33333333-3333-4333-8333-333333333333',client='22222222-2222-4222-8222-222222222222';
- const origin=await fixture(t,{PUBLIC_API_KEYS_JSON:JSON.stringify([{id:'studio',secret,scopes:['gallery:publish']}]),CLIENT_BINDINGS_JSON:JSON.stringify({'demo-google-maya':client})}),base=origin+'/api/v1';
- const headers={Authorization:'Bearer '+secret,'Content-Type':'application/json'};
- assert.equal((await fetch(base+'/galleries',{method:'POST',headers,body:JSON.stringify({id:gallery,clientId:client,title:'Local gallery',finalDeliveryAvailable:true,items:[{versionId:version,fileName:'portrait.jpg'}]})})).status,200);
- assert.equal((await fetch(base+`/galleries/${gallery}/publish`,{method:'POST',headers,body:'{}'})).status,409);
- const bytes=Buffer.from([255,216,255,217]);assert.equal((await fetch(base+`/galleries/${gallery}/media/${version}`,{method:'PUT',headers:{Authorization:'Bearer '+secret,'Content-Type':'image/jpeg'},body:bytes})).status,200);
- assert.equal((await fetch(base+`/galleries/${gallery}/publish`,{method:'POST',headers,body:'{}'})).status,200);
- async function login(identity){const r=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity})});return r.headers.get('set-cookie').split(';')[0];}
- const own=await login('maya'),other=await login('jordan');
- assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:own}})).status,200);
- assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:other}})).status,404);
- const media=await fetch(origin+`/api/galleries/${gallery}/items/${version}/preview`,{headers:{Cookie:own}});assert.deepEqual(Buffer.from(await media.arrayBuffer()),bytes);
- assert.equal((await fetch(base+`/galleries/${gallery}/revoke`,{method:'POST',headers,body:'{}'})).status,200);
- assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:own}})).status,404);
-});
-
 test('server provisions one-time integration keys, enforces scopes, and revokes them', async t => {
   const provisioning='provisioning-secret-that-is-long-enough-for-tests';
   const origin=await fixture(t,{PUBLIC_API_PROVISIONING_TOKEN:provisioning});
@@ -205,29 +153,14 @@ test('server provisions one-time integration keys, enforces scopes, and revokes 
   assert.equal(afterRevoke.status,401);
 });
 
-test('client link proof is single use, bound to authenticated provider subject, and scopes galleries by Studio client UUID',async t=>{
+test('client proofs can be provisioned but not redeemed without verified sign-in',async t=>{
  const provision='client-link-provisioning-secret-long-enough',client='22222222-2222-4222-8222-222222222222';
- const origin=await fixture(t,{PUBLIC_API_PROVISIONING_TOKEN:provision,CLIENT_BINDINGS_JSON:'{}'});
- const api=origin+'/api/v1',keyResponse=await fetch(api+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Studio Client Link Admin',scopes:['client:link']})});assert.equal(keyResponse.status,201);const adminSecret=(await keyResponse.json()).secret,admin={Authorization:'Bearer '+adminSecret,'Content-Type':'application/json'};
- const denied=await fetch(api+'/admin/client-link-proofs',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({clientId:client})});assert.equal(denied.status,401);
- const created=await fetch(api+'/admin/client-link-proofs',{method:'POST',headers:admin,body:JSON.stringify({clientId:client})});assert.equal(created.status,201);const proof=await created.json();assert.ok(proof.code);assert.equal(created.headers.get('cache-control'),'no-store');
- const login=await fetch(origin+'/api/demo-login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({identity:'maya'})}),cookie=login.headers.get('set-cookie').split(';')[0];
- const redeem=await fetch(origin+'/api/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})});assert.equal(redeem.status,200);
- assert.equal((await fetch(origin+'/api/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})})).status,404);
- const gallery='11111111-1111-4111-8111-111111111111',version='33333333-3333-4333-8333-333333333333';
- const provisioned=await fetch(api+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Gallery Publisher',scopes:['gallery:publish']})});const publisher=(await provisioned.json()).secret;
- const ph={Authorization:'Bearer '+publisher,'Content-Type':'application/json'};
- await fetch(api+'/galleries',{method:'POST',headers:ph,body:JSON.stringify({id:gallery,clientId:client,title:'Linked client gallery',items:[{versionId:version,fileName:'proof.jpg'}]})});
- await fetch(api+`/galleries/${gallery}/media/${version}`,{method:'PUT',headers:{Authorization:'Bearer '+publisher,'Content-Type':'image/jpeg'},body:Buffer.from([255,216,255,217])});
- await fetch(api+`/galleries/${gallery}/publish`,{method:'POST',headers:ph,body:'{}'});
- const status=await(await fetch(api+`/admin/client-link-proofs/${proof.id}`,{headers:admin})).json();assert.equal(status.status,'Used');assert.equal('code' in status,false);assert.equal('subject' in status,false);
- const session=await(await fetch(origin+'/api/session',{headers:{Cookie:cookie}})).json();assert.equal(session.user.galleryReference,gallery);
- const galleries=await(await fetch(origin+'/api/client-galleries',{headers:{Cookie:cookie}})).json();assert.deepEqual(galleries.items,[{reference:gallery,title:'Linked client gallery'}]);
- assert.equal((await fetch(origin+`/api/galleries/${gallery}`,{headers:{Cookie:cookie}})).status,200);
- const revokeCreate=await fetch(api+'/admin/client-link-proofs',{method:'POST',headers:admin,body:JSON.stringify({clientId:client})}),revocable=await revokeCreate.json();
- assert.equal((await fetch(api+`/admin/client-link-proofs/${revocable.id}`,{method:'DELETE',headers:admin})).status,200);
- assert.equal((await(await fetch(api+`/admin/client-link-proofs/${revocable.id}`,{headers:admin})).json()).status,'Revoked');
- assert.equal((await fetch(api+`/admin/client-link-proofs/${proof.id}`,{method:'DELETE',headers:admin})).status,409);
+ const origin=await fixture(t,{PUBLIC_DEMO_MODE:'false',PUBLIC_API_PROVISIONING_TOKEN:provision}),api=origin+'/api/v1';
+ const keyResponse=await fetch(api+'/admin/integration-keys',{method:'POST',headers:{'X-Site-Provisioning-Token':provision,'Content-Type':'application/json'},body:JSON.stringify({name:'Client Link Admin',scopes:['client:link']})});
+ const token=(await keyResponse.json()).secret,headers={Authorization:'Bearer '+token,'Content-Type':'application/json'};
+ const created=await fetch(api+'/admin/client-link-proofs',{method:'POST',headers,body:JSON.stringify({clientId:client})});
+ assert.equal(created.status,201);const proof=await created.json();assert.ok(proof.code);
+ assert.equal((await fetch(origin+'/api/v1/client-link-proofs/redeem',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({code:proof.code})})).status,401);
+ const status=await(await fetch(api+'/admin/client-link-proofs/'+proof.id,{headers})).json();
+ assert.equal(status.status,'Pending');assert.equal('code' in status,false);
 });
-
-
