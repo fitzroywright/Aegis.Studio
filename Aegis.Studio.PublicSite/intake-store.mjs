@@ -300,7 +300,12 @@ export class IntakeStore {
   }
   gallerySelectionFeed(cursor='') {
     let after=0;
-    if(cursor){after=Number(Buffer.from(cursor,'base64url').toString());if(!Number.isSafeInteger(after)||after<0)fail(400,'invalid_cursor','Invalid selection cursor.');}
+    if(cursor){
+      const decoded=Buffer.from(cursor,'base64url').toString();after=Number(decoded);
+      if(!/^(0|[1-9][0-9]*)$/.test(decoded)||!Number.isSafeInteger(after)||Buffer.from(decoded).toString('base64url')!==cursor)fail(400,'invalid_cursor','Invalid selection cursor.');
+    }
+    // Keyset pagination survives acknowledgements removing earlier rows. Start
+    // every new Studio scan without a cursor to retry all unacknowledged rows.
     const rows=this.db.prepare('SELECT sequence,payload FROM gallery_selection_submissions WHERE acknowledged_at IS NULL AND sequence>? ORDER BY sequence LIMIT 51').all(after);
     const page=rows.slice(0,50);
     return {items:page.map(x=>JSON.parse(x.payload)),nextCursor:Buffer.from(String(page.at(-1)?.sequence||after)).toString('base64url'),hasMore:rows.length>50};

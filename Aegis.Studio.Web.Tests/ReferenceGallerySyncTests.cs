@@ -127,6 +127,103 @@ public sealed class ReferenceGallerySyncTests
         Assert.Equal(f.JobConversation,store.Import("https://reference.example.test",payload));
     }
 
+    [StudioPostgresFact]
+    public async Task PartialPageFailuresDoNotStarveLaterPagesAndRestartRetriesPendingSelections()
+    {
+        using var f=new GalleryFixture();f.Export("Published");var config=Config();
+        var selections=Enumerable.Range(0,102).Select(_=>f.Selection(Guid.NewGuid())).ToArray();
+        var ids=selections.Select(x=>x.GetProperty("reference").GetGuid()).ToArray();
+        var acknowledged=new HashSet<Guid>();var paths=new List<string>();var attempts=new List<Guid>();
+        bool fail=true;
+        // The first import fails transactionally; the second import commits but
+        // loses its acknowledgement response. Other items must still progress.
+        f.Sql($"create function reject_first_selection() returns trigger language plpgsql as $$ begin if new.external_id='{ids[0]:D}'::uuid then raise exception 'temporary import failure'; end if; return new; end $$");
+        f.Sql("create trigger reject_first_selection before insert on studio_website_gallery_selections for each row execute function reject_first_selection()");
+        using var site=new PublicSiteClient(config,new Handler(request=>
+        {
+            Assert.Equal("reference.example.test",request.RequestUri!.Host);
+            if(request.Method==HttpMethod.Get)
+            {
+                paths.Add(request.RequestUri.PathAndQuery);
+                int after=string.IsNullOrEmpty(request.RequestUri.Query)?0:int.Parse(request.RequestUri.Query[8..]);
+                var pending=Enumerable.Range(after,selections.Length-after).Where(i=>!acknowledged.Contains(ids[i])).Take(51).ToArray();
+                var page=pending.Take(50).ToArray();
+                return Task.FromResult(Json(new{items=page.Select(i=>selections[i]),hasMore=pending.Length>50,nextCursor=(page.LastOrDefault()+1).ToString()}));
+            }
+            Assert.Equal(HttpMethod.Post,request.Method);
+            var id=Guid.Parse(request.RequestUri.Segments[^2].Trim('/'));attempts.Add(id);
+            if(fail&&id==ids[1])throw new HttpRequestException("Acknowledgement request interrupted");
+            acknowledged.Add(id);return Task.FromResult(Json(new{importStatus="Imported"}));
+        }));
+        GallerySelectionWorker Worker()=>new(f.Context.Database,config,NullLogger<GallerySelectionWorker>.Instance);
+        await Worker().Synchronize(site,CancellationToken.None);
+        Assert.Equal(new[]{"/api/v1/gallery-selections","/api/v1/gallery-selections?cursor=50","/api/v1/gallery-selections?cursor=100"},paths);
+        Assert.DoesNotContain(ids[0],attempts);Assert.Contains(ids[101],acknowledged);
+        Assert.Equal(100,acknowledged.Count);
+        Assert.Equal(101L,f.Scalar("select count(*) from studio_website_gallery_selections"));
+        f.Sql("drop trigger reject_first_selection on studio_website_gallery_selections");
+        fail=false;paths.Clear();
+        await Worker().Synchronize(site,CancellationToken.None);
+        await Worker().Synchronize(site,CancellationToken.None);
+        Assert.All(paths,path=>Assert.Equal("/api/v1/gallery-selections",path));
+        Assert.Equal(102,acknowledged.Count);Assert.Equal(2,attempts.Count(x=>x==ids[1]));
+        Assert.Equal(102L,f.Scalar("select count(*) from studio_website_gallery_selections"));
+        Assert.Equal(102L,f.Scalar("select count(*) from studio_messages where external_message_id like 'gallery-selection:%'"));
+    }
+
+    [StudioPostgresFact]
+    public async Task InterruptedPageFetchRestartsAtBeginningAndReplaysCommittedImport()
+    {
+        using var f=new GalleryFixture();f.Export("Published");var config=Config();
+        var first=f.Selection(Guid.NewGuid());var second=f.Selection(Guid.NewGuid());
+        bool interrupted=true;int firstPageFetches=0,acks=0;
+        using var site=new PublicSiteClient(config,new Handler(request=>
+        {
+            Assert.Equal("reference.example.test",request.RequestUri!.Host);
+            if(request.Method==HttpMethod.Post)
+            {
+                acks++;
+                if(interrupted)throw new TaskCanceledException("Lost acknowledgement response");
+                return Task.FromResult(Json(new{importStatus="Imported"}));
+            }
+            if(request.RequestUri.Query.Length==0)
+            {
+                firstPageFetches++;
+                return Task.FromResult(Json(new{items=new[]{first},hasMore=true,nextCursor="second"}));
+            }
+            Assert.Equal("?cursor=second",request.RequestUri.Query);
+            if(interrupted)throw new HttpRequestException("Feed connection interrupted");
+            return Task.FromResult(Json(new{items=new[]{second},hasMore=false}));
+        }));
+        GallerySelectionWorker Worker()=>new(f.Context.Database,config,NullLogger<GallerySelectionWorker>.Instance);
+        await Assert.ThrowsAsync<HttpRequestException>(()=>Worker().Synchronize(site,CancellationToken.None));
+        Assert.Equal(1L,f.Scalar("select count(*) from studio_website_gallery_selections"));
+        interrupted=false;await Worker().Synchronize(site,CancellationToken.None);
+        Assert.Equal(2,firstPageFetches);Assert.Equal(3,acks);
+        Assert.Equal(2L,f.Scalar("select count(*) from studio_messages where external_message_id like 'gallery-selection:%'"));
+    }
+
+    [StudioPostgresFact]
+    public async Task CyclicPaginationFailsAndCancelledScanDoesNotImportAnotherItem()
+    {
+        using var f=new GalleryFixture();f.Export("Published");var config=Config();int pages=0;
+        using(var site=new PublicSiteClient(config,new Handler(_=>
+        {
+            if(++pages>3)throw new HttpRequestException("Cursor loop was not detected");
+            return Task.FromResult(Json(new{items=Array.Empty<object>(),hasMore=true,nextCursor=pages==2?"b":"a"}));
+        })))
+            await Assert.ThrowsAsync<InvalidOperationException>(()=>new GallerySelectionWorker(f.Context.Database,config,NullLogger<GallerySelectionWorker>.Instance).Synchronize(site,CancellationToken.None));
+        Assert.Equal(3,pages);
+        using var cancellation=new CancellationTokenSource();
+        using var cancelledSite=new PublicSiteClient(config,new Handler(_=>
+        {
+            cancellation.Cancel();
+            return Task.FromResult(Json(new{items=new[]{f.Selection(Guid.NewGuid())},hasMore=false}));
+        }));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(()=>new GallerySelectionWorker(f.Context.Database,config,NullLogger<GallerySelectionWorker>.Instance).Synchronize(cancelledSite,cancellation.Token));
+        Assert.Equal(0L,f.Scalar("select count(*) from studio_website_gallery_selections"));
+    }
+
     private static HttpResponseMessage Json(object value)=>new(HttpStatusCode.OK){Content=JsonContent.Create(value)};
 
     [StudioPostgresFact]

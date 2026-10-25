@@ -92,3 +92,35 @@ test('selection pagination advances past unacknowledged snapshots without losing
   assert.equal(s.gallerySelectionFeed().items[0].reference,'1');assert.throws(()=>s.gallerySelectionFeed('invalid'),e=>e.status===400);
  }finally{s.close();}
 });
+
+test('partial selection acknowledgements and interrupted pagination retry after restart',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'studio-selection-pages-')),path=join(dir,'test.sqlite');let s;
+ try{
+  s=new IntakeStore(path);
+  for(let i=1;i<=102;i++)s.db.prepare('INSERT INTO gallery_selection_submissions(id,payload) VALUES(?,?)').run(String(i),JSON.stringify({reference:String(i)}));
+  const first=s.gallerySelectionFeed();assert.equal(first.items.length,50);
+  // One failed import and one lost ack request remain pending. A repeated ack
+  // models a lost response after the site has already committed it.
+  for(const item of first.items.slice(2))s.acknowledgeGallerySelections(item.reference);
+  const timestamp=s.db.prepare("SELECT acknowledged_at FROM gallery_selection_submissions WHERE id='3'").get().acknowledged_at;
+  s.acknowledgeGallerySelections('3');
+  assert.equal(s.db.prepare("SELECT acknowledged_at FROM gallery_selection_submissions WHERE id='3'").get().acknowledged_at,timestamp);
+  const second=s.gallerySelectionFeed(first.nextCursor);
+  assert.equal(second.items.length,50);assert.equal(second.items[0].reference,'51');assert.equal(second.hasMore,true);
+  for(const item of second.items)s.acknowledgeGallerySelections(item.reference);
+  // Interrupt before fetching page three, then restart both ends without a cursor.
+  s.close();s=new IntakeStore(path);
+  assert.deepEqual(s.gallerySelectionFeed().items.map(x=>x.reference),['1','2','101','102']);
+  assert.deepEqual(s.gallerySelectionFeed(second.nextCursor).items.map(x=>x.reference),['101','102']);
+  for(const item of s.gallerySelectionFeed().items)s.acknowledgeGallerySelections(item.reference);
+  s.close();s=new IntakeStore(path);assert.deepEqual(s.gallerySelectionFeed().items,[]);
+ }finally{s?.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('selection cursors reject malformed and noncanonical positions',()=>{
+ const s=new IntakeStore(':memory:');try{
+  for(const cursor of ['invalid','!!!','MQ==',...['','-1','1.5','1e2','01',' ','9007199254740992'].map(x=>Buffer.from(x).toString('base64url')).filter(Boolean)])
+   assert.throws(()=>s.gallerySelectionFeed(cursor),e=>e.status===400,cursor);
+  assert.deepEqual(s.gallerySelectionFeed(Buffer.from('0').toString('base64url')).items,[]);
+ }finally{s.close();}
+});

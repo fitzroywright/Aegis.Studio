@@ -70,12 +70,21 @@ public sealed class GallerySelectionWorker(StudioDatabase database,IConfiguratio
     public async Task Synchronize(PublicSiteClient site,CancellationToken ct)
     {
         string source=new Uri(configuration["PublicSite:BaseUrl"]!).GetLeftPart(UriPartial.Authority);
+        // A cursor is only a position within this scan, never a durable checkpoint:
+        // imports and acknowledgements can fail independently anywhere in a page.
         string cursor="";
-        do
+        var visited=new HashSet<string>(StringComparer.Ordinal){cursor};
+        while(true)
         {
+            ct.ThrowIfCancellationRequested();
             var feed=await site.Get("/api/v1/gallery-selections"+(cursor.Length==0?"":"?cursor="+Uri.EscapeDataString(cursor)),ct);
+            bool hasMore=feed.GetProperty("hasMore").GetBoolean();
+            string? next=hasMore?feed.GetProperty("nextCursor").GetString():null;
+            if(hasMore&&(string.IsNullOrEmpty(next)||!visited.Add(next)))
+                throw new InvalidOperationException("Selection feed cursor did not advance.");
             foreach(var payload in feed.GetProperty("items").EnumerateArray())
             {
+                ct.ThrowIfCancellationRequested();
                 try
                 {
                     new GallerySelectionStore(database).Import(source,payload);
@@ -84,11 +93,9 @@ public sealed class GallerySelectionWorker(StudioDatabase database,IConfiguratio
                 catch(Exception ex)when(ex is not OperationCanceledException||!ct.IsCancellationRequested)
                 {logger.LogWarning("Gallery selection retained for retry. ErrorType={ErrorType}",ex.GetType().Name);}
             }
-            if(!feed.TryGetProperty("hasMore",out var more)||!more.GetBoolean())break;
-            string next=feed.GetProperty("nextCursor").GetString()!;
-            if(string.IsNullOrEmpty(next)||next==cursor)throw new InvalidOperationException("Selection feed cursor did not advance.");
-            cursor=next;
-        }while(!ct.IsCancellationRequested);
+            if(!hasMore)break;
+            cursor=next!;
+        }
 
     }
 }

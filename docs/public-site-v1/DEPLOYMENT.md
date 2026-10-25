@@ -106,3 +106,44 @@ The broader failures are pre-existing and still block claiming a fully green rep
 ```
 
 Local evidence: `/private/tmp/aegis-reference-results/` contains the baseline/full/final affected TRX reports; `/private/tmp/aegis-reference-ui.log` and `/private/tmp/aegis-reference-baseline-ui.log` contain the UI runs. These temporary files are not committed. Review and address the baseline suite failures separately before declaring the whole repository release-ready.
+
+## Selection polling follow-up verification, 2026-10-24
+
+Fresh local runs for the PR #258 follow-up independently reproduce the earlier baseline failures. The comparison checkout was clean, detached at fetched `origin/main`, `ff089c8f057a9d623927addee425237b75e06a7e`. Both checkouts used this Mac, Node 24.22.1, .NET SDK 10.0.402, the same installed UI dependencies and sibling Common projects. Database tests used a separate disposable PostgreSQL 18 cluster on `127.0.0.1:55440`, with isolated schemas and serialized xUnit collections.
+
+| Local suite | Feature branch with follow-up | Unchanged main |
+| --- | --- | --- |
+| Studio Web, full suite | 418 passed, 10 failed, 0 skipped | 408 passed, 10 failed, 0 skipped |
+| UI, full suite | 188 passed, 87 failed, 0 skipped | 188 passed, 87 failed, 0 skipped |
+| Affected Studio filter above | 37 passed, 0 failed, 0 skipped | Not rerun separately |
+| Reference Site | 29 passed, 0 failed, 0 skipped | Not rerun separately |
+
+The full Web and UI runs match by **every failing test name and first error message**, with checkout paths normalized for UI errors. [Machine-readable comparison evidence](gallery-selection-baseline-evidence.json) records all 97 failures and their first errors. These suites remain failing; baseline equivalence does not establish that the unrelated behavior is correct.
+
+Investigation of the 10 Web failures found two PostgreSQL `42601` errors from parameterized commands containing multiple statements, three missing `er.attendance_start_utc` column errors, two missing `studio_workflow_crew` table errors, one missing `external_message_id` column error, one missing `studio_schedule_entries` table error, and one stale reflection invocation of `MediaDerivativeWorker.Generate` with the wrong parameter count. The same names and errors occur on main. They concern existing SQL/schema setup and test invocation, outside the selection polling code.
+
+The 87 UI failures consist of 21 missing-file errors (20 refer to the old root `roster-editor.js`, one to the old root `job-details.css`), 35 reference/type errors (including missing fixture globals and DOM elements, and the removed `StudioJobDetails.nextStep` function), and 31 assertion failures, including CSS ownership and legacy renderer expectations. The job-details stylesheet currently lives under `css/pages/`; `job-next-step.test.cjs` still calls the removed function. Matching baseline failures are recorded without changing these unrelated UI implementations or tests.
+
+Polling retains its essential retry behavior: only a committed import is acknowledged; each item fails independently; subsequent pages still run; every new scan, including after restart or feed interruption, begins without a cursor. Cursors are scan positions, never durable success checkpoints. The follow-up rejects multi-page cursor cycles and malformed/noncanonical site cursors, requires the feed's `hasMore` flag, and checks cancellation before fetching or importing another item. Import uniqueness, transactional message creation and idempotent site acknowledgements are preserved.
+
+New tests exercise 102 snapshots over three pages with simultaneous import and acknowledgement failures, a fresh worker retry, feed interruption after a committed import, timeout responses, cursor cycles, cancellation, site restart persistence, repeated acknowledgements and strict cursor parsing. Existing tests continue to cover snapshot/message rollback and changed-content rejection.
+
+The request-direction audit traced Studio's `GalleryPushWorker`, `GallerySelectionWorker`, gallery administration and `PublicSiteClient`, plus all six Reference Site server modules and browser requests. Studio opens the HTTPS integration requests; redirects are disabled. The site exposes authenticated local store operations, contains no outbound fetch/request/connect calls or Kratos endpoint configuration, and serves a browser CSP with `connect-src 'self'`. The scoped HTTP selection handoff test and Studio handler host assertions passed. No Reference Site-to-Kratos integration was introduced or exercised; deployment networking was not inspected.
+
+Commands used locally:
+
+```sh
+# Both checkouts; set STUDIO_TEST_POSTGRES to the disposable local database.
+dotnet test Aegis.Studio.Web.Tests/Aegis.Studio.Web.Tests.csproj -m:1 \
+  --settings /private/tmp/aegis-reference-tests.runsettings \
+  --logger 'trx;LogFileName=feature.trx' --results-directory /private/tmp/aegis-gallery-results/feature
+# Main also used -p:CommonRoot=/Users/fitzroyf.wright/Projects/Common.
+# Settings: <RunSettings><xUnit><MaxParallelThreads>1</MaxParallelThreads><ParallelizeTestCollections>false</ParallelizeTestCollections></xUnit></RunSettings>
+# The affected run used --no-build --no-restore and the filter above.
+(cd tests/ui && npm test)
+# Main used NODE_PATH pointing to the feature checkout's tests/ui/node_modules.
+(cd Aegis.Studio.PublicSite && npm test)
+git diff --check
+```
+
+Raw logs and TRX files are retained locally under `/private/tmp/aegis-gallery-*.log` and `/private/tmp/aegis-gallery-results/`. Sandbox-blocked initial build/listener attempts were rerun with local access; only completed runs are counted above. No PR merge, AWS operation, resource provisioning or cloud build was performed.
