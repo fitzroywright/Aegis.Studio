@@ -1,7 +1,10 @@
 import { randomUUID, randomBytes, timingSafeEqual, createHash } from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
 import { readRosterFile } from './roster-file.mjs';
 import { IntakeStore, validateRoster, fail } from './intake-store.mjs';
 import { WorkDayExchangeStore } from './workday-exchange-store.mjs';
+import { createPreview } from './gallery-watermark.mjs';
+import { GalleryObjectStorage } from './gallery-object-storage.mjs';
 import { join } from 'node:path';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -11,6 +14,7 @@ const run = promisify(execFile);
 const equal=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&timingSafeEqual(x,y);};
 export function createIntakeApi(env,readBody,json) {
   const store=new IntakeStore(env.INTAKE_DB_PATH || './data/intake.sqlite');
+  const mediaStorage=new GalleryObjectStorage(env,store);
   const workdayStore=new WorkDayExchangeStore(env.WORKDAY_EXCHANGE_DB_PATH||env.INTAKE_DB_PATH||'./data/intake.sqlite');
   function workdayToken(req){
     const header=String(req.headers['x-aegis-workday-token']||'');
@@ -55,7 +59,7 @@ export function createIntakeApi(env,readBody,json) {
     try{const path=join(dir,'upload');await writeFile(path,bytes,{mode:0o600});await run(env.MALWARE_SCANNER_PATH,['--no-summary',path],{timeout:30000,maxBuffer:4096});return {state:'Clean',type};}
     catch{return {state:'Quarantined',type};}finally{await rm(dir,{recursive:true,force:true});}
   }
-  return {store,workdayStore,async handle(req,res,url){
+  return {store,workdayStore,mediaStorage,async handle(req,res,url){
     const route=url.pathname, method=req.method;
     if(route==='/api/v1/auth/login'&&method==='POST'){
       const p=await input(req,8192);
@@ -153,13 +157,39 @@ export function createIntakeApi(env,readBody,json) {
     }
     const assignmentUpload=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/uploads$/i);
     if(assignmentUpload&&method==='POST'){
-      const user=requireWorkday(req),bytes=await readBody(req,30_000_000);
-      const request=new Request('http://localhost/upload',{method:'POST',headers:{'Content-Type':req.headers['content-type']||''},body:bytes});
-      const form=await request.formData(),file=form.get('file'),uploadId=String(form.get('uploadId')||'');
-      if(!file||typeof file==='string'||!/^[0-9a-f-]{36}$/i.test(uploadId))fail(400,'invalid_upload','Upload ID and file are required.');
+      const user=requireWorkday(req);
+      // Studio also independently verifies AddAttachments when consuming this queue.
+      const snapshot=workdayStore.snapshot(user.user_name);
+      const allowed=[...(snapshot?.today||snapshot?.Today||[]),...(snapshot?.upcoming||snapshot?.Upcoming||[])]
+        .some(x=>String(x.id||x.Id||'').toLowerCase()===assignmentUpload[1].toLowerCase());
+      if(!allowed)fail(403,'assignment_forbidden','This assignment is not in your current WorkDay schedule.');
+      if(!String(req.headers['content-type']||'').toLowerCase().startsWith('multipart/form-data;'))
+        fail(415,'invalid_media_type','Use multipart/form-data for photograph uploads.');
+      const bytes=await readBody(req,26_000_000);
+      const multipart=new Request('http://localhost/upload',{method:'POST',
+        headers:{'Content-Type':req.headers['content-type']},body:bytes});
+      const form=await multipart.formData(),file=form.get('file'),uploadId=String(form.get('uploadId')||'');
+      if(!file||typeof file==='string'||!/^[0-9a-f-]{36}$/i.test(uploadId))
+        fail(400,'invalid_upload','A stable UUID upload ID and file are required.');
+      const name=String(file.name||'');
+      if(!name||name.length>160||name==='.'||name==='..'||name.includes('/')||name.includes('\\')||
+        /[\x00-\x1f]/.test(name))
+        fail(400,'invalid_upload_name','Choose a valid photograph filename.');
       const content=Buffer.from(await file.arrayBuffer());
-      const result=workdayStore.enqueue(user.user_name,uploadId,'AssignmentUpload',{assignmentId:assignmentUpload[1],uploadId,fileName:file.name,contentType:file.type||'application/octet-stream',contentBase64:content.toString('base64')});
-      json(res,202,{uploadId,attachmentId:uploadId,assignmentId:assignmentUpload[1],fileName:file.name,sizeBytes:content.length,storageStatus:result.state,acknowledgedAtUtc:new Date().toISOString()},{'Cache-Control':'no-store'});return true;
+      const jpeg=content.length>=4&&content[0]===255&&content[1]===216&&content[2]===255;
+      const png=content.length>=8&&content.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+      const webp=content.length>=12&&content.toString('ascii',0,4)==='RIFF'&&content.toString('ascii',8,12)==='WEBP';
+      const type=jpeg?'image/jpeg':png?'image/png':webp?'image/webp':null;
+      if(!type||content.length>25_000_000||
+        (type==='image/jpeg'&&!/\.jpe?g$/i.test(name))||
+        (type==='image/png'&&!/\.png$/i.test(name))||
+        (type==='image/webp'&&!/\.webp$/i.test(name)))
+        fail(415,'invalid_photograph','Upload JPEG, PNG or WebP photographs no larger than 25 MB.');
+      const result=workdayStore.enqueue(user.user_name,uploadId,'AssignmentUpload',
+        {assignmentId:assignmentUpload[1],uploadId,fileName:name,contentType:type,contentBase64:content.toString('base64')});
+      json(res,202,{uploadId,attachmentId:uploadId,assignmentId:assignmentUpload[1],
+        fileName:name,sizeBytes:content.length,storageStatus:result.state,
+        acknowledgedAtUtc:new Date().toISOString()},{'Cache-Control':'no-store'});return true;
     }
     const galleryStatus=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/gallery-status$/i);
     if(galleryStatus&&method==='GET'){
@@ -332,15 +362,97 @@ export function createIntakeApi(env,readBody,json) {
     if(publication&&method==='POST'){
       authenticate(req,'gallery:publish');store.transaction(()=>{const row=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(publication[1]);if(!row)fail(404,'not_found','Gallery not found.');const p=JSON.parse(row.payload);
         if(publication[2]==='publish'&&p.items.some(x=>!store.db.prepare('SELECT 1 FROM media WHERE gallery_id=? AND id=?').get(p.id,x.versionId)))fail(409,'media_pending','All media must be stored before publishing.');
+        if(publication[2]==='publish'&&env.PUBLIC_WATERMARK_PROCESSING_ENABLED==='true'&&
+          p.items.some(x=>!store.db.prepare('SELECT 1 FROM gallery_previews WHERE gallery_id=? AND id=?').get(p.id,x.versionId)))
+          fail(409,'preview_pending','Protected client previews must be generated before publication.');
         p.published=publication[2]==='publish';store.db.prepare('UPDATE galleries SET payload=? WHERE id=?').run(JSON.stringify(p),p.id);});json(res,200,{state:publication[2]==='publish'?'Published':'Revoked'});return true;
+    }
+    const backfill=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/previews\/backfill$/i);
+    if(backfill&&method==='POST'){
+      authenticate(req,'gallery:publish');
+      if(env.PUBLIC_WATERMARK_PROCESSING_ENABLED!=='true')
+        fail(503,'watermark_disabled','Enable protected preview generation before requesting backfill.');
+      const row=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(backfill[1]);
+      if(!row)fail(404,'not_found','Gallery not found.');
+      const gallery=JSON.parse(row.payload);
+      const requestedLimit=Number(url.searchParams.get('limit')||2);
+      const limit=Number.isSafeInteger(requestedLimit)?Math.max(1,Math.min(5,requestedLimit)):2;
+      const refresh=url.searchParams.get('refresh')==='true';
+      const after=url.searchParams.get('after');
+      const afterIndex=after?gallery.items.findIndex(x=>x.versionId===after):-1;
+      if(after&&afterIndex<0)fail(400,'invalid_cursor','Unknown photograph cursor.');
+      const candidates=gallery.items.slice(afterIndex+1).filter(x=>refresh||
+        !store.db.prepare('SELECT 1 FROM gallery_previews WHERE gallery_id=? AND id=?').get(gallery.id,x.versionId));
+      const batch=candidates.slice(0,limit);
+      let processed=0;
+      for(const item of batch){
+        const legacy=store.db.prepare('SELECT content,type FROM media WHERE gallery_id=? AND id=?').get(gallery.id,item.versionId);
+        const original=await mediaStorage.get(gallery.id,item.versionId,'original')||legacy;
+        if(!original)continue;
+        let bytes;
+        if(original.stream){
+          const chunks=[];let size=0;
+          for await(const chunk of original.stream){
+            size+=chunk.length;if(size>30_000_000)fail(413,'media_too_large','Original exceeds preview processing limit.');
+            chunks.push(chunk);
+          }
+          bytes=Buffer.concat(chunks);
+        }else bytes=Buffer.from(original.content);
+        const preview=await createPreview(bytes,env);
+        const stored=await mediaStorage.storeObject(gallery.id,item.versionId,'preview',preview.type,preview.content);
+        store.transaction(()=>{
+          store.db.prepare('INSERT INTO gallery_previews(gallery_id,id,type,content,content_hash) VALUES(?,?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content,content_hash=excluded.content_hash')
+            .run(gallery.id,item.versionId,preview.type,mediaStorage.s3?Buffer.alloc(0):preview.content,preview.contentHash);
+          mediaStorage.remember(gallery.id,item.versionId,'preview',preview.type,stored);
+        });
+        processed++;
+      }
+      const nextCursor=candidates.length>batch.length?batch.at(-1).versionId:null;
+      const remaining=candidates.length-batch.length;
+      json(res,200,{publicationId:gallery.id,processed,remaining,nextCursor,refresh});return true;
+    }
+    const originalDownload=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})\/original$/i);
+    if(originalDownload&&method==='GET'){
+      authenticate(req,'gallery:original:read');
+      const galleryRow=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(originalDownload[1]);
+      const gallery=galleryRow&&JSON.parse(galleryRow.payload);
+      if(!gallery?.published||!gallery.items.some(x=>x.versionId===originalDownload[2]))
+        fail(404,'not_found','Published photograph not found.');
+      const legacy=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?')
+        .get(originalDownload[1],originalDownload[2]);
+      const original=await mediaStorage.get(originalDownload[1],originalDownload[2],'original')||legacy;
+      if(!original||(!original.stream&&!original.content?.length))fail(404,'not_found','Original photograph not found.');
+      res.writeHead(200,{'Content-Type':original.type,'Cache-Control':'private, no-store',
+        'X-Content-Type-Options':'nosniff','Content-Disposition':'attachment'});
+      if(original.stream)await pipeline(original.stream,res);else res.end(original.content);return true;
     }
     const media=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})$/i);
     if(media&&method==='PUT'){
       authenticate(req,'gallery:publish');const r=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(media[1]);if(!r||!JSON.parse(r.payload).items.some(x=>x.versionId===media[2]))fail(404,'not_found','Gallery item not registered.');
       const bytes=await readBody(req,30_000_000),type=String(req.headers['content-type']||'application/octet-stream');
       if(!['image/jpeg','image/png','image/webp'].includes(type))fail(400,'invalid_type','Only raster gallery images accepted.');
-      const old=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?').get(media[1],media[2]);if(old&&(old.type!==type||!Buffer.from(old.content).equals(bytes)))fail(409,'media_conflict','A version ID cannot be reused for different bytes.');
-      store.db.prepare('INSERT INTO media VALUES(?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content').run(media[1],media[2],type,bytes);json(res,200,{stored:true});return true;
+      const old=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?').get(media[1],media[2]);if(old&&(old.type!==type||(old.content?.length>0&&!Buffer.from(old.content).equals(bytes))))
+        fail(409,'media_conflict','A version ID cannot be reused for different bytes.');
+      // Generate pixel-embedded previews during ingestion, never on public reads.
+      // Until the watermark worker is configured, clients receive no preview.
+      let preview=null;
+      if(env.PUBLIC_WATERMARK_PROCESSING_ENABLED==='true'){
+        try{preview=await createPreview(bytes,env);}
+        catch{fail(503,'preview_processing_failed','Could not prepare a protected preview; retry this upload.');}
+      }
+      const originalObject=await mediaStorage.storeObject(media[1],media[2],'original',type,bytes);
+      const previewObject=preview?await mediaStorage.storeObject(media[1],media[2],'preview',preview.type,preview.content):null;
+      store.transaction(()=>{
+        store.db.prepare('INSERT INTO media VALUES(?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content')
+          .run(media[1],media[2],type,mediaStorage.s3?Buffer.alloc(0):bytes);
+        mediaStorage.remember(media[1],media[2],'original',type,originalObject);
+        if(preview){
+          store.db.prepare('INSERT INTO gallery_previews(gallery_id,id,type,content,content_hash) VALUES(?,?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content,content_hash=excluded.content_hash')
+            .run(media[1],media[2],preview.type,mediaStorage.s3?Buffer.alloc(0):preview.content,preview.contentHash);
+          mediaStorage.remember(media[1],media[2],'preview',preview.type,previewObject);
+        }
+      });
+      json(res,200,{stored:true,previewReady:Boolean(preview)});return true;
     }
     fail(404,'not_found','Operation not found.');
   }};

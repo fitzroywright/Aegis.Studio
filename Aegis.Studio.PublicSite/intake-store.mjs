@@ -47,6 +47,8 @@ export class IntakeStore {
       CREATE TABLE IF NOT EXISTS client_link_challenges(id TEXT PRIMARY KEY,code_hash TEXT NOT NULL UNIQUE,client_id TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT,revoked_at TEXT,created_at TEXT NOT NULL,provider TEXT);
       CREATE TABLE IF NOT EXISTS client_identity_links(provider TEXT NOT NULL,subject TEXT NOT NULL,client_id TEXT NOT NULL,verified_at TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(provider,subject));
       CREATE TABLE IF NOT EXISTS media(gallery_id TEXT,id TEXT,type TEXT,content BLOB,PRIMARY KEY(gallery_id,id));
+      CREATE TABLE IF NOT EXISTS gallery_previews(gallery_id TEXT NOT NULL,id TEXT NOT NULL,type TEXT NOT NULL,
+        content BLOB NOT NULL,content_hash TEXT NOT NULL,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS selections(gallery_id TEXT,id TEXT,selected INTEGER,PRIMARY KEY(gallery_id,id));
       CREATE TABLE IF NOT EXISTS gallery_selection_submissions(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,payload TEXT NOT NULL,acknowledged_at TEXT);
       CREATE TABLE IF NOT EXISTS payment_events(id TEXT PRIMARY KEY,intake_id TEXT NOT NULL,hash TEXT NOT NULL,payload TEXT NOT NULL);`);
@@ -73,7 +75,7 @@ export class IntakeStore {
   transaction(action) { this.db.exec('BEGIN IMMEDIATE'); try { const result = action(); this.db.exec('COMMIT'); return result; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
   createApiCredential(name, scopes, clientApplication='API') {
     if(typeof name!=='string'||!name.trim()||name.trim().length>100) fail(400,'invalid_key_name','Provide a key name up to 100 characters.');
-    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','booking:catalog:publish','booking:availability:publish','gallery:publish','gallery:read','client:link','attachment:scan','payment:verified','workday:sync','gallery:access:submit','gallery:access:pull','gallery:access:ack','gallery:selections:pull','gallery:selections:ack']);
+    const allowed=new Set(['intake:submit','intake:pull','intake:ack','bookings:read','availability:read','booking:catalog:publish','booking:availability:publish','gallery:publish','gallery:read','gallery:original:read','client:link','attachment:scan','payment:verified','workday:sync','gallery:access:submit','gallery:access:pull','gallery:access:ack','gallery:selections:pull','gallery:selections:ack']);
     if(!Array.isArray(scopes)||!scopes.length||scopes.some(x=>!allowed.has(x))||new Set(scopes).size!==scopes.length) fail(400,'invalid_scopes','Choose one or more supported, unique scopes.');
     if(!['API','Workday Mobile','Studio'].includes(clientApplication))fail(400,'invalid_client_application','Choose API, Workday Mobile or Studio as the credential application.');
     const id=randomUUID(),secret=randomBytes(32).toString('base64url'),createdAt=this.now().toISOString();
@@ -152,7 +154,7 @@ export class IntakeStore {
     return {id,code,expiresAt:expires};
   }
   redeemClientLinkChallenge(code,provider,subject) {
-    if(typeof code!=='string'||code.length<20||!['Google','Facebook','Apple'].includes(provider)||typeof subject!=='string'||subject.length<1||subject.length>300) fail(400,'invalid_link_proof','A valid provider and stable authenticated provider subject are required.');
+    if(typeof code!=='string'||code.length<20||!['microsoft','facebook','yahoo'].includes(provider)||typeof subject!=='string'||subject.length<1||subject.length>300) fail(400,'invalid_link_proof','A valid provider and stable authenticated provider subject are required.');
     return this.transaction(()=>{
       const row=this.db.prepare('SELECT * FROM client_link_challenges WHERE code_hash=?').get(createHash('sha256').update(code).digest('hex'));
       if(!row||row.used_at||row.revoked_at||Date.parse(row.expires_at)<=this.now().getTime()) fail(404,'link_proof_unavailable','Link proof is invalid, expired, used, or revoked.');
