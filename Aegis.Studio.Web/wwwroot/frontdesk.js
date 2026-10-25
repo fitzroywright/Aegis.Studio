@@ -124,10 +124,10 @@ function renderFrontDesk(){
     const jobQueue=['Pickup / Delivery','Completed'].includes(frontDeskColumnFilters.status);
     const queueJobs=frontDeskJobs.filter(j=>frontDeskColumnFilters.status==='Completed'?j.status==='Completed':['Ready for Client','Ready for Delivery','Published'].includes(j.status));
     const intakeEntries=[
-        ...enquiries.map(e=>({kind:'enquiry',id:e.id,created:e.createdAtUtc,name:e.contactName||'New inquiry',title:e.subject||'Inquiry',date:null,status:'New',source:e.channel||'Inquiry',conversationId:e.id})),
-        ...frontDeskRequests.filter(Boolean).map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Client',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:/^website(v1)?$/i.test(String(x.request?.bookingSource||''))?'Web site':x.request?.bookingSource==='FrontDesk'?'Front Desk':x.request?.bookingSource||'Booking',request:x}))
+        ...enquiries.map(e=>({kind:'enquiry',id:e.id,created:e.createdAtUtc,name:e.contactName||'New inquiry',title:e.subject||'Inquiry',date:null,status:'New',source:e.channel||'Inquiry',conversationId:e.id,reference:e.intakeReference||''})),
+        ...frontDeskRequests.filter(Boolean).map(x=>({kind:'request',id:x.id,jobId:x.jobId,created:x.createdAtUtc||x.request?.createdAtUtc,name:x.request?.clientName||'Client',title:x.request?.title||'Booking',date:x.request?.eventDate,status:frontDeskRequestStage(x),source:/^website(v1)?$/i.test(String(x.request?.bookingSource||''))?'Web site':x.request?.bookingSource==='FrontDesk'?'Front Desk':x.request?.bookingSource||'Booking',request:x,reference:x.intakeReference||x.request?.intakeReference||''}))
     ].sort((a,b)=>new Date(b.created||0)-new Date(a.created||0));
-    const entries=jobQueue?queueJobs.map(j=>({kind:'job',id:j.id,jobId:j.id,created:j.createdAtUtc,name:j.clientName||'Client',title:j.title,date:j.eventDate,status:j.status,source:'Job'})):intakeEntries;
+    const entries=jobQueue?queueJobs.map(j=>({kind:'job',id:j.id,jobId:j.id,created:j.createdAtUtc,name:j.clientName||'Client',title:j.title,date:j.eventDate,status:j.status,source:'Job',reference:j.intakeReference||''})):intakeEntries;
     const entryType=e=>e.kind==='enquiry'?'Inquiry':e.kind==='job'?'Job':'Booking';
     const valuesFor=key=>{const values=[...new Set(entries.map(e=>key==='type'?entryType(e):String(e[key]||'')))].filter(Boolean);return key==='status'?StudioStatusOrder.sort([...new Set([...intakeEntries.map(e=>e.status),'Pickup / Delivery','Completed'])]):values.sort((a,b)=>a.localeCompare(b));};
     const metricMatch=e=>{
@@ -141,7 +141,7 @@ function renderFrontDesk(){
     };
     const filtered=entries.filter(e=>metricMatch(e)&&
         (frontDeskTab==='today'||(frontDeskTab==='enquiries'&&e.kind==='enquiry')||(frontDeskTab==='requests'&&e.kind==='request'))
-        &&[e.name,e.title,e.status,e.source].join(' ').toLowerCase().includes(frontDeskTerm.toLowerCase())
+        &&[e.name,e.title,e.status,e.source,e.reference].join(' ').toLowerCase().includes(frontDeskTerm.toLowerCase())
         &&(!frontDeskColumnFilters.type||entryType(e)===frontDeskColumnFilters.type)
         &&(!frontDeskColumnFilters.status||jobQueue||e.status===frontDeskColumnFilters.status)
         &&(!frontDeskColumnFilters.source||e.source===frontDeskColumnFilters.source)
@@ -163,14 +163,14 @@ function renderFrontDesk(){
         const arrow=frontDeskSort.column===key?(frontDeskSort.direction===1?' ↑':' ↓'):' ↕';
         return '<th class="fd-column-head"><div class="fd-column-controls"><button type="button" data-fd-sort="'+key+'" aria-label="Sort by '+label+'">'+label+arrow+'</button><select data-fd-filter="'+key+'" aria-label="Filter '+label+'"><option value="">All '+label+'</option>'+options+'</select></div></th>';
     };
-    const rows=filtered.map(e=>`<tr class="fd-speedbump-row" tabindex="0" role="link" aria-label="Open ${esc(e.name)}" data-fd-row-open="${esc(e.id)}"><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}${jobQueue&&e.status!=='Completed'?` <button type="button" class="action" data-frontdesk-fulfill="${esc(e.jobId)}">Record collection / delivery</button>`:''}</td><td>${pill(e.source,'source')}</td></tr>`).join('');
+    const rows=filtered.map(e=>`<tr class="fd-speedbump-row" tabindex="0" role="link" aria-label="Open ${esc(e.name)}" data-fd-row-open="${esc(e.id)}"><td><small>${esc(e.created?new Date(e.created).toLocaleDateString():'—')}</small></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small></td><td><small class="fd-intake-reference">${esc(e.reference||'—')}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${pill(e.status,'status')}${jobQueue&&e.status!=='Completed'?` <button type="button" class="action" data-frontdesk-fulfill="${esc(e.jobId)}">Record collection / delivery</button>`:''}</td><td>${pill(e.source,'source')}</td></tr>`).join('');
     const metric=(key,label,count,note)=>`<div class="workspace-summary-row"><span aria-hidden="true">${({enquiries:'✉',deposits:'$',confirmation:'✓',unassigned:'▣'})[key]}</span><button type="button" class="fd-overview-link" data-fd-metric="${key}" aria-pressed="${frontDeskMetricView===key}" title="${esc(note)}">${esc(label)}</button><strong>${count}</strong></div>`;
     genericView.innerHTML=`<div class="fd-page">
       
       <div class="fd-layout"><div class="fd-main">
         
         <section class="op-card fd-queue">
-          <div class="fd-table-frame" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<div class="fd-table-head-clip"><table class="fd-table"><thead><tr><th>Date</th><th><div class="fd-client-header"><span>Client / Request</span><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search clients…" value="${esc(frontDeskTerm)}"></div></th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}</tr></thead></table></div><div class="fd-table-scroll"><table class="fd-table"><tbody>${rows||'<tr><td colspan="6">No bookings or inquiries in this queue.</td></tr>'}</tbody></table></div>`:'<div id="frontDeskJobList"></div>'}</div>
+          <div class="fd-table-frame" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<div class="fd-table-head-clip"><table class="fd-table"><thead><tr><th>Date</th><th><div class="fd-client-header"><span>Client / Request</span><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search clients…" value="${esc(frontDeskTerm)}"></div></th><th>Reference No.</th>${columnHead('type','Type')}<th>Event Date</th>${columnHead('status','Status')}${columnHead('source','Source')}</tr></thead></table></div><div class="fd-table-scroll"><table class="fd-table"><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table></div>`:'<div id="frontDeskJobList"></div>'}</div>
           </section>
         
       </div><aside class="fd-secondary mw-list-right" aria-label="Front Desk activity">
