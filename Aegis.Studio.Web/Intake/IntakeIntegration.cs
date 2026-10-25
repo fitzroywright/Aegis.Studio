@@ -186,6 +186,7 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
         if(!configuration.GetValue<bool>("PublicSite:PollingEnabled")){logger.LogInformation("Website intake polling disabled by configuration.");return;}
         logger.LogInformation("Website intake polling worker started.");
         using var site=new PublicSiteClient(configuration);string source=new Uri(configuration["PublicSite:BaseUrl"]!).GetLeftPart(UriPartial.Authority);
+        DateTimeOffset nextReconciliation=DateTimeOffset.MinValue;
         while(!ct.IsCancellationRequested)
         {
             try
@@ -199,6 +200,29 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                     string cursor=WorkflowStore.Scalar(c,null,"select cursor from studio_website_cursor where source=$1",source) as string??"";
                     var feed=await site.Get("/api/v1/changes?cursor="+Uri.EscapeDataString(cursor),ct);
                     var feedItems=feed.GetProperty("items").EnumerateArray().ToArray();
+                    var recovered=new List<JsonElement>();
+                    if(!string.IsNullOrEmpty(cursor)&&DateTimeOffset.UtcNow>=nextReconciliation)
+                    {
+                        nextReconciliation=DateTimeOffset.UtcNow.AddMinutes(10);
+                        string historyCursor="";
+                        for(int page=0;page<10;page++)
+                        {
+                            var history=await site.Get("/api/v1/changes?cursor="+Uri.EscapeDataString(historyCursor),ct);
+                            var historyItems=history.GetProperty("items").EnumerateArray().ToArray();
+                            foreach(var item in historyItems)
+                            {
+                                Guid id=item.GetProperty("id").GetGuid();
+                                long revision=item.GetProperty("revision").GetInt64();
+                                var stored=WorkflowStore.Scalar(c,null,"select revision from studio_website_imports where source=$1 and external_id=$2",source,id);
+                                if(stored is null||stored is DBNull||Convert.ToInt64(stored)<revision)recovered.Add(item);
+                            }
+                            string next=history.GetProperty("nextCursor").GetString()??"";
+                            if(historyItems.Length==0||next==historyCursor)break;
+                            historyCursor=next;
+                            if(page==9)logger.LogWarning("Website intake reconciliation reached 10-page limit; later history will be checked on next pass.");
+                        }
+                        logger.LogInformation("Website intake reconciliation completed. RecoverableItemCount={RecoverableItemCount}.",recovered.Count);
+                    }
                     logger.LogInformation("Website intake feed fetched. Source={Source} ItemCount={ItemCount} CursorPresent={CursorPresent}.",source,feedItems.Length,!string.IsNullOrEmpty(cursor));
                     var importer=new WebsiteIntakeStore(database,workspaces,configuration);
                     try
@@ -223,7 +247,7 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                     catch(Exception ex){logger.LogWarning("Gallery access request polling failed; existing intake polling will continue. ErrorType={ErrorType}",ex.GetType().Name);}
                     var retries=new List<JsonElement>();
                     using(var q=WorkflowStore.Command(c,null,"select payload::text from studio_website_import_errors where source=$1 and payload is not null order by updated_at_utc limit 25",source))using(var r=q.ExecuteReader())while(r.Read())retries.Add(JsonSerializer.Deserialize<JsonElement>(r.GetString(0)));
-                    var batch=retries.Concat(feedItems).GroupBy(p=>p.GetProperty("id").GetGuid()).Select(g=>g.OrderByDescending(p=>p.GetProperty("revision").GetInt64()).First()).ToArray();
+                    var batch=retries.Concat(feedItems).Concat(recovered).GroupBy(p=>p.GetProperty("id").GetGuid()).Select(g=>g.OrderByDescending(p=>p.GetProperty("revision").GetInt64()).First()).ToArray();
                     if(retries.Count>0)logger.LogInformation("Website intake retries loaded. RetryCount={RetryCount} BatchCount={BatchCount}.",retries.Count,batch.Length);
                     foreach(var p in batch)
                     {
