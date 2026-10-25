@@ -12,7 +12,7 @@ namespace Aegis.Studio.Web.FrontDesk;
 public sealed record BookingPriceSnapshot(string SessionTypeId,string SessionType,long CatalogRevision,long PriceMinor,long DepositMinor,string Currency,IReadOnlyDictionary<string,int> ResourceRequirements,int SetupBufferMinutes=0,int CleanupBufferMinutes=0);
 public sealed record PendingBookingRequest(Guid WorkspaceId,string ClientName,string ClientEmail,string Title,DateOnly EventDate,decimal RequiredDeposit,string Currency,string? Notes,Guid? ConversationId=null,Guid? ClientId=null,string? ExternalBookingId=null,DateTimeOffset? StartsAtUtc=null,DateTimeOffset? EndsAtUtc=null,string? Location=null,string? ClientPhone=null,string? Destination=null,string BookingSource="FrontDesk",Guid? JobTemplateId=null,Guid[]? SelectedServiceIds=null,BookingPriceSnapshot? PriceSnapshot=null);
 public sealed record VerifiedDepositRequest(decimal Amount,string Currency,string Provider,string Reference);
-public sealed record FrontDeskRequest(Guid Id,PendingBookingRequest Request,string Status,Guid? JobId,decimal RecordedDeposit,DateTimeOffset CreatedAtUtc);
+public sealed record FrontDeskRequest(Guid Id,PendingBookingRequest Request,string Status,Guid? JobId,decimal RecordedDeposit,DateTimeOffset CreatedAtUtc,string? IntakeReference=null);
 
 public static class FrontDeskRequestRules
 {
@@ -55,7 +55,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
     }
     public IReadOnlyList<FrontDeskRequest> GetAll()
     {
-        using var connection=database.OpenConnection();using var command=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,greatest(0,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0)+coalesce((select sum(e.amount) from studio_financial_events e where e.job_id=r.job_id and e.kind in ('Refund','Reversal')),0)),r.created_at_utc from studio_frontdesk_requests r order by r.created_at_utc desc",connection);
+        using var connection=database.OpenConnection();using var command=new NpgsqlCommand("select r.id,r.payload::text,r.status,r.job_id,greatest(0,coalesce((select sum(d.amount) from studio_frontdesk_deposits d where d.request_id=r.id),0)+coalesce((select sum(e.amount) from studio_financial_events e where e.job_id=r.job_id and e.kind in ('Refund','Reversal')),0)),r.created_at_utc,(select v.intake_reference from studio_conversations v where v.id=(r.payload->>'conversationId')::uuid) from studio_frontdesk_requests r order by r.created_at_utc desc",connection);
         using var reader=command.ExecuteReader();List<FrontDeskRequest> result=[];
         while(reader.Read())result.Add(Read(reader));return result;
     }
@@ -216,7 +216,7 @@ public sealed class FrontDeskBookingRequestStore(StudioDatabase database)
         }
         return job;
     }
-    private static FrontDeskRequest Read(NpgsqlDataReader r)=>new(r.GetGuid(0),JsonSerializer.Deserialize<PendingBookingRequest>(r.GetString(1),JsonOptions)!,r.GetString(2),r.IsDBNull(3)?null:r.GetGuid(3),r.GetDecimal(4),r.GetFieldValue<DateTimeOffset>(5));
+    private static FrontDeskRequest Read(NpgsqlDataReader r)=>new(r.GetGuid(0),JsonSerializer.Deserialize<PendingBookingRequest>(r.GetString(1),JsonOptions)!,r.GetString(2),r.IsDBNull(3)?null:r.GetGuid(3),r.GetDecimal(4),r.GetFieldValue<DateTimeOffset>(5),r.FieldCount>6&&!r.IsDBNull(6)?r.GetString(6):null);
     private static void Execute(NpgsqlConnection c,NpgsqlTransaction tx,string sql,params object[] args)
     {using var command=new NpgsqlCommand(sql,c,tx);foreach(object value in args)command.Parameters.AddWithValue(value);command.ExecuteNonQuery();}
 }
