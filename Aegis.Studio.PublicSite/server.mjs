@@ -29,14 +29,36 @@ export function createServer(env = process.env) {
   // gallery viewers until a real, validated identity provider is configured.
   if(env.PUBLIC_DEMO_MODE==='true'||env.PUBLIC_REFERENCE_DEMO_MODE==='true')
     throw new Error('Mock gallery sign-in is removed.');
+  const webHostname=String(env.PUBLIC_WEB_HOST||'web.bryanstudiosltd.com').toLowerCase();
+  const apiHostname=String(env.PUBLIC_API_HOST||'api.bryanstudiosltd.com').toLowerCase();
+  // Trust the validated Host header only. Never use X-Forwarded-Host to
+  // construct OAuth redirects or to choose an authorization policy.
+  const hostAllowlist=new Set((env.PUBLIC_ALLOWED_HOSTS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean));
+  if(env.NODE_ENV==='production'&&!hostAllowlist.has(webHostname)||env.NODE_ENV==='production'&&!hostAllowlist.has(apiHostname))
+    throw new Error('PUBLIC_ALLOWED_HOSTS must include both the web and API hostnames in production.');
+  function hostname(req) {
+    const raw=String(req.headers.host||'').toLowerCase();
+    if(!raw||raw.includes('/')||raw.includes('\\')||raw.includes('@')||raw.includes(','))return null;
+    try{
+      const u=new URL('http://'+raw),host=u.hostname.toLowerCase();
+      if(u.username||u.password||!host)return null;
+      if(hostAllowlist.size)return hostAllowlist.has(host)?host:null;
+      return env.NODE_ENV!=='production'&&['localhost','127.0.0.1','[::1]'].includes(host)?host:null;
+    }catch{return null;}
+  }
   const intake=createIntakeApi(env,readBody,json);
   const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const url = new URL(req.url, 'http://localhost');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     try {
+      const host=hostname(req);
+      if(!host){json(res,421,{message:'Unrecognized website hostname.'});return;}
       if (req.method === 'GET' && url.pathname === '/health') { res.writeHead(200, { 'Cache-Control': 'no-store' }).end('ok'); return; }
+      if (req.method === 'GET' && url.pathname === '/' && host===apiHostname) {
+        json(res,200,{service:'Bryan\'s Studio API',status:'available'});return;
+      }
       if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(await readFile(new URL('index.html', ROOT))); return; }
       if (req.method === 'GET' && ['/styles.css', '/app.js', '/roster-editor.js'].includes(url.pathname)) {
         const type = url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
