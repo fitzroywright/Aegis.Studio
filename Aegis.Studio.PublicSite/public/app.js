@@ -112,3 +112,21 @@ $('submit-selections').addEventListener('click', async () => { const button = $(
 try { const session = await api('/api/session'); showAuth(session.user); if (!session.demo) { document.querySelectorAll('[data-identity]').forEach(button => button.hidden = true); $('auth-note').textContent = 'Client sign-in is being connected.'; } } catch { /* The public booking form remains visible while sign-in recovers. */ }
 
 
+
+// Identity providers appear only after real client credentials are configured.
+(async()=>{
+ const links=document.getElementById('client-provider-links');
+ if(!links)return;
+ try{
+  const reply=await api('/api/auth/providers');
+  const names={microsoft:'Microsoft (Hotmail / Outlook)',facebook:'Facebook',yahoo:'Yahoo'};
+  for(const name of reply.providers||[]){
+   if(!names[name])continue;
+   const link=document.createElement('a');link.className='social-button';
+   link.href='/auth/'+encodeURIComponent(name);
+   link.textContent='Continue with '+names[name];
+   links.append(link);
+  }
+  if(!links.childElementCount)document.getElementById('auth-note').textContent='Secure client sign-in is not yet configured.';
+ }catch{document.getElementById('auth-note').textContent='Secure sign-in is currently unavailable.';}
+})();
