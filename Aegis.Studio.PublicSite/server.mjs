@@ -53,6 +53,8 @@ export function createServer(env = process.env) {
   if(env.NODE_ENV==='production'&&clientAuth.providers().length>0&&
      env.PUBLIC_WATERMARK_PROCESSING_ENABLED!=='true')
     throw new Error('Watermarked previews must be enabled before production client authentication.');
+  if(env.NODE_ENV==='production'&&clientAuth.providers().length>0&&env.GALLERY_STORAGE_MODE!=='s3')
+    throw new Error('Private S3 media storage must be configured for production client galleries.');
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -114,8 +116,9 @@ export function createServer(env = process.env) {
           // Original media must never be available using a client session.
           if(galleryItem[3]==='download'){json(res,403,{message:'Original files require privileged integration authorization.'});return;}
           if(!gallery.items.some(x=>x.versionId===galleryItem[2])){json(res,404,{message:'Photograph not found.'});return;}
-          const preview=intake.store.db.prepare('SELECT content,type FROM gallery_previews WHERE gallery_id=? AND id=?').get(galleryId,galleryItem[2]);
-          if(!preview){json(res,503,{message:'Protected preview is not ready.'});return;}
+          const legacy=intake.store.db.prepare('SELECT content,type FROM gallery_previews WHERE gallery_id=? AND id=?').get(galleryId,galleryItem[2]);
+          const preview=await intake.mediaStorage.get(galleryId,galleryItem[2],'preview')||legacy;
+          if(!preview||!preview.content?.length){json(res,503,{message:'Protected preview is not ready.'});return;}
           res.writeHead(200,{'Content-Type':preview.type,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});
           res.end(preview.content);return;
         }
