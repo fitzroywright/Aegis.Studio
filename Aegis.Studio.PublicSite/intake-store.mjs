@@ -154,7 +154,7 @@ export class IntakeStore {
     return {id,code,expiresAt:expires};
   }
   redeemClientLinkChallenge(code,provider,subject) {
-    if(typeof code!=='string'||code.length<20||!['Google','Facebook','Apple'].includes(provider)||typeof subject!=='string'||subject.length<1||subject.length>300) fail(400,'invalid_link_proof','A valid provider and stable authenticated provider subject are required.');
+    if(typeof code!=='string'||code.length<20||!['microsoft','facebook','yahoo'].includes(provider)||typeof subject!=='string'||subject.length<1||subject.length>300) fail(400,'invalid_link_proof','A valid provider and stable authenticated provider subject are required.');
     return this.transaction(()=>{
       const row=this.db.prepare('SELECT * FROM client_link_challenges WHERE code_hash=?').get(createHash('sha256').update(code).digest('hex'));
       if(!row||row.used_at||row.revoked_at||Date.parse(row.expires_at)<=this.now().getTime()) fail(404,'link_proof_unavailable','Link proof is invalid, expired, used, or revoked.');
