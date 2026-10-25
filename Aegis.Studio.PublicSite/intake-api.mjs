@@ -359,6 +359,9 @@ export function createIntakeApi(env,readBody,json) {
     if(publication&&method==='POST'){
       authenticate(req,'gallery:publish');store.transaction(()=>{const row=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(publication[1]);if(!row)fail(404,'not_found','Gallery not found.');const p=JSON.parse(row.payload);
         if(publication[2]==='publish'&&p.items.some(x=>!store.db.prepare('SELECT 1 FROM media WHERE gallery_id=? AND id=?').get(p.id,x.versionId)))fail(409,'media_pending','All media must be stored before publishing.');
+        if(publication[2]==='publish'&&env.PUBLIC_WATERMARK_PROCESSING_ENABLED==='true'&&
+          p.items.some(x=>!store.db.prepare('SELECT 1 FROM gallery_previews WHERE gallery_id=? AND id=?').get(p.id,x.versionId)))
+          fail(409,'preview_pending','Protected client previews must be generated before publication.');
         p.published=publication[2]==='publish';store.db.prepare('UPDATE galleries SET payload=? WHERE id=?').run(JSON.stringify(p),p.id);});json(res,200,{state:publication[2]==='publish'?'Published':'Revoked'});return true;
     }
     const originalDownload=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})\/original$/i);
