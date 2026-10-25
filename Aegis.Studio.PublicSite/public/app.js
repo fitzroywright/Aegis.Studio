@@ -34,12 +34,6 @@ async function openGallery(reference) {
 async function loadClientGalleries(){try{const result=await api('/api/client-galleries'),picker=$('client-gallery-picker'),select=$('client-gallery-select'),items=result.items||[];select.replaceChildren();for(const item of items)select.add(new Option(item.title,item.reference));picker.hidden=items.length<2;if(items.length&&!items.some(x=>x.reference===state.user?.galleryReference)){state.user.galleryReference=items[0].reference;openGallery(items[0].reference);}if(items.length===1&&state.user?.galleryReference!==items[0].reference){state.user.galleryReference=items[0].reference;openGallery(items[0].reference);}if(state.user?.galleryReference)select.value=state.user.galleryReference;}catch{/* Keep the signed-in state usable if gallery listing is temporarily unavailable. */}}
 document.getElementById('client-gallery-select').addEventListener('change',event=>{const reference=event.currentTarget.value;if(reference&&state.user){state.user.galleryReference=reference;openGallery(reference);}});
 
-document.querySelectorAll('[data-identity]').forEach(button => button.addEventListener('click', async () => {
-  button.disabled = true;
-  try { const result = await api('/api/demo-login', { method: 'POST', body: JSON.stringify({ identity: button.dataset.identity }) }); showAuth((await api('/api/session')).user); }
-  catch (error) { $('auth-note').textContent = error.message; }
-  finally { button.disabled = false; }
-}));
 $('sign-out').addEventListener('click', async () => { await api('/api/logout', { method: 'POST', body: '{}' }); $('gallery-grid').replaceChildren(); showAuth(null); });
 $('client-link-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type=submit]'),result=$('client-link-result');button.disabled=true;result.textContent='';try{const code=new FormData(form).get('clientLinkCode').trim();await api('/api/v1/client-link-proofs/redeem',{method:'POST',body:JSON.stringify({code})});form.reset();const session=await api('/api/session');showAuth(session.user);result.textContent=session.user?.galleryReference?'Client connected. Your Studio galleries are shown below.':'Client connected. Galleries will appear here after Studio publishes them.';}catch(error){result.textContent=error.message;}finally{button.disabled=false;}});
 document.getElementById('gallery-request-form').addEventListener('submit',async event=>{
