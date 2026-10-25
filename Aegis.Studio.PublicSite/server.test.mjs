@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, sign } from './server.mjs';
+import { IntakeStore } from './intake-store.mjs';
+import { DatabaseSync } from 'node:sqlite';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 async function fixture(t, extra = {}) {
   const env = { SESSION_SECRET: 'test-only-session-secret-at-least-32-chars', PUBLIC_DEMO_MODE: 'false', INTAKE_DB_PATH: ':memory:', PUBLIC_API_PROVISIONING_TOKEN:'test-site-provisioning-token-at-least-32-chars', ...extra };
@@ -79,6 +84,25 @@ test('Studio retains gallery publication API while private reads require verifie
  assert.equal((await fetch(base+'/galleries/'+gallery+'/revoke',{method:'POST',headers,body:'{}'})).status,200);
 });
 
+test('existing AWS gallery request rows migrate without losing pending requests',()=>{
+ const folder=mkdtempSync(join(tmpdir(),'bryans-gallery-migrate-')),path=join(folder,'site.sqlite');
+ try{
+   const old=new DatabaseSync(path);
+   old.exec("CREATE TABLE gallery_access_requests(id TEXT PRIMARY KEY,client_id TEXT NOT NULL,gallery_id TEXT,client_name TEXT NOT NULL,client_email TEXT NOT NULL,notes TEXT NOT NULL,request_key TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'Pending',acknowledged_at TEXT)");
+   old.prepare('INSERT INTO gallery_access_requests(id,client_id,gallery_id,client_name,client_email,notes,request_key,created_at) VALUES(?,?,?,?,?,?,?,?)')
+     .run('11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222',null,'Legacy Client','legacy@example.com','', 'legacy-request-key',new Date().toISOString());
+   old.close();
+   const store=new IntakeStore(path);
+   const oldPending=store.pendingGalleryAccessRequests();
+   assert.equal(oldPending.length,1);
+   assert.equal(oldPending[0].clientId,'22222222-2222-4222-8222-222222222222');
+   assert.equal(oldPending[0].telephone,'');
+   const fresh=store.createGalleryAccessRequest({clientName:'New Person',clientEmail:'new@example.com',telephone:'+18765550123',requestKey:'a'.repeat(64)});
+   assert.equal(fresh.created,true);
+   assert.equal(store.pendingGalleryAccessRequests().length,2);
+   store.close();
+ }finally{rmSync(folder,{recursive:true,force:true});}
+});
 test('gallery requests accept contacts and optional booking reference, without knowing Studio IDs',async t=>{
   const origin=await fixture(t);
   const csrfResponse=await fetch(origin+'/api/intake-session'),csrf=(await csrfResponse.json()).csrf,cookie=csrfResponse.headers.get('set-cookie').split(';')[0];
