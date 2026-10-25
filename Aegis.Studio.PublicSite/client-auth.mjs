@@ -84,27 +84,30 @@ export class ClientAuthentication {
     }
     for(const [k,v] of Object.entries({response_type:'code',client_id:config.id,redirect_uri:callback,state}))
       target.searchParams.set(k,v);
-    res.writeHead(302,{Location:target.href,'Cache-Control':'no-store'}).end();
+    res.writeHead(302,{Location:target.href,'Cache-Control':'no-store',
+      'Set-Cookie':'bryans_auth_state='+state+'; Path=/auth/; HttpOnly; SameSite=Lax; Max-Age=600'+(this.secure?'; Secure':'')}).end();
   }
-  async finish(provider,url,res){
+  async finish(provider,url,res,req){
     const state=url.searchParams.get('state'),code=url.searchParams.get('code');
-    if(!state||!code||url.searchParams.has('error'))throw reject(401,'Authentication was cancelled or invalid.');
+    const stateCookie=String(req.headers.cookie||'').split(';').map(x=>x.trim())
+      .find(x=>x.startsWith('bryans_auth_state='))?.slice('bryans_auth_state='.length);
+    if(!state||!code||url.searchParams.has('error')||!equal(stateCookie,state))
+      throw reject(401,'Authentication state is not bound to this browser.');
     const row=this.store.db.prepare('SELECT * FROM client_auth_states WHERE state_hash=?').get(digest(state));
     if(!row||row.provider!==provider||row.expires_at<Date.now())throw reject(401,'Sign-in state expired or invalid.');
     this.store.db.prepare('DELETE FROM client_auth_states WHERE state_hash=?').run(digest(state));
     const c=this.config[provider],callback=this.origin+'/auth/'+provider+'/callback';
     let identity;
     if(provider==='facebook'){
-      const tokenUrl=new URL('https://graph.facebook.com/v24.0/oauth/access_token');
-      for(const [k,v] of Object.entries({client_id:c.id,client_secret:c.secret,redirect_uri:callback,code}))
-        tokenUrl.searchParams.set(k,v);
-      const token=await requestJson(tokenUrl.href);
+      const token=await requestJson('https://graph.facebook.com/v24.0/oauth/access_token',{
+        method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:new URLSearchParams({client_id:c.id,client_secret:c.secret,redirect_uri:callback,code}).toString()
+      });
       const debug=new URL('https://graph.facebook.com/debug_token');
       debug.searchParams.set('input_token',token.access_token);
-      debug.searchParams.set('access_token',c.id+'|'+c.secret);
-      const validated=(await requestJson(debug.href)).data;
+      const validated=(await requestJson(debug.href,{headers:{Authorization:'Bearer '+c.id+'|'+c.secret}})).data;
       if(!validated?.is_valid||String(validated.app_id)!==String(c.id))throw reject(401,'Invalid Facebook token.');
-      const person=await requestJson('https://graph.facebook.com/me?fields=id,name,email&access_token='+encodeURIComponent(token.access_token));
+      const person=await requestJson('https://graph.facebook.com/me?fields=id,name,email',{headers:{Authorization:'Bearer '+token.access_token}});
       if(!person.id||String(person.id)!==String(validated.user_id))throw reject(401,'Facebook identity mismatch.');
       identity={subject:String(person.id),name:String(person.name||'Client'),email:person.email||null};
     }else{
@@ -123,7 +126,8 @@ export class ClientAuthentication {
     this.store.db.prepare('INSERT INTO client_auth_sessions VALUES(?,?,?,?,?,?)')
       .run(digest(token),provider,identity.subject,identity.name,identity.email,Date.now()+28800000);
     res.writeHead(302,{Location:this.origin+'/#galleries',
-      'Set-Cookie':'bryans_client_session='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800'+(this.secure?'; Secure':''),
+      'Set-Cookie':['bryans_auth_state=; Path=/auth/; HttpOnly; SameSite=Lax; Max-Age=0'+(this.secure?'; Secure':''),
+        'bryans_client_session='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800'+(this.secure?'; Secure':'')],
       'Cache-Control':'no-store'}).end();
   }
   logout(req,res){
@@ -138,7 +142,7 @@ export class ClientAuthentication {
     if(!start&&!done)return false;
     if(host!==this.host)throw reject(404,'Sign-in is available on the web hostname only.');
     if(req.method!=='GET')throw reject(405,'Method not allowed.');
-    if(start)await this.begin(start[1],res);else await this.finish(done[1],url,res);
+    if(start)await this.begin(start[1],res);else await this.finish(done[1],url,res,req);
     return true;
   }
 }
