@@ -2,6 +2,7 @@ import { randomUUID, randomBytes, timingSafeEqual, createHash } from 'node:crypt
 import { readRosterFile } from './roster-file.mjs';
 import { IntakeStore, validateRoster, fail } from './intake-store.mjs';
 import { WorkDayExchangeStore } from './workday-exchange-store.mjs';
+import { createPreview } from './gallery-watermark.mjs';
 import { join } from 'node:path';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -360,13 +361,40 @@ export function createIntakeApi(env,readBody,json) {
         if(publication[2]==='publish'&&p.items.some(x=>!store.db.prepare('SELECT 1 FROM media WHERE gallery_id=? AND id=?').get(p.id,x.versionId)))fail(409,'media_pending','All media must be stored before publishing.');
         p.published=publication[2]==='publish';store.db.prepare('UPDATE galleries SET payload=? WHERE id=?').run(JSON.stringify(p),p.id);});json(res,200,{state:publication[2]==='publish'?'Published':'Revoked'});return true;
     }
+    const originalDownload=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})\/original$/i);
+    if(originalDownload&&method==='GET'){
+      authenticate(req,'gallery:original:read');
+      const galleryRow=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(originalDownload[1]);
+      const gallery=galleryRow&&JSON.parse(galleryRow.payload);
+      if(!gallery?.published||!gallery.items.some(x=>x.versionId===originalDownload[2]))
+        fail(404,'not_found','Published photograph not found.');
+      const original=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?')
+        .get(originalDownload[1],originalDownload[2]);
+      if(!original)fail(404,'not_found','Original photograph not found.');
+      res.writeHead(200,{'Content-Type':original.type,'Cache-Control':'private, no-store',
+        'X-Content-Type-Options':'nosniff','Content-Disposition':'attachment'});
+      res.end(original.content);return true;
+    }
     const media=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})$/i);
     if(media&&method==='PUT'){
       authenticate(req,'gallery:publish');const r=store.db.prepare('SELECT payload FROM galleries WHERE id=?').get(media[1]);if(!r||!JSON.parse(r.payload).items.some(x=>x.versionId===media[2]))fail(404,'not_found','Gallery item not registered.');
       const bytes=await readBody(req,30_000_000),type=String(req.headers['content-type']||'application/octet-stream');
       if(!['image/jpeg','image/png','image/webp'].includes(type))fail(400,'invalid_type','Only raster gallery images accepted.');
       const old=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?').get(media[1],media[2]);if(old&&(old.type!==type||!Buffer.from(old.content).equals(bytes)))fail(409,'media_conflict','A version ID cannot be reused for different bytes.');
-      store.db.prepare('INSERT INTO media VALUES(?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content').run(media[1],media[2],type,bytes);json(res,200,{stored:true});return true;
+      // Generate pixel-embedded previews during ingestion, never on public reads.
+      // Until the watermark worker is configured, clients receive no preview.
+      let preview=null;
+      if(env.PUBLIC_WATERMARK_PROCESSING_ENABLED==='true'){
+        try{preview=await createPreview(bytes,env);}
+        catch{fail(503,'preview_processing_failed','Could not prepare a protected preview; retry this upload.');}
+      }
+      store.transaction(()=>{
+        store.db.prepare('INSERT INTO media VALUES(?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content')
+          .run(media[1],media[2],type,bytes);
+        if(preview)store.db.prepare('INSERT INTO gallery_previews(gallery_id,id,type,content,content_hash) VALUES(?,?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content,content_hash=excluded.content_hash')
+          .run(media[1],media[2],preview.type,preview.content,preview.contentHash);
+      });
+      json(res,200,{stored:true,previewReady:Boolean(preview)});return true;
     }
     fail(404,'not_found','Operation not found.');
   }};
