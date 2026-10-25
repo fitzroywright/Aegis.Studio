@@ -47,7 +47,7 @@ function verifyToken(token,metadata,keys,clientId,nonce,provider,msTenant){
     }
     // Microsoft sub is tenant-scoped. Include tid to prevent linking identities across tenants.
     // Keep the legacy personal-account subject for existing single-consumer deployments.
-    return {...claims,verifiedSubject:msTenant==='common'?tenant+':'+claims.sub:claims.sub};
+    return {...claims,verifiedSubject:msTenant==='common'&&tenant!==MICROSOFT_CONSUMER_TENANT?tenant+':'+claims.sub:claims.sub};
   }else if(claims.iss!==metadata.issuer)throw reject(401,'Invalid identity issuer.');
   return claims;
 }
