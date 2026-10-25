@@ -267,8 +267,8 @@ export function createIntakeApi(env,readBody,json) {
       // Return the text to the same reusable editor for column mapping and explicit commit.
       json(res,200,{csv});return true;
     }
-    if(!route.startsWith('/api/v1/')&&!/^\/api\/(bookings|inquiries)(\/|$)/.test(route))return false;
-    const browser=/^\/api\/(bookings|inquiries)/.test(route);
+    if(!route.startsWith('/api/v1/')&&!/^\/api\/(bookings|inquiries|gallery-requests)(\/|$)/.test(route))return false;
+    const browser=/^\/api\/(bookings|inquiries|gallery-requests)/.test(route);
     if(browser&&['POST','PUT','DELETE'].includes(method))await sameOrigin(req,url);
     const submit=route==='/api/bookings'||route==='/api/inquiries'||route==='/api/v1/intakes';
     if(submit&&method==='POST'){
@@ -278,13 +278,13 @@ export function createIntakeApi(env,readBody,json) {
       const result=store.create(owner,String(req.headers['idempotency-key']||''),value,browser?'Form':'Api',clientApplication);json(res,201,result);return true;
     }
     if(route==='/api/v1/changes'&&method==='GET'){authenticate(req,'intake:pull');json(res,200,store.feed(url.searchParams.get('cursor')||''));return true;}
-    if(route==='/api/v1/gallery-access-requests'&&method==='POST'){
-      const owner=authenticate(req,'gallery:access:submit');const p=await input(req,8192);
+    if((route==='/api/v1/gallery-access-requests'||route==='/api/gallery-requests')&&method==='POST'){
+      const owner=browser?'reference-site-gallery-form':authenticate(req,'gallery:access:submit');const p=await input(req,8192);
       const key=String(req.headers['idempotency-key']||'').trim();
       if(!key||key.length>200)fail(400,'invalid_idempotency_key','A unique Idempotency-Key of at most 200 characters is required.');
       const requestKey=createHash('sha256').update(owner+':'+key).digest('hex');
       const result=store.createGalleryAccessRequest({...p,requestKey});
-      json(res,result.created?201:200,{id:result.id,status:result.status,accepted:true});return true;
+      json(res,result.created?201:200,{id:result.id,status:result.status,accepted:true,requestReference:result.id});return true;
     }
     if(route==='/api/v1/gallery-access-requests'&&method==='GET'){
       authenticate(req,'gallery:access:pull');json(res,200,{items:store.pendingGalleryAccessRequests(Math.max(1,Math.min(500,Number(url.searchParams.get('limit')||100))))});return true;
