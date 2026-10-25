@@ -183,7 +183,8 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        if(!configuration.GetValue<bool>("PublicSite:PollingEnabled"))return;
+        if(!configuration.GetValue<bool>("PublicSite:PollingEnabled")){logger.LogInformation("Website intake polling disabled by configuration.");return;}
+        logger.LogInformation("Website intake polling worker started.");
         using var site=new PublicSiteClient(configuration);string source=new Uri(configuration["PublicSite:BaseUrl"]!).GetLeftPart(UriPartial.Authority);
         while(!ct.IsCancellationRequested)
         {
@@ -191,10 +192,14 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
             {
                 using var c=database.OpenConnection();
                 using var gate=WorkflowStore.Command(c,null,"select pg_try_advisory_lock(hashtextextended($1,0))","public-site-poll:"+source);
-                if((bool)gate.ExecuteScalar()!)try
+                bool lockAcquired=(bool)gate.ExecuteScalar()!;
+                if(!lockAcquired)logger.LogWarning("Website intake polling skipped: database advisory lock is held for source {Source}.",source);
+                if(lockAcquired)try
                 {
                     string cursor=WorkflowStore.Scalar(c,null,"select cursor from studio_website_cursor where source=$1",source) as string??"";
                     var feed=await site.Get("/api/v1/changes?cursor="+Uri.EscapeDataString(cursor),ct);
+                    var feedItems=feed.GetProperty("items").EnumerateArray().ToArray();
+                    logger.LogInformation("Website intake feed fetched. Source={Source} ItemCount={ItemCount} CursorPresent={CursorPresent}.",source,feedItems.Length,!string.IsNullOrEmpty(cursor));
                     var importer=new WebsiteIntakeStore(database,workspaces,configuration);
                     try
                     {
@@ -218,7 +223,8 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                     catch(Exception ex){logger.LogWarning("Gallery access request polling failed; existing intake polling will continue. ErrorType={ErrorType}",ex.GetType().Name);}
                     var retries=new List<JsonElement>();
                     using(var q=WorkflowStore.Command(c,null,"select payload::text from studio_website_import_errors where source=$1 and payload is not null order by updated_at_utc limit 25",source))using(var r=q.ExecuteReader())while(r.Read())retries.Add(JsonSerializer.Deserialize<JsonElement>(r.GetString(0)));
-                    var batch=retries.Concat(feed.GetProperty("items").EnumerateArray()).GroupBy(p=>p.GetProperty("id").GetGuid()).Select(g=>g.OrderByDescending(p=>p.GetProperty("revision").GetInt64()).First());
+                    var batch=retries.Concat(feedItems).GroupBy(p=>p.GetProperty("id").GetGuid()).Select(g=>g.OrderByDescending(p=>p.GetProperty("revision").GetInt64()).First()).ToArray();
+                    if(retries.Count>0)logger.LogInformation("Website intake retries loaded. RetryCount={RetryCount} BatchCount={BatchCount}.",retries.Count,batch.Length);
                     foreach(var p in batch)
                     {
                       try
@@ -232,7 +238,7 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                       catch(Exception ex)when(ex is not OperationCanceledException)
                       {
                         WorkflowStore.Sql(c,null,"insert into studio_website_import_errors(source,external_id,revision,error_type,payload) values($1,$2,$3,$4,$5::jsonb) on conflict(source,external_id) do update set revision=$3,error_type=$4,payload=$5::jsonb,updated_at_utc=now()",source,p.GetProperty("id").GetGuid(),p.GetProperty("revision").GetInt64(),ex.GetType().Name,p.GetRawText());
-                        logger.LogError("Website intake held for retry. ExternalId={ExternalId} Revision={Revision} ErrorType={ErrorType}",p.GetProperty("id"),p.GetProperty("revision"),ex.GetType().Name);
+                        logger.LogError(ex,"Website intake held for retry. ExternalId={ExternalId} Revision={Revision} ErrorType={ErrorType}",p.GetProperty("id"),p.GetProperty("revision"),ex.GetType().Name);
                       }
                     }
                     WorkflowStore.Sql(c,null,"insert into studio_website_cursor values($1,$2) on conflict(source) do update set cursor=$2",source,feed.GetProperty("nextCursor").GetString()!);
@@ -251,7 +257,7 @@ public sealed class WebsiteIntakeWorker(StudioDatabase database,WorkspaceStore w
                 }finally{WorkflowStore.Sql(c,null,"select pg_advisory_unlock(hashtextextended($1,0))","public-site-poll:"+source);}
             }
             catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
-            catch(Exception ex){logger.LogError("Website polling cycle incomplete; durable retry state retained. ErrorType={ErrorType}",ex.GetType().Name);}
+            catch(Exception ex){logger.LogError(ex,"Website polling cycle incomplete; durable retry state retained. ErrorType={ErrorType}",ex.GetType().Name);}
             try{await Task.Delay(TimeSpan.FromSeconds(60),ct);}catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
         }
     }
