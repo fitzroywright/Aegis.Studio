@@ -253,6 +253,20 @@ public static class FrontDeskBookingRequestEndpoints
                 status=reader.GetString(3),candidateClients=JsonDocument.Parse(reader.GetString(4)).RootElement.Clone()});
             return Results.Ok(items);
         });
+        group.MapGet("/gallery-publications",(Guid clientId,ClaimsPrincipal user,StudioDatabase db)=>
+        {
+            if(!Allowed(user,db))return Results.Forbid();
+            using var c=db.OpenConnection();
+            using var q=new NpgsqlCommand("""
+              select e.publication_id,j.title,e.state,j.status
+              from studio_gallery_exports e join studio_jobs j on j.id=e.job_id
+              where e.client_id=$1 and j.client_id=$1 and e.state in ('PendingReview','Published')
+              order by e.updated_at_utc desc limit 100
+              """,c);
+            q.Parameters.AddWithValue(clientId);using var reader=q.ExecuteReader();var items=new List<object>();
+            while(reader.Read())items.Add(new{id=reader.GetGuid(0),title=reader.GetString(1),state=reader.GetString(2),jobStatus=reader.GetString(3)});
+            return Results.Ok(items);
+        });
         group.MapPost("/gallery-access-requests/{conversationId:guid}/resolve",
             (Guid conversationId,GalleryRequestResolution request,ClaimsPrincipal user,StudioDatabase db)=>
         {
