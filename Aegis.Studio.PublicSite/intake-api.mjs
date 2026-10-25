@@ -1,4 +1,5 @@
 import { randomUUID, randomBytes, timingSafeEqual, createHash } from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
 import { readRosterFile } from './roster-file.mjs';
 import { IntakeStore, validateRoster, fail } from './intake-store.mjs';
 import { WorkDayExchangeStore } from './workday-exchange-store.mjs';
@@ -376,10 +377,10 @@ export function createIntakeApi(env,readBody,json) {
       const legacy=store.db.prepare('SELECT type,content FROM media WHERE gallery_id=? AND id=?')
         .get(originalDownload[1],originalDownload[2]);
       const original=await mediaStorage.get(originalDownload[1],originalDownload[2],'original')||legacy;
-      if(!original||!original.content?.length)fail(404,'not_found','Original photograph not found.');
+      if(!original||(!original.stream&&!original.content?.length))fail(404,'not_found','Original photograph not found.');
       res.writeHead(200,{'Content-Type':original.type,'Cache-Control':'private, no-store',
         'X-Content-Type-Options':'nosniff','Content-Disposition':'attachment'});
-      res.end(original.content);return true;
+      if(original.stream)await pipeline(original.stream,res);else res.end(original.content);return true;
     }
     const media=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})$/i);
     if(media&&method==='PUT'){
