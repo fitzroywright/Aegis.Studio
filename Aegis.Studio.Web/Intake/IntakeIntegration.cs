@@ -155,7 +155,7 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
         Guid external=p.GetProperty("id").GetGuid();
         string name=Text(p,"clientName"),email=Text(p,"clientEmail"),phone=Text(p,"telephone"),booking=Text(p,"bookingReference"),notes=Text(p,"notes");
         if(string.IsNullOrWhiteSpace(name)||name.Length>200||!System.Net.Mail.MailAddress.TryCreate(email,out _)||email.Length>320||
-           !System.Text.RegularExpressions.Regex.IsMatch(phone,@"^\\+?[0-9 ()-]{7,30}$")||
+           !System.Text.RegularExpressions.Regex.IsMatch(phone,@"^\+?[0-9 ()-]{7,30}$")||
            booking.Length>40||notes.Length>2000)
             throw new ArgumentException("Invalid gallery request contact information.");
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
