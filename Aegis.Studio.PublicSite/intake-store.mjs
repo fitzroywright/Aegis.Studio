@@ -259,8 +259,8 @@ export class IntakeStore {
     const name=String(p.clientName||'').trim(),email=String(p.clientEmail||'').trim().toLowerCase();
     const phone=String(p.telephone||p.clientPhone||'').trim(),booking=String(p.bookingReference||'').trim().toUpperCase();
     const notes=String(p.notes||'').trim(),key=String(p.requestKey||'').trim();
-    if(!name||name.length>200||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||email.length>320||
-       !/^\\+?[0-9 ()-]{7,30}$/.test(phone)||notes.length>2000||key.length!==64||
+    if(!name||name.length>200||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>320||
+       !/^\+?[0-9 ()-]{7,30}$/.test(phone)||notes.length>2000||key.length!==64||
        (booking&&!/^[0-9]{4}-(?:BK|BE|BR|W)-[0-9]{6}$/.test(booking)))
       fail(400,'invalid_gallery_access_request','Name, email and telephone are required; booking reference is optional.');
     return this.transaction(()=>{
