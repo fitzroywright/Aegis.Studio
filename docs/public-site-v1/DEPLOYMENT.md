@@ -74,6 +74,8 @@ Studio already has an Administrator-only Management UI and `/api/admin/gallery-c
 
 The signed-in client redeems the code with same-origin `POST /api/v1/client-link-proofs/redeem`. Ownership is checked using a server-side provider-subject/client binding. `CLIENT_BINDINGS_JSON` is a legacy server-side mapping, not a replacement for verified production identity.
 
+**Reference demonstration sign-in (fictional accounts only):** For a public HTTPS reference demo, set `PUBLIC_REFERENCE_DEMO_MODE=true` and keep `PUBLIC_DEMO_MODE=false`. This enables the existing Maya/Jordan simulated Google/Facebook buttons with secure signed cookies while limiting those accounts to bundled fictional proof galleries. Reference-demo accounts cannot redeem client-link proofs or access Studio-published galleries. Set `PUBLIC_REFERENCE_DEMO_MODE=false` when real client authentication is introduced. This is NOT production identity verification and does NOT complete live publishing acceptance.
+
 **Production social/OIDC sign-in is still unimplemented.** The session reader currently recognizes only fixed demo identities. Keep `PUBLIC_DEMO_MODE=false` publicly; startup rejects demo mode when `NODE_ENV=production`. Do not open real client galleries until production sign-in, provider-subject verification and two-client isolation are implemented and tested. Thumbnail/preview/download currently serve the same stored raster bytes; separate proof transformations are also unimplemented.
 
 ## Controlled acceptance before release
