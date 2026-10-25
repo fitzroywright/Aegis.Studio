@@ -11,7 +11,7 @@ using Npgsql;
 
 namespace Aegis.Studio.Web.Bookings;
 
-public sealed record PublicBookingSessionType(string Id,string Name,string Description,int DurationMinutes,int SetupBufferMinutes,int CleanupBufferMinutes,long PriceMinor,long DepositMinor,string Currency,IReadOnlyList<string> Locations,IReadOnlyDictionary<string,int> ResourceRequirements,bool IsActive,bool IsPublished);
+public sealed record PublicBookingSessionType(string Id,string Name,string Description,int DurationMinutes,int SetupBufferMinutes,int CleanupBufferMinutes,long PriceMinor,long DepositMinor,string Currency,IReadOnlyList<string> Locations,IReadOnlyDictionary<string,int> ResourceRequirements,bool IsActive,bool IsPublished,Guid? DefaultWorkspaceId=null);
 public sealed record PublicBookingCatalog(long Revision,IReadOnlyList<PublicBookingSessionType> SessionTypes);
 public sealed record PublicBookingHours(string LocationCode,int DayOfWeek,string OpensAt,string ClosesAt,int SlotStepMinutes);
 
@@ -35,6 +35,12 @@ public sealed class StudioPublicBookingCatalogStore(StudioDatabase database)
     public PublicBookingCatalog Save(IReadOnlyList<PublicBookingSessionType> items)
     {
         Validate(items);using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        foreach(var item in items.Where(x=>x.DefaultWorkspaceId.HasValue))
+        {
+            using var verify=new NpgsqlCommand("select count(*) from studio_workspaces where id=$1 and is_enabled",c,tx);
+            verify.Parameters.AddWithValue(item.DefaultWorkspaceId!.Value);
+            if(Convert.ToInt64(verify.ExecuteScalar())!=1)throw new ArgumentException("Default Workspace must be an enabled Studio workspace.");
+        }
         using(var lockRow=new NpgsqlCommand("select revision from studio_public_booking_catalog_state where id=1 for update",c,tx))_ = lockRow.ExecuteScalar();
         using(var clear=new NpgsqlCommand("delete from studio_public_booking_session_types",c,tx))clear.ExecuteNonQuery();
         foreach(var item in items){using var q=new NpgsqlCommand("insert into studio_public_booking_session_types(id,payload) values($1,$2::jsonb)",c,tx);q.Parameters.AddWithValue(item.Id);q.Parameters.AddWithValue(JsonSerializer.Serialize(item,JsonOptions));q.ExecuteNonQuery();}
@@ -77,6 +83,7 @@ public static class StudioPublicBookingCatalogEndpoints
     {
         var group=app.MapGroup("/api/admin/public-booking/session-types").RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
         group.MapGet("/",(StudioPublicBookingCatalogStore store)=>Results.Ok(store.Get()));
+        group.MapGet("/workspaces",(StudioDatabase db)=>{using var c=db.OpenConnection();using var q=new NpgsqlCommand("select id,name from studio_workspaces where is_enabled order by sort_order,name",c);using var r=q.ExecuteReader();var items=new List<object>();while(r.Read())items.Add(new{id=r.GetGuid(0),name=r.GetString(1)});return Results.Ok(items);});
         group.MapPut("/",(PublicBookingSessionType[] items,StudioPublicBookingCatalogStore store)=>{try{return Results.Ok(store.Save(items));}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}});
         app.MapGet("/api/admin/public-booking/hours",(StudioPublicBookingCatalogStore store)=>Results.Ok(store.GetHours())).RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});
         app.MapPut("/api/admin/public-booking/hours",(PublicBookingHours[] hours,StudioPublicBookingCatalogStore store)=>{try{return Results.Ok(new{revision=store.SaveHours(hours)});}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}}).RequireAuthorization(new AuthorizeAttribute{Roles="Administrator"});

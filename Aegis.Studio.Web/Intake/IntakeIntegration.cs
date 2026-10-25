@@ -55,6 +55,16 @@ public sealed class WebsiteIntakeStore(StudioDatabase database,WorkspaceStore wo
         Guid external=p.GetProperty("id").GetGuid();long revision=p.GetProperty("revision").GetInt64();string reference=Text(p,"intakeReference");
         if(revision<1||!Regex.IsMatch(reference,@"^\d{4}-(?:BK|BE|BR|W)-\d{6}$"))throw new ArgumentException("Invalid website revision or intake reference.");
         var destination=Text(p,"destination");var w=workspaces.FindByRouteKey(destination)??workspaces.FindByAddress(destination);
+        if(Text(p,"kind")=="Booking" && p.TryGetProperty("pricingSnapshot",out var bookingQuote) && bookingQuote.ValueKind==JsonValueKind.Object)
+        {
+            string sessionId=Text(bookingQuote,"sessionTypeId");
+            if(!string.IsNullOrEmpty(sessionId))
+            {
+                var session=new Bookings.StudioPublicBookingCatalogStore(database).Get().SessionTypes.FirstOrDefault(x=>x.Id==sessionId && x.IsActive && x.IsPublished);
+                if(session?.DefaultWorkspaceId is Guid workspaceId)
+                    w=workspaces.Get(workspaceId) is {IsEnabled:true} configured?configured:null;
+            }
+        }
         if(w is null||!w.IsEnabled)w=workspaces.Get(WorkflowRules.UnassignedWorkspaceId)??throw new InvalidOperationException("Unassigned workspace unavailable.");
         var rows=p.GetProperty("roster");IntakeRosterStore.Validate(rows);
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
