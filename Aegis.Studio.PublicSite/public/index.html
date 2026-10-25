@@ -2,28 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#f6f4ef"><title>Bryan's — Booking, Client Galleries & WorkDay</title>
+  <meta name="theme-color" content="#172b33"><title>Bryan's — Booking, Client Galleries & WorkDay</title>
   <link rel="stylesheet" href="/styles.css"><script src="/roster-editor.js" defer></script>
 <script type="module" src="/app.js"></script><script type="module" src="/workday-web.js"></script>
 </head>
 <body>
   <div class="site-shell">
+    <div class="heritage-strip"><span>BRYAN’S STUDIOS · JAMAICA · EST. 1927</span><a href="https://www.bryanstudiosltd.com/" rel="noopener noreferrer">Visit our main website ↗</a></div>
     <header class="topbar">
-      <a class="brand" href="#home" aria-label="Bryan’s Studio home"><span class="brand-mark">B</span><span>BRYAN'S <i>STUDIO</i></span></a>
-      <nav aria-label="Main navigation"><a href="#booking">Booking</a><a href="#galleries">Client Galleries</a><a href="#workday">WorkDay</a></nav>
+      <a class="brand" href="#home" aria-label="Bryan’s Studio home"><span class="brand-mark" aria-hidden="true">B</span><span class="brand-words">BRYAN’S <i>STUDIOS</i></span></a>
+      <nav aria-label="Main navigation"><a href="#home">Home</a><a href="#booking">Book a session</a><a href="#galleries">Client galleries</a><a href="#workday">WorkDay</a></nav>
       <a class="top-cta" href="#booking">Book a session <span>↗</span></a>
     </header>
 
     <main id="home">
       <section class="hero">
-        <div class="hero-copy"><p class="eyebrow">PORTRAITS · WEDDINGS · STORIES</p><h1>Make room for<br><em>the moments</em><br>that matter.</h1><p class="hero-text">From the first hello to the photographs you’ll keep, we make every part feel considered.</p><a class="button button-dark" href="#booking">Explore booking <span>↓</span></a></div>
-        <div class="hero-art" aria-label="Abstract portrait artwork"><div class="sun"></div><div class="arch arch-back"></div><div class="arch arch-front"><div class="art-person"><span></span></div></div><span class="art-note">A LITTLE LIGHT<br>TO KEEP FOREVER</span><span class="art-number">NO. 024</span></div>
-        <div class="hero-index"><span>01</span><span class="index-line"></span><span>02</span><span class="index-line"></span><span>03</span></div>
+        <div class="hero-copy"><p class="eyebrow">JAMAICAN PHOTOGRAPHY SINCE 1927</p><h1>Every story<br>deserves to be<br><em>remembered.</em></h1><p class="hero-text">From milestones to everyday moments, Bryan’s brings generations of experience to the photographs you’ll treasure.</p><div class="hero-actions"><a class="button button-dark" href="#booking">Book a session <span>↗</span></a><a class="hero-secondary" href="#galleries">View your galleries <span>→</span></a></div></div>
+        <div class="hero-art" role="img" aria-label="Art-inspired composition celebrating portrait photography"><div class="sun"></div><div class="arch arch-back"></div><div class="arch arch-front"><div class="art-person"><span></span></div></div><span class="art-note">BRYAN’S STUDIOS<br>ESTABLISHED 1927</span><span class="art-number">A LEGACY IN EVERY FRAME</span></div>
+        <div class="hero-index"><span>PHOTOGRAPHY</span><span class="index-line"></span><span>FAMILY MILESTONES</span><span class="index-line"></span><span>LASTING MEMORIES</span></div>
       </section>
 
       <section id="booking" class="booking-section section-grid">
-        <div class="section-intro"><p class="eyebrow">01 / BOOKING</p><h2>Start with a<br><em>good feeling.</em></h2><p>Tell us what you’re imagining. Our Front Desk team will review your request and get back to you with the next steps.</p><div class="small-note"><span class="note-dot"></span> Every session starts with a conversation.</div></div>
-        <div class="form-card"><div class="card-heading"><div><p class="eyebrow">YOUR SESSION</p><h3>Request a booking</h3></div><span class="step-chip">01 — 02</span></div>
+        <div class="section-intro"><p class="eyebrow">01 / YOUR NEXT CHAPTER</p><h2>Let’s capture<br><em>your moment.</em></h2><p>Tell us what you’re imagining. Our Front Desk team will review your request and get back to you with the next steps.</p><div class="small-note"><span class="note-dot"></span> Every session starts with a conversation.</div></div>
+        <div class="form-card"><div class="card-heading"><div><p class="eyebrow">BOOK WITH BRYAN’S</p><h3>Request your session</h3></div><span class="step-chip">01 — 02</span></div>
           <form id="booking-form">
             <div class="field-row"><label>Your name<input name="clientName" autocomplete="name" placeholder="First and last name" maxlength="200" required></label><label>Email address<input name="clientEmail" autocomplete="email" type="email" placeholder="you@example.com" required></label></div>
             <div class="field-row"><label>Studio location<select name="locationCode" required><option value="">Choose a location</option><option value="BK">Kings Plaza</option><option value="BE">East Queen Street</option></select></label><label>What are we photographing?<select name="sessionTypeId" required><option value="">Loading Studio sessions…</option></select></label><label>Preferred date<input name="bookingDate" type="date" required></label></div>
@@ -39,10 +40,10 @@
         </div>
       </section>
 
-      <section class="interlude"><p class="eyebrow">FROM SESSION TO STORY</p><p class="interlude-quote">“The best photographs don’t ask you to pose.<br><em>They let you be there.</em>”</p><span>— BRYAN’S STUDIO</span></section>
+      <section class="interlude"><p class="eyebrow">A JAMAICAN PHOTOGRAPHY LEGACY</p><p class="interlude-quote">Capturing today.<br><em>Preserving tomorrow.</em></p><span>BRYAN’S STUDIOS · EST. 1927</span></section>
 
       <section id="galleries" class="gallery-section section-grid">
-        <div class="section-intro"><p class="eyebrow">02 / CLIENT GALLERIES</p><h2>Your story,<br><em>beautifully kept.</em></h2><p>Come back to your photographs, choose your favourites, and revisit the day just as it felt.</p><div class="gallery-stamp"><span>PRIVATE</span><span>BY<br>DESIGN</span></div></div>
+        <div class="section-intro"><p class="eyebrow">02 / YOUR PHOTOGRAPHS</p><h2>Memories worth<br><em>coming back to.</em></h2><p>Come back to your photographs, choose your favourites, and revisit the day just as it felt.</p><div class="gallery-stamp"><span>PRIVATE</span><span>BY<br>DESIGN</span></div></div>
         <div class="gallery-card">
           <div class="sign-in-panel">
             <div class="card-heading"><div><p class="eyebrow">REQUEST YOUR PHOTOGRAPHS</p><h3>Request a Client Gallery</h3></div></div>
@@ -69,7 +70,7 @@
         </div>
       </section>
       <section id="workday" class="gallery-section section-grid" aria-label="WorkDay photo uploads">
-        <div class="section-intro"><p class="eyebrow">03 / BRYAN'S WORKDAY</p>
+        <div class="section-intro"><p class="eyebrow">03 / STAFF ACCESS</p>
           <h2>Your assignments,<br><em>one place.</em></h2>
           <p>Use your existing Studio-provisioned WorkDay account to review assignments and upload photographs for authorized Jobs.</p>
         </div>
@@ -95,9 +96,9 @@
           <p id="workday-status" role="status" aria-live="polite"></p>
         </div>
       </section>
-      <section class="closing"><div class="closing-orbit">A</div><p class="eyebrow">WE’D LOVE TO HEAR YOUR STORY</p><h2>A good photograph<br>can <em>take you back.</em></h2><a href="#booking" class="button button-light">Let’s begin <span>↗</span></a></section>
+      <section class="closing"><div class="closing-orbit">A</div><p class="eyebrow">YOUR STORY IS WORTH KEEPING</p><h2>Made for today.<br><em>Kept for generations.</em></h2><a href="#booking" class="button button-light">Let’s begin <span>↗</span></a></section>
     </main>
-    <footer><a class="brand" href="#home"><span class="brand-mark">B</span><span>BRYAN'S <i>STUDIO</i></span></a><span>Thoughtfully captured. Beautifully remembered.</span><a href="#home">Back to top ↑</a></footer>
+    <footer><a class="brand" href="#home"><span class="brand-mark">B</span><span>BRYAN'S <i>STUDIO</i></span></a><span>Since 1927 · Kingston, Jamaica · Photography, stories &amp; memories.</span><a href="#home">Back to top ↑</a></footer>
   </div>
 </body>
 </html>
