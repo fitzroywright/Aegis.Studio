@@ -48,7 +48,6 @@ public sealed class StudioFeatureDatabase
                 refund_void_pos boolean not null default false,notify_job_members boolean not null default false,manage_job_members boolean not null default false,admin_job boolean not null default false,
                 created_at_utc timestamptz not null,updated_at_utc timestamptz not null,primary key(job_id,user_name)
             );
-            alter table studio_job_members add column if not exists delete_media boolean not null default false;
             create index if not exists ix_studio_job_members_user on studio_job_members(lower(user_name),job_id);
 
             create table if not exists studio_schedule_resources
