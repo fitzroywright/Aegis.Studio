@@ -1,0 +1,27 @@
+name: Studio UI CSS ownership
+on:
+  pull_request:
+    paths:
+      - 'Aegis.Studio.Web/wwwroot/**'
+      - 'scripts/check-ui-css-ownership.cjs'
+      - '.github/workflows/ui-css-ownership.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Aegis.Studio.Web/wwwroot/**'
+      - 'scripts/check-ui-css-ownership.cjs'
+      - '.github/workflows/ui-css-ownership.yml'
+jobs:
+  css-ownership:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check ownership
+        run: |
+          git fetch origin main
+          UI_CSS_BASE=origin/main node scripts/check-ui-css-ownership.cjs
