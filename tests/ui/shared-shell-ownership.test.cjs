@@ -38,5 +38,5 @@ test('shell CSS contains no malformed empty declarations', () => {
 
 
 test('canonical Studio stylesheet has no important declarations', () => {
-  assert.doesNotMatch(css, /!important\\b/);
+  assert.doesNotMatch(css, /!important\b/);
 });
