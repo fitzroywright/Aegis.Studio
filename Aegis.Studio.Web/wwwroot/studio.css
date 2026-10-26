@@ -9009,14 +9009,7 @@ body[data-studio-view="workspaces"] .workspace-list-layout {
     grid-column: 1;
   }
 }
-body .topbar #studioBreadcrumb .breadcrumb-label {
-  color: #d8aa52 !important;
-  font-weight: 800;
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  white-space: nowrap;
-}
+
 .fd-page {
   height: 100%;
   min-height: 0;
@@ -9991,7 +9984,7 @@ body .topbar #studioBreadcrumb {
   overflow: hidden;
 }
 body .topbar #studioBreadcrumb .breadcrumb-label {
-  display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   color: #efc36b;
   font-weight: 800;
@@ -10027,7 +10020,7 @@ body .topbar .studio-today-brand-title {
 body .topbar { padding-left: 0 !important; column-gap: 0 !important; }
 body .topbar .studio-script-brand { padding: 0 !important; margin: 0 !important; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
 body .topbar .studio-script-brand .studio-bryans-brand-image { display: block; width: 216px; height: 56px; object-fit: contain; }
-body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left: 0 !important; border-left: 0 !important; }
+
 
 
 
