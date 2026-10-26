@@ -95,7 +95,7 @@ body[data-theme="office-light"] :is(.smc-actions button,.smc-footer>button,.smc-
 body[data-theme="office-light"] :is(.smc-actions button,.smc-footer>button,.smc-note-open,.smc-note button):hover {background:#fce5ef;}
 
 /* Tables, Media headings and secondary bars share the pale blue treatment. */
-body[data-theme="office-light"] :is(.mw-today-job-columns,.management-workload-head,.sj-table th,.operational-grid th,.op-table th,.workspace-table th,.fd-table th,.studio-media-panel h2,.studio-media-detail>h3,.studio-media-gallery-header>div:first-child,.operations-workspace-overview>header) {
+body[data-theme="office-light"] :is(.mw-today-job-columns,.management-workload-head,.sj-table th,.operational-grid th,.op-table th,.workspace-table th,.fd-table th,.studio-media-panel h2,.studio-media-detail>h3,.studio-media-gallery-header>div:first-child) {
   background:var(--studio-grid-header-bg)!important;
   color:var(--studio-grid-header-text)!important;
   border-color:var(--studio-grid-header-border)!important;
@@ -111,7 +111,7 @@ body[data-theme="office-light"] #studioContextRail [data-rail-card="workspaces"]
 
 /* Controls stay readable inside pale grid headers, including the Today search. */
 body[data-theme="office-light"] :is(input,select,textarea,.theme-picker) {background:#fff;color:var(--theme-text);border-color:var(--studio-control-border)!important;accent-color:var(--theme-accent);}
-body[data-theme="office-light"] :is(.mw-today-job-columns,.sj-job-header,.sj-column-filter,.operations-workspace-overview,.studio-media-gallery-tools,.workspace-column-header,.fd-column-controls,.fd-client-header) :is(input,select),
+body[data-theme="office-light"] :is(.mw-today-job-columns,.sj-job-header,.sj-column-filter,.studio-media-gallery-tools,.workspace-column-header,.fd-column-controls,.fd-client-header) :is(input,select),
 body[data-theme="office-light"] #frontDeskSearch {
   background:#fff!important;color:var(--theme-text)!important;border-color:var(--studio-control-border)!important;
 }
@@ -123,6 +123,7 @@ body[data-theme="office-light"] :is(input,select,textarea,button,a):focus-visibl
 body[data-theme="office-light"] :is(.st-link,.sj-gold,.text-button,.link-button,.studio-workspaces-view-all,.mw-list-right header button,.mw-today-right header button) {color:var(--theme-accent)!important;}
 body[data-theme="office-light"] :is(.primary,.smc-content>.composer .send-split button) {background:#0068d9;color:#fff;border-color:#0068d9;}
 body[data-theme="office-light"] :is(.primary,.smc-content>.composer .send-split button):hover {background:#075fc0;border-color:#075fc0;}
-body[data-theme="office-light"] :is(.sj-view-tabs button.active,.mw-today-view-tabs button.active,.mw-calendar-view-switch button.active,.studio-media-status-tabs button.active,.operations-view-switch button[aria-pressed="true"],.pipeline-view-switch button.active,.workspace-tabs button.active,.workspace-reference-tabs button.active,.production-filters>button.active,.production-queue-tabs button.active,.fd-tabs button.active) {background:#986c55;color:#fff;border-color:#986c55;}
+body[data-theme="office-light"] :is(.sj-view-tabs button.active,.mw-today-view-tabs button.active,.mw-calendar-view-switch button.active,.studio-media-status-tabs button.active,.pipeline-view-switch button.active,.workspace-tabs button.active,.workspace-reference-tabs button.active,.production-filters>button.active,.production-queue-tabs button.active,.fd-tabs button.active) {background:#986c55;color:#fff;border-color:#986c55;}
 body[data-theme="office-light"] :is(dialog,.studio-dialog,.user-menu-popover) {background:#fff;color:var(--theme-text);border-color:var(--theme-border);}
 body[data-theme="office-light"] dialog::backdrop {background:#17345166;}
+

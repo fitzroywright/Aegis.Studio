@@ -31,7 +31,7 @@
     })[character]);
 
     function labelFor(view) {
-        return ({'operations-management':'Operations','studio-management':'Studio Management','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
+        return ({'studio-management':'Studio Management','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
             || String(view || 'Studio').replace(/(^|\s)\S/g, match => match.toUpperCase());
     }
 
@@ -49,7 +49,6 @@
         schedule: 'View scheduled shoots, assignments and staff availability.',
         pipeline: 'Track jobs through their workflow stages and next actions.',
         finance: 'Review invoices, payments and outstanding balances.',
-        'operations-management': 'Monitor operational work, assignments and exceptions.',
         'studio-management': 'Configure Studio settings, staff access and workspaces.'
     };
     const taglineFor = view => pageTaglines[view] || 'Manage Studio work and related information.';
@@ -138,7 +137,6 @@
                     <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
                     <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
                     <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
-                    <button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations</span></button>
                     <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                 </div>
             </section>
@@ -664,3 +662,4 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })()
+

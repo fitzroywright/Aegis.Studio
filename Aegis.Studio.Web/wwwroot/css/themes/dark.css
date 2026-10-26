@@ -95,7 +95,7 @@ body[data-theme="fluent-dark"] :is(.smc-actions button,.smc-footer>button,.smc-n
 body[data-theme="fluent-dark"] :is(.smc-actions button,.smc-footer>button,.smc-note-open,.smc-note button):hover {background:#52354b;}
 
 /* Tables, Media headings and secondary bars share the dark blue treatment. */
-body[data-theme="fluent-dark"] :is(.mw-today-job-columns,.management-workload-head,.sj-table th,.operational-grid th,.op-table th,.workspace-table th,.fd-table th,.studio-media-panel h2,.studio-media-detail>h3,.studio-media-gallery-header>div:first-child,.operations-workspace-overview>header) {
+body[data-theme="fluent-dark"] :is(.mw-today-job-columns,.management-workload-head,.sj-table th,.operational-grid th,.op-table th,.workspace-table th,.fd-table th,.studio-media-panel h2,.studio-media-detail>h3,.studio-media-gallery-header>div:first-child) {
   background:var(--studio-grid-header-bg)!important;
   color:var(--studio-grid-header-text)!important;
   border-color:var(--studio-grid-header-border)!important;
@@ -111,7 +111,7 @@ body[data-theme="fluent-dark"] #studioContextRail [data-rail-card="workspaces"] 
 
 /* Controls stay dark and readable, including focused grid searches. */
 body[data-theme="fluent-dark"] :is(input,select,textarea,.theme-picker) {background:#1a2836;color:var(--theme-text);border-color:var(--studio-control-border)!important;accent-color:var(--theme-accent);}
-body[data-theme="fluent-dark"] :is(.mw-today-job-columns,.sj-job-header,.sj-column-filter,.operations-workspace-overview,.studio-media-gallery-tools,.workspace-column-header,.fd-column-controls,.fd-client-header) :is(input,select),
+body[data-theme="fluent-dark"] :is(.mw-today-job-columns,.sj-job-header,.sj-column-filter,.studio-media-gallery-tools,.workspace-column-header,.fd-column-controls,.fd-client-header) :is(input,select),
 body[data-theme="fluent-dark"] #frontDeskSearch {
   background:#1a2836!important;color:var(--theme-text)!important;border-color:var(--studio-control-border)!important;
 }
@@ -123,7 +123,7 @@ body[data-theme="fluent-dark"] :is(input,select,textarea,button,a):focus-visible
 body[data-theme="fluent-dark"] :is(.st-link,.sj-gold,.text-button,.link-button,.studio-workspaces-view-all,.mw-list-right header button,.mw-today-right header button) {color:var(--theme-accent)!important;}
 body[data-theme="fluent-dark"] :is(.primary,.smc-content>.composer .send-split button) {background:#82bfff;color:#102033;border-color:#82bfff;}
 body[data-theme="fluent-dark"] :is(.primary,.smc-content>.composer .send-split button):hover {background:#a6d1ff;border-color:#a6d1ff;}
-body[data-theme="fluent-dark"] :is(.sj-view-tabs button.active,.mw-today-view-tabs button.active,.mw-calendar-view-switch button.active,.studio-media-status-tabs button.active,.operations-view-switch button[aria-pressed="true"],.pipeline-view-switch button.active,.workspace-tabs button.active,.workspace-reference-tabs button.active,.production-filters>button.active,.production-queue-tabs button.active,.fd-tabs button.active) {background:#986c55;color:#fff;border-color:#986c55;}
+body[data-theme="fluent-dark"] :is(.sj-view-tabs button.active,.mw-today-view-tabs button.active,.mw-calendar-view-switch button.active,.studio-media-status-tabs button.active,.pipeline-view-switch button.active,.workspace-tabs button.active,.workspace-reference-tabs button.active,.production-filters>button.active,.production-queue-tabs button.active,.fd-tabs button.active) {background:#986c55;color:#fff;border-color:#986c55;}
 body[data-theme="fluent-dark"] :is(dialog,.studio-dialog,.user-menu-popover) {background:#1a2836;color:var(--theme-text);border-color:var(--theme-border);}
 body[data-theme="fluent-dark"] dialog::backdrop {background:#08101dcc;}
 
@@ -149,3 +149,4 @@ body[data-theme="fluent-dark"] :is(.sj-pill.sj-purple) {background:#392d4d;color
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-teal,.sj-pill.sj-green,.jd-status-pill) {background:#254338;color:#a0e0bd;border-color:#579f83;}
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-amber,.jd-compact-exception.current) {background:#483b26;color:#f5d395;border-color:#aa874e;}
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-red,.jd-flow-terminal) {background:#482d37;color:#ffb9c7;border-color:#bb6f83;}
+
