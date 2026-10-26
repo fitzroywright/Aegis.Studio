@@ -178,9 +178,9 @@ body[data-studio-view="frontdesk"] #frontDeskSearch:focus{background:#23466d!imp
 :is(.mw-today-right,.mw-list-right,.st-right,.sj-right,.fd-secondary,.workspace-right-rail,.job-detail-right,.studio-media-detail).studio-rail-collapsed-right > [data-rail-toggle="right"] { position:fixed; inset-inline-end:4px; inset-block-start:64px; z-index:1001; }
 body[data-studio-view] .shell :has(> .studio-rail-collapsed-right) { --studio-shell-grid-columns:minmax(0,1fr); grid-template-columns:var(--studio-shell-grid-columns); padding-inline-end:30px; box-sizing:border-box; }
 :is(.studio-rail-collapsed-left,.studio-rail-collapsed-right) > :not([data-rail-toggle]) { display:none !important; }
-body .shell:has(> #studioContextRail.studio-rail-collapsed-left) { grid-template-columns:minmax(0,1fr) !important; column-gap:0 !important; }
+body .shell:has(> #studioContextRail.studio-rail-collapsed-left) { grid-template-columns:minmax(0,1fr); column-gap:0; }
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail { position:fixed; inset-inline-start:0; top:56px; bottom:36px; grid-column:auto; grid-row:auto; width:0; min-width:0; overflow:visible; z-index:1000; }
-body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > main { grid-column:1 !important; grid-row:1; width:100% !important; min-width:0; padding-inline-start:34px; }
+body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > main { grid-column:1; grid-row:1; width:100%; min-width:0; padding-inline-start:34px; }
 body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContextRail > [data-rail-toggle="left"] { position:fixed; inset-inline-start:4px; inset-block-start:64px; z-index:1001; }
 
 /* Expanded rail toggles live in the first card header; collapsed rails keep a compact edge control. */
@@ -198,3 +198,4 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 .studio-shell-rail-toggle { display:grid; place-items:center; width:28px; height:28px; min-width:28px; padding:0; border:1px solid #aab9c9; border-radius:50%; background:#fff; color:#29445e; box-shadow:0 1px 4px #172b4033; }
 .studio-shell-rail-toggle svg { display:block; width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
 .studio-shell-rail-toggle[data-chevron-direction="left"] svg { transform:scaleX(-1); }
+
