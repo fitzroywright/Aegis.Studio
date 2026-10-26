@@ -176,14 +176,17 @@ async function showCatalogProduction(){
     if(!current())return;
     commercialPage('Production','<div class="production-board-view">'+filters+'<div class="production-kanban" aria-label="Production work order board">'+lanes+'</div><footer class="commercial-pager production-board-pager"><button type="button" data-prev '+(commercialQueueOffset?'':'disabled')+'>Previous</button><span>'+(workItems.length?commercialQueueOffset+1:0)+'–'+(commercialQueueOffset+pageItems.length)+' of '+workItems.length+' production items</span><button type="button" data-next '+(commercialQueueOffset+50<workItems.length?'':'disabled')+'>Next</button><p role="alert"></p></footer></div>','',summary,attention);
     genericView.querySelector('.st-board')?.classList.add('production-main-board');
-    const overviewCard=genericView.querySelector('.st-right>.st-card:first-child');
-    const overviewHeader=overviewCard?.querySelector('header');
-    const pipelineLink=document.createElement('button');pipelineLink.type='button';pipelineLink.className='fd-card-link';pipelineLink.dataset.openProductionPlan='';pipelineLink.textContent='View Production Pipeline →';
-    if(overviewHeader){overviewCard.classList.add('production-overview-card');overviewHeader.appendChild(pipelineLink);}
-    const attentionCard=genericView.querySelector('.st-right>.st-card:nth-child(2)');
-    const attentionHeader=attentionCard?.querySelector('header');
-    const tasksLink=document.createElement('button');tasksLink.type='button';tasksLink.className='fd-card-link';tasksLink.dataset.graphTasks='';tasksLink.textContent='Workflow Tasks →';
-    if(attentionHeader){attentionCard.classList.add('production-attention-card');attentionHeader.appendChild(tasksLink);}
+    // Production actions belong to the active board toolbar, not retired right-rail cards.
+    const productionFilters=genericView.querySelector('.production-board-filters');
+    if(productionFilters){
+        const pipelineLink=document.createElement('button');
+        pipelineLink.type='button';pipelineLink.className='fd-card-link';pipelineLink.dataset.openProductionPlan='';
+        pipelineLink.textContent='View Production Pipeline →';
+        const tasksLink=document.createElement('button');
+        tasksLink.type='button';tasksLink.className='fd-card-link';tasksLink.dataset.graphTasks='';
+        tasksLink.textContent='Workflow Tasks →';
+        productionFilters.append(pipelineLink,tasksLink);
+    }
     const reload=()=>showCatalogProduction().catch(e=>alert(e.message));
     genericView.querySelectorAll('[data-workload-filter]').forEach(b=>b.onclick=()=>{selection.filter=b.dataset.workloadFilter==='all'?'':b.dataset.workloadFilter;commercialQueueOffset=0;reload();});
     for(const [selector,key] of [['filter-select','filter'],['assignee','assignee'],['stage','stage']])genericView.querySelector('[data-workload-'+selector+']').onchange=e=>{selection[key]=e.target.value;commercialQueueOffset=0;reload();};
