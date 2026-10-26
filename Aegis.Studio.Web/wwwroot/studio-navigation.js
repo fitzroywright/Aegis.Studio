@@ -1054,6 +1054,20 @@
     }
     function beginNavigation(view,options){
         const context=recordNavigation(view,options),revision=++navigationRevision;
+        // Switch mutually exclusive page surfaces before awaiting route data.
+        // Otherwise the previous Job Details view remains above the new page.
+        const openingJob = view === 'workspaces' && !!context.studioJobId;
+        if (!openingJob) {
+            conversationView.classList.add('hidden');
+            conversationView.hidden = true;
+            genericView.classList.remove('hidden');
+            genericView.hidden = false;
+            genericView.replaceChildren();
+        } else {
+            genericView.classList.add('hidden');
+            genericView.hidden = true;
+            conversationView.hidden = false;
+        }
         window.StudioProductionPlanning?.invalidate();
         window.StudioPhotographerSchedule?.invalidate();
         window.StudioClients?.invalidate();
