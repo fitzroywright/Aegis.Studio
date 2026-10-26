@@ -9959,7 +9959,7 @@ body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:sta
   align-self: center;
   background: #68472f;
   color: #fff;
-  border: 1px solid #d8b58f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 5px;
   font-size: 12px;
   font-weight: 700;
