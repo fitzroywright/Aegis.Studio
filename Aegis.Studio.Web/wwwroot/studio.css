@@ -7505,7 +7505,7 @@ body[data-studio-view="today"] .mw-today-toolbar-actions [data-assign-job-lead]:
   display: none;
 }
 .mw-today-right .mw-session-row {
-  min-width: 0;;
+  min-width: 0;
 }
 .mw-today-right .mw-session-row {
   grid-template-columns: minmax(58px,.7fr) minmax(0,1.3fr);
@@ -9148,8 +9148,6 @@ flex:1;}
 }
 
 
-
-
 .studio-today-brand-title .mw-today-focus-icon {
   font-size: 22px;
   flex: 0 0 auto;
@@ -9186,8 +9184,6 @@ body[data-studio-view="today"] .topbar #studioBreadcrumb {
   min-width: 0;
   overflow: hidden;
 }
-
-
 
 
 @media (max-width:1200px) {
@@ -9388,10 +9384,6 @@ body .shell>main {
   flex-direction: column;
   min-height: 0;
 }
-
-
-
-
 
 
 body:not([data-studio-view="today"]) .shell>main {
@@ -9954,10 +9946,8 @@ body .topbar .studio-today-brand-title {
 }
 /* Single artwork for the Studio identity, with the page title directly beside it. */
 
-body .topbar .studio-script-brand { padding: 0 !important; margin: 0 !important; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
+body .topbar .studio-script-brand { padding: 0; margin: 0; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
 body .topbar .studio-script-brand .studio-bryans-brand-image { display: block; width: 216px; height: 56px; object-fit: contain; }
-
-
 
 
 /* Front Desk grid: fixed header and rows share one responsive six-column layout. */
