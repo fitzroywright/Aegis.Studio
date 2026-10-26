@@ -138,7 +138,6 @@
                     <button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations</span></button>
                     <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                     <button type="button" data-studio-side="messages"><span>✉</span><span>Messages</span></button>
-                    <button type="button" data-studio-side="notifications"><span>♧</span><span>Notifications</span></button>
                 </div>
             </section>
             ${shellOverviews.get(overviewKey()) || defaultOverview()}
