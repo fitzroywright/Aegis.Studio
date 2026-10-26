@@ -52,7 +52,7 @@ if(notificationButton){
     panel.setAttribute('role','dialog');
     panel.setAttribute('aria-label','Recent messages');
     panel.hidden=true;
-    panel.innerHTML='<header><strong>Messages</strong><button type="button" data-bell-close aria-label="Close messages">×</button></header><div class="studio-message-bell-list" role="status">Open to load recent messages.</div><footer><button type="button" data-bell-all>Open Messages →</button></footer>';
+    panel.innerHTML='<header><strong>Messages &amp; Announcements</strong><button type="button" data-bell-close aria-label="Close messages">×</button></header><div class="studio-message-bell-list" role="status">Open to load recent messages and announcements.</div><footer><button type="button" data-bell-all>Open Messages →</button></footer>';
     notificationButton.insertAdjacentElement('afterend',panel);
     let requestRevision=0;
     const close=()=>{panel.hidden=true;notificationButton.setAttribute('aria-expanded','false');requestRevision++;};
@@ -66,22 +66,38 @@ if(notificationButton){
         const list=panel.querySelector('.studio-message-bell-list');
         list.textContent='Loading messages…';
         try{
-            const response=await fetch('/api/messages/inbox?offset=0&limit=8',{credentials:'same-origin'});
-            if(!response.ok)throw new Error('Message inbox unavailable');
-            const payload=await response.json();
-            const items=Array.isArray(payload.items)?payload.items.slice(0,8):[];
+            const messageResponse=await fetch('/api/messages/inbox?offset=0&limit=8',{credentials:'same-origin'});
+            if(!messageResponse.ok)throw new Error('Message inbox unavailable');
+            const payload=await messageResponse.json();
+            const messages=(Array.isArray(payload.items)?payload.items:[]).map(item=>({kind:'message',title:item.message?.subject||item.thread?.title||item.message?.senderUserName||'Message',body:item.message?.body||item.message?.text||item.message?.content||'',at:item.message?.createdAtUtc||''}));
+            const workspaceResponse=await fetch('/api/workspaces',{credentials:'same-origin'});
+            if(!workspaceResponse.ok)throw new Error('Workspace announcements unavailable');
+            const workspacePayload=await workspaceResponse.json();
+            const workspaces=Array.isArray(workspacePayload)?workspacePayload:Array.isArray(workspacePayload.items)?workspacePayload.items:[];
+            const results=await Promise.allSettled(workspaces.filter(w=>w.id).map(async workspace=>{
+                const response=await fetch('/api/workspaces/'+encodeURIComponent(workspace.id)+'/announcements',{credentials:'same-origin'});
+                if(!response.ok)throw new Error('Announcements unavailable');
+                const announcements=await response.json();
+                return (Array.isArray(announcements)?announcements:[]).map(item=>({kind:'announcement',title:item.title||'Announcement',body:item.body||'',at:item.createdAtUtc||'',workspaceId:workspace.id,workspaceName:workspace.name||''}));
+            }));
+            const announcements=results.flatMap(result=>result.status==='fulfilled'?result.value:[]);
+            const items=[...messages,...announcements].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,12);
             if(revision!==requestRevision||panel.hidden)return;
             list.replaceChildren();
-            if(!items.length){list.textContent='No recent messages.';return;}
+            if(!items.length){list.textContent='No recent messages or announcements.';return;}
             for(const item of items){
                 const button=document.createElement('button');
                 button.type='button';
                 const title=document.createElement('strong');
-                title.textContent=String(item.message?.subject||item.thread?.title||item.message?.senderUserName||'Message');
+                title.textContent=(item.kind==='announcement'?'📣 ':'✉ ')+String(item.title);
                 const preview=document.createElement('span');
-                preview.textContent=String(item.message?.body||item.message?.text||item.message?.content||'').slice(0,170);
+                preview.textContent=String((item.workspaceName?item.workspaceName+' · ':'')+item.body).slice(0,170);
                 button.append(title,preview);
-                button.onclick=()=>{close();window.studioNavigate?.('messages');};
+                button.onclick=()=>{
+                    close();
+                    if(item.kind==='announcement'&&item.workspaceId&&typeof window.openWorkspace==='function')window.openWorkspace(item.workspaceId);
+                    else window.studioNavigate?.('messages');
+                };
                 list.append(button);
             }
         }catch(error){if(revision===requestRevision&&!panel.hidden)list.textContent='Messages could not be loaded. Open Messages to try again.';}
