@@ -3216,7 +3216,7 @@ body[data-studio-view="workspaces"] .generic {
   color: #7c746c;
 }
 body[data-studio-view="workspaces"] .topbar {
-  background: rgba(255,253,249,.97);
+  background: #172d4a;
   box-shadow: 0 1px 0#ddd7cf,0 5px 18px rgba(54,37,24,.04);
 }
 body[data-studio-view="workspaces"] .brand-button.active {
@@ -3706,10 +3706,10 @@ body[data-studio-view] {
   background: var(--studio-page);
 }
 body[data-studio-view] .topbar {
-  height: 58px;
+  height: 56px;
   padding: 0 28px;
   gap: 12px;
-  background: #fff;
+  background: #172d4a;
   border-bottom: 1px solid var(--studio-border);
   box-shadow: 0 1px 3px rgba(23,52,78,.05);
 }
@@ -6463,12 +6463,6 @@ body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .three-pane
     display: none;
   }
 }
-body[data-studio-view="workspaces"] .studio-context-rail {
-  display: none;
-}
-body[data-studio-view="workspaces"] .shell {
-  grid-template-columns: minmax(0,1fr);
-}
 body[data-studio-view="workspaces"] .generic {
   padding: 14px 22px 20px;
 }
@@ -6545,14 +6539,6 @@ body[data-studio-view="workspaces"] .studio-shell-breadcrumb button {
 body[data-studio-view="workspaces"] .studio-shell-breadcrumb strong {
   color: #102b4e;
   font-weight: 800;
-}
-body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell {
-  grid-template-columns: var(--studio-shell-left-width,220px) minmax(0,1fr);
-  gap: 14px;
-  box-sizing: border-box;
-  background: #f8f9fa;
-  display: block;
-  padding: 0;
 }
 body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell>main {
   min-width: 0;
