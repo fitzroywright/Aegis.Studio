@@ -331,7 +331,8 @@
         const productionTasks=myTasks.filter(t=>/edit|retouch|qc|print|deliver|production|gallery|select|design|color|review|upload|schedule/i.test(String(t.activityType||'')+' '+String(t.title||'')));
         const attentionItems=[...productionTasks,...myTasks.filter(t=>!productionTasks.includes(t))].slice(0,5);
         const attentionTotal=overdueTasks+blockedTasks+attentionJobs;
-        window.dispatchEvent(new CustomEvent('studio-attention-updated', {detail: {overdueTasks,blockedTasks,schedulingJobs,uploadJobs,exceptionJobs}}));
+        window.dispatchEvent(new CustomEvent('studio-attention-updated', {detail: {view:'today',loaded:true,overdueTasks,blockedTasks,schedulingJobs,uploadJobs,exceptionJobs}}));
+        window.dispatchEvent(new CustomEvent('studio-sessions-updated', {detail: {view:'today',count:visibleTodaySchedule.length,markup:sessionRows}}));
 
         const availableWorkspaces=(typeof workspaceCache!=='undefined'&&Array.isArray(workspaceCache)?workspaceCache:[])
             .filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view);
@@ -356,9 +357,7 @@
                             <div class="mw-today-job-list">${phase('jobs',mainJobRows)}</div>
                         </section>
                     </main>
-                    <aside class="mw-today-right studio-dashboard-template__aside" aria-label="Daily activity">
-                        <section class="mw-list-panel" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button data-nav="schedule">View Calendar →</button></header><div class="mw-section-rows">${phase('schedule',sessionRows)}</div></section>
-                    </aside>
+
                 </div>
             </section>`;
         const next=document.createElement('div');next.innerHTML=markup;
