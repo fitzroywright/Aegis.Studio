@@ -4,12 +4,14 @@ on:
     paths:
       - 'Aegis.Studio.Web/wwwroot/**'
       - 'scripts/check-ui-css-ownership.cjs'
+      - 'tests/ui/shared-shell-ownership.test.cjs'
       - '.github/workflows/ui-css-ownership.yml'
   push:
     branches: [main]
     paths:
       - 'Aegis.Studio.Web/wwwroot/**'
       - 'scripts/check-ui-css-ownership.cjs'
+      - 'tests/ui/shared-shell-ownership.test.cjs'
       - '.github/workflows/ui-css-ownership.yml'
 jobs:
   css-ownership:
