@@ -3,6 +3,8 @@ const digest=x=>createHash('sha256').update(x).digest('hex');
 const rand=()=>randomBytes(32).toString('base64url');
 const equal=(a,b)=>{const x=Buffer.from(String(a||'')),y=Buffer.from(String(b||''));return x.length===y.length&&timingSafeEqual(x,y);};
 const reject=(status,message)=>Object.assign(new Error(message),{status});
+const TENANT_GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MICROSOFT_CONSUMER_TENANT='9188040d-6c67-4c5b-b112-36a304b66dad';
 async function requestJson(url,options={}){
   const r=await fetch(url,{...options,redirect:'error',signal:AbortSignal.timeout(12000)});
   if(!r.ok)throw reject(502,'Identity provider request failed.');
@@ -24,9 +26,28 @@ function verifyToken(token,metadata,keys,clientId,nonce,provider,msTenant){
   if(!claims.sub||claims.aud!==clientId||claims.exp<=now||claims.iat>now+60||!equal(claims.nonce,nonce))
     throw reject(401,'Invalid identity claims.');
   if(provider==='microsoft'){
-    const tenant=msTenant==='consumers'?'9188040d-6c67-4c5b-b112-36a304b66dad':msTenant;
-    if(claims.tid!==tenant||claims.iss!=='https://login.microsoftonline.com/'+tenant+'/v2.0')
+    const tenant=claims.tid;
+    if(typeof tenant!=='string'||!TENANT_GUID.test(tenant))
+      throw reject(401,'Invalid Microsoft tenant ID.');
+    if(msTenant==='consumers'&&tenant!==MICROSOFT_CONSUMER_TENANT
+       || msTenant!=='common'&&msTenant!=='consumers'&&tenant!==msTenant)
       throw reject(401,'Microsoft identity is not issued by the configured tenant.');
+    const issuer='https://login.microsoftonline.com/'+tenant+'/v2.0';
+    if(claims.iss!==issuer)throw reject(401,'Invalid Microsoft identity issuer.');
+    const expectedMetadataIssuer=msTenant==='common'
+      ?'https://login.microsoftonline.com/{tenantid}/v2.0'
+      :issuer;
+    if(metadata.issuer!==expectedMetadataIssuer)
+      throw reject(401,'Unexpected Microsoft discovery issuer.');
+    if(typeof jwk.issuer!=='string') {
+      if(msTenant==='common')throw reject(401,'Missing Microsoft signing-key issuer.');
+    }else {
+      const signingKeyIssuer=jwk.issuer.replaceAll('{tenantid}',tenant);
+      if(signingKeyIssuer!==issuer)throw reject(401,'Microsoft signing key does not belong to this tenant.');
+    }
+    // Microsoft sub is tenant-scoped. Include tid to prevent linking identities across tenants.
+    // Keep the legacy personal-account subject for existing single-consumer deployments.
+    return {...claims,verifiedSubject:msTenant==='common'&&tenant!==MICROSOFT_CONSUMER_TENANT?tenant+':'+claims.sub:claims.sub};
   }else if(claims.iss!==metadata.issuer)throw reject(401,'Invalid identity issuer.');
   return claims;
 }
@@ -39,8 +60,8 @@ export class ClientAuthentication {
       throw Error('PUBLIC_WEB_ORIGIN must be an origin and HTTPS in production.');
     this.host=u.hostname.toLowerCase();
     this.msTenant=String(env.MICROSOFT_TENANT_ID||'consumers').toLowerCase();
-    if(this.msTenant!=='consumers'&&!/^[0-9a-f-]{36}$/.test(this.msTenant))
-      throw Error('MICROSOFT_TENANT_ID must be consumers or a specific organization tenant UUID.');
+    if(this.msTenant!=='common'&&this.msTenant!=='consumers'&&!TENANT_GUID.test(this.msTenant))
+      throw Error('MICROSOFT_TENANT_ID must be common, consumers or a specific organization tenant UUID.');
     this.config={
       microsoft:{id:env.MICROSOFT_CLIENT_ID,secret:env.MICROSOFT_CLIENT_SECRET,
         discovery:'https://login.microsoftonline.com/'+this.msTenant+'/v2.0/.well-known/openid-configuration'},
@@ -122,7 +143,7 @@ export class ClientAuthentication {
           redirect_uri:callback,code,code_verifier:row.verifier}).toString()
       });
       const claims=verifyToken(token.id_token,metadata,keys,c.id,row.nonce,provider,this.msTenant);
-      identity={subject:String(claims.sub),name:String(claims.name||claims.preferred_username||'Client'),
+      identity={subject:String(claims.verifiedSubject||claims.sub),name:String(claims.name||claims.preferred_username||'Client'),
         email:claims.email||claims.preferred_username||null};
     }
     if(identity.subject.length>300||identity.name.length>200)throw reject(401,'Invalid provider profile.');
