@@ -10157,3 +10157,17 @@ body[data-studio-view="frontdesk"] .fd-table-head-clip{flex:0 0 auto;min-width:0
 body[data-studio-view="frontdesk"] .fd-table-scroll{flex:1 1 auto;min-width:0;width:100%;min-height:0;overflow-x:hidden;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
 body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-width:0;table-layout:fixed}
 body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:static}
+
+
+/* Shared navigation and footer workspace selector (active stylesheet). */
+#studioContextRail [data-rail-card="navigation"] > header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+#studioContextRail .studio-nav-today { border:1px solid #e6a04d; background:#285578; color:#fff; border-radius:5px; padding:5px 9px; font:inherit; font-weight:700; cursor:pointer; white-space:nowrap; }
+body .shell > footer#studioShellFooter > select#studioFooterWorkspaces {
+ display:block !important; flex:0 0 190px !important; width:190px !important; min-width:0 !important;
+ max-width:190px !important; height:27px !important; min-height:27px !important; max-height:27px !important;
+ margin:0 0 0 auto !important; padding:2px 9px !important; box-sizing:border-box !important;
+ align-self:center !important; background:#68472f !important; color:#fff !important;
+ border:1px solid #d8b58f !important; border-radius:5px !important; font-size:12px !important;
+ font-weight:700 !important; cursor:pointer;
+}
+body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { background:#fff; color:#173552; }
