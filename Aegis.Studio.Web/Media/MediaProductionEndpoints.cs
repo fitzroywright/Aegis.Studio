@@ -46,7 +46,7 @@ public static class MediaProductionEndpoints
             if(string.IsNullOrWhiteSpace(request.Name)||request.Name.Length>100||!new[]{"Auto","Images","Subjects","Collections"}.Contains(request.DefaultLens))throw new ArgumentException("Choose a media name and default view.");
             Store(db,storage).Sync(jobId);using var c=db.OpenConnection();using var tx=c.BeginTransaction();MediaProductionStore.Execute(c,tx,"update studio_media_galleries set name=$2,default_lens=$3 where id=$1",jobId,request.Name.Trim(),request.DefaultLens);MediaProductionStore.Audit(c,tx,jobId,"MediaSettingsChanged",Name(user),"Updated media name and default view.");tx.Commit();return Results.NoContent();
         })).RequireAuthorization();
-        app.MapDelete("/api/jobs/{jobId:guid}/media/assets/{assetId:guid}",(Guid jobId,Guid assetId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>DeleteMediaWrite(jobId,user,access,()=>{Store(db,storage).SoftDeleteAsset(jobId,assetId,Name(user));return Results.NoContent();})).RequireAuthorization();
+        app.MapDelete("/api/jobs/{jobId:guid}/media/assets/{assetId:guid}",(Guid jobId,Guid assetId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>DeleteMediaWrite(jobId,user,access,db,()=>{Store(db,storage).SoftDeleteAsset(jobId,assetId,Name(user));return Results.NoContent();})).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/assets/{assetId:guid}/restore",(Guid jobId,Guid assetId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>DeleteMediaWrite(jobId,user,access,()=>{Store(db,storage).SoftDeleteAsset(jobId,assetId,Name(user),restore:true);return Results.NoContent();})).RequireAuthorization();
         app.MapPut("/api/jobs/{jobId:guid}/media/assets/{assetId:guid}",(Guid jobId,Guid assetId,MediaAssetUpdate request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).UpdateAsset(jobId,assetId,request,Name(user),new GlobalOperationalRoleStore(db).HasRole(user,StudioRoleNames.ProductionManager));return Results.NoContent();})).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/collections",(Guid jobId,MediaCollectionRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).CreateCollection(jobId,request.Name,Name(user));return Results.NoContent();})).RequireAuthorization();
@@ -101,9 +101,10 @@ public static class MediaProductionEndpoints
     }
     private static MediaProductionStore Store(StudioDatabase db,IFileStorage storage)=>new(db,new StudioVersionStore(db,storage));
     private static string Name(ClaimsPrincipal user)=>user.FindFirstValue("login_name")??user.Identity?.Name??throw new UnauthorizedAccessException();
-    private static IResult DeleteMediaWrite(Guid job,ClaimsPrincipal user,JobAccessService access,Func<IResult> action)
+    private static IResult DeleteMediaWrite(Guid job,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,Func<IResult> action)
     {
-        if(!access.HasPermission(user,job,"DeleteMedia"))return Results.Forbid();
+        if(!access.HasPermission(user,job,"ViewAttachments"))return Results.Forbid();
+        if(!user.IsInRole("Administrator") && !new GlobalOperationalRoleStore(db).HasPermission(user,StudioPermissions.DeleteMedia))return Results.Forbid();
         try{return action();}catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}catch(KeyNotFoundException){return Results.NotFound();}catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
     }
     private static IResult Write(Guid job,ClaimsPrincipal user,JobAccessService access,Func<IResult> action)
