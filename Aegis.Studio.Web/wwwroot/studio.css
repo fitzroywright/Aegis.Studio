@@ -9434,7 +9434,7 @@ body .topbar .shell-context {
   flex: 0 0 auto;
 }
 body .topbar #notificationButton {
-  margin-left: auto;
+  margin-left: 0;
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -9970,6 +9970,7 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 /* Shared masthead attention control and slide-out drawer. */
 .topbar { position: relative; }
 .topbar .studio-attention-trigger {
+  margin-left: auto;
   position: static;
   transform: none;
   display: inline-flex;
