@@ -357,7 +357,6 @@
                     </main>
                     <aside class="mw-today-right studio-dashboard-template__aside" aria-label="Daily activity">
                         <section class="mw-list-panel" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button data-nav="schedule">View Calendar →</button></header><div class="mw-section-rows">${phase('schedule',sessionRows)}</div></section>
-                        ${StudioMessageCard.html({id:'todayMessageCard',title:'Messages',body:phase('notifications',messageRows),actions:'<button type="button" data-nav="messages">View All →</button>',footer:'<button type="button" data-nav="messages">✉ Send Message →</button>',attributes:'data-mw-region="messages"'})}
                     </aside>
                 </div>
             </section>`;
@@ -370,7 +369,6 @@
         }
         else next.querySelectorAll('[data-mw-region]').forEach(region=>{
             const existing=genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]');
-            if(region.dataset.mwRegion==='messages'){existing.querySelector('.smc-feed').innerHTML=region.querySelector('.smc-feed').innerHTML;return;}
             if(existing.innerHTML===region.innerHTML)return;
             const scroll=[...existing.querySelectorAll('div')].map(el=>el.scrollTop);
             const focused=document.activeElement?.dataset?.mwFilter;
@@ -379,7 +377,6 @@
             if(focused)existing.querySelector('[data-mw-filter="'+focused+'"]')?.focus();
         });
         state.root=genericView.querySelector('.mw-page');
-        StudioMessageCard.bind(state.root.querySelector('#todayMessageCard'));
         window.studioSetBreadcrumb?.([{label:'Today',view:'today'}]);
         if(studioPageTools){
             const today=new Date();
@@ -726,9 +723,7 @@
                         </div>
                     </section>
 
-                    <aside class="mw-list-right workspace-right-rail">
-                        ${StudioMessageCard.html({id:'workspaceMessageCard',title:'Messages',body:announcements.map(a=>`<article class="smc-row"><span aria-hidden="true">📣</span><span class="smc-copy"><strong>${esc(a.title)}</strong><small>${esc(a.body)}</small><small>${esc(a.workspaceName)} · ${esc(a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):'')}</small></span></article>`).join('')||'<p>No workspace announcements.</p>',footer:'<button type="button" data-nav-quick="messages">✉ Send Message →</button>'})}
-                    </aside>
+
                 </div>
             </section>`;
 
