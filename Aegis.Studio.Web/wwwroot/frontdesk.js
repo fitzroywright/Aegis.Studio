@@ -110,7 +110,6 @@ function openFrontDeskJob(jobId){
 }
 
 function renderFrontDesk(){
-    const preservedMessageCard=genericView.querySelector('#frontDeskMessageCard');
     const searchNode=genericView.querySelector('#frontDeskSearch');
     const searchFocused=searchNode===document.activeElement;
     const searchSelection=searchNode?[searchNode.selectionStart,searchNode.selectionEnd]:null;
@@ -175,7 +174,9 @@ function renderFrontDesk(){
           </section>
         
       </div><aside class="fd-secondary mw-list-right" aria-label="Front Desk activity">
-        <section class="mw-list-panel fd-overview">
+        <section class="mw-list-panel fd-schedule" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button type="button" class="fd-card-link" data-calendar>View Calendar →</button></header><div class="mw-section-rows fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="mw-session-row fd-session"><span class="mw-session-time fd-session-time">${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))} – ${esc(new Date(s.endsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</span><span class="mw-session-main"><strong>${esc(frontDeskJobs.find(j=>String(j.id)===String(s.jobId))?.title||s.title)}</strong><small>${esc(frontDeskJobs.find(j=>String(j.id)===String(s.jobId))?.clientName||'Client name unavailable')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
+      </aside></div></div>`;
+    window.studioFrontDeskOverviewMarkup = `<section class="mw-list-panel fd-overview">
             <header><h2><span class="mw-title-icon attention">▤</span> Overview</h2></header>
             <div class="mw-status-list">
                 ${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}
@@ -186,11 +187,8 @@ function renderFrontDesk(){
             <footer class="smc-footer fd-overview-toolbar" role="toolbar" aria-label="Overview actions">
                 <button type="button" data-new-booking>＋ Create Manual Booking →</button>
             </footer>
-        </section>
-        <section class="mw-list-panel fd-schedule" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button type="button" class="fd-card-link" data-calendar>View Calendar →</button></header><div class="mw-section-rows fd-schedule-list">${sessions.map(s=>`<button data-frontdesk-job="${esc(s.jobId||'')}" class="mw-session-row fd-session"><span class="mw-session-time fd-session-time">${esc(new Date(s.startsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))} – ${esc(new Date(s.endsAtUtc).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</span><span class="mw-session-main"><strong>${esc(frontDeskJobs.find(j=>String(j.id)===String(s.jobId))?.title||s.title)}</strong><small>${esc(frontDeskJobs.find(j=>String(j.id)===String(s.jobId))?.clientName||'Client name unavailable')}</small></span></button>`).join('')||'<p class="muted">No sessions scheduled today.</p>'}</div></section>
-        ${StudioMessageCard.html({id:'frontDeskMessageCard',body:'<div id="fdCommunicationFeed"><p>Loading messages…</p></div>',actions:'<button type="button" data-messages-all>View All →</button>',footer:'<button type="button" data-message-compose>✉ Send Message →</button>',attributes:'data-mw-region="messages" data-fd-communications'})}
-      </aside></div></div>`;
-    if(preservedMessageCard)genericView.querySelector('#frontDeskMessageCard').replaceWith(preservedMessageCard);
+        </section>`;
+    window.dispatchEvent(new CustomEvent('studio-frontdesk-overview-updated'));
     if(searchNode&&genericView.querySelector('#frontDeskSearch')){genericView.querySelector('#frontDeskSearch').replaceWith(searchNode);searchNode.value=frontDeskTerm;if(searchFocused){searchNode.focus({preventScroll:true});searchNode.setSelectionRange(...searchSelection);}}
     // The shared shell footer owns the visible filtered row count.
     const shellCount=document.getElementById('studioFooterRate');
@@ -201,7 +199,7 @@ function renderFrontDesk(){
         const label=jobQueue?(frontDeskColumnFilters.status==='Completed'?'Completed Jobs':'Pickup / Delivery Jobs'):frontDeskTab==='unassigned'?'Unassigned Jobs':frontDeskTab==='completed'?'Completed Jobs':frontDeskTab==='delivery'?'Pickup / Delivery Jobs':frontDeskMetricView==='enquiries'||frontDeskTab==='enquiries'?'New Inquiries':frontDeskMetricView==='deposits'?'Pending Deposits':frontDeskMetricView==='confirmation'?'Needs Confirmation':'Bookings & Inquiries';
         shellCount.textContent=count+' '+label;
     }
-    genericView.querySelectorAll('[data-fd-metric]').forEach(button=>button.onclick=()=>{
+    document.querySelectorAll('#studioContextRail [data-fd-metric]').forEach(button=>button.onclick=()=>{
         const key=button.dataset.fdMetric;
         frontDeskMetricView=frontDeskMetricView===key?'':key;
         frontDeskTab=frontDeskMetricView==='unassigned'?'unassigned':'today';
@@ -220,13 +218,9 @@ function renderFrontDesk(){
         renderFrontDesk();
     });
     const newBooking=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
-    genericView.querySelectorAll('[data-new-booking]').forEach(b=>b.onclick=newBooking);
+    document.querySelectorAll('#studioContextRail [data-new-booking]').forEach(b=>b.onclick=newBooking);
     genericView.querySelectorAll('[data-view-receipt]').forEach(button=>button.addEventListener('click',()=>pickFrontDeskSale('ViewReceipt',button.dataset.viewReceipt).catch(error=>alert(error.message))));
     genericView.querySelector('[data-calendar]')?.addEventListener('click',()=>studioNavigate('pipeline'));
-    genericView.querySelector('[data-messages-all]')?.addEventListener('click',()=>studioNavigate('messages'));
-    genericView.querySelector('[data-message-compose]')?.addEventListener('click',()=>openFrontDeskMessagePicker());
-    StudioMessageCard.bind(genericView.querySelector('#frontDeskMessageCard'));
-    loadFrontDeskCommunications();
     const search=genericView.querySelector('#frontDeskSearch');
     if(search)search.oninput=e=>{frontDeskTerm=e.target.value;renderFrontDesk();};
     genericView.querySelectorAll('[data-frontdesk-job]').forEach(b=>b.onclick=()=>b.dataset.frontdeskJob&&openFrontDeskJob(b.dataset.frontdeskJob));
