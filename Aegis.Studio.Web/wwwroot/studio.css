@@ -10060,3 +10060,67 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 @media (max-width: 760px) {
   .topbar .studio-attention-trigger { position: static; transform: none; margin-left: auto; }
 }
+
+/* Masthead message bell slide-down preview. */
+.studio-message-bell-panel:not([hidden]) {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 56px;
+  z-index: 1100;
+  width: min(385px, calc(100vw - 24px));
+  max-height: min(520px, 75vh);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #c8d1dc;
+  border-radius: 8px;
+  background: #fff;
+  color: #172d4a;
+  box-shadow: 0 12px 30px rgba(10,20,35,.25);
+  overflow: hidden;
+}
+.studio-message-bell-panel header,
+.studio-message-bell-panel footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  background: #f1f5f9;
+}
+.studio-message-bell-panel header strong { font-size: 14px; }
+.studio-message-bell-panel [data-bell-close] {
+  border: 0;
+  background: transparent;
+  font-size: 23px;
+  color: #172d4a;
+  cursor: pointer;
+}
+.studio-message-bell-list { overflow-y: auto; padding: 8px; min-height: 48px; }
+.studio-message-bell-list button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border: 0;
+  border-bottom: 1px solid #e6ebf0;
+  background: #fff;
+  color: #172d4a;
+  text-align: left;
+  cursor: pointer;
+}
+.studio-message-bell-list button:hover { background: #f0f5fb; }
+.studio-message-bell-list button strong { font-size: 12px; }
+.studio-message-bell-list button span { font-size: 11px; color: #536273; line-height: 1.35; }
+.studio-message-bell-panel [data-bell-all] {
+  width: 100%;
+  padding: 7px;
+  border: 1px solid #bbc9d8;
+  border-radius: 5px;
+  background: #fff;
+  color: #172d4a;
+  font-weight: 700;
+  cursor: pointer;
+}
+@media (max-width: 700px) {
+  .studio-message-bell-panel:not([hidden]) { right: 12px; }
+}
