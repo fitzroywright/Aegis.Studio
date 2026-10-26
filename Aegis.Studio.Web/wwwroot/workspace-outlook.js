@@ -64,6 +64,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
         delete detailPane.dataset.mediaCount;delete detailPane.dataset.subjectCount;delete detailPane.dataset.productionEnabled;delete detailPane.dataset.editEnabled;delete detailPane.dataset.readyEnabled;
         disposeJobView();disposeJobView=()=>{};
         selectedJob=null;selectedConversation=null;
+        detailPane.dataset.jobId = job?.id || '';
         display();
         detailPane.classList.remove('empty');
         detailPane.classList.add('job-reading-view','job-detail-page');
@@ -84,6 +85,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
     async function showJobMessages(job,version=beginJobLoading(job)) {
         if(!currentJobOpening(version))return;
         selectedWorkspace=job.workspaceId;
+        detailPane.dataset.jobId = job.id;
         const workspace=workspaceCache.find(item=>String(item.id)===String(job.workspaceId));
         currentWorkspacePermissions=workspace?.permissions||{};
         workspaceTitle.textContent=workspace?.name||'Workspace';

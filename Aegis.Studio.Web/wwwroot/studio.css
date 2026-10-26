@@ -33,7 +33,7 @@
   box-sizing: border-box;
 }
 body {
-  font: 14px/1.35"Segoe UI",Arial,sans-serif;
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
 }
 button {
   cursor: pointer;
@@ -3706,7 +3706,7 @@ body[data-studio-view] {
   background: var(--studio-page);
 }
 body[data-studio-view] .topbar {
-  height: 56px;
+  height: 60px;
   padding: 0 28px;
   gap: 12px;
   background: #172d4a;
@@ -3714,7 +3714,7 @@ body[data-studio-view] .topbar {
   box-shadow: 0 1px 3px rgba(23,52,78,.05);
 }
 body[data-studio-view] .shell {
-  height: calc(100dvh - 58px);
+  height: calc(100dvh - 62px);
 }
 body[data-studio-view] .shell-brand strong:before {
   letter-spacing: 0;
@@ -7954,14 +7954,6 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel>:not(header) {
   background:var(--studio-rail-accent);
   border-bottom-color:var(--studio-rail-accent);
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="schedule"] {
-  border-color: #a6c8e8;
-  background: #f7fbff;
-}
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="schedule"]>header {
-  background: #e7f2ff;
-  border-bottom-color: #c9def3;
-}
 body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"] {
   border-color: #e6c29c;
   background: #fffaf4;
@@ -7986,9 +7978,6 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel>header h2 {
   line-height:1.2;
   margin:0;
   font-size:.81rem;
-}
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="schedule"]>header h2 {
-  color: #235b8c;
 }
 body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header h2 {
   color: #945b23;
@@ -9969,7 +9958,7 @@ body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:sta
 body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { background:#fff; color:#173552; }
 
 /* Shared masthead attention control and slide-out drawer. */
-.topbar .studio-sessions-trigger { margin-left: auto; }
+
 .topbar { position: relative; }
 .topbar .studio-attention-trigger {
   margin-left: 0;
@@ -9990,6 +9979,8 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   white-space: nowrap;
   z-index: 2;
 }
+.topbar .studio-sessions-trigger { margin-left: auto; border-color: #8cbcd8; background: #234969; color: #edf8ff; }
+.topbar .studio-attention-trigger:not(.studio-sessions-trigger) { border-color: #e7a56c; background: #593b32; color: #fff1e2; }
 .topbar .studio-attention-trigger:hover,
 .topbar .studio-attention-trigger[aria-expanded="true"] { background: rgba(255,255,255,.18); }
 .topbar .studio-attention-trigger strong {
@@ -10003,6 +9994,8 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   color: #172d4a;
   font-variant-numeric: tabular-nums;
 }
+.topbar .studio-sessions-trigger strong { background: #d9effa; color: #174b6a; }
+.topbar .studio-attention-trigger:not(.studio-sessions-trigger) strong { background: #ffe0c2; color: #784017; }
 .topbar .studio-attention-trigger.has-attention strong { background: #d94841; color: #fff; }
 .studio-attention-backdrop:not([hidden]) {
   position: fixed;
@@ -10032,6 +10025,11 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   color: #fff;
 }
 .studio-attention-drawer h2 { font-size: 18px; margin: 0; }
+#studioSessionsDrawer header { background: #234969; }
+#studioAttentionDrawer header { background: #70412e; }
+.studio-shared-session-row { display:grid; gap:5px; padding:12px; border:1px solid #c9e0ec; border-radius:7px; background:#f2f9fd; }
+.studio-shared-session-row strong { color:#174b6a; }
+.studio-shared-session-row span { font-size:12px; color:#40576a; }
 .studio-attention-drawer [data-attention-close] {
   border: 0;
   background: transparent;
@@ -10056,10 +10054,7 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 .studio-attention-details button:hover { background: #eaf0f7; }
 .studio-attention-details strong { color: #ba3430; font-variant-numeric: tabular-nums; }
 @media (max-width: 1100px) {
-  .topbar .studio-attention-trigger { left: 54%; font-size: 11px; padding: 5px 7px; }
-}
-@media (max-width: 760px) {
-  .topbar .studio-attention-trigger { position: static; transform: none; margin-left: auto; }
+  .topbar .studio-attention-trigger { font-size: 11px; padding: 5px 7px; }
 }
 
 /* Masthead message bell slide-down preview. */
