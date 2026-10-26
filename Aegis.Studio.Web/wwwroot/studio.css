@@ -8889,13 +8889,8 @@ body .topbar .studio-bryans-logo small {
   letter-spacing: .15em;
   font-weight: 650;
 }
-body .shell>.studio-shell-footer {
-  text-align: left;
-  gap: 12px;
-}
-body .shell>.studio-shell-footer #studioFooterRate {
-  margin-left: auto;
-}
+
+
 @media (max-width:1080px) {
   body[data-studio-view="today"] .mw-today-job-toolbar {
     flex-wrap: wrap;
@@ -9326,6 +9321,8 @@ body[data-studio-view="today"] .topbar #studioBreadcrumb {
   }
 }
 body .shell>.studio-shell-footer {
+  text-align: left;
+  gap: 12px;
   display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
@@ -9335,6 +9332,9 @@ body .shell>.studio-shell-footer {
 body .shell>.studio-shell-footer #studioFooterUser {
   flex: 0 1 auto;
   min-width: 0;
+}
+body .shell>.studio-shell-footer #studioFooterRate {
+  margin-left: auto;
 }
 body .shell>.studio-shell-footer .studio-grid-item-count {
   display: block !important;
