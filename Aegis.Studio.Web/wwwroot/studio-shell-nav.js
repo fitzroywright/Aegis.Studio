@@ -16,6 +16,7 @@
     ];
     let currentView = document.body.dataset.studioView || 'today';
     let workspaceOverview = null;
+    let pageOverview = null;
     let renderingTools = false;
     let workspaceLoadPromise = null;
     let workspaceLoadAttempted = false;
@@ -70,12 +71,12 @@
     }
 
     function syncFooterIdentity() {
-        const target = document.getElementById('studioFooterUser');
+        const target = document.querySelector('.user-menu-trigger');
         if (!target) return;
         const label = document.getElementById('signedInUser')?.textContent?.trim();
         const avatar = document.getElementById('userAvatar')?.textContent?.trim();
         const identity = label && !/^signed in$/i.test(label) ? label : (avatar && avatar !== '--' ? avatar : 'Studio Administrator - Admin');
-        target.textContent = 'Logged in User: ' + identity;
+        target.title = 'Logged in User: ' + identity;
     }
 
     function ensureLeftRail() {
@@ -146,6 +147,7 @@
                 </div>
             </section>` : ''}
             ${document.body.dataset.studioView === 'frontdesk' && window.studioFrontDeskOverviewMarkup ? window.studioFrontDeskOverviewMarkup : ''}
+            ${pageOverview?.view === document.body.dataset.studioView && !['workspaces','frontdesk'].includes(pageOverview.view) ? pageOverview.markup : ''}
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
@@ -392,9 +394,8 @@
 
         // Every view, including Today, uses the same shared masthead and frame sync.
         document.getElementById('studioSharedPageHeading')?.remove();
-        if (breadcrumb && breadcrumb.nextElementSibling !== bell) {
-            masthead.insertBefore(breadcrumb, bell);
-        }
+        const footer = document.getElementById('studioShellFooter');
+        if (footer && breadcrumb && breadcrumb.parentElement !== footer) footer.prepend(breadcrumb);
         if (title) {
             const jobOpen = view === 'workspaces' && !document.getElementById('conversationView')?.classList.contains('hidden') && !!document.querySelector('#conversationView.has-open-job .job-detail-page');
             const pageLabel = jobOpen ? 'Job Details' : labelFor(view);
@@ -508,6 +509,7 @@
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
         window.addEventListener('studio-frontdesk-overview-updated', renderLeftRail);
+        window.addEventListener('studio-page-overview-updated',event=>{pageOverview=event.detail||null;renderLeftRail();});
         window.addEventListener('studio-workspace-overview-updated', event => {
             workspaceOverview = event.detail || null;
             renderLeftRail();
