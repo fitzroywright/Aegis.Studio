@@ -27,6 +27,7 @@ public static class StudioPermissions
     public const string ViewClientAttachments = "studio.attachments.view";
     public const string AddClientAttachments = "studio.attachments.add";
     public const string ManageSecurity = "studio.security.manage";
+    public const string DeleteMedia = "studio.media.delete";
 }
 
 public sealed class GlobalOperationalRoleStore : IAuthorizationStore
@@ -38,6 +39,7 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
 
     private static readonly Guid FinanceManagerRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc005");
     private static readonly Guid ProductionManagerRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc006");
+    private static readonly Guid MediaCustodianRoleId = Guid.Parse("f40f8c48-233b-49f4-a1d3-5ba85d6fc007");
 
     private readonly StudioDatabase database;
 
@@ -97,6 +99,8 @@ public sealed class GlobalOperationalRoleStore : IAuthorizationStore
 
         if (EnsureRole(FinanceManagerRoleId, StudioRoleNames.FinanceManager, "Contractual credit, final delivery authorization and outstanding receivables.")) created.Add(FinanceManagerRoleId);
         if (EnsureRole(ProductionManagerRoleId, StudioRoleNames.ProductionManager, "Production dispatch and final technical approval.")) created.Add(ProductionManagerRoleId);
+        if (EnsureRole(MediaCustodianRoleId, "Media Custodian", "Authorized to soft-delete and restore Studio photographs.")) created.Add(MediaCustodianRoleId);
+        SeedPermission(MediaCustodianRoleId, StudioPermissions.DeleteMedia);
         foreach (var role in new[] { FinanceManagerRoleId, ProductionManagerRoleId })
         {
             SeedPermission(role, StudioPermissions.Access);
