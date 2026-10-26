@@ -5625,9 +5625,7 @@ body[data-studio-view="today"] .generic {
   color: #155f9f;
   box-shadow: 0 1px 3px rgba(24,45,67,.12);
 }
-.studio-shell-page-tools .mw-day-nav button {
-  height: 34px;
-}
+
 .studio-shell-page-tools .mw-day-nav .calendar {
   height: 34px;
 }
@@ -5985,6 +5983,7 @@ body[data-studio-view] .user-menu-popover button:hover {
   background: #f9fbfd;
 }
 .studio-shell-page-tools .mw-day-nav button {
+  height: 34px;
   border: 0;
   background: transparent;
 }
