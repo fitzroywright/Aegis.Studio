@@ -15,6 +15,7 @@
         ['messages', 'Messages', '✉']
     ];
     let currentView = document.body.dataset.studioView || 'today';
+    let workspaceOverview = null;
     let renderingTools = false;
     let workspaceLoadPromise = null;
     let workspaceLoadAttempted = false;
@@ -138,6 +139,12 @@
                     <button type="button" data-studio-side="notifications"><span>♧</span><span>Notifications</span></button>
                 </div>
             </section>
+            ${document.body.dataset.studioView === 'workspaces' && !jobPage && workspaceOverview ? `<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview">
+                <header><h2><span class="studio-card-icon" aria-hidden="true">▤</span> Overview</h2><small>Studio totals</small></header>
+                <div class="mw-status-list">
+                    ${[['▥','Active Jobs','activeJobs'],['✓','Completed Jobs','completedJobs'],['▣','Upcoming Shoots','upcomingShoots'],['☑','Open Tasks','openTasks'],['◷','Overdue Tasks','overdueTasks'],['◆','Jobs Awaiting Production','awaitingProduction']].map(([icon,label,key])=>`<div class="workspace-summary-row"><span>${icon}</span><span>${label}</span><strong>${Number(workspaceOverview[key] || 0)}</strong></div>`).join('')}
+                </div>
+            </section>` : ''}
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
@@ -498,6 +505,10 @@
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
+        window.addEventListener('studio-workspace-overview-updated', event => {
+            workspaceOverview = event.detail || null;
+            renderLeftRail();
+        });
         window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();});
         // Job details and the workspace list share a route. Refresh the masthead
         // when the visible panel changes, not only when the route changes.
