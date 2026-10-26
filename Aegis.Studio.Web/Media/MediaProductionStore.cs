@@ -34,6 +34,8 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
             "create table if not exists studio_media_assets(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,gallery_id uuid not null references studio_media_galleries(id),asset_key text not null,production_status text not null default 'Needs Sorting',assigned_to text null,capture_at_utc timestamptz null,unique(job_id,asset_key))",
             "alter table studio_media_assets add column if not exists approved_version_id uuid null references studio_asset_versions(id)",
             "alter table studio_media_assets add column if not exists tags text[] not null default '{}'",
+            "alter table studio_media_assets add column if not exists deleted_at_utc timestamptz null",
+            "alter table studio_media_assets add column if not exists deleted_by text null",
             "create table if not exists studio_media_asset_subjects(asset_id uuid not null references studio_media_assets(id) on delete cascade,subject_id uuid not null references studio_job_subjects(id) on delete cascade,primary key(asset_id,subject_id))",
             "create table if not exists studio_media_edit_batches(id uuid primary key,job_id uuid not null references studio_jobs(id) on delete cascade,created_by text not null,created_at_utc timestamptz not null default now())",
             "create table if not exists studio_media_edit_items(token uuid primary key,batch_id uuid not null references studio_media_edit_batches(id) on delete cascade,asset_id uuid not null references studio_media_assets(id),source_version_id uuid not null references studio_asset_versions(id),export_name text not null,unique(batch_id,asset_id))",
@@ -71,7 +73,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         using var cmd=new NpgsqlCommand("""
             with matching as (select a.* from studio_media_assets a
               left join studio_job_asset_collections col on col.job_id=a.job_id and col.asset_key=a.asset_key
-              where a.job_id=$1 and ($2::text is null or coalesce(col.collection_name,'Unclassified')=$2)
+              where a.job_id=$1 and a.deleted_at_utc is null and ($2::text is null or coalesce(col.collection_name,'Unclassified')=$2)
               and ($3::uuid is null or exists(select 1 from studio_media_asset_subjects x where x.asset_id=a.id and x.subject_id=$3))
               and ($4::text is null or a.production_status=$4) and ($8::uuid is null or a.id=$8)),
             page as (select * from matching where ($5::uuid is null or id>$5) order by id limit $6)
@@ -100,6 +102,20 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         foreach(var value in new object?[]{job,page.Collection,page.SubjectId,page.Status,page.After,page.Limit,page.SubjectSearch,page.AssetId})cmd.Parameters.AddWithValue(value??DBNull.Value);
         return JsonSerializer.Deserialize<JsonElement>((string)cmd.ExecuteScalar()!);
     }
+    public void SoftDeleteAsset(Guid job,Guid id,string user,bool restore=false)
+    {
+        using var c=database.OpenConnection();using var tx=c.BeginTransaction();
+        if(Scalar(c,tx,"select id from studio_jobs where id=$1 and status not in ('Completed','Cancelled') for update",job) is null)
+            throw new InvalidOperationException("Reopen the Job before changing media.");
+        using var cmd=new NpgsqlCommand(restore?
+            "update studio_media_assets set deleted_at_utc=null,deleted_by=null where id=$1 and job_id=$2 and deleted_at_utc is not null":
+            "update studio_media_assets set deleted_at_utc=now(),deleted_by=$3 where id=$1 and job_id=$2 and deleted_at_utc is null",c,tx);
+        cmd.Parameters.AddWithValue(id);cmd.Parameters.AddWithValue(job);
+        if(!restore)cmd.Parameters.AddWithValue(user);
+        if(cmd.ExecuteNonQuery()!=1)throw new KeyNotFoundException("Media asset not found or already in the requested state.");
+        Audit(c,tx,job,restore?"MediaPhotoRestored":"MediaPhotoSoftDeleted",user,$"Asset {id}");
+        tx.Commit();
+    }
     public void UpdateAsset(Guid job,Guid id,MediaAssetUpdate request,string user,bool canDispatch=false)
     {
         MediaProductionRules.ValidateState(request.Status);
@@ -107,6 +123,7 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         string[]? tags=request.Tags is null?null:NormalizeTags(request.Tags);
         using var c=database.OpenConnection();using var tx=c.BeginTransaction();
         if(Scalar(c,tx,"select id from studio_jobs where id=$1 and status not in ('Completed','Cancelled') for update",job) is null)throw new ArgumentException("Reopen the Job before changing media.");
+        if(Scalar(c,tx,"select deleted_at_utc from studio_media_assets where id=$1 and job_id=$2",id,job) is DateTime)throw new InvalidOperationException("Restore the deleted photo before editing it.");
         string key=AssetKey(c,tx,job,id);
         string? previousAssignee=Scalar(c,tx,"select assigned_to from studio_media_assets where id=$1 and job_id=$2 for update",id,job) as string;
         if(!canDispatch&&!string.Equals(previousAssignee?.Trim(),request.AssignedTo?.Trim(),StringComparison.OrdinalIgnoreCase))throw new ArgumentException("Only a Production Manager may change the production assignment.");

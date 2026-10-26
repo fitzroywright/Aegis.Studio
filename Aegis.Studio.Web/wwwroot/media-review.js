@@ -184,11 +184,22 @@
         const versionUrl='/api/jobs/'+encodeURIComponent(job.value)+'/versions/by-id/'+encodeURIComponent(version);
         const bytes=Number(a.sizeBytes||a.size||0);
         const size=bytes?(typeof formatBytes==='function'?formatBytes(bytes):(bytes/1048576).toFixed(1)+' MB'):'';
-        detail.innerHTML='<h3 class="studio-media-selected-heading">'+escMedia(nameOf(a))+'<small>'+escMedia([size,a.contentType||a.mimeType,a.version?'v'+a.version:''].filter(Boolean).join(' · '))+'</small></h3>'+(image?'<img class="studio-media-selected-preview" src="'+versionUrl+'/preview?size=preview" onerror="this.onerror=null;this.src=\''+versionUrl+'/preview/fallback\'" alt="'+escMedia(nameOf(a))+'">':'<div class="studio-media-selected-placeholder">'+escMedia(a.previewStatus||'File preview unavailable')+'</div>')+'<div class="studio-media-detail-fields"><label class="studio-media-job-field">Job<input type="text" value="'+escMedia(describe(jobRecord||{})||job.value)+'" readonly title="Changing the Job requires moving the asset between Jobs"></label><label>Collection<select id="studioMediaDetailCollection">'+collectionOptions+'</select></label><label>Subjects<select data-subject-picker multiple aria-label="Photo subjects" id="studioMediaDetailSubjects"></select></label><button type="button" class="primary" id="studioMediaSaveTags">Save Tags</button><small id="studioMediaTagFeedback" role="status" aria-live="polite"></small>'+(version?'<a class="studio-media-original" href="'+versionUrl+'/content" target="_blank" rel="noopener">Open Original ↗</a>':'')+'</div>';
+        detail.innerHTML='<h3 class="studio-media-selected-heading">'+escMedia(nameOf(a))+'<small>'+escMedia([size,a.contentType||a.mimeType,a.version?'v'+a.version:''].filter(Boolean).join(' · '))+'</small></h3>'+(image?'<img class="studio-media-selected-preview" src="'+versionUrl+'/preview?size=preview" onerror="this.onerror=null;this.src=\''+versionUrl+'/preview/fallback\'" alt="'+escMedia(nameOf(a))+'">':'<div class="studio-media-selected-placeholder">'+escMedia(a.previewStatus||'File preview unavailable')+'</div>')+'<div class="studio-media-detail-fields"><label class="studio-media-job-field">Job<input type="text" value="'+escMedia(describe(jobRecord||{})||job.value)+'" readonly title="Changing the Job requires moving the asset between Jobs"></label><label>Collection<select id="studioMediaDetailCollection">'+collectionOptions+'</select></label><label>Subjects<select data-subject-picker multiple aria-label="Photo subjects" id="studioMediaDetailSubjects"></select></label><button type="button" class="primary" id="studioMediaSaveTags">Save Tags</button><button type="button" id="studioMediaDeletePhoto">Delete Photo</button><small id="studioMediaTagFeedback" role="status" aria-live="polite"></small>'+(version?'<a class="studio-media-original" href="'+versionUrl+'/content" target="_blank" rel="noopener">Open Original ↗</a>':'')+'</div>';
         const collectionInput=detail.querySelector('#studioMediaDetailCollection');
         const subjectList=detail.querySelector('#studioMediaDetailSubjects');
         subjectList.innerHTML=StudioSubjectPicker.options(subjects,currentSubjects);
         const save=detail.querySelector('#studioMediaSaveTags'),feedback=detail.querySelector('#studioMediaTagFeedback');
+        detail.querySelector('#studioMediaDeletePhoto').onclick=async()=>{
+          const assetId=a.id||a.assetId;
+          if(!assetId){feedback.textContent='This file cannot be deleted without an asset identifier.';return;}
+          if(!window.confirm('Remove this photograph from Studio Media? It can be restored by an authorized user.'))return;
+          const button=detail.querySelector('#studioMediaDeletePhoto');
+          button.disabled=true;feedback.textContent='Removing photograph…';
+          try{
+            await json('/api/jobs/'+encodeURIComponent(job.value)+'/media/assets/'+encodeURIComponent(assetId),{method:'DELETE'});
+            selectedAssetId='';await refresh();renderTree();
+          }catch(error){feedback.textContent=error.message||'Unable to remove photograph.';button.disabled=false;}
+        };
         save.onclick=async()=>{
           const chosenCollection=collectionInput.value,chosenSubjects=Array.from(subjectList.selectedOptions,x=>x.value);
           const assetId=a.id||a.assetId;
