@@ -2579,7 +2579,7 @@ small {
   font-size: 11px;
   color: #66717c;
 }
-body[data-studio-view="today"] .topbar {
+body .topbar {
   height: 64px;
   padding: 0 36px;
   gap: 14px;
@@ -7608,35 +7608,33 @@ body[data-studio-view="today"] .topbar {
   color: #fff !important;
   border-bottom: 1px solid #102238 !important;
 }
-body[data-studio-view="today"] .topbar .shell-brand {
+body .topbar .shell-brand {
   color: #fff !important;
 }
-body[data-studio-view="today"] .topbar .shell-brand strong {
+body .topbar .shell-brand strong {
   color: #fff !important;
 }
-body[data-studio-view="today"] .topbar .brand-button {
+body .topbar .brand-button {
   color: #fff !important;
 }
-body[data-studio-view="today"] .topbar .studio-organization {
+body .topbar .studio-organization {
   color: #fff !important;
 }
-body[data-studio-view="today"] .topbar .studio-breadcrumb {
+body .topbar .studio-breadcrumb {
   color: #fff !important;
 }
-body[data-studio-view="today"] .topbar #studioBreadcrumb {
+
+body .topbar .breadcrumb-separator {
   color: #fff !important;
 }
-body[data-studio-view="today"] .topbar .breadcrumb-separator {
+body .topbar .shell-brand strong:before {
   color: #fff !important;
 }
-body[data-studio-view="today"] .topbar .shell-brand strong:before {
-  color: #fff !important;
-}
-body[data-studio-view="today"] .topbar .brand-button.active {
+body .topbar .brand-button.active {
   color: #fff !important;
   border-bottom-color: #b98b69 !important;
 }
-body[data-studio-view="today"] .topbar .brand-button:hover {
+body .topbar .brand-button:hover {
   color: #fff !important;
   background: #ffffff1a !important;
 }
@@ -7669,11 +7667,7 @@ body[data-studio-view="today"] .mw-today-heading time {
     flex: 0 0 auto;
   }
 }
-body[data-studio-view="today"] .shell {
-  height: calc(100dvh - 64px);
-  min-height: 0;
-  overflow: hidden;
-}
+
 body[data-studio-view="today"] .shell>main {
   height: 100%;
   min-height: 0;
@@ -8921,17 +8915,7 @@ body .shell>.studio-shell-footer #studioFooterRate {
 body[data-studio-view="today"] .shell {
   position: relative;
 }
-body[data-studio-view="today"] .shell::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 55px;
-  height: 4px;
-  background: #df8a32;
-  z-index: 4;
-  pointer-events: none;
-}
+
 body[data-studio-view="today"] .mw-today-layout {
   border-top: 0;
   padding-top: 0;
@@ -8971,20 +8955,8 @@ body[data-studio-view="today"] .mw-today-heading #studioBreadcrumb button {
     top: 55px;
   }
 }
-body:not([data-studio-view="today"]) .shell {
-  position: relative;
-}
-body:not([data-studio-view="today"]) .shell::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 55px;
-  height: 3px;
-  background: #df8a32;
-  z-index: 5;
-  pointer-events: none;
-}
+
+
 body[data-studio-view="today"] .mw-today-jobs {
   display: flex;
   flex-direction: column;
@@ -9514,13 +9486,7 @@ body .shell>main {
   min-height: 0;
 }
 
-body:not([data-studio-view="today"]) .topbar #studioBreadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-}
+
 
 
 
@@ -9550,16 +9516,8 @@ body:not([data-studio-view="today"]) .shell>main>#genericView {
   padding-bottom: 6px;
   gap: 7px;
 }
-body:not([data-studio-view="today"]) .shell>.studio-shell-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-body:not([data-studio-view="today"]) .shell>.studio-shell-footer #studioFooterRate {
-  margin-left: auto;
-  text-align: right;
-  white-space: nowrap;
-}
+
+
 body:not([data-studio-view="today"]) :is(.mw-list-page,.production-page,.fd-page) {
   display: flex;
   flex-direction: column;
