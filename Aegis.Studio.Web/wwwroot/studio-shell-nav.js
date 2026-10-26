@@ -154,6 +154,7 @@
             </section>
 
 `;
+        if(document.body.dataset.studioView === 'frontdesk') window.studioBindFrontDeskOverview?.();
         renderFooterWorkspaceMenu(workspaces);
         if(document.body.dataset.studioView==='schedule')window.StudioScheduleWorkspaceCard?.bindRail(rail);
         rail.querySelector('[data-studio-close-register]')?.addEventListener('click',()=>launchFrontDeskPos('CloseRegister').catch(error=>alert(error.message)));
