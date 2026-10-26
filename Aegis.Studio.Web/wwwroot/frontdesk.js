@@ -199,14 +199,18 @@ function renderFrontDesk(){
         const label=jobQueue?(frontDeskColumnFilters.status==='Completed'?'Completed Jobs':'Pickup / Delivery Jobs'):frontDeskTab==='unassigned'?'Unassigned Jobs':frontDeskTab==='completed'?'Completed Jobs':frontDeskTab==='delivery'?'Pickup / Delivery Jobs':frontDeskMetricView==='enquiries'||frontDeskTab==='enquiries'?'New Inquiries':frontDeskMetricView==='deposits'?'Pending Deposits':frontDeskMetricView==='confirmation'?'Needs Confirmation':'Bookings & Inquiries';
         shellCount.textContent=count+' '+label;
     }
-    document.querySelectorAll('#studioContextRail [data-fd-metric]').forEach(button=>button.onclick=()=>{
-        const key=button.dataset.fdMetric;
-        frontDeskMetricView=frontDeskMetricView===key?'':key;
-        frontDeskTab=frontDeskMetricView==='unassigned'?'unassigned':'today';
-        frontDeskTerm='';
-        frontDeskColumnFilters={type:'',status:'',source:''};
-        renderFrontDesk();
-    });
+    window.studioBindFrontDeskOverview = () => {
+        document.querySelectorAll('#studioContextRail [data-fd-metric]').forEach(button=>button.onclick=()=>{
+            const key=button.dataset.fdMetric;
+            frontDeskMetricView=frontDeskMetricView===key?'':key;
+            frontDeskTab=frontDeskMetricView==='unassigned'?'unassigned':'today';
+            frontDeskTerm='';
+            frontDeskColumnFilters={type:'',status:'',source:''};
+            renderFrontDesk();
+        });
+        document.querySelectorAll('#studioContextRail [data-new-booking]').forEach(button=>button.onclick=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId)));
+    };
+    window.studioBindFrontDeskOverview();
     genericView.querySelectorAll('[data-fd-filter]').forEach(select=>select.onchange=()=>{
         frontDeskColumnFilters[select.dataset.fdFilter]=select.value;
         if(select.dataset.fdFilter==='status'){frontDeskTab='today';frontDeskMetricView='';if(['Pickup / Delivery','Completed'].includes(select.value)){frontDeskColumnFilters.type='';frontDeskColumnFilters.source='';}}
