@@ -16,6 +16,7 @@
     ];
     let currentView = document.body.dataset.studioView || 'today';
     let workspaceOverview = null;
+    let pageOverview = null;
     let renderingTools = false;
     let workspaceLoadPromise = null;
     let workspaceLoadAttempted = false;
@@ -146,6 +147,7 @@
                 </div>
             </section>` : ''}
             ${document.body.dataset.studioView === 'frontdesk' && window.studioFrontDeskOverviewMarkup ? window.studioFrontDeskOverviewMarkup : ''}
+            ${pageOverview && pageOverview.view === document.body.dataset.studioView && document.body.dataset.studioView !== 'workspaces' && document.body.dataset.studioView !== 'frontdesk' ? pageOverview.markup : ''}
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
@@ -508,6 +510,10 @@
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
         window.addEventListener('studio-frontdesk-overview-updated', renderLeftRail);
+        window.addEventListener('studio-page-overview-updated', event => {
+            pageOverview = event.detail || null;
+            renderLeftRail();
+        });
         window.addEventListener('studio-workspace-overview-updated', event => {
             workspaceOverview = event.detail || null;
             renderLeftRail();
