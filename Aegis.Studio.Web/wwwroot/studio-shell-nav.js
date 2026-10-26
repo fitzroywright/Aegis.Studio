@@ -22,7 +22,8 @@
     let workspaceLoadAttempted = false;
     let productionWorkspaceFilter = null;
     const pageAttention = new Map();
-    const pageSessions = new Map();
+    let sharedSessions = [];
+    let sessionsState = 'loading';
     const currentPage = () => overviewKey();
 
     const escText = value => String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -512,11 +513,7 @@
             pageAttention.set(data.view || currentPage(), data);
             refreshPageDrawers();
         });
-        window.addEventListener('studio-sessions-updated', event => {
-            const data = event.detail || {};
-            pageSessions.set(data.view || currentPage(), data);
-            refreshPageDrawers();
-        });
+
     }
 
 
@@ -555,13 +552,52 @@
                 details.append(button);
             });
         }
-        const sessions = pageSessions.get(key) || {};
-        const sessionCount = document.getElementById('studioSessionsCount');
-        if (sessionCount) sessionCount.textContent = String(sessions.count || 0);
-        const sessionDetails = document.getElementById('studioSessionsDetails');
-        if (sessionDetails) {
-            sessionDetails.innerHTML = sessions.markup || '<p>No sessions available for this page.</p>';
+        const jobRoot = key === 'job-detail' ? document.querySelector('#conversationView.has-open-job .job-detail-page') : null;
+        const jobId = jobRoot?.dataset.jobId || jobRoot?.closest('[data-job-id]')?.dataset.jobId;
+        const sessions = jobRoot && jobId ? sharedSessions.filter(item => String(item.jobId) === String(jobId)) : sharedSessions;
+        const count = document.getElementById('studioSessionsCount');
+        if (count) count.textContent = sessionsState === 'ready' ? String(sessions.length) : '…';
+        const details = document.getElementById('studioSessionsDetails');
+        if (details) {
+            details.replaceChildren();
+            if (sessionsState !== 'ready' || !sessions.length) {
+                const empty = document.createElement('p');
+                empty.textContent = sessionsState === 'loading' ? 'Loading sessions…' : sessionsState === 'error' ? 'Unable to load sessions. Open Today to retry.' : 'No sessions scheduled today.';
+                details.append(empty);
+            }
+            for (const item of sessions) {
+                const row = document.createElement('div');
+                row.className = 'studio-shared-session-row';
+                const start = new Date(item.startsAtUtc || item.start || item.startsAt);
+                const end = new Date(item.endsAtUtc || item.end || item.endsAt);
+                const time = Number.isNaN(start.getTime()) ? 'Time not set' : start.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+                const status = !Number.isNaN(end.getTime()) && end < new Date() ? 'Finished' : start <= new Date() ? 'In Progress' : 'Upcoming';
+                const name = document.createElement('strong');
+                name.textContent = item.jobTitle || item.title || 'Photography session';
+                const meta = document.createElement('span');
+                meta.textContent = [time,item.clientName,item.photographerName || item.photographer,item.location,status].filter(Boolean).join(' · ');
+                row.append(name,meta);
+                details.append(row);
+            }
         }
+    }
+
+    async function loadSharedSessions() {
+        const now = new Date();
+        const from = new Date(now.getFullYear(),now.getMonth(),now.getDate());
+        const to = new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+        try {
+            const response = await fetch('/api/today/schedule?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString()),{credentials:'same-origin'});
+            if (!response.ok) throw Error('Schedule request failed');
+            const data = await response.json();
+            sharedSessions = (Array.isArray(data) ? data : []).filter(item => item.status !== 'Cancelled' && new Date(item.startsAtUtc || item.start || item.startsAt) >= from && new Date(item.startsAtUtc || item.start || item.startsAt) < to);
+            sharedSessions.sort((a,b) => new Date(a.startsAtUtc || a.start) - new Date(b.startsAtUtc || b.start));
+            sessionsState = 'ready';
+        } catch (error) {
+            sessionsState = 'error';
+            console.error('[Studio sessions]',error);
+        }
+        refreshPageDrawers();
     }
 
     function initialize() {
@@ -577,6 +613,7 @@
         syncPageFrame();
         initializeAttentionDrawer();
         refreshPageDrawers();
+        loadSharedSessions();
         syncGridFooterCount();
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
@@ -598,11 +635,11 @@
             const detail = event.detail || {};
             window.studioShellSetOverview(detail.markup, detail.view);
         });
-        window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();});
+        window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();refreshPageDrawers();});
         // Job details and the workspace list share a route. Refresh the masthead
         // when the visible panel changes, not only when the route changes.
         const conversation=document.getElementById('conversationView');
-        if(conversation)new MutationObserver(()=>syncPageFrame()).observe(conversation,{attributes:true,attributeFilter:['class']});
+        if(conversation)new MutationObserver(()=>{syncPageFrame();refreshPageDrawers();}).observe(conversation,{attributes:true,attributeFilter:['class']});
 
 
         if (pageTools) {
