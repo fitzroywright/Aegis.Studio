@@ -49,6 +49,10 @@ test('Today, Front Desk and Job Detail use the one shared sessions drawer', () =
   const front = fs.readFileSync(path.join(root, 'frontdesk.js'), 'utf8');
   assert.doesNotMatch(nav, /Today's Sessions|data-mw-region="schedule"/);
   assert.doesNotMatch(front, /Today's Sessions|fd-secondary mw-list-right/);
+  for (const page of ['photographer-schedule.js', 'tasks-page.js']) {
+    const source = fs.readFileSync(path.join(root, page), 'utf8');
+    assert.doesNotMatch(source, /Today[’']s Sessions|ps-todays-sessions|data-mw-region="schedule"/);
+  }
   assert.match(shell, /sessionsDrawer.id = 'studioSessionsDrawer'/);
   assert.match(shell, /const jobRoot = key === 'job-detail'/);
   assert.match(shell, /loadSharedSessions\(\)/);
@@ -59,3 +63,4 @@ test('shared shell and Front Desk scripts are syntactically valid', () => {
     assert.doesNotThrow(() => new vm.Script(fs.readFileSync(path.join(root, name), 'utf8'), {filename:name}));
   }
 });
+
