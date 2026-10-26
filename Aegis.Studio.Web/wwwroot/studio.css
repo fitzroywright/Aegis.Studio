@@ -8290,8 +8290,7 @@ body[data-studio-view="today"] .mw-today-focus-label {
   padding: 2px 7px;
   font-size: .58rem;
 }
-.shell>.studio-context-rail {;;;
-}
+
 body[data-studio-view="today"] .mw-today-page {
   padding-top: 62px !important;
   padding-bottom: 6px !important;
