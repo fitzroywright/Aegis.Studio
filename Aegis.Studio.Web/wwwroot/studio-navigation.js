@@ -974,7 +974,6 @@
         pipeline:()=>showPipeline(),
         production:()=>showCatalogProduction(),
         'studio-management':()=>showStudioManagement(),
-        'operations-management':()=>showOperationsManagement(),
         catalog:()=>showCommercialCatalog(),
         'job-templates':()=>showCommercialTemplates('Job'),
         'work-order-templates':()=>showCommercialTemplates('WorkOrder'),
@@ -987,7 +986,7 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={'operations-management':'Operations Management','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Clients',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
+    const navigationLabels={'studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Clients',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
         return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'photographers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioJobId:view==='workspaces'&&options.jobId?String(options.jobId):null};
@@ -1089,6 +1088,7 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 
 
 
