@@ -16,6 +16,7 @@
       genericView.innerHTML='<section class="job-section"><h2>Media Review & Upload</h2><p role="alert">'+escMedia(error.message||'Unable to load jobs.')+'</p></section>';return;
     }
     if(current!==revision)return;
+    window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Jobs</span><strong>${jobs.length}</strong></div><div class="workspace-summary-row"><span>Workspaces</span><strong>${workspaces.length}</strong></div></section>`,'media');
     genericView.innerHTML=`<div class="studio-media-page">
       <header class="studio-media-heading"><div><h1>Media Review &amp; Upload</h1><p>Upload, organise and review Job media and source files.</p></div></header>
       <div class="studio-media-workspace"><section class="studio-media-panel studio-media-browser"><h2>Media Destinations</h2>
