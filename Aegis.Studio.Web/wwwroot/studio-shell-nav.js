@@ -423,7 +423,11 @@
         trigger.setAttribute('aria-controls', 'studioAttentionDrawer');
         trigger.setAttribute('aria-expanded', 'false');
         trigger.innerHTML = '<span>Needs Attention</span><strong id="studioAttentionCount" aria-label="Attention items">0</strong>';
-        masthead.insertBefore(trigger, document.getElementById('studioBreadcrumb'));
+        // Navigation History now lives in the footer, not the masthead.
+        // Use a masthead-owned sibling to avoid insertBefore NotFoundError.
+        const bell = document.getElementById('notificationButton');
+        if (bell?.parentElement === masthead) masthead.insertBefore(trigger, bell);
+        else masthead.appendChild(trigger);
         const backdrop = document.createElement('div');
         backdrop.className = 'studio-attention-backdrop';
         backdrop.hidden = true;
