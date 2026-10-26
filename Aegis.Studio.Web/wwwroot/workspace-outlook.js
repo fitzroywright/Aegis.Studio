@@ -205,9 +205,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 panels[name]=panel;contents[name]=panel.querySelector('.job-'+name+'-content');center.append(panel);
             }
             const right=document.createElement('aside');right.className='job-detail-right st-right';right.setAttribute('aria-label','Job tools and messages');
-            const selectedFile=document.createElement('section');selectedFile.className='jd-panel job-detail-selected-file';
-            selectedFile.innerHTML='<header class="jd-card-heading"><h2>Selected File</h2></header><div class="job-detail-selected-content"><p class="muted">Select a photo in the gallery to inspect it.</p></div>';
-            const selectedContent=selectedFile.querySelector('.job-detail-selected-content');
+
             const messagesPanel=document.getElementById('combinedJobMessages'),composer=document.getElementById('hierarchyCompose');
             const messageCard=StudioMessageCard.create({id:'jobDetailMessages',title:'Messages',attributes:'data-message-job-id="'+esc(job.id)+'"',actions:'<button type="button" data-message-search aria-label="Search messages">⌕</button><button type="button" data-message-more aria-label="Show all messages">⋮</button>'});
             const messageHeader=messageCard.querySelector('.smc-header');
@@ -220,7 +218,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             window.studioShellMountJobConversation?.(messageCard);
             window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Job</span><strong>${esc(job.title || 'Job Details')}</strong></div><div class="workspace-summary-row"><span>Client</span><strong>${esc(job.clientName || 'Not assigned')}</strong></div></section>`,'job-detail');
             window.studioShellMountJobAttention?.(attention);
-            right.append(selectedFile);board.append(center,right);detailPane.append(board);
+            board.append(center);detailPane.append(board);
             const footerTools=document.getElementById('studioFooterJobTools');
             const makeDrawer=(key,title,label)=>{
                 const toggle=document.createElement('button');toggle.type='button';toggle.className='jd-footer-link';toggle.dataset['job'+key]='';toggle.textContent=label;toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','job'+key+'Drawer');
@@ -249,7 +247,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 host.innerHTML='<p role="status">Loading…</p>';
                 const request=(async()=>{
                     try{
-                        if(name==='media')await window.StudioJobDetails.media(job,host,selectedContent,current,(mediaCount,subjectCount,permissions)=>{detailPane.dataset.productionEnabled=String(!!permissions.manageProduction);detailPane.dataset.editEnabled=String(!!permissions.editJob);detailPane.dataset.mediaCount=mediaCount;detailPane.dataset.subjectCount=subjectCount;window.dispatchEvent(new CustomEvent('studio-job-view-changed'));});
+                        if(name==='media')await window.StudioJobDetails.media(job,host,null,current,(mediaCount,subjectCount,permissions)=>{detailPane.dataset.productionEnabled=String(!!permissions.manageProduction);detailPane.dataset.editEnabled=String(!!permissions.editJob);detailPane.dataset.mediaCount=mediaCount;detailPane.dataset.subjectCount=subjectCount;window.dispatchEvent(new CustomEvent('studio-job-view-changed'));});
                         else await renderJobTab(name,job,host,requestCurrent,()=>loadPanel(name,true));
                         if(!requestCurrent())return false;
                         loaded.add(name);

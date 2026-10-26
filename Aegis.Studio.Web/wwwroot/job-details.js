@@ -33,7 +33,8 @@
   const picture=(asset,large=false)=>isPreviewable(asset)?`<img ${large?'':'loading="lazy"'} src="${preview(asset)}${large?'':'?size=thumbnail'}" alt="${escape(asset.fileName)}"><span class="jd-preview-fallback" hidden>Preview ${escape(asset.previewStatus||'unavailable')}<br>Original file is retained</span>`:'<span class="jd-preview-fallback">▤ Document</span>';
   function openPreview(asset){
    if(!isPreviewable(asset))return;
-   const dialog=studioDialog(asset.fileName,`<div class="jd-full-preview">${picture(asset,true)}</div>`);
+   const dialog=studioDialog(asset.fileName,'<section class="job-detail-selected-file jd-photo-dialog"><header class="jd-card-heading"></header><div class="job-detail-selected-content"></div></section>');
+   select(asset,dialog.querySelector('.job-detail-selected-content'));
    bindImages(dialog);
   }
   async function versions(asset){
@@ -41,7 +42,9 @@
    try{const history=await json(`/api/jobs/${job.id}/versions/${encodeURIComponent(asset.assetKey)}`);if(!dialog.isConnected)return;body.innerHTML=history.map(version=>`<article class="task-card"><a href="/api/jobs/${job.id}/versions/by-id/${version.id}/content">${escape(version.fileName)} · v${escape(version.versionNumber)}</a><small>${escape(studioFirstName(version.createdBy))} · ${escape(new Date(version.createdAtUtc).toLocaleString())}</small><p>${escape(version.note||'')}</p></article>`).join('')||'<p>No version history available.</p>';}
    catch(error){if(dialog.isConnected)body.textContent=error.message;}
   }
-  function select(asset){
+  function select(asset,target){
+   if(!target){selectedId=asset.id;host.querySelectorAll('[data-jd-asset]').forEach(tile=>{const active=tile.dataset.jdAsset===asset.id;tile.classList.toggle('selected',active);tile.setAttribute('aria-pressed',String(active));});return;}
+   const selectedHost=target;
    selectedId=asset.id;
    host.querySelectorAll('[data-jd-asset]').forEach(tile=>{const active=tile.dataset.jdAsset===asset.id;tile.classList.toggle('selected',active);tile.setAttribute('aria-pressed',String(active));});
    const collections=[...new Set(['Unclassified',...(data.collections||[]),asset.collection||'Unclassified'])];
@@ -51,7 +54,7 @@
    const tagInputId='jd-photo-tags-'+asset.id;
    selectedHost.innerHTML=`<div class="jd-selected-preview" tabindex="0" role="button" aria-label="Open selected photo preview">${picture(asset,true)}</div><form class="jd-file-form"><div class="jd-file-fields"><label>Collection<select name="collection" ${canEdit?'':'disabled'}>${collections.map(name=>`<option ${name===(asset.collection||'Unclassified')?'selected':''}>${escape(name)}</option>`).join('')}</select></label><label>Subjects<select data-subject-picker name="subjects" multiple size="2" ${canEdit?'':'disabled'} aria-label="File subjects">${StudioSubjectPicker.options(data.subjects,asset.subjects||[])}</select></label></div><label for="${escape(tagInputId)}">Tags</label><div class="jd-tag-editor"><div class="jd-tag-tokens" role="list" aria-label="Photo tags"></div><input id="${escape(tagInputId)}" type="text" data-tag-input placeholder="Add tags; Enter or comma" aria-label="Add photo tags" ${canEdit?'':'disabled'}></div>${canEdit?'<button type="submit" class="jd-save">Save file details</button>':''}<p role="alert"></p></form><div class="jd-file-links"><a href="/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content" download="${escape(asset.fileName)}">Download original</a><button type="button" data-versions>Versions</button>${canEdit?'<button type="button" data-retry-preview>Regenerate preview</button>':''}</div>`;
    bindImages(selectedHost);
-   const previewButton=selectedHost.querySelector('.jd-selected-preview');previewButton.onclick=()=>openPreview(asset);previewButton.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openPreview(asset);}};
+   const previewButton=selectedHost.querySelector('.jd-selected-preview');previewButton.removeAttribute('role');previewButton.removeAttribute('tabindex');previewButton.removeAttribute('aria-label');
    selectedHost.querySelector('[data-versions]').onclick=()=>versions(asset);
    const form=selectedHost.querySelector('form');
    const tokens=form.querySelector('.jd-tag-tokens'),tagInput=form.querySelector('[data-tag-input]');
@@ -112,7 +115,7 @@
     host.ondrop=async e=>{e.preventDefault();host.classList.remove('jd-drag-over');try{await upload(await studioDroppedPhotos(e.dataTransfer));}catch(error){announce(error.message);}};
    }
    const selected=data.assets.find(a=>a.id===selectedId)||data.assets[0];
-   if(selected)select(selected);else{selectedId='';selectedHost.closest('.job-detail-selected-file').querySelector('.jd-card-heading').innerHTML='<h2>Selected Image</h2>';selectedHost.innerHTML='<p class="jd-empty">Select a photo in the gallery to inspect it.</p>';}
+   if(selected)select(selected);else selectedId='';
   }
   async function load(){
    const version=++request;
