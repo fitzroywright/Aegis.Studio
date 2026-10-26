@@ -12,7 +12,7 @@
         return () => version === revision && matches();
     }
     function html({title, tools = '', content = '', summary = '', attention = '', className = '', scroll = false, showMessagesCard = true, showHeader = true, summaryTitle = 'Overview'}) {
-        return `<section class="st-page ${className}" aria-label="${escape(title)}"><section class="st-board">${showHeader ? `<header class="st-toolbar"><h1>${escape(title)}</h1><div class="st-tools">${tools}</div></header>` : ''}<div class="st-content${scroll ? ' st-card-scroll' : ''}">${content}</div></section><aside class="st-right" aria-label="Page information">${card(summaryTitle,summary || '<p>No summary available.</p>')}${card('Needs Attention',attention || '<p>No attention items reported.</p>','st-attention')}${showMessagesCard ? StudioMessageCard.html({id:'pageMessageCard',body:'<div data-page-messages role="status">Loading messages…</div>',footer:'<button type="button" data-page-send>✉ Send Message →</button>'}) : ''}</aside></section>`;
+        return `<section class="st-page ${className}" aria-label="${escape(title)}"><template data-studio-overview>${card(summaryTitle,summary || '<p>No summary available.</p>')}</template><section class="st-board">${showHeader ? `<header class="st-toolbar"><h1>${escape(title)}</h1><div class="st-tools">${tools}</div></header>` : ''}<div class="st-content${scroll ? ' st-card-scroll' : ''}">${content}</div></section><aside class="st-right" aria-label="Page information">${card('Needs Attention',attention || '<p>No attention items reported.</p>','st-attention')}${showMessagesCard ? StudioMessageCard.html({id:'pageMessageCard',body:'<div data-page-messages role="status">Loading messages…</div>',footer:'<button type="button" data-page-send>✉ Send Message →</button>'}) : ''}</aside></section>`;
     }
     function metrics(items) {
         return items.map(([label, value]) => `<div class="st-stat"><span>${escape(label)}</span><strong>${escape(value)}</strong></div>`).join('');
@@ -27,6 +27,9 @@
     }
     function bind(host, current = () => host.isConnected) {
         const root = host.querySelector('.st-page');
+        if (root) window.dispatchEvent(new CustomEvent('studio-page-overview-updated', {
+            detail: {view: document.body.dataset.studioView, title: root.getAttribute('aria-label'), markup: root.querySelector('[data-studio-overview]')?.innerHTML || ''}
+        }));
         const live = () => current() && root?.isConnected && host.querySelector('.st-page') === root;
         root?.querySelector('[data-page-send]')?.addEventListener('click',async () => {
             await window.studioNavigate('messages');
