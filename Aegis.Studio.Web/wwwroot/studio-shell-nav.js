@@ -555,8 +555,8 @@
         const jobRoot = key === 'job-detail' ? document.querySelector('#conversationView.has-open-job .job-detail-page') : null;
         const jobId = jobRoot?.dataset.jobId || jobRoot?.closest('[data-job-id]')?.dataset.jobId;
         const sessions = jobRoot && jobId ? sharedSessions.filter(item => String(item.jobId) === String(jobId)) : sharedSessions;
-        const count = document.getElementById('studioSessionsCount');
-        if (count) count.textContent = sessionsState === 'ready' ? String(sessions.length) : '…';
+        const sessionCount = document.getElementById('studioSessionsCount');
+        if (sessionCount) sessionCount.textContent = sessionsState === 'ready' ? String(sessions.length) : '…';
         const details = document.getElementById('studioSessionsDetails');
         if (details) {
             details.replaceChildren();
