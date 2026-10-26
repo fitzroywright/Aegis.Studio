@@ -727,24 +727,12 @@
                     </section>
 
                     <aside class="mw-list-right workspace-right-rail">
-                        <section class="mw-list-panel">
-                            <header><h2><span class="mw-title-icon attention">▤</span> Overview</h2><small>Studio totals</small></header>
-                            <div class="mw-status-list">
-                                <div class="workspace-summary-row"><span>▥</span><span>Active Jobs</span><strong>${totals.activeJobs}</strong></div>
-                                <div class="workspace-summary-row"><span>✓</span><span>Completed Jobs</span><strong>${totals.completedJobs}</strong></div>
-                                <div class="workspace-summary-row"><span>▣</span><span>Upcoming Shoots</span><strong>${totals.upcomingShoots}</strong></div>
-                                <div class="workspace-summary-row"><span>☑</span><span>Open Tasks</span><strong>${totals.openTasks}</strong></div>
-                                <div class="workspace-summary-row"><span>◷</span><span>Overdue Tasks</span><strong>${totals.overdueTasks}</strong></div>
-                                <div class="workspace-summary-row"><span>◆</span><span>Jobs Awaiting Production</span><strong>${totals.awaitingProduction}</strong></div>
-                            </div>
-                        </section>
-
-
                         ${StudioMessageCard.html({id:'workspaceMessageCard',title:'Messages',body:announcements.map(a=>`<article class="smc-row"><span aria-hidden="true">📣</span><span class="smc-copy"><strong>${esc(a.title)}</strong><small>${esc(a.body)}</small><small>${esc(a.workspaceName)} · ${esc(a.createdAtUtc?new Date(a.createdAtUtc).toLocaleDateString([],{month:'short',day:'numeric'}):'')}</small></span></article>`).join('')||'<p>No workspace announcements.</p>',footer:'<button type="button" data-nav-quick="messages">✉ Send Message →</button>'})}
                     </aside>
                 </div>
             </section>`;
 
+        window.dispatchEvent(new CustomEvent('studio-workspace-overview-updated', {detail: {...totals}}));
         window.studioSetBreadcrumb?.([{label:'Workspaces',view:'workspaces'}]);
         if(studioPageTools) studioPageTools.innerHTML='';
 
