@@ -239,27 +239,6 @@
             return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/preview/fallback':'';
         };
 
-        const visibleTodaySchedule=todaySchedule.filter(entry=>{
-            const job=jobById(entry.jobId)||{};
-            return state.jobView==='all'||(state.jobView==='led'&&isLead(job))||(state.jobView==='involved'&&isInvolved(job));
-        });
-        const sessionRows=visibleTodaySchedule.slice(0,5).map((entry,index)=>{
-            const job=scheduleJob(entry);
-            const image=entry.jobId?imageForJob(entry.jobId):'';
-            const fallbackImage=entry.jobId?fallbackImageForJob(entry.jobId):'';
-            const start=new Date(entry.startsAtUtc||entry.start||entry.startsAt);
-            const end=new Date(entry.endsAtUtc||entry.end||entry.endsAt);
-            const stateLabel=end<now?'Finished':start<=now?'In Progress':'Upcoming';
-            return `<button class="mw-session-row ${index===0?'active':''}" data-open-job="${entry.jobId||job.id||''}">
-                <div class="mw-session-thumb">${image?`<img loading="lazy" src="${image}" data-fallback-src="${fallbackImage}" alt="">`:'<span>📷</span>'}</div>
-                <div class="mw-session-time"><span>${formatTime(start)} – ${formatTime(end)}</span></div>
-                <div class="mw-session-main"><strong>${esc(job.title||entry.title||'Session')}</strong><span>${esc(job.clientName||entry.title||'Photography session')}</span></div>
-                <span class="mw-session-location">⌖ &nbsp;${esc(entry.location||'Location not set')}</span>
-                <span class="mw-state-pill ${stateLabel==='In Progress'?'in-progress':''}">${stateLabel}</span>
-                <span class="mw-today-open-job" aria-hidden="true" title="Open job">↗</span>
-            </button>`;
-        }).join('')||'<div class="mw-empty">No sessions scheduled today.</div>';
-
         const taskRows=myTasks.slice(0,8).map(task=>{
             const job=jobById(task.jobId)||{};
             const context=[job.title,job.clientName].filter(Boolean).join(' · ')||task.activityType||'Studio task';
@@ -332,7 +311,6 @@
         const attentionItems=[...productionTasks,...myTasks.filter(t=>!productionTasks.includes(t))].slice(0,5);
         const attentionTotal=overdueTasks+blockedTasks+attentionJobs;
         window.dispatchEvent(new CustomEvent('studio-attention-updated', {detail: {view:'today',loaded:true,overdueTasks,blockedTasks,schedulingJobs,uploadJobs,exceptionJobs}}));
-        window.dispatchEvent(new CustomEvent('studio-sessions-updated', {detail: {view:'today',count:visibleTodaySchedule.length,markup:sessionRows}}));
 
         const availableWorkspaces=(typeof workspaceCache!=='undefined'&&Array.isArray(workspaceCache)?workspaceCache:[])
             .filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view);
