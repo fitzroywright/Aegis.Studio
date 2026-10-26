@@ -74,6 +74,15 @@ export function createServer(env = process.env) {
         const type = url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
         res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=300' }); res.end(await readFile(new URL(url.pathname.slice(1), ROOT))); return;
       }
+      // Only curated public assets are served here; private gallery media keeps its authenticated routes.
+      if (req.method === 'GET' && (/^\/assets\/photography\/[a-z0-9-]+\.(webp|jpg)$/.test(url.pathname) || url.pathname === '/assets/brand.svg')) {
+        let bytes;
+        try { bytes = await readFile(new URL(url.pathname.slice(1), ROOT)); }
+        catch (error) { if (error.code === 'ENOENT') { json(res, 404, { message: 'Asset not found.' }); return; } throw error; }
+        const type = url.pathname.endsWith('.svg') ? 'image/svg+xml' : url.pathname.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+        res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+        res.end(bytes); return;
+      }
       if(await clientAuth.handle(req,res,url,host,json))return;
       const user=clientAuth.current(req);
       if(req.method==='GET'&&url.pathname==='/api/session'){

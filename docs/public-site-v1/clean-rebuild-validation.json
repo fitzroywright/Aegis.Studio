@@ -1,0 +1,338 @@
+{
+  "date": "2026-10-25",
+  "environment": "Local Mac; Node 24.22.1; .NET SDK 10.0.402; local Chrome; disposable PostgreSQL 18 on 127.0.0.1:55441",
+  "awsDeployment": false,
+  "publicSite": {
+    "command": "cd Aegis.Studio.PublicSite && npm test",
+    "passed": 38,
+    "failed": 0,
+    "skipped": 0,
+    "checks": [
+      "HTTP image decoding and WebP MIME",
+      "200 KB per-image budget",
+      "EXIF/XMP stripped",
+      "missing assets and traversal denied",
+      "image SHA-256 matches photography-manifest.json"
+    ]
+  },
+  "solution": {
+    "command": "STUDIO_TEST_POSTGRES=<disposable local database> dotnet test Aegis.Studio.slnx --no-build --no-restore -m:1 --settings /private/tmp/aegis-reference-tests.runsettings",
+    "build": "Initial dotnet test Aegis.Studio.slnx --no-restore built Debug locally; successful run required unsandboxed local test-listener access.",
+    "runs": [
+      {
+        "report": "clean-rebuild-pg_net10.0_20261025174248.trx",
+        "counters": {
+          "total": "3",
+          "executed": "3",
+          "passed": "3",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        },
+        "failures": []
+      },
+      {
+        "report": "clean-rebuild-pg_net10.0_20261025174342.trx",
+        "counters": {
+          "total": "428",
+          "executed": "428",
+          "passed": "413",
+          "failed": "15",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        },
+        "failures": [
+          {
+            "name": "Aegis.Studio.Web.Tests.MediaProductionPersistenceTests.RosterEditingRoundTripAndWeddingClassificationPreserveIdentity",
+            "message": "Npgsql.PostgresException : 42P01: relation \"studio_schedule_entries\" does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.TodayStartupTests.BulkAccessMatchesIndividualPermissionsForInheritanceOverridesAndGlobalRoles",
+            "message": "Npgsql.PostgresException : 42P01: relation \"studio_workflow_crew\" does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.IntegratedWorkflowTests.PreviewGenerationRetainsUnsupportedOriginals",
+            "message": "System.Reflection.TargetParameterCountException : Parameter count mismatch."
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.WorkDayFieldSyncTests.LostAcknowledgementReplaysOnceAndNewStudioRosterEditsConflict",
+            "message": "Npgsql.PostgresException : 42703: column er.attendance_start_utc does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.DemoIsolationTests.ClearPreservesSecurityAndNormalBookingAndQuoteConversionWorkWithoutDemo",
+            "message": "Npgsql.PostgresException : 42703: column v.intake_reference does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.ManualPhotographerPersistenceTests.ManualReportsRetainRecorderAndWaitForEveryPhotographer",
+            "message": "Npgsql.PostgresException : 42703: column er.attendance_start_utc does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.WorkDayRosterJourneyTests.AssignAcceptReportReplayCountAndScheduleOnlyRemainder",
+            "message": "Npgsql.PostgresException : 42601: cannot insert multiple commands into a prepared statement"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.UnifiedMessagingPersistenceTests.PersonalInboxKeepsProviderRepliesInOnePrivateThread",
+            "message": "Npgsql.PostgresException : 42703: column \"external_message_id\" does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.WorkDayFieldSyncTests.TwoAssignmentsShareRosterRevisionAndCannotOverwriteEachOther",
+            "message": "Npgsql.PostgresException : 42601: cannot insert multiple commands into a prepared statement"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.IntegratedWorkflowTests.WorkDayReschedulePreservesIdsAndRollsBackConflicts",
+            "message": "Npgsql.PostgresException : 42703: column er.attendance_start_utc does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.JobGraphPersistenceTests.FrontDeskCreatesOneWorkflowWithExplicitServicesAndSharedJoin",
+            "message": "Npgsql.PostgresException : 42703: column v.intake_reference does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.FrontDeskBookingRequestTests.PendingJobExistsBeforeDepositAndConcurrentReceiptReplayDoesNotConfirm",
+            "message": "Npgsql.PostgresException : 42703: column v.intake_reference does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.CommercialProductionTests.CatalogToJobToSaleToProductionUsesImmutableVersionsAndOneWorkOrder",
+            "message": "Npgsql.PostgresException : 42703: column v.intake_reference does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.FrontDeskBookingRequestTests.ConcurrentWebsiteRetryCreatesOnePendingRequestAndOnePendingJob",
+            "message": "Npgsql.PostgresException : 42703: column v.intake_reference does not exist"
+          },
+          {
+            "name": "Aegis.Studio.Web.Tests.UnifiedMessagingPersistenceTests.SharedIncomingReadIsFirstReaderWinsAndNewRepliesReturnToUnread",
+            "message": "Npgsql.PostgresException : 42P01: relation \"studio_workflow_crew\" does not exist"
+          }
+        ]
+      }
+    ],
+    "note": "No Studio Web, Domain, or their test sources changed in this branch. The broad failures remain unresolved; no claim of a green repository."
+  },
+  "ui": {
+    "command": "cd tests/ui && npm test",
+    "passed": 188,
+    "failed": 87,
+    "skipped": 0,
+    "note": "Matches previously documented counts; no Studio UI or UI test source changes."
+  },
+  "browser": {
+    "engine": "Local Google Chrome via Playwright",
+    "visualReview": "All four views inspected at 1440px and 390px; service portraits preserve original aspect ratio.",
+    "layoutAndInteractionsWidths": [
+      320,
+      390,
+      768,
+      1440
+    ],
+    "checks": [
+      {
+        "viewport": 1440,
+        "route": "home",
+        "errors": [],
+        "overflow": false,
+        "visiblePages": [
+          "home"
+        ],
+        "images": [
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/wedding-hero.webp",
+            "loaded": true
+          },
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/family-portrait.webp",
+            "loaded": true
+          },
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/client-portrait.webp",
+            "loaded": true
+          },
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/photographer-at-work.webp",
+            "loaded": true
+          }
+        ]
+      },
+      {
+        "viewport": 1440,
+        "route": "booking",
+        "errors": [],
+        "overflow": false,
+        "visiblePages": [
+          "booking"
+        ],
+        "images": [
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/family-portrait.webp",
+            "loaded": true
+          }
+        ]
+      },
+      {
+        "viewport": 1440,
+        "route": "galleries",
+        "errors": [],
+        "overflow": false,
+        "visiblePages": [
+          "galleries"
+        ],
+        "images": [
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/client-portrait.webp",
+            "loaded": true
+          }
+        ]
+      },
+      {
+        "viewport": 1440,
+        "route": "workday",
+        "errors": [],
+        "overflow": false,
+        "visiblePages": [
+          "workday"
+        ],
+        "images": [
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/photographer-at-work.webp",
+            "loaded": true
+          }
+        ]
+      },
+      {
+        "viewport": 390,
+        "route": "home",
+        "errors": [],
+        "overflow": false,
+        "visiblePages": [
+          "home"
+        ],
+        "images": [
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/wedding-mobile.webp",
+            "loaded": true
+          },
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/family-portrait.webp",
+            "loaded": true
+          },
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/client-portrait.webp",
+            "loaded": true
+          },
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/photographer-at-work.webp",
+            "loaded": true
+          }
+        ]
+      },
+      {
+        "viewport": 390,
+        "route": "booking",
+        "errors": [],
+        "overflow": false,
+        "visiblePages": [
+          "booking"
+        ],
+        "images": [
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/family-portrait.webp",
+            "loaded": true
+          }
+        ]
+      },
+      {
+        "viewport": 390,
+        "route": "galleries",
+        "errors": [],
+        "overflow": false,
+        "visiblePages": [
+          "galleries"
+        ],
+        "images": [
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/client-portrait.webp",
+            "loaded": true
+          }
+        ]
+      },
+      {
+        "viewport": 390,
+        "route": "workday",
+        "errors": [],
+        "overflow": false,
+        "visiblePages": [
+          "workday"
+        ],
+        "images": [
+          {
+            "src": "http://127.0.0.1:8088/assets/photography/photographer-at-work.webp",
+            "loaded": true
+          }
+        ]
+      }
+    ],
+    "interactions": [
+      {
+        "check": "Inquiry submitted and durable receipt displayed",
+        "result": "Received \u2014 awaiting review.\nReference: 2026-W-000007\nSaved on the website; awaiting Studio import. This does not confirm payment or final booking confirmation."
+      },
+      {
+        "check": "Browser Back restores homepage",
+        "passed": true
+      },
+      {
+        "check": "Gallery request submitted and receipt displayed",
+        "result": "Request received. Reference: 0cc64d21-34ea-437a-80b1-fbc345bd1746. Bryan's Front Desk will verify your identity before photographs are released."
+      },
+      {
+        "check": "Contact request does not authenticate or expose private photographs",
+        "passed": true
+      },
+      {
+        "check": "Unprovisioned WorkDay account is rejected",
+        "result": "Authentication failed."
+      },
+      {
+        "check": "Exactly one visible view and no horizontal overflow at 320, 390, 768, 1440px on all four routes",
+        "passed": true
+      }
+    ],
+    "ownership": {
+      "declarations": 1396,
+      "duplicates": [],
+      "skipLinkPreservesView": true
+    }
+  },
+  "otherChecks": [
+    "git diff --check",
+    "node --check public/app.js",
+    "node --check public/workday-web.js",
+    "node --check server.mjs",
+    "38 unique element IDs; four canonical page views",
+    "Obsolete abstract artwork and old renderer/style names removed"
+  ],
+  "localEvidenceDirectory": "/private/tmp/bryans-clean-rebuild-qa",
+  "limitations": [
+    "Real provider sign-in and provisioned WorkDay upload were not exercised.",
+    "No Docker runtime or AWS deployment was performed.",
+    "Library source filenames identify selected imagery as generated demo images; assets are for this review context."
+  ]
+}

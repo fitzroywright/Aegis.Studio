@@ -1,3 +1,27 @@
+// Hash navigation keeps a single canonical instance of every service interface.
+const pages = [...document.querySelectorAll('[data-page]')];
+function showPage() {
+  const requested = location.hash.slice(1);
+  const active = pages.find(page => page.id === requested)?.id || 'home';
+  for (const page of pages) page.hidden = page.id !== active;
+  for (const link of document.querySelectorAll('.topbar nav a')) {
+    if (link.hash === '#' + active) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+  document.title = active === 'home' ? 'Bryan’s Studios — More Than Photographs' :
+    ({ booking: 'Book a Session', galleries: 'Client Galleries', workday: 'WorkDay' }[active] + ' — Bryan’s Studios');
+}
+showPage();
+document.querySelector('.skip-link').addEventListener('click', event => {
+  event.preventDefault();
+  document.getElementById('main-content').focus();
+});
+window.addEventListener('hashchange', () => {
+  showPage();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  document.getElementById('main-content').focus({ preventScroll: true });
+});
+
 const $ = id => document.getElementById(id);
 const state = { user: null, page: null, selected: new Set(), selectionKey: crypto.randomUUID() };
 async function api(path, options = {}) {
@@ -66,7 +90,7 @@ let intakeCsrf='';
 try{intakeCsrf=(await api('/api/intake-session')).csrf;}catch{}
 const bookingForm=$('booking-form');
 const kindLabel=document.createElement('label');kindLabel.textContent='Request type';const kindSelect=document.createElement('select');kindSelect.name='intakeKind';kindSelect.append(new Option('Booking request','Booking'),new Option('Inquiry','Inquiry'));kindLabel.append(kindSelect);bookingForm.prepend(kindLabel);
-const rosterBox=document.createElement('details'),rosterTitle=document.createElement('summary'),rosterHost=document.createElement('div');rosterTitle.textContent='Subjects and roster (optional)';rosterBox.append(rosterTitle,rosterHost);bookingForm.append(rosterBox);
+const rosterBox=document.createElement('details'),rosterTitle=document.createElement('summary'),rosterHost=document.createElement('div');rosterTitle.textContent='Subjects and roster (optional)';rosterBox.append(rosterTitle,rosterHost);bookingForm.insertBefore(rosterBox, bookingForm.querySelector('.submit-button'));
 let draftReceipt=JSON.parse(sessionStorage.getItem('roster-draft')||'null'),draftData={};
 if(draftReceipt)try{draftData=await api('/api/roster-drafts/'+draftReceipt.id,{headers:{'X-Intake-Token':draftReceipt.accessToken}});}catch(e){$('booking-result').hidden=false;$('booking-result').textContent='Could not restore saved roster: '+e.message;}
 const publicRoster=StudioRosterEditor.open(rosterHost,{...draftData,readFile:async file=>{const data=new FormData();data.append('file',file);const r=await fetch('/api/roster-file',{method:'POST',body:data,headers:{'X-CSRF-Token':intakeCsrf}});if(!r.ok)throw Error((await r.json()).message);return StudioRosterEditor.csv((await r.json()).csv);},save:async value=>{

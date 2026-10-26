@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import sharp from 'sharp';
 import { createServer, sign } from './server.mjs';
 import { IntakeStore } from './intake-store.mjs';
 import { DatabaseSync } from 'node:sqlite';
@@ -197,6 +198,32 @@ test('serves standalone client assets and an operational health endpoint', async
   assert.match(await (await fetch(origin)).text(), /Client Galleries/);
   assert.equal((await fetch(`${origin}/styles.css`)).headers.get('content-type'), 'text/css; charset=utf-8');
   assert.equal((await fetch(`${origin}/app.js`)).headers.get('content-type'), 'text/javascript; charset=utf-8');
+});
+test('public photography is self-contained and restricted to the curated asset directory', async t => {
+  const origin = await fixture(t);
+  const html = await (await fetch(origin)).text();
+  const images = [...new Set([...html.matchAll(/(?:src|srcset)="([^" ]+)"/g)]
+    .map(match => match[1]).filter(path => path.startsWith('/assets/')))];
+  assert.equal(images.length, 5);
+  for (const path of images) {
+    const response = await fetch(origin + path);
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers.get('content-type'), 'image/webp');
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.ok(bytes.length > 1000 && bytes.length < 200_000, path);
+    const metadata = await sharp(bytes).metadata();
+    assert.equal(metadata.format, 'webp', path);
+    assert.ok(metadata.width >= 400 && metadata.height >= 500, path);
+    assert.equal(metadata.exif, undefined, path);
+    assert.equal(metadata.xmp, undefined, path);
+    // Decode the complete image, rather than accepting only a valid header.
+    await sharp(bytes).raw().toBuffer();
+  }
+  assert.equal((await fetch(origin + '/assets/brand.svg')).headers.get('content-type'), 'image/svg+xml');
+  assert.equal((await fetch(origin + '/assets/photography/missing.webp')).status, 404);
+  assert.equal((await fetch(origin + '/assets/photography/server.mjs')).status, 404);
+  assert.equal((await fetch(origin + '/assets/photography/%2e%2e%2f%2e%2e%2fserver.mjs')).status, 404);
 });
 test('server integrations do not require Origin and scopes isolate submission from polling and payment',async t=>{
  const keys=[{id:'external',secret:'external-test-secret-01234567890123456789',scopes:['intake:submit']},{id:'studio',secret:'studio-test-secret-01234567890123456789',scopes:['intake:pull','intake:ack']},{id:'other',secret:'other-test-secret-01234567890123456789',scopes:['intake:submit']}];
