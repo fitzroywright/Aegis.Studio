@@ -21,8 +21,20 @@ jobs:
         with:
           fetch-depth: 0
       - name: Test shared shell ownership
-        run: node --test tests/ui/shared-shell-ownership.test.cjs
+        run: |
+          set -o pipefail
+          node --test tests/ui/shared-shell-ownership.test.cjs 2>&1 | tee /tmp/css-ownership-tests.log
       - name: Check ownership
         run: |
+          set -o pipefail
           git fetch origin main
-          UI_CSS_BASE=origin/main node scripts/check-ui-css-ownership.cjs
+          UI_CSS_BASE=origin/main node scripts/check-ui-css-ownership.cjs 2>&1 | tee /tmp/css-ownership-check.log
+      - name: Preserve ownership failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: css-ownership-diagnostics
+          path: |
+            /tmp/css-ownership-tests.log
+            /tmp/css-ownership-check.log
+          if-no-files-found: warn
