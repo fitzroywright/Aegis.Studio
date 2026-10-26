@@ -114,7 +114,6 @@ public static class JobAccessEndpoints
         && (!requested.AssignStaff || caller.AssignStaff)
         && (!requested.ManageSchedule || caller.ManageSchedule)
         && (!requested.ManageProduction || caller.ManageProduction)
-        && (!requested.DeleteMedia || caller.DeleteMedia)
         && (!requested.ViewFinancials || caller.ViewFinancials)
         && (!requested.RecordFinancialActivity || caller.RecordFinancialActivity)
         && (!requested.UsePos || caller.UsePos)
