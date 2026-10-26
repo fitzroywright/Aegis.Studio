@@ -107,10 +107,10 @@ textarea:focus-visible {
   background: #f6f7f9;
 }
 .hidden {
-  display: none;
+  display: none !important;
 }
 [hidden] {
-  display: none;
+  display: none !important;
 }
 svg {
   width: 20px;

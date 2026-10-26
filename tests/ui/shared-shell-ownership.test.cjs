@@ -37,6 +37,9 @@ test('shell CSS contains no malformed empty declarations', () => {
 });
 
 
-test('canonical Studio stylesheet has no important declarations', () => {
-  assert.doesNotMatch(css, /!important\b/);
+test('hidden page surfaces remain hidden regardless of page display rules', () => {
+  assert.match(css, /\.hidden \{\s*display: none !important;/);
+  assert.match(css, /\[hidden\] \{\s*display: none !important;/);
+  const exceptions = [...css.matchAll(/!important\b/g)];
+  assert.equal(exceptions.length, 2);
 });
