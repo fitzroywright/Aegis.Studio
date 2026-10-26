@@ -214,9 +214,12 @@ function mergeJobMessages(teamMessages, clientMessages) {
             messageCard.querySelector('.smc-feed').append(messagesPanel);
             messageCard.querySelector('.smc-content').append(composer);
             StudioMessageCard.bind(messageCard);
-            const attention=document.createElement('section');attention.className='jd-panel jd-attention';
+            const attention=document.createElement('div');attention.className='studio-job-attention-details';
             attention.innerHTML='<header class="jd-card-heading"><h2>⚠ Needs Attention</h2></header><div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
-            right.append(selectedFile,messageCard);board.append(center,right);detailPane.append(board);
+            // The shared bell owns the conversation; Job Details owns only functional job content.
+            window.studioShellMountJobConversation?.(messageCard);
+            window.studioShellMountJobAttention?.(attention);
+            right.append(selectedFile);board.append(center,right);detailPane.append(board);
             const footerTools=document.getElementById('studioFooterJobTools');
             const makeDrawer=(key,title,label)=>{
                 const toggle=document.createElement('button');toggle.type='button';toggle.className='jd-footer-link';toggle.dataset['job'+key]='';toggle.textContent=label;toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','job'+key+'Drawer');

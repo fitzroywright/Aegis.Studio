@@ -27,7 +27,7 @@
     }
     function bind(host, current = () => host.isConnected) {
         const root = host.querySelector('.st-page');
-        if(root)window.dispatchEvent(new CustomEvent('studio-page-overview-updated',{detail:{view:document.body.dataset.studioView,markup:root.querySelector('[data-studio-overview]')?.innerHTML||''}}));
+        if(root)window.studioShellSetOverview?.(root.querySelector('[data-studio-overview]')?.innerHTML||'');
         const live = () => current() && root?.isConnected && host.querySelector('.st-page') === root;
         // Messages and announcements are owned by the masthead slide-down only.
     }

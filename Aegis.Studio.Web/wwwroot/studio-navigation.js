@@ -5,6 +5,10 @@
     const studioPageTools=document.getElementById('studioPageTools');
 
     function setActive(view){
+        if(view!=='workspaces'){
+            window.studioShellMountJobConversation?.(null);
+            window.studioShellMountJobAttention?.(null);
+        }
         document.body.dataset.studioView=view;
         if(view!=='today' && view!=='jobs'){const count=document.getElementById('studioFooterRate');if(count)count.textContent='';}
         document.querySelectorAll('[data-view]').forEach(button=>{
@@ -724,7 +728,7 @@
                 </div>
             </section>`;
 
-        window.dispatchEvent(new CustomEvent('studio-workspace-overview-updated', {detail: {...totals}}));
+        window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2><small>Studio totals</small></header><div class="mw-status-list">${[['▥','Active Jobs','activeJobs'],['✓','Completed Jobs','completedJobs'],['▣','Upcoming Shoots','upcomingShoots'],['☑','Open Tasks','openTasks'],['◷','Overdue Tasks','overdueTasks'],['◆','Jobs Awaiting Production','awaitingProduction']].map(([icon,label,key])=>`<div class="workspace-summary-row"><span>${icon}</span><span>${label}</span><strong>${Number(totals[key]||0)}</strong></div>`).join('')}</div></section>`,'workspaces');
         window.studioSetBreadcrumb?.([{label:'Workspaces',view:'workspaces'}]);
         if(studioPageTools) studioPageTools.innerHTML='';
 
