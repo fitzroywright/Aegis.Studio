@@ -9969,7 +9969,7 @@ body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:sta
 body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { background:#fff; color:#173552; }
 
 /* Shared masthead attention control and slide-out drawer. */
-.topbar .studio-sessions-trigger { margin-left: auto; }
+
 .topbar { position: relative; }
 .topbar .studio-attention-trigger {
   margin-left: 0;
@@ -9990,6 +9990,10 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   white-space: nowrap;
   z-index: 2;
 }
+.topbar .studio-sessions-trigger { margin-left: auto; border-color: #8cbcd8; background: #234969; color: #edf8ff; }
+.topbar #studioAttentionTrigger { border-color: #e7a56c; background: #593b32; color: #fff1e2; }
+.topbar .studio-sessions-trigger strong { background: #d9effa; color: #174b6a; }
+.topbar #studioAttentionTrigger strong { background: #ffe0c2; color: #784017; }
 .topbar .studio-attention-trigger:hover,
 .topbar .studio-attention-trigger[aria-expanded="true"] { background: rgba(255,255,255,.18); }
 .topbar .studio-attention-trigger strong {
@@ -10032,6 +10036,11 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   color: #fff;
 }
 .studio-attention-drawer h2 { font-size: 18px; margin: 0; }
+#studioSessionsDrawer header { background: #234969; }
+#studioAttentionDrawer header { background: #70412e; }
+.studio-shared-session-row { display:grid; gap:5px; padding:12px; border:1px solid #c9e0ec; border-radius:7px; background:#f2f9fd; }
+.studio-shared-session-row strong { color:#174b6a; }
+.studio-shared-session-row span { font-size:12px; color:#40576a; }
 .studio-attention-drawer [data-attention-close] {
   border: 0;
   background: transparent;
@@ -10059,7 +10068,8 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   .topbar .studio-attention-trigger { left: 54%; font-size: 11px; padding: 5px 7px; }
 }
 @media (max-width: 760px) {
-  .topbar .studio-attention-trigger { position: static; transform: none; margin-left: auto; }
+  .topbar .studio-attention-trigger { position: static; transform: none; margin-left: 0; }
+  .topbar .studio-sessions-trigger { margin-left: auto; }
 }
 
 /* Masthead message bell slide-down preview. */
