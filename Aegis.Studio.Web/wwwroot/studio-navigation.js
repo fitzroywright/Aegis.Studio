@@ -330,6 +330,7 @@
         const productionTasks=myTasks.filter(t=>/edit|retouch|qc|print|deliver|production|gallery|select|design|color|review|upload|schedule/i.test(String(t.activityType||'')+' '+String(t.title||'')));
         const attentionItems=[...productionTasks,...myTasks.filter(t=>!productionTasks.includes(t))].slice(0,5);
         const attentionTotal=overdueTasks+blockedTasks+attentionJobs;
+        window.dispatchEvent(new CustomEvent('studio-attention-updated', {detail: {overdueTasks,blockedTasks,schedulingJobs,uploadJobs,exceptionJobs}}));
 
         const availableWorkspaces=(typeof workspaceCache!=='undefined'&&Array.isArray(workspaceCache)?workspaceCache:[])
             .filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view);
@@ -355,11 +356,6 @@
                         </section>
                     </main>
                     <aside class="mw-today-right studio-dashboard-template__aside" aria-label="Daily activity">
-                        <section class="mw-list-panel" data-mw-region="attention"><header><h2><span class="studio-card-icon" aria-hidden="true">⚑</span> Needs Attention</h2><button data-nav="tasks">View All →</button></header><div class="mw-status-list">
-                            <button class="mw-status-row warning" data-nav="tasks"><span class="studio-attention-label"><span aria-hidden="true">◷</span>Overdue tasks</span><strong>${metric('tasks',overdueTasks)}</strong></button>
-                            <button class="mw-status-row warning" data-nav="schedule"><span class="studio-attention-label"><span aria-hidden="true">▦</span>Needs scheduling (led by me)</span><strong>${metric('jobs',schedulingJobs)}</strong></button>
-                            <button class="mw-status-row warning" data-nav="production"><span class="studio-attention-label"><span aria-hidden="true">⇧</span>Awaiting upload (led by me)</span><strong>${metric('jobs',uploadJobs)}</strong></button>
-                        </div></section>
                         <section class="mw-list-panel" data-mw-region="schedule"><header><h2><span class="studio-card-icon" aria-hidden="true">▦</span> Today's Sessions</h2><button data-nav="schedule">View Calendar →</button></header><div class="mw-section-rows">${phase('schedule',sessionRows)}</div></section>
                         ${StudioMessageCard.html({id:'todayMessageCard',title:'Messages',body:phase('notifications',messageRows),actions:'<button type="button" data-nav="messages">View All →</button>',footer:'<button type="button" data-nav="messages">✉ Send Message →</button>',attributes:'data-mw-region="messages"'})}
                     </aside>
