@@ -218,6 +218,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             attention.innerHTML='<header class="jd-card-heading"><h2>⚠ Needs Attention</h2></header><div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
             // The shared bell owns the conversation; Job Details owns only functional job content.
             window.studioShellMountJobConversation?.(messageCard);
+            window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Job</span><strong>${esc(job.title || 'Job Details')}</strong></div><div class="workspace-summary-row"><span>Client</span><strong>${esc(job.clientName || 'Not assigned')}</strong></div></section>`,'job-detail');
             window.studioShellMountJobAttention?.(attention);
             right.append(selectedFile);board.append(center,right);detailPane.append(board);
             const footerTools=document.getElementById('studioFooterJobTools');

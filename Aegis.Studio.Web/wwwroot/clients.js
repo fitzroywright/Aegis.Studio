@@ -51,6 +51,14 @@ window.StudioClients=(()=>{
             genericView.querySelectorAll('[data-c-id]').forEach(row=>row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();row.click();}});
             genericView.querySelector('[data-c-messages]').onclick=()=>window.studioNavigate('messages');
             genericView.querySelectorAll('[data-c-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.cTab;paint();});
+            // Page renderers publish data and actions; the shell exclusively owns card placement.
+            const clientRail=genericView.querySelector('.client-right');
+            const overviewPanel=clientRail?.querySelector('.sj-card');
+            window.studioShellSetOverview?.(overviewPanel?.outerHTML?.replace('class="sj-card"','class="sj-card studio-overview-rail" data-rail-card="overview"') || '', 'clients');
+            overviewPanel?.remove();
+            window.studioShellMountJobAttention?.(clientRail?.querySelector('.sj-attention-card'));
+            window.studioShellMountJobConversation?.(clientRail?.querySelector('#clientMessageCard'));
+            clientRail?.remove();
             if(client)void showTab();
         }
         async function editClient(client){

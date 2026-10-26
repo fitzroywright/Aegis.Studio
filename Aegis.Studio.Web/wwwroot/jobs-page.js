@@ -48,8 +48,16 @@
     <div class="sj-table-frame"><div class="sj-table-head-clip"><table class="sj-table"><colgroup><col style="width:30%"><col style="width:17%"><col style="width:18%"><col style="width:18%"><col style="width:17%"></colgroup><thead><tr><th><div class="sj-job-header"><span>Job / Client</span><input type="search" data-sj-search aria-label="Search jobs, clients or references" placeholder="Search jobs…" autocomplete="off"></div></th><th><label class="sj-column-filter sj-column-filter-inline"><span>Event date</span><select data-sj-sort aria-label="Sort by event date"><option value="date-desc">Newest first ↓</option><option value="date-asc">Oldest first ↑</option></select></label></th><th>Job Owner</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Status</span><select data-sj-status aria-label="Filter by status"><option value="">All Open Jobs</option>${stages.map(s=>`<option>${esc(s)}</option>`).join('')}</select></label></th><th>Next Action</th></tr></thead></table></div><div class="sj-table-scroll"><table class="sj-table"><colgroup><col style="width:30%"><col style="width:17%"><col style="width:18%"><col style="width:18%"><col style="width:17%"></colgroup><tbody></tbody></table></div></div>
     <footer class="sj-pagination"><span data-sj-range></span><div><button type="button" data-sj-prev aria-label="Previous page">‹</button><span data-sj-page></span><button type="button" data-sj-next aria-label="Next page">›</button></div></footer>
    </section><aside class="sj-right" aria-label="Job information">${card('Job Status','<div class="sj-card-body" data-sj-statuses></div>')}${card('Needs Attention','<div class="sj-card-body" data-sj-attention></div>','sj-attention-card')}${StudioMessageCard.html({id:'jobsMessageCard',title:'Messages',body:'<div data-sj-messages><p>Loading messages…</p></div>',footer:'<button type="button" data-sj-message>✉ Send Message →</button>'})}</aside></section>`;
-   const find=s=>host.querySelector(s);
-   StudioMessageCard.bind(find('.smc-card'));
+   const find=s=>host.querySelector(s) || document.getElementById('studioShellJobAttention')?.querySelector(s) || document.getElementById('studioShellJobConversation')?.querySelector(s);
+   // Shell owns the Overview and both masthead drawers; page owns the underlying data/actions.
+   const jobsAside=find('.sj-right');
+   const statusPanel=jobsAside?.querySelector('.sj-card');
+   window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="mw-status-list"><div class="workspace-summary-row"><span>Jobs</span><strong>${jobs.length}</strong></div><div class="workspace-summary-row"><span>Workspaces</span><strong>${workspaces.length}</strong></div></div></section>`,'jobs');
+   const attentionPanel=jobsAside?.querySelector('.sj-attention-card');
+   const messagesPanel=jobsAside?.querySelector('.smc-card');
+   window.studioShellMountJobAttention?.(attentionPanel);
+   window.studioShellMountJobConversation?.(messagesPanel);
+      StudioMessageCard.bind(find('.smc-card'));
    find('[data-sj-search]').value=term;find('[data-sj-status]').value=stage;find('[data-sj-sort]').value=sort;
    host.studioJobsWorkspaceCounts=Object.fromEntries(workspaces.map(w=>[String(w.id),jobs.filter(j=>belongs(j,String(w.id))).length]));
    window.dispatchEvent(new CustomEvent('studio-jobs-view-changed'));
