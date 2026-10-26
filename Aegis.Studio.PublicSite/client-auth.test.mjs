@@ -77,11 +77,11 @@ test('Microsoft common authority accepts personal and external tenants but isola
   const auth=new ClientAuthentication({MICROSOFT_CLIENT_ID:'bryans-client',
     MICROSOFT_CLIENT_SECRET:'fake-secret',MICROSOFT_TENANT_ID:'common',PUBLIC_WEB_ORIGIN:'http://localhost:8080'},store);
   const originalFetch=globalThis.fetch;
-  let tid=personal, keyIssuer=template, badIssuer=false;
+  let tid=personal, keyIssuer=template, badIssuer=false, activeNonce;
   function token(nonce){
     const now=Math.floor(Date.now()/1000);
     const head=Buffer.from(JSON.stringify({alg:'RS256',kid:'ms-test-key'})).toString('base64url');
-    const claims={iss:badIssuer?issuer(companyB):issuer(tid),tid,aud:'bryans-client',
+    const claims={iss:badIssuer?issuer(tid===companyB?companyA:companyB):issuer(tid),tid,aud:'bryans-client',
       sub:'same-subject',name:'Example client',nonce,iat:now,exp:now+600};
     const body=Buffer.from(JSON.stringify(claims)).toString('base64url');
     return head+'.'+body+'.'+sign('sha256',Buffer.from(head+'.'+body),privateKey).toString('base64url');
@@ -94,13 +94,14 @@ test('Microsoft common authority accepts personal and external tenants but isola
       jwks_uri:'https://login.microsoftonline.com/common/discovery/v2.0/keys'})};
     if(target.endsWith('/discovery/v2.0/keys'))return {ok:true,json:async()=>({keys:[{...jwk,issuer:keyIssuer}]})};
     if(target.endsWith('/oauth2/v2.0/token'))return {ok:true,json:async()=>({
-      id_token:token(store.db.prepare('SELECT nonce FROM client_auth_states LIMIT 1').get().nonce)})};
+      id_token:token(activeNonce)})};
     throw Error('Unexpected fetch '+target);
   };
   async function signIn(){
     auth.cache.clear();
     const started=fakeResponse();await auth.begin('microsoft',started);
     assert.equal(new URL(started.headers.Location).pathname,'/common/oauth2/v2.0/authorize');
+    activeNonce=new URL(started.headers.Location).searchParams.get('nonce');
     const state=new URL(started.headers.Location).searchParams.get('state');
     const callback=fakeResponse();
     await auth.finish('microsoft',new URL('http://localhost:8080/auth/microsoft/callback?code=ok&state='+state),
