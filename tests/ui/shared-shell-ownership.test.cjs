@@ -43,3 +43,19 @@ test('hidden page surfaces remain hidden regardless of page display rules', () =
   const exceptions = [...css.matchAll(/!important\b/g)];
   assert.equal(exceptions.length, 2);
 });
+
+test('Today, Front Desk and Job Detail use the one shared sessions drawer', () => {
+  const nav = fs.readFileSync(path.join(root, 'studio-navigation.js'), 'utf8');
+  const front = fs.readFileSync(path.join(root, 'frontdesk.js'), 'utf8');
+  assert.doesNotMatch(nav, /Today's Sessions|data-mw-region="schedule"/);
+  assert.doesNotMatch(front, /Today's Sessions|fd-secondary mw-list-right/);
+  assert.match(shell, /sessionsDrawer.id = 'studioSessionsDrawer'/);
+  assert.match(shell, /const jobRoot = key === 'job-detail'/);
+  assert.match(shell, /loadSharedSessions\(\)/);
+});
+test('shared shell and Front Desk scripts are syntactically valid', () => {
+  const vm = require('node:vm');
+  for (const name of ['studio-shell-nav.js', 'studio-navigation.js', 'frontdesk.js']) {
+    assert.doesNotThrow(() => new vm.Script(fs.readFileSync(path.join(root, name), 'utf8'), {filename:name}));
+  }
+});
