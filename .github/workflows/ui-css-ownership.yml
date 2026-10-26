@@ -20,9 +20,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
       - name: Test shared shell ownership
         run: node --test tests/ui/shared-shell-ownership.test.cjs
       - name: Check ownership
