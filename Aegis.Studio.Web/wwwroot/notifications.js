@@ -39,5 +39,58 @@ async function showNotifications() {
     }
     await load();
 }
+// Notifications remain a dedicated navigation page; the masthead bell is a message preview.
 const notificationButton=document.getElementById('notificationButton');
-if(notificationButton)notificationButton.onclick=()=>window.studioNavigate('notifications').catch(error=>console.error('Notifications could not open',error));
+if(notificationButton){
+    notificationButton.title='Messages';
+    notificationButton.setAttribute('aria-label','Show recent messages');
+    notificationButton.setAttribute('aria-haspopup','dialog');
+    notificationButton.setAttribute('aria-expanded','false');
+    const panel=document.createElement('section');
+    panel.id='studioMessageBellPanel';
+    panel.className='studio-message-bell-panel';
+    panel.setAttribute('role','dialog');
+    panel.setAttribute('aria-label','Recent messages');
+    panel.hidden=true;
+    panel.innerHTML='<header><strong>Messages</strong><button type="button" data-bell-close aria-label="Close messages">×</button></header><div class="studio-message-bell-list" role="status">Open to load recent messages.</div><footer><button type="button" data-bell-all>Open Messages →</button></footer>';
+    notificationButton.insertAdjacentElement('afterend',panel);
+    let requestRevision=0;
+    const close=()=>{panel.hidden=true;notificationButton.setAttribute('aria-expanded','false');requestRevision++;};
+    panel.querySelector('[data-bell-close]').onclick=()=>{close();notificationButton.focus();};
+    panel.querySelector('[data-bell-all]').onclick=()=>{close();window.studioNavigate?.('messages');};
+    notificationButton.onclick=async()=>{
+        if(!panel.hidden){close();return;}
+        panel.hidden=false;
+        notificationButton.setAttribute('aria-expanded','true');
+        const revision=++requestRevision;
+        const list=panel.querySelector('.studio-message-bell-list');
+        list.textContent='Loading messages…';
+        try{
+            const response=await fetch('/api/notifications?count=80',{credentials:'same-origin'});
+            if(!response.ok)throw new Error('Message feed unavailable');
+            const payload=await response.json();
+            const items=(Array.isArray(payload)?payload:Array.isArray(payload.items)?payload.items:[])
+                .filter(item=>/message|conversation|reply|mention/i.test(String(item.eventType||item.title||item.type||'')))
+                .slice(0,8);
+            if(revision!==requestRevision||panel.hidden)return;
+            list.replaceChildren();
+            if(!items.length){list.textContent='No recent messages.';return;}
+            for(const item of items){
+                const button=document.createElement('button');
+                button.type='button';
+                const title=document.createElement('strong');
+                title.textContent=String(item.subject||item.title||'Message');
+                const preview=document.createElement('span');
+                preview.textContent=String(item.body||item.message||'').slice(0,170);
+                button.append(title,preview);
+                button.onclick=()=>{close();window.studioNavigate?.('messages');};
+                list.append(button);
+            }
+        }catch(error){if(revision===requestRevision&&!panel.hidden)list.textContent='Messages could not be loaded. Open Messages to try again.';}
+    };
+    document.addEventListener('pointerdown',event=>{
+        if(!panel.hidden&&!panel.contains(event.target)&&!notificationButton.contains(event.target))close();
+    });
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden){close();notificationButton.focus();}});
+}
+
