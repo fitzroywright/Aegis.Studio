@@ -138,7 +138,6 @@
                     <button type="button" data-studio-side="operations-management"><span>✓</span><span>Operations</span></button>
                     <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
                     <button type="button" data-studio-side="messages"><span>✉</span><span>Messages</span></button>
-                    <button type="button" data-studio-side="notifications"><span>♧</span><span>Notifications</span></button>
                 </div>
             </section>
             ${shellOverviews.get(overviewKey()) || defaultOverview()}
@@ -515,6 +514,10 @@
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
+        document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
+            document.querySelector('.user-menu')?.removeAttribute('open');
+            window.studioNavigate?.('notifications');
+        });
         // One shell contract for Overview on every route.
         window.studioShellSetOverview = (markup, view = document.body.dataset.studioView) => {
             shellOverviews.set(view, markup || defaultOverview());
