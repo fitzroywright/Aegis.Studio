@@ -187,14 +187,16 @@
             footer.append(control);
         }
         const isProduction = document.body.dataset.studioView === 'production' && productionWorkspaceFilter;
-        const selectedId = isProduction ? String(productionWorkspaceFilter.selected || '') : '';
+        const savedSelection = window.sessionStorage.getItem('studio.footer.workspace.selection') || '';
+        const selectedId = isProduction ? String(productionWorkspaceFilter.selected || '') : savedSelection;
         control.replaceChildren();
         const all = new Option('Workspaces: All', '');
         control.add(all);
         workspaces.forEach(workspace => control.add(new Option(workspace.name || workspace.title || 'Workspace', String(workspace.id))));
-        control.value = selectedId;
+        control.value = workspaces.some(workspace => String(workspace.id) === selectedId) ? selectedId : '';
         control.onchange = () => {
             const id = control.value;
+            if (!isProduction) window.sessionStorage.setItem('studio.footer.workspace.selection', id);
             if (isProduction) {
                 productionWorkspaceFilter.onSelect?.(id);
             } else if (id) {
