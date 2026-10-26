@@ -2,12 +2,16 @@ alter table studio_conversations add column if not exists intake_reference text;
 create unique index if not exists ux_conversation_intake_reference on studio_conversations(intake_reference) where intake_reference is not null;
 create table if not exists studio_intake_sequences(year integer,source text,value integer not null check(value between 1 and 999999),primary key(year,source));
 create or replace function studio_assign_intake_reference() returns trigger language plpgsql as $$
-declare y integer; n integer;
+declare y integer; n integer; reference_series text;
 begin
  if new.intake_reference is null then
   y=extract(year from new.created_at_utc at time zone 'America/Jamaica');
-  insert into studio_intake_sequences values(y,'S',1) on conflict(year,source) do update set value=studio_intake_sequences.value+1 returning value into n;
-  new.intake_reference=y::text||'-S-'||lpad(n::text,6,'0');
+  -- Kings Plaza is the only current installation. Email inquiries use IK;
+  -- retain the existing S series for other intake channels.
+  reference_series=case when lower(coalesce(new.channel,''))='email' then 'IK' else 'S' end;
+  insert into studio_intake_sequences(year,source,value) values(y,reference_series,1)
+    on conflict(year,source) do update set value=studio_intake_sequences.value+1 returning value into n;
+  new.intake_reference=y::text||'-'||reference_series||'-'||lpad(n::text,6,'0');
  end if;
  return new;
 end $$;
