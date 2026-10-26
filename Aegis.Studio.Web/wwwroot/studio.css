@@ -9979,7 +9979,7 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   white-space: nowrap;
   z-index: 2;
 }
-.topbar .studio-sessions-trigger { margin-left: auto; border-color: #8cbcd8; background: #234969; color: #edf8ff; }
+.topbar .studio-attention-trigger.studio-sessions-trigger { margin-left: auto; border-color: #8cbcd8; background: #234969; color: #edf8ff; }
 .topbar #studioAttentionTrigger { border-color: #e7a56c; background: #593b32; color: #fff1e2; }
 .topbar .studio-sessions-trigger strong { background: #d9effa; color: #174b6a; }
 .topbar #studioAttentionTrigger strong { background: #ffe0c2; color: #784017; }
@@ -10058,7 +10058,7 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 }
 @media (max-width: 760px) {
   .topbar .studio-attention-trigger { position: static; transform: none; margin-left: 0; }
-  .topbar .studio-sessions-trigger { margin-left: auto; }
+  .topbar .studio-attention-trigger.studio-sessions-trigger { margin-left: auto; }
 }
 
 /* Masthead message bell slide-down preview. */
