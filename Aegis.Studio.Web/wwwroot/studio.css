@@ -9931,8 +9931,9 @@ body .topbar .studio-today-brand-title {
 }
 /* Single artwork for the Studio identity, with the page title directly beside it. */
 
-body .topbar .studio-script-brand { padding: 0; margin: 0; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
+body .topbar .studio-script-brand { padding: 0; margin: 0 -18px 0 -30px; min-width: 0; max-width: none; gap: 0; flex: 0 0 auto; }
 body .topbar .studio-script-brand .studio-bryans-brand-image { display: block; width: 216px; height: 56px; object-fit: contain; }
+body .topbar .studio-script-brand + .studio-today-brand-title { margin-left: 0; }
 
 
 /* Front Desk grid: fixed header and rows share one responsive six-column layout. */
@@ -9968,9 +9969,10 @@ body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:sta
 body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { background:#fff; color:#173552; }
 
 /* Shared masthead attention control and slide-out drawer. */
+.topbar .studio-sessions-trigger { margin-left: auto; }
 .topbar { position: relative; }
 .topbar .studio-attention-trigger {
-  margin-left: auto;
+  margin-left: 0;
   position: static;
   transform: none;
   display: inline-flex;
