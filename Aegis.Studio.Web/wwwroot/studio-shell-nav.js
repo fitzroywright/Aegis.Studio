@@ -4,14 +4,12 @@
     const shell = document.querySelector('.shell');
     const quickLinks = [
         ['today', 'Today', '▤'],
-        ['workspaces', 'Workspaces', '▰'],
-        ['jobs', 'Jobs', '▥'],
-        ['media', 'Media', '▧'],
-        ['pipeline', 'Pipeline', '⇥'],
-        ['production', 'Production', '◆'],
         ['frontdesk', 'Front Desk', '▣'],
         ['clients', 'Clients', '♧'],
-        ['finance', 'Finance', '$']
+        ['jobs', 'Jobs', '▥'],
+        ['production', 'Production', '◆'],
+        ['schedule', 'Schedule', '▦'],
+        ['media', 'Media', '▧']
     ];
     let currentView = document.body.dataset.studioView || 'today';
     const shellOverviews = new Map();
@@ -59,6 +57,76 @@
 
     function ensureTools() {
         pageTools?.querySelector('[data-studio-persistent-tools]')?.remove();
+    }
+
+    function ensureNavigationToolstrip() {
+        const banner = document.querySelector('.topbar');
+        if (!banner) return;
+        let host = document.getElementById('studioNavigationToolstrip');
+        if (!host) {
+            host = document.createElement('div');
+            host.id = 'studioNavigationToolstrip';
+            host.className = 'studio-navigation-toolstrip';
+            const trigger = document.createElement('button');
+            trigger.type = 'button';
+            trigger.className = 'studio-navigation-reveal';
+            trigger.setAttribute('aria-label', 'Show navigation');
+            trigger.setAttribute('aria-controls', 'studioNavigationTools');
+            trigger.title = 'Navigation';
+            const tools = document.createElement('nav');
+            tools.id = 'studioNavigationTools';
+            tools.className = 'studio-navigation-tools';
+            tools.setAttribute('aria-label', 'Studio navigation');
+            tools.innerHTML = quickLinks.map(([view,label,icon]) => '<button type="button" data-studio-side="'+view+'"><span aria-hidden="true">'+icon+'</span><span>'+label+'</span></button>').join('');
+            host.append(trigger, tools);
+            banner.append(host);
+            const setOpen = open => {
+                host.classList.toggle('is-open', open);
+                trigger.setAttribute('aria-expanded', String(open));
+                tools.setAttribute('aria-hidden', String(!open));
+                tools.inert = !open;
+            };
+            setOpen(false);
+            host.addEventListener('pointerenter', event => {
+                if (event.pointerType !== 'touch') setOpen(true);
+            });
+            host.addEventListener('pointerleave', () => {
+                if (!tools.contains(document.activeElement)) setOpen(false);
+            });
+            host.addEventListener('focusin', event => {
+                if (event.target !== trigger) setOpen(true);
+            });
+            host.addEventListener('focusout', event => {
+                if (!host.contains(event.relatedTarget)) setOpen(false);
+            });
+            trigger.onclick = () => setOpen(!host.classList.contains('is-open'));
+            host.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    trigger.focus();
+                    setOpen(false);
+                } else if (event.key === 'ArrowDown' && event.target === trigger) {
+                    event.preventDefault();
+                    setOpen(true);
+                    tools.querySelector('button')?.focus();
+                }
+            });
+            tools.addEventListener('click', event => {
+                const button = event.target.closest('[data-studio-side]');
+                if (!button) return;
+                if (tools.contains(document.activeElement)) trigger.focus();
+                setOpen(false);
+                window.studioNavigate?.(button.dataset.studioSide);
+            });
+            document.addEventListener('pointerdown', event => {
+                if (!host.contains(event.target)) setOpen(false);
+            });
+        }
+        host.querySelectorAll('[data-studio-side]').forEach(button => {
+            const active = button.dataset.studioSide === currentView;
+            if (active) button.setAttribute('aria-current', 'page');
+            else button.removeAttribute('aria-current');
+        });
     }
 
     function ensureFooter() {
@@ -110,7 +178,6 @@
         return workspaceLoadPromise;
     }
 
-    const railRole=title=>title==='Navigation'?'navigation':'actions';
     function renderLeftRail() {
         const rail = document.getElementById('studioContextRail');
         if (!rail) return;
@@ -129,17 +196,8 @@
         const actionItems=jobPage?jobActions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''):'<button type="button" data-studio-new-booking><span>＋</span><span>New Booking</span></button>'+(document.body.dataset.studioView==='today'?'<button type="button" data-studio-assign-job-lead><span>▣</span><span>Assign Job Lead</span></button>':'');
         const financialActions=document.body.dataset.studioView==='frontdesk'?[['TakePayment','Take Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['NewSale','New Sale']].map(([action,label])=>'<button type="button" data-studio-financial-action="'+action+'"><span>$</span><span>'+label+'</span></button>').join(''):'';
         const pipelineScheduleAction=document.body.dataset.studioView==='schedule'&&window.history.state?.studioSchedulePanel==='pipeline'?'<button type="button" data-studio-schedule-item><span>▦</span><span>Schedule item</span></button>':'';
-        rail.innerHTML = `<section class="mw-list-panel studio-context-card" data-rail-card="navigation">
-                <header><h2><span class="studio-card-icon" aria-hidden="true">↗</span> Navigation</h2><button type="button" class="studio-nav-today" data-studio-side="today">▤ Today →</button></header>
-                <div class="mw-today-rail-links">
-                    <button type="button" data-studio-side="frontdesk"><span>▣</span><span>Front Desk</span></button>
-                    <button type="button" data-studio-side="clients"><span>♧</span><span>Clients</span></button>
-                    <button type="button" data-studio-side="jobs"><span>▥</span><span>Jobs</span></button>
-                    <button type="button" data-studio-side="production"><span>◆</span><span>Production</span></button>
-                    <button type="button" data-studio-side="schedule"><span>▦</span><span>Schedule</span></button>
-                    <button type="button" data-studio-side="media"><span>▧</span><span>Media</span></button>
-                </div>
-            </section>
+        ensureNavigationToolstrip();
+        rail.innerHTML = `
             ${shellOverviews.get(overviewKey()) || defaultOverview()}
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
@@ -161,9 +219,6 @@
         rail.querySelector('[data-clients-new]')?.addEventListener('click',()=>window.StudioClients?.newClient());
         rail.querySelector('[data-studio-assign-job-lead]')?.addEventListener('click',()=>document.getElementById('genericView')?.dispatchEvent(new CustomEvent('studio-assign-job-lead')));
         rail.querySelectorAll('[data-job-action]').forEach(button => button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
-        rail.querySelectorAll('[data-studio-side]').forEach(button => {
-            button.onclick = () => window.studioNavigate?.(button.dataset.studioSide);
-        });
         rail.querySelectorAll('[data-production-workspace]').forEach(button => {
             button.onclick = () => productionWorkspaceFilter?.onSelect?.(button.dataset.productionWorkspace || '');
         });
@@ -219,7 +274,7 @@
         try { return JSON.parse(localStorage.getItem(railStorage) || '{}'); } catch { return {}; }
     }
     function setRailState(side, collapsed) {
-        const state = railState(); state[side] = side === 'left' ? false : collapsed;
+        const state = railState(); state[side] = collapsed;
         try { localStorage.setItem(railStorage, JSON.stringify(state)); } catch {}
         applyRailState();
     }
@@ -250,16 +305,15 @@
 
     function applyRailState() {
         const state = railState();
-        state.left = false;
         const leftTargets = [document.getElementById('studioContextRail'), document.querySelector('.mw-today-left')].filter(Boolean);
         leftTargets.forEach(rail => {
-            rail.classList.toggle('studio-rail-collapsed-left', false);
+            rail.classList.toggle('studio-rail-collapsed-left', !!state.left);
             rail.dataset.shellRailReadyLeft = 'true';
             const toggle = placeRailToggle(rail, 'left', !!state.left);
-            toggle.setAttribute('aria-expanded', 'true');
-            toggle.setAttribute('aria-label', 'Collapse' + ' left rail');
+            toggle.setAttribute('aria-expanded', String(!state.left));
+            toggle.setAttribute('aria-label', (state.left ? 'Expand' : 'Collapse') + ' left rail');
             toggle.title = toggle.getAttribute('aria-label');
-            toggle.dataset.chevronDirection = 'left';
+            toggle.dataset.chevronDirection = state.left ? 'right' : 'left';
         });
         const rightTargets = document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail, .job-detail-right, .studio-media-detail');
         rightTargets.forEach(rail => {

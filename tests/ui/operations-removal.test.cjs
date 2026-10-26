@@ -52,7 +52,7 @@ test('shared navigation retains functional destinations without Operations',asyn
  for(const view of ['today','frontdesk','jobs','production','schedule','media']) {
   w.document.body.dataset.studioView=view;
   w.StudioShell.sync(view);
-  const rail=w.document.getElementById('studioContextRail');
+  const rail=w.document.getElementById('studioNavigationTools');
   assert.equal(rail.querySelector('[data-studio-side="operations-management"]'),null);
   for(const destination of ['frontdesk','clients','jobs','production','schedule','media'])
    assert.ok(rail.querySelector(`[data-studio-side="${destination}"]`),destination);
