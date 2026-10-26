@@ -432,6 +432,15 @@
         drawer.hidden = true;
         drawer.innerHTML = '<header><h2>Needs Attention</h2><button type="button" data-attention-close aria-label="Close Needs Attention">×</button></header><div id="studioAttentionDetails" class="studio-attention-details"><p>Open Today to refresh attention items.</p></div>';
         document.body.append(backdrop, drawer);
+        // Page-specific attention details are hosted exclusively by this shell drawer.
+        const jobAttentionSlot=document.createElement('div');
+        jobAttentionSlot.id='studioShellJobAttention';
+        drawer.querySelector('#studioAttentionDetails').after(jobAttentionSlot);
+        window.studioShellMountJobAttention=(content)=>{
+            jobAttentionSlot.replaceChildren();
+            if(content)jobAttentionSlot.append(content);
+        };
+
         const close = () => {
             drawer.hidden = true;
             backdrop.hidden = true;
