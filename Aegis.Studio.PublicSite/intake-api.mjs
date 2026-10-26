@@ -15,6 +15,38 @@ const equal=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.len
 export function createIntakeApi(env,readBody,json) {
   const store=new IntakeStore(env.INTAKE_DB_PATH || './data/intake.sqlite');
   const mediaStorage=new GalleryObjectStorage(env,store);
+  // Retain a tombstone even after the temporary media bytes have been removed.
+  store.db.exec("CREATE TABLE IF NOT EXISTS gallery_media_retention(gallery_id TEXT NOT NULL,photo_id TEXT NOT NULL,uploaded_at_utc TEXT NOT NULL,deleted_at_utc TEXT,delete_reason TEXT,PRIMARY KEY(gallery_id,photo_id))");
+  let cleanupRunning=false;
+  async function deleteTransferredImage(galleryId,photoId,reason){
+    const record=store.db.prepare('SELECT deleted_at_utc FROM gallery_media_retention WHERE gallery_id=? AND photo_id=?').get(galleryId,photoId);
+    if(!record||record.deleted_at_utc)return false;
+    // Delete remote objects first. A failed S3 deletion leaves metadata available for retry.
+    for(const representation of ['original','preview'])await mediaStorage.delete(galleryId,photoId,representation);
+    store.transaction(()=>{
+      store.db.prepare('DELETE FROM gallery_media_objects WHERE gallery_id=? AND photo_id=?').run(galleryId,photoId);
+      store.db.prepare('DELETE FROM gallery_previews WHERE gallery_id=? AND id=?').run(galleryId,photoId);
+      store.db.prepare('DELETE FROM media WHERE gallery_id=? AND id=?').run(galleryId,photoId);
+      store.db.prepare('UPDATE gallery_media_retention SET deleted_at_utc=?,delete_reason=? WHERE gallery_id=? AND photo_id=? AND deleted_at_utc IS NULL')
+        .run(new Date().toISOString(),reason,galleryId,photoId);
+    });
+    return true;
+  }
+  async function purgeExpiredGalleryMedia(){
+    if(cleanupRunning)return;
+    cleanupRunning=true;
+    try{
+      const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
+      const rows=store.db.prepare('SELECT gallery_id,photo_id FROM gallery_media_retention WHERE deleted_at_utc IS NULL AND uploaded_at_utc<=? LIMIT 100').all(cutoff);
+      for(const row of rows){
+        try{await deleteTransferredImage(row.gallery_id,row.photo_id,'Expired7Days');}
+        catch(error){console.error('Gallery retention cleanup failed',row.gallery_id,row.photo_id,error);}
+      }
+    }finally{cleanupRunning=false;}
+  }
+  const retentionTimer=setInterval(()=>{purgeExpiredGalleryMedia().catch(error=>console.error('Gallery retention cleanup error',error));},60*60*1000);
+  retentionTimer.unref?.();
+  queueMicrotask(()=>{purgeExpiredGalleryMedia().catch(error=>console.error('Gallery retention startup cleanup error',error));});
   const workdayStore=new WorkDayExchangeStore(env.WORKDAY_EXCHANGE_DB_PATH||env.INTAKE_DB_PATH||'./data/intake.sqlite');
   function workdayToken(req){
     const header=String(req.headers['x-aegis-workday-token']||'');
@@ -411,6 +443,16 @@ export function createIntakeApi(env,readBody,json) {
       const remaining=candidates.length-batch.length;
       json(res,200,{publicationId:gallery.id,processed,remaining,nextCursor,refresh});return true;
     }
+    // The external site must acknowledge only after it has durably stored the bytes.
+    const downloadAck=route.match(/^\\/api\\/v1\\/galleries\\/([0-9a-f-]{36})\\/media\\/([0-9a-f-]{36})\\/download-ack$/i);
+    if(downloadAck&&method==='POST'){
+      authenticate(req,'gallery:original:read');
+      const record=store.db.prepare('SELECT deleted_at_utc,delete_reason FROM gallery_media_retention WHERE gallery_id=? AND photo_id=?').get(downloadAck[1],downloadAck[2]);
+      if(!record)fail(404,'not_found','Gallery image not found.');
+      if(!record.deleted_at_utc)await deleteTransferredImage(downloadAck[1],downloadAck[2],'ExternalDownloadConfirmed');
+      const current=store.db.prepare('SELECT deleted_at_utc,delete_reason FROM gallery_media_retention WHERE gallery_id=? AND photo_id=?').get(downloadAck[1],downloadAck[2]);
+      json(res,200,{acknowledged:true,deletedAtUtc:current.deleted_at_utc,reason:current.delete_reason});return true;
+    }
     const originalDownload=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})\/original$/i);
     if(originalDownload&&method==='GET'){
       authenticate(req,'gallery:original:read');
@@ -442,7 +484,10 @@ export function createIntakeApi(env,readBody,json) {
       }
       const originalObject=await mediaStorage.storeObject(media[1],media[2],'original',type,bytes);
       const previewObject=preview?await mediaStorage.storeObject(media[1],media[2],'preview',preview.type,preview.content):null;
+      const retention=store.db.prepare('SELECT deleted_at_utc FROM gallery_media_retention WHERE gallery_id=? AND photo_id=?').get(media[1],media[2]);
+      if(retention?.deleted_at_utc)fail(409,'media_already_deleted','A deleted gallery version cannot be uploaded again.');
       store.transaction(()=>{
+        store.db.prepare('INSERT OR IGNORE INTO gallery_media_retention(gallery_id,photo_id,uploaded_at_utc) VALUES(?,?,?)').run(media[1],media[2],new Date().toISOString());
         store.db.prepare('INSERT INTO media VALUES(?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content')
           .run(media[1],media[2],type,mediaStorage.s3?Buffer.alloc(0):bytes);
         mediaStorage.remember(media[1],media[2],'original',type,originalObject);
