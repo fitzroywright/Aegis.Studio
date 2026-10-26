@@ -145,6 +145,13 @@
             </section>
 
 `;
+        const activeView = document.body.dataset.studioView || currentView;
+        rail.querySelectorAll('[data-studio-side]').forEach(button => {
+            const active = button.dataset.studioSide === activeView;
+            button.classList.toggle('active', active);
+            if (active) button.setAttribute('aria-current', 'page');
+            else button.removeAttribute('aria-current');
+        });
         renderFooterWorkspaceMenu(workspaces);
         if(document.body.dataset.studioView==='schedule')window.StudioScheduleWorkspaceCard?.bindRail(rail);
         rail.querySelector('[data-studio-close-register]')?.addEventListener('click',()=>launchFrontDeskPos('CloseRegister').catch(error=>alert(error.message)));
@@ -418,7 +425,7 @@
         // Job details and the workspace list share a route. Refresh the masthead
         // when the visible panel changes, not only when the route changes.
         const conversation=document.getElementById('conversationView');
-        if(conversation)new MutationObserver(()=>syncPageFrame()).observe(conversation,{attributes:true,attributeFilter:['class']});
+        if(conversation)new MutationObserver(()=>{renderLeftRail();syncPageFrame();}).observe(conversation,{attributes:true,attributeFilter:['class']});
 
 
         if (pageTools) {
