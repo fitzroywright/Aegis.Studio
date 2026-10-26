@@ -7609,34 +7609,34 @@ body[data-studio-view="today"] .topbar {
   border-bottom: 1px solid #102238 !important;
 }
 body .topbar .shell-brand {
-  color: #fff !important;
+  color: #fff;
 }
 body .topbar .shell-brand strong {
-  color: #fff !important;
+  color: #fff;
 }
 body .topbar .brand-button {
-  color: #fff !important;
+  color: #fff;
 }
 body .topbar .studio-organization {
-  color: #fff !important;
+  color: #fff;
 }
 body .topbar .studio-breadcrumb {
-  color: #fff !important;
+  color: #fff;
 }
 
 body .topbar .breadcrumb-separator {
-  color: #fff !important;
+  color: #fff;
 }
 body .topbar .shell-brand strong:before {
-  color: #fff !important;
+  color: #fff;
 }
 body .topbar .brand-button.active {
-  color: #fff !important;
-  border-bottom-color: #b98b69 !important;
+  color: #fff;
+  border-bottom-color: #b98b69;
 }
 body .topbar .brand-button:hover {
-  color: #fff !important;
-  background: #ffffff1a !important;
+  color: #fff;
+  background: #ffffff1a;
 }
 body[data-studio-view="today"] .mw-today-heading {
   color: inherit !important;
