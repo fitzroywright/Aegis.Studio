@@ -5,6 +5,10 @@
     const studioPageTools=document.getElementById('studioPageTools');
 
     function setActive(view){
+        if(view!=='workspaces'){
+            window.studioShellMountJobConversation?.(null);
+            window.studioShellMountJobAttention?.(null);
+        }
         document.body.dataset.studioView=view;
         if(view!=='today' && view!=='jobs'){const count=document.getElementById('studioFooterRate');if(count)count.textContent='';}
         document.querySelectorAll('[data-view]').forEach(button=>{
