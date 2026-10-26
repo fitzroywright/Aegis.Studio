@@ -108,6 +108,12 @@ window.StudioPhotographerSchedule=(()=>{
             genericView.querySelector('[data-ps-inactive]').onchange=e=>{state.inactive=e.target.checked;render();};
             genericView.querySelectorAll('[data-ps-only]').forEach(b=>b.onclick=()=>{state.photographer=b.dataset.psOnly;paint();});
             genericView.querySelectorAll('[data-ps-entry]').forEach(b=>b.onclick=()=>{const entry=rawEntries.find(e=>e.id===b.dataset.psEntry);if(entry?.jobId){openWorkspaceJob(entry.jobId).catch(error=>alert(error.message));return;}entryDetails(entry,roster.find(p=>p.userName===b.dataset.psPerson)||{displayName:'Worker not assigned'});});
+            // Keep schedule actions bound before transferring shell-owned panels.
+            const scheduleAttention=genericView.querySelector('.ps-attention');
+            const scheduleMessages=genericView.querySelector('#pageMessageCard');
+            window.studioShellMountJobAttention?.(scheduleAttention);
+            window.studioShellMountJobConversation?.(scheduleMessages);
+            window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Workers</span><strong>${people.length}</strong></div><div class="workspace-summary-row"><span>Assignments</span><strong>${rawEntries.length}</strong></div></section>`,'schedule');
             genericView.querySelectorAll('[data-ps-profile]').forEach(b=>b.onclick=()=>profile(roster.find(p=>p.userName===b.dataset.psProfile)));
             genericView.querySelectorAll('[data-ps-availability]').forEach(b=>b.onclick=()=>{const a=(availability.get(b.dataset.psPerson)||[]).find(a=>a.id===b.dataset.psAvailability);if(a)studioDialog('Recorded availability',`<p><strong>${esc(roster.find(p=>p.userName===b.dataset.psPerson)?.displayName)}</strong></p><p>${esc(a.availabilityType)}</p><p>${esc(new Date(a.startsAtUtc).toLocaleString())} – ${esc(new Date(a.endsAtUtc).toLocaleString())}</p>`);});
         }
