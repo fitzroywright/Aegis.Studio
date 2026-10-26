@@ -514,6 +514,10 @@
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
+        document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
+            document.querySelector('.user-menu')?.removeAttribute('open');
+            window.studioNavigate?.('notifications');
+        });
         // One shell contract for Overview on every route.
         window.studioShellSetOverview = (markup, view = document.body.dataset.studioView) => {
             shellOverviews.set(view, markup || defaultOverview());
