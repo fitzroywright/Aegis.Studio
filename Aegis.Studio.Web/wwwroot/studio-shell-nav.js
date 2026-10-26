@@ -139,7 +139,7 @@
                     <button type="button" data-studio-side="notifications"><span>♧</span><span>Notifications</span></button>
                 </div>
             </section>
-            ${shellOverview?.view === document.body.dataset.studioView && !jobPage ? shellOverview.markup : ''}
+            ${shellOverview?.view === document.body.dataset.studioView ? shellOverview.markup : ''}
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
