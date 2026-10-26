@@ -10,6 +10,8 @@ catch (error) { console.error('Cannot determine CSS changes against ' + base + '
 const failures = [];
 let file = '';
 let added = [];
+let removedImportant = 0;
+let addedImportant = 0;
 function check() {
   if (!file || !added.length) { added = []; return; }
   const css = file.endsWith('.css');
@@ -22,7 +24,9 @@ function check() {
 for (const line of diff.split('\n')) {
   if (line.startsWith('diff --git ')) { check(); file = line.match(/^diff --git a\/.* b\/(.*)$/)?.[1] || ''; }
   else if (line.startsWith('+') && !line.startsWith('+++')) added.push(line.slice(1));
+  else if (line.startsWith('-') && !line.startsWith('---') && file.endsWith('.css')) removedImportant += (line.match(/!important\\b/gi) || []).length;
 }
 check();
+if (addedImportant > removedImportant) failures.push('CSS introduces ' + (addedImportant - removedImportant) + ' net new !important declarations.');
 if (failures.length) { console.error('Studio UI CSS ownership violations:\n' + failures.map(x => ' - ' + x).join('\n')); process.exit(1); }
 console.log('Studio UI CSS ownership guard passed (changed lines only).');
