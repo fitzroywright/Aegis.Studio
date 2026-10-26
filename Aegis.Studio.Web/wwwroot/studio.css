@@ -2670,15 +2670,8 @@ body[data-studio-view="today"] {
 body[data-studio-view="today"] .generic {
   background: radial-gradient(circle at 14% 8%,rgba(180,112,58,.10),transparent 28%),radial-gradient(circle at 84% 14%,rgba(43,112,126,.07),transparent 24%),linear-gradient(180deg,#f7f4ef 0%,#f0ede7 100%);
 }
-body[data-studio-view="today"] .topbar {
-  backdrop-filter: blur(14px);
-  box-shadow: 0 1px 0#ddd7cf,0 5px 18px rgba(54,37,24,.04);
-}
-body[data-studio-view="today"] .shell-brand strong:before {
-  content: "◉  Studio";
-  color: #2d160b;
-  text-shadow: 0 1px 0#fff;
-}
+
+
 body[data-studio-view="today"] .brand-button {
   transition: background .14s ease,color .14s ease,border-color .14s ease;
 }
@@ -7603,10 +7596,10 @@ body[data-studio-view="today"] .mw-today-footer {
   font-size: .75rem;
   letter-spacing: .02em;
 }
-body[data-studio-view="today"] .topbar {
-  background: #172d4a !important;
-  color: #fff !important;
-  border-bottom: 1px solid #102238 !important;
+body .topbar {
+  background: #172d4a;
+  color: #fff;
+  border-bottom: 1px solid #102238;
 }
 body .topbar .shell-brand {
   color: #fff;
@@ -8912,9 +8905,7 @@ body .shell>.studio-shell-footer #studioFooterRate {
     margin-left: 0;
   }
 }
-body[data-studio-view="today"] .shell {
-  position: relative;
-}
+
 
 body[data-studio-view="today"] .mw-today-layout {
   border-top: 0;
@@ -9361,9 +9352,7 @@ body .shell>.studio-shell-footer .studio-grid-item-count {
   font-variant-numeric: tabular-nums;
 }
 @media (min-width:1101px) {
-  body[data-studio-view="today"] .shell {
-    min-height: 0;
-  }
+
   body[data-studio-view="today"] .shell>main {
     min-height: 0;
     overflow: hidden;
