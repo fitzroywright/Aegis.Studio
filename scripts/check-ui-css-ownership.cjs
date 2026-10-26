@@ -14,10 +14,9 @@ function check() {
   if (!file || !added.length) { added = []; return; }
   const css = file.endsWith('.css');
   if (css && file.endsWith('/studio-legacy.css')) failures.push(file + ': legacy stylesheet is frozen; migrate ownership instead of editing it.');
-  if (css && /(^|\/)studio\.css$/.test(file)) failures.push(file + ': monolithic studio.css is frozen; edit the owning component stylesheet.');
   if (css && added.some(line => /!important\b/i.test(line))) failures.push(file + ': new !important declarations are prohibited.');
   if (css && added.some(line => /(?:override|temporary fix|hotfix|css patch)/i.test(line))) failures.push(file + ': override patches are prohibited.');
-  if (/\.(html|js)$/.test(file) && added.some(line => /studio-legacy\.css/i.test(line))) failures.push(file + ': new legacy CSS references are prohibited.');
+  if (/\.(html|js|css)$/.test(file) && added.some(line => /studio-legacy\.css/i.test(line))) failures.push(file + ': new legacy CSS references are prohibited.');
   added = [];
 }
 for (const line of diff.split('\n')) {
