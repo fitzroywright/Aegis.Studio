@@ -9970,10 +9970,8 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 /* Shared masthead attention control and slide-out drawer. */
 .topbar { position: relative; }
 .topbar .studio-attention-trigger {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  position: static;
+  transform: none;
   display: inline-flex;
   align-items: center;
   gap: 9px;
