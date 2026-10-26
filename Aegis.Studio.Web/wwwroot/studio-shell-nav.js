@@ -145,7 +145,7 @@
             </section>
 
 `;
-        renderFooterWorkspaceMenu(workspaces, workspaceItems);
+        renderFooterWorkspaceMenu(workspaces);
         if(document.body.dataset.studioView==='schedule')window.StudioScheduleWorkspaceCard?.bindRail(rail);
         rail.querySelector('[data-studio-close-register]')?.addEventListener('click',()=>launchFrontDeskPos('CloseRegister').catch(error=>alert(error.message)));
         rail.querySelector('[data-studio-new-client]')?.addEventListener('click',()=>showFrontDeskClients(true).catch(error=>alert(error.message)));
@@ -174,46 +174,37 @@
     }
 
 
-    function renderFooterWorkspaceMenu(workspaces, workspaceItems) {
+    function renderFooterWorkspaceMenu(workspaces) {
         const footer = document.getElementById('studioShellFooter');
         if (!footer) return;
         let control = document.getElementById('studioFooterWorkspaces');
-        if (!control) {
-            control = document.createElement('details');
+        if (!control || control.tagName !== 'SELECT') {
+            control?.remove();
+            control = document.createElement('select');
             control.id = 'studioFooterWorkspaces';
             control.className = 'studio-footer-workspaces';
+            control.setAttribute('aria-label', 'Select workspace');
             footer.append(control);
         }
-        const selected = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
-            ? workspaces.find(w => String(w.id) === String(productionWorkspaceFilter.selected))
-            : null;
-        const label = selected?.name || 'All';
-        control.innerHTML = '<summary>▣ &nbsp; Workspaces: ' + escText(label) + ' <span aria-hidden="true">⌄</span></summary>' +
-            '<div class="studio-footer-workspace-menu" role="group" aria-label="Workspaces">' +
-            '<button type="button" data-studio-view-all-workspaces>View All Workspaces →</button>' +
-            (document.body.dataset.studioView === 'production' && productionWorkspaceFilter
-                ? workspaceItems
-                : (workspaceItems || '<p class="mw-empty">No workspaces available.</p>')) +
-            '</div>';
-        control.querySelector('[data-studio-view-all-workspaces]')?.addEventListener('click', () => {
-            control.open = false;
-            window.studioNavigate?.('workspaces');
-        });
-        control.querySelectorAll('[data-studio-workspace-id]').forEach(button => {
-            button.addEventListener('click', () => {
-                control.open = false;
-                const id = button.dataset.studioWorkspaceId;
+        const isProduction = document.body.dataset.studioView === 'production' && productionWorkspaceFilter;
+        const selectedId = isProduction ? String(productionWorkspaceFilter.selected || '') : '';
+        control.replaceChildren();
+        const all = new Option('Workspaces: All', '');
+        control.add(all);
+        workspaces.forEach(workspace => control.add(new Option(workspace.name || workspace.title || 'Workspace', String(workspace.id))));
+        control.value = selectedId;
+        control.onchange = () => {
+            const id = control.value;
+            if (isProduction) {
+                productionWorkspaceFilter.onSelect?.(id);
+            } else if (id) {
                 const workspace = workspaces.find(item => String(item.id) === id);
                 if (typeof window.selectWorkspace === 'function') window.selectWorkspace(id, workspace?.name || '');
                 else window.studioNavigate?.('workspaces');
-            });
-        });
-        control.querySelectorAll('[data-production-workspace]').forEach(button => {
-            button.addEventListener('click', () => {
-                control.open = false;
-                productionWorkspaceFilter?.onSelect?.(button.dataset.productionWorkspace || '');
-            });
-        });
+            } else {
+                window.studioNavigate?.('workspaces');
+            }
+        };
     }
 
     const railStorage = 'aegis.studio.rail-collapse.v1';
