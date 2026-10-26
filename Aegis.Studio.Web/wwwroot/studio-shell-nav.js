@@ -16,11 +16,14 @@
     let currentView = document.body.dataset.studioView || 'today';
     const shellOverviews = new Map();
     const overviewKey = () => document.body.dataset.studioView === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page') ? 'job-detail' : (document.body.dataset.studioView || 'today');
-    const defaultOverview = () => `<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><p>${escText(labelFor(document.body.dataset.studioView || 'today'))} workspace</p></section>`;
+    const defaultOverview = () => `<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><p>${escText(labelFor(document.body.dataset.studioView || 'today'))}</p><p>Use this page to ${escText((pageTaglines[document.body.dataset.studioView || 'today'] || 'manage Studio work').replace(/\.$/, '').toLowerCase())}.</p></section>`;
     let renderingTools = false;
     let workspaceLoadPromise = null;
     let workspaceLoadAttempted = false;
     let productionWorkspaceFilter = null;
+    const pageAttention = new Map();
+    const pageSessions = new Map();
+    const currentPage = () => overviewKey();
 
     const escText = value => String(value ?? '').replace(/[&<>"']/g, character => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -328,6 +331,7 @@
         currentView=view;
         ensureTools();
         initializeAttentionDrawer();
+        refreshPageDrawers();
         ensureLeftRail();
         ensureWorkspaceListLoaded();
         syncPageFrame();
@@ -420,6 +424,14 @@
         const bell = document.getElementById('notificationButton');
         if (bell?.parentElement === masthead) masthead.insertBefore(trigger, bell);
         else masthead.appendChild(trigger);
+        const sessionsTrigger = document.createElement('button');
+        sessionsTrigger.type = 'button';
+        sessionsTrigger.id = 'studioSessionsTrigger';
+        sessionsTrigger.className = 'studio-attention-trigger studio-sessions-trigger';
+        sessionsTrigger.setAttribute('aria-controls', 'studioSessionsDrawer');
+        sessionsTrigger.setAttribute('aria-expanded', 'false');
+        sessionsTrigger.innerHTML = '<span>Today\'s Sessions</span><strong id="studioSessionsCount">0</strong>';
+        trigger.before(sessionsTrigger);
         const backdrop = document.createElement('div');
         backdrop.className = 'studio-attention-backdrop';
         backdrop.hidden = true;
@@ -431,7 +443,15 @@
         drawer.setAttribute('aria-label', 'Needs Attention');
         drawer.hidden = true;
         drawer.innerHTML = '<header><h2>Needs Attention</h2><button type="button" data-attention-close aria-label="Close Needs Attention">×</button></header><div id="studioAttentionDetails" class="studio-attention-details"><p>Open Today to refresh attention items.</p></div>';
-        document.body.append(backdrop, drawer);
+        const sessionsDrawer = document.createElement('aside');
+        sessionsDrawer.id = 'studioSessionsDrawer';
+        sessionsDrawer.className = 'studio-attention-drawer';
+        sessionsDrawer.setAttribute('role', 'dialog');
+        sessionsDrawer.setAttribute('aria-modal', 'true');
+        sessionsDrawer.setAttribute('aria-label', "Today's Sessions");
+        sessionsDrawer.hidden = true;
+        sessionsDrawer.innerHTML = '<header><h2>Today\'s Sessions</h2><button type="button" data-sessions-close aria-label="Close sessions">×</button></header><div id="studioSessionsDetails" class="studio-attention-details"></div><button type="button" data-sessions-calendar>View Calendar →</button>';
+        document.body.append(backdrop, drawer, sessionsDrawer);
         // Page-specific attention details are hosted exclusively by this shell drawer.
         const jobAttentionSlot=document.createElement('div');
         jobAttentionSlot.id='studioShellJobAttention';
@@ -443,21 +463,43 @@
 
         const close = () => {
             drawer.hidden = true;
+            sessionsDrawer.hidden = true;
+            sessionsTrigger.setAttribute('aria-expanded', 'false');
             backdrop.hidden = true;
             trigger.setAttribute('aria-expanded', 'false');
             trigger.focus();
         };
         trigger.onclick = () => {
             const opening = drawer.hidden;
+            sessionsDrawer.hidden = true;
+            sessionsTrigger.setAttribute('aria-expanded', 'false');
             drawer.hidden = !opening;
             backdrop.hidden = !opening;
             trigger.setAttribute('aria-expanded', String(opening));
             if (opening) drawer.querySelector('[data-attention-close]').focus();
         };
+        sessionsTrigger.onclick = () => {
+            const opening = sessionsDrawer.hidden;
+            drawer.hidden = true;
+            trigger.setAttribute('aria-expanded', 'false');
+            sessionsDrawer.hidden = !opening;
+            backdrop.hidden = !opening;
+            sessionsTrigger.setAttribute('aria-expanded', String(opening));
+            if (opening) sessionsDrawer.querySelector('[data-sessions-close]').focus();
+        };
+        sessionsDrawer.querySelector('[data-sessions-close]').onclick = close;
+        sessionsDrawer.querySelector('[data-sessions-calendar]').onclick = () => { close(); window.studioNavigate?.('schedule'); };
+        sessionsDrawer.addEventListener('click', event => {
+            const job = event.target.closest('[data-open-job]');
+            if (!job) return;
+            close();
+            const id = job.dataset.openJob;
+            if (id) window.studioOpenJob?.(id);
+        });
         backdrop.onclick = close;
         drawer.querySelector('[data-attention-close]').onclick = close;
         document.addEventListener('keydown', event => {
-            if (event.key === 'Escape' && !drawer.hidden) close();
+            if (event.key === 'Escape' && (!drawer.hidden || !sessionsDrawer.hidden)) close();
         });
         drawer.addEventListener('click', event => {
             const link = event.target.closest('[data-attention-route]');
@@ -467,35 +509,59 @@
         });
         window.addEventListener('studio-attention-updated', event => {
             const data = event.detail || {};
-            const rows = [
-                ['Overdue tasks', data.overdueTasks || 0, 'tasks'],
-                ['Blocked tasks', data.blockedTasks || 0, 'tasks'],
-                ['Needs scheduling (led by me)', data.schedulingJobs || 0, 'schedule'],
-                ['Awaiting upload (led by me)', data.uploadJobs || 0, 'production'],
-                ['Job exceptions', data.exceptionJobs || 0, 'jobs']
-            ];
-            const total = rows.reduce((sum, row) => sum + Number(row[1] || 0), 0);
-            document.getElementById('studioAttentionCount').textContent = String(total);
-            trigger.classList.toggle('has-attention', total > 0);
-            const details = document.getElementById('studioAttentionDetails');
+            pageAttention.set(data.view || currentPage(), data);
+            refreshPageDrawers();
+        });
+        window.addEventListener('studio-sessions-updated', event => {
+            const data = event.detail || {};
+            pageSessions.set(data.view || currentPage(), data);
+            refreshPageDrawers();
+        });
+    }
+
+
+    function refreshPageDrawers() {
+        const key = currentPage();
+        const data = pageAttention.get(key) || {};
+        const rows = [
+            ['Overdue tasks', data.overdueTasks || 0, 'tasks'],
+            ['Blocked tasks', data.blockedTasks || 0, 'tasks'],
+            ['Needs scheduling', data.schedulingJobs || 0, 'schedule'],
+            ['Awaiting upload', data.uploadJobs || 0, 'production'],
+            ['Job exceptions', data.exceptionJobs || 0, 'jobs']
+        ];
+        const total = rows.reduce((sum, row) => sum + Number(row[1] || 0), 0);
+        const count = document.getElementById('studioAttentionCount');
+        if (count) count.textContent = String(total);
+        document.getElementById('studioAttentionTrigger')?.classList.toggle('has-attention', total > 0);
+        const details = document.getElementById('studioAttentionDetails');
+        if (details) {
             details.replaceChildren();
             if (!total) {
-                const empty = document.createElement('p');
-                empty.textContent = 'Nothing currently needs attention.';
-                details.append(empty);
-            } else rows.forEach(([label, count, route]) => {
-                if (!count) return;
+                const p = document.createElement('p');
+                p.textContent = data.loaded ? 'Nothing currently needs attention.' : 'No attention data available for this page.';
+                details.append(p);
+            }
+            rows.forEach(([label, amount, route]) => {
+                if (!amount) return;
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.dataset.attentionRoute = route;
-                const text = document.createElement('span');
-                text.textContent = label;
+                const name = document.createElement('span');
+                name.textContent = label;
                 const badge = document.createElement('strong');
-                badge.textContent = String(count);
-                button.append(text, badge);
+                badge.textContent = String(amount);
+                button.append(name, badge);
                 details.append(button);
             });
-        });
+        }
+        const sessions = pageSessions.get(key) || {};
+        const sessionCount = document.getElementById('studioSessionsCount');
+        if (sessionCount) sessionCount.textContent = String(sessions.count || 0);
+        const sessionDetails = document.getElementById('studioSessionsDetails');
+        if (sessionDetails) {
+            sessionDetails.innerHTML = sessions.markup || '<p>No sessions available for this page.</p>';
+        }
     }
 
     function initialize() {
@@ -509,10 +575,16 @@
         if (identityNode) new MutationObserver(syncFooterIdentity).observe(identityNode, {childList:true,characterData:true,subtree:true});
         ensureBreadcrumb();
         syncPageFrame();
+        initializeAttentionDrawer();
+        refreshPageDrawers();
         syncGridFooterCount();
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
+        document.querySelector('[data-studio-avatar-activity]')?.addEventListener('click', () => {
+            document.querySelector('.user-menu')?.removeAttribute('open');
+            window.studioNavigate?.('activity');
+        });
         document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
             window.studioNavigate?.('notifications');
@@ -547,6 +619,7 @@
                 currentView = next;
                 renderLeftRail();
                 syncPageFrame();
+                refreshPageDrawers();
             }
         }).observe(document.body, { attributes: true, attributeFilter: ['data-studio-view'] });
     }
