@@ -11,7 +11,8 @@
         ['production', 'Production', '◆'],
         ['frontdesk', 'Front Desk', '▣'],
         ['clients', 'Clients', '♧'],
-        ['finance', 'Finance', '    ];
+        ['finance', 'Finance', '$']
+    ];
     let currentView = document.body.dataset.studioView || 'today';
     const shellOverviews = new Map();
     const overviewKey = () => document.body.dataset.studioView === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page') ? 'job-detail' : (document.body.dataset.studioView || 'today');
