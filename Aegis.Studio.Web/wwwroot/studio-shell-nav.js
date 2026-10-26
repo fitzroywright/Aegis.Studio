@@ -323,6 +323,7 @@
         sync(view=document.body.dataset.studioView||currentView){
         currentView=view;
         ensureTools();
+        initializeAttentionDrawer();
         ensureLeftRail();
         ensureWorkspaceListLoaded();
         syncPageFrame();
@@ -399,6 +400,86 @@
             if (tagline) tagline.textContent = isToday ? taglineFor('today') : jobOpen ? 'Review job details, assignments, workflow, media and conversations.' : taglineFor(view);
         }
         main.classList.add('studio-standard-main');
+    }
+
+    function initializeAttentionDrawer() {
+        const masthead = document.querySelector('.topbar');
+        if (!masthead || document.getElementById('studioAttentionTrigger')) return;
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.id = 'studioAttentionTrigger';
+        trigger.className = 'studio-attention-trigger';
+        trigger.setAttribute('aria-controls', 'studioAttentionDrawer');
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.innerHTML = '<span>Needs Attention</span><strong id="studioAttentionCount" aria-label="Attention items">0</strong>';
+        masthead.insertBefore(trigger, document.getElementById('studioBreadcrumb'));
+        const backdrop = document.createElement('div');
+        backdrop.className = 'studio-attention-backdrop';
+        backdrop.hidden = true;
+        const drawer = document.createElement('aside');
+        drawer.id = 'studioAttentionDrawer';
+        drawer.className = 'studio-attention-drawer';
+        drawer.setAttribute('role', 'dialog');
+        drawer.setAttribute('aria-modal', 'true');
+        drawer.setAttribute('aria-label', 'Needs Attention');
+        drawer.hidden = true;
+        drawer.innerHTML = '<header><h2>Needs Attention</h2><button type="button" data-attention-close aria-label="Close Needs Attention">×</button></header><div id="studioAttentionDetails" class="studio-attention-details"><p>Open Today to refresh attention items.</p></div>';
+        document.body.append(backdrop, drawer);
+        const close = () => {
+            drawer.hidden = true;
+            backdrop.hidden = true;
+            trigger.setAttribute('aria-expanded', 'false');
+            trigger.focus();
+        };
+        trigger.onclick = () => {
+            const opening = drawer.hidden;
+            drawer.hidden = !opening;
+            backdrop.hidden = !opening;
+            trigger.setAttribute('aria-expanded', String(opening));
+            if (opening) drawer.querySelector('[data-attention-close]').focus();
+        };
+        backdrop.onclick = close;
+        drawer.querySelector('[data-attention-close]').onclick = close;
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !drawer.hidden) close();
+        });
+        drawer.addEventListener('click', event => {
+            const link = event.target.closest('[data-attention-route]');
+            if (!link) return;
+            close();
+            window.studioNavigate?.(link.dataset.attentionRoute);
+        });
+        window.addEventListener('studio-attention-updated', event => {
+            const data = event.detail || {};
+            const rows = [
+                ['Overdue tasks', data.overdueTasks || 0, 'tasks'],
+                ['Blocked tasks', data.blockedTasks || 0, 'tasks'],
+                ['Needs scheduling (led by me)', data.schedulingJobs || 0, 'schedule'],
+                ['Awaiting upload (led by me)', data.uploadJobs || 0, 'production'],
+                ['Job exceptions', data.exceptionJobs || 0, 'jobs']
+            ];
+            const total = rows.reduce((sum, row) => sum + Number(row[1] || 0), 0);
+            document.getElementById('studioAttentionCount').textContent = String(total);
+            trigger.classList.toggle('has-attention', total > 0);
+            const details = document.getElementById('studioAttentionDetails');
+            details.replaceChildren();
+            if (!total) {
+                const empty = document.createElement('p');
+                empty.textContent = 'Nothing currently needs attention.';
+                details.append(empty);
+            } else rows.forEach(([label, count, route]) => {
+                if (!count) return;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.dataset.attentionRoute = route;
+                const text = document.createElement('span');
+                text.textContent = label;
+                const badge = document.createElement('strong');
+                badge.textContent = String(count);
+                button.append(text, badge);
+                details.append(button);
+            });
+        });
     }
 
     function initialize() {
