@@ -188,7 +188,7 @@ function renderFrontDesk(){
                 <button type="button" data-new-booking>＋ Create Manual Booking →</button>
             </footer>
         </section>`;
-    window.dispatchEvent(new CustomEvent('studio-frontdesk-overview-updated'));
+    window.studioShellSetOverview?.(window.studioFrontDeskOverviewMarkup,'frontdesk');
     if(searchNode&&genericView.querySelector('#frontDeskSearch')){genericView.querySelector('#frontDeskSearch').replaceWith(searchNode);searchNode.value=frontDeskTerm;if(searchFocused){searchNode.focus({preventScroll:true});searchNode.setSelectionRange(...searchSelection);}}
     // The shared shell footer owns the visible filtered row count.
     const shellCount=document.getElementById('studioFooterRate');
