@@ -9968,9 +9968,10 @@ body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:sta
 body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { background:#fff; color:#173552; }
 
 /* Shared masthead attention control and slide-out drawer. */
+.topbar .studio-sessions-trigger { margin-left: auto; }
 .topbar { position: relative; }
 .topbar .studio-attention-trigger {
-  margin-left: auto;
+  margin-left: 0;
   position: static;
   transform: none;
   display: inline-flex;
