@@ -33,7 +33,7 @@
   box-sizing: border-box;
 }
 body {
-  font: 14px/1.35"Segoe UI",Arial,sans-serif;
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
 }
 button {
   cursor: pointer;
@@ -3706,7 +3706,7 @@ body[data-studio-view] {
   background: var(--studio-page);
 }
 body[data-studio-view] .topbar {
-  height: 56px;
+  height: 60px;
   padding: 0 28px;
   gap: 12px;
   background: #172d4a;
@@ -3714,7 +3714,7 @@ body[data-studio-view] .topbar {
   box-shadow: 0 1px 3px rgba(23,52,78,.05);
 }
 body[data-studio-view] .shell {
-  height: calc(100dvh - 58px);
+  height: calc(100dvh - 62px);
 }
 body[data-studio-view] .shell-brand strong:before {
   letter-spacing: 0;
