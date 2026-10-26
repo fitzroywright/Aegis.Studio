@@ -557,13 +557,13 @@
         const sessions = jobRoot && jobId ? sharedSessions.filter(item => String(item.jobId) === String(jobId)) : sharedSessions;
         const sessionCount = document.getElementById('studioSessionsCount');
         if (sessionCount) sessionCount.textContent = sessionsState === 'ready' ? String(sessions.length) : '…';
-        const details = document.getElementById('studioSessionsDetails');
-        if (details) {
-            details.replaceChildren();
+        const sessionDetails = document.getElementById('studioSessionsDetails');
+        if (sessionDetails) {
+            sessionDetails.replaceChildren();
             if (sessionsState !== 'ready' || !sessions.length) {
                 const empty = document.createElement('p');
                 empty.textContent = sessionsState === 'loading' ? 'Loading sessions…' : sessionsState === 'error' ? 'Unable to load sessions. Open Today to retry.' : 'No sessions scheduled today.';
-                details.append(empty);
+                sessionDetails.append(empty);
             }
             for (const item of sessions) {
                 const row = document.createElement('div');
@@ -577,7 +577,7 @@
                 const meta = document.createElement('span');
                 meta.textContent = [time,item.clientName,item.photographerName || item.photographer,item.location,status].filter(Boolean).join(' · ');
                 row.append(name,meta);
-                details.append(row);
+                sessionDetails.append(row);
             }
         }
     }
