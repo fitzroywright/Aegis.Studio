@@ -35,7 +35,7 @@ if (addedImportant > removedImportant) failures.push('CSS introduces ' + (addedI
 // ownership or introduce page-specific rules that reposition shared-shell controls.
 function declarations(source) {
   const result = new Map();
-  const cleaned = source.replace(/\\/\\*[\\s\\S]*?\\*\\//g, '');
+  const cleaned = source.replace(/\/\*[\s\S]*?\*\//g, '');
   const stack = [];
   let start = 0;
   for (let i = 0; i < cleaned.length; i++) {
@@ -49,8 +49,8 @@ function declarations(source) {
         const context = stack.filter(x => x.header.startsWith('@')).map(x => x.header).join('|');
         const body = cleaned.slice(block.start, i);
         for (const selector of block.header.split(',')) {
-          const normalized = selector.trim().replace(/\\s+/g,' ');
-          for (const match of body.matchAll(/(?:^|;)\\s*([\\w-]+)\\s*:\\s*([^;{}]+)/g)) {
+          const normalized = selector.trim().replace(/\s+/g,' ');
+          for (const match of body.matchAll(/(?:^|;)\s*([\w-]+)\s*:\s*([^;{}]+)/g)) {
             const key = context+'|'+normalized+'|'+match[1].toLowerCase();
             result.set(key,(result.get(key)||0)+1);
           }
@@ -75,14 +75,13 @@ for (const path of touchedCss) {
     const old = before.get(key)||0;
     if (count > 1 && count > Math.max(1,old)) failures.push(path+': competing declarations for '+key);
   }
-  const shellSelector = /(?:\\.topbar|#studioShellFooter|#studioContextRail|#studioBreadcrumb|#studioSessionsDrawer|#studioAttentionDrawer)/;
-  const reposition = /\\|(?:margin-left|margin-right|position|left|right|top|bottom|transform|display|height|gap)$/;
+  const shellSelector = /(?:\.topbar|#studioShellFooter|#studioContextRail|#studioBreadcrumb|#studioSessionsDrawer|#studioAttentionDrawer)/;
   for (const [key,count] of after) {
     if (before.has(key)) continue;
     const parts=key.split('|'), selector=parts[parts.length-2], property=parts[parts.length-1];
-    if (/body\\[(?:data-studio-view|data-view)=/.test(selector) && shellSelector.test(selector) && /^(margin-left|margin-right|position|left|right|top|bottom|transform|display|height|gap)$/.test(property))
+    if (/body\[(?:data-studio-view|data-view)=/.test(selector) && shellSelector.test(selector) && /^(margin-left|margin-right|position|left|right|top|bottom|transform|display|height|gap)$/.test(property))
       failures.push(path+': page-specific shared-shell layout rule prohibited: '+key);
-    if (shellSelector.test(selector) && /!important/.test(key)) failures.push(path+': shared-shell important rule prohibited: '+key);
+    
   }
 }
 if (failures.length) { console.error('Studio UI CSS ownership violations:\n' + failures.map(x => ' - ' + x).join('\n')); process.exit(1); }
