@@ -3715,7 +3715,8 @@ body[data-studio-view] .topbar {
 }
 body[data-studio-view] .shell {
   height: calc(100dvh - 58px);
-}body[data-studio-view] .shell-brand strong:before {
+}
+body[data-studio-view] .shell-brand strong:before {
   letter-spacing: 0;
   content: "◉  Studio";
   color: #10243a;
@@ -6545,14 +6546,16 @@ body[data-studio-view="workspaces"] .studio-shell-breadcrumb button {
 body[data-studio-view="workspaces"] .studio-shell-breadcrumb strong {
   color: #102b4e;
   font-weight: 800;
-}body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell {
+}
+body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell {
   grid-template-columns: var(--studio-shell-left-width,220px) minmax(0,1fr);
   gap: 14px;
   box-sizing: border-box;
   background: #f8f9fa;
   display: block;
   padding: 0;
-}body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell>main {
+}
+body:not([data-studio-view="today"]):not([data-studio-view="tasks"]) .shell>main {
   min-width: 0;
   min-height: 0;
   width: 100%;
@@ -7812,7 +7815,8 @@ body[data-studio-view="today"] .mw-today-right .mw-list-panel>header button:hove
   body[data-studio-view="today"] .mw-today-calendar-date {
     display: none;
   }
-}.topbar {
+}
+.topbar {
   height: 72px;
   gap: 16px;
   padding: 0 24px;
@@ -8016,7 +8020,8 @@ body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"
   body[data-studio-view="today"] .mw-today-right {
     overflow-y: auto;
   display:flex;flex-direction:column;}
-}.studio-context-rail .studio-context-card>header h2 {
+}
+.studio-context-rail .studio-context-card>header h2 {
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -8161,7 +8166,8 @@ body[data-studio-view="today"] .mw-today-page {
 }
 body[data-studio-view="today"] .mw-today-layout {
   gap: 7px;
-}.studio-context-rail .studio-context-card>header {
+}
+.studio-context-rail .studio-context-card>header {
   height: auto;
   gap: 6px;
   min-height: 30px !important;
@@ -8184,7 +8190,8 @@ body[data-studio-view="today"] .mw-today-layout {
   padding: 2px 5px;
   gap: 6px;
   font-size: .76rem;
-}.studio-context-rail .mw-today-rail-links button>span:first-child {
+}
+.studio-context-rail .mw-today-rail-links button>span:first-child {
   flex: 0 0 25px;
   display: grid;
   place-items: center;
@@ -8832,7 +8839,8 @@ body[data-studio-view="today"] .mw-today-job-list::-webkit-scrollbar-thumb {
   background: #8da0b4;
   border: 2px solid #edf2f7;
   border-radius: 8px;
-}body .topbar {
+}
+body .topbar {
   padding-left: 0;
   column-gap: 0;
   height: 56px !important;
@@ -8850,7 +8858,8 @@ body[data-studio-view="today"] .mw-today-job-list::-webkit-scrollbar-thumb {
   z-index: 10000 !important;
   overflow: visible !important;
   isolation: isolate;
-}body .topbar .user-menu {
+}
+body .topbar .user-menu {
   margin-left: 8px !important;
   margin-right: 0 !important;
   position: relative;
@@ -9193,7 +9202,8 @@ body[data-studio-view="today"] .topbar #studioBreadcrumb {
   .studio-today-brand-title em {
     display: none;
   }
-}body .shell>.studio-shell-footer {
+}
+body .shell>.studio-shell-footer {
   min-width: 0;
   font-size: .75rem;
   font-weight: 500;
@@ -9339,7 +9349,8 @@ body .shell>.studio-shell-footer .studio-grid-item-count {
   margin-left: auto;
   text-align: right;
   white-space: nowrap;
-}body .shell {
+}
+body .shell {
   gap: 0;
   align-items: stretch;
   box-sizing: border-box;
@@ -9364,7 +9375,8 @@ body .shell::before {
   background: #df8a32 !important;
   z-index: 4;
   pointer-events: none;
-}body .shell>main {
+}
+body .shell>main {
   margin-bottom: 0 !important;
   grid-column: 2;
   grid-row: 1;
@@ -9399,7 +9411,8 @@ body:not([data-studio-view="today"]) .shell>main>#genericView {
   overflow: auto;
   box-sizing: border-box;
   padding: 7px 12px 6px 5px !important;
-}.shell>.studio-context-rail {
+}
+.shell>.studio-context-rail {
   display: grid !important;
   grid-template-rows: repeat(3,minmax(0,1fr));
   align-content: stretch;
@@ -9442,7 +9455,8 @@ body .topbar #studioPageTools {
 }
 body .topbar .shell-context {
   flex: 0 0 auto;
-}body .topbar #notificationButton {
+}
+body .topbar #notificationButton {
   margin-left: auto !important;
   width: 28px;
   height: 28px;
@@ -9453,7 +9467,8 @@ body .topbar .shell-context {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-}body .shell>.studio-context-rail {
+}
+body .shell>.studio-context-rail {
   margin-bottom: 0 !important;
   flex-direction: column;
   grid-column: 1;
