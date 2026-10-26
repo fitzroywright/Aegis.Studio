@@ -11059,3 +11059,24 @@ body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left
 #studioFooterWorkspaces { margin-left:auto; flex-shrink:0; min-width:150px; max-width:240px; height:31px; padding:4px 9px; border:1px solid #d8b58f; border-radius:5px; background:#68472f; color:#fff; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
 #studioFooterWorkspaces:focus-visible { outline:2px solid #efaa4e; outline-offset:2px; }
 #studioFooterWorkspaces option { background:#fff; color:#173552; }
+
+/* Footer workspace selector: constrain the native select against broad shell form-control rules. */
+body .shell > footer#studioShellFooter > select#studioFooterWorkspaces {
+    display: block !important;
+    flex: 0 0 190px !important;
+    width: 190px !important;
+    min-width: 0 !important;
+    max-width: 190px !important;
+    height: 27px !important;
+    min-height: 27px !important;
+    max-height: 27px !important;
+    margin: 0 0 0 auto !important;
+    padding: 2px 24px 2px 9px !important;
+    box-sizing: border-box !important;
+    align-self: center !important;
+    background-color: #68472f !important;
+    color: #fff !important;
+    border: 1px solid #d8b58f !important;
+    border-radius: 5px !important;
+    font-size: 12px !important;
+}
