@@ -2,7 +2,7 @@
     const permissionLabels = [
         ['accessJob','Access job'],['viewJob','View job'],['viewConversation','View conversation'],['replyRequester','Reply to requester'],
         ['viewAttachments','View attachments'],['addAttachments','Add attachments'],['editJob','Edit job'],['changeStatus','Change status'],
-        ['assignStaff','Assign staff'],['manageSchedule','Manage schedule'],['manageProduction','Manage production'],['deleteMedia','Delete media'],['viewFinancials','View financials'],
+        ['assignStaff','Assign staff'],['manageSchedule','Manage schedule'],['manageProduction','Manage production'],['viewFinancials','View financials'],
         ['recordFinancialActivity','Record financial activity'],['usePos','Use P O S'],['viewPosTransactions','View P O S transactions'],
         ['refundVoidPos','Refund / void P O S'],['notifyJobMembers','Notify job members'],['manageJobMembers','Manage job members'],['adminJob','Job administrator']
     ];
