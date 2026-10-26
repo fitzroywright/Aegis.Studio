@@ -1059,14 +1059,10 @@
         const openingJob = view === 'workspaces' && !!context.studioJobId;
         if (!openingJob) {
             conversationView.classList.add('hidden');
-            conversationView.hidden = true;
-            genericView.classList.remove('hidden');
-            genericView.hidden = false;
+             genericView.classList.remove('hidden');
             genericView.replaceChildren();
         } else {
             genericView.classList.add('hidden');
-            genericView.hidden = true;
-            conversationView.hidden = false;
         }
         window.StudioProductionPlanning?.invalidate();
         window.StudioPhotographerSchedule?.invalidate();
