@@ -66,12 +66,10 @@ if(notificationButton){
         const list=panel.querySelector('.studio-message-bell-list');
         list.textContent='Loading messages…';
         try{
-            const response=await fetch('/api/notifications?count=80',{credentials:'same-origin'});
-            if(!response.ok)throw new Error('Message feed unavailable');
+            const response=await fetch('/api/messages/inbox?offset=0&limit=8',{credentials:'same-origin'});
+            if(!response.ok)throw new Error('Message inbox unavailable');
             const payload=await response.json();
-            const items=(Array.isArray(payload)?payload:Array.isArray(payload.items)?payload.items:[])
-                .filter(item=>/message|conversation|reply|mention/i.test(String(item.eventType||item.title||item.type||'')))
-                .slice(0,8);
+            const items=Array.isArray(payload.items)?payload.items.slice(0,8):[];
             if(revision!==requestRevision||panel.hidden)return;
             list.replaceChildren();
             if(!items.length){list.textContent='No recent messages.';return;}
@@ -79,9 +77,9 @@ if(notificationButton){
                 const button=document.createElement('button');
                 button.type='button';
                 const title=document.createElement('strong');
-                title.textContent=String(item.subject||item.title||'Message');
+                title.textContent=String(item.message?.subject||item.thread?.title||item.message?.senderUserName||'Message');
                 const preview=document.createElement('span');
-                preview.textContent=String(item.body||item.message||'').slice(0,170);
+                preview.textContent=String(item.message?.body||item.message?.text||item.message?.content||'').slice(0,170);
                 button.append(title,preview);
                 button.onclick=()=>{close();window.studioNavigate?.('messages');};
                 list.append(button);
