@@ -7601,12 +7601,6 @@ body .topbar {
   color: #fff;
   border-bottom: 1px solid #102238;
 }
-body .topbar .shell-brand {
-  color: #fff;
-}
-body .topbar .shell-brand strong {
-  color: #fff;
-}
 body .topbar .brand-button {
   color: #fff;
 }
@@ -7917,10 +7911,12 @@ body .topbar {
   border-bottom: 1px solid #102238 !important;
 }
 body .topbar .shell-brand {
-  color: #fff !important;
+  color: #fff;
+  color: #fff;
 }
 body .topbar .shell-brand strong {
-  color: #fff !important;
+  color: #fff;
+  color: #fff;
 }
 body .topbar .studio-shell-breadcrumb strong {
   color: #fff !important;
@@ -9336,13 +9332,6 @@ body .shell>.studio-shell-footer #studioFooterUser {
 body .shell>.studio-shell-footer #studioFooterRate {
   margin-left: auto;
 }
-body .shell>.studio-shell-footer .studio-grid-item-count {
-  display: block !important;
-  flex: 0 0 auto;
-  color: #fff;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
 @media (min-width:1101px) {
 
   body[data-studio-view="today"] .shell>main {
@@ -9445,8 +9434,13 @@ body .shell>.studio-shell-footer .studio-grid-item-count {
   }
 }
 body .shell>.studio-shell-footer .studio-grid-item-count {
-  margin-left: auto !important;
-  text-align: right !important;
+  display: block;
+  flex: 0 0 auto;
+  color: #fff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  text-align: right;
   white-space: nowrap;
 }
 body .shell {
@@ -9530,16 +9524,6 @@ body .topbar #studioPageTools {
 }
 body .topbar .shell-context {
   flex: 0 0 auto;
-}
-body .topbar #studioBreadcrumb {
-  margin-left: auto;
-  margin-right: 8px;
-  flex: 0 1 auto;
-  justify-content: flex-end;
-  text-align: right;
-  align-self: center;
-  max-width: 40vw;
-  white-space: nowrap;
 }
 body .topbar #notificationButton {
   margin-left: 0;
@@ -9977,6 +9961,14 @@ body[data-studio-view="frontdesk"] .fd-metrics .fd-metric-link.is-active strong 
 
 /* Canonical shell masthead: Today and every other page use the same structure. */
 body .topbar #studioBreadcrumb {
+  margin-left: auto;
+  margin-right: 8px;
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  text-align: right;
+  align-self: center;
+  max-width: 40vw;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 6px;
