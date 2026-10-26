@@ -90,7 +90,19 @@ public sealed class StudioEmailIntake(StudioDatabase database, StudioEmailRoutin
             // Personal Studio inboxes remain supported; workspace destinations use inquiries.
             if(decision.ReviewReason is null && await unified.TryImportAsync(email,token))
             {return new(true,null,null,duplicate);}
-            return Hold(email,decision with {ReviewReason=workspace.FailureReason??"No workspace route resolved"},workspace);
+            // A new inquiry without a matching destination belongs in the permanent
+            // Unassigned workspace. Do not override ambiguous workspace matches,
+            // conflicting references, or other explicit review holds.
+            if(!duplicate && decision.ReviewReason is null && target is null && fallback is null &&
+                workspace.FailureReason?.StartsWith("No persisted workspace route matched",StringComparison.Ordinal)==true)
+            {
+                using var unassigned=new NpgsqlCommand("select id,name from studio_workspaces where system_key='unassigned' and is_enabled",c);
+                using var reader=unassigned.ExecuteReader();
+                if(reader.Read())workspace=new(true,reader.GetGuid(0),reader.GetString(1),null,null);
+                reader.Close();
+            }
+            if(!workspace.IsRouted||!workspace.WorkspaceId.HasValue)
+                return Hold(email,decision with {ReviewReason=workspace.FailureReason??"No workspace route resolved"},workspace);
         }
         if(user is not null && target?.ConversationId is null)associations.AssertWorkspace(workspace.WorkspaceId.Value,user);
         var ingest=studio.ReceiveEmail(email,workspace,target?.ConversationId);
