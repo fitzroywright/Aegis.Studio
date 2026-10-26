@@ -48,7 +48,7 @@ public sealed class JobAccessService
               m.job_id is not null,coalesce(m.inherit_workspace_permissions,true),coalesce(w.admin_workspace,false),lower(coalesce(j.job_lead,''))=lower($1),
               exists(select 1 from studio_workflow_crew wc join studio_workflow_sessions ws on ws.id=wc.session_id where ws.job_id=j.id and lower(wc.user_name)=lower($1) and ws.required),
               exists(select 1 from studio_job_activities a where a.job_id=j.id and lower(a.assigned_to)=lower($1) and a.status<>'Cancelled'),
-              exists(select 1 from studio_job_owner_assignments a where a.id=j.owner_assignment_id and lower(a.assigned_to)=lower($1) and a.status='Declined' and j.job_lead is null), coalesce(m.delete_media,false)
+              exists(select 1 from studio_job_owner_assignments a where a.id=j.owner_assignment_id and lower(a.assigned_to)=lower($1) and a.status='Declined' and j.job_lead is null)
             from studio_jobs j
             left join lateral(select bool_or(access_workspace) as access_workspace,bool_or(can_view) as can_view,bool_or(reply_requester) as reply_requester,bool_or(view_attachments) as view_attachments,bool_or(add_attachments) as add_attachments,bool_or(edit_job) as edit_job,bool_or(manage_schedule) as manage_schedule,bool_or(manage_production) as manage_production,bool_or(notify_members) as notify_members,bool_or(manage_members) as manage_members,bool_or(admin_workspace) as admin_workspace from studio_workspace_members wm
               where lower(wm.user_name)=lower($1) and wm.is_active and (wm.workspace_id=j.workspace_id or exists(
@@ -60,14 +60,14 @@ public sealed class JobAccessService
         while(reader.Read())
         {
             JobPermissionSet inherited=reader.GetBoolean(5)?JobPermissionSet.Full:FromArray(reader.GetFieldValue<bool[]>(1));
-            JobPermissionSet direct=FromArray(reader.GetFieldValue<bool[]>(2)) with { DeleteMedia = reader.GetBoolean(10) };
+            JobPermissionSet direct=FromArray(reader.GetFieldValue<bool[]>(2));
             if(direct.AdminJob)direct=JobPermissionSet.Full;
             var permissions=administrator?JobPermissionSet.Full:reader.GetBoolean(3)
                 ?Union(reader.GetBoolean(4)?Union(global,inherited):global,direct):Union(global,inherited);
             if(reader.GetBoolean(6))permissions=Union(permissions,JobPermissionSet.WorkflowOwner);
             else if(reader.GetBoolean(7)||reader.GetBoolean(8))permissions=Union(permissions,JobPermissionSet.WorkflowContributor);
             if(reader.GetBoolean(9))permissions=Union(permissions,JobPermissionSet.Viewer);
-            if(permissions.AccessJob||permissions.ViewJob||permissions.ManageProduction||permissions.DeleteMedia)result[reader.GetGuid(0)]=permissions;
+            if(permissions.AccessJob||permissions.ViewJob||permissions.ManageProduction)result[reader.GetGuid(0)]=permissions;
         }
         return result;
     }
@@ -82,7 +82,7 @@ public sealed class JobAccessService
                    access_job,view_job,view_conversation,reply_requester,view_attachments,add_attachments,
                    edit_job,change_status,assign_staff,manage_schedule,manage_production,view_financials,
                    record_financial_activity,use_pos,view_pos_transactions,refund_void_pos,notify_job_members,
-                   manage_job_members,admin_job,created_at_utc,updated_at_utc,delete_media
+                   manage_job_members,admin_job,created_at_utc,updated_at_utc
             from studio_job_members where job_id=$1 order by display_name,user_name
             """;
         command.Parameters.AddWithValue(jobId);
@@ -109,8 +109,8 @@ public sealed class JobAccessService
             (job_id,user_name,display_name,is_active,inherit_workspace_permissions,access_job,view_job,view_conversation,
              reply_requester,view_attachments,add_attachments,edit_job,change_status,assign_staff,manage_schedule,
              manage_production,view_financials,record_financial_activity,use_pos,view_pos_transactions,refund_void_pos,
-             notify_job_members,manage_job_members,admin_job,delete_media,created_at_utc,updated_at_utc)
-            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,now(),now())
+             notify_job_members,manage_job_members,admin_job,created_at_utc,updated_at_utc)
+            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,now(),now())
             on conflict(job_id,user_name) do update set
               display_name=excluded.display_name,is_active=excluded.is_active,inherit_workspace_permissions=excluded.inherit_workspace_permissions,
               access_job=excluded.access_job,view_job=excluded.view_job,view_conversation=excluded.view_conversation,
@@ -120,14 +120,14 @@ public sealed class JobAccessService
               record_financial_activity=excluded.record_financial_activity,use_pos=excluded.use_pos,
               view_pos_transactions=excluded.view_pos_transactions,refund_void_pos=excluded.refund_void_pos,
               notify_job_members=excluded.notify_job_members,manage_job_members=excluded.manage_job_members,
-              admin_job=excluded.admin_job,delete_media=excluded.delete_media,updated_at_utc=now()
+              admin_job=excluded.admin_job,updated_at_utc=now()
             """;
         object[] values = [jobId,userName,displayName,request.IsActive,request.InheritWorkspacePermissions,
             permissions.AccessJob,permissions.ViewJob,permissions.ViewConversation,permissions.ReplyRequester,
             permissions.ViewAttachments,permissions.AddAttachments,permissions.EditJob,permissions.ChangeStatus,
             permissions.AssignStaff,permissions.ManageSchedule,permissions.ManageProduction,permissions.ViewFinancials,
             permissions.RecordFinancialActivity,permissions.UsePos,permissions.ViewPosTransactions,permissions.RefundVoidPos,
-            permissions.NotifyJobMembers,permissions.ManageJobMembers,permissions.AdminJob,permissions.DeleteMedia];
+            permissions.NotifyJobMembers,permissions.ManageJobMembers,permissions.AdminJob];
         foreach (object value in values) command.Parameters.AddWithValue(value);
         command.ExecuteNonQuery();
         return GetMembers(jobId).First(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase));
@@ -237,7 +237,7 @@ public sealed class JobAccessService
             a.RefundVoidPos || b.RefundVoidPos,
             a.NotifyJobMembers || b.NotifyJobMembers,
             a.ManageJobMembers || b.ManageJobMembers,
-            a.AdminJob || b.AdminJob) { DeleteMedia = a.DeleteMedia || b.DeleteMedia };
+            a.AdminJob || b.AdminJob);
 
     private static bool GetPermission(JobPermissionSet p, string permission) => permission switch
     {
@@ -252,7 +252,6 @@ public sealed class JobAccessService
         "AssignStaff" => p.AssignStaff,
         "ManageSchedule" => p.ManageSchedule,
         "ManageProduction" => p.ManageProduction,
-        "DeleteMedia" => p.DeleteMedia,
         "ViewFinancials" => p.ViewFinancials,
         "RecordFinancialActivity" => p.RecordFinancialActivity,
         "UsePos" => p.UsePos,
@@ -270,7 +269,7 @@ public sealed class JobAccessService
     private static JobMember ReadMember(NpgsqlDataReader r)
         => new(
             r.GetGuid(0),r.GetString(1),r.GetString(2),r.GetBoolean(3),r.GetBoolean(4),
-            new JobPermissionSet(r.GetBoolean(5),r.GetBoolean(6),r.GetBoolean(7),r.GetBoolean(8),r.GetBoolean(9),r.GetBoolean(10),r.GetBoolean(11),r.GetBoolean(12),r.GetBoolean(13),r.GetBoolean(14),r.GetBoolean(15),r.GetBoolean(16),r.GetBoolean(17),r.GetBoolean(18),r.GetBoolean(19),r.GetBoolean(20),r.GetBoolean(21),r.GetBoolean(22),r.GetBoolean(23)) { DeleteMedia = r.GetBoolean(26) },
+            new JobPermissionSet(r.GetBoolean(5),r.GetBoolean(6),r.GetBoolean(7),r.GetBoolean(8),r.GetBoolean(9),r.GetBoolean(10),r.GetBoolean(11),r.GetBoolean(12),r.GetBoolean(13),r.GetBoolean(14),r.GetBoolean(15),r.GetBoolean(16),r.GetBoolean(17),r.GetBoolean(18),r.GetBoolean(19),r.GetBoolean(20),r.GetBoolean(21),r.GetBoolean(22),r.GetBoolean(23)),
             r.GetFieldValue<DateTimeOffset>(24),r.GetFieldValue<DateTimeOffset>(25));
 }
 
@@ -278,8 +277,6 @@ public sealed record JobMember(Guid JobId,string UserName,string DisplayName,boo
 public sealed record JobMemberRequest(string UserName,string? DisplayName,bool IsActive,bool InheritWorkspacePermissions,JobPermissionSet? Permissions);
 public sealed record JobPermissionSet(bool AccessJob,bool ViewJob,bool ViewConversation,bool ReplyRequester,bool ViewAttachments,bool AddAttachments,bool EditJob,bool ChangeStatus,bool AssignStaff,bool ManageSchedule,bool ManageProduction,bool ViewFinancials,bool RecordFinancialActivity,bool UsePos,bool ViewPosTransactions,bool RefundVoidPos,bool NotifyJobMembers,bool ManageJobMembers,bool AdminJob)
 {
-    public bool DeleteMedia { get; init; }
-
     public static JobPermissionSet None => new(false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false);
     public static JobPermissionSet Viewer => new(true,true,true,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false);
     public static JobPermissionSet Contributor => new(true,true,true,false,true,true,false,false,false,false,true,false,false,false,false,false,true,false,false);
@@ -287,6 +284,6 @@ public sealed record JobPermissionSet(bool AccessJob,bool ViewJob,bool ViewConve
     public static JobPermissionSet JobManager => new(true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,true,true,false);
     public static JobPermissionSet WorkflowOwner => new(true,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,true,false,false);
     public static JobPermissionSet WorkflowContributor => new(true,true,true,false,true,true,false,false,false,false,true,false,false,false,false,false,false,false,false);
-    public static JobPermissionSet Full => new(true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true) { DeleteMedia = true };
+    public static JobPermissionSet Full => new(true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true);
 }
 
