@@ -444,7 +444,7 @@ export function createIntakeApi(env,readBody,json) {
       json(res,200,{publicationId:gallery.id,processed,remaining,nextCursor,refresh});return true;
     }
     // The external site must acknowledge only after it has durably stored the bytes.
-    const downloadAck=route.match(/^\\/api\\/v1\\/galleries\\/([0-9a-f-]{36})\\/media\\/([0-9a-f-]{36})\\/download-ack$/i);
+    const downloadAck=route.match(/^\/api\/v1\/galleries\/([0-9a-f-]{36})\/media\/([0-9a-f-]{36})\/download-ack$/i);
     if(downloadAck&&method==='POST'){
       authenticate(req,'gallery:original:read');
       const record=store.db.prepare('SELECT deleted_at_utc,delete_reason FROM gallery_media_retention WHERE gallery_id=? AND photo_id=?').get(downloadAck[1],downloadAck[2]);
@@ -482,10 +482,10 @@ export function createIntakeApi(env,readBody,json) {
         try{preview=await createPreview(bytes,env);}
         catch{fail(503,'preview_processing_failed','Could not prepare a protected preview; retry this upload.');}
       }
-      const originalObject=await mediaStorage.storeObject(media[1],media[2],'original',type,bytes);
-      const previewObject=preview?await mediaStorage.storeObject(media[1],media[2],'preview',preview.type,preview.content):null;
       const retention=store.db.prepare('SELECT deleted_at_utc FROM gallery_media_retention WHERE gallery_id=? AND photo_id=?').get(media[1],media[2]);
       if(retention?.deleted_at_utc)fail(409,'media_already_deleted','A deleted gallery version cannot be uploaded again.');
+      const originalObject=await mediaStorage.storeObject(media[1],media[2],'original',type,bytes);
+      const previewObject=preview?await mediaStorage.storeObject(media[1],media[2],'preview',preview.type,preview.content):null;
       store.transaction(()=>{
         store.db.prepare('INSERT OR IGNORE INTO gallery_media_retention(gallery_id,photo_id,uploaded_at_utc) VALUES(?,?,?)').run(media[1],media[2],new Date().toISOString());
         store.db.prepare('INSERT INTO media VALUES(?,?,?,?) ON CONFLICT(gallery_id,id) DO UPDATE SET type=excluded.type,content=excluded.content')
