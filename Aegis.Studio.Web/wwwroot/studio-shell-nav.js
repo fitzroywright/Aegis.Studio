@@ -15,7 +15,9 @@
         ['messages', 'Messages', '✉']
     ];
     let currentView = document.body.dataset.studioView || 'today';
-    let shellOverview = null;
+    const shellOverviews = new Map();
+    const overviewKey = () => document.body.dataset.studioView === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page') ? 'job-detail' : (document.body.dataset.studioView || 'today');
+    const defaultOverview = () => `<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><p>${escText(labelFor(document.body.dataset.studioView || 'today'))} workspace</p></section>`;
     let renderingTools = false;
     let workspaceLoadPromise = null;
     let workspaceLoadAttempted = false;
@@ -139,7 +141,7 @@
                     <button type="button" data-studio-side="notifications"><span>♧</span><span>Notifications</span></button>
                 </div>
             </section>
-            ${shellOverview?.view === document.body.dataset.studioView ? shellOverview.markup : ''}
+            ${shellOverviews.get(overviewKey()) || defaultOverview()}
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
@@ -515,8 +517,8 @@
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
         // One shell contract for Overview on every route.
         window.studioShellSetOverview = (markup, view = document.body.dataset.studioView) => {
-            shellOverview = {view, markup: markup || ''};
-            renderLeftRail();
+            shellOverviews.set(view, markup || defaultOverview());
+            if (view === overviewKey()) renderLeftRail();
         };
         window.addEventListener('studio-shell-overview', event => {
             const detail = event.detail || {};
