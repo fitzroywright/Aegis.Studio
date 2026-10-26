@@ -494,7 +494,7 @@
             if (!job) return;
             close();
             const id = job.dataset.openJob;
-            if (id) window.studioOpenJob?.(id);
+            if (id) window.studioNavigate?.('workspaces', {jobId:id});
         });
         backdrop.onclick = close;
         drawer.querySelector('[data-attention-close]').onclick = close;
@@ -583,7 +583,7 @@
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
         document.querySelector('[data-studio-avatar-activity]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
-            window.studioNavigate?.('activity');
+            window.studioNavigate?.('notifications');
         });
         document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
