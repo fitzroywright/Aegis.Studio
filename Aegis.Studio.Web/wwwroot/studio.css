@@ -11056,11 +11056,6 @@ body .topbar .studio-today-brand-title { margin-left: 0 !important; padding-left
 #studioContextRail .studio-nav-today { border:1px solid #e6a04d; background:#285578; color:#fff; border-radius:5px; padding:5px 9px; font:inherit; font-weight:700; cursor:pointer; white-space:nowrap; }
 #studioContextRail .studio-nav-today:hover, #studioContextRail .studio-nav-today:focus-visible { background:#376b91; }
 #studioShellFooter { position:relative; }
-#studioFooterWorkspaces { margin-left:auto; position:relative; flex-shrink:0; color:#fff; font-size:12px; }
-#studioFooterWorkspaces > summary { list-style:none; cursor:pointer; border:1px solid #d8b58f; border-radius:5px; padding:7px 12px; font-weight:700; white-space:nowrap; }
-#studioFooterWorkspaces > summary::-webkit-details-marker { display:none; }
-#studioFooterWorkspaces[open] > summary { outline:1px solid #efaa4e; }
-#studioFooterWorkspaces .studio-footer-workspace-menu { position:absolute; bottom:calc(100% + 8px); right:0; width:min(300px,90vw); max-height:55vh; overflow-y:auto; background:#fff; color:#173552; border:1px solid #a77a51; border-radius:7px; box-shadow:0 8px 22px #0004; padding:6px; z-index:1100; }
-#studioFooterWorkspaces .studio-footer-workspace-menu button { display:flex; align-items:center; gap:9px; width:100%; padding:9px; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; border-radius:4px; font:inherit; }
-#studioFooterWorkspaces .studio-footer-workspace-menu button:hover, #studioFooterWorkspaces .studio-footer-workspace-menu button:focus-visible { background:#e9f2f8; }
-#studioFooterWorkspaces .studio-footer-workspace-menu button:first-child { font-weight:700; border-bottom:1px solid #e2e8ed; border-radius:0; }
+#studioFooterWorkspaces { margin-left:auto; flex-shrink:0; min-width:150px; max-width:240px; height:31px; padding:4px 9px; border:1px solid #d8b58f; border-radius:5px; background:#68472f; color:#fff; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+#studioFooterWorkspaces:focus-visible { outline:2px solid #efaa4e; outline-offset:2px; }
+#studioFooterWorkspaces option { background:#fff; color:#173552; }
