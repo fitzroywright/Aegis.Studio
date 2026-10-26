@@ -27,11 +27,11 @@ test('shared shell owns the workspace selector', () => {
 
 
 test('shared topbar has one authoritative top-level declaration', () => {
-  const rules = css.match(/^body \\.topbar \\{/gm) || [];
+  const rules = css.match(/^body \.topbar \{/gm) || [];
   assert.equal(rules.length, 1);
-  assert.match(css, /body \\.topbar \\{[^}]*background: #172d4a/s);
+  assert.match(css, /body \.topbar \{[^}]*background: #172d4a/s);
 });
 
 test('shell CSS contains no malformed empty declarations', () => {
-  assert.doesNotMatch(css, /\\{\\s*;+(?:\\s*;)*\\s*\\}/);
+  assert.doesNotMatch(css, /\{\s*;+(?:\s*;)*\s*\}/);
 });
