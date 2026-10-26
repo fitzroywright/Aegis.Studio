@@ -7954,14 +7954,6 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel>:not(header) {
   background:var(--studio-rail-accent);
   border-bottom-color:var(--studio-rail-accent);
 }
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="schedule"] {
-  border-color: #a6c8e8;
-  background: #f7fbff;
-}
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="schedule"]>header {
-  background: #e7f2ff;
-  border-bottom-color: #c9def3;
-}
 body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"] {
   border-color: #e6c29c;
   background: #fffaf4;
@@ -7986,9 +7978,6 @@ body[data-studio-view="today"] .mw-today-right>.mw-list-panel>header h2 {
   line-height:1.2;
   margin:0;
   font-size:.81rem;
-}
-body[data-studio-view="today"] .mw-today-right>.mw-list-panel[data-mw-region="schedule"]>header h2 {
-  color: #235b8c;
 }
 body[data-studio-view] .mw-today-right>.mw-list-panel[data-mw-region="attention"]>header h2 {
   color: #945b23;
