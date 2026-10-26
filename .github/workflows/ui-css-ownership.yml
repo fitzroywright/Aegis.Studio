@@ -4,12 +4,14 @@ on:
     paths:
       - 'Aegis.Studio.Web/wwwroot/**'
       - 'scripts/check-ui-css-ownership.cjs'
+      - 'tests/ui/shared-shell-ownership.test.cjs'
       - '.github/workflows/ui-css-ownership.yml'
   push:
     branches: [main]
     paths:
       - 'Aegis.Studio.Web/wwwroot/**'
       - 'scripts/check-ui-css-ownership.cjs'
+      - 'tests/ui/shared-shell-ownership.test.cjs'
       - '.github/workflows/ui-css-ownership.yml'
 jobs:
   css-ownership:
@@ -18,9 +20,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
+      - name: Test shared shell ownership
+        run: node --test tests/ui/shared-shell-ownership.test.cjs
       - name: Check ownership
         run: |
           git fetch origin main

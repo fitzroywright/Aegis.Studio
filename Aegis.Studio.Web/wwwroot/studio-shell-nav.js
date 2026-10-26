@@ -63,7 +63,7 @@
             footer = document.createElement('footer');
             footer.id = 'studioShellFooter';
             footer.className = 'studio-shell-footer';
-            footer.textContent = "Brian's Photo Studios · Studio";
+            footer.textContent = "Bryan's Photo Studios · Studio";
             shell.append(footer);
         }
     }
