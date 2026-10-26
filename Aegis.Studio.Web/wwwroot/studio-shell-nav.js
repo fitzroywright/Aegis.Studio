@@ -145,6 +145,7 @@
                     ${[['▥','Active Jobs','activeJobs'],['✓','Completed Jobs','completedJobs'],['▣','Upcoming Shoots','upcomingShoots'],['☑','Open Tasks','openTasks'],['◷','Overdue Tasks','overdueTasks'],['◆','Jobs Awaiting Production','awaitingProduction']].map(([icon,label,key])=>`<div class="workspace-summary-row"><span>${icon}</span><span>${label}</span><strong>${Number(workspaceOverview[key] || 0)}</strong></div>`).join('')}
                 </div>
             </section>` : ''}
+            ${document.body.dataset.studioView === 'frontdesk' && window.studioFrontDeskOverviewMarkup ? window.studioFrontDeskOverviewMarkup : ''}
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
@@ -153,6 +154,7 @@
             </section>
 
 `;
+        if(document.body.dataset.studioView === 'frontdesk') window.studioBindFrontDeskOverview?.();
         renderFooterWorkspaceMenu(workspaces);
         if(document.body.dataset.studioView==='schedule')window.StudioScheduleWorkspaceCard?.bindRail(rail);
         rail.querySelector('[data-studio-close-register]')?.addEventListener('click',()=>launchFrontDeskPos('CloseRegister').catch(error=>alert(error.message)));
@@ -505,6 +507,7 @@
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
+        window.addEventListener('studio-frontdesk-overview-updated', renderLeftRail);
         window.addEventListener('studio-workspace-overview-updated', event => {
             workspaceOverview = event.detail || null;
             renderLeftRail();
