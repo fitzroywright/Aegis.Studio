@@ -455,8 +455,14 @@
     function updateUnreadBadge(count) {
         const badge = document.getElementById('messageUnreadBadge');
         if (!badge) return;
-        badge.hidden = count < 1;
-        badge.textContent = count > 99 ? '99+' : String(count);
+        const total = Number.isFinite(Number(count)) ? Math.max(0, Math.trunc(Number(count))) : 0;
+        badge.hidden = false;
+        badge.textContent = total > 99 ? '99+' : String(total);
+        const bell = document.getElementById('notificationButton');
+        if (bell) {
+            bell.title = `Messages · ${total} unread`;
+            bell.setAttribute('aria-label', `Messages, ${total} unread`);
+        }
     }
 
     function handleUnreadChanges(threads) {
@@ -694,6 +700,7 @@
 
     installNavigation();
     startRefresh();
+    void refreshIfVisible();
     connectRealtime();
     // Give authentication and the initial shell a moment to settle, then show the digest once.
     setTimeout(() => showAwayDigestOnce(), 450);
