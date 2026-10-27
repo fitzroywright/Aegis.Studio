@@ -6573,9 +6573,12 @@ body[data-studio-view="workspaces"] .generic {
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
+  scrollbar-width: none;
   padding: 10px 16px 0;
   box-sizing: border-box;
 }
+.workspace-announcement-banners::-webkit-scrollbar { display:none; }
+.workspace-announcement-banners[data-multiple="true"] .workspace-announcement { cursor:pointer; }
 .workspace-announcement-banners[hidden] {
   display: none;
 }

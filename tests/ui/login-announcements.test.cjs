@@ -13,7 +13,7 @@ test('login announcements use one horizontal banner, persist dismissals and do n
  await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});
  const host=w.document.getElementById('studioLoginAnnouncements');assert.ok(host);assert.equal(host.children.length,2);assert.equal(host.parentElement,w.document.querySelector('.shell>main'));assert.match(host.textContent,/First <notice>/);assert.equal(host.querySelector('notice'),null);assert.equal(calls.some(x=>x.includes('denied')),false);
  await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});assert.equal(w.document.querySelectorAll('#studioLoginAnnouncements').length,1);
- assert.ok(host.querySelector('.workspace-announcement-symbol svg'));assert.equal(host.querySelector('.workspace-announcement-kicker').textContent,'Staff announcement');assert.equal(host.querySelector('h2').textContent,'First <notice>');assert.match(host.querySelector('.workspace-announcement-position').textContent,/1 of 2.*Scroll for more/);
+ assert.ok(host.querySelector('.workspace-announcement-symbol svg'));assert.equal(host.querySelector('.workspace-announcement-kicker').textContent,'Staff announcement');assert.equal(host.querySelector('h2').textContent,'First <notice>');assert.match(host.querySelector('.workspace-announcement-position').textContent,/1 of 2.*Click for next/);
  const button=host.querySelector('button');setFail(true);await button.onclick();assert.equal(host.children.length,2);assert.equal(button.disabled,false);assert.match(host.textContent,/Could not dismiss/);
  setFail(false);await button.onclick();assert.ok(dismissed.has('a'));assert.equal(host.children.length,1);assert.equal(host.querySelector('.workspace-announcement-position').textContent,'1 of 1');
  host.remove();w.eval(read('announcements.js'));await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});assert.equal(w.document.getElementById('studioLoginAnnouncements'),null);
@@ -68,4 +68,17 @@ test('bell uses the same icon and adjacent count treatment as Upcoming Sessions'
  w.eval(read('notifications.js'));const button=w.document.getElementById('notificationButton'),count=button.querySelector('strong');
  assert.equal(button.className,'studio-attention-trigger');assert.ok(button.querySelector('svg.studio-status-icon'));assert.equal(count.id,'messageUnreadBadge');assert.equal(count.previousElementSibling.tagName.toLowerCase(),'svg');
  assert.doesNotMatch(read('studio.css'),/\.studio-message-bell-count\s*\{/);
+});
+test('clicking announcements scrolls their strip, wraps around and keeps dismissal separate',async t=>{
+ const {w}=fixture(t);w.matchMedia=()=>({matches:false});await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});
+ const host=w.document.getElementById('studioLoginAnnouncements'),slides=[...host.children],moves=[];
+ slides.forEach((slide,index)=>Object.defineProperty(slide,'offsetLeft',{get:()=>20+index*600}));
+ host.scrollTo=options=>{moves.push(options);host.scrollLeft=options.left;};
+ slides[0].querySelector('h2').click();assert.equal(moves.at(-1).left,600);assert.equal(moves.at(-1).behavior,'smooth');
+ slides[1].querySelector('p').click();assert.equal(moves.at(-1).left,0);
+ host.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));assert.equal(moves.at(-1).left,600);
+ w.matchMedia=()=>({matches:true});host.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true}));assert.equal(moves.at(-1).left,0);assert.equal(moves.at(-1).behavior,'auto');
+ const before=moves.length;slides[0].querySelector('button').click();await new Promise(resolve=>setImmediate(resolve));assert.equal(host.children.length,1);assert.equal(moves.length,before);assert.equal(host.dataset.multiple,'false');
+ host.querySelector('h2').click();assert.equal(moves.length,before);
+ const css=read('studio.css');assert.match(css,/\.workspace-announcement-banners \{[^}]*overflow-x: auto;[^}]*scrollbar-width: none;/s);assert.match(css,/\.workspace-announcement-banners::-webkit-scrollbar \{ display:none; \}/);
 });

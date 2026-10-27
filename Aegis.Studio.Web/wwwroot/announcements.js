@@ -19,8 +19,26 @@
             if (!items.length) return;
             const host = document.createElement('section');
             host.id = 'studioLoginAnnouncements';host.className = 'workspace-announcement-banners';
-            host.setAttribute('aria-label','Announcements — scroll horizontally for more');host.tabIndex = 0;
-            const updatePositions=()=>{[...host.children].forEach((article,index)=>{article.querySelector('.workspace-announcement-position').textContent=(index+1)+' of '+host.children.length+(host.children.length>1?' · Scroll for more':'');});};
+            host.setAttribute('aria-label','Staff announcements. Click an announcement or use arrow keys to move between announcements.');host.tabIndex = 0;
+            const updatePositions=()=>{host.dataset.multiple=String(host.children.length>1);[...host.children].forEach((article,index)=>{article.querySelector('.workspace-announcement-position').textContent=(index+1)+' of '+host.children.length+(host.children.length>1?' · Click for next':'');});};
+            const advance=(article,direction=1)=>{
+                const slides=[...host.children];if(slides.length<2)return;
+                const index=slides.indexOf(article);if(index<0)return;
+                const next=slides[(index+direction+slides.length)%slides.length];
+                host.scrollTo({left:next.offsetLeft-slides[0].offsetLeft,behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches?'auto':'smooth'});
+            };
+            host.addEventListener('click',event=>{
+                if(event.target.closest('button,a,input,textarea,select'))return;
+                const article=event.target.closest('.workspace-announcement');if(!article||article.parentElement!==host)return;
+                const selection=window.getSelection();if(selection?.toString()&&article.contains(selection.anchorNode))return;
+                advance(article);
+            });
+            host.addEventListener('keydown',event=>{
+                if(event.target!==host||!['ArrowRight','ArrowLeft','Enter',' '].includes(event.key)||host.children.length<2)return;
+                event.preventDefault();const slides=[...host.children],first=slides[0].offsetLeft;
+                const current=slides.reduce((best,slide)=>Math.abs(slide.offsetLeft-first-host.scrollLeft)<Math.abs(best.offsetLeft-first-host.scrollLeft)?slide:best);
+                advance(current,event.key==='ArrowLeft'?-1:1);
+            });
             for (const item of items) {
                 const article=document.createElement('article');article.className='workspace-announcement';
                 article.setAttribute('aria-label',item.title);
