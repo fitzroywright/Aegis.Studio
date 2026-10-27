@@ -653,6 +653,11 @@
     }
 
     function initialize() {
+        document.querySelector('[data-studio-home]')?.addEventListener('click', event => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            window.studioNavigate?.('today');
+        });
         currentView = document.body.dataset.studioView || currentView;
         ensureTools();
         ensureFooter();
