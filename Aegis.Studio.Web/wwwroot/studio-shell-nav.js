@@ -68,59 +68,17 @@
             host = document.createElement('div');
             host.id = 'studioNavigationToolstrip';
             host.className = 'studio-navigation-toolstrip';
-            const trigger = document.createElement('button');
-            trigger.type = 'button';
-            trigger.className = 'studio-navigation-reveal';
-            trigger.setAttribute('aria-label', 'Show navigation');
-            trigger.setAttribute('aria-controls', 'studioNavigationTools');
-            trigger.title = 'Navigation';
             const tools = document.createElement('nav');
             tools.id = 'studioNavigationTools';
             tools.className = 'studio-navigation-tools';
             tools.setAttribute('aria-label', 'Studio navigation');
             tools.innerHTML = quickLinks.map(([view,label,icon]) => '<button type="button" data-studio-side="'+view+'"><span aria-hidden="true">'+icon+'</span><span>'+label+'</span></button>').join('');
-            host.append(trigger, tools);
+            host.append(tools);
             banner.append(host);
-            const setOpen = open => {
-                host.classList.toggle('is-open', open);
-                trigger.setAttribute('aria-expanded', String(open));
-                tools.setAttribute('aria-hidden', String(!open));
-                tools.inert = !open;
-            };
-            setOpen(false);
-            host.addEventListener('pointerenter', event => {
-                if (event.pointerType !== 'touch') setOpen(true);
-            });
-            host.addEventListener('pointerleave', () => {
-                if (!tools.contains(document.activeElement)) setOpen(false);
-            });
-            host.addEventListener('focusin', event => {
-                if (event.target !== trigger) setOpen(true);
-            });
-            host.addEventListener('focusout', event => {
-                if (!host.contains(event.relatedTarget)) setOpen(false);
-            });
-            trigger.onclick = () => setOpen(!host.classList.contains('is-open'));
-            host.addEventListener('keydown', event => {
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    trigger.focus();
-                    setOpen(false);
-                } else if (event.key === 'ArrowDown' && event.target === trigger) {
-                    event.preventDefault();
-                    setOpen(true);
-                    tools.querySelector('button')?.focus();
-                }
-            });
             tools.addEventListener('click', event => {
                 const button = event.target.closest('[data-studio-side]');
                 if (!button) return;
-                if (tools.contains(document.activeElement)) trigger.focus();
-                setOpen(false);
                 window.studioNavigate?.(button.dataset.studioSide);
-            });
-            document.addEventListener('pointerdown', event => {
-                if (!host.contains(event.target)) setOpen(false);
             });
         }
         host.querySelectorAll('[data-studio-side]').forEach(button => {
