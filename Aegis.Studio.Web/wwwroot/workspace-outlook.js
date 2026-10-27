@@ -304,7 +304,6 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     const action=event.detail?.action;
                     if(action==='upload'){await selectPanel('media');contents.media.studioJobMedia?.upload();}
                     if(action==='activity')await selectPanel('activity');
-                    if(action==='session-plan')await studioNavigate('session-plan',{jobId:job.id});
                     if(action==='subject'){await selectPanel('subjects');contents.subjects.querySelector('#addJobSubject')?.click();}
                     if(action==='task'){await selectPanel('tasks');contents.tasks.querySelector('form input')?.focus();}
                     if(action==='edit')await openJobDetailsEditor(job);

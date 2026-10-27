@@ -129,3 +129,17 @@ test('printing clones the card statement and preserves signed ledger values',asy
  assert.match(paper.window.document.querySelector('.client-statement-ledger').textContent,/-.*10/);
  assert.ok(w.document.querySelector('[data-c-statement]'));
 });
+
+test('the actual Clients left rail contains no Messages or Notes card',async t=>{
+ const {dom,w}=setup();t.after(()=>dom.window.close());
+ const shell=w.document.createElement('div');shell.className='shell';w.document.body.append(shell);
+ w.fetch=async()=>({ok:true,json:async()=>[]});
+ w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/studio-shell-nav.js'),'utf8'));
+ w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+ await w.StudioClients.render({clientId:'a'});await settle();
+ const rail=w.document.getElementById('studioContextRail');assert.ok(rail);
+ assert.equal(rail.querySelector('.smc-card,#clientMessageCard,[data-page-messages]'),null);
+ tab(w,'finance');await settle();
+ assert.equal(w.document.querySelector('.client-statement-heading h3').textContent,'Financial Statement');
+ assert.equal(w.document.querySelector('.client-statement-eyebrow'),null);
+});
