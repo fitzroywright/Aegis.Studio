@@ -48,11 +48,10 @@
     <div class="sj-error" role="alert" data-sj-error hidden></div>
     <div class="sj-table-frame"><div class="sj-table-head-clip"><table class="sj-table"><colgroup><col style="width:30%"><col style="width:17%"><col style="width:18%"><col style="width:18%"><col style="width:17%"></colgroup><thead><tr><th><div class="sj-job-header"><span>Job / Client</span><input type="search" data-sj-search aria-label="Search jobs, clients or references" placeholder="Search jobs…" autocomplete="off"></div></th><th><label class="sj-column-filter sj-column-filter-inline"><span>Event date</span><select data-sj-sort aria-label="Sort by event date"><option value="date-desc">Newest first ↓</option><option value="date-asc">Oldest first ↑</option></select></label></th><th>Job Owner</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Status</span><select data-sj-status aria-label="Filter by status"><option value="">All Open Jobs</option>${stages.map(s=>`<option>${esc(s)}</option>`).join('')}</select></label></th><th>Next Action</th></tr></thead></table></div><div class="sj-table-scroll"><table class="sj-table"><colgroup><col style="width:30%"><col style="width:17%"><col style="width:18%"><col style="width:18%"><col style="width:17%"></colgroup><tbody></tbody></table></div></div>
     <footer class="sj-pagination"><span data-sj-range></span><div><button type="button" data-sj-prev aria-label="Previous page">‹</button><span data-sj-page></span><button type="button" data-sj-next aria-label="Next page">›</button></div></footer>
-   </section><div data-studio-context>${card('Overview','<div class="sj-card-body" data-sj-statuses></div>')}<div data-studio-attention><div data-sj-attention></div></div>${StudioMessageCard.html({id:'jobsMessageCard',title:'Messages',body:'<div data-sj-messages><p>Loading messages…</p></div>',footer:'<button type="button" data-sj-message>✉ Send Message →</button>'})}</div></section>`;
+   </section><div data-studio-context>${card('Overview','<div class="sj-card-body" data-sj-statuses></div>')}<div data-studio-attention><div data-sj-attention></div></div></div></section>`;
    const find=s=>StudioPage.query(host,s);
    host.querySelector('[data-studio-context] > section').dataset.railCard='overview';
    StudioPage.mountContext(host,'jobs');
-      StudioMessageCard.bind(find('.smc-card'));
    find('[data-sj-search]').value=term;find('[data-sj-status]').value=stage;find('[data-sj-sort]').value=sort;
    host.studioJobsWorkspaceCounts=Object.fromEntries(workspaces.map(w=>[String(w.id),jobs.filter(j=>belongs(j,String(w.id))).length]));
    window.dispatchEvent(new CustomEvent('studio-jobs-view-changed'));
@@ -115,14 +114,7 @@
    find('[data-sj-attention]').onclick=handleJobClick;
    host.onkeydown=e=>{const row=e.target.closest('tr[data-sj-job]');if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void open(row.dataset.sjJob);}};
    find('[data-sj-settings]').onclick=async()=>{try{await options.openWorkspaceSettings(workspace);}catch(error){if(current()){find('[data-sj-error]').textContent=error.message||String(error);find('[data-sj-error]').hidden=false;}}};
-   find('[data-sj-message]').onclick=()=>options.sendMessage?options.sendMessage():options.navigate('messages');apply();
-   const announcements=await Promise.allSettled(workspaces.map(async w=>array(await options.json('/api/workspaces/'+encodeURIComponent(w.id)+'/announcements')).map(a=>({...a,workspaceId:w.id,workspaceName:w.name}))));
-   if(!current())return controller;
-   const messages=notificationResult.value.filter(n=>/message|conversation|reply/i.test(n.eventType||n.title||n.type||'')).map(n=>({at:n.createdAtUtc||n.createdAt,item:n}));
-   messages.push(...announcements.flatMap(r=>r.status==='fulfilled'?r.value.map(a=>({at:a.createdAtUtc||a.createdAt,item:a,announcement:true})):[]));messages.sort((a,b)=>+(date(b.at)||0)-+(date(a.at)||0));
-   find('[data-sj-messages]').innerHTML=(notificationResult.error||announcements.some(r=>r.status==='rejected')?'<p>Some messages could not load. <button type="button" data-sj-retry>Retry</button></p>':'')+(messages.slice(0,8).map(({item:n,announcement})=>`<button type="button" class="smc-row" data-sj-communication="${esc(announcement?n.workspaceId:n.referenceType==='Job'?n.referenceId||'':'')}" data-sj-kind="${announcement?'workspace':'message'}"><span class="smc-copy"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.workspaceName||'Studio message')}</small></span></button>`).join('')||'<p>No messages or announcements.</p>');
-   find('[data-sj-retry]')?.addEventListener('click',()=>options.retry());
-   StudioPage.queryAll(host,'[data-sj-communication]').forEach(b=>b.onclick=()=>{if(b.dataset.sjKind==='workspace')options.openWorkspace(b.dataset.sjCommunication);else if(b.dataset.sjCommunication)void open(b.dataset.sjCommunication);else options.navigate('messages');});
+   apply();
   } catch(error){if(current()){host.innerHTML='<div class="sj-loading" role="alert">Unable to load jobs: '+esc(error.message)+' <button type="button">Retry</button></div>';StudioPage.query(host,'button').onclick=()=>options.retry();}}
   return controller;
  }

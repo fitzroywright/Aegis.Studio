@@ -766,7 +766,6 @@
                 await selectWorkspace(button.dataset.openWorkspace,button.dataset.workspaceName);
             };
         });
-        StudioMessageCard.bind(genericView.querySelector('#workspaceMessageCard'));
         genericView.querySelectorAll('[data-nav-quick]').forEach(button=>{
             button.onclick=()=>window.studioNavigate(button.dataset.navQuick);
         });

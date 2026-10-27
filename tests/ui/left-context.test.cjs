@@ -44,7 +44,8 @@ test('Jobs Overview owns interactive status counts and recent changes without a 
  assert.equal(rail.querySelector('[data-rail-card="overview"]'),overview);
  overview.querySelector('[data-sj-stage="Scheduled"]').click();
  assert.equal(host.querySelectorAll('tr[data-sj-job]').length,13);
- assert.equal(rail.querySelectorAll('[data-rail-card="context"]').length,1);
+ assert.equal(rail.querySelectorAll('[data-rail-card="context"]').length,0);
+ assert.equal(w.document.querySelector('#jobsMessageCard,.smc-card'),null);
  assert.equal(rail.querySelector('[data-sj-attention]'),null);
  assert.ok(w.document.querySelector('#studioAttentionDrawer [data-sj-attention]'));
  const need=w.document.querySelector('#studioAttentionDrawer [data-sj-job="job-0"]');
