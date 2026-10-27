@@ -824,7 +824,6 @@
                 <section class="studio-about-card" data-service-status><header class="studio-about-card-heading"><h2>Service health</h2><div class="studio-about-card-tools"><button class="action" data-refresh-service-status>Refresh</button><button class="action" data-service-audit>Recent audit</button></div></header><div class="studio-about-card-body" data-service-status-body>Loading…</div></section>
                 <section class="studio-about-card studio-about-demo" id="studioDemoLoader"><header class="studio-about-card-heading"><h2>Demo Data</h2></header><div class="studio-about-card-body"><p class="studio-about-demo-warning">Reset clears business records and files. Staff accounts, configuration and Unassigned are preserved.</p><div class="studio-about-demo-actions"><button class="action" type="button" data-demo-preview>Preview reset scope</button><button class="action" type="button" data-demo-remove>Remove demo data</button><button class="primary" type="button" data-load-demo>Clear and recreate</button><button class="primary" type="button" data-demo-reset>Reset and regenerate</button></div><progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress><p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p><small data-demo-elapsed hidden></small></div></section>`;break;
             case 'staff-roles': content=renderEmployeeDirectorySection()+renderSecurityRolesSection('Job');break;
-            case 'workflows-admin': content=renderWorkflowSection();break;
         }
         genericView.innerHTML=StudioPage.html({title,scroll:view!=='about',summary:view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':view==='staff-roles'?'<p>Maintain staff identities, reusable job roles and global operational access. Workspace administration stays on Workspaces.</p>':'',content:`<div class="${view==='about'?'studio-about-grid':'admin-generated-sections'}">${content}</div>`});
         StudioPage.bind(genericView,current);
@@ -847,7 +846,6 @@
             dialog.addEventListener('close',()=>observer.disconnect(),{once:true});
         };
         if(view==='staff-roles')await refreshStudioEmployees();
-        if(view==='workflows-admin')await refreshWorkflowList();
         if(view==='staff-roles'&&current())await renderGlobalRoleAdministration(current);
         if(!current())return;
         const adminGrid=genericView.querySelector('.admin-generated-sections');
@@ -918,7 +916,7 @@
     }
 
 
-    const routeAliases={admin:'about','studio-management':'about','demo-data':'about','api-site-key':'about','booking-sessions':'catalog','job-templates':'templates','work-order-templates':'templates','staff-admin':'staff-roles','roles-admin':'staff-roles'};
+    const routeAliases={admin:'about','studio-management':'about','demo-data':'about','api-site-key':'about','booking-sessions':'catalog','job-templates':'templates','work-order-templates':'templates','workflows-admin':'templates','staff-admin':'staff-roles','roles-admin':'staff-roles'};
     const canonicalRoute=view=>routeAliases[view]||view;
     const routes={
         today:renderToday,
@@ -932,7 +930,7 @@
         jobs:renderJobs,
         pipeline:()=>showPipeline(),
         production:()=>showCatalogProduction(),
-        ...Object.fromEntries(['about','staff-roles','workflows-admin'].map(view=>[view,()=>renderAdmin(view)])),
+        ...Object.fromEntries(['about','staff-roles'].map(view=>[view,()=>renderAdmin(view)])),
         catalog:()=>showCommercialCatalog({tab:window.history.state?.studioCatalogTab}),
         templates:()=>showCommercialTemplates(window.history.state?.studioTemplateKind||'Job'),
         media:()=>showMediaReview(),
@@ -949,7 +947,7 @@
     const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
-        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioTemplateKind:view==='templates'?(options.kind==='WorkOrder'?'WorkOrder':'Job'):null,studioCatalogTab:view==='catalog'?(options.tab==='booking-sessions'?'booking-sessions':'products'):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
+        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioTemplateKind:view==='templates'?(['Job','WorkOrder','Automation'].includes(options.kind)?options.kind:'Job'):null,studioCatalogTab:view==='catalog'?(options.tab==='booking-sessions'?'booking-sessions':'products'):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
     }
     function recordNavigation(view,options={}){
         const next=navigationContext(view,options),previous=window.history.state;
@@ -998,6 +996,7 @@
     window.studioBeginJobNavigation=(id,options={})=>beginNavigation('workspaces',{...options,jobId:id});
 
     window.studioNavigate=async function(view,options={}){
+        if(view==='workflows-admin')options={...options,kind:'Automation'};
         if(view==='job-templates'||view==='work-order-templates')options={...options,kind:view==='work-order-templates'?'WorkOrder':'Job'};
         if(view==='booking-sessions')options={...options,tab:'booking-sessions'};
         view=canonicalRoute(view);
@@ -1030,7 +1029,7 @@
     function destinationFromLocation(state){
         const params=new URLSearchParams(window.location.hash.replace(/^#/,''));
         const view=canonicalRoute(state?.studioView&&routes[canonicalRoute(state.studioView)]?state.studioView:params.get('studio'));
-        return {view:view&&routes[view]?view:'today',kind:(state?.studioView==='work-order-templates'||(!state?.studioView&&params.get('studio')==='work-order-templates'))?'WorkOrder':state?.studioTemplateKind||params.get('kind')||'Job',panel:state?.studioView?(state.studioSchedulePanel||'workers'):(params.get('panel')||'workers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),tab:(state?.studioView==='booking-sessions'||(!state?.studioView&&params.get('studio')==='booking-sessions'))?'booking-sessions':state?.studioView?(state.studioView==='catalog'?(state.studioCatalogTab||'products'):(state.studioClientTab||'')):(params.get('tab')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
+        return {view:view&&routes[view]?view:'today',kind:(state?.studioView==='workflows-admin'||(!state?.studioView&&params.get('studio')==='workflows-admin'))?'Automation':(state?.studioView==='work-order-templates'||(!state?.studioView&&params.get('studio')==='work-order-templates'))?'WorkOrder':state?.studioTemplateKind||params.get('kind')||'Job',panel:state?.studioView?(state.studioSchedulePanel||'workers'):(params.get('panel')||'workers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),tab:(state?.studioView==='booking-sessions'||(!state?.studioView&&params.get('studio')==='booking-sessions'))?'booking-sessions':state?.studioView?(state.studioView==='catalog'?(state.studioCatalogTab||'products'):(state.studioClientTab||'')):(params.get('tab')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
     }
     window.addEventListener('popstate',event=>{
         const destination=destinationFromLocation(event.state);
