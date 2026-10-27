@@ -95,14 +95,17 @@ test('scrolled inbox selection and the following read refresh preserve the seven
  }finally{dom.window.close();}
 });
 
-test('bell count uses all thread unread totals and updates to zero and 99+',async t=>{
+test('bell count uses unified inbox total including incoming email and ignores internal thread totals',async t=>{
  const dom=new JSDOM('<button id="notificationButton"><span id="messageUnreadBadge"></span></button>',{url:'https://studio.test',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());
- let poll,threads=[{id:'one',unreadCount:2},{id:'two',unreadCount:5}];
+ let poll,total=7,fail=false;const requests=[];
  w.setInterval=fn=>{poll=fn;return 1;};w.clearInterval=()=>{};w.setTimeout=()=>0;
- w.fetch=async()=>({ok:false});w.json=async url=>url==='/api/messages/threads'?threads:[];
+ w.fetch=async()=>({ok:false});w.json=async url=>{requests.push(url);if(url==='/api/messages/inbox?offset=0&limit=1&unreadOnly=true'){if(fail)throw Error('offline');return {items:[{isUnread:true}],total};}return [];};
  w.eval(source);await new Promise(resolve=>setImmediate(resolve));
  const badge=w.document.getElementById('messageUnreadBadge'),bell=w.document.getElementById('notificationButton');
  assert.equal(badge.textContent,'7');assert.equal(bell.getAttribute('aria-label'),'Messages, 7 unread');
- threads=[];await poll();assert.equal(badge.textContent,'0');assert.equal(badge.hidden,false);
- threads=[{id:'many',unreadCount:120}];await poll();assert.equal(badge.textContent,'99+');assert.match(bell.title,/120 unread/);
+ total=0;await poll();assert.equal(badge.textContent,'0');assert.equal(badge.hidden,false);
+ total=120;await poll();assert.equal(badge.textContent,'99+');assert.match(bell.title,/120 unread/);
+ fail=true;await poll();assert.equal(badge.textContent,'?');assert.match(bell.title,/unavailable/);
+ fail=false;total=3;await poll();assert.equal(badge.textContent,'3');
+ assert.ok(requests.includes('/api/messages/inbox?offset=0&limit=1&unreadOnly=true'));
 });
