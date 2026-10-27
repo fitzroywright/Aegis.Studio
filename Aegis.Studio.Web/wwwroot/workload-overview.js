@@ -1,7 +1,7 @@
 /* Shared read projection and navigation. No workflow commands or quantity writes. */
 (function(root){
  'use strict';
- const closed=new Set(['Completed','Cancelled','Archived','Delivered','Published','Closed']),done=a=>['Completed','Cancelled','Archived'].includes(a.status),n=x=>Number(x)||0;
+ const closed=new Set(['Completed','Cancelled','Archived','Delivered','Published','Closed']),done=a=>['Completed','Cancelled','Archived','Skipped'].includes(a.status),n=x=>Number(x)||0;
  function model(data,jobs=[],now=Date.now()){
   const jobMap=new Map(jobs.map(j=>[j.id,j])),eligibility=new Map((data.eligibility||[]).map(e=>[e.activityId,e]));
   const activities=(data.activities||[]).map(a=>({...a,eligibility:eligibility.get(a.id)?.status,blockedReason:a.blockedReason||eligibility.get(a.id)?.reason}));
@@ -12,6 +12,21 @@
   const bucket=a=>!active(a)?'complete':waiting(a)?'waiting':['InProgress','Partial'].includes(a.eligibility||a.status)?'progress':a.eligibility==='Available'||['Active Production','Changes Requested'].includes(jobMap.get(a.jobId)?.status)?'ready':'unknown';
   const itemMap=new Map();for(const i of data.items||[])itemMap.set(i.activityId,[...(itemMap.get(i.activityId)||[]),i]);
   const matches=(a,filter)=>!filter||filter==='all'||(filter==='refunds'?(itemMap.get(a.id)||[]).some(i=>n(i.refundedProduced)>0):filter==='qc'?(itemMap.get(a.id)||[]).some(i=>i.kind==='Physical outputs'&&n(i.awaitingQc)>0):filter==='item-rework'?(itemMap.get(a.id)||[]).some(i=>i.kind==='Physical outputs'&&n(i.rework)>0):filter==='overdue'?overdue(a):filter==='unassigned'?active(a)&&!a.assignedTo:filter==='handoffs'?active(a)&&!!a.handoffTo:filter==='rework'?active(a)&&/Rework|Reprint|Failed/.test(a.status):filter==='unknown'?active(a)&&!Number.isFinite(Date.parse(a.dueAtUtc)):bucket(a)===filter);
+  const isQc=a=>a.qualityControl||a.step?.qualityControl||['QC','Quality Control'].includes(a.activityType||a.step?.activityType);
+  function jobLane(job,tasks=[]){
+   const status=String(job.status||'').toLowerCase().replace(/[^a-z]/g,'');
+   if(['completed','cancelled','archived','delivered','published','closed','readyforclient','readyfordelivery','delivery','awaitingdelivery'].includes(status))return 'complete';
+   if(['changesrequested','rework','reworkrequired','reprintrequired','failed','needsrework'].includes(status))return 'attention';
+   if(['awaitingproductionreview','awaitingapproval','qualitycontrol','qc','review','awaitingreview','inreview','productionreview','awaitingqualitycontrol'].includes(status))return 'qc';
+   if(['activeproduction','inproduction','production','editing','retouching','printing','processing'].includes(status))return 'progress';
+   if(['pending','confirmed','needsassignment','needsjobowner','needsphotographer','needsphotographerassignment','photographerassigned','awaitingscheduling','scheduled','shoot','shooting','awaitingupload','inquiry','booking','ready','readytostart'].includes(status))return 'ready';
+   // Custom stages use recorded running work; waiting prerequisites alone never mean rework.
+   const live=tasks.filter(active),working=live.filter(a=>['InProgress','Partial'].includes(a.status));
+   if(working.length)return working.some(a=>!isQc(a))?'progress':'qc';
+   if(live.some(a=>['Failed','ReworkRequired','ReprintRequired'].includes(a.status)))return 'attention';
+   if(live.some(a=>isQc(a)&&!waiting(a)))return 'qc';
+   return 'ready';
+  }
   function summary(selected){
    const ids=new Set(selected.map(a=>a.id)),selectedMap=new Map(selected.map(a=>[a.id,a]));
    const physical={ready:0,progress:0,waiting:0,unknown:0,awaitingQc:0,rework:0,refundedProduced:0},other={quantity:0},images={records:0};
@@ -24,7 +39,7 @@
    const restricted=new Set(selected.filter(a=>!(data.productionJobIds||[]).includes(a.jobId)).map(a=>a.jobId)).size;
    return {physical,other,images,restricted,orders:orders.length,orderedUnits:units,partialUnknown:orders.filter(o=>n(o.quantity)>0&&(o.activityIds||[]).some(id=>{const a=activities.find(a=>a.id===id);return a&&active(a);})).length,missing,jobs:new Set(selected.map(a=>a.jobId)).size,activities:selected.length};
   }
-  return {activities,active,waiting,overdue,bucket,matches,summary};
+  return {activities,active,waiting,overdue,bucket,matches,summary,jobLane};
  }
  function cards(model,selected,esc,section='all'){
   const summary=model.summary(selected),p=summary.physical;
@@ -59,8 +74,9 @@
   return `<section class="studio-workload-summary" aria-label="${section==='attention'?'Production items needing attention':'Workload for current filters'}"><div class="workload-indicators">${entries.map(x=>x.html).join('')}${empty}</div>${section!=='overview'&&notes.length?'<div class="workload-attention-notes">'+notes.map(note=>'<p>'+esc(note)+'</p>').join('')+'</div>':''}</section>`;
  }
  function production(filter,workspace='',assignee='',stage='',jobIds=null){
-  root.studioWorkloadSelection={filter:filter||'',workspace,assignee,stage,jobIds};commercialQueueOffset=0;
+  root.studioWorkloadSelection={filter:filter||'',workspace,assignee,stage,jobIds};root.studioProductionScopeRequested=true;
   productionWorkloadJobIds=jobIds;productionQueueScope='all';productionWorkloadFilter=filter||'';productionWorkspaceFilter=workspace;productionAssigneeFilter=assignee;productionStageFilter=stage;productionDueFilter='';productionSearch='';productionPriority='';return root.studioNavigate('production');
  }
  root.StudioWorkload={model,cards,production};
 })(window);
+

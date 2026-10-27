@@ -22,16 +22,17 @@ public static class WorkloadOverview
             using var tx = c.BeginTransaction(System.Data.IsolationLevel.RepeatableRead);
             using var q = new NpgsqlCommand("""
                 select jsonb_build_object(
-                  'jobs',coalesce((select jsonb_agg(jsonb_build_object('id',j.id,'title',j.title,'status',j.status,'workspaceId',j.workspace_id,'workspaceName',(select name from studio_workspaces where id=j.workspace_id))) from studio_jobs j where j.id=any($1)),'[]'),
+                  'jobs',coalesce((select jsonb_agg(jsonb_build_object('id',j.id,'title',j.title,'clientName',j.client_name,'status',j.status,'workspaceId',j.workspace_id,'workspaceName',(select name from studio_workspaces where id=j.workspace_id))) from studio_jobs j where j.id=any($1)),'[]'),
                   'activities',coalesce((select jsonb_agg(jsonb_build_object(
                     'id',a.id,'jobId',a.job_id,'title',a.title,'activityType',a.activity_type,'status',a.status,
                     'assignedTo',a.assigned_to,'dueAtUtc',a.due_at_utc,'scheduledAtUtc',a.scheduled_at_utc,
+                    'priority',a.priority,'qualityControl',a.quality_control_required,'stepOrder',a.step_order,
                     'handoffTo',a.handoff_to,'productionArea',a.production_area,'workOrderId',a.work_order_id,'nodeId',a.workflow_node_id,
-                    'blockedReason',coalesce(a.blocked_reason,w.exception_reason,case when a.job_id=any($2) then
+                    'blockedReason',coalesce(nullif(a.blocked_reason,''),nullif(w.exception_reason,''),case when a.job_id=any($2) then
                       (select 'QC rejected: '||min(i.qc_reason) from studio_production_items i where i.activity_id=a.id and i.qc_state='Rejected') end,case
                       when a.approved_image_required and w.source_version_id is null then 'Approved source required'
                       when exists(select 1 from studio_activity_dependencies d join studio_job_activities p on p.id=d.depends_on_id
-                        where d.activity_id=a.id and p.status not in ('Completed','Cancelled')) then 'Waiting for prerequisite' end)))
+                        where d.activity_id=a.id and p.status not in ('Completed','Cancelled','Skipped')) then 'Waiting for prerequisite' end)))
                     from studio_job_activities a left join studio_catalog_work_orders w on w.id=a.work_order_id
                     where a.job_id=any($1)),'[]'),
                   'items',coalesce((select jsonb_agg(row) from (
@@ -64,7 +65,7 @@ public static class WorkloadOverview
                         and not exists(select 1 from studio_production_items existing where existing.source_sale_line_id=l.id)
                     ) pending where pending.quantity>0 group by pending.activity_id,pending.job_id,pending.kind
                   ) row),'[]'),
-                  'orders',coalesce((select jsonb_agg(jsonb_build_object('id',w.id,'jobId',w.job_id,'quantity',w.quantity,
+                  'orders',coalesce((select jsonb_agg(jsonb_build_object('id',w.id,'jobId',w.job_id,'product',w.product_name,'quantity',w.quantity,
                     'exceptionReason',w.exception_reason,'sourceMissing',w.source_version_id is null,
                     'activityIds',coalesce((select jsonb_agg(a.id) from studio_job_activities a where a.work_order_id=w.id),'[]')) order by w.created_at,w.id)
                     from studio_catalog_work_orders w where w.job_id=any($1)),'[]'),
@@ -115,3 +116,4 @@ public static class WorkloadOverview
         }).RequireAuthorization();
     }
 }
+
