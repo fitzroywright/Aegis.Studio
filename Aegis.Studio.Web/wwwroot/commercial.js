@@ -52,12 +52,23 @@ function editCommercialItem(item){
     }catch(error){f.querySelector('[role=alert]').textContent=error.message;}};
 }
 function commercialTemplatePage(kind,body,tools){
-    const tabs=`<nav class="booking-tabs" aria-label="Template types"><button type="button" data-template-kind="Job" aria-pressed="${kind==='Job'}">Job Templates</button><button type="button" data-template-kind="WorkOrder" aria-pressed="${kind==='WorkOrder'}">Work Order Templates</button></nav>`;
-    commercialPage('Templates',tabs+body,tools,'<p>Manage reusable job workflows and work order production templates.</p>');
+    const tabs=`<nav class="booking-tabs" aria-label="Template types"><button type="button" data-template-kind="Job" aria-pressed="${kind==='Job'}">Job Templates</button><button type="button" data-template-kind="WorkOrder" aria-pressed="${kind==='WorkOrder'}">Work Order Templates</button><button type="button" data-template-kind="Automation" aria-pressed="${kind==='Automation'}">Workflow Automation</button></nav>`;
+    commercialPage('Templates',tabs+body,tools,'<p>Manage job templates, work order templates and workflow automation.</p>');
     genericView.querySelectorAll('[data-template-kind]').forEach(button=>button.onclick=()=>studioNavigate('templates',{kind:button.dataset.templateKind}));
     const params=new URLSearchParams({studio:'templates',kind});window.history.replaceState({...window.history.state,studioView:'templates',studioTemplateKind:kind},'','#'+params);
 }
 async function showCommercialTemplates(kind='WorkOrder'){
+    if(kind==='Automation'){
+        const current=StudioPage.begin('templates');
+        commercialTemplatePage(kind,'<div class="commercial-grid" data-template-automation aria-label="Workflow Automation"><p role="status">Checking access…</p></div>','');
+        const host=genericView.querySelector('[data-template-automation]'),live=()=>current()&&host.isConnected;
+        try{
+            const me=await json('/api/auth/me');if(!live())return;
+            if((me?.user||me)?.isAdministrator!==true){host.innerHTML='<p>Administrator access required to manage workflow automation.</p>';return;}
+            host.innerHTML=renderWorkflowSection();await refreshWorkflowList();if(live())StudioPage.setCount(host.querySelectorAll('#workflowList .job-row').length+' workflows');
+        }catch(error){if(live()){host.innerHTML='<p role="alert">'+esc(error.message)+'</p><button type="button" class="action" data-automation-retry>Retry</button>';host.querySelector('[data-automation-retry]').onclick=()=>showCommercialTemplates('Automation');}}
+        return;
+    }
     if(kind==='Job')return StudioGraphTemplates.list();
     const current=StudioPage.begin('templates');
     commercialKind=kind;[commercialTemplates,commercialItems]=await Promise.all([json(`/api/admin/commercial/templates/${kind}`),json('/api/admin/pos/catalog/')]);

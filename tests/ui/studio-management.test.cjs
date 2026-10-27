@@ -20,8 +20,8 @@ test('About contains product, support, service health and demo tools; Staff and 
  assert.equal(w.document.querySelector('.st-content.st-card-scroll'),null);
  assert.ok(w.document.querySelector('[data-service-status] .studio-health-details'));
  assert.equal(w.document.querySelector('[data-service-status]').closest('.studio-about'),null);
- assert.equal(w.StudioAdmin.entries.map(entry=>entry.view).join(','),'catalog,templates,workflows-admin,staff-roles,workspace-management,about');assert.equal(w.StudioAdmin.entries.some(entry=>['studio-management','demo-data','staff-admin','roles-admin','api-site-key','booking-sessions'].includes(entry.view)),false);
- for(const [view,text] of [['staff-roles','Staff directory'],['workflows-admin','Workflows']]){
+ assert.equal(w.StudioAdmin.entries.map(entry=>entry.view).join(','),'catalog,templates,staff-roles,workspace-management,about');assert.equal(w.StudioAdmin.entries.some(entry=>['studio-management','demo-data','staff-admin','roles-admin','api-site-key','booking-sessions'].includes(entry.view)),false);
+ for(const [view,text] of [['staff-roles','Staff directory']]){
   await w.studioNavigate(view);assert.ok(w.document.getElementById('genericView').textContent.includes(text),view);assert.equal(w.document.querySelector('[data-service-status],#studioDemoLoader'),null);assert.equal(w.location.hash.includes('studio='+view),true);
   if(view==='staff-roles')assert.match(w.document.getElementById('genericView').textContent,/Staff directory.*Roles/s);
  }
