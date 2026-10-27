@@ -14,8 +14,6 @@
 .st-card-body{padding:8px 10px;overflow:auto;min-height:0;flex:1;overscroll-behavior:contain}
 .st-card-body p{margin:0 0 8px;line-height:1.5;color:var(--theme-muted)}
 .st-stat{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #e9ecef}
-.st-attention{border-top:3px solid #b44b42}
-.st-attention>header{background:#fff3ef}
 .st-link{border:0;background:transparent;color:#98701c;font-weight:700;cursor:pointer}
 .st-tools button,.st-content input,.st-content select{font-size:12px;min-height:30px}
 .st-dashboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-height:0;flex:1;overflow:auto;overscroll-behavior:contain}

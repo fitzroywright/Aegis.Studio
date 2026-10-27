@@ -39,6 +39,9 @@ for(const view of ['tasks','schedule'])test(`${view} keeps sessions in the share
  else await w.StudioPhotographerSchedule.render({view:'day'});
  await settle();
  assert.equal(w.document.querySelector('.ps-todays-sessions,[data-mw-region="schedule"]'),null);
+ assert.equal(w.genericView.querySelector('[data-studio-attention]'),null);
+ assert.equal(w.document.querySelector('#studioContextRail [data-studio-attention]'),null);
+ assert.ok(w.document.querySelector('#studioAttentionDrawer [data-studio-attention]'));
  assert.doesNotMatch(w.genericView.textContent,/Today[’']s Sessions/);
  assert.ok(w.document.querySelector(view==='tasks'?'[data-task-rows]':'.ps-calendar'),w.genericView.textContent);
  const status=w.document.querySelector('#studioNavigationToolstrip .studio-navigation-status');

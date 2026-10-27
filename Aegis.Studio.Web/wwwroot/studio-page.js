@@ -12,7 +12,7 @@
         return () => version === revision && matches();
     }
     function html({title, tools = '', content = '', summary = '', attention = '', className = '', scroll = false, showMessagesCard = true, showHeader = true, summaryTitle = 'Overview'}) {
-        return `<section class="st-page ${className}" aria-label="${escape(title)}"><template data-studio-overview>${card(summaryTitle,summary || '<p>No summary available.</p>')}</template><section class="st-board">${showHeader ? `<header class="st-toolbar"><h1>${escape(title)}</h1><div class="st-tools">${tools}</div></header>` : ''}<div class="st-content${scroll ? ' st-card-scroll' : ''}">${content}</div></section>${attention ? `<div data-studio-context>${card("Needs Attention",attention,"st-attention")}</div>` : ''}</section>`;
+        return `<section class="st-page ${className}" aria-label="${escape(title)}"><template data-studio-overview>${card(summaryTitle,summary || '<p>No summary available.</p>')}</template><section class="st-board">${showHeader ? `<header class="st-toolbar"><h1>${escape(title)}</h1><div class="st-tools">${tools}</div></header>` : ''}<div class="st-content${scroll ? ' st-card-scroll' : ''}">${content}</div></section>${attention ? `<div data-studio-context><div data-studio-attention>${attention}</div></div>` : ''}</section>`;
     }
     function metrics(items) {
         return items.map(([label, value]) => `<div class="st-stat"><span>${escape(label)}</span><strong>${escape(value)}</strong></div>`).join('');
@@ -33,14 +33,16 @@
         mountContext(host);
     }
     function query(host, selector) {
-        return host.querySelector(selector) || document.getElementById('studioContextRail')?.querySelector(selector) || null;
+        return host.querySelector(selector) || document.getElementById('studioContextRail')?.querySelector(selector) || document.getElementById('studioPageAttention')?.querySelector(selector) || null;
     }
     function queryAll(host, selector) {
-        return [...new Set([...host.querySelectorAll(selector), ...(document.getElementById('studioContextRail')?.querySelectorAll(selector) || [])])];
+        return [...new Set([...host.querySelectorAll(selector), ...(document.getElementById('studioContextRail')?.querySelectorAll(selector) || []), ...(document.getElementById('studioPageAttention')?.querySelectorAll(selector) || [])])];
     }
     function mountContext(host, view) {
         const context = host.querySelector('[data-studio-context]');
         if (!context) return;
+        const attention = context.querySelector('[data-studio-attention]');
+        if(window.studioShellMountAttention){attention?.remove();window.studioShellMountAttention(attention,view);}
         const overview = context.querySelector('[data-rail-card="overview"]');
         if (overview) window.studioShellSetOverview?.(overview, view);
         window.studioShellMountContext?.(context ? [...context.children] : [], view);

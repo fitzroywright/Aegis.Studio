@@ -33,7 +33,6 @@
 
 
 
-.st-task-attention .mw-status-row{display:flex;justify-content:space-between;padding:8px 12px}
 .st-task-messages footer{padding:8px 12px;border-top:1px solid var(--studio-border,#d9dde3)}
 .st-task-messages footer button{font-weight:650}
 .st-tasks-loading{padding:24px}
