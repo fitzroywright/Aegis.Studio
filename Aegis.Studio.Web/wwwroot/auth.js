@@ -74,9 +74,12 @@ async function loadSignedInUser() {
     if (signOutButton) {
         signOutButton.onclick = async () => {
             await fetch('/api/auth/logout', { method: 'POST' });
+            sessionStorage.removeItem('studio-announcements-login');
             window.location.replace('/login');
         };
     }
+    return user;
 }
 
-loadSignedInUser();
+window.studioSignedInUserReady = loadSignedInUser();
+

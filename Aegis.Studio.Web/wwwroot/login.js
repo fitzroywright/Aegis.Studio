@@ -32,6 +32,7 @@ loginForm.addEventListener('submit', async event => {
             return;
         }
 
+        sessionStorage.removeItem('studio-announcements-login');
         window.location.replace('/');
     } catch {
         error.textContent = 'Aegis could not reach the sign-in service.';
@@ -40,3 +41,4 @@ loginForm.addEventListener('submit', async event => {
         signInButton.textContent = 'Sign in';
     }
 });
+

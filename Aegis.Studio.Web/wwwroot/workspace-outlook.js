@@ -135,15 +135,16 @@ function mergeJobMessages(teamMessages, clientMessages) {
         detailPane.classList.remove('empty');
         detailPane.removeAttribute('aria-busy');
         detailPane.innerHTML = `<div class="detail-header"><div><h1>${esc(job?.title || 'Workspace messages')}</h1><p>${job ? 'Job discussion and client correspondence' : 'Shared with the workspace team'}</p></div></div><div id="combinedJobMessages" class="messages" aria-live="polite"></div><form id="hierarchyCompose" class="composer"><label for="hierarchyBody">${job ? 'Write a message' : 'Message the entire workspace'}</label><div class="reply-textbox-shell"><textarea id="hierarchyBody" placeholder="Write a message…" required maxlength="10000"></textarea>${job ? `<label class="reply-paperclip" title="Attach document" aria-label="Attach document"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-10 10a2 2 0 0 1-2.8-2.8l9.2-9.2"/></svg><input type="file" data-message-file hidden></label>` : ``}</div><div class="send-split"><button class="primary" type="submit">${job ? 'Reply' : 'Send message'}</button>${job ? `<select id="jobSendingIdentity" aria-label="Reply identity" title="Choose how to reply"><option value="Workspace" ${conversation && (String(conversation.channel).toLowerCase() !== 'email' || identities.some(i => i.type === 'Workspace')) ? '' : 'disabled'}>Reply</option><option value="Internal">Reply as internal note</option><option value="Self" ${identities.some(i => i.type === 'Self') ? '' : 'disabled'}>Reply as myself${identities.some(i => i.type === 'Self') ? '' : ' (unavailable)'}</option></select>` : ''}</div><p class="muted">${esc(clientNotice)}</p><p id="hierarchyError" role="alert"></p></form>`;
+        const messageList=detailPane.querySelector('#combinedJobMessages'),messageForm=detailPane.querySelector('#hierarchyCompose');
         const renderMessages = () => {
             const visible = combined;
-            document.getElementById('combinedJobMessages').innerHTML = visible.map(m => `<article class="message ${m.client ? 'client-exchange' : 'internal-discussion'}" data-message-id="${esc(m.sourceId||'')}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.client ? "Client" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><strong>${esc(messageFirstName(m.author, people, m.client ? 'Client' : 'Team member', m.loginOnly))}</strong> <time datetime="${esc(m.at)}" title="${esc(new Date(m.at).toLocaleString())}">${esc(new Date(m.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))}</time>${m.client ? '<span class="message-kind">Client</span>' : ''}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
+            messageList.innerHTML = visible.map(m => `<article class="message ${m.client ? 'client-exchange' : 'internal-discussion'}" data-message-id="${esc(m.sourceId||'')}"><span class="message-avatar" aria-hidden="true">${esc(messageFirstName(m.author, people, m.client ? "Client" : "Team member", m.loginOnly).slice(0,1))}</span><div class="message-content"><div class="message-head"><strong>${esc(messageFirstName(m.author, people, m.client ? 'Client' : 'Team member', m.loginOnly))}</strong> <time datetime="${esc(m.at)}" title="${esc(new Date(m.at).toLocaleString())}">${esc(new Date(m.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))}</time>${m.client ? '<span class="message-kind">Client</span>' : ''}</div><p style="white-space:pre-wrap">${esc(m.body)}</p></div></article>`).join('') || '<p>No messages to display.</p>';
         };
         renderMessages();
         const sender = document.getElementById('jobSendingIdentity');
         const canSend = () => !job || sender?.value === 'Internal' || (!!conversation && (String(conversation.channel).toLowerCase() !== 'email' ? sender?.value === 'Workspace' : identities.some(i => i.type === sender?.value)));
         const syncSend = () => {
-            const button = document.getElementById('hierarchyCompose').querySelector('button');
+            const button = messageForm.querySelector('button');
             button.textContent = !job ? 'Send message' : sender?.value === 'Internal' ? 'Send internal note' : sender?.value === 'Self' ? 'Send as myself' : 'Send Message';
             button.disabled = !canSend();
         };
@@ -152,7 +153,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
         if (scope === 'Job') {
             detailPane.classList.add('job-reading-view','job-detail-page');
             conversationView.classList.add('has-open-job');
-            let disposed=false,taskDialog=null;
+            let disposed=false,taskDialog=null,messageDialog=null;
             const current=()=>!disposed && version===revision && selectedJob?.id===job.id && detailPane.classList.contains('job-detail-page') && !conversationView.classList.contains('hidden');
             const header=detailPane.querySelector('.detail-header');
             header.className='job-detail-heading';
@@ -207,7 +208,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 panels[name]=panel;contents[name]=panel.querySelector('.job-'+name+'-content');center.append(panel);
             }
 
-            const messagesPanel=document.getElementById('combinedJobMessages'),composer=document.getElementById('hierarchyCompose');
+            const messagesPanel=messageList,composer=messageForm;
             const messageCard=StudioMessageCard.create({id:'jobDetailMessages',title:'Messages',attributes:'data-message-job-id="'+esc(job.id)+'"',actions:'<button type="button" data-message-search aria-label="Search messages">⌕</button><button type="button" data-message-more aria-label="Show all messages">⋮</button>'});
             const messageHeader=messageCard.querySelector('.smc-header');
             messageCard.querySelector('.smc-feed').append(messagesPanel);
@@ -215,8 +216,14 @@ function mergeJobMessages(teamMessages, clientMessages) {
             StudioMessageCard.bind(messageCard);
             const attention=document.createElement('div');attention.className='studio-job-attention-details';
             attention.innerHTML='<div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
-            // The shared bell owns the conversation; Job Details owns only functional job content.
-            window.studioShellMountJobConversation?.(messageCard);
+            const openJobConversation=()=>{
+                if(messageDialog?.open){messageDialog.focus();return;}
+                const trigger=document.activeElement;
+                messageDialog=studioDialog('Job Messages & Notes','');
+                messageDialog.classList.add('jd-messages-dialog');
+                messageDialog.querySelector('.studio-dialog-body').append(messageCard);
+                messageDialog.addEventListener('close',()=>{messageDialog=null;if(current()&&trigger?.isConnected)trigger.focus();},{once:true});
+            };
             window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Status</span><strong>${esc(job.status || 'Not set')}</strong></div><div class="workspace-summary-row"><span>Days in Stage</span><strong data-job-overview-age>Loading…</strong></div><div class="workspace-summary-row"><span>Next Action</span><strong data-job-overview-action>Loading…</strong></div></section>`,'job-detail');
             window.studioShellMountJobAttention?.(attention);
             board.append(center);detailPane.append(board);
@@ -285,7 +292,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 if(name==='tasks')return openTasks();
                 if(name==='activity')return openDrawer(activityView,()=>loadPanel('activity',true));
                 if(name==='messages'){
-                    StudioMessageCard.setMode(messageCard,'messages');composer.querySelector('textarea').focus();return;
+                    openJobConversation();StudioMessageCard.setMode(messageCard,'messages');composer.querySelector('textarea').focus();return;
                 }
                 for(const [key,panel] of Object.entries(panels))panel.hidden=key!==name;
                 await loadPanel(name);
@@ -304,6 +311,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     const action=event.detail?.action;
                     if(action==='upload'){await selectPanel('media');contents.media.studioJobMedia?.upload();}
                     if(action==='activity')await selectPanel('activity');
+                    if(action==='messages')await selectPanel('messages');
                     if(action==='subject'){await selectPanel('subjects');contents.subjects.querySelector('#addJobSubject')?.click();}
                     if(action==='task'){await selectPanel('tasks');contents.tasks.querySelector('form input')?.focus();}
                     if(action==='edit')await openJobDetailsEditor(job);
@@ -384,7 +392,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);
             const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
             navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
-            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.removeAttribute('aria-expanded');view.toggle.removeAttribute('aria-controls');});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
+            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();messageDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.removeAttribute('aria-expanded');view.toggle.removeAttribute('aria-controls');});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
             const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};document.addEventListener('studio-workflow-changed',graphChanged);const previousDispose=disposeJobView;disposeJobView=()=>{document.removeEventListener('studio-workflow-changed',graphChanged);previousDispose();};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
@@ -394,7 +402,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));
         }
         let pendingSend=null,pendingAttachment=null;
-        document.getElementById('hierarchyCompose').onsubmit = async event => {
+        messageForm.onsubmit = async event => {
             event.preventDefault();
             const form = event.currentTarget, body = form.querySelector('textarea').value.trim();
             if ((!body&&!pendingSend) || !canSend()) return;

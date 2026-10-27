@@ -97,15 +97,6 @@ test('current shell keeps obsolete left navigation removed',()=>{
  assert.equal(shell.window.document.querySelector('[data-view="messages"]'),null);
  assert.equal(shell.window.document.querySelector('[data-view="jobs"]'),null);
 });
-test('announcement banner disappears only after dismissal succeeds',async()=>{
- const {w,panel}=environment();const calls=[];let fail=true;
- w.json=async(url,options)=>{calls.push(url);if(options){if(fail)throw Error('Offline');return null;}return [{id:'notice',title:'Photo day',body:'Bring equipment'}];};
- await w.renderAnnouncementBanners(panel,'workspace',()=>true);
- assert.equal(panel.hidden,false);let button=panel.querySelector('[data-dismiss]');
- await button.onclick();assert.ok(panel.querySelector('article'));assert.equal(button.disabled,false);
- fail=false;await button.onclick();assert.equal(panel.hidden,true);
- assert.equal(calls.at(-1),'/api/workspaces/workspace/announcements/notice/dismiss');
-});
 test('job handoff uses shoot completion, never first upload, and shows blocked work',()=>{
  const {w}=environment();w.eval(fs.readFileSync(path.join(root,'job-handoff.js'),'utf8'));
  const job={status:'Photography'};
@@ -123,7 +114,7 @@ test('FrontDesk search preserves focus and separates enquiry and booking queues'
  assert.ok(panel.querySelector('[data-fd-row-open="request"]'));assert.match(panel.textContent,/Ready for confirmation/);assert.equal(panel.querySelector('[data-frontdesk-job]'),null);
 });
 
-test('shared request helper accepts empty successes and dismissal removes the banner',async()=>{
+test('shared request helper accepts empty successful responses',async()=>{
  const {w,panel}=environment();
  const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
  const helper=source.slice(source.indexOf('async function json('),source.indexOf('async function loadWorkspaces('));
@@ -136,11 +127,7 @@ test('shared request helper accepts empty successes and dismissal removes the ba
  assert.equal((await w.json('/data')).ok,true);
  w.fetch=async()=>new Response('Denied',{status:403});
  await assert.rejects(w.json('/denied'),/permission/);
- w.fetch=async(url,options)=>options?.method==='POST'?new Response(null,{status:204}):new Response(JSON.stringify([{id:'a',title:'Notice',body:'Message'}]),{status:200});
- await w.renderAnnouncementBanners(panel,'workspace',()=>true);
- await panel.querySelector('[data-dismiss]').onclick();
- assert.equal(panel.querySelector('article'),null);
- assert.equal(panel.hidden,true);
+
 });
 
 test('Media shows all images by default and collection and subject filters live in the title bar',async()=>{
@@ -253,4 +240,5 @@ test('Jobs uses its dedicated renderer and shared shell rail',()=>{
  assert.match(shell,/sj-rail-card/);
  assert.match(shell,/studioOpenJobs/);
 });
+
 

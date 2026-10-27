@@ -15,15 +15,14 @@ test('selecting a scrolled notification updates the detail without replacing its
  assert.match(w.document.querySelector('.notification-detail').textContent,/Details 6/);assert.equal(row.getAttribute('aria-pressed'),'true');
 });
 
-test('message slide-down keeps the feed and job conversation in one scroll region',async t=>{
+test('message slide-down contains only its unread feed',async t=>{
  const dom=new JSDOM('<body><button id="notificationButton"></button></body>',{runScripts:'outside-only',url:'https://studio.test'}),w=dom.window;t.after(()=>w.close());
- w.fetch=async url=>({ok:true,json:async()=>url.startsWith('/api/messages/inbox')?{items:[{message:{subject:'Proofs ready',body:'Review the gallery'}}]}:[]});
+ w.fetch=async url=>({ok:true,json:async()=>url.startsWith('/api/messages/inbox')?{items:[{isUnread:true,message:{subject:'Proofs ready',body:'Review the gallery'}}]}:[]});
  w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/notifications.js'),'utf8'));
- const panel=w.document.getElementById('studioMessageBellPanel'),conversation=w.document.createElement('form');
- w.studioShellMountJobConversation(conversation);
- assert.equal(panel.querySelector('header h2').textContent,'Messages & Announcements');
+ const panel=w.document.getElementById('studioMessageBellPanel');
+ assert.equal(panel.querySelector('header h2').textContent,'Unread Messages');
  assert.ok(w.document.querySelector('#notificationButton #messageUnreadBadge.studio-message-bell-count'));
- assert.equal(conversation.closest('.studio-message-bell-content'),panel.querySelector('.studio-message-bell-content'));
+ assert.equal(panel.querySelector('#studioShellJobConversation,.smc-card'),null);
  await w.document.getElementById('notificationButton').onclick();
  assert.equal(panel.hidden,false);assert.match(panel.querySelector('.studio-message-bell-list').textContent,/Proofs ready/);
  assert.equal(panel.querySelector('footer').parentElement,panel);
