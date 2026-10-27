@@ -35,7 +35,7 @@
     })[character]);
 
     function labelFor(view) {
-        return ({clients:'Client Management','workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
+        return window.StudioAdmin?.entries.find(entry=>entry.view===view)?.label || ({clients:'Client Management','workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
             || String(view || 'Studio').replace(/(^|\s)\S/g, match => match.toUpperCase());
     }
 
@@ -53,7 +53,7 @@
         schedule: 'View scheduled shoots, assignments and staff availability.',
         pipeline: 'Track jobs through their workflow stages and next actions.',
         finance: 'Review invoices, payments and outstanding balances.',
-        'studio-management': 'Configure Studio settings, staff access and workspaces.'
+        'studio-management': 'Review Studio service health and operational audit.'
     };
     const taglineFor = view => pageTaglines[view] || 'Manage Studio work and related information.';
 
@@ -82,7 +82,9 @@
             for (const control of [document.getElementById('notificationButton'), document.getElementById('studioMessageBellPanel'), banner.querySelector('.user-menu')]) {
                 if (control) account.append(control);
             }
-            host.append(scroll, account);
+            host.append(scroll);
+            window.StudioAdmin?.mountMenu(host);
+            host.append(account);
             banner.append(host);
             tools.addEventListener('click', event => {
                 const button = event.target.closest('[data-studio-side]');
@@ -463,7 +465,7 @@
         const statusTools = document.createElement('div');
         statusTools.className = 'studio-navigation-status';
         statusTools.append(sessionsTrigger, trigger);
-        toolstrip.querySelector('.studio-navigation-scroll').append(statusTools);
+        toolstrip.insertBefore(statusTools,toolstrip.querySelector('.studio-navigation-account'));
         const backdrop = document.createElement('div');
         backdrop.className = 'studio-attention-backdrop';
         backdrop.hidden = true;
@@ -692,7 +694,6 @@
                 window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:'activity'}}));
             } else window.studioNavigate?.('notifications');
         });
-        document.querySelector('[data-studio-avatar-workspaces]')?.addEventListener('click',()=>{document.querySelector('.user-menu')?.removeAttribute('open');window.studioNavigate?.('workspace-management');});
         document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
             window.studioNavigate?.('notifications');
