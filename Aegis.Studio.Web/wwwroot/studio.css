@@ -9769,24 +9769,26 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 .studio-attention-trigger.has-attention strong { background: #5e502e; color: #ffd275; }
 .studio-attention-backdrop:not([hidden]) {
   position: fixed;
-  inset: 0;
+  inset: var(--studio-banner-height) 0 var(--studio-footer-height);
   z-index: 1199;
-  background: rgba(9,20,36,.38);
 }
 .studio-attention-drawer:not([hidden]) {
   position: fixed;
-  top: 0;
+  top: var(--studio-banner-height);
   right: 0;
-  bottom: 0;
+  bottom: var(--studio-footer-height);
   width: min(390px, 92vw);
   z-index: 1200;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   background: #fff;
   color: #172d4a;
   box-shadow: -8px 0 30px rgba(0,0,0,.2);
 }
 .studio-attention-drawer header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -9800,14 +9802,16 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 .studio-shared-session-row { display:grid; gap:5px; padding:12px; border:1px solid #c9e0ec; border-radius:7px; background:#f2f9fd; }
 .studio-shared-session-row strong { color:#174b6a; }
 .studio-shared-session-row span { font-size:12px; color:#40576a; }
-.studio-attention-drawer [data-attention-close] {
+.studio-attention-drawer :is([data-attention-close],[data-sessions-close]) {
   border: 0;
   background: transparent;
   color: #fff;
   font-size: 26px;
   cursor: pointer;
 }
-.studio-attention-details { padding: 15px; display: grid; align-content: start; gap: 8px; overflow-y: auto; }
+.studio-sessions-range { flex:0 0 auto; margin:0; padding:12px 15px 0; font-size:12px; color:#40576a; }
+.studio-attention-drawer > [data-sessions-calendar] { flex:0 0 auto; margin:0; padding:12px 15px; border:0; border-top:1px solid #c8d1dc; border-radius:0; background:#234969; color:#fff; font:inherit; cursor:pointer; }
+.studio-attention-details { flex:1 1 auto; min-height:0; padding: 15px; display: grid; align-content: start; gap: 8px; overflow-y: auto; }
 .studio-attention-details button {
   display: flex;
   justify-content: space-between;
