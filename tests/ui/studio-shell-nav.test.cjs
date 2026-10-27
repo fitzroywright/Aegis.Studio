@@ -84,6 +84,36 @@ test('collapsed side rail persists while navigation stays accessible',async t=>{
  toggle.click();assert.equal(toggle.getAttribute('aria-expanded'),'true');
 });
 
+test('toolstrip ends with the existing bell and avatar while their menus remain usable',async t=>{
+ const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://studio.test/',runScripts:'outside-only'});
+ t.after(()=>dom.window.close());
+ const w=dom.window,calls=[];
+ w.fetch=async()=>({ok:true,json:async()=>[]});
+ w.studioNavigate=view=>calls.push(view);
+ const bell=w.document.getElementById('notificationButton');
+ const avatar=w.document.querySelector('.user-menu');
+ w.eval(fs.readFileSync(path.join(root,'notifications.js'),'utf8'));
+ w.eval(code);w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+ const host=w.document.getElementById('studioNavigationToolstrip');
+ const account=host.lastElementChild;
+ assert.ok(account.classList.contains('studio-navigation-account'));
+ assert.equal(account.firstElementChild,bell);
+ assert.equal(account.lastElementChild,avatar);
+ assert.equal(w.document.querySelectorAll('#notificationButton').length,1);
+ assert.equal(w.document.querySelectorAll('.user-menu').length,1);
+ await bell.onclick();
+ const panel=w.document.getElementById('studioMessageBellPanel');
+ assert.equal(panel.parentElement,account);
+ assert.equal(panel.hidden,false);
+ panel.querySelector('[data-bell-close]').click();assert.equal(panel.hidden,true);
+ avatar.open=true;
+ avatar.querySelector('[data-studio-avatar-notifications]').click();
+ assert.deepEqual(calls,['notifications']);assert.equal(avatar.open,false);
+ w.StudioShell.sync('jobs');
+ assert.equal(account.firstElementChild,bell);assert.equal(account.lastElementChild,avatar);
+});
+
 test('shared footer restores count and keeps history and workspace selection across pages',async t=>{
  const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://studio.test/',runScripts:'outside-only'});

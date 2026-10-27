@@ -5861,8 +5861,8 @@ body[data-studio-view] .user-menu {
   margin-left: 2px;
 }
 body[data-studio-view] .user-menu-trigger {
-  height: 38px;
-  min-width: 54px;
+  height: 28px;
+  min-width: 38px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -8386,9 +8386,9 @@ body .topbar .user-menu-trigger {
 body .topbar .studio-profile-avatar {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
   overflow: hidden;
   border-radius: 50%;
   background: #e7eef5;
@@ -8650,14 +8650,30 @@ body .topbar {
   height: var(--studio-navigation-strip-height);
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 10px;
   padding: 0 24px;
+}
+.studio-navigation-scroll {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 24px;
+  height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
 }
-.studio-navigation-toolstrip::-webkit-scrollbar { display: none; }
+.studio-navigation-scroll::-webkit-scrollbar { display: none; }
+.studio-navigation-account {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 100%;
+  gap: 4px;
+}
 .studio-navigation-tools {
   display: flex;
   flex: 0 0 auto;
@@ -8706,7 +8722,7 @@ body .topbar {
   color: #fff;
 }
 body .topbar .user-menu {
-  margin-left: 8px;
+  margin-left: 0;
   margin-right: 0;
   position: relative;
   z-index: 10001;
@@ -9840,7 +9856,7 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 .studio-message-bell-panel:not([hidden]) {
   position: absolute;
   top: calc(100% + 5px);
-  right: 56px;
+  right: 0;
   z-index: 1100;
   width: min(385px, calc(100vw - 24px));
   max-height: min(520px, 75vh);
@@ -9895,9 +9911,6 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   color: #172d4a;
   font-weight: 700;
   cursor: pointer;
-}
-@media (max-width: 700px) {
-  .studio-message-bell-panel:not([hidden]) { right: 12px; }
 }
 
 /* Footer owns Navigation History; no masthead breadcrumb positioning. */
