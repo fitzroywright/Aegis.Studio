@@ -8627,7 +8627,7 @@ body .topbar {
   padding-left: 0;
   column-gap: 0;
   height: var(--studio-banner-height);
-  padding: 0 36px var(--studio-navigation-strip-height);
+  padding: 0 36px;
   gap: 14px;
   background: #172d4a;
   color: #fff;
@@ -8642,16 +8642,15 @@ body .topbar {
   overflow: visible;
   isolation: isolate;
 }
-/* Navigation is always visible in its own bottom row inside the banner. */
+/* Navigation shares the banner’s vertically centered row with the Studio identity. */
 .studio-navigation-toolstrip {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
+  flex: 1 1 auto;
+  min-width: 0;
   height: var(--studio-navigation-strip-height);
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 24px;
+  padding: 0;
 }
 .studio-navigation-scroll {
   display: flex;
