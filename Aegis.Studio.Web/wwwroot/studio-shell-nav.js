@@ -451,7 +451,7 @@
         sessionsTrigger.className = 'studio-attention-trigger studio-sessions-trigger';
         sessionsTrigger.setAttribute('aria-controls', 'studioSessionsDrawer');
         sessionsTrigger.setAttribute('aria-expanded', 'false');
-        sessionsTrigger.innerHTML = '<span>Today\'s Sessions</span><strong id="studioSessionsCount">0</strong><span aria-hidden="true">⌄</span>';
+        sessionsTrigger.innerHTML = '<span>Upcoming Sessions</span><strong id="studioSessionsCount">0</strong><span aria-hidden="true">⌄</span>';
         const statusTools = document.createElement('div');
         statusTools.className = 'studio-navigation-status';
         statusTools.append(sessionsTrigger, trigger);
@@ -472,9 +472,9 @@
         sessionsDrawer.className = 'studio-attention-drawer';
         sessionsDrawer.setAttribute('role', 'dialog');
         sessionsDrawer.setAttribute('aria-modal', 'true');
-        sessionsDrawer.setAttribute('aria-label', "Today's Sessions");
+        sessionsDrawer.setAttribute('aria-label', "Upcoming Sessions");
         sessionsDrawer.hidden = true;
-        sessionsDrawer.innerHTML = '<header><h2>Today\'s Sessions</h2><button type="button" data-sessions-close aria-label="Close sessions">×</button></header><div id="studioSessionsDetails" class="studio-attention-details"></div><button type="button" data-sessions-calendar>View Calendar →</button>';
+        sessionsDrawer.innerHTML = '<header><h2>Upcoming Sessions</h2><button type="button" data-sessions-close aria-label="Close sessions">×</button></header><p class="studio-attention-scope">Next 30 days · Local time</p><div id="studioSessionsDetails" class="studio-attention-details"></div><button type="button" data-sessions-calendar>View Calendar →</button>';
         document.body.append(backdrop, drawer, sessionsDrawer);
         // Page-specific attention details are hosted exclusively by this shell drawer.
         const jobAttentionSlot=document.createElement('div');
@@ -586,20 +586,18 @@
             sessionDetails.replaceChildren();
             if (sessionsState !== 'ready' || !sessions.length) {
                 const empty = document.createElement('p');
-                empty.textContent = sessionsState === 'loading' ? 'Loading sessions…' : sessionsState === 'error' ? 'Unable to load sessions. Close and reopen to retry.' : 'No sessions scheduled today.';
+                empty.textContent = sessionsState === 'loading' ? 'Loading sessions…' : sessionsState === 'error' ? 'Unable to load sessions. Close and reopen to retry.' : 'No upcoming sessions in the next 30 days.';
                 sessionDetails.append(empty);
             }
             for (const item of sessions) {
                 const row = document.createElement('div');
                 row.className = 'studio-shared-session-row';
                 const start = new Date(item.startsAtUtc || item.start || item.startsAt);
-                const end = new Date(item.endsAtUtc || item.end || item.endsAt);
-                const time = Number.isNaN(start.getTime()) ? 'Time not set' : start.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
-                const status = !Number.isNaN(end.getTime()) && end < new Date() ? 'Finished' : start <= new Date() ? 'In Progress' : 'Upcoming';
+                const time = Number.isNaN(start.getTime()) ? 'Time not set' : start.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
                 const name = document.createElement('strong');
                 name.textContent = item.jobTitle || item.title || 'Photography session';
                 const meta = document.createElement('span');
-                meta.textContent = [time,item.clientName,item.photographerName || item.photographer,item.location,status].filter(Boolean).join(' · ');
+                meta.textContent = [time,item.clientName,item.photographerName || item.photographer,item.location].filter(Boolean).join(' · ');
                 row.append(name,meta);
                 sessionDetails.append(row);
             }
@@ -615,9 +613,9 @@
     }
 
     async function readSharedSessions() {
-        const now = new Date();
-        const from = new Date(now.getFullYear(),now.getMonth(),now.getDate());
-        const to = new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+        const from = new Date();
+        const to = new Date(from);
+        to.setDate(to.getDate()+30);
         try {
             const response = await fetch('/api/today/schedule?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString()),{credentials:'same-origin'});
             if (!response.ok) throw Error('Schedule request failed');
@@ -626,9 +624,9 @@
             sharedSessions = data.filter(item => {
                 const start = new Date(item.startsAtUtc || item.start || item.startsAt);
                 const end = new Date(item.endsAtUtc || item.end || item.endsAt);
-                return item.status !== 'Cancelled' && start < to && end > from;
+                return !['Cancelled','Completed'].includes(item.status) && start >= from && start < to && end > start;
             });
-            sharedSessions.sort((a,b) => new Date(a.startsAtUtc || a.start) - new Date(b.startsAtUtc || b.start));
+            sharedSessions.sort((a,b) => new Date(a.startsAtUtc || a.start || a.startsAt) - new Date(b.startsAtUtc || b.start || b.startsAt));
             sessionsState = 'ready';
         } catch (error) {
             sessionsState = 'error';
