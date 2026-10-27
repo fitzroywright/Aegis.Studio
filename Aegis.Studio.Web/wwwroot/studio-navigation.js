@@ -348,11 +348,25 @@
         else next.querySelectorAll('[data-mw-region]').forEach(region=>{
             const existing=genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]');
             if(existing.innerHTML===region.innerHTML)return;
-            const scroll=[...existing.querySelectorAll('div')].map(el=>el.scrollTop);
-            const focused=document.activeElement?.dataset?.mwFilter;
-            existing.innerHTML=region.innerHTML;
-            existing.querySelectorAll('div').forEach((el,i)=>el.scrollTop=scroll[i]||0);
-            if(focused)existing.querySelector('[data-mw-filter="'+focused+'"]')?.focus();
+            // Keep the scroll container and each job button alive during enrichment.
+            // Replacing the region resets browser focus/scroll anchoring while a
+            // pointer gesture may still be targeting one of its rows.
+            const list=existing.querySelector('.mw-today-job-list');
+            const nextList=region.querySelector('.mw-today-job-list');
+            const top=list.scrollTop,left=list.scrollLeft;
+            const rows=new Map([...list.querySelectorAll('[data-open-job]')].map(row=>[row.dataset.openJob,row]));
+            let cursor=list.firstChild;
+            for(const nextRow of [...nextList.children]){
+                const row=rows.get(nextRow.dataset.openJob)||nextRow;
+                if(row!==nextRow&&row.innerHTML!==nextRow.innerHTML)row.innerHTML=nextRow.innerHTML;
+                if(row!==cursor)list.insertBefore(row,cursor);
+                cursor=row.nextSibling;
+            }
+            while(cursor){const removed=cursor;cursor=cursor.nextSibling;removed.remove();}
+            [...region.children].forEach((child,index)=>{
+                if(child!==nextList&&existing.children[index].innerHTML!==child.innerHTML)existing.children[index].replaceWith(child);
+            });
+            list.scrollTop=top;list.scrollLeft=left;
         });
         state.root=genericView.querySelector('.mw-page');
         window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Jobs</span><strong>${jobs.length}</strong></div><div class="workspace-summary-row"><span>Tasks</span><strong>${tasks.length}</strong></div><div class="workspace-summary-row"><span>Sessions</span><strong>${schedule.length}</strong></div></section>`,'today');
@@ -461,16 +475,19 @@
             paintToday(state);
         });
         
-        genericView.querySelector('[data-mw-job-status]')?.addEventListener('change',event=>{state.jobStatusFilter=event.target.value;paintToday(state);});
-        genericView.querySelector('[data-mw-job-role]')?.addEventListener('change',event=>{state.jobRoleFilter=event.target.value;paintToday(state);});
-        genericView.querySelector('[data-mw-job-search]')?.addEventListener('input',event=>{
+        const statusFilter=genericView.querySelector('[data-mw-job-status]');
+        if(statusFilter)statusFilter.onchange=event=>{state.jobStatusFilter=event.target.value;paintToday(state);};
+        const roleFilter=genericView.querySelector('[data-mw-job-role]');
+        if(roleFilter)roleFilter.onchange=event=>{state.jobRoleFilter=event.target.value;paintToday(state);};
+        const jobSearch=genericView.querySelector('[data-mw-job-search]');
+        if(jobSearch)jobSearch.oninput=event=>{
             state.jobSearch=event.target.value;
             const position=event.target.selectionStart;
             paintToday(state);
             const replacement=genericView.querySelector('[data-mw-job-search]');
             replacement?.focus();
             if(position!==null)replacement?.setSelectionRange(position,position);
-        });
+        };
         genericView.querySelectorAll('[data-mw-workspace]').forEach(button=>button.onclick=()=>{
             const workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===button.dataset.mwWorkspace);
             if(workspace)selectWorkspace(workspace.id,workspace.name);
@@ -562,7 +579,7 @@
             else window.studioNavigate?.('workspaces');
         });
         genericView.querySelectorAll('[data-open-job]').forEach(button=>button.onclick=()=>{
-            if(button.dataset.openJob)openWorkspaceJob(button.dataset.openJob).catch(error=>alert(error.message));
+            if(state.active()&&button.dataset.openJob)openWorkspaceJob(button.dataset.openJob).catch(error=>alert(error.message));
         });
         genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b.dataset.mwFilter===state.taskFilter));
         genericView.querySelectorAll('[data-task-type]').forEach(row=>row.hidden=state.taskFilter!=='all'&&!row.dataset.taskType.toLowerCase().includes(state.taskFilter));
