@@ -415,10 +415,7 @@ dialog::backdrop {
   overflow: hidden;
   clip: rect(0,0,0,0);
 }
-.shell {
-  height: calc(100dvh - 72px);
-  display: block;
-}
+
 .navigation-pane {
   display: none;
 }
@@ -786,9 +783,7 @@ dialog::backdrop {
   .brand-button.active {
     height: 40px;
   }
-  .shell {
-    height: auto;
-  }
+
   .mw-hero {
     height: 126px;
     padding: 20px;
@@ -1860,8 +1855,6 @@ color:var(--studio-grid-header-text);}
 }
 @media (max-width:1000px) {
   .shell {
-    height: auto;
-    min-height: calc(100dvh - 68px);
     grid-template-columns: 70px minmax(0,1fr);
   }
   .topbar {
@@ -2161,8 +2154,6 @@ small {
 }
 @media (min-width:760px) and (max-width:1000px) {
   .shell {
-    height: calc(100dvh - 68px);
-    min-height: 0;
     grid-template-columns: 228px minmax(0,1fr);
   }
   .topbar {
@@ -3727,9 +3718,7 @@ body[data-studio-view] .topbar {
   border-bottom: 1px solid var(--studio-border);
   box-shadow: 0 1px 3px rgba(23,52,78,.05);
 }
-body[data-studio-view] .shell {
-  height: calc(100dvh - 62px);
-}
+
 body[data-studio-view] .shell-brand strong:before {
   letter-spacing: 0;
   content: "◉  Studio";
