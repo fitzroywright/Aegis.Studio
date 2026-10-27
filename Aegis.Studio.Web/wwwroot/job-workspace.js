@@ -64,7 +64,7 @@ async function renderJobSubjects(job, panel, current, refresh) {
                         <span aria-hidden="true">⌕</span>
                         <input type="search" placeholder="Search people…" aria-label="Search people">
                     </label>
-                    ${canEdit?'<button type="button" class="action" data-import-roster>Import Roster</button><button type="button" class="primary" id="addJobSubject">＋ Add Person</button>':''}
+                    ${canEdit?'<button type="button" class="action" data-import-roster>Session Plan</button><button type="button" class="primary" id="addJobSubject">＋ Add Person</button>':''}
                 </div>
             </header>
 
@@ -217,6 +217,7 @@ async function renderAnnouncementAdministration(){
             finally{button.disabled=false;}
         };
 }
+
 
 
 

@@ -36,6 +36,8 @@ public static class RosterFileReader
         XNamespace spreadsheet="http://schemas.openxmlformats.org/spreadsheetml/2006/main";
         XNamespace relation="http://schemas.openxmlformats.org/officeDocument/2006/relationships";
         var workbook=Xml(zip,"xl/workbook.xml");
+        if(workbook.Root?.Element(spreadsheet+"workbookPr")?.Attribute("date1904")?.Value is "1" or "true")
+            throw new ArgumentException("This workbook uses Excel's 1904 date system. Export the subject sheet as CSV with YYYY-MM-DD dates before importing the Session Plan.");
         string? sheetId=workbook.Descendants(spreadsheet+"sheet").FirstOrDefault()?.Attribute(relation+"id")?.Value;
         var relationships=Xml(zip,"xl/_rels/workbook.xml.rels");
         var sheetRelation=relationships.Root?.Elements().FirstOrDefault(e=>e.Attribute("Id")?.Value==sheetId);
@@ -95,3 +97,4 @@ public static class RosterFileReader
     }
     private static string Quote(string value)=>"\""+value.Replace("\"","\"\"")+"\"";
 }
+

@@ -299,7 +299,7 @@
   }
   async function importRoster(){
    if(!canEdit)return;
-   await root.openIntakeRoster(job.conversationId);
+   await root.studioNavigate('session-plan',{jobId:job.id});
   }
 
   const controller={reload:()=>{const focus=root.studioMediaFocus?.jobId===job.id?root.studioMediaFocus:root.studioMediaPage?.[job.id];if(focus?.subjectId!==undefined){subject=focus.subjectId||'';root.studioMediaFocus=null;after='';page=1;previous.length=0;}return load();},upload:()=>host.querySelector('[data-add]')?.click(),importRoster,dispose:()=>{disposed=true;request++;photoDialog?.close();host.ondrop=null;host.ondragover=null;}};
@@ -308,5 +308,6 @@
  }
  root.StudioJobDetails={media,openGallery,nextActionLink,workflowAction};
 })(window);
+
 
 
