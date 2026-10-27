@@ -143,3 +143,15 @@ test('the actual Clients left rail contains no Messages or Notes card',async t=>
  assert.equal(w.document.querySelector('.client-statement-heading h3').textContent,'Financial Statement');
  assert.equal(w.document.querySelector('.client-statement-eyebrow'),null);
 });
+
+test('Client Jobs has four columns and keeps gallery access in its own tab',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());
+ await w.StudioClients.render({clientId:'a'});await settle();
+ const grid=w.document.querySelector('.client-jobs-grid');
+ assert.equal(grid.querySelectorAll('th').length,4);
+ assert.equal(grid.querySelector('[data-c-gallery-job]'),null);
+ const row=grid.querySelector('[data-c-job]');assert.equal(row.children.length,4);row.click();assert.deepEqual(fixture.opened,['j1']);
+ w.document.querySelector('[data-c-job-search]').value='No match';w.document.querySelector('[data-c-job-search]').dispatchEvent(new w.Event('input'));
+ assert.equal(w.document.querySelector('.client-jobs-scroll td').colSpan,4);
+ tab(w,'galleries');await settle();assert.ok(w.document.querySelector('[data-c-media]'));
+});
