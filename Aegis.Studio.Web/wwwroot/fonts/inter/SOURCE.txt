@@ -1,0 +1,11 @@
+Inter Variable — unmodified upstream font files
+
+Project: https://github.com/rsms/inter
+Source revision: 353b61b9f4430d5f420d56605a6e7993e0941470
+Upstream paths:
+  docs/font-files/InterVariable.woff2
+  docs/font-files/InterVariable-Italic.woff2
+  LICENSE.txt
+
+The accompanying LICENSE.txt is the upstream SIL Open Font License 1.1.
+Both fonts provide weights 100–900 and optical sizes 14–32.
