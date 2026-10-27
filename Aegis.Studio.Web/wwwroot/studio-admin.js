@@ -1,16 +1,14 @@
 (() => {
     const entries = [
         {view:'workspace-management',label:'Workspaces',staff:true},
-        {view:'studio-management',label:'Studio Management'},
         {view:'catalog',label:'Products and Services'},
         {view:'work-order-templates',label:'Work Order Templates'},
         {view:'job-templates',label:'Job Templates'},
         {view:'booking-sessions',label:'Booking Sessions'},
-        {view:'staff-admin',label:'Staff'},
-        {view:'roles-admin',label:'Roles'},
+        {view:'staff-roles',label:'Staff and Roles'},
         {view:'workflows-admin',label:'Workflow Automation'},
-        {view:'demo-data',label:'Demo Data'},
-        {view:'api-site-key',label:'Generate API Site Key'}
+        {view:'api-site-key',label:'Generate API Site Key'},
+        {view:'about',label:'About'}
     ];
     function mountMenu(host){
         const menu=document.createElement('details');

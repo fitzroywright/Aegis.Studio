@@ -1711,6 +1711,24 @@ color:var(--studio-grid-header-text);}
   font-size: 12px;
   line-height: 1.45;
 }
+.studio-about-logo {
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  margin-bottom: 12px;
+  clip-path: polygon(0 0,100% 0,100% 76%,14.6% 76%,14.6% 100%,0 100%);
+}
+.studio-about h2 { font-size: 26px; margin: 4px 0 8px; }
+.studio-about > p { max-width: 850px; line-height: 1.6; }
+.studio-about-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr));
+  gap: 16px;
+  margin: 20px 0 4px;
+}
+.studio-about-details dt { color: var(--theme-muted,#667383); font-size: 11px; margin-bottom: 5px; }
+.studio-about-details dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 .admin-form-stack {
   display: grid;
   gap: 10px;
