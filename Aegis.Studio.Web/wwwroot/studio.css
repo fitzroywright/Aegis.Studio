@@ -8642,34 +8642,17 @@ body .topbar {
   overflow: visible;
   isolation: isolate;
 }
-/* Navigation occupies its own bottom row inside the banner; the reveal lines sit below it. */
+/* Navigation is always visible in its own bottom row inside the banner. */
 .studio-navigation-toolstrip {
   position: absolute;
   inset-inline: 0;
-  top: 100%;
-  height: 10px;
-}
-.studio-navigation-reveal {
-  display: block;
-  width: 100%;
-  height: 10px;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-top: 2px solid #d18b35;
-  border-bottom: 1px solid #536d86;
-  border-radius: 0;
-  background: var(--theme-surface,#fff);
-  cursor: pointer;
-}
-.studio-navigation-reveal:focus-visible {
-  outline: 2px solid #d18b35;
-  outline-offset: -2px;
+  bottom: 0;
+  height: var(--studio-navigation-strip-height);
 }
 .studio-navigation-tools {
   position: absolute;
   inset-inline-start: 50%;
-  bottom: 100%;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -8685,19 +8668,9 @@ body .topbar {
   overscroll-behavior-x: contain;
   background: #172d4a;
   color: #fff;
-  opacity: 0;
-  visibility: hidden;
-  transform: translate(-50%, 8px);
-  pointer-events: none;
-  transition: transform 160ms ease, opacity 160ms ease, visibility 160ms;
+  transform: translateX(-50%);
 }
 .studio-navigation-tools::-webkit-scrollbar { display: none; }
-.studio-navigation-toolstrip.is-open .studio-navigation-tools {
-  opacity: 1;
-  visibility: visible;
-  transform: translate(-50%, 0);
-  pointer-events: auto;
-}
 .studio-navigation-tools button {
   display: inline-flex;
   align-items: center;
@@ -8722,9 +8695,6 @@ body .topbar {
 .studio-navigation-tools button[aria-current="page"] {
   background: #986c55;
   color: #fff;
-}
-@media (prefers-reduced-motion: reduce) {
-  .studio-navigation-tools { transition: none; }
 }
 body .topbar .user-menu {
   margin-left: 8px;

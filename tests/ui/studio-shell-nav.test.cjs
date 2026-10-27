@@ -33,31 +33,27 @@ test('shared shell keeps contextual cards and one navigation toolstrip',async t=
  assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*Production/);
 });
 
-test('pointer reveals navigation at the banner and retracts it after leaving',t=>{
+test('navigation stays available without a reveal control or pointer interaction',t=>{
  const {w,dom}=setup();t.after(()=>dom.window.close());
  const host=w.document.getElementById('studioNavigationToolstrip');
  const tools=w.document.getElementById('studioNavigationTools');
- const trigger=host.querySelector('.studio-navigation-reveal');
- assert.equal(trigger.getAttribute('aria-expanded'),'false');
- assert.equal(tools.inert,true);
- host.dispatchEvent(new w.Event('pointerenter'));
- assert.equal(trigger.getAttribute('aria-expanded'),'true');
- assert.equal(tools.inert,false);
- assert.ok(host.classList.contains('is-open'));
- host.dispatchEvent(new w.Event('pointerleave'));
- assert.equal(trigger.getAttribute('aria-expanded'),'false');
- assert.equal(tools.getAttribute('aria-hidden'),'true');
+ assert.equal(host.parentElement,w.document.querySelector('.topbar'));
+ assert.equal(host.querySelector('.studio-navigation-reveal'),null);
+ for(const type of ['pointerenter','pointerleave','focusout'])host.dispatchEvent(new w.Event(type));
+ w.document.body.dispatchEvent(new w.Event('pointerdown',{bubbles:true}));
+ assert.notEqual(tools.inert,true);
+ assert.notEqual(tools.getAttribute('aria-hidden'),'true');
+ assert.equal(tools.querySelectorAll('button').length,7);
 });
 
 test('toolstrip routes once and remains the single navigation after page changes',async t=>{
  const {w,dom,calls}=setup();t.after(()=>dom.window.close());
  const tools=w.document.getElementById('studioNavigationTools');
  for(const view of ['frontdesk','jobs','schedule','media']){
-  w.document.getElementById('studioNavigationToolstrip').dispatchEvent(new w.Event('pointerenter'));
   tools.querySelector(`[data-studio-side="${view}"]`).click();
   w.StudioShell.sync(view);
   assert.equal(tools.querySelector('[aria-current="page"]').dataset.studioSide,view);
-  assert.equal(w.document.getElementById('studioNavigationToolstrip').classList.contains('is-open'),false);
+  assert.notEqual(tools.inert,true);
  }
  assert.deepEqual(calls,['frontdesk','jobs','schedule','media']);
  assert.equal(w.document.querySelectorAll('#studioNavigationTools').length,1);
@@ -65,18 +61,14 @@ test('toolstrip routes once and remains the single navigation after page changes
  assert.equal(w.document.querySelector('[data-studio-side="operations-management"]'),null);
 });
 
-test('keyboard and touch can use navigation without hovering',t=>{
- const {w,dom}=setup();t.after(()=>dom.window.close());
- const trigger=w.document.querySelector('.studio-navigation-reveal');
- const tools=w.document.getElementById('studioNavigationTools');
- trigger.focus();trigger.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
- assert.equal(w.document.activeElement,tools.querySelector('button'));
- assert.equal(tools.inert,false);
- tools.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
- assert.equal(w.document.activeElement,trigger);
- assert.equal(tools.inert,true);
- trigger.click();assert.equal(tools.inert,false);
- trigger.click();assert.equal(tools.inert,true);
+test('navigation buttons accept keyboard focus and direct activation',t=>{
+ const {w,dom,calls}=setup();t.after(()=>dom.window.close());
+ const button=w.document.querySelector('#studioNavigationTools [data-studio-side="jobs"]');
+ button.focus();assert.equal(w.document.activeElement,button);
+ button.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ assert.equal(w.document.activeElement,button);
+ button.click();assert.deepEqual(calls,['jobs']);
+ assert.equal(w.document.activeElement,button);
 });
 
 test('collapsed side rail persists while navigation stays accessible',async t=>{
@@ -88,8 +80,7 @@ test('collapsed side rail persists while navigation stays accessible',async t=>{
  await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
  assert.equal(toggle.getAttribute('aria-expanded'),'false');
  assert.equal(toggle.getAttribute('aria-label'),'Expand left rail');
- w.document.getElementById('studioNavigationToolstrip').dispatchEvent(new w.Event('pointerenter'));
- assert.equal(w.document.querySelector('.studio-navigation-reveal').getAttribute('aria-expanded'),'true');
+ assert.notEqual(w.document.getElementById('studioNavigationTools').inert,true);
  toggle.click();assert.equal(toggle.getAttribute('aria-expanded'),'true');
 });
 
