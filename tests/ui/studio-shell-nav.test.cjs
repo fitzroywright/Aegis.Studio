@@ -142,3 +142,12 @@ test('shared footer restores count and keeps history and workspace selection acr
  }
 });
 
+
+test('Today through Media share crisp multicolor SVG icons without changing routes or labels',t=>{
+ const {w,dom,calls}=setup();t.after(()=>dom.window.close());
+ const expected=[['today','Today'],['frontdesk','Front Desk'],['clients','Clients'],['jobs','Jobs'],['production','Production'],['schedule','Schedule'],['media','Media']];
+ const buttons=[...w.document.querySelectorAll('#studioNavigationTools [data-studio-side]')];
+ assert.deepEqual(buttons.map(b=>[b.dataset.studioSide,b.textContent]),expected);
+ for(const button of buttons){const icon=button.querySelector('svg.studio-navigation-icon');assert.ok(icon);assert.equal(icon.getAttribute('viewBox'),'0 0 24 24');assert.equal(icon.getAttribute('aria-hidden'),'true');assert.ok(new Set([...icon.querySelectorAll('[fill]')].map(el=>el.getAttribute('fill')).filter(v=>v!=='none')).size>=2);button.click();}
+ assert.deepEqual(calls,expected.map(([key])=>key));
+});

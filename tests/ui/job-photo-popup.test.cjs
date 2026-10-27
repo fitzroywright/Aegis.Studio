@@ -56,7 +56,7 @@ test('popup CSS fits images without cropping and preserves a visible stacked lay
  assert.match(image,/object-fit:contain/);assert.doesNotMatch(image,/cover/);
  const preview=css.match(/\.jd-selected-preview \{([^}]+)\}/)[1];assert.doesNotMatch(preview,/clamp\(76px/);
  assert.doesNotMatch(css,/\.job-detail-selected-file\s*\{\s*display:none/);
- assert.match(css,/@media\(max-width:760px\)[^\n]+grid-template-columns:minmax\(0,1fr\)/);
+ assert.match(css,/@media\(max-width:760px\)[^\n]+flex-direction:column/);
  const shared=read('css/components/studio-dialog.css');assert.match(shared,/width:var\(--studio-dialog-width/);assert.match(shared,/padding:var\(--studio-dialog-body-padding/);
 });
 
@@ -109,4 +109,79 @@ test('closing the popup ignores a late photo-navigation response',async t=>{
  dialog.querySelector('[data-close]').click();
  release({assets:[],hasMore:false});await settle();
  assert.equal(w.document.querySelector('.jd-photo-viewer'),null);
+});
+
+test('Gallery opens the job collection grid and switches to full images and back',async t=>{
+ const {w,dialog:photo}=await setup(t);photo.close();
+ w.document.querySelector('[data-open-gallery]').click();await settle();
+ const dialog=w.document.querySelector('.jd-photo-viewer');
+ assert.equal(dialog.dataset.galleryMode,'grid');
+ assert.equal(dialog.querySelector('.studio-dialog-heading h2').textContent,'Wedding selects review');
+ assert.equal(dialog.querySelectorAll('.jd-gallery-tile').length,40);
+ assert.equal(dialog.querySelector('.job-detail-selected-content').hidden,true);
+ dialog.querySelector('[data-gallery-collection="Selections"]').click();
+ assert.equal(dialog.querySelectorAll('.jd-gallery-tile').length,40);
+ dialog.querySelector('[data-gallery-photo="image-2"]').click();
+ assert.equal(dialog.dataset.galleryMode,'photo');
+ assert.equal(dialog.querySelector('.jd-photo-inspector').hidden,true);
+ assert.equal(dialog.querySelectorAll('.jd-photo-filmstrip button').length,40);
+ assert.equal(dialog.querySelector('.jd-photo-filmstrip [aria-current=true]').dataset.galleryPhoto,'image-2');
+ dialog.querySelector('[data-photo-details]').click();assert.equal(dialog.querySelector('.jd-photo-inspector').hidden,false);
+ dialog.querySelector('[data-photo-favourite]').click();
+ dialog.querySelector('[data-photo-grid]').click();dialog.querySelector('[data-gallery-favourites]').click();
+ assert.equal(dialog.querySelectorAll('.jd-gallery-tile').length,1);
+ assert.equal(dialog.querySelector('.jd-gallery-tile').dataset.galleryPhoto,'image-2');
+ assert.equal(dialog.querySelector('.jd-photo-filmstrip').hidden,true);
+});
+
+test('gallery selection exports exact assets through the existing API and exposes errors',async t=>{
+ const {w,dialog:photo}=await setup(t);photo.close();
+ w.document.querySelector('[data-open-gallery]').click();await settle();
+ const dialog=w.document.querySelector('.jd-photo-viewer'),exports=[];
+ w.fetch=async(url,options)=>{exports.push({url,body:JSON.parse(options.body)});return{ok:false,text:async()=>'Permission denied'};};
+ dialog.querySelector('[data-gallery-select]').click();
+ for(const id of ['image-1','image-2'])dialog.querySelector(`[data-gallery-photo="${id}"]`).click();
+ assert.equal(dialog.dataset.galleryMode,'grid');assert.equal(dialog.querySelector('[data-gallery-selected]').textContent,'2 selected');
+ dialog.querySelector('[data-gallery-download]').click();await settle();
+ assert.equal(exports[0].url,'/api/jobs/job/media/export');assert.deepEqual(exports[0].body.assets,['image-1','image-2']);
+ assert.match(dialog.querySelector('[data-gallery-status]').textContent,/Permission denied/);
+ assert.equal(dialog.querySelector('[data-gallery-download]').disabled,false);
+});
+
+test('read-only gallery keeps browsing and individual download without bulk editing actions',async t=>{
+ const {w,dialog:photo}=await setup(t,true);photo.close();
+ w.document.querySelector('[data-open-gallery]').click();await settle();
+ const dialog=w.document.querySelector('.jd-photo-viewer');
+ assert.equal(dialog.querySelector('[data-gallery-select]'),null);
+ assert.equal(dialog.querySelector('[data-gallery-download]'),null);
+ dialog.querySelector('[data-gallery-photo]').click();
+ assert.match(dialog.querySelector('[data-photo-download]').href,/\/content$/);
+});
+
+test('gallery handles empty jobs, load failure and retry without stale content',async t=>{
+ const {w,dialog:photo}=await setup(t);photo.close();const original=w.json;let fail=true;
+ w.json=async(url,options)=>{if(url.includes('/media?limit=100')){if(fail)throw Error('Offline');return{assets:[],hasMore:false};}return original(url,options);};
+ w.document.querySelector('[data-open-gallery]').click();await settle();
+ const dialog=w.document.querySelector('.jd-photo-viewer');
+ assert.match(dialog.querySelector('[data-gallery-status]').textContent,/Offline/);
+ fail=false;dialog.querySelector('[data-gallery-retry]').click();await settle();
+ assert.match(dialog.querySelector('.jd-gallery-mosaic').textContent,/No photographs/);
+ assert.equal(dialog.querySelector('[data-gallery-more]').hidden,true);
+});
+
+test('Clients and Job Details can open the same gallery without mounting another page renderer',async t=>{
+ const {w,dialog:photo,fixture}=await setup(t);photo.close();
+ const dialog=await w.StudioJobDetails.openGallery(fixture.jobs[0]);await settle();
+ assert.equal(dialog.dataset.galleryMode,'grid');assert.equal(dialog.querySelectorAll('.jd-gallery-tile').length,40);
+ assert.equal(w.document.querySelectorAll('.jd-photo-viewer').length,1);
+ dialog.querySelector('[data-gallery-photo="image-3"]').click();
+ assert.match(dialog.querySelector('.studio-dialog-heading h2').textContent,/Photo 3/);
+});
+
+test('repeated standalone gallery opening keeps only the latest popup',async t=>{
+ const {w,dialog:photo,fixture}=await setup(t);photo.close();
+ const first=await w.StudioJobDetails.openGallery(fixture.jobs[0]);await settle();
+ const second=await w.StudioJobDetails.openGallery(fixture.jobs[0]);await settle();
+ assert.equal(first.isConnected,false);assert.equal(second.isConnected,true);
+ assert.equal(w.document.querySelectorAll('.jd-photo-viewer').length,1);
 });

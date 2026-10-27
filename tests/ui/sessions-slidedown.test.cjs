@@ -140,14 +140,13 @@ test('session and attention drawers respect shared banner/footer bounds without 
  const css=read('studio.css');
  const csstree=require('css-tree'),ast=csstree.parse(css);
  const rules=selector=>{const matches=[];csstree.walk(ast,{visit:'Rule',enter(node){if(csstree.generate(node.prelude)===selector)matches.push(node);}});assert.equal(matches.length,1,'one styling owner for '+selector);return Object.fromEntries(matches[0].block.children.toArray().filter(n=>n.type==='Declaration').map(n=>[n.property,csstree.generate(n.value)]));};
- const drawer=rules('.studio-attention-drawer:not([hidden])');
+ const drawer=rules('.studio-attention-drawer:not([hidden]),.studio-message-bell-panel:not([hidden])');
  assert.equal(drawer.top,'var(--studio-banner-height)');assert.equal(drawer.bottom,'var(--studio-footer-height)');
  assert.equal(drawer.overflow,'hidden');assert.equal(drawer['min-height'],'0');
  const backdrop=rules('.studio-attention-backdrop:not([hidden])');
  assert.equal(backdrop.inset,csstree.generate(csstree.parse('var(--studio-banner-height) 0 var(--studio-footer-height)',{context:'value'})));assert.equal(backdrop.background,undefined);
- const list=rules('.studio-attention-details');assert.equal(list.flex,'1 1 auto');assert.equal(list['min-height'],'0');assert.equal(list['overflow-y'],'auto');
- assert.equal(rules('.studio-attention-drawer header').flex,'0 0 auto');
+ const list=rules('.studio-attention-details,.studio-message-bell-content');assert.equal(list.flex,'1 1 auto');assert.equal(list['min-height'],'0');assert.equal(list['overflow-y'],'auto');
+ assert.equal(rules('.studio-attention-drawer>header,.studio-message-bell-panel>header').flex,'0 0 auto');
  assert.equal(rules('.studio-attention-drawer>[data-sessions-calendar]').flex,'0 0 auto');
  assert.equal(rules('.studio-sessions-range').flex,'0 0 auto');
 });
-
