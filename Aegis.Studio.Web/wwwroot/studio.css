@@ -8667,12 +8667,12 @@ body .topbar {
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-start;
-  gap: 2px;
+  gap: 1px;
   width: max-content;
   margin-inline-start: auto;
   height: var(--studio-navigation-strip-height);
   min-height: 0;
-  padding: 1px 4px;
+  padding: 1px 2px;
   background: #172d4a;
   color: #fff;
 }
@@ -8688,10 +8688,10 @@ body .topbar {
 .studio-navigation-tools button {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   flex: 0 0 auto;
   min-height: 24px;
-  padding: 2px 9px;
+  padding: 2px 4px;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
