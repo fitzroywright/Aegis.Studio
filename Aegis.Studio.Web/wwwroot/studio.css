@@ -14,7 +14,7 @@
   font-display: swap;
 }
 /* Shared role colors consumed by each left-rail card's owning rules. */
-:root { --studio-font-sans:"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; --studio-banner-controls-height:56px; --studio-navigation-strip-height:28px; --studio-banner-height:calc(var(--studio-banner-controls-height) + var(--studio-navigation-strip-height)); --studio-grid-header-bg:#536a80; --studio-grid-header-text:#f2f5f8; --studio-grid-header-border:#8394a4; --studio-grid-body-bg:#ffffff; }
+:root { --studio-footer-height:40px; --studio-font-sans:"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; --studio-banner-controls-height:56px; --studio-navigation-strip-height:28px; --studio-banner-height:calc(var(--studio-banner-controls-height) + var(--studio-navigation-strip-height)); --studio-grid-header-bg:#536a80; --studio-grid-header-text:#f2f5f8; --studio-grid-header-border:#8394a4; --studio-grid-body-bg:#ffffff; }
 /* Today is the canonical left-rail presentation across Studio pages. */
 #studioContextRail > [data-rail-card] { --studio-rail-border:2px solid var(--studio-rail-accent); --studio-rail-title:#fff; --studio-rail-title-weight:750; border:var(--studio-rail-border); border-radius:7px; background:var(--theme-surface,#fff); overflow:hidden; min-width:0; }
 #studioContextRail > [data-rail-card] > header { background:var(--studio-rail-accent); border-bottom:1px solid var(--studio-rail-accent); padding:8px 10px; min-height:0; }
@@ -9265,13 +9265,13 @@ body .shell>.studio-shell-footer {
   font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
   letter-spacing: .02em;
   border-bottom: 0;
-  align-self: end;
-  position: relative;
-  grid-column: 1/-1;
-  grid-row: 2;
-  height: 32px;
-  min-height: 32px;
-  max-height: 32px;
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  flex-shrink: 0;
+  height: var(--studio-footer-height);
+  min-height: var(--studio-footer-height);
+  max-height: var(--studio-footer-height);
   margin: 0;
   padding: 0 12px;
   border: 0;
@@ -9412,7 +9412,7 @@ body .shell {
   box-sizing: border-box;
   display: grid;
   grid-template-columns: var(--studio-shell-left-width,210px) minmax(0,1fr);
-  grid-template-rows: minmax(0,1fr) 32px;
+  grid-template-rows: minmax(0,1fr) var(--studio-footer-height);
   height: calc(100dvh - var(--studio-banner-height));
   min-height: 0;
   overflow: hidden;
