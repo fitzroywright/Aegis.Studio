@@ -3,7 +3,7 @@
 .ps-toolbar,.ps-filters,.pipeline-filters,.pp-filters{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .ps-toolbar{justify-content:space-between;padding:10px 12px 6px}.ps-filters select,.ps-filters>input{min-height:29px;border:1px solid var(--studio-control-border,#bacbd8);border-radius:5px;padding:4px 7px;background:var(--studio-control-surface,#fff);color:var(--studio-control-text,#233e57);font-size:11px;box-sizing:border-box}
 .ps-filters{padding:6px 12px 10px}.ps-filters>input{flex:1;min-width:140px}.ps-filters select{max-width:180px}.ps-filters label{font-size:11px;display:flex;align-items:center;gap:5px}
-.ps-calendar-tools{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:auto}
+.ps-calendar-tools{display:inline-flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;min-width:0;max-width:100%;gap:6px;white-space:nowrap;margin-left:auto}
 .ps-calendar-tools .mw-calendar-view-switch{display:inline-flex;align-items:center;gap:1px;height:28px;margin:0;padding:2px;background:#eaf1f7;border:1px solid #cddbe8;border-radius:7px;flex:0 0 auto}
 .ps-calendar-tools .mw-calendar-view-switch button{min-width:37px;height:22px;min-height:22px;padding:2px 7px;border:0;border-radius:5px;background:transparent;color:#4c647d;font-size:10px;font-weight:700;cursor:pointer}
 .ps-calendar-tools .mw-calendar-view-switch button.active{background:#234c73;color:#fff;box-shadow:0 1px 2px rgba(20,44,68,.18)}
@@ -37,10 +37,6 @@
 .st-pipeline-content .st-tools,.st-commercial .st-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .st-pipeline-content .pipeline-calendar-toolbar{margin:-8px -8px 0;flex-wrap:nowrap;gap:8px}
 .st-pipeline-content .pipeline-toolbar-left{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
-.st-pipeline-content .pipeline-mode-switch{display:inline-flex;align-items:center;gap:1px;padding:2px;background:#eaf1f7;border:1px solid #cddbe8;border-radius:7px}
-.st-pipeline-content .pipeline-mode-switch button{min-height:24px;padding:3px 8px;border:0;border-radius:5px;background:transparent;color:#4c647d;font-size:10px;font-weight:700;cursor:pointer}
-.st-pipeline-content .pipeline-mode-switch button.active{background:#234c73;color:#fff;box-shadow:0 1px 2px rgba(20,44,68,.18)}
-.st-pipeline-content .pipeline-mode-switch button:not(.active):hover{background:#dceaf5;color:#173c5d}
 .st-pipeline-content .pipeline-job-heading{display:flex;align-items:center;gap:8px;min-width:220px;white-space:nowrap}
 .st-pipeline-content .pipeline-job-heading input{flex:1 1 150px;min-width:90px;width:100%;height:27px;min-height:27px;padding:3px 7px;border:1px solid #658bad;border-radius:5px;background:#2c537c;color:#fff;font-size:11px;font-weight:600;box-sizing:border-box}
 .st-pipeline-content .pipeline-job-heading input::placeholder{color:#e2ebf6;opacity:1}

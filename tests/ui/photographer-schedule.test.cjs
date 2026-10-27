@@ -64,3 +64,13 @@ test('one worker assigned in different job roles still has cross-role conflicts'
  await w.StudioPhotographerSchedule.render(options);await settle();
  assert.equal(w.document.querySelectorAll('.ps-calendar-row .ps-shoot.has-conflict').length,2);
 });
+
+test('Job Roles layout options precede date filters and switch without refetching assignments',async t=>{
+ const {w,fixture}=setup();t.after(()=>w.close());await w.StudioPhotographerSchedule.render(options);await settle();
+ const layout=w.document.querySelector('.ps-calendar-tools .studio-layout-switch');assert.equal(layout.nextElementSibling.className,'mw-calendar-view-switch');
+ const reads=fixture.calls.length;
+ layout.querySelector('[data-calendar-layout="jobs"]').click();assert.ok(w.document.querySelector('.studio-calendar-list'));
+ w.document.querySelector('[data-calendar-layout="timeline"]').click();assert.ok(w.document.querySelector('.studio-calendar-timeline'));
+ assert.equal(fixture.calls.length,reads);
+ w.document.querySelector('[data-calendar-layout="calendar"]').click();assert.ok(w.document.querySelector('.ps-calendar-row'));
+});

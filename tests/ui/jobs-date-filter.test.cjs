@@ -42,3 +42,17 @@ test('Jobs month navigation clamps month-end dates and preserves leap day',async
  host.querySelector('[data-sj-calendar-step="1"]').click();assert.equal(host.querySelector('[data-sj-calendar-date]').value,'2028-02-29');
  host.querySelector('[data-sj-calendar-step="1"]').click();assert.equal(host.querySelector('[data-sj-calendar-date]').value,'2028-03-29');
 });
+
+
+test('Jobs layout options preserve filters, totals, navigation and saved layout',async t=>{
+ const {w,host,fixture}=await environment(t);
+ const layout=host.querySelector('.sj-calendar .studio-layout-switch');assert.equal(layout.nextElementSibling.className,'mw-calendar-view-switch');
+ host.querySelector('[data-sj-calendar-view="week"]').click();layout.querySelector('[data-calendar-layout="calendar"]').click();
+ assert.equal(host.querySelectorAll('.studio-calendar-day').length,7);assert.equal(w.document.getElementById('studioFooterRate').textContent,'7 jobs');
+ const status=host.querySelector('[data-sj-status]');status.value='Scheduled';status.dispatchEvent(new w.Event('change'));
+ assert.equal(host.querySelectorAll('.studio-calendar-item').length,4);
+ host.querySelector('[data-calendar-layout="timeline"]').click();assert.ok(host.querySelector('.studio-calendar-timeline'));
+ assert.equal(JSON.parse(w.sessionStorage.getItem('studio-jobs-view')).layout,'timeline');
+ assert.equal(host.querySelector('.sj-pagination').hidden,true);
+ host.querySelector('.studio-calendar-bar[data-sj-job]').click();assert.equal(fixture.opened.length,1);
+});
