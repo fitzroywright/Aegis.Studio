@@ -42,3 +42,29 @@ test('Job conversation and notes open from Actions outside the unread slide-down
  action.click();await new Promise(resolve=>setImmediate(resolve));assert.ok(w.document.querySelector('.jd-messages-dialog #jobDetailMessages'));
  w.StudioWorkspace.invalidate();assert.equal(w.document.querySelector('.jd-messages-dialog'),null);
 });
+test('Messages composer creates only staff workspace announcements using its dedicated endpoint',async t=>{
+ const {w,calls}=fixture(t);
+ w.document.querySelector('main').innerHTML='<div class="studio-inbox-tools"></div>';
+ w.loadWorkspaces=async()=>[{id:'staff',name:'Bryan’s staff',permissions:{accessWorkspace:true,view:true,notifyMembers:true}},{id:'restricted',name:'Restricted',permissions:{accessWorkspace:true,view:true,notifyMembers:false}}];
+ w.studioDialog=(title,html)=>{const dialog=w.document.createElement('dialog');dialog.innerHTML=html;w.document.body.append(dialog);return dialog;};
+ let payload;w.json=async(url,options)=>{calls.push(url);payload=JSON.parse(options.body);};
+ const toolbar=w.document.querySelector('.studio-inbox-tools');await w.StudioAnnouncements.attachComposer(toolbar,()=>true);
+ toolbar.querySelector('[data-post-announcement]').click();const form=w.document.querySelector('dialog form');
+ assert.equal(form.elements.workspace.options.length,1);assert.equal(form.elements.workspace.value,'staff');assert.match(w.document.querySelector('dialog').textContent,/not sent to clients/);
+ form.elements.title.value='Tomorrow';form.elements.body.value='Team briefing';await form.onsubmit({preventDefault(){}});
+ assert.deepEqual(calls,['/api/workspaces/staff/announcements']);assert.deepEqual(payload,{title:'Tomorrow',body:'Team briefing'});
+ assert.equal(form.querySelector('button').disabled,false);assert.match(form.textContent,/posted/);
+ assert.doesNotMatch(read('job-workspace.js'),/renderWorkspaceAnnouncements|renderAnnouncementAdministration|announcement-form/);
+ assert.doesNotMatch(read('studio-navigation.js'),/renderAnnouncementAdministration/);
+ assert.match(read('messages.js'),/StudioAnnouncements\?\.attachComposer/);
+});
+test('staff without announcement permission receive no creation control',async t=>{
+ const {w}=fixture(t);const toolbar=w.document.createElement('div');w.document.body.append(toolbar);
+ await w.StudioAnnouncements.attachComposer(toolbar,()=>true);assert.equal(toolbar.children.length,0);
+});
+test('bell uses the same icon and adjacent count treatment as Upcoming Sessions',t=>{
+ const dom=new JSDOM('<button id="notificationButton" class="action icon-action"><svg><use href="#bell"></use></svg></button>',{url:'https://studio.test',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());
+ w.eval(read('notifications.js'));const button=w.document.getElementById('notificationButton'),count=button.querySelector('strong');
+ assert.equal(button.className,'studio-attention-trigger');assert.ok(button.querySelector('svg.studio-status-icon'));assert.equal(count.id,'messageUnreadBadge');assert.equal(count.previousElementSibling.tagName.toLowerCase(),'svg');
+ assert.doesNotMatch(read('studio.css'),/\.studio-message-bell-count\s*\{/);
+});

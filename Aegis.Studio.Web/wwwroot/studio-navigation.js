@@ -917,7 +917,6 @@
         await refreshStudioEmployees();
         await refreshWorkflowList();
         await renderGlobalRoleAdministration();
-        await renderAnnouncementAdministration();
         if(!current())return;
         const adminGrid=genericView.querySelector('.st-admin-grid');
         for(const section of [...genericView.children].filter(el=>el.classList.contains('job-section'))){section.classList.add('admin-card');adminGrid.appendChild(section);}
