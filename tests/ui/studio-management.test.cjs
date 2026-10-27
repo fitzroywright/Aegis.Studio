@@ -12,9 +12,10 @@ function setup(t,administrator=true){
 test('Admin routes mount their own content without retaining unrelated cards',async t=>{
  const {w}=setup(t);await new Promise(resolve=>w.setTimeout(resolve,0));await w.studioNavigate('studio-management');
  assert.equal(w.document.querySelector('.st-toolbar h1').textContent,'Studio Management');
+ assert.equal(w.StudioAdmin.entries.some(entry=>entry.view==='gallery-access-admin'),false);
  assert.ok(w.document.querySelector('[data-service-status]'));
  assert.equal(w.document.querySelector('#studioDemoLoader,#publicBookingCatalog,#galleryClientLinkAdmin'),null);
- for(const [view,text] of [['demo-data','Demo Data'],['staff-admin','Staff directory'],['roles-admin','Roles'],['workflows-admin','Workflows'],['booking-sessions','Public booking sessions'],['gallery-access-admin','Client gallery identity proofs'],['api-site-key','API Site key']]){
+ for(const [view,text] of [['demo-data','Demo Data'],['staff-admin','Staff directory'],['roles-admin','Roles'],['workflows-admin','Workflows'],['booking-sessions','Public booking sessions'],['api-site-key','API Site key']]){
    await w.studioNavigate(view);assert.ok(w.document.getElementById('genericView').textContent.includes(text),view);
    assert.equal(w.document.querySelector('[data-service-status]'),null);
    assert.equal(w.location.hash.includes('studio='+view),true);
@@ -33,7 +34,7 @@ test('the avatar menu contains one Preferences action and no separate Administra
 
 
 test('every extracted admin route denies non-administrators before rendering controls',async t=>{
- const {w}=setup(t,false);for(const view of ['booking-sessions','gallery-access-admin','demo-data','staff-admin','roles-admin','workflows-admin','api-site-key']){
+ const {w}=setup(t,false);for(const view of ['booking-sessions','demo-data','staff-admin','roles-admin','workflows-admin','api-site-key']){
   await w.studioNavigate(view);assert.match(w.document.getElementById('genericView').textContent,/Administrator access required/);assert.equal(w.document.querySelector('[data-api-key-generate],[data-demo-reset],#publicBookingCatalog'),null);
  }
 });

@@ -6,7 +6,6 @@
         {view:'work-order-templates',label:'Work Order Templates'},
         {view:'job-templates',label:'Job Templates'},
         {view:'booking-sessions',label:'Booking Sessions'},
-        {view:'gallery-access-admin',label:'Client Gallery Access'},
         {view:'staff-admin',label:'Staff'},
         {view:'roles-admin',label:'Roles'},
         {view:'workflows-admin',label:'Workflow Automation'},

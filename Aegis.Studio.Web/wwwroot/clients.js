@@ -2,6 +2,8 @@
 window.StudioClients=(()=>{
     let revision=0;
     let activeActions={};
+    let galleryLinkDialog=null;
+    function closeGalleryLink(){galleryLinkDialog?.close();galleryLinkDialog=null;}
     const views=new Map();
     let directoryScroll={top:0,left:0};
     const safe=()=>window.StudioPage.escape;
@@ -9,6 +11,7 @@ window.StudioClients=(()=>{
     const amount=(value,currency='JMD')=>new Intl.NumberFormat(undefined,{style:'currency',currency}).format(Number(value)||0);
     const loadArray=async url=>{const result=await json(url);if(!Array.isArray(result))throw Error('Unexpected response. Please refresh.');return result;};
     async function render(options={}){
+        closeGalleryLink();
         const token=++revision;activeActions={};
         const live=()=>token===revision&&document.body.dataset.studioView==='clients';
         const esc=safe();
@@ -87,9 +90,13 @@ window.StudioClients=(()=>{
                 }else if(tab==='reminders'){
                     await window.StudioClientReminders.mountClient(host,linked,current);
                 }else if(tab==='galleries'){
+                    const me=await json('/api/auth/me').catch(()=>null);
+                    if(!current())return;
+                    const canLink=(me?.user||me)?.isAdministrator===true;
                     if(!state.gallery)state.gallery=await mapJobs(async j=>{const [media,workflow,publications]=await Promise.all([json('/api/jobs/'+j.id+'/media?limit=12'),json('/api/jobs/'+j.id+'/workflow'),loadArray('/api/jobs/'+j.id+'/media/publications')]);return {job:j,media,workflow,publications};});
                     if(!current())return;
-                    host.innerHTML=`<p class="client-note">Each gallery belongs to a linked job. Publishing uses its approved finished submission; later uploads are not automatically included.</p>${state.gallery.map(entry=>entry.error?`<article class="client-gallery-row"><h3>${esc(entry.job.title)}</h3><p role="alert">Gallery unavailable: ${esc(entry.error)}</p></article>`:galleryRow(entry)).join('')||'<p class="client-empty">No linked job galleries yet.</p>'}<p class="client-note" role="status" data-c-gallery-feedback></p>`;
+                    host.innerHTML=`${canLink?'<button type="button" class="action" data-c-link-gallery>Link Gallery Account</button>':''}<p class="client-note">Each gallery belongs to a linked job. Publishing uses its approved finished submission; later uploads are not automatically included.</p>${state.gallery.map(entry=>entry.error?`<article class="client-gallery-row"><h3>${esc(entry.job.title)}</h3><p role="alert">Gallery unavailable: ${esc(entry.error)}</p></article>`:galleryRow(entry)).join('')||'<p class="client-empty">No linked job galleries yet.</p>'}<p class="client-note" role="status" data-c-gallery-feedback></p>`;
+                    host.querySelector('[data-c-link-gallery]')?.addEventListener('click',()=>linkGalleryAccount(client,live));
                     host.querySelectorAll('[data-c-publish]').forEach(b=>b.onclick=()=>publishOptions(state.gallery.find(x=>x.job.id===b.dataset.cPublish)));
                     host.querySelectorAll('[data-c-media]').forEach(b=>b.onclick=()=>mediaPreview(state.gallery.find(x=>x.job.id===b.dataset.cMedia)));
                 }else if(tab==='finance'){
@@ -137,13 +144,49 @@ window.StudioClients=(()=>{
         }
         paint();
     }
+    function linkGalleryAccount(client,live){
+        if(!live())return;
+        closeGalleryLink();
+        const esc=safe();
+        const dialog=studioDialog('Link Gallery Account',`<div class="admin-form-stack"><p><strong>${esc(client.displayName)}</strong>${client.email?' · '+esc(client.email):''}</p><p>Generate a single-use code for this client. After signing in to the public Gallery site, they enter the code to link their account to their published galleries.</p><button type="button" class="primary" data-link-create>Generate linking code</button><p data-link-status role="status"></p><label data-link-code-wrap hidden>Give this code directly to the client<input data-link-code readonly autocomplete="off"></label><button class="action" type="button" data-link-copy hidden>Copy code</button><section aria-label="Gallery account links"><h3>Link status</h3><div data-link-list role="status">Loading…</div></section></div>`);
+        galleryLinkDialog=dialog;
+        const current=()=>live()&&galleryLinkDialog===dialog&&dialog.isConnected&&dialog.open!==false;
+        const field=name=>dialog.querySelector('[data-link-'+name+']'),status=field('status'),list=field('list'),code=field('code'),create=field('create'),copy=field('copy');
+        let refreshRevision=0;
+        async function refresh(){
+            const turn=++refreshRevision;
+            try{
+                const result=await json('/api/admin/gallery-client-links/?clientId='+encodeURIComponent(client.id));
+                if(!current()||turn!==refreshRevision)return;
+                const items=(result.items||[]).filter(item=>String(item.clientId).toLowerCase()===String(client.id).toLowerCase());
+                list.innerHTML=items.map(item=>`<article class="admin-list-row"><div><strong>${esc(item.status)}</strong><p>Expires ${esc(item.expiresAt)}${item.provider?' · '+esc(item.provider):''}</p></div>${item.status==='Pending'?`<button type="button" class="action" data-link-revoke="${esc(item.id)}">Revoke unused code</button>`:''}</article>`).join('')||'<p class="muted">No gallery account links for this client.</p>';
+                list.querySelectorAll('[data-link-revoke]').forEach(button=>button.onclick=async()=>{
+                    if(!current()||button.disabled)return;button.disabled=true;
+                    try{await json('/api/admin/gallery-client-links/'+encodeURIComponent(button.dataset.linkRevoke),{method:'DELETE'});if(!current())return;code.value='';field('code-wrap').hidden=true;copy.hidden=true;status.textContent='Unused code revoked.';await refresh();}
+                    catch(error){if(current()){status.textContent='Could not revoke code: '+error.message;button.disabled=false;}}
+                });
+            }catch(error){if(current()&&turn===refreshRevision)list.textContent='Link status unavailable: '+error.message;}
+        }
+        create.onclick=async()=>{
+            if(!current()||create.disabled)return;create.disabled=true;status.textContent='Generating linking code…';code.value='';field('code-wrap').hidden=true;copy.hidden=true;
+            try{
+                const proof=await json('/api/admin/gallery-client-links/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId:client.id})});
+                if(!current())return;
+                if(typeof proof.code!=='string'||!proof.code.trim())throw new Error('The API Site did not return a linking code.');
+                code.value=proof.code;field('code-wrap').hidden=false;copy.hidden=false;status.textContent=`Code expires ${proof.expiresAt}. Copy it now; it is shown only once. Give it directly to the client.`;await refresh();
+            }catch(error){if(current())status.textContent='Could not generate linking code: '+error.message;}
+            finally{if(current())create.disabled=false;}
+        };
+        copy.onclick=async()=>{if(!current())return;try{await navigator.clipboard.writeText(code.value);if(current())status.textContent='Code copied. Give it directly to the client.';}catch{if(current())status.textContent='Copy unavailable. Select and copy the code from the field.';}};
+        void refresh();
+    }
     function printStatement(source,name){
         const popup=window.open('about:blank','_blank');if(!popup){alert('Allow popups to print this statement.');return;}
         popup.opener=null;
         const doc=popup.document;doc.title=name+' — Client statement';
         const style=doc.createElement('style');style.textContent='body{font:12px Arial,sans-serif;color:#142d46;padding:24px}table{width:100%;border-collapse:collapse;margin:12px 0 24px}th,td{padding:7px;border-bottom:1px solid #ccc;text-align:left}small{display:block}button{display:none}p{line-height:1.5}.client-statement-heading{margin-bottom:12px}.client-finance-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.client-finance-card{border:1px solid #ccc;padding:12px;break-inside:avoid}.client-finance-card h5{margin:0 0 8px;font-size:13px}.client-finance-label{display:block;margin-top:10px}.client-finance-amount{display:block;font-size:20px;margin:6px 0}.client-finance-card dl{font-size:11px}.client-statement-section{margin-top:20px}.client-statement-section>header{display:flex;align-items:center;justify-content:space-between}';doc.head.append(style);doc.body.append(source.cloneNode(true));popup.focus();popup.print();
     }
-    return {render,newClient(){return activeActions.newClient?.();},newBooking(){return activeActions.newBooking?.();},invalidate(){++revision;activeActions={};}};
+    return {render,newClient(){return activeActions.newClient?.();},newBooking(){return activeActions.newBooking?.();},invalidate(){++revision;activeActions={};closeGalleryLink();}};
 })();
 
 
