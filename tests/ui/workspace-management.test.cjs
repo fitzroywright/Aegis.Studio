@@ -23,7 +23,7 @@ test('Admin menu exposes Workspaces and ends with About',async t=>{
  const {w,navigation}=setup(t);w.fetch=async()=>({ok:true,json:async()=>[]});w.eval(read('studio-admin.js'));w.eval(read('studio-shell-nav.js'));w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await settle();
  assert.equal(w.document.querySelector('[data-studio-avatar-workspaces],[data-studio-profile-management]'),null);
  const menu=w.document.querySelector('.studio-admin-menu');assert.ok(menu);assert.equal(menu.previousElementSibling.className,'studio-navigation-scroll');
- const link=menu.querySelector('[data-studio-admin-view="workspace-management"]');assert.equal(menu.querySelector('div').lastElementChild.textContent,'About');menu.open=true;link.click();assert.equal(navigation.at(-1).view,'workspace-management');assert.equal(menu.open,false);
+ const link=menu.querySelector('[data-studio-admin-view="workspace-management"]');assert.equal(menu.querySelector('div').lastElementChild.textContent,'About');assert.equal(link.nextElementSibling.textContent,'About');menu.open=true;link.click();assert.equal(navigation.at(-1).view,'workspace-management');assert.equal(menu.open,false);
  menu.open=true;menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.open,false);
 });
 test('dedicated Session Plan Import preserves the job in its route and browser history',async t=>{
