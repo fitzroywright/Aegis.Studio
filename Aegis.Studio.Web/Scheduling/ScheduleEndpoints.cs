@@ -14,29 +14,71 @@ public static class ScheduleEndpoints
     {
         app.Services.GetRequiredService<ScheduleStore>().EnsureOperationalSchema();
         // Calendar payloads deliberately omit full Job aggregates, media and financial ledgers.
-        app.MapGet("/api/schedule/photographer-data", (DateTimeOffset from, DateTimeOffset to, bool? includeInactive, ClaimsPrincipal user, ScheduleStore store, JobAccessService access, StudioDatabase database) =>
+        app.MapGet("/api/schedule/worker-data", (DateTimeOffset from, DateTimeOffset to, bool? includeInactive, ClaimsPrincipal user, ScheduleStore store, JobAccessService access, StudioDatabase database, Aegis.Studio.Web.Workers.WorkerDirectory directory) =>
         {
-            if (to <= from || (to - from).TotalDays > 31) return Results.BadRequest(new { error = "Choose a calendar period of at most 31 days." });
-            IReadOnlyList<ScheduleEntry> values = store.GetEntries(from, to);
-            HashSet<Guid>? allowed = user.IsInRole("Administrator") ? null : access.GetAccessibleJobIds(user).ToHashSet();
-            var visible = values.Where(e => allowed is null || (e.JobId.HasValue && allowed.Contains(e.JobId.Value))).ToArray();
-            var resources = visible.SelectMany(e => e.ResourceIds).ToHashSet();
-            var photographers = new PhotographerStore(database).GetAll(true).Where(p => includeInactive == true || p.IsActive || resources.Contains(p.ScheduleResourceId)).ToArray();
-            var ids = visible.Where(e => e.JobId.HasValue).Select(e => e.JobId!.Value).Distinct().ToArray();
-            var jobs = new List<object>();
-            using var connection = database.OpenConnection();
-            using var command = new NpgsqlCommand("""
+            if (to <= from || (to-from).TotalDays > 31) return Results.BadRequest(new { error = "Choose a calendar period of at most 31 days." });
+            HashSet<Guid>? allowed=user.IsInRole("Administrator")?null:access.GetAccessibleJobIds(user).ToHashSet();
+            var visible=store.GetEntries(from,to).Where(e=>allowed is null||(e.JobId.HasValue&&allowed.Contains(e.JobId.Value))).ToArray();
+            var roles=directory.GetTypes(true);
+            var roleNames=roles.ToDictionary(r=>r.Code,r=>r.DisplayName,StringComparer.OrdinalIgnoreCase);
+            var photographers=new PhotographerStore(database).GetAll(true).ToDictionary(p=>p.UserName,StringComparer.OrdinalIgnoreCase);
+            var roster=new Dictionary<string,WorkerCalendarPerson>(StringComparer.OrdinalIgnoreCase);
+            WorkerCalendarPerson Register(string userName,string displayName,string role,bool active)
+            {
+                role=role.ToUpperInvariant();string key=role+":"+userName.ToLowerInvariant();
+                if(roster.TryGetValue(key,out var existing))return existing;
+                string resource=role=="PHOTOGRAPHER"&&photographers.TryGetValue(userName,out var photo)?photo.ScheduleResourceId.ToString("D"):"worker:"+key;
+                var person=new WorkerCalendarPerson(userName,displayName,role,roleNames.GetValueOrDefault(role,role),active,resource);
+                roster[key]=person;return person;
+            }
+            foreach(var worker in directory.GetWorkers(includeInactive:true))Register(worker.UserName,worker.DisplayName,worker.JobRoleCode,worker.IsActive);
+            foreach(var photo in photographers.Values)Register(photo.UserName,photo.DisplayName,"PHOTOGRAPHER",photo.IsActive);
+            var entries=new List<object>(visible);
+            var assignedResources=visible.SelectMany(e=>e.ResourceIds).Select(id=>id.ToString("D")).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var jobIds=visible.Where(e=>e.JobId.HasValue).Select(e=>e.JobId!.Value).ToHashSet();
+            using var connection=database.OpenConnection();
+            using(var assignments=new NpgsqlCommand("""
+                select a.id,a.job_id,a.worker_user_name,w.display_name,a.worker_type_code,w.is_active,
+                       a.responsibility,a.starts_at_utc,a.ends_at_utc,a.status,j.title
+                from studio_job_worker_assignments a
+                join studio_workers w on w.user_name=a.worker_user_name
+                join studio_jobs j on j.id=a.job_id
+                where a.starts_at_utc<$2 and a.ends_at_utc>$1 and a.status<>'Cancelled'
+                  and ($3 or a.job_id=any($4))
+                order by a.starts_at_utc,a.id
+                """,connection))
+            {
+                assignments.Parameters.AddWithValue(from.ToUniversalTime());assignments.Parameters.AddWithValue(to.ToUniversalTime());
+                assignments.Parameters.AddWithValue(allowed is null);assignments.Parameters.AddWithValue(allowed?.ToArray()??Array.Empty<Guid>());
+                using var reader=assignments.ExecuteReader();
+                while(reader.Read())
+                {
+                    var person=Register(reader.GetString(2),reader.GetString(3),reader.GetString(4),reader.GetBoolean(5));
+                    Guid jobId=reader.GetGuid(1);var start=reader.GetFieldValue<DateTimeOffset>(7);var end=reader.GetFieldValue<DateTimeOffset>(8);
+                    if(end<=start)continue;
+                    assignedResources.Add(person.ScheduleResourceId);jobIds.Add(jobId);
+                    // A photographer's linked calendar entry already represents this exact assignment.
+                    if(person.WorkerTypeCode=="PHOTOGRAPHER"&&visible.Any(e=>e.JobId==jobId&&e.StartsAtUtc==start&&e.EndsAtUtc==end&&e.ResourceIds.Any(id=>id.ToString("D")==person.ScheduleResourceId)))continue;
+                    string responsibility=reader.GetString(6);
+                    entries.Add(new WorkerCalendarEntry("assignment:"+reader.GetGuid(0).ToString("D"),jobId,
+                        reader.GetString(10)+(string.IsNullOrWhiteSpace(responsibility)?"":" · "+responsibility),start,end,null,reader.GetString(9),new[]{person.ScheduleResourceId}));
+                }
+            }
+            var workers=roster.Values.Where(p=>includeInactive==true||p.IsActive||assignedResources.Contains(p.ScheduleResourceId)).OrderBy(p=>p.WorkerTypeLabel).ThenBy(p=>p.DisplayName).ToArray();
+            var jobs=new List<object>();
+            using(var command=new NpgsqlCommand("""
                 select j.id,j.title,j.client_name,j.workspace_id,
                   array(select l.workspace_id from studio_job_workspace_links l where l.job_id=j.id)
                 from studio_jobs j where j.id=any($1)
-                """, connection);
-            command.Parameters.AddWithValue(ids);
-            using var reader = command.ExecuteReader();
-            while (reader.Read()) jobs.Add(new { id = reader.GetGuid(0), title = reader.GetString(1), clientName = reader.GetString(2), workspaceId = reader.GetGuid(3), participatingWorkspaceIds = reader.GetFieldValue<Guid[]>(4) });
-            return Results.Ok(new { photographers, entries = visible, jobs });
+                """,connection))
+            {
+                command.Parameters.AddWithValue(jobIds.ToArray());using var reader=command.ExecuteReader();
+                while(reader.Read())jobs.Add(new{id=reader.GetGuid(0),title=reader.GetString(1),clientName=reader.GetString(2),workspaceId=reader.GetGuid(3),participatingWorkspaceIds=reader.GetFieldValue<Guid[]>(4)});
+            }
+            return Results.Ok(new{workers,roles,entries,jobs});
         }).RequireAuthorization();
 
-        app.MapGet("/api/schedule/photographer-availability", (DateTimeOffset from, DateTimeOffset to, StudioDatabase database) =>
+        app.MapGet("/api/schedule/worker-availability", (DateTimeOffset from, DateTimeOffset to, StudioDatabase database) =>
         {
             if (to <= from || (to - from).TotalDays > 31) return Results.BadRequest(new { error = "Choose a calendar period of at most 31 days." });
             using var connection = database.OpenConnection();
@@ -296,3 +338,7 @@ public static class ScheduleEndpoints
 public sealed record ScheduleReassignmentRequest(IReadOnlyList<Guid>? ResourceIds,string? Reason);
 
 
+
+
+public sealed record WorkerCalendarPerson(string UserName,string DisplayName,string WorkerTypeCode,string WorkerTypeLabel,bool IsActive,string ScheduleResourceId);
+public sealed record WorkerCalendarEntry(string Id,Guid JobId,string Title,DateTimeOffset StartsAtUtc,DateTimeOffset EndsAtUtc,string? Location,string Status,IReadOnlyList<string> ResourceIds);

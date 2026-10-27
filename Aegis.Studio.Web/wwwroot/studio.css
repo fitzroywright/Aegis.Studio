@@ -9788,9 +9788,13 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 .studio-attention-drawer h2 { font-size: 18px; margin: 0; }
 #studioSessionsDrawer header { background: #234969; }
 #studioAttentionDrawer header { background: #70412e; }
-.studio-shared-session-row { display:grid; gap:5px; padding:12px; border:1px solid #c9e0ec; border-radius:7px; background:#f2f9fd; }
-.studio-shared-session-row strong { color:#174b6a; }
-.studio-shared-session-row span { font-size:12px; color:#40576a; }
+.studio-sessions-grid { width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+.studio-sessions-grid th { position:sticky; top:0; padding:8px 5px; background:#eef2f5; color:#233e57; text-align:left; font-weight:600; border-bottom:1px solid #bacbd8; }
+.studio-sessions-grid td { padding:9px 5px; border-bottom:1px solid #e0e6ec; color:#233e57; vertical-align:top; overflow-wrap:anywhere; }
+.studio-sessions-grid th:nth-child(1) { width:17%; }
+.studio-sessions-grid th:nth-child(2) { width:21%; }
+.studio-sessions-grid th:nth-child(3) { width:37%; }
+.studio-sessions-grid th:nth-child(4) { width:25%; }
 .studio-attention-drawer :is([data-attention-close],[data-sessions-close]) {
   border: 0;
   background: transparent;
