@@ -39,32 +39,21 @@ public static class TodayEndpoints
         }).RequireAuthorization();
 
 
-        app.MapGet("/api/today/schedule", async (DateTimeOffset? from, DateTimeOffset? to, HttpContext context, StudioDatabase database, JobAccessService access, ILoggerFactory logs) =>
+        app.MapGet("/api/today/schedule", (DateTimeOffset? from, DateTimeOffset? to, HttpContext context, ScheduleStore store, JobAccessService access, ILoggerFactory logs) =>
         {
             ILogger logger = logs.CreateLogger("Studio.Today");
-            Guid[] allowed = Allowed(context, access, logger);
             DateTimeOffset start=(from??DateTimeOffset.UtcNow.Date).ToUniversalTime();
             DateTimeOffset end=(to??start.AddDays(1)).ToUniversalTime();
+            if (end <= start || (end-start).TotalDays > 31)
+                return Results.BadRequest(new { error = "Choose a calendar period of at most 31 days." });
+            HashSet<Guid>? allowed = context.User.IsInRole("Administrator") ? null : Allowed(context, access, logger).ToHashSet();
             Stopwatch timer=Stopwatch.StartNew();
-            await using var connection=database.OpenConnection();
-            await using var command=new NpgsqlCommand("""
-                select e.id,e.job_id,e.booking_id,e.title,e.starts_at_utc,e.ends_at_utc,e.location,e.status,e.notes,e.created_at_utc,
-                       coalesce(array_agg(er.resource_id) filter(where er.resource_id is not null),'{}')
-                from studio_schedule_entries e
-                join studio_shoot_sessions s on s.schedule_entry_id=e.id
-                left join studio_schedule_entry_resources er on er.entry_id=e.id
-                where e.starts_at_utc<$2 and e.ends_at_utc>$1
-                  and e.status<>'Cancelled' and s.status<>'Cancelled'
-                  and e.job_id=any($3)
-                group by e.id
-                order by e.starts_at_utc
-                """,connection);
-            command.Parameters.AddWithValue(start);command.Parameters.AddWithValue(end);command.Parameters.AddWithValue(allowed);
-            await using var reader=await command.ExecuteReaderAsync(context.RequestAborted);
-            List<ScheduleEntry> rows=[];
-            while(await reader.ReadAsync(context.RequestAborted))
-                rows.Add(new(reader.GetGuid(0),reader.IsDBNull(1)?null:reader.GetGuid(1),reader.IsDBNull(2)?null:reader.GetGuid(2),reader.GetString(3),reader.GetFieldValue<DateTimeOffset>(4),reader.GetFieldValue<DateTimeOffset>(5),reader.IsDBNull(6)?null:reader.GetString(6),reader.GetString(7),reader.IsDBNull(8)?null:reader.GetString(8),reader.GetFieldValue<DateTimeOffset>(9),reader.GetFieldValue<Guid[]>(10)));
-            QueryComplete(context,logger,"personal-schedule",timer,rows.Count);
+            // Use the calendar's canonical records and visibility rules. A scheduled
+            // session need not already have a WorkDay shoot record or assigned crew.
+            var rows=store.GetEntries(start,end)
+                .Where(e=>e.Status!="Cancelled" && (allowed is null || (e.JobId.HasValue && allowed.Contains(e.JobId.Value))))
+                .ToArray();
+            QueryComplete(context,logger,"personal-schedule",timer,rows.Length);
             return Results.Ok(rows);
         }).RequireAuthorization();
 
@@ -113,3 +102,4 @@ public static class TodayEndpoints
 public sealed record TodayMediaSummary(Guid JobId, long AssetCount, Guid? ThumbnailVersionId);
 
 public sealed record TodayJobSummary(Guid Id,Guid WorkspaceId,Guid ConversationId,string Title,string ClientName,string Status,DateOnly? EventDate,DateTimeOffset CreatedAt,string? AssignedTo,Guid? ClientId,string? LinkedClientName,long TaskCount,long CompletedTaskCount,string? JobLead=null,bool IsCrewMember=false);
+
