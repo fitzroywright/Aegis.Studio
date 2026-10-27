@@ -19,9 +19,12 @@ test('Workspaces has accountability cards, real managers and counts, photos and 
 test('view-only Workspace cards expose jobs without administration actions',async t=>{
  const {w}=setup(t,false);await w.StudioWorkspaceManagement.render();assert.equal(w.document.querySelector('[data-create-workspace],[data-workspace-edit],[data-workspace-members],[data-workspace-mail],#roleScope'),null);assert.equal(w.document.querySelectorAll('[data-workspace-jobs]').length,2);
 });
-test('avatar Workspaces entry routes to its own page immediately above Studio Management',async t=>{
- const {w,navigation}=setup(t);w.fetch=async()=>({ok:true,json:async()=>[]});w.eval(read('studio-shell-nav.js'));w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
- const link=w.document.querySelector('[data-studio-avatar-workspaces]');assert.equal(link.nextElementSibling.id,'adminMenuButton');link.click();assert.equal(navigation.at(-1).view,'workspace-management');
+test('Admin menu moves Workspaces and Studio Management out of the avatar',async t=>{
+ const {w,navigation}=setup(t);w.fetch=async()=>({ok:true,json:async()=>[]});w.eval(read('studio-admin.js'));w.eval(read('studio-shell-nav.js'));w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await settle();
+ assert.equal(w.document.querySelector('[data-studio-avatar-workspaces],[data-studio-profile-management]'),null);
+ const menu=w.document.querySelector('.studio-admin-menu');assert.ok(menu);assert.equal(menu.previousElementSibling.className,'studio-navigation-scroll');
+ const link=menu.querySelector('[data-studio-admin-view="workspace-management"]');assert.equal(link.nextElementSibling.textContent,'Studio Management');menu.open=true;link.click();assert.equal(navigation.at(-1).view,'workspace-management');assert.equal(menu.open,false);
+ menu.open=true;menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.open,false);
 });
 test('dedicated Session Plan Import preserves the job in its route and browser history',async t=>{
  const dom=new JSDOM('<body><div id="genericView"></div><div id="conversationView"></div></body>',{url:'https://studio.test/#studio=session-plan-import&job=j',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());const seen=[];
@@ -31,4 +34,9 @@ test('Create Workspace retains manager assignment and returns to Workspace admin
  const {w,calls,navigation}=setup(t),json=w.json;w.json=async(url,options)=>{if(options?.method==='POST'&&url==='/api/admin/workspaces/'){calls.push({url,options});return {id:'new',name:'New Workspace'};}if(options?.method==='PUT'&&url==='/api/workspaces/new/managers/lisa'){calls.push({url,options});return null;}return json(url,options);};
  await w.StudioWorkspaceManagement.render();w.document.querySelector('[data-create-workspace]').click();const form=w.document.querySelector('#workspaceName').closest('form');form.querySelector('#workspaceName').value='New Workspace';form.querySelector('#workspaceManagerUser').value='lisa';form.querySelector('#workspaceEmail').value='new@studio.test';await form.onsubmit({preventDefault(){},currentTarget:form});
  const creation=calls.find(call=>call.url==='/api/admin/workspaces/');assert.equal(JSON.parse(creation.options.body).defaultJobLead,'lisa');assert.ok(calls.some(call=>call.url==='/api/workspaces/new/managers/lisa'));assert.equal(navigation.at(-1).view,'workspace-management');assert.equal(w.document.querySelector('dialog #workspaceName'),null);
+});
+
+test('non-administrator Admin menu exposes only permitted workspace access',async t=>{
+ const {w}=setup(t,false);w.studioSignedInUserReady=Promise.resolve({isAdministrator:false});w.eval(read('studio-admin.js'));const host=w.document.createElement('div');w.document.body.append(host);w.StudioAdmin.mountMenu(host);await settle();
+ const visible=[...host.querySelectorAll('button')].filter(button=>!button.hidden);assert.equal(visible.length,1);assert.equal(visible[0].textContent,'Workspaces');
 });

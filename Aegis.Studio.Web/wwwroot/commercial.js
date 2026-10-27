@@ -5,9 +5,6 @@ function commercialPage(title,body,tools='',summary='',attention='') {
     StudioPage.bind(genericView);
     window.studioSetBreadcrumb?.(title==='Production'?[{label:'Production'}]:[{label:'Studio Management',view:'studio-management'},{label:title}]);
 }
-function studioManagementCatalogCards(){
-    return `<section class="admin-card"><header class="admin-card-header"><h2>Products and services</h2></header><p>Manage catalog items, prices and production requirements.</p><button class="fd-card-link" onclick="studioNavigate('catalog')">Product &amp; Services Catalog →</button></section><section class="admin-card"><header class="admin-card-header"><h2>Job Templates</h2></header><p>Design job workflows, branches and service requirements.</p><button class="fd-card-link" onclick="studioNavigate('job-templates')">Manage Job Templates →</button></section><section class="admin-card"><header class="admin-card-header"><h2>Work Order Templates</h2></header><p>Define production steps and final quality control.</p><button class="fd-card-link" onclick="studioNavigate('work-order-templates')">Manage Work Order Templates →</button></section>`;
-}
 async function showStudioManagement(){return window.StudioManagement.render();}
 async function showCommercialCatalog(){
     const current=StudioPage.begin('catalog');

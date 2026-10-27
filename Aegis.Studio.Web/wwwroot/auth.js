@@ -34,7 +34,6 @@ async function loadSignedInUser() {
     const signedInUser = document.getElementById('signedInUser');
     const userAvatar = document.getElementById('userAvatar');
     const signOutButton = document.getElementById('signOutButton');
-    const adminMenuButton = document.getElementById('adminMenuButton');
 
     if (signedInUser) {
         signedInUser.textContent = studioFirstName(user);
@@ -69,7 +68,6 @@ async function loadSignedInUser() {
         } else showPlaceholder();
     }
 
-    if (adminMenuButton) adminMenuButton.hidden = user.isAdministrator !== true;
 
     if (signOutButton) {
         signOutButton.onclick = async () => {

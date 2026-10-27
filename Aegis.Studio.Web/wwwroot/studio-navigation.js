@@ -798,8 +798,9 @@
         return window.studioNavigate('jobs');
     };
 
-    async function renderAdmin(){
-        const current=StudioPage.begin('studio-management');
+    async function renderAdmin(view='studio-management'){
+        const title=window.StudioAdmin?.entries.find(entry=>entry.view===view)?.label||'Studio Management';
+        const current=StudioPage.begin(view);
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
         genericView.innerHTML='<div class="today-loading">Loading Studio Management…</div>';
@@ -808,7 +809,7 @@
         if(!current())return;
         const isAdministrator=me?.user?.isAdministrator===true||me?.isAdministrator===true;
         if(!isAdministrator){
-            genericView.innerHTML=StudioPage.html({title:'Studio Management',content:'<section class="admin-card"><h2>Administrator access required</h2><p>Your account does not have permission to administer Studio.</p></section>'});StudioPage.bind(genericView,current);
+            genericView.innerHTML=StudioPage.html({title,content:'<section class="admin-card"><h2>Administrator access required</h2><p>Your account does not have permission to administer Studio.</p></section>'});StudioPage.bind(genericView,current);
             return;
         }
 
@@ -817,9 +818,9 @@
         if(!current())return;
 
 
-        genericView.innerHTML=StudioPage.html({title:'Studio Management',scroll:true,
-            summary:StudioPage.metrics([['Active roles',studioRolesCache.filter(x=>x.isActive).length]]),
-            content:`<div class="st-admin-grid">${studioManagementCatalogCards()}<section class="admin-card" id="publicBookingCatalog">
+        let content='';
+        switch(view){
+            case 'booking-sessions': content=`<section class="admin-card" id="publicBookingCatalog">
                             <header class="admin-card-header"><div><h2>Public booking sessions</h2><p>Studio owns session descriptions, duration, JMD price, deposit, locations and resource rules. Published changes sync to the API site when external publishing is enabled.</p></div></header>
                             <div class="admin-form-stack"><input type="hidden" data-catalog-id><label>Session name<input data-catalog-name maxlength="160"></label><label>Public description<textarea data-catalog-description maxlength="1000" rows="2"></textarea></label>
                                 <div class="admin-form-row"><label>Session minutes<input data-catalog-duration type="number" min="15" max="1440" value="60"></label><label>Setup minutes<input data-catalog-setup type="number" min="0" max="480" value="0"></label><label>Cleanup minutes<input data-catalog-cleanup type="number" min="0" max="480" value="0"></label></div>
@@ -832,10 +833,12 @@
                                 <div><button class="primary" type="button" data-catalog-save>Save session type</button> <button class="action" type="button" data-catalog-reset>Clear form</button></div><p data-catalog-status role="status"></p>
                                 <div data-catalog-list></div>
                             </div>
-                        </section><section class="admin-card" id="galleryClientLinkAdmin">
+                        </section>`;break;
+            case 'gallery-access-admin': content=`<section class="admin-card" id="galleryClientLinkAdmin">
                             <header class="admin-card-header"><div><h2>Client gallery identity proofs</h2><p>Issue a single use code for a real Studio client. The client enters it after signing in to the public Gallery site.</p></div></header>
                             <div class="admin-form-stack"><label>Studio client<select data-link-client-id><option value="">Loading clients…</option></select></label><button class="primary" type="button" data-link-create>Create proof</button><p data-link-status role="status"></p><label data-link-code-wrap hidden>Show this code to the client now<input data-link-code readonly></label><button class="action" type="button" data-link-copy hidden>Copy code</button><div data-link-list></div></div>
-                        </section><section class="admin-card admin-demo-card" id="studioDemoLoader">
+                        </section>`;break;
+            case 'demo-data': content=`<section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
                                 <div><h2>Demo Data</h2><p>Rebuild the complete Studio demo with job templates, workflows, genuine photographs, bookings, schedules and payments.</p></div>
                                 <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Clear and Recreate Demo Data</button><button class="primary" type="button" data-demo-reset>Reset and Regenerate</button></div>
@@ -846,18 +849,15 @@
                             <small data-demo-elapsed hidden></small>
                         </section>
 
-                        <div class="admin-generated-sections">
-                            ${renderEmployeeDirectorySection()}
-                            ${renderSecurityRolesSection('Job')}
-                            ${renderWorkflowSection()}
-                        </div>
-                        <section class="admin-card" data-service-status><header class="admin-card-header"><h2>Service health</h2><button class="action" data-refresh-service-status>Refresh</button></header><div data-service-status-body>Loading…</div><button class="action" onclick="showPosCatalogManager()">Manage products</button><button class="action" data-service-audit>Recent audit</button></section>
-                        <section class="admin-card admin-help-card">
-                            <header class="admin-card-header"><div><h2>Studio settings and access</h2></div></header>
-                            <p>Workspace access remains membership-based. Use reusable roles where possible and one-off permissions only when required.</p>
-                            <p>Manage workspace membership, managers and routing on the Workspaces page.</p>
-                        </section>
-</div>`});
+                        `;break;
+            case 'studio-management': content=`<section class="admin-card" data-service-status><header class="admin-card-header"><h2>Service health</h2><button class="action" data-refresh-service-status>Refresh</button></header><div data-service-status-body>Loading…</div><button class="action" data-service-audit>Recent audit</button></section>
+                        `;break;
+            case 'staff-admin': content=renderEmployeeDirectorySection();break;
+            case 'roles-admin': content=renderSecurityRolesSection('Job');break;
+            case 'workflows-admin': content=renderWorkflowSection();break;
+            case 'api-site-key': content=window.StudioAdmin.keyForm();break;
+        }
+        genericView.innerHTML=StudioPage.html({title,scroll:true,content:`<div class="admin-generated-sections">${content}</div>`});
         StudioPage.bind(genericView,current);
 
         const bookingCatalogPanel=document.getElementById('publicBookingCatalog');
@@ -891,14 +891,16 @@
             statusPanel.querySelector('[data-service-audit]').onclick=async()=>{const dialog=studioDialog('Recent operational audit','<p>Loading…</p>');try{const rows=await json('/api/admin/operations/audit?count=100');dialog.querySelector('.studio-dialog-body').textContent=JSON.stringify(rows,null,2);}catch(e){dialog.querySelector('.studio-dialog-body').textContent=e.message;}};
             readStatus();
         }
-        await refreshStudioEmployees();
-        await refreshWorkflowList();
-        await renderGlobalRoleAdministration();
+        if(view==='api-site-key')window.StudioAdmin.bindKeyForm(genericView);
+        if(view==='staff-admin')await refreshStudioEmployees();
+        if(view==='workflows-admin')await refreshWorkflowList();
+        if(view==='roles-admin')await renderGlobalRoleAdministration();
         if(!current())return;
-        const adminGrid=genericView.querySelector('.st-admin-grid');
+        const adminGrid=genericView.querySelector('.admin-generated-sections');
         for(const section of [...genericView.children].filter(el=>el.classList.contains('job-section'))){section.classList.add('admin-card');adminGrid.appendChild(section);}
 
         const panel=document.getElementById('studioDemoLoader');
+        if(!panel)return;
         panel.querySelector('[data-demo-preview]').onclick=async()=>{
             const status=panel.querySelector('[data-demo-status]');
             const button=panel.querySelector('[data-demo-preview]');
@@ -976,6 +978,7 @@
         pipeline:()=>showPipeline(),
         production:()=>showCatalogProduction(),
         'studio-management':()=>showStudioManagement(),
+        ...Object.fromEntries(['booking-sessions','gallery-access-admin','demo-data','staff-admin','roles-admin','workflows-admin','api-site-key'].map(view=>[view,()=>renderAdmin(view)])),
         catalog:()=>showCommercialCatalog(),
         'job-templates':()=>showCommercialTemplates('Job'),
         'work-order-templates':()=>showCommercialTemplates('WorkOrder'),
@@ -991,7 +994,7 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
+    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
         return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
