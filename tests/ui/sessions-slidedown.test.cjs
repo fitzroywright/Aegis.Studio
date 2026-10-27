@@ -15,7 +15,7 @@ async function setup(t,view,options={}){
  w.genericView=w.document.getElementById('genericView');
  w.conversationView=w.document.getElementById('conversationView');
  const at=(day,hour)=>{const d=new Date();d.setDate(d.getDate()+day);d.setHours(hour,0,0,0);return d.toISOString();};
- const session={id:'session',jobId:'job',title:'School portraits',startsAtUtc:at(0,10),endsAtUtc:at(0,11),location:'Studio A',status:'Scheduled',resourceIds:['resource']};
+ const session={id:'session',jobId:'job',title:'School portraits',startsAtUtc:new Date(Date.now()+3600000).toISOString(),endsAtUtc:new Date(Date.now()+7200000).toISOString(),location:'Studio A',status:'Scheduled',resourceIds:['resource']};
  const sessions=[session,{...session,id:'cancelled',title:'Cancelled session',status:'Cancelled'},{...session,id:'tomorrow',title:'Tomorrow session',startsAtUtc:at(1,10),endsAtUtc:at(1,11)}];
  w.json=async url=>{
   requests.push(url);
@@ -59,40 +59,43 @@ for(const view of ['tasks','schedule'])test(`${view} keeps sessions in the share
  assert.equal(drawer.hidden,false);
  assert.equal(attention.hidden,true);
  assert.equal(w.document.getElementById('studioSessionsTrigger').getAttribute('aria-expanded'),'true');
- assert.equal(w.document.getElementById('studioSessionsCount').textContent,'1');
+ assert.equal(w.document.getElementById('studioSessionsCount').textContent,'2');
  assert.match(drawer.textContent,/School portraits/);
  assert.match(drawer.textContent,/Studio A/);
- assert.doesNotMatch(drawer.textContent,/Cancelled session|Tomorrow session/);
+ assert.match(drawer.textContent,/Tomorrow session/);
+ assert.match(drawer.textContent,/Upcoming Sessions/);
+ assert.match(drawer.textContent,/Next 30 days/);
+ assert.equal(drawer.getAttribute('aria-label'),'Upcoming Sessions');
+ assert.match(w.document.getElementById('studioSessionsTrigger').textContent,/Upcoming Sessions/);
+ assert.doesNotMatch(drawer.textContent,/Cancelled session/);
  assert.equal(requests.filter(url=>url.startsWith('/api/today/schedule')).length,2);
 });
 
-test('sessions span midnight, remain global in Job Details, and refresh when opened',async t=>{
+test('upcoming sessions use the next 30 days, exclude past/cancelled/completed, stay global and refresh',async t=>{
  let calls=0;
  const {w,requests}=await setup(t,'workspaces',{fetch:async(url,sessions)=>{
   calls++;
-  const midnight=new Date();midnight.setHours(0,0,0,0);
-  const at=hours=>new Date(+midnight+hours*3600000).toISOString();
+  const range=new URL(url,'https://studio.test'),from=+new Date(range.searchParams.get('from')),to=+new Date(range.searchParams.get('to'));
+  const entry=(id,start,status='Scheduled')=>({...sessions[0],id,title:id,jobId:'other-job',status,startsAtUtc:new Date(start).toISOString(),endsAtUtc:new Date(start+3600000).toISOString()});
   return {ok:true,json:async()=>[
-   {...sessions[0],id:'overnight',jobId:'other-job',title:'Overnight shoot',startsAtUtc:at(-1),endsAtUtc:at(1)},
-   {...sessions[0],id:'yesterday',title:'Ended at midnight',startsAtUtc:at(-2),endsAtUtc:at(0)},
-   {...sessions[0],id:'tomorrow',title:'Starts tomorrow',startsAtUtc:at(24),endsAtUtc:at(25)},
-   ...(calls>1?[{...sessions[0],id:'new',jobId:'other-job',title:'Newly scheduled shoot'}]:[])
+   entry('Next week',from+7*86400000),entry('At start',from),entry('Overnight already started',from-3600000),
+   entry('At horizon',to),entry('Cancelled shoot',from+86400000,'Cancelled'),entry('Completed shoot',from+86400000,'Completed'),
+   ...(calls>1?[entry('Newly scheduled shoot',from+86400000)]:[])
   ]};
  }});
  const conversation=w.document.getElementById('conversationView');
- conversation.classList.add('has-open-job');
- conversation.innerHTML='<section class="job-detail-page" data-job-id="current-job"></section>';
- await settle();
- assert.equal(w.document.getElementById('studioSessionsCount').textContent,'1');
+ conversation.classList.add('has-open-job');conversation.innerHTML='<section class="job-detail-page" data-job-id="current-job"></section>';
+ await settle();assert.equal(w.document.getElementById('studioSessionsCount').textContent,'2');
  w.document.getElementById('studioSessionsTrigger').click();await settle();
  const drawer=w.document.getElementById('studioSessionsDrawer');
- assert.match(drawer.textContent,/Overnight shoot/);
- assert.match(drawer.textContent,/Newly scheduled shoot/);
- assert.doesNotMatch(drawer.textContent,/Ended at midnight|Starts tomorrow/);
- assert.equal(w.document.getElementById('studioSessionsCount').textContent,'2');
+ assert.deepEqual([...drawer.querySelectorAll('.studio-shared-session-row strong')].map(el=>el.textContent),['At start','Newly scheduled shoot','Next week']);
+ assert.doesNotMatch(drawer.textContent,/Overnight already started|At horizon|Cancelled shoot|Completed shoot|Finished/);
+ assert.equal(w.document.getElementById('studioSessionsCount').textContent,'3');
  const range=new URL(requests.find(u=>u.startsWith('/api/today/schedule')),'https://studio.test');
- assert.equal(new Date(range.searchParams.get('from')).getHours(),0);
- assert.equal(new Date(range.searchParams.get('to')).getDate(),new Date(Date.now()+86400000).getDate());
+ const from=new Date(range.searchParams.get('from')),to=new Date(range.searchParams.get('to')),expected=new Date(from);expected.setDate(expected.getDate()+30);
+ assert.equal(+to,+expected);assert.ok(Math.abs(Date.now()-from)<10000);
+ const meta=drawer.querySelector('.studio-shared-session-row span').textContent;
+ assert.ok(meta.startsWith(from.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})));
 });
 
 test('failed or malformed session responses show an error and reopening retries',async t=>{
@@ -105,7 +108,7 @@ test('failed or malformed session responses show an error and reopening retries'
  trigger.click();await settle();assert.match(drawer.textContent,/Unable to load sessions/);
  trigger.click();trigger.click();await settle();
  assert.match(drawer.textContent,/School portraits/);
- assert.equal(w.document.getElementById('studioSessionsCount').textContent,'1');
+ assert.equal(w.document.getElementById('studioSessionsCount').textContent,'2');
 });
 
 test('Today schedule uses the calendar store and matching access rules without requiring a shoot record',()=>{
