@@ -26,7 +26,6 @@ function setup(){
  if(url.endsWith('/operations/audit'))return[{action:'JobCreated',detail:'Pending job prepared',createdAtUtc:'2026-10-17',userName:'staff'}];
  throw Error('Unexpected URL '+url);};
  w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
- w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/studio-message-card.js'),'utf8'));
 require('./studio-page-fixture.cjs')(w); w.eval(code);return{dom,w,fixture};
 }
 function tab(w,key){w.document.querySelector('[data-c-tab="'+key+'"]').click();}
@@ -37,7 +36,16 @@ test('financial statement preserves signed ledger values and invoice currency',a
 test('restricted financial data is shown as unavailable rather than zero',async t=>{const {dom,w,fixture}=setup();t.after(()=>dom.window.close());fixture.failFinance=true;await w.StudioClients.render({clientId:'a'});tab(w,'finance');await settle();assert.match(w.document.querySelector('[data-c-statement]').textContent,/Unavailable/);assert.match(w.document.querySelector('[data-c-statement] [role=alert]').textContent,/restricted/);});
 test('late gallery responses do not replace a newly opened client or route',async t=>{const {dom,w,fixture}=setup();t.after(()=>dom.window.close());let release;fixture.delay=new Promise(r=>release=r);await w.StudioClients.render({clientId:'a'});tab(w,'galleries');await w.StudioClients.render({clientId:'b'});release();await settle();assert.match(w.document.querySelector('[data-c-content]').textContent,/Other client job/);assert.doesNotMatch(w.document.querySelector('[data-c-content]').textContent,/42 images/);});
 test('client and job text is escaped',async t=>{const {dom,w,fixture}=setup();t.after(()=>dom.window.close());fixture.clients[0].displayName='<img src=x onerror=alert(1)>';fixture.jobs[0].title='<script>bad()</script>';await w.StudioClients.render({clientId:'a'});assert.equal(w.genericView.querySelector('script'),null);assert.equal(w.genericView.querySelector('img'),null);assert.match(w.genericView.textContent,/<script>bad/);});
-test('client message alerts stay scoped to linked jobs',async t=>{const {dom,w,fixture}=setup();t.after(()=>dom.window.close());const base=w.json;w.json=async(url,options)=>url==='/api/notifications?count=200'?[{channel:'InApp',referenceType:'Job',referenceId:'j1',eventType:'WorkspaceMessage',subject:'Client reply',body:'Thank you'},{channel:'InApp',referenceType:'Job',referenceId:'j2',eventType:'WorkspaceMessage',subject:'Other client private reply'}]:base(url,options);await w.StudioClients.render({clientId:'a'});await settle();assert.match(w.document.querySelector('#clientMessageCard').textContent,/Client reply/);assert.doesNotMatch(w.document.querySelector('#clientMessageCard').textContent,/Other client private/);});
+test('Clients has no Messages or Notes card in the directory or selected-client view',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());
+ assert.equal(w.StudioMessageCard,undefined);
+ for(const options of [{},{clientId:'a'}]){
+  await w.StudioClients.render(options);await settle();
+  assert.equal(w.document.querySelector('#clientMessageCard,.smc-card,[data-c-send-message],[data-c-messages]'),null);
+  assert.equal(fixture.calls.some(call=>call.url.startsWith('/api/notifications')),false);
+  assert.ok(w.document.querySelector('.client-directory'));
+ }
+});
 test('client navigation records selection and restores it on browser back',async t=>{const d=new JSDOM('<body data-studio-view="clients"><div><nav id="studioBreadcrumb"></nav><div id="studioPageTools"></div></div><div id="conversationView"></div><div id="genericView"></div></body>',{url:'https://studio.test/#studio=clients&client=a',runScripts:'outside-only'}),w=d.window;t.after(()=>w.close());const seen=[];w.StudioClients={render:async o=>seen.push(o.clientId),invalidate(){}};w.StudioPage={invalidate(){}};w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/studio-navigation.js'),'utf8'));w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await settle();assert.equal(w.history.state.studioClientId,'a');await w.studioNavigate('clients',{clientId:'b'});assert.equal(w.history.state.studioClientId,'b');assert.match(w.location.hash,/client=b/);w.history.back();await new Promise(r=>setTimeout(r,25));assert.equal(w.history.state.studioClientId,'a');assert.equal(seen.at(-1),'a');});
 
 
@@ -74,18 +82,16 @@ test('Client Reminders tab passes only jobs associated with the selected client'
 });
 
 
-test('client directory keeps scroll on selection and late messages do not replace either grid',async t=>{
+test('client directory keeps scroll and focus on selection without replacing either grid',async t=>{
  const {dom,w,fixture}=setup();t.after(()=>dom.window.close());
  fixture.clients.push(...Array.from({length:8},(_,i)=>({id:'c'+i,displayName:'Client '+i})));
- const base=w.json;let release;const pending=new Promise(r=>release=r);
- w.json=async(url,options)=>url==='/api/notifications?count=200'?(await pending,[]):base(url,options);
  await w.StudioClients.render();
  let directory=w.genericView.querySelector('.client-directory-rows');directory.scrollTop=300;
  directory.querySelector('[data-c-id="c4"]').click();await settle();
  directory=w.genericView.querySelector('.client-directory-rows');
  assert.equal(directory.scrollTop,300);assert.equal(directory.querySelector('[aria-selected="true"]').dataset.cId,'c4');
  const row=directory.querySelector('[data-c-id="c4"]'),jobs=w.genericView.querySelector('.client-jobs-scroll');jobs.scrollTop=200;row.focus();
- release();await settle();await settle();
+ await settle();await settle();
  assert.equal(w.genericView.querySelector('.client-directory-rows'),directory);assert.equal(directory.scrollTop,300);
  assert.equal(directory.querySelector('[data-c-id="c4"]'),row);assert.equal(w.document.activeElement,row);
  assert.equal(w.genericView.querySelector('.client-jobs-scroll'),jobs);assert.equal(jobs.scrollTop,200);
