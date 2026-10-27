@@ -139,6 +139,14 @@
             footer.textContent = "Bryan's Photo Studios · Studio";
             shell.append(footer);
         }
+        if (!footer.querySelector('#studioFooterRate')) {
+            const count = document.createElement('span');
+            count.id = 'studioFooterRate';
+            count.className = 'studio-grid-item-count';
+            count.setAttribute('role', 'status');
+            const workspaces = footer.querySelector('#studioFooterWorkspaces');
+            footer.insertBefore(count, workspaces);
+        }
     }
 
     function syncFooterIdentity() {
@@ -655,9 +663,9 @@
     function initialize() {
         currentView = document.body.dataset.studioView || currentView;
         ensureTools();
+        ensureFooter();
         ensureLeftRail();
         ensureWorkspaceListLoaded();
-        ensureFooter();
         syncFooterIdentity();
         const identityNode = document.getElementById('signedInUser');
         if (identityNode) new MutationObserver(syncFooterIdentity).observe(identityNode, {childList:true,characterData:true,subtree:true});
