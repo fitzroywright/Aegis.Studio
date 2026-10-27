@@ -24,6 +24,23 @@ test('breadcrumbs return to Today without leaving Studio',async t=>{
  await new Promise(r=>setTimeout(r,0));
  assert.deepEqual(calls,['workspaces','today']);assert.equal(w.location.href,'https://studio.test/');
 });
+test('Studio logo returns every page to Today through shared navigation',async t=>{
+ const html=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/index.html'),'utf8');
+ const dom=new JSDOM(html,{url:'https://studio.test/',runScripts:'outside-only'});t.after(()=>dom.window.close());
+ const w=dom.window,calls=[];
+ w.studioNavigate=async view=>{calls.push(view);};w.fetch=async()=>({ok:true,json:async()=>[]});
+ w.eval(code);w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+ const logo=w.document.querySelector('a[data-studio-home]');
+ assert.ok(logo);assert.equal(logo.getAttribute('href'),'#studio=today');assert.match(logo.getAttribute('aria-label'),/Today/);
+ for(const view of ['jobs','workspaces','frontdesk','schedule','production','clients','media']){
+  w.document.body.dataset.studioView=view;w.StudioShell.sync(view);
+  const event=new w.MouseEvent('click',{bubbles:true,cancelable:true,button:0});
+  logo.querySelector('img').dispatchEvent(event);assert.equal(event.defaultPrevented,true);
+ }
+ assert.deepEqual(calls,Array(7).fill('today'));
+ const modified=new w.MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:true});
+ logo.dispatchEvent(modified);assert.equal(modified.defaultPrevented,false);assert.equal(calls.length,7);
+});
 test('shared shell keeps contextual cards and one navigation toolstrip',async t=>{
  const {w,dom}=setup();t.after(()=>dom.window.close());await w.studioNavigate('production');w.StudioShell.sync('production');
  const rail=w.document.getElementById('studioContextRail');
