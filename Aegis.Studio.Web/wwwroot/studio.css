@@ -30,7 +30,7 @@
   --studio-purple: #8b5cf6;
   --studio-orange: #ff9800;
   --studio-red: #ef3340;
-  --studio-bg: #f5f7fb;
+  --studio-bg: #ffffff;
   --studio-panel: #fff;
   --studio-text: #141922;
   --workspace-gold: #a36b17;
@@ -1940,7 +1940,7 @@ html {
   text-rendering: optimizeLegibility;
 }
 body {
-  background: #f4f6f8;
+  background: var(--studio-bg);
   color: #111827;
   font-size: 14px;
 }

@@ -1,7 +1,7 @@
 /* Light palette only: layout and component behavior remain owned by their stylesheets. */
 body[data-theme="office-light"] {
   color-scheme:light;
-  --theme-bg:#f5f8fb;
+  --theme-bg:#ffffff;
   --theme-surface:#ffffff;
   --theme-surface-2:#f3f9fc;
   --theme-surface-alt:#eaf3ff;
