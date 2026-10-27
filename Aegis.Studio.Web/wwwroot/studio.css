@@ -8648,29 +8648,38 @@ body .topbar {
   inset-inline: 0;
   bottom: 0;
   height: var(--studio-navigation-strip-height);
-}
-.studio-navigation-tools {
-  position: absolute;
-  inset-inline-start: 50%;
-  bottom: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 2px;
-  width: max-content;
-  max-width: calc(100% - 48px);
-  height: var(--studio-navigation-strip-height);
-  min-height: 0;
-  padding: 1px 4px;
+  gap: 24px;
+  padding: 0 24px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
+}
+.studio-navigation-toolstrip::-webkit-scrollbar { display: none; }
+.studio-navigation-tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  width: max-content;
+  margin-inline-start: auto;
+  height: var(--studio-navigation-strip-height);
+  min-height: 0;
+  padding: 1px 4px;
   background: #172d4a;
   color: #fff;
-  transform: translateX(-50%);
 }
-.studio-navigation-tools::-webkit-scrollbar { display: none; }
+.studio-navigation-status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding-inline-start: 14px;
+  border-inline-start: 1px solid #536d86;
+}
 .studio-navigation-tools button {
   display: inline-flex;
   align-items: center;
@@ -9735,46 +9744,41 @@ body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:sta
 }
 body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { background:#fff; color:#173552; }
 
-/* Shared masthead attention control and slide-out drawer. */
-
-.topbar { position: relative; }
-.topbar .studio-attention-trigger {
-  margin-left: 0;
-  position: static;
-  transform: none;
+/* Shared toolstrip status controls and their existing drawers. */
+.studio-attention-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 6px 11px;
-  border: 1px solid rgba(255,255,255,.35);
-  border-radius: 7px;
-  background: rgba(255,255,255,.08);
+  gap: 7px;
+  min-height: 24px;
+  padding: 2px 7px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
   color: #fff;
   font: inherit;
   font-size: 12px;
-  font-weight: 750;
+  line-height: 18px;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  z-index: 2;
 }
-.topbar .studio-sessions-trigger { margin-left: auto; border-color: #8cbcd8; background: #234969; color: #edf8ff; }
-.topbar .studio-attention-trigger:not(.studio-sessions-trigger) { border-color: #e7a56c; background: #593b32; color: #fff1e2; }
-.topbar .studio-attention-trigger:hover,
-.topbar .studio-attention-trigger[aria-expanded="true"] { background: rgba(255,255,255,.18); }
-.topbar .studio-attention-trigger strong {
+.studio-attention-trigger:is(:hover,:focus-visible,[aria-expanded="true"]) {
+  background: rgba(255,255,255,.18);
+  outline: 2px solid var(--theme-accent,#a36b17);
+  outline-offset: -2px;
+}
+.studio-attention-trigger strong {
   display: inline-grid;
   place-items: center;
-  min-width: 21px;
-  height: 21px;
-  padding: 0 5px;
-  border-radius: 11px;
-  background: #e6ebf0;
-  color: #172d4a;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #365571;
+  color: #edf8ff;
   font-variant-numeric: tabular-nums;
 }
-.topbar .studio-sessions-trigger strong { background: #d9effa; color: #174b6a; }
-.topbar .studio-attention-trigger:not(.studio-sessions-trigger) strong { background: #ffe0c2; color: #784017; }
-.topbar .studio-attention-trigger.has-attention strong { background: #d94841; color: #fff; }
+.studio-attention-trigger.has-attention strong { background: #5e502e; color: #ffd275; }
 .studio-attention-backdrop:not([hidden]) {
   position: fixed;
   inset: 0;
@@ -9831,9 +9835,6 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 }
 .studio-attention-details button:hover { background: #eaf0f7; }
 .studio-attention-details strong { color: #ba3430; font-variant-numeric: tabular-nums; }
-@media (max-width: 1100px) {
-  .topbar .studio-attention-trigger { font-size: 11px; padding: 5px 7px; }
-}
 
 /* Masthead message bell slide-down preview. */
 .studio-message-bell-panel:not([hidden]) {

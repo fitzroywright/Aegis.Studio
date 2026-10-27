@@ -426,28 +426,27 @@
     }
 
     function initializeAttentionDrawer() {
-        const masthead = document.querySelector('.topbar');
-        if (!masthead || document.getElementById('studioAttentionTrigger')) return;
+        ensureNavigationToolstrip();
+        const toolstrip = document.getElementById('studioNavigationToolstrip');
+        if (!toolstrip || document.getElementById('studioAttentionTrigger')) return;
         const trigger = document.createElement('button');
         trigger.type = 'button';
         trigger.id = 'studioAttentionTrigger';
         trigger.className = 'studio-attention-trigger';
         trigger.setAttribute('aria-controls', 'studioAttentionDrawer');
         trigger.setAttribute('aria-expanded', 'false');
-        trigger.innerHTML = '<span>Needs Attention</span><strong id="studioAttentionCount" aria-label="Attention items">0</strong>';
-        // Navigation History now lives in the footer, not the masthead.
-        // Use a masthead-owned sibling to avoid insertBefore NotFoundError.
-        const bell = document.getElementById('notificationButton');
-        if (bell?.parentElement === masthead) masthead.insertBefore(trigger, bell);
-        else masthead.appendChild(trigger);
+        trigger.innerHTML = '<span>Needs Attention</span><strong id="studioAttentionCount" aria-label="Attention items">0</strong><span aria-hidden="true">⌄</span>';
         const sessionsTrigger = document.createElement('button');
         sessionsTrigger.type = 'button';
         sessionsTrigger.id = 'studioSessionsTrigger';
         sessionsTrigger.className = 'studio-attention-trigger studio-sessions-trigger';
         sessionsTrigger.setAttribute('aria-controls', 'studioSessionsDrawer');
         sessionsTrigger.setAttribute('aria-expanded', 'false');
-        sessionsTrigger.innerHTML = '<span>Today\'s Sessions</span><strong id="studioSessionsCount">0</strong>';
-        trigger.before(sessionsTrigger);
+        sessionsTrigger.innerHTML = '<span>Today\'s Sessions</span><strong id="studioSessionsCount">0</strong><span aria-hidden="true">⌄</span>';
+        const statusTools = document.createElement('div');
+        statusTools.className = 'studio-navigation-status';
+        statusTools.append(sessionsTrigger, trigger);
+        toolstrip.append(statusTools);
         const backdrop = document.createElement('div');
         backdrop.className = 'studio-attention-backdrop';
         backdrop.hidden = true;
