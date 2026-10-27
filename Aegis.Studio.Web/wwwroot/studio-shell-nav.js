@@ -2,15 +2,15 @@
     const breadcrumb = document.getElementById('studioBreadcrumb');
     const pageTools = document.getElementById('studioPageTools');
     const shell = document.querySelector('.shell');
-    const navigationIcon = artwork => '<svg class="studio-navigation-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'+artwork+'</svg>';
+    const navigationIcon = artwork => '<svg class="studio-navigation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+artwork+'</svg>';
     const quickLinks = [
-        ['today', 'Today', navigationIcon('<rect x="3" y="5" width="18" height="17" rx="3" fill="#83caff"/><path d="M3 9h18V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2Z" fill="#398be0"/><path d="M7 3v4m10-4v4" stroke="#d9efff" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="15" r="4" fill="#ffe078"/><path d="m10 15 1.4 1.4 2.8-3" fill="none" stroke="#815817" stroke-width="1.5" stroke-linecap="round"/>')],
-        ['frontdesk', 'Front Desk', navigationIcon('<path d="M3 12h18v9H3z" fill="#68d7ca"/><path d="M2 11h20v3H2z" fill="#21a79b"/><path d="M9 10a4 4 0 0 1 8 0Z" fill="#ffd477"/><path d="M13 4v2m-5 4h10" stroke="#ffb34f" stroke-width="2" stroke-linecap="round"/><path d="M6 17h5" stroke="#e0fff6" stroke-width="2" stroke-linecap="round"/>')],
-        ['clients', 'Clients', navigationIcon('<circle cx="5" cy="8" r="3" fill="#ffc57e"/><circle cx="19" cy="8" r="3" fill="#d1b4ff"/><path d="M0 19v-2a5 5 0 0 1 10 0v2" fill="#49c7bb"/><path d="M14 19v-2a5 5 0 0 1 10 0v2" fill="#a08af1"/><circle cx="12" cy="7" r="4" fill="#ffdcac"/><path d="M5 22v-3a7 7 0 0 1 14 0v3" fill="#6bb9ff"/>')],
-        ['jobs', 'Jobs', navigationIcon('<path d="M2 7a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v11H2Z" fill="#ffd074"/><path d="M2 11h20l-2 10H4Z" fill="#eea642"/><rect x="8" y="3" width="10" height="14" rx="1.5" fill="#e7f3ff"/><path d="M11 7h4m-4 3h4m-4 3h2" stroke="#4a93d6" stroke-width="1.5" stroke-linecap="round"/>')],
-        ['production', 'Production', navigationIcon('<rect x="2" y="4" width="19" height="17" rx="3" fill="#b6a0f4"/><path d="M6 8h11M6 12h11M6 16h11" stroke="#6448af" stroke-width="1.5" stroke-linecap="round"/><circle cx="9" cy="8" r="2" fill="#80e0d4"/><circle cx="15" cy="12" r="2" fill="#ffdc7b"/><circle cx="10" cy="16" r="2" fill="#ffadc9"/><path d="m20 0 1.2 3.8L24 5l-2.8 1.2L20 10l-1.2-3.8L16 5l2.8-1.2Z" fill="#ffeaa2"/>')],
-        ['schedule', 'Schedule', navigationIcon('<rect x="2" y="5" width="20" height="17" rx="3" fill="#a2e3ba"/><path d="M2 10h20V8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3Z" fill="#39ad81"/><path d="M7 3v4m10-4v4" stroke="#dcffed" stroke-width="2" stroke-linecap="round"/><rect x="5" y="13" width="5" height="3" rx="1" fill="#458edf"/><rect x="12" y="13" width="7" height="3" rx="1" fill="#ef8c6f"/><rect x="5" y="18" width="9" height="2" rx="1" fill="#fff2b5"/>')],
-        ['media', 'Media', navigationIcon('<rect x="1" y="3" width="19" height="16" rx="2" fill="#b39aef"/><rect x="4" y="6" width="19" height="16" rx="2" fill="#8ddce9"/><circle cx="18" cy="11" r="2.5" fill="#ffdf7f"/><path d="m5 20 6-8 4 5 3-3 4 6Z" fill="#389f9a"/><path d="m5 20 6-8 3 4-3 4Z" fill="#55bd91"/>')]
+        ['today', 'Today', navigationIcon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/><path class="studio-navigation-accent" d="m8 15 3 3 5-5"/>')],
+        ['frontdesk', 'Front Desk', navigationIcon('<path d="M3 12h18v9H3zM2 12h20M8 12V9a4 4 0 0 1 8 0v3"/><path class="studio-navigation-accent" d="M12 3v2M7 17h4"/>')],
+        ['clients', 'Clients', navigationIcon('<circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3"/><path class="studio-navigation-accent" d="M16 4a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5v2"/>')],
+        ['jobs', 'Jobs', navigationIcon('<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V4h8v3M3 12a24 24 0 0 0 18 0"/><path class="studio-navigation-accent" d="M10 13h4v3h-4z"/>')],
+        ['production', 'Production', navigationIcon('<path d="M4 6h16M4 12h16M4 18h16"/><path class="studio-navigation-accent" d="M8 3v6m8 0v6m-6 0v6"/>')],
+        ['schedule', 'Schedule', navigationIcon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/><path class="studio-navigation-accent" d="M7 14h3m4 0h3M7 18h3"/>')],
+        ['media', 'Media', navigationIcon('<rect x="5" y="6" width="16" height="15" rx="2"/><path d="M17 3H5a2 2 0 0 0-2 2v12m2 1 5-5 4 4 3-3 4 4"/><circle class="studio-navigation-accent" cx="16.5" cy="10.5" r="1.5"/>')]
     ];
     let currentView = document.body.dataset.studioView || 'today';
     const shellOverviews = new Map();

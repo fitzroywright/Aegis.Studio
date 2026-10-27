@@ -74,3 +74,13 @@ test('shell height has one owner and reserves the full footer below every page',
  assert.equal(properties['grid-template-rows'],'minmax(0,1fr) var(--studio-footer-height)');
  assert.equal(properties['box-sizing'],'border-box');assert.equal(properties.overflow,'hidden');
 });
+
+
+test('footer participates in the reserved shell row instead of covering page content',()=>{
+ const footer=css.match(/body \.shell>\.studio-shell-footer \{([^}]+)\}/)[1];
+ assert.match(footer,/position: relative;/);
+ assert.match(footer,/grid-column: 1 \/ -1;/);
+ assert.match(footer,/grid-row: 2;/);
+ assert.match(footer,/height: var\(--studio-footer-height\);/);
+ assert.doesNotMatch(footer,/position: fixed|(?:^|;)\s*(?:bottom|inset-inline):/);
+});

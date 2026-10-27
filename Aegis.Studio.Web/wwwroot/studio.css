@@ -8685,6 +8685,7 @@ body .topbar {
   border-inline-start: 1px solid #536d86;
 }
 .studio-navigation-icon { display:block; width:24px; height:24px; flex:0 0 24px; }
+.studio-navigation-accent { stroke:#bca485; }
 .studio-navigation-tools button {
   display: inline-flex;
   align-items: center;
@@ -9037,10 +9038,9 @@ body .shell>.studio-shell-footer {
   font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
   letter-spacing: .02em;
   border-bottom: 0;
-  position: fixed;
-  inset-inline: 0;
-  bottom: 0;
-  flex-shrink: 0;
+  position: relative;
+  grid-column: 1 / -1;
+  grid-row: 2;
   height: var(--studio-footer-height);
   min-height: var(--studio-footer-height);
   max-height: var(--studio-footer-height);
