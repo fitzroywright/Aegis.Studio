@@ -6565,9 +6565,14 @@ body[data-studio-view="workspaces"] .generic {
 }
 .workspace-announcement-banners {
   grid-column: 1/-1;
-  display: grid;
+  display: flex;
+  flex: 0 0 auto;
   gap: 8px;
+  min-width: 0;
   width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
   padding: 10px 16px 0;
   box-sizing: border-box;
 }
@@ -6575,6 +6580,9 @@ body[data-studio-view="workspaces"] .generic {
   display: none;
 }
 .workspace-announcement {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
   display: grid;
   grid-template-columns: minmax(0,1fr) auto;
   align-items: center;
@@ -6608,6 +6616,9 @@ body[data-studio-view="workspaces"] .generic {
   color: var(--theme-text,#2e2924);
 }
 .workspace-announcement p {
+  max-height: 72px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   margin: 0;
   max-width: 1100px;
   font-size: 12.5px;
@@ -9820,7 +9831,7 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 .studio-attention-details button:hover,.studio-message-bell-list button:hover { background:var(--studio-drawer-hover,#eaf0f7); }
 .studio-attention-details strong { color:#ba3430; font-variant-numeric:tabular-nums; }
 .studio-attention-details button span { font-size:11px; line-height:1.35; }
-.studio-message-bell-list,#studioShellJobConversation { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+.studio-message-bell-list { min-width:0; max-width:100%; overflow-wrap:anywhere; }
 .studio-message-bell-count { position:absolute; top:0; right:0; display:grid; place-items:center; min-width:12px; height:12px; padding:0 2px; border-radius:3px; background:#365571; color:#edf8ff; font-size:9px; line-height:12px; font-weight:600; font-variant-numeric:tabular-nums; }
 .studio-message-bell-panel > footer { flex:none; display:flex; padding:0; }
 .studio-message-bell-list button strong { font-size:12px; }

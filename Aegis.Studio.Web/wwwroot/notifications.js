@@ -50,7 +50,7 @@ async function showNotifications() {
 const notificationButton=document.getElementById('notificationButton');
 if(notificationButton){
     notificationButton.title='Messages';
-    notificationButton.setAttribute('aria-label','Show recent messages');
+    notificationButton.setAttribute('aria-label','Show unread messages');
     notificationButton.setAttribute('aria-haspopup','dialog');
     notificationButton.setAttribute('aria-expanded','false');
     const unreadBadge=document.createElement('span');
@@ -61,19 +61,10 @@ if(notificationButton){
     panel.id='studioMessageBellPanel';
     panel.className='studio-message-bell-panel';
     panel.setAttribute('role','dialog');
-    panel.setAttribute('aria-label','Recent messages');
+    panel.setAttribute('aria-label','Unread messages');
     panel.hidden=true;
-    panel.innerHTML='<header><h2>Messages &amp; Announcements</h2><button type="button" data-bell-close aria-label="Close messages">×</button></header><div class="studio-message-bell-content"><div class="studio-message-bell-list" role="status">Open to load recent messages and announcements.</div></div><footer><button type="button" data-bell-all>Open Messages →</button></footer>';
+    panel.innerHTML='<header><h2>Unread Messages</h2><button type="button" data-bell-close aria-label="Close messages">×</button></header><div class="studio-message-bell-content"><div class="studio-message-bell-list" role="status">Open to load unread messages.</div></div><footer><button type="button" data-bell-all>Open Messages →</button></footer>';
     notificationButton.insertAdjacentElement('afterend',panel);
-    // The bell owns all message presentation, including the active job conversation.
-    const jobConversationSlot=document.createElement('div');
-    jobConversationSlot.id='studioShellJobConversation';
-    panel.querySelector('.studio-message-bell-content').append(jobConversationSlot);
-    window.studioShellMountJobConversation=(conversation)=>{
-        jobConversationSlot.replaceChildren();
-        if(conversation)jobConversationSlot.append(conversation);
-    };
-
     let requestRevision=0;
     const close=()=>{panel.hidden=true;notificationButton.setAttribute('aria-expanded','false');requestRevision++;};
     panel.querySelector('[data-bell-close]').onclick=()=>{close();notificationButton.focus();};
@@ -86,37 +77,24 @@ if(notificationButton){
         const list=panel.querySelector('.studio-message-bell-list');
         list.textContent='Loading messages…';
         try{
-            const messageResponse=await fetch('/api/messages/inbox?offset=0&limit=8',{credentials:'same-origin'});
+            const messageResponse=await fetch('/api/messages/inbox?offset=0&limit=8&unreadOnly=true',{credentials:'same-origin'});
             if(!messageResponse.ok)throw new Error('Message inbox unavailable');
             const payload=await messageResponse.json();
-            const messages=(Array.isArray(payload.items)?payload.items:[]).map(item=>({kind:'message',title:item.message?.subject||item.thread?.title||item.message?.senderUserName||'Message',body:item.message?.body||item.message?.text||item.message?.content||'',at:item.message?.createdAtUtc||''}));
-            const workspaceResponse=await fetch('/api/workspaces',{credentials:'same-origin'});
-            if(!workspaceResponse.ok)throw new Error('Workspace announcements unavailable');
-            const workspacePayload=await workspaceResponse.json();
-            const workspaces=Array.isArray(workspacePayload)?workspacePayload:Array.isArray(workspacePayload.items)?workspacePayload.items:[];
-            const results=await Promise.allSettled(workspaces.filter(w=>w.id).map(async workspace=>{
-                const response=await fetch('/api/workspaces/'+encodeURIComponent(workspace.id)+'/announcements',{credentials:'same-origin'});
-                if(!response.ok)throw new Error('Announcements unavailable');
-                const announcements=await response.json();
-                return (Array.isArray(announcements)?announcements:[]).map(item=>({kind:'announcement',title:item.title||'Announcement',body:item.body||'',at:item.createdAtUtc||'',workspaceId:workspace.id,workspaceName:workspace.name||''}));
-            }));
-            const announcements=results.flatMap(result=>result.status==='fulfilled'?result.value:[]);
-            const items=[...messages,...announcements].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,12);
+            const items=(Array.isArray(payload.items)?payload.items:[]).filter(item=>item.isUnread===true).map(item=>({title:item.message?.subject||item.thread?.title||item.message?.senderUserName||'Message',body:item.message?.body||item.message?.text||item.message?.content||''}));
             if(revision!==requestRevision||panel.hidden)return;
             list.replaceChildren();
-            if(!items.length){list.textContent='No recent messages or announcements.';return;}
+            if(!items.length){list.textContent='No unread messages.';return;}
             for(const item of items){
                 const button=document.createElement('button');
                 button.type='button';
                 const title=document.createElement('strong');
-                title.textContent=(item.kind==='announcement'?'📣 ':'✉ ')+String(item.title);
+                title.textContent='✉ '+String(item.title);
                 const preview=document.createElement('span');
-                preview.textContent=String((item.workspaceName?item.workspaceName+' · ':'')+item.body).slice(0,170);
+                preview.textContent=String(item.body).slice(0,170);
                 button.append(title,preview);
                 button.onclick=()=>{
                     close();
-                    if(item.kind==='announcement'&&item.workspaceId&&typeof window.openWorkspace==='function')window.openWorkspace(item.workspaceId);
-                    else window.studioNavigate?.('messages');
+                    window.studioNavigate?.('messages');
                 };
                 list.append(button);
             }

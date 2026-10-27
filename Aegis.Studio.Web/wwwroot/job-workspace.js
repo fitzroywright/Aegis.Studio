@@ -189,20 +189,6 @@ function galleryActionIcon(name) {
 // Compatibility entry point; production media has one implementation.
 async function renderVersionedGallery(job,host,current) { return renderProductionMedia(job,host,current); }
 
-async function renderAnnouncementBanners(host,workspaceId,current) {
-    const items=await json(`/api/workspaces/${workspaceId}/announcements`);
-    if(!current())return;
-    host.hidden=!items.length;
-    host.innerHTML=items.map(x=>`<article class="workspace-announcement" role="status"><div><strong>${esc(x.title)}</strong><p>${esc(x.body)}</p><small class="dismiss-error" role="alert"></small></div><button class="action" data-dismiss="${esc(x.id)}" aria-label="Dismiss announcement">Dismiss</button></article>`).join('');
-    host.querySelectorAll('[data-dismiss]').forEach(button=>button.onclick=async()=>{
-        button.disabled=true;
-        try {
-            await json(`/api/workspaces/${workspaceId}/announcements/${encodeURIComponent(button.dataset.dismiss)}/dismiss`,{method:'POST'});
-            if(current()){button.closest('article').remove();host.hidden=!host.querySelector('article');}
-        }catch(error){button.closest('article').querySelector('.dismiss-error').textContent='Could not dismiss. Please try again.';button.disabled=false;}
-    });
-}
-
 // Posting remains available in workspace administration, without a navigation tab.
 async function renderAnnouncementAdministration(){
         const eligible=workspaceCache.filter(w=>w.permissions?.notifyMembers);

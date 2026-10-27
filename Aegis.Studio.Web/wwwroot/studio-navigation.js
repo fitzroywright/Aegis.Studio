@@ -6,7 +6,6 @@
 
     function setActive(view){
         if(view!=='workspaces'){
-            window.studioShellMountJobConversation?.(null);
             window.studioShellMountJobAttention?.(null);
         }
         document.body.dataset.studioView=view;
