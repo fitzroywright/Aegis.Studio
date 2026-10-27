@@ -9262,8 +9262,7 @@ body[data-studio-view="today"] .topbar #studioBreadcrumb {
 }
 body .shell>.studio-shell-footer {
   min-width: 0;
-  font-size: .75rem;
-  font-weight: 500;
+  font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
   letter-spacing: .02em;
   border-bottom: 0;
   align-self: end;

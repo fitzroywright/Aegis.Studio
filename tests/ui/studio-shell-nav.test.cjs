@@ -93,3 +93,31 @@ test('collapsed side rail persists while navigation stays accessible',async t=>{
  toggle.click();assert.equal(toggle.getAttribute('aria-expanded'),'true');
 });
 
+test('shared footer restores count and keeps history and workspace selection across pages',async t=>{
+ const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://studio.test/',runScripts:'outside-only'});
+ t.after(()=>dom.window.close());
+ const w=dom.window,selected=[];
+ w.document.body.dataset.studioView='frontdesk';
+ w.workspaceCache=[{id:'studio-a',name:'Studio A'},{id:'studio-b',name:'Studio B'}];
+ w.selectWorkspace=(id,name)=>selected.push({id,name});
+ w.fetch=async()=>({ok:true,json:async()=>[]});
+ w.eval(fs.readFileSync(path.join(root,'studio-page.js'),'utf8'));
+ w.eval(code);w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+ const footer=w.document.getElementById('studioShellFooter');
+ assert.equal(footer.querySelector('#studioBreadcrumb').parentElement,footer);
+ const count=footer.querySelector('#studioFooterRate');
+ assert.ok(count);
+ w.StudioPage.setCount('12 Jobs');assert.equal(count.textContent,'12 Jobs');
+ const workspace=footer.querySelector('#studioFooterWorkspaces');
+ assert.ok(workspace);assert.equal(count.nextElementSibling,workspace);
+ workspace.value='studio-b';workspace.dispatchEvent(new w.Event('change'));
+ assert.deepEqual(selected,[{id:'studio-b',name:'Studio B'}]);
+ for(const view of ['jobs','frontdesk','today']){
+  w.document.body.dataset.studioView=view;w.StudioShell.sync(view);
+  assert.equal(w.document.getElementById('studioShellFooter'),footer);
+  assert.equal(footer.querySelector('#studioFooterWorkspaces').value,'studio-b');
+  assert.equal(footer.querySelectorAll('#studioFooterRate').length,1);
+ }
+});
+
