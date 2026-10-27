@@ -1,5 +1,5 @@
 /* Jobs owns this layout. Shared masthead, left rail and footer remain in studio.css. */
-.sj-page{display:grid;grid-template-columns:minmax(0,1fr) var(--studio-right-rail-width,260px);gap:8px;height:100%;min-height:0;color:#283442;font-size:12px}
+.sj-page{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;height:100%;min-height:0;color:#283442;font-size:12px}
 .sj-board,.sj-card,.sj-rail-card{background:#fff;border:var(--studio-rail-border,1px solid #d5d9dd);border-radius:5px;box-shadow:0 2px 5px #2633440c;min-width:0;min-height:0;overflow:hidden}
 .sj-board{display:flex;flex-direction:column}
 .sj-toolbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #e4e5e7;flex-wrap:wrap}
@@ -38,7 +38,7 @@
 .sj-pill.sj-amber{background:#fff4db;color:#89671e;border-color:#e8d7aa}.sj-pill.sj-teal{background:#e7f3ed;color:#3a6f57;border-color:#bcd8c9}.sj-pill.sj-blue{background:#eaf0fa;color:#49638c;border-color:#c4d4eb}.sj-pill.sj-purple{background:#f1edf9;color:#745b95;border-color:#d9cee9}.sj-pill.sj-green{background:#edf5e6;color:#5c793c;border-color:#cddfbb}.sj-pill.sj-rose{background:#fcebed;color:#a15b65;border-color:#ebc9cf}
 .sj-pagination{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#fafbfc;color:#6b7785;border-top:1px solid #dde2e7;gap:8px}
 .sj-pagination div{display:flex;gap:10px;align-items:center}.sj-pagination button{border:1px solid #d2d9e0;border-radius:4px;background:#fff;padding:4px 10px;cursor:pointer}.sj-pagination button[aria-current=page]{background:#d99a2a;color:#fff;border-color:#d99a2a}.sj-pagination button:disabled{opacity:.4;cursor:default}
-.sj-right{gap:8px;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
+
 .sj-card,.sj-rail-card{display:flex;flex-direction:column;flex:1 1 0;}
 .sj-card header,.sj-rail-card header{padding:8px 10px;border-bottom:1px solid var(--studio-rail-accent,#dedfe2);background:var(--studio-rail-accent,#fafbfc);flex-shrink:0}
 .sj-card h2,.sj-rail-card h2{font-size:13px;margin:0;font-weight:var(--studio-rail-title-weight,650);color:var(--studio-rail-title,#344252)}
@@ -50,8 +50,8 @@
 .sj-attention-card{border-top:3px solid #c74c48}
 .sj-rail-links button{font-weight:600;display:flex;align-items:center;gap:8px;padding:11px 8px;color:#596676;background:none;border:0;border-radius:3px;width:100%;text-align:left;cursor:pointer;font-size:12px}.sj-rail-links button b{margin-left:auto;font-size:11px;font-weight:500}.sj-rail-links button.active,.sj-rail-links button:hover{background:#f3eddb;color:#946c20}.sj-rail-links button.active{box-shadow:inset 3px 0 #c49229}
 .sj-error{color:#a43b3b;padding:8px 12px}.sj-loading,.sj-empty{padding:20px;color:#6a7683}
-@media(max-width:1200px){.sj-page{grid-template-columns:minmax(0,1fr) 220px}.sj-table th,.sj-table td{padding:9px 7px}.sj-toolbar{gap:5px;padding:8px}.sj-toolbar select{max-width:140px}}
-@media(max-width:900px){.sj-page{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 170px}.sj-card header,.sj-card-body{padding:6px}.sj-card h2{font-size:11px}.sj-status-count{grid-template-columns:1fr auto}.sj-status-count meter{display:none}.sj-status-count b{grid-column:2}.sj-card footer{padding:4px}.sj-pagination div{gap:4px}}
+@media(max-width:1200px){.sj-page{grid-template-columns:minmax(0,1fr)}.sj-table th,.sj-table td{padding:9px 7px}.sj-toolbar{gap:5px;padding:8px}.sj-toolbar select{max-width:140px}}
+@media(max-width:900px){.sj-page{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}.sj-card header,.sj-card-body{padding:6px}.sj-card h2{font-size:11px}.sj-status-count{grid-template-columns:1fr auto}.sj-status-count meter{display:none}.sj-status-count b{grid-column:2}.sj-card footer{padding:4px}.sj-pagination div{gap:4px}}
 body[data-studio-view="jobs"] .mw-today-focus-icon{color:#e8b647}
 
 
@@ -84,4 +84,3 @@ body[data-studio-view="jobs"] .mw-today-focus-icon{color:#e8b647}
 .sj-calendar .mw-day-nav button:focus-visible{outline:2px solid #df8a32;outline-offset:1px}
 .sj-calendar .mw-calendar-control{position:relative;display:inline-flex;align-items:center}
 .sj-calendar input[data-sj-calendar-date]{position:absolute;inset:auto auto 0 0;width:1px;height:1px;padding:0;opacity:0;pointer-events:none}
-.sj-page:has(> .sj-right.studio-rail-collapsed-right){--studio-right-rail-width:42px}

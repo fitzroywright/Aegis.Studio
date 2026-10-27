@@ -25,8 +25,8 @@ body[data-theme="fluent-dark"] .workspace-list-page .workspace-wow-email.workspa
 .workspace-list-page .workspace-column-header>span:nth-child(8){white-space:nowrap}
 
 
-/* The two remaining right-rail cards share the available height evenly. */
-.workspace-list-page .workspace-right-rail>.smc-card{min-height:0}
+
+
 
 .workspace-list-page .workspace-grid-scroll{flex:1 1 auto;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
 .workspace-list-page .workspace-grid-table{width:100%;min-width:730px}

@@ -228,20 +228,20 @@ async function showPipeline() {
     window.StudioScheduleCalendarControls.bind(genericView,{date:()=>pipelineAnchor,view:value=>{pipelineCalendarPeriod=value;showPipeline().catch(pipelineError);},shift:shiftPipeline,today:()=>{pipelineAnchor=new Date();showPipeline().catch(pipelineError);},dateSelected:date=>{pipelineAnchor=date;showPipeline().catch(pipelineError);}});
     StudioPage.bind(genericView,current);
     StudioPage.setCount(selected.length+' jobs');
-    genericView.querySelectorAll('[data-open-job]').forEach(button => button.onclick = () => button.dataset.openJob && openWorkspaceJob(button.dataset.openJob).catch(error => alert(error.message)));
-    genericView.querySelectorAll('[data-pipeline-view]').forEach(button => button.onclick = () => { pipelineView = button.dataset.pipelineView; showPipeline().catch(pipelineError); });
-    const statusFilter=genericView.querySelector('#pipelineStatusFilter');
+    StudioPage.queryAll(genericView,'[data-open-job]').forEach(button => button.onclick = () => button.dataset.openJob && openWorkspaceJob(button.dataset.openJob).catch(error => alert(error.message)));
+    StudioPage.queryAll(genericView,'[data-pipeline-view]').forEach(button => button.onclick = () => { pipelineView = button.dataset.pipelineView; showPipeline().catch(pipelineError); });
+    const statusFilter=StudioPage.query(genericView,'#pipelineStatusFilter');
     if(statusFilter)statusFilter.onchange=event=>{pipelineSelectedStatus=event.target.value;pipelineSelectedStage='';showPipeline().catch(pipelineError);};
-    const searchInput=genericView.querySelector('#pipelineSearch');
+    const searchInput=StudioPage.query(genericView,'#pipelineSearch');
     if(searchInput)searchInput.onchange=event=>{pipelineSearch=event.target.value;showPipeline().catch(pipelineError);};
-    genericView.querySelectorAll('[data-pipeline-row]').forEach(row=>row.onclick=event=>{if(!event.target.closest('button,a,input,select'))void openWorkspaceJob(row.dataset.pipelineRow).catch(error=>alert(error.message));});
-    genericView.querySelectorAll('[data-stage]').forEach(button => button.onclick = () => {pipelineSelectedStage = pipelineSelectedStage === button.dataset.stage ? '' : button.dataset.stage; showPipeline().catch(pipelineError);});
-    genericView.querySelectorAll('[data-pipeline-manage]').forEach(button=>button.onclick=event=>{event.stopPropagation();openPipelineMove(button.dataset.pipelineManage).catch(error=>alert(error.message));});
-    genericView.querySelectorAll('[data-pipeline-advance]').forEach(button=>button.onclick=async event=>{event.stopPropagation();await advancePipelineJob(button.dataset.pipelineAdvance,jobs);});
+    StudioPage.queryAll(genericView,'[data-pipeline-row]').forEach(row=>row.onclick=event=>{if(!event.target.closest('button,a,input,select'))void openWorkspaceJob(row.dataset.pipelineRow).catch(error=>alert(error.message));});
+    StudioPage.queryAll(genericView,'[data-stage]').forEach(button => button.onclick = () => {pipelineSelectedStage = pipelineSelectedStage === button.dataset.stage ? '' : button.dataset.stage; showPipeline().catch(pipelineError);});
+    StudioPage.queryAll(genericView,'[data-pipeline-manage]').forEach(button=>button.onclick=event=>{event.stopPropagation();openPipelineMove(button.dataset.pipelineManage).catch(error=>alert(error.message));});
+    StudioPage.queryAll(genericView,'[data-pipeline-advance]').forEach(button=>button.onclick=async event=>{event.stopPropagation();await advancePipelineJob(button.dataset.pipelineAdvance,jobs);});
     installPipelineDrag(entries,tasks);
-    genericView.querySelector('#scheduleEntryForm').onsubmit = saveScheduleEntry;
-    genericView.querySelector('#scheduleEntryDialog [data-cancel]').onclick = () => genericView.querySelector('#scheduleEntryDialog').close();
-    if (isAdmin) genericView.querySelector('#scheduleAddResource').onclick = () => createScheduleResource().catch(pipelineError);
+    StudioPage.query(genericView,'#scheduleEntryForm').onsubmit = saveScheduleEntry;
+    StudioPage.query(genericView,'#scheduleEntryDialog [data-cancel]').onclick = () => StudioPage.query(genericView,'#scheduleEntryDialog').close();
+    if (isAdmin) StudioPage.query(genericView,'#scheduleAddResource').onclick = () => createScheduleResource().catch(pipelineError);
 }
 async function openPipelineMove(jobId){
     const [workspaces,workflow]=await Promise.all([json('/api/frontdesk/workspaces'),json(`/api/jobs/${jobId}/workflow-graph`)]);
@@ -257,7 +257,7 @@ async function advancePipelineJob(jobId){
 }
 function installPipelineDrag(entries,tasks){
     const scheduleMap=new Map(entries.map(item=>[item.id,item])),taskMap=new Map(tasks.map(item=>[item.id,item]));
-    genericView.querySelectorAll('[data-pipeline-item]').forEach(element=>{
+    StudioPage.queryAll(genericView,'[data-pipeline-item]').forEach(element=>{
         element.addEventListener('dragstart',event=>{
             event.stopPropagation();
             event.dataTransfer.effectAllowed='move';
@@ -266,7 +266,7 @@ function installPipelineDrag(entries,tasks){
         });
         element.addEventListener('dragend',()=>element.classList.remove('dragging'));
     });
-    genericView.querySelectorAll('[data-pipeline-day]').forEach(cell=>{
+    StudioPage.queryAll(genericView,'[data-pipeline-day]').forEach(cell=>{
         cell.addEventListener('dragover',event=>{event.preventDefault();event.dataTransfer.dropEffect='move';cell.classList.add('drag-target');});
         cell.addEventListener('dragleave',()=>cell.classList.remove('drag-target'));
         cell.addEventListener('drop',async event=>{
@@ -301,7 +301,7 @@ async function reschedulePipelineTask(task,targetDay){
     await json(`/api/operations/activities/${task.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({activityType:task.activityType,title:task.title,description:task.description||null,status:task.status,priority:task.priority,assignedTo:task.assignedTo||null,scheduledAtUtc:scheduled?scheduled.toISOString():null,dueAtUtc:due?due.toISOString():null,location:task.location||null,blockedReason:task.blockedReason||null,handoffTo:task.handoffTo||null})});
 }
 
-function pipelineError(error) { genericView.innerHTML = `<h1>Pipeline could not be loaded</h1><p role="alert">${esc(error.message || error)}</p><button class="action" id="pipelineRetry">Retry</button>`; genericView.querySelector('#pipelineRetry').onclick = () => showPipeline().catch(pipelineError); }
+function pipelineError(error) { genericView.innerHTML = `<h1>Pipeline could not be loaded</h1><p role="alert">${esc(error.message || error)}</p><button class="action" id="pipelineRetry">Retry</button>`; StudioPage.query(genericView,'#pipelineRetry').onclick = () => showPipeline().catch(pipelineError); }
 function shiftPipeline(direction) {
     if(pipelineCalendarPeriod==='month')pipelineAnchor=new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth()+direction,1);
     else if(pipelineCalendarPeriod==='week')pipelineAnchor=new Date(pipelineAnchor.getFullYear(),pipelineAnchor.getMonth(),pipelineAnchor.getDate()+direction*7);
@@ -309,7 +309,7 @@ function shiftPipeline(direction) {
     showPipeline().catch(pipelineError);
 }
 function openScheduleEntryForm(jobId) {
-    const dialog = genericView.querySelector('#scheduleEntryDialog');
+    const dialog = StudioPage.query(genericView,'#scheduleEntryDialog');
     const start = new Date(Date.now() + 3600000); start.setMinutes(0,0,0);
     const local = date => new Date(date.getTime() - date.getTimezoneOffset()*60000).toISOString().slice(0,16);
     dialog.querySelector('#scheduleJob').value = jobId || '';
@@ -337,9 +337,9 @@ async function saveScheduleEntry(event) {
     } catch (cause) { error.textContent = cause.message || String(cause); button.disabled = false; }
 }
 async function createScheduleResource() {
-    const name = genericView.querySelector('#scheduleResourceName').value.trim();
+    const name = StudioPage.query(genericView,'#scheduleResourceName').value.trim();
     if (!name) return alert('Resource name is required.');
-    await json('/api/schedule/resources', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, resourceType:genericView.querySelector('#scheduleResourceType').value, isActive:true, notes:null }) });
+    await json('/api/schedule/resources', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ name, resourceType:StudioPage.query(genericView,'#scheduleResourceType').value, isActive:true, notes:null }) });
     await showPipeline();
 }
 
@@ -348,6 +348,7 @@ window.addEventListener('studio-schedule-item',()=>{
 });
 // Older Schedule calls now open the dedicated photographer calendar.
 async function showSchedule() { return window.studioNavigate('schedule'); }
+
 
 
 

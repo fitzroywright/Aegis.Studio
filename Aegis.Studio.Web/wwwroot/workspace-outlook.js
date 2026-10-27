@@ -206,7 +206,6 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 panel.innerHTML=(name==='media'?'':`<header class="jd-card-heading"><h2>${title}</h2>${name==='subjects'?'<div><button type="button" class="jd-link" data-job-media>← Media</button><button type="button" class="jd-link" data-job-add-subject hidden>＋ Add Subject</button></div>':''}</header>`)+`<div class="job-${name}-content"></div>`;
                 panels[name]=panel;contents[name]=panel.querySelector('.job-'+name+'-content');center.append(panel);
             }
-            const right=document.createElement('aside');right.className='job-detail-right st-right';right.setAttribute('aria-label','Job tools and messages');
 
             const messagesPanel=document.getElementById('combinedJobMessages'),composer=document.getElementById('hierarchyCompose');
             const messageCard=StudioMessageCard.create({id:'jobDetailMessages',title:'Messages',attributes:'data-message-job-id="'+esc(job.id)+'"',actions:'<button type="button" data-message-search aria-label="Search messages">⌕</button><button type="button" data-message-more aria-label="Show all messages">⋮</button>'});
@@ -218,7 +217,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             attention.innerHTML='<header class="jd-card-heading"><h2>⚠ Needs Attention</h2></header><div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
             // The shared bell owns the conversation; Job Details owns only functional job content.
             window.studioShellMountJobConversation?.(messageCard);
-            window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Job</span><strong>${esc(job.title || 'Job Details')}</strong></div><div class="workspace-summary-row"><span>Client</span><strong>${esc(job.clientName || 'Not assigned')}</strong></div></section>`,'job-detail');
+            window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Status</span><strong>${esc(job.status || 'Not set')}</strong></div><div class="workspace-summary-row"><span>Days in Stage</span><strong data-job-overview-age>Loading…</strong></div><div class="workspace-summary-row"><span>Next Action</span><strong data-job-overview-action>Loading…</strong></div></section>`,'job-detail');
             window.studioShellMountJobAttention?.(attention);
             board.append(center);detailPane.append(board);
             const footerTools=document.getElementById('studioFooterJobTools');
@@ -326,6 +325,10 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 const action=window.StudioJobDetails.workflowAction(workflow);
                 const started=Date.parse(action?.task?.startedAtUtc||action?.task?.startedAt||'');
                 header.querySelector('[data-stage-age]').textContent=Number.isFinite(started)?'In workflow: '+Math.floor(Math.max(0,Date.now()-started)/86400000)+' days':'Timing unavailable';
+                const age=document.querySelector('#studioContextRail [data-job-overview-age]');
+                if(age)age.textContent=header.querySelector('[data-stage-age]').textContent;
+                const next=document.querySelector('#studioContextRail [data-job-overview-action]');
+                if(next)next.textContent=action?.task?.title || 'No outstanding action';
             };
             const openGraphAction=nodeId=>{const task=workflow?.tasks?.find(item=>item.nodeId===nodeId);window.StudioJobGraph.launchTask(job.id,task?.id).catch(error=>console.error('[Studio Job Details] Could not launch next action',error));};
             const refreshWorkflow=async()=>{
@@ -361,6 +364,11 @@ function mergeJobMessages(teamMessages, clientMessages) {
                         console.error('[Studio Job Details] Failed to load workflow graph for job '+job.id,error);
                         header.querySelector('.jd-next-action').replaceChildren();
                         header.querySelector('[data-stage-age]').textContent='Workflow unavailable';
+                        const overview=document.getElementById('studioContextRail');
+                        const age=overview?.querySelector('[data-job-overview-age]');
+                        if(age)age.textContent='Timing unavailable';
+                        const next=overview?.querySelector('[data-job-overview-action]');
+                        if(next)next.textContent='Workflow unavailable';
                         const attentionItems=attention.querySelector('.jd-attention-items');
                         attentionItems.replaceChildren();
                         const status=document.createElement('p');
@@ -423,6 +431,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
 
     }
 })();
+
 
 
 

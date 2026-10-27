@@ -120,10 +120,9 @@ body[data-theme="office-light"][data-studio-view] :is(#frontDeskSearch,.sj-job-h
 }
 body[data-theme="office-light"] :is(input,textarea)::placeholder {color:var(--theme-muted)!important;opacity:1;}
 body[data-theme="office-light"] :is(input,select,textarea,button,a):focus-visible {outline-color:var(--theme-accent);}
-body[data-theme="office-light"] :is(.st-link,.sj-gold,.text-button,.link-button,.studio-workspaces-view-all,.mw-list-right header button,.mw-today-right header button) {color:var(--theme-accent)!important;}
+body[data-theme="office-light"] :is(.st-link,.sj-gold,.text-button,.link-button,.studio-workspaces-view-all) {color:var(--theme-accent);}
 body[data-theme="office-light"] :is(.primary,.smc-content>.composer .send-split button) {background:#0068d9;color:#fff;border-color:#0068d9;}
 body[data-theme="office-light"] :is(.primary,.smc-content>.composer .send-split button):hover {background:#075fc0;border-color:#075fc0;}
 body[data-theme="office-light"] :is(.sj-view-tabs button.active,.mw-today-view-tabs button.active,.mw-calendar-view-switch button.active,.studio-media-status-tabs button.active,.pipeline-view-switch button.active,.workspace-tabs button.active,.workspace-reference-tabs button.active,.production-filters>button.active,.production-queue-tabs button.active,.fd-tabs button.active) {background:#986c55;color:#fff;border-color:#986c55;}
 body[data-theme="office-light"] :is(dialog,.studio-dialog,.user-menu-popover) {background:#fff;color:var(--theme-text);border-color:var(--theme-border);}
 body[data-theme="office-light"] dialog::backdrop {background:#17345166;}
-
