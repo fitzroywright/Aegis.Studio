@@ -449,14 +449,18 @@
         trigger.className = 'studio-attention-trigger';
         trigger.setAttribute('aria-controls', 'studioAttentionDrawer');
         trigger.setAttribute('aria-expanded', 'false');
-        trigger.innerHTML = '<span>Needs Attention</span><strong id="studioAttentionCount" aria-label="Attention items">0</strong><span aria-hidden="true">⌄</span>';
+        trigger.setAttribute('aria-label', 'Needs Attention');
+        trigger.title = 'Needs Attention';
+        trigger.innerHTML = '<svg class="studio-status-icon studio-attention-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10.3 4.4 2.8 17.5A2 2 0 0 0 4.5 20.5h15a2 2 0 0 0 1.7-3L13.7 4.4a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5m0 3h.01"/></svg><strong id="studioAttentionCount" aria-label="Attention items">0</strong><span aria-hidden="true">⌄</span>';
         const sessionsTrigger = document.createElement('button');
         sessionsTrigger.type = 'button';
         sessionsTrigger.id = 'studioSessionsTrigger';
         sessionsTrigger.className = 'studio-attention-trigger studio-sessions-trigger';
         sessionsTrigger.setAttribute('aria-controls', 'studioSessionsDrawer');
         sessionsTrigger.setAttribute('aria-expanded', 'false');
-        sessionsTrigger.innerHTML = '<span>Upcoming Sessions</span><strong id="studioSessionsCount">0</strong><span aria-hidden="true">⌄</span>';
+        sessionsTrigger.setAttribute('aria-label', 'Upcoming Sessions');
+        sessionsTrigger.title = 'Upcoming Sessions';
+        sessionsTrigger.innerHTML = '<svg class="studio-status-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 10V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h6M7 2v4m9-4v4M3 9h17M7 13h.01M11 13h.01M7 17h.01"/><g class="studio-session-clock"><circle cx="17" cy="17" r="5"/><path d="M17 14v3l2 1"/></g></svg><strong id="studioSessionsCount" aria-label="Upcoming sessions">0</strong><span aria-hidden="true">⌄</span>';
         const statusTools = document.createElement('div');
         statusTools.className = 'studio-navigation-status';
         statusTools.append(sessionsTrigger, trigger);
@@ -722,4 +726,5 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })()
+
 
