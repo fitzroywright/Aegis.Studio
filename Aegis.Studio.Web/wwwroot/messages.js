@@ -3,6 +3,7 @@
     let selectedThread = null;
     let refreshTimer = null;
     let lastUnreadTotal = 0;
+    let unreadRevision = 0;
     let knownThreadUnread = new Map();
     let mentionUsers = [];
     let toastTimer = null;
@@ -123,6 +124,7 @@
             pickerJobs=await json('/api/jobs');
             if(revision!==inboxRevision||document.getElementById('studioInboxRows')!==body)return;
             renderInboxFilters();renderInbox();
+            void refreshUnreadCount();
         }catch(error){if(revision!==inboxRevision||document.getElementById('studioInboxRows')!==body)return;body.innerHTML='<div class="studio-inbox-loading">'+esc(error.message||'Unable to load messages.')+'</div>';}
     }
     function renderInboxFilters(){
@@ -183,6 +185,7 @@
             list.querySelectorAll('[data-thread-id]').forEach(button => button.onclick = () => openThread(button.dataset.threadId));
         }
         handleUnreadChanges(threads);
+        await refreshUnreadCount();
         return threads;
     }
 
@@ -465,9 +468,27 @@
         }
     }
 
+    async function refreshUnreadCount() {
+        const revision = ++unreadRevision;
+        try {
+            const page = await json('/api/messages/inbox?offset=0&limit=1&unreadOnly=true');
+            if (revision !== unreadRevision) return;
+            if (!Number.isSafeInteger(page?.total) || page.total < 0) throw new Error('Invalid unread total');
+            updateUnreadBadge(page.total);
+        } catch {
+            if (revision !== unreadRevision) return;
+            const bell = document.getElementById('notificationButton');
+            const badge = document.getElementById('messageUnreadBadge');
+            if (badge) { badge.hidden = false; badge.textContent = '?'; }
+            if (bell) {
+                bell.title = 'Messages · unread count unavailable';
+                bell.setAttribute('aria-label', 'Messages, unread count unavailable');
+            }
+        }
+    }
+
     function handleUnreadChanges(threads) {
         const total = threads.reduce((sum, item) => sum + Number(item.unreadCount || 0), 0);
-        updateUnreadBadge(total);
         if (lastUnreadTotal > 0 && total > lastUnreadTotal) {
             const changed = threads.find(thread => Number(thread.unreadCount || 0) > Number(knownThreadUnread.get(thread.id) || 0));
             const recentlyMentioned = changed && recentMentionThread === changed.id && Date.now() - recentMentionAt < 4000;
@@ -565,6 +586,7 @@
     }
 
     async function refreshIfVisible() {
+        await refreshUnreadCount();
         try {
             const messagesButton = document.querySelector('[data-view="messages"]');
             if (messagesButton?.classList.contains('active')) {
