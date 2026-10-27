@@ -65,6 +65,7 @@
                 <section id="messageConversationPane" class="message-conversation-pane studio-inbox-reading"><div class="empty-state"><h2>Select a message</h2><p>Read the conversation and reply here.</p></div></section>
             </div>`});
         StudioPage.bind(genericView,current);
+        void window.StudioAnnouncements?.attachComposer(genericView.querySelector('.studio-inbox-tools'),current);
         document.getElementById('newDirectMessage').onclick = startDirect;
         document.getElementById('studioAddressBook').onclick = () => showAddressBook();
         document.getElementById('studioInboxPrevious').onclick=()=>{inboxOffset=Math.max(0,inboxOffset-100);void loadInbox(true);};

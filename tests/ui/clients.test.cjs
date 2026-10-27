@@ -16,7 +16,7 @@ function setup(){
  w.studioNavigate=async(view,options={})=>{fixture.navigation={view,options};if(view==='clients')await w.StudioClients.render(options);};
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML='<div class="studio-dialog-body">'+html+'</div>';d.close=()=>d.remove();w.document.body.append(d);return d;};
  w.json=async(url,options)=>{fixture.calls.push({url,options});if(fixture.delay&&url.includes('/media?'))await fixture.delay;
- if(url==='/api/frontdesk/clients')return fixture.clients;if(url==='/api/jobs')return fixture.jobs;if(url==='/api/workspaces')return[{id:'w1',name:'Portraits'}];
+ if(url==='/api/production/media-summary')return fixture.mediaSummary||[];if(url==='/api/frontdesk/clients')return fixture.clients;if(url==='/api/jobs')return fixture.jobs;if(url==='/api/workspaces')return[{id:'w1',name:'Portraits'}];
  if(url.endsWith('/workflow'))return{status:'Ready for Delivery',revision:12,actions:fixture.allowed?['publish']:[]};
  if(url.endsWith('/media/publications'))return[];
  if(url.includes('/media?'))return{gallery:{name:'Graduation Selects'},assets:[],collections:['Selects'],totalAssets:42};
@@ -154,4 +154,15 @@ test('Client Jobs has four columns and keeps gallery access in its own tab',asyn
  w.document.querySelector('[data-c-job-search]').value='No match';w.document.querySelector('[data-c-job-search]').dispatchEvent(new w.Event('input'));
  assert.equal(w.document.querySelector('.client-jobs-scroll td').colSpan,4);
  tab(w,'galleries');await settle();assert.ok(w.document.querySelector('[data-c-media]'));
+});
+test('client job listing chooses a real job photo once and preserves it while filtering',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());w.Math.random=()=>0.99;
+ fixture.mediaSummary=[{jobId:'j1',thumbnailVersionIds:['v1','v2']},{jobId:'j1',thumbnailVersionIds:['v2']},{jobId:'j2',thumbnailVersionIds:['other-client']}];
+ await w.StudioClients.render({clientId:'a'});await settle();
+ const photo=w.document.querySelector('[data-c-photo="j1"] img');assert.ok(photo);assert.match(photo.src,/jobs\/j1\/versions\/by-id\/v2\/preview\?size=thumbnail/);
+ assert.equal(w.document.querySelector('[data-c-photo="j2"]'),null);assert.equal(w.document.querySelectorAll('.client-jobs-table th').length,4);
+ const search=w.document.querySelector('[data-c-job-search]');search.value='Graduation';search.dispatchEvent(new w.Event('input'));await settle();
+ assert.equal(w.document.querySelector('[data-c-photo] img').src,photo.src);assert.equal(fixture.calls.filter(c=>c.url==='/api/production/media-summary').length,1);
+ w.document.querySelector('[data-c-photo] img').dispatchEvent(new w.Event('error'));assert.equal(w.document.querySelector('[data-c-photo] img'),null);assert.match(w.document.querySelector('[data-c-photo]').getAttribute('aria-label'),/unavailable/);
+ w.document.querySelector('[data-c-job]').click();assert.deepEqual(fixture.opened,['j1']);
 });

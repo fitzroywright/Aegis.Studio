@@ -49,14 +49,17 @@ async function showNotifications() {
 // Notifications remain a dedicated navigation page; the masthead bell is a message preview.
 const notificationButton=document.getElementById('notificationButton');
 if(notificationButton){
+    notificationButton.className='studio-attention-trigger';
+    notificationButton.querySelector('svg')?.classList.add('studio-status-icon');
     notificationButton.title='Messages';
     notificationButton.setAttribute('aria-label','Show unread messages');
     notificationButton.setAttribute('aria-haspopup','dialog');
     notificationButton.setAttribute('aria-expanded','false');
-    const unreadBadge=document.createElement('span');
+    const unreadBadge=document.createElement('strong');
     unreadBadge.id='messageUnreadBadge';unreadBadge.className='studio-message-bell-count';
     unreadBadge.textContent='…';unreadBadge.setAttribute('aria-hidden','true');
     notificationButton.append(unreadBadge);
+    const chevron=document.createElement('span');chevron.textContent='⌄';chevron.setAttribute('aria-hidden','true');notificationButton.append(chevron);
     const panel=document.createElement('section');
     panel.id='studioMessageBellPanel';
     panel.className='studio-message-bell-panel';

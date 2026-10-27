@@ -25,6 +25,12 @@ window.StudioClients=(()=>{
         // Refresh invalidates derived data; switching tabs does not refetch it.
         state.gallery=null;state.finance=null;state.activity=null;
         const linked=client?jobs.filter(j=>j.clientId===client.id):[];
+        let photoPromise;
+        const loadJobPhotos=()=>photoPromise ||= loadArray('/api/production/media-summary').then(rows=>{
+            const candidates=new Map();
+            for(const row of rows){const id=String(row.jobId),values=candidates.get(id)||new Set();for(const value of row.thumbnailVersionIds||[])values.add(value);candidates.set(id,values);}
+            return new Map([...candidates].map(([id,values])=>{const ids=[...values];return [id,ids[Math.floor(Math.random()*ids.length)]];}));
+        }).catch(()=>new Map());
         let detailRevision=0;
         const wname=id=>workspaces.find(w=>w.id===id)?.name||'Workspace';
         const workflowByJob=new Map((Array.isArray(workflowJobs)?workflowJobs:[]).map(item=>[String(item.jobId),item]));
@@ -65,7 +71,16 @@ window.StudioClients=(()=>{
             try{
                 if(tab==='jobs'){
                     const values=linked.filter(j=>(!state.status||j.status===state.status)&&[j.title,j.status,wname(j.workspaceId),jobOwnerName(j)].join(' ').toLowerCase().includes(state.jobSearch.toLowerCase()));
-                    host.innerHTML=`<div class="client-jobs-grid"><div class="client-jobs-head-clip"><table class="sj-table client-jobs-table"><thead><tr><th><label class="client-column-search"><span>Job / Workspace</span><input data-c-job-search type="search" placeholder="Search jobs…" aria-label="Search client jobs" value="${esc(state.jobSearch)}"></label></th><th>Event date</th><th>Job Owner</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Status</span><select data-c-job-status aria-label="Job status"><option value="">All statuses</option>${[...new Set(linked.map(j=>j.status))].sort().map(s=>`<option ${s===state.status?'selected':''}>${esc(s)}</option>`).join('')}</select></label></th></tr></thead></table></div><div class="client-jobs-scroll"><table class="sj-table client-jobs-table"><tbody>${values.map(j=>`<tr tabindex="0" data-c-job="${esc(j.id)}" data-sj-job="${esc(j.id)}"><td><strong>${esc(j.title)}</strong><small>${esc(wname(j.workspaceId))}</small></td><td>${esc(date(j.eventDate))}</td><td><span class="sj-owner"><span class="sj-initials" aria-hidden="true">${jobOwner(j)?esc(jobOwnerName(j).split(/[\s.]+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase()):'–'}</span>${esc(jobOwnerName(j))}</span></td><td>${badge(j.status)}</td></tr>`).join('')||'<tr><td colspan="4">No linked jobs match this view.</td></tr>'}</tbody></table></div></div>`;
+                    host.innerHTML=`<div class="client-jobs-grid"><div class="client-jobs-head-clip"><table class="sj-table client-jobs-table"><thead><tr><th><label class="client-column-search"><span>Job / Workspace</span><input data-c-job-search type="search" placeholder="Search jobs…" aria-label="Search client jobs" value="${esc(state.jobSearch)}"></label></th><th>Event date</th><th>Job Owner</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Status</span><select data-c-job-status aria-label="Job status"><option value="">All statuses</option>${[...new Set(linked.map(j=>j.status))].sort().map(s=>`<option ${s===state.status?'selected':''}>${esc(s)}</option>`).join('')}</select></label></th></tr></thead></table></div><div class="client-jobs-scroll"><table class="sj-table client-jobs-table"><tbody>${values.map(j=>`<tr tabindex="0" data-c-job="${esc(j.id)}" data-sj-job="${esc(j.id)}"><td><div class="client-job-identity"><span class="client-job-photo" data-c-photo="${esc(j.id)}" aria-label="Job photo">▧</span><span class="client-job-copy"><strong>${esc(j.title)}</strong><small>${esc(wname(j.workspaceId))}</small></span></div></td><td>${esc(date(j.eventDate))}</td><td><span class="sj-owner"><span class="sj-initials" aria-hidden="true">${jobOwner(j)?esc(jobOwnerName(j).split(/[\s.]+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase()):'–'}</span>${esc(jobOwnerName(j))}</span></td><td>${badge(j.status)}</td></tr>`).join('')||'<tr><td colspan="4">No linked jobs match this view.</td></tr>'}</tbody></table></div></div>`;
+                    void loadJobPhotos().then(photos=>{
+                        if(!current())return;
+                        host.querySelectorAll('[data-c-photo]').forEach(slot=>{
+                            const version=photos.get(slot.dataset.cPhoto);if(!version){slot.setAttribute('aria-label','No job photo available');return;}
+                            const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';
+                            image.src='/api/jobs/'+encodeURIComponent(slot.dataset.cPhoto)+'/versions/by-id/'+encodeURIComponent(version)+'/preview?size=thumbnail';
+                            image.onerror=()=>{slot.textContent='▧';slot.setAttribute('aria-label','Job photo unavailable');};slot.replaceChildren(image);
+                        });
+                    });
                     host.querySelector('[data-c-job-search]').oninput=e=>{const input=e.target,start=input.selectionStart,end=input.selectionEnd,direction=input.selectionDirection;state.jobSearch=input.value;showTab();const next=host.querySelector('[data-c-job-search]');next.focus({preventScroll:true});next.setSelectionRange(start,end,direction);};
                     host.querySelector('[data-c-job-status]').onchange=e=>{state.status=e.target.value;showTab();};
                 }else if(tab==='reminders'){

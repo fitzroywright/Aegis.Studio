@@ -1,17 +1,4 @@
 // Job records are shared by all workspace views; no separate calendar task store.
-async function renderWorkspaceAnnouncements(host, workspaceId, current) {
-    const items = await json(`/api/workspaces/${workspaceId}/announcements`);
-    if (!current()) return;
-    host.innerHTML = `<div class="detail-header"><h1>Announcements</h1></div><div class="messages">${items.map(x => `<article class="message"><h2>${esc(x.title)}</h2><p style="white-space:pre-wrap">${esc(x.body)}</p><small>${esc(new Date(x.createdAtUtc).toLocaleString())}</small></article>`).join('') || '<p>No announcements yet.</p>'}</div>${currentWorkspacePermissions?.notifyMembers ? '<form class="composer announcement-form"><label>Title<input name="title" required maxlength="200"></label><label>Announcement<textarea name="body" required maxlength="10000"></textarea></label><button class="primary">Post announcement</button><p role="alert"></p></form>' : ''}`;
-    const form = host.querySelector('form');
-    if (form) form.onsubmit = async event => {
-        event.preventDefault(); const button = form.querySelector('button'); button.disabled = true;
-        try { await json(`/api/workspaces/${workspaceId}/announcements`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:form.elements.title.value,body:form.elements.body.value})}); if(current()) await renderWorkspaceAnnouncements(host,workspaceId,current); }
-        catch(error) { form.querySelector('[role=alert]').textContent = error.message; }
-        finally {button.disabled=false;}
-    };
-}
-
 async function renderJobSubjects(job, panel, current, refresh) {
     const [originalSubjects, permissions, media] = await Promise.all([
         json(`/api/jobs/${job.id}/subjects`),
@@ -188,22 +175,3 @@ function galleryActionIcon(name) {
 }
 // Compatibility entry point; production media has one implementation.
 async function renderVersionedGallery(job,host,current) { return renderProductionMedia(job,host,current); }
-
-// Posting remains available in workspace administration, without a navigation tab.
-async function renderAnnouncementAdministration(){
-        const eligible=workspaceCache.filter(w=>w.permissions?.notifyMembers);
-        if(!eligible.length)return;
-        const section=document.createElement('section');section.className='job-section';
-        section.innerHTML=`<h2>Post workspace announcement</h2><form class="announcement-form"><label>Workspace<select name="workspace">${eligible.map(w=>`<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</select></label><label>Title<input name="title" required maxlength="200"></label><label>Announcement<textarea name="body" required maxlength="10000"></textarea></label><button class="primary">Post announcement</button><p role="status"></p></form>`;
-        genericView.appendChild(section);
-        const form=section.querySelector('form');form.onsubmit=async e=>{
-            e.preventDefault();const button=form.querySelector('button');button.disabled=true;
-            try{await json(`/api/workspaces/${form.elements.workspace.value}/announcements`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:form.elements.title.value,body:form.elements.body.value})});form.elements.title.value='';form.elements.body.value='';form.querySelector('[role=status]').textContent='Announcement posted.';}
-            catch(error){form.querySelector('[role=status]').textContent=error.message;}
-            finally{button.disabled=false;}
-        };
-}
-
-
-
-
