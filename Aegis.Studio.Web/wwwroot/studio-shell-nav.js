@@ -73,7 +73,15 @@
             tools.className = 'studio-navigation-tools';
             tools.setAttribute('aria-label', 'Studio navigation');
             tools.innerHTML = quickLinks.map(([view,label,icon]) => '<button type="button" data-studio-side="'+view+'"><span aria-hidden="true">'+icon+'</span><span>'+label+'</span></button>').join('');
-            host.append(tools);
+            const scroll = document.createElement('div');
+            scroll.className = 'studio-navigation-scroll';
+            scroll.append(tools);
+            const account = document.createElement('div');
+            account.className = 'studio-navigation-account';
+            for (const control of [document.getElementById('notificationButton'), document.getElementById('studioMessageBellPanel'), banner.querySelector('.user-menu')]) {
+                if (control) account.append(control);
+            }
+            host.append(scroll, account);
             banner.append(host);
             tools.addEventListener('click', event => {
                 const button = event.target.closest('[data-studio-side]');
@@ -446,7 +454,7 @@
         const statusTools = document.createElement('div');
         statusTools.className = 'studio-navigation-status';
         statusTools.append(sessionsTrigger, trigger);
-        toolstrip.append(statusTools);
+        toolstrip.querySelector('.studio-navigation-scroll').append(statusTools);
         const backdrop = document.createElement('div');
         backdrop.className = 'studio-attention-backdrop';
         backdrop.hidden = true;
