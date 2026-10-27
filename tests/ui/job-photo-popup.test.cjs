@@ -185,3 +185,11 @@ test('repeated standalone gallery opening keeps only the latest popup',async t=>
  assert.equal(first.isConnected,false);assert.equal(second.isConnected,true);
  assert.equal(w.document.querySelectorAll('.jd-photo-viewer').length,1);
 });
+
+test('Session Plan opens from the job media toolbar rather than the Actions card',async t=>{
+ const {w,dialog}=await setup(t);dialog.close();const routes=[];
+ w.studioNavigate=async(view,options)=>routes.push({view,options});
+ assert.equal(w.document.querySelector('#studioContextRail [data-job-action="session-plan"]'),null);
+ w.document.querySelector('.jd-gallery-toolbar [data-job-session-plan]').click();
+ assert.deepEqual(JSON.parse(JSON.stringify(routes)),[{view:'session-plan',options:{jobId:'job'}}]);
+});

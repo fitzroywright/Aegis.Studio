@@ -24,7 +24,8 @@ test('Session Plan reads outcomes and full photo counts separately from roster i
  assert.match(w.document.getElementById('studioContextRail').textContent,/Reshoots1/);
  assert.ok(calls.some(c=>c.url==='/api/jobs/j/session-plan'));
  assert.equal(w.document.querySelector('.studio-right-rail'),null);
- assert.ok(w.document.querySelector('#studioContextRail [data-workflow-action="import"]'));
+ assert.equal(w.document.querySelector('#studioContextRail [data-rail-card="actions"]'),null);
+ assert.ok(w.genericView.querySelector('[aria-label="Session Plan actions"] [data-workflow-action="import"]'));
 });
 test('guided import maps, merges stable references, blocks invalid rows and commits the reviewed revision',async t=>{
  const {w,calls}=setup(t,'session-plan');await w.StudioWorkflowViews.showSessionPlan('j');
@@ -124,4 +125,14 @@ test('Delivery retains the scrolled row through selection and delayed photo resp
  assert.equal(w.genericView.querySelector('.workflow-table-scroll'),list);assert.equal(list.scrollTop,300);
  assert.match(w.genericView.querySelector('.workflow-detail').textContent,/Delivery 6/);
  assert.equal(list.querySelectorAll('[aria-selected="true"]').length,1);
+});
+
+test('Session Plan actions live on the page and retain import and return navigation',async t=>{
+ const {w,navigation}=setup(t,'session-plan');await w.StudioWorkflowViews.showSessionPlan('j');
+ const toolbar=w.genericView.querySelector('[aria-label="Session Plan actions"]');
+ assert.equal(w.document.querySelector('#studioContextRail [data-workflow-action]'),null);
+ toolbar.querySelector('[data-workflow-action="import"]').click();
+ assert.ok(w.genericView.querySelector('[data-session-file]'));
+ w.genericView.querySelector('[data-workflow-action="job"]').click();await settle();
+ assert.deepEqual(JSON.parse(JSON.stringify(navigation.at(-1))),{view:'workspaces',options:{jobId:'j'}});
 });
