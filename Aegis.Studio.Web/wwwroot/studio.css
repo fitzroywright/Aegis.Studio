@@ -8644,8 +8644,11 @@ body .topbar {
 }
 /* Navigation shares the banner’s vertically centered row with the Studio identity. */
 .studio-navigation-toolstrip {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  width: max-content;
   min-width: 0;
+  margin-inline-start: auto;
+  align-self: center;
   height: var(--studio-navigation-strip-height);
   display: flex;
   align-items: center;
