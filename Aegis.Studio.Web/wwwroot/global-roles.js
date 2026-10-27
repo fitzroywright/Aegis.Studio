@@ -1,8 +1,9 @@
-async function renderGlobalRoleAdministration() {
+async function renderGlobalRoleAdministration(current=()=>true) {
     try {
         const me = await json('/api/auth/me');
-        if (me?.user?.isAdministrator !== true) return;
+        if (!current() || (me?.user||me)?.isAdministrator !== true) return;
         const roles = await json('/api/security/global-roles/');
+        if(!current())return;
         const frontDesk = roles.find(role => role.name === 'Front Desk');
         const operationsManager = roles.find(role => role.name === 'Operations Manager');
         if (!frontDesk && !operationsManager) return;
@@ -64,4 +65,5 @@ async function removeOperationsManagerRoleMember(roleId, userName) {
     if (!response.ok) throw new Error(await response.text());
     await refreshOperationsManagerRoleMembers(roleId);
 }
+
 

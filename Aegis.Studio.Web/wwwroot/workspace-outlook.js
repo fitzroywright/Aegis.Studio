@@ -230,10 +230,9 @@ function mergeJobMessages(teamMessages, clientMessages) {
             board.append(center);detailPane.append(board);
             void window.StudioJobBrief?.mount(job,brief,current);
             const makeDrawer=(key,title)=>{
-                const toggle=document.querySelector('[data-studio-avatar-activity]');toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','job'+key+'Drawer');
                 const drawer=document.createElement('aside');drawer.id='job'+key+'Drawer';drawer.className='jd-footer-drawer';drawer.setAttribute('aria-labelledby','job'+key+'Title');drawer.setAttribute('aria-hidden','true');drawer.setAttribute('inert','');
                 drawer.innerHTML=`<header class="jd-card-heading"><h2 id="job${key}Title">${title}</h2><button type="button" class="jd-link" data-close-drawer aria-label="Close ${title}">×</button></header><div class="jd-footer-drawer-content"></div>`;
-                detailPane.append(drawer);return {toggle,drawer,host:drawer.querySelector('.jd-footer-drawer-content')};
+                detailPane.append(drawer);return {get toggle(){return document.querySelector('[data-job-action="activity"]');},drawer,host:drawer.querySelector('.jd-footer-drawer-content')};
             };
             const activityView=makeDrawer('Activity','Recent Activity');
             const drawerViews=[activityView];
@@ -278,17 +277,17 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 dialog.addEventListener('close',()=>{if(taskDialog===dialog){taskDialog=null;loaded.delete('tasks');pending.delete('tasks');if(current()){if(trigger?.isConnected&&trigger!==document.body)trigger.focus();else contents.media.querySelector('[data-job-tasks]')?.focus();}}}, {once:true});
                 await loadPanel('tasks',true);
             };
-            const closeDrawer=(view,restoreFocus=false)=>{view.drawer.classList.remove('is-open');view.drawer.setAttribute('aria-hidden','true');view.drawer.setAttribute('inert','');view.toggle.setAttribute('aria-expanded','false');if(restoreFocus)document.querySelector('.user-menu-trigger')?.focus();};
+            const closeDrawer=(view,restoreFocus=false)=>{view.drawer.classList.remove('is-open');view.drawer.setAttribute('aria-hidden','true');view.drawer.setAttribute('inert','');view.toggle?.setAttribute('aria-expanded','false');if(restoreFocus)view.toggle?.focus();};
             const openDrawer=async(view,load)=>{
                 drawerViews.filter(other=>other!==view).forEach(other=>closeDrawer(other));
                 view.drawer.style.setProperty('--jd-drawer-bottom',(document.getElementById('studioShellFooter').getBoundingClientRect().height||32)+'px');
-                view.drawer.classList.add('is-open');view.drawer.setAttribute('aria-hidden','false');view.drawer.removeAttribute('inert');view.toggle.setAttribute('aria-expanded','true');view.drawer.querySelector('[data-close-drawer]').focus();await load();
+                view.drawer.classList.add('is-open');view.drawer.setAttribute('aria-hidden','false');view.drawer.removeAttribute('inert');view.toggle?.setAttribute('aria-expanded','true');view.toggle?.setAttribute('aria-controls',view.drawer.id);view.drawer.querySelector('[data-close-drawer]').focus();await load();
             };
             for(const view of drawerViews){
                 view.drawer.querySelector('[data-close-drawer]').onclick=()=>closeDrawer(view,true);
                 view.drawer.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeDrawer(view,true);}});
             }
-            const dismissDrawers=event=>{for(const view of drawerViews)if(view.toggle.getAttribute('aria-expanded')==='true'&&!view.drawer.contains(event.target)&&!view.toggle.contains(event.target))closeDrawer(view);};
+            const dismissDrawers=event=>{for(const view of drawerViews)if(view.drawer.classList.contains('is-open')&&!view.drawer.contains(event.target)&&!view.toggle?.contains(event.target))closeDrawer(view);};
             document.addEventListener('pointerdown',dismissDrawers);
             const selectPanel=async name=>{
                 if(name==='tasks')return openTasks();
@@ -395,7 +394,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             const timer=setInterval(()=>{if(!current()||!header.isConnected)clearInterval(timer);else updateAge();},60000);
             const navigationObserver=new MutationObserver(()=>{if(document.body.dataset.studioView!=='workspaces'){disposeJobView();disposeJobView=()=>{};}});
             navigationObserver.observe(document.body,{attributes:true,attributeFilter:['data-studio-view']});
-            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();messageDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle.removeAttribute('aria-expanded');view.toggle.removeAttribute('aria-controls');});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
+            disposeJobView=()=>{disposed=true;navigationObserver.disconnect();clearInterval(timer);taskDialog?.close();messageDialog?.close();document.removeEventListener('pointerdown',dismissDrawers);drawerViews.forEach(view=>{view.drawer.remove();view.toggle?.removeAttribute('aria-expanded');view.toggle?.removeAttribute('aria-controls');});contents.media.studioJobMedia?.dispose();window.removeEventListener('studio-job-action',handleAction);};
             const graphChanged=event=>{if(event.detail?.jobId===job.id&&current())refreshWorkflow();};document.addEventListener('studio-workflow-changed',graphChanged);const previousDispose=disposeJobView;disposeJobView=()=>{document.removeEventListener('studio-workflow-changed',graphChanged);previousDispose();};
             detailPane.dataset.readyEnabled='true';refreshWorkflow();refreshLocation();selectPanel('media');
             window.dispatchEvent(new CustomEvent('studio-job-view-changed'));

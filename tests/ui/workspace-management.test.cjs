@@ -19,11 +19,11 @@ test('Workspaces has accountability cards, real managers and counts, photos and 
 test('view-only Workspace cards expose jobs without administration actions',async t=>{
  const {w}=setup(t,false);await w.StudioWorkspaceManagement.render();assert.equal(w.document.querySelector('[data-create-workspace],[data-workspace-edit],[data-workspace-members],[data-workspace-mail],#roleScope'),null);assert.equal(w.document.querySelectorAll('[data-workspace-jobs]').length,2);
 });
-test('Admin menu moves Workspaces and Studio Management out of the avatar',async t=>{
+test('Admin menu exposes Workspaces and ends with About',async t=>{
  const {w,navigation}=setup(t);w.fetch=async()=>({ok:true,json:async()=>[]});w.eval(read('studio-admin.js'));w.eval(read('studio-shell-nav.js'));w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await settle();
  assert.equal(w.document.querySelector('[data-studio-avatar-workspaces],[data-studio-profile-management]'),null);
  const menu=w.document.querySelector('.studio-admin-menu');assert.ok(menu);assert.equal(menu.previousElementSibling.className,'studio-navigation-scroll');
- const link=menu.querySelector('[data-studio-admin-view="workspace-management"]');assert.equal(link.nextElementSibling.textContent,'Studio Management');menu.open=true;link.click();assert.equal(navigation.at(-1).view,'workspace-management');assert.equal(menu.open,false);
+ const link=menu.querySelector('[data-studio-admin-view="workspace-management"]');assert.equal(menu.querySelector('div').lastElementChild.textContent,'About');menu.open=true;link.click();assert.equal(navigation.at(-1).view,'workspace-management');assert.equal(menu.open,false);
  menu.open=true;menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.open,false);
 });
 test('dedicated Session Plan Import preserves the job in its route and browser history',async t=>{
@@ -39,4 +39,11 @@ test('Create Workspace retains manager assignment and returns to Workspace admin
 test('non-administrator Admin menu exposes only permitted workspace access',async t=>{
  const {w}=setup(t,false);w.studioSignedInUserReady=Promise.resolve({isAdministrator:false});w.eval(read('studio-admin.js'));const host=w.document.createElement('div');w.document.body.append(host);w.StudioAdmin.mountMenu(host);await settle();
  const visible=[...host.querySelectorAll('button')].filter(button=>!button.hidden);assert.equal(visible.length,1);assert.equal(visible[0].textContent,'Workspaces');
+});
+
+test('job role create and delete return to Staff and Roles, preserving workspace role destinations',async t=>{
+ const {w,navigation}=setup(t);w.confirm=()=>true;w.json=async()=>({});w.fetch=async()=>({ok:true});
+ const form=w.document.createElement('div');form.innerHTML='<input id="roleName" value="Editor"><select id="roleScope"><option>Job</option></select><input id="roleDescription" value="Editing"><select id="roleTemplate"><option>worker</option></select>';w.document.body.append(form);
+ await w.createStudioRole();assert.equal(navigation.at(-1).view,'staff-roles');w.document.body.dataset.studioView='staff-roles';await w.deleteStudioRole('jr');assert.equal(navigation.at(-1).view,'staff-roles');
+ w.document.body.dataset.studioView='workspace-management';await w.deleteStudioRole('wr');assert.equal(navigation.at(-1).view,'workspace-management');
 });

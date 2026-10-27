@@ -62,12 +62,13 @@ test('Job Details Overview shows status instead of repeating job and client iden
  assert.doesNotMatch(overview.textContent,/Williams & Clarke|Wedding selects review/);
  assert.equal(w.document.querySelector('.job-detail-right,[data-rail-toggle="right"]'),null);
 });
-test('Activity stays out of every footer and job history opens from the avatar',async t=>{
+test('Activity stays out of avatar and footer while job history opens from Job Details Actions',async t=>{
  const {w}=require('./job-detail-fixture.cjs').environment(t);
  for(const file of ['studio-page.js','notifications.js','job-workflow-display.js','job-workflow-graph.js'])w.eval(read(file));
  await w.openWorkspaceJob('job');await settle();await settle();
  const footer=w.document.getElementById('studioShellFooter');
- const activity=w.document.querySelector('[data-studio-avatar-activity]');
+ const activity=w.document.querySelector('[data-job-action="activity"]');
+ assert.equal(w.document.querySelector('[data-studio-avatar-activity]'),null);
  assert.equal(footer.querySelector('[data-job-activity],.jd-footer-link,#studioFooterJobTools'),null);
  assert.doesNotMatch(footer.textContent,/Activity/);
  activity.click();await settle();
@@ -75,10 +76,10 @@ test('Activity stays out of every footer and job history opens from the avatar',
  assert.equal(drawer.getAttribute('aria-hidden'),'false');
  drawer.querySelector('[data-close-drawer]').click();
  assert.equal(drawer.getAttribute('aria-hidden'),'true');
- assert.equal(w.document.activeElement,w.document.querySelector('.user-menu-trigger'));
+ assert.equal(w.document.activeElement,w.document.querySelector('[data-job-action="activity"]'));
  for(const view of ['today','frontdesk','jobs','media','schedule','production','clients','session-plan','delivery']){
   w.document.body.dataset.studioView=view;w.StudioShell.sync(view);await settle();
-  assert.equal(w.document.querySelector('[data-studio-avatar-activity]'),activity);
+  assert.equal(w.document.querySelector('[data-studio-avatar-activity]'),null);
   assert.equal(footer.querySelector('[data-job-activity],.jd-footer-link,#studioFooterJobTools'),null);
   assert.doesNotMatch(footer.textContent,/Activity/);
  }

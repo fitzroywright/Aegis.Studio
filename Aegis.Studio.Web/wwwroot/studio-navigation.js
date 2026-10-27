@@ -798,12 +798,12 @@
         return window.studioNavigate('jobs');
     };
 
-    async function renderAdmin(view='studio-management'){
-        const title=window.StudioAdmin?.entries.find(entry=>entry.view===view)?.label||'Studio Management';
+    async function renderAdmin(view='about'){
+        const title=window.StudioAdmin?.entries.find(entry=>entry.view===view)?.label||'About';
         const current=StudioPage.begin(view);
         conversationView.classList.add('hidden');
         genericView.classList.remove('hidden');
-        genericView.innerHTML='<div class="today-loading">Loading Studio Management…</div>';
+        genericView.innerHTML='<div class="today-loading">Loading administration…</div>';
 
         const me=await json('/api/auth/me').catch(()=>null);
         if(!current())return;
@@ -821,7 +821,7 @@
         let content='';
         switch(view){
             case 'booking-sessions': content=window.StudioBookingSessions.html();break;
-            case 'demo-data': content=`<section class="admin-card admin-demo-card" id="studioDemoLoader">
+            case 'about': content=`<section class="admin-card studio-about"><img class="studio-about-logo" src="/thinking-machines-letterhead.png" alt="Thinking Machines — pixelated thinking man" width="2025" height="375"><h2>Aegis.Studio</h2><p>Photography studio management for Bryan’s Photo Studios, from client inquiries and bookings through photography, production and delivery.</p><dl class="studio-about-details"><div><dt>Developed by</dt><dd>Thinking Machines</dd></div><div><dt>Support</dt><dd><a href="mailto:it@thinkingmachines.ltd">it@thinkingmachines.ltd</a></dd></div><div><dt>Studio</dt><dd>Bryan’s Photo Studios</dd></div><div><dt>Operating time zone</dt><dd>America/Jamaica</dd></div><div><dt>This installation</dt><dd>${esc(window.location.origin)}</dd></div></dl></section><section class="admin-card" data-service-status><header class="admin-card-header"><h2>Service health</h2><button class="action" data-refresh-service-status>Refresh</button></header><div data-service-status-body>Loading…</div><button class="action" data-service-audit>Recent audit</button></section><section class="admin-card admin-demo-card" id="studioDemoLoader">
                             <header class="admin-card-header">
                                 <div><h2>Demo Data</h2><p>Rebuild the complete Studio demo with job templates, workflows, genuine photographs, bookings, schedules and payments.</p></div>
                                 <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action" type="button" data-demo-preview>Preview Reset Scope</button><button class="action" type="button" data-demo-remove>Remove Demo Data</button><button class="primary" type="button" data-load-demo>Clear and Recreate Demo Data</button><button class="primary" type="button" data-demo-reset>Reset and Regenerate</button></div>
@@ -833,14 +833,11 @@
                         </section>
 
                         `;break;
-            case 'studio-management': content=`<section class="admin-card" data-service-status><header class="admin-card-header"><h2>Service health</h2><button class="action" data-refresh-service-status>Refresh</button></header><div data-service-status-body>Loading…</div><button class="action" data-service-audit>Recent audit</button></section>
-                        `;break;
-            case 'staff-admin': content=renderEmployeeDirectorySection();break;
-            case 'roles-admin': content=renderSecurityRolesSection('Job');break;
+            case 'staff-roles': content=renderEmployeeDirectorySection()+renderSecurityRolesSection('Job');break;
             case 'workflows-admin': content=renderWorkflowSection();break;
             case 'api-site-key': content=window.StudioAdmin.keyForm();break;
         }
-        genericView.innerHTML=StudioPage.html({title,scroll:true,summary:view==='booking-sessions'?'<p>Manage publicly bookable session types and weekly opening hours. Studio controls prices, deposits, resources and routing.</p>':'',content:view==='booking-sessions'?content:`<div class="admin-generated-sections">${content}</div>`});
+        genericView.innerHTML=StudioPage.html({title,scroll:true,summary:view==='booking-sessions'?'<p>Manage publicly bookable session types and weekly opening hours. Studio controls prices, deposits, resources and routing.</p>':view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':view==='staff-roles'?'<p>Maintain staff identities, reusable job roles and global operational access. Workspace administration stays on Workspaces.</p>':'',content:view==='booking-sessions'?content:`<div class="admin-generated-sections">${content}</div>`});
         StudioPage.bind(genericView,current);
 
         if(view==='booking-sessions')await window.StudioBookingSessions.mount(genericView,current);
@@ -848,15 +845,15 @@
 
         const statusPanel=document.querySelector('[data-service-status]');
         if(statusPanel){
-            const readStatus=async()=>{const body=statusPanel.querySelector('[data-service-status-body]');try{const s=await json('/api/admin/studio-status');body.innerHTML=`<p>Database: ${esc(s.database)}</p><p>Storage: ${esc(s.storage.provider)} · ${s.storage.available?'Available':'Unavailable'} · ${s.storage.writable?'Writable':'Read only'}</p><p>Previews: ${s.previews.queued} queued · ${s.previews.failed} retrying · ${s.previews.unsupported} unsupported</p><p>Messaging: ${s.messaging.queuedEmails} queued emails · ${s.messaging.failedNotifications} failed notifications</p><p>Gallery: ${s.galleryConfigured?'Configured':'Unconfigured'} · ${esc(s.diagnostics)}</p>`;}catch(e){body.textContent=e.message;}};
+            const readStatus=async()=>{const body=statusPanel.querySelector('[data-service-status-body]');try{const s=await json('/api/admin/studio-status');if(!current()||!body.isConnected)return;body.innerHTML=`<p>Database: ${esc(s.database)}</p><p>Storage: ${esc(s.storage.provider)} · ${s.storage.available?'Available':'Unavailable'} · ${s.storage.writable?'Writable':'Read only'}</p><p>Previews: ${s.previews.queued} queued · ${s.previews.failed} retrying · ${s.previews.unsupported} unsupported</p><p>Messaging: ${s.messaging.queuedEmails} queued emails · ${s.messaging.failedNotifications} failed notifications</p><p>Gallery: ${s.galleryConfigured?'Configured':'Unconfigured'} · ${esc(s.diagnostics)}</p><p>Last checked: ${s.checkedAtUtc?esc(new Date(s.checkedAtUtc).toLocaleString()):'Not supplied by server'}</p>`;}catch(e){if(current()&&body.isConnected)body.textContent=e.message;}};
             statusPanel.querySelector('[data-refresh-service-status]').onclick=readStatus;
             statusPanel.querySelector('[data-service-audit]').onclick=async()=>{const dialog=studioDialog('Recent operational audit','<p>Loading…</p>');try{const rows=await json('/api/admin/operations/audit?count=100');dialog.querySelector('.studio-dialog-body').textContent=JSON.stringify(rows,null,2);}catch(e){dialog.querySelector('.studio-dialog-body').textContent=e.message;}};
             readStatus();
         }
         if(view==='api-site-key')window.StudioAdmin.bindKeyForm(genericView);
-        if(view==='staff-admin')await refreshStudioEmployees();
+        if(view==='staff-roles')await refreshStudioEmployees();
         if(view==='workflows-admin')await refreshWorkflowList();
-        if(view==='roles-admin')await renderGlobalRoleAdministration();
+        if(view==='staff-roles'&&current())await renderGlobalRoleAdministration(current);
         if(!current())return;
         const adminGrid=genericView.querySelector('.admin-generated-sections');
         for(const section of [...genericView.children].filter(el=>el.classList.contains('job-section'))){section.classList.add('admin-card');adminGrid.appendChild(section);}
@@ -925,8 +922,9 @@
         }catch{/* Demo status is advisory; the load action remains available. */}
     }
 
-    window.StudioManagement={render:renderAdmin};
 
+    const routeAliases={admin:'about','studio-management':'about','demo-data':'about','staff-admin':'staff-roles','roles-admin':'staff-roles'};
+    const canonicalRoute=view=>routeAliases[view]||view;
     const routes={
         today:renderToday,
         notifications:()=>showNotifications(),
@@ -939,8 +937,7 @@
         jobs:renderJobs,
         pipeline:()=>showPipeline(),
         production:()=>showCatalogProduction(),
-        'studio-management':()=>showStudioManagement(),
-        ...Object.fromEntries(['booking-sessions','demo-data','staff-admin','roles-admin','workflows-admin','api-site-key'].map(view=>[view,()=>renderAdmin(view)])),
+        ...Object.fromEntries(['about','booking-sessions','staff-roles','workflows-admin','api-site-key'].map(view=>[view,()=>renderAdmin(view)])),
         catalog:()=>showCommercialCatalog(),
         'job-templates':()=>showCommercialTemplates('Job'),
         'work-order-templates':()=>showCommercialTemplates('WorkOrder'),
@@ -951,12 +948,11 @@
         delivery:()=>StudioWorkflowViews.showDelivery(),
         finance:()=>showAccounts(),
         reports:()=>showManagement(),
-        management:()=>showManagement(),
-        admin:renderAdmin
+        management:()=>showManagement()
     };
 
     let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
+    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
         return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
@@ -1006,7 +1002,7 @@
     window.studioBeginJobNavigation=(id,options={})=>beginNavigation('workspaces',{...options,jobId:id});
 
     window.studioNavigate=async function(view,options={}){
-        if(view==='admin')view='studio-management';
+        view=canonicalRoute(view);
         const route=routes[view];
         if(!route) throw new Error('Unknown Studio navigation view: '+view);
         const {context,revision}=beginNavigation(view,options);
@@ -1035,7 +1031,7 @@
 
     function destinationFromLocation(state){
         const params=new URLSearchParams(window.location.hash.replace(/^#/,''));
-        const view=state?.studioView&&routes[state.studioView]?state.studioView:params.get('studio');
+        const view=canonicalRoute(state?.studioView&&routes[canonicalRoute(state.studioView)]?state.studioView:params.get('studio'));
         return {view:view&&routes[view]?view:'today',panel:state?.studioView?(state.studioSchedulePanel||'workers'):(params.get('panel')||'workers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),tab:state?.studioView?(state.studioClientTab||''):(params.get('tab')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
     }
     window.addEventListener('popstate',event=>{

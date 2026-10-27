@@ -35,7 +35,7 @@
     })[character]);
 
     function labelFor(view) {
-        return window.StudioAdmin?.entries.find(entry=>entry.view===view)?.label || ({clients:'Client Management','workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
+        return window.StudioAdmin?.entries.find(entry=>entry.view===view)?.label || ({clients:'Client Management','workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',about:'About','staff-roles':'Staff and Roles','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
             || String(view || 'Studio').replace(/(^|\s)\S/g, match => match.toUpperCase());
     }
 
@@ -53,7 +53,8 @@
         schedule: 'View scheduled shoots, assignments and staff availability.',
         pipeline: 'Track jobs through their workflow stages and next actions.',
         finance: 'Review invoices, payments and outstanding balances.',
-        'studio-management': 'Review Studio service health and operational audit.'
+        about: 'About Aegis.Studio, service health, support and demo data.',
+        'staff-roles': 'Manage Studio staff, reusable job roles and global operational roles.'
     };
     const taglineFor = view => pageTaglines[view] || 'Manage Studio work and related information.';
 
@@ -170,7 +171,7 @@
         // All views share the exact Today rail markup and presentation.
         // Job Detail retains its contextual actions in the shared Actions card.
         const jobPage=document.body.dataset.studioView==='workspaces'?document.querySelector('#conversationView.has-open-job .job-detail-page'):null;
-        const jobActions=[['messages','Messages & Notes','✉','ready'],['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready'],['template-workflow','Template Workflow','◇','ready'],['reminders','Client Reminders','◷','ready']];
+        const jobActions=[['activity','Activity','◷','ready'],['messages','Messages & Notes','✉','ready'],['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready'],['template-workflow','Template Workflow','◇','ready'],['reminders','Client Reminders','◷','ready']];
         const workflowActions=window.StudioWorkflowViews?.actions(document.body.dataset.studioView);
         const actionItems=workflowActions?workflowActions.map(([key,label])=>'<button type="button" data-workflow-action="'+key+'"><span>'+escText(label)+'</span></button>').join(''):jobPage?jobActions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''):'<button type="button" data-studio-new-booking><span>＋</span><span>New Booking</span></button>'+(document.body.dataset.studioView==='today'?'<button type="button" data-studio-assign-job-lead><span>▣</span><span>Assign Job Lead</span></button>':'');
         const financialActions=!workflowActions&&document.body.dataset.studioView==='frontdesk'?[['TakePayment','Take Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['NewSale','New Sale']].map(([action,label])=>'<button type="button" data-studio-financial-action="'+action+'"><span>$</span><span>'+label+'</span></button>').join(''):'';
@@ -688,12 +689,6 @@
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
         document.addEventListener('studio-workflow-changed',()=>{void loadSharedAttention();});
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
-        document.querySelector('[data-studio-avatar-activity]')?.addEventListener('click', () => {
-            document.querySelector('.user-menu')?.removeAttribute('open');
-            if (document.body.dataset.studioView==='workspaces' && document.querySelector('#conversationView:not(.hidden).has-open-job .job-detail-page')) {
-                window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:'activity'}}));
-            } else window.studioNavigate?.('notifications');
-        });
         document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
             window.studioNavigate?.('notifications');

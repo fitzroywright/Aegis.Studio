@@ -3,9 +3,8 @@ function commercialPage(title,body,tools='',summary='',attention='') {
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
     genericView.innerHTML=StudioPage.html({title,tools,showHeader:title!=='Production',content:body,className:'st-commercial',summary:summary||'<p>Manage Studio services, templates and production.</p>',attention});
     StudioPage.bind(genericView);
-    window.studioSetBreadcrumb?.(title==='Production'?[{label:'Production'}]:[{label:'Studio Management',view:'studio-management'},{label:title}]);
+    window.studioSetBreadcrumb?.([{label:title}]);
 }
-async function showStudioManagement(){return window.StudioManagement.render();}
 async function showCommercialCatalog(){
     const current=StudioPage.begin('catalog');
     [commercialItems,commercialTemplates]=await Promise.all([json('/api/admin/pos/catalog/'),json('/api/admin/commercial/templates/WorkOrder')]);
