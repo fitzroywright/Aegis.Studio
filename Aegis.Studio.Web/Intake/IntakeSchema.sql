@@ -26,17 +26,17 @@ alter table studio_job_subjects add column if not exists pickup_notification tex
 alter table studio_job_subjects add column if not exists preference_source text;
 alter table studio_job_subjects add column if not exists preference_at_utc timestamptz;
 alter table studio_client_reminders add column if not exists subject_id uuid references studio_job_subjects(id);
-create or replace function studio_apply_intake_roster(cv uuid) returns void language plpgsql as $$
-declare target uuid; row jsonb; sid uuid; matches integer;
+create index if not exists ix_session_plan_reference on studio_job_subjects(job_id,lower(reference)) where not is_system;
+create or replace function studio_apply_job_roster(target uuid, payload jsonb, actor text) returns void language plpgsql as $$
+declare row jsonb; sid uuid; matches integer;
 begin
- select job_id into target from studio_conversations where id=cv;
  if target is null then return; end if;
- for row in select jsonb_array_elements(rows) from studio_intake_rosters where conversation_id=cv loop
-  select count(*),min(id::text)::uuid into matches,sid from studio_job_subjects where job_id=target and not is_system and (lower(reference)=lower(btrim(row->>'reference')) or id::text=row->>'subjectId');
+ for row in select jsonb_array_elements(payload) loop
+  select count(*),min(id::text)::uuid into matches,sid from studio_job_subjects where job_id=target and not is_system and (lower(reference)=lower(btrim(row->>'reference')) or id=nullif(row->>'subjectId','')::uuid);
   if matches>1 then raise exception 'Ambiguous subject reference'; end if;
   sid=coalesce(sid,gen_random_uuid());
   insert into studio_job_subjects(id,job_id,name,reference,notes,collection_name,contact_name,contact_email,contact_phone,schedule_location,scheduled_at_utc,updated_by,pickup_notification,preference_source,preference_at_utc)
-  values(sid,target,row->>'name',row->>'reference',coalesce(row->>'notes',''),coalesce(nullif(row->>'collection',''),'General'),coalesce(row->>'contactName',''),coalesce(row->>'contactEmail',''),coalesce(row->>'contactPhone',''),coalesce(row->>'scheduleLocation',''),nullif(row->>'scheduledAtUtc','')::timestamptz,'Intake',coalesce(row->>'pickupNotification','None'),'Intake',now())
+  values(sid,target,row->>'name',row->>'reference',coalesce(row->>'notes',''),coalesce(nullif(row->>'collection',''),'General'),coalesce(row->>'contactName',''),coalesce(row->>'contactEmail',''),coalesce(row->>'contactPhone',''),coalesce(row->>'scheduleLocation',''),nullif(row->>'scheduledAtUtc','')::timestamptz,actor,coalesce(row->>'pickupNotification','None'),'Intake',now())
   on conflict(id) do update set name=excluded.name,notes=case when row ? 'notes' then excluded.notes else studio_job_subjects.notes end,
    collection_name=case when row ? 'collection' then excluded.collection_name else studio_job_subjects.collection_name end,
    contact_name=case when row ? 'contactName' then excluded.contact_name else studio_job_subjects.contact_name end,
@@ -45,8 +45,16 @@ begin
    schedule_location=case when row ? 'scheduleLocation' then excluded.schedule_location else studio_job_subjects.schedule_location end,
    scheduled_at_utc=case when row ? 'scheduledAtUtc' then excluded.scheduled_at_utc else studio_job_subjects.scheduled_at_utc end,
    pickup_notification=case when row ? 'pickupNotification' then excluded.pickup_notification else studio_job_subjects.pickup_notification end,
-   preference_source='Intake',preference_at_utc=now(),updated_by='Intake',updated_at_utc=now();
+   preference_source='Intake',preference_at_utc=now(),updated_by=actor,updated_at_utc=now();
  end loop;
+end $$;
+create or replace function studio_apply_intake_roster(cv uuid) returns void language plpgsql as $$
+declare target uuid; payload jsonb;
+begin
+ select job_id into target from studio_conversations where id=cv;
+ if target is null then return; end if;
+ select rows into payload from studio_intake_rosters where conversation_id=cv;
+ perform studio_apply_job_roster(target,coalesce(payload,'[]'::jsonb),'Intake');
 end $$;
 create or replace function studio_promote_intake_roster() returns trigger language plpgsql as $$
 begin if new.job_id is distinct from old.job_id and new.job_id is not null then perform studio_apply_intake_roster(new.id); end if;return new;end $$;
@@ -106,3 +114,4 @@ create table if not exists studio_website_gallery_selections(
  imported_at_utc timestamptz not null default now(),
  primary key(source,external_id)
 );
+

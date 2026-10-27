@@ -8,7 +8,7 @@ using Npgsql;
 namespace Aegis.Studio.Web.Intake;
 
 public sealed record IntakeRosterView(string? IntakeReference,long Revision,JsonElement Rows,Guid? JobId,JsonElement? IncomingRows,bool CanEdit=false,bool CanMessage=false);
-public sealed record RosterCommit(long Revision,JsonElement Rows,bool ResolveConflict=false);
+public sealed record RosterCommit(long Revision,JsonElement Rows,bool ResolveConflict=false,Guid? ConflictConversationId=null);
 public sealed class IntakeRosterStore(StudioDatabase database)
 {
     static readonly string[] Fields=["name","reference","collection","contactName","contactEmail","contactPhone","scheduledAtUtc","scheduleLocation","notes","pickupNotification"];
@@ -21,6 +21,7 @@ public sealed class IntakeRosterStore(StudioDatabase database)
         {
             if(row.ValueKind!=JsonValueKind.Object)throw new ArgumentException("Invalid roster row.");
             foreach(var p in row.EnumerateObject())if(Fields.Contains(p.Name)&&(p.Value.ValueKind!=JsonValueKind.String||p.Value.GetString()!.Length>limits[p.Name]))throw new ArgumentException("Invalid or oversized roster field: "+p.Name);
+            if(row.TryGetProperty("subjectId",out var identity)&&(identity.ValueKind!=JsonValueKind.String||!Guid.TryParse(identity.GetString(),out _)))throw new ArgumentException("Invalid subject identity.");
             string name=WebsiteIntakeStore.Text(row,"name"),reference=WebsiteIntakeStore.Text(row,"reference"),email=WebsiteIntakeStore.Text(row,"contactEmail"),phone=WebsiteIntakeStore.Text(row,"contactPhone"),preference=WebsiteIntakeStore.Text(row,"pickupNotification","None");
             if(string.IsNullOrWhiteSpace(name)||name.Equals("Unclassified",StringComparison.OrdinalIgnoreCase)||string.IsNullOrWhiteSpace(reference)||!seen.Add(reference))throw new ArgumentException("Each subject needs a name and a unique stable reference. Unclassified is reserved.");
             if(!string.IsNullOrEmpty(email)&&!System.Net.Mail.MailAddress.TryCreate(email,out _))throw new ArgumentException("Correct the contact email.");
@@ -55,6 +56,74 @@ public sealed class IntakeRosterStore(StudioDatabase database)
         if(request.ResolveConflict)WorkflowStore.Sql(c,tx,"delete from studio_intake_roster_conflicts where conversation_id=$1",cv);
         tx.Commit();return Read(cv);
     }
+    // All jobs use the same subject store, including jobs created without intake.
+    // A content revision includes timestamps so edits through Media also invalidate stale plans.
+    public JobSessionPlanView ReadJob(Guid job)
+    {
+        using var c=database.OpenConnection();return ReadJob(c,null,job);
+    }
+    private static JobSessionPlanView ReadJob(NpgsqlConnection c,NpgsqlTransaction? tx,Guid job)
+    {
+        const string sql="""
+          select jsonb_build_object(
+            'rows',coalesce((select jsonb_agg(jsonb_build_object(
+              'subjectId',s.id,'name',s.name,'reference',case when s.reference='' then s.id::text else s.reference end,
+              'collection',s.collection_name,'contactName',s.contact_name,'contactEmail',s.contact_email,
+              'contactPhone',s.contact_phone,'scheduledAtUtc',coalesce(to_char(s.scheduled_at_utc at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'),''),
+              'scheduleLocation',s.schedule_location,'notes',s.notes,'pickupNotification',s.pickup_notification,
+              '_updatedAt',s.updated_at_utc) order by s.id) from studio_job_subjects s where s.job_id=j.id and not s.is_system),'[]'::jsonb),
+            'incomingRows',(select jsonb_agg(jsonb_build_object('conversationId',v.id,'rows',f.rows,'revision',f.revision) order by v.id)
+              from studio_conversations v join studio_intake_roster_conflicts f on f.conversation_id=v.id where v.job_id=j.id or v.id=j.conversation_id)
+          )::text from studio_jobs j where j.id=$1
+          """;
+        string raw=WorkflowStore.Scalar(c,tx,sql,job) as string??throw new KeyNotFoundException();
+        var value=JsonSerializer.Deserialize<JsonElement>(raw);
+        byte[] digest=System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw));
+        long revision=0;for(int i=0;i<6;i++)revision=(revision<<8)|digest[i];
+        return new(revision,value.GetProperty("rows").Clone(),value.GetProperty("incomingRows").ValueKind==JsonValueKind.Null?null:value.GetProperty("incomingRows").Clone());
+    }
+    public JobSessionPlanView CommitJob(Guid job,RosterCommit request,string actor,bool canSchedule)
+    {
+        Validate(request.Rows);
+        using var c=database.OpenConnection();using var tx=c.BeginTransaction(System.Data.IsolationLevel.Serializable);
+        try
+        {
+            var current=ReadJob(c,tx,job);
+            if(current.Revision!=request.Revision)throw new InvalidOperationException("Session Plan changed. Reload before saving; your proposed changes have been retained.");
+            var existing=current.Rows.EnumerateArray().ToDictionary(r=>WebsiteIntakeStore.Text(r,"reference"),StringComparer.OrdinalIgnoreCase);
+            var incoming=request.Rows.EnumerateArray().ToArray();
+            // Never drop existing people or their photograph links through a partial import.
+            var references=incoming.Select(r=>WebsiteIntakeStore.Text(r,"reference")).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach(var old in current.Rows.EnumerateArray())
+                if(!references.Contains(WebsiteIntakeStore.Text(old,"reference")))
+                    throw new ArgumentException("Existing subjects must be retained. Use Session Plan to update their details.");
+            foreach(var row in incoming)
+            {
+                existing.TryGetValue(WebsiteIntakeStore.Text(row,"reference"),out var prior);
+                if(row.TryGetProperty("subjectId",out var id)&&(!Guid.TryParse(id.GetString(),out _)||prior.ValueKind==JsonValueKind.Undefined||WebsiteIntakeStore.Text(prior,"subjectId")!=id.GetString()))
+                    throw new ArgumentException("A subject reference must retain its existing identity.");
+                foreach(string field in new[]{"scheduledAtUtc","scheduleLocation"})
+                    if(!canSchedule&&row.TryGetProperty(field,out var changed)&&changed.GetString()!=(prior.ValueKind==JsonValueKind.Undefined?"":WebsiteIntakeStore.Text(prior,field)))
+                        throw new UnauthorizedAccessException("Scheduling permission is required to change planned times or locations.");
+            }
+            WorkflowStore.Sql(c,tx,"select studio_apply_job_roster($1,$2::jsonb,$3)",job,request.Rows.GetRawText(),actor);
+            // Mark linked intake as staff-edited so later website updates require review.
+            WorkflowStore.Sql(c,tx,"""
+              insert into studio_intake_rosters(conversation_id,revision,rows,updated_by)
+              select id,1,$2::jsonb,$3 from studio_conversations where job_id=$1 or id=(select conversation_id from studio_jobs where id=$1)
+              on conflict(conversation_id) do update set revision=studio_intake_rosters.revision+1,rows=excluded.rows,updated_by=excluded.updated_by,updated_at_utc=now()
+              """,job,request.Rows.GetRawText(),actor);
+            if(request.ResolveConflict)
+            {
+                if(request.ConflictConversationId is not Guid conflict)throw new ArgumentException("Choose the website change being reviewed.");
+                WorkflowStore.Sql(c,tx,"delete from studio_intake_roster_conflicts f using studio_conversations v where f.conversation_id=v.id and (v.job_id=$1 or v.id=(select conversation_id from studio_jobs where id=$1)) and v.id=$2",job,conflict);
+            }
+            WorkflowStore.Sql(c,tx,"insert into studio_operational_audit(id,job_id,action,user_name,detail,created_at_utc) values($1,$2,'SessionPlanUpdated',$3,$4,now())",Guid.NewGuid(),job,actor,$"Saved {incoming.Length} subjects.");
+            var result=ReadJob(c,tx,job);tx.Commit();return result;
+        }
+        catch(PostgresException e) when(e.SqlState==PostgresErrorCodes.SerializationFailure||e.SqlState==PostgresErrorCodes.DeadlockDetected)
+        {throw new InvalidOperationException("Session Plan changed while saving. Reload before retrying; your proposed changes have been retained.",e);}
+    }
     public static bool Allowed(Guid cv,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja,bool edit)
     {
         using var c=db.OpenConnection();using var q=WorkflowStore.Command(c,null,"select workspace_id,job_id from studio_conversations where id=$1",cv);using var r=q.ExecuteReader();if(!r.Read())return false;
@@ -68,6 +137,31 @@ public sealed class IntakeRosterStore(StudioDatabase database)
             using var input=typeof(IntakeRosterStore).Assembly.GetManifestResourceStream("Aegis.Studio.Web.Intake.RosterEditor.js")!;using var reader=new StreamReader(input);
             return Results.Text(reader.ReadToEnd(),"text/javascript; charset=utf-8");
         }).AllowAnonymous();
+        var plans=app.MapGroup("/api/jobs/{job:guid}/session-plan").RequireAuthorization();
+        plans.MapGet("/roster",(Guid job,ClaimsPrincipal user,StudioDatabase db,JobAccessService access)=>
+        {
+            if(!access.HasPermission(user,job,"ViewJob"))return Results.Forbid();
+            try{return Results.Ok(new IntakeRosterStore(db).ReadJob(job) with{CanEdit=access.HasPermission(user,job,"EditJob"),CanSchedule=access.HasPermission(user,job,"ManageSchedule")});}
+            catch(KeyNotFoundException){return Results.NotFound();}
+        });
+        plans.MapPut("/roster",(Guid job,RosterCommit request,ClaimsPrincipal user,StudioDatabase db,JobAccessService access)=>
+        {
+            if(!access.HasPermission(user,job,"EditJob"))return Results.Forbid();
+            try{return Results.Ok(new IntakeRosterStore(db).CommitJob(job,request,user.Identity?.Name??"Staff",access.HasPermission(user,job,"ManageSchedule")));}
+            catch(UnauthorizedAccessException){return Results.Forbid();}
+            catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}
+            catch(InvalidOperationException e){return Results.Conflict(new{error=e.Message});}
+            catch(KeyNotFoundException){return Results.NotFound();}
+        });
+        plans.MapPost("/file",async(Guid job,HttpRequest request,ClaimsPrincipal user,StudioDatabase db,JobAccessService access,CancellationToken ct)=>
+        {
+            if(!access.HasPermission(user,job,"EditJob"))return Results.Forbid();
+            if(!request.HasFormContentType)return Results.BadRequest(new{error="Choose a CSV or XLSX file."});
+            var form=await request.ReadFormAsync(ct);
+            if(form.Files.Count!=1||form.Files[0].Length>5_000_000)return Results.BadRequest(new{error="Choose one CSV or XLSX file, at most 5 MB."});
+            try{await using var stream=form.Files[0].OpenReadStream();return Results.Ok(new{cells=MediaProductionRules.ReadRoster(RosterFileReader.Read(stream,form.Files[0].FileName))});}
+            catch(ArgumentException e){return Results.BadRequest(new{error=e.Message});}
+        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6_000_000)).DisableAntiforgery();
         var g=app.MapGroup("/api/intake").RequireAuthorization();
         g.MapGet("/lookup/{reference}",(string reference,ClaimsPrincipal user,StudioDatabase db,WorkspaceAccessService wa,JobAccessService ja)=>
         {
@@ -105,3 +199,6 @@ public sealed class IntakeRosterStore(StudioDatabase database)
         });
     }
 }
+
+
+public sealed record JobSessionPlanView(long Revision,JsonElement Rows,JsonElement? IncomingRows,bool CanEdit=false,bool CanSchedule=false);

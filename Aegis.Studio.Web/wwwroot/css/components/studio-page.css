@@ -171,7 +171,7 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 .workflow-view{--studio-content-overflow:auto;--studio-content-padding:16px;--studio-content-gap:14px}
 .workflow-page-title h1{margin:0 0 4px;font-size:20px;font-weight:600}
 .workflow-page-title p,.workflow-note{margin:0;color:var(--theme-muted);font-size:12px}
-.workflow-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.workflow-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .workflow-toolbar label{display:flex;align-items:center;gap:8px;font-size:12px}
 .workflow-table-scroll{flex:1 1 auto;min-height:150px;overflow:auto;border:1px solid var(--studio-grid-border,#dce5ee);border-radius:5px}
 .workflow-table{width:100%;border-collapse:collapse;table-layout:auto;font-size:12px}
@@ -206,6 +206,10 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 .workflow-validation button{margin-left:auto}
 .workflow-column-map{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}
 .workflow-detail label{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;font-size:12px}
-.workflow-detail input,.workflow-detail textarea,.workflow-detail select,.workflow-toolbar input{font:inherit;border:1px solid #b9cbdb;border-radius:4px;padding:7px;background:var(--studio-control-surface,#fff);color:var(--theme-text);max-width:100%}
+.workflow-detail input,.workflow-detail textarea,.workflow-detail select,.workflow-toolbar input,.workflow-toolbar select,.workflow-match select{font:inherit;border:1px solid #b9cbdb;border-radius:4px;padding:7px;background:var(--studio-control-surface,#fff);color:var(--theme-text);max-width:100%}
 .workflow-detail textarea{min-height:80px}
-@media(max-width:700px){.workflow-column-map{grid-template-columns:minmax(0,1fr)}.workflow-facts{gap:8px}.workflow-facts div+div{padding-left:8px}.workflow-toolbar{flex-wrap:wrap}}
+.workflow-match{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:12px}
+.session-plan-view .workflow-table td{max-width:260px;overflow-wrap:anywhere}
+.workflow-detail [data-plan-preview]{max-height:240px;overflow:auto}
+@media(max-width:700px){.workflow-column-map{grid-template-columns:minmax(0,1fr)}.workflow-facts{gap:8px}.workflow-facts div+div{padding-left:8px}}
+

@@ -8,10 +8,11 @@ function setup(t,view){
  w.genericView=w.document.getElementById('genericView');w.conversationView=w.document.getElementById('conversationView');w.alert=message=>{throw Error(message);};w.money=v=>'JMD '+v;w.studioFirstName=v=>v;
  w.studioNavigate=async(view,options)=>navigation.push({view,options});
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML='<h2>'+title+'</h2><div class="studio-dialog-body">'+html+'</div>';d.close=()=>d.remove();w.document.body.append(d);return d;};
- const roster={revision:7,canEdit:true,rows:[{subjectId:'a',reference:'A1',name:'Alicia',collection:'2026',pickupNotification:'None'}]};
+ const roster={revision:7,canEdit:true,canSchedule:true,rows:[{subjectId:'a',reference:'A1',name:'Alicia',collection:'2026',pickupNotification:'None'}]};
  const subjects=[{id:'a',reference:'A1',name:'Alicia',collection:'2026',status:'Photographed',imageCount:3},{id:'b',reference:'B1',name:'David',collection:'2026',status:'Absent',imageCount:0},{id:'c',reference:'C1',name:'Maya',collection:'2026',status:'Needs Retake',imageCount:1}];
+ roster.rows=subjects.map(r=>({subjectId:r.id,reference:r.reference,name:r.name,collection:r.collection,pickupNotification:'None'}));
  const jobs=[{id:'j',conversationId:'cv',title:'Campion Graduation',clientName:'Campion College',clientId:'client',status:'Ready for Delivery'},{id:'j2',title:'Carter Wedding',clientName:'Carter',status:'Published'}];
- w.json=async(url,options)=>{calls.push({url,options});if(options?.method==='PUT')return {...roster,revision:8};if(url==='/api/jobs')return jobs;if(url==='/api/jobs/j')return jobs[0];if(url.endsWith('/session-plan'))return subjects;if(url.endsWith('/access'))return {permissions:{editJob:true}};if(url.includes('/intake/')&&url.endsWith('/roster'))return roster;if(url.endsWith('/finance-release')){if(url.includes('j2'))throw Error('Accounts unavailable');return {decision:{balance:12500}};}if(url==='/api/auth/me')return {user:{isAdministrator:true}};return [];};
+ w.json=async(url,options)=>{calls.push({url,options});if(options?.method==='PUT')return {...roster,revision:8};if(url==='/api/jobs')return jobs;if(url==='/api/jobs/j')return jobs[0];if(url.endsWith('/session-plan'))return subjects;if(url.endsWith('/access'))return {permissions:{editJob:true}};if(url.endsWith('/session-plan/roster')||url.includes('/intake/')&&url.endsWith('/roster'))return roster;if(url.endsWith('/finance-release')){if(url.includes('j2'))throw Error('Accounts unavailable');return {decision:{balance:12500}};}if(url==='/api/auth/me')return {user:{isAdministrator:true}};return [];};
  w.fetch=async()=>({ok:true,json:async()=>[]});
  for(const file of ['studio-page.js','frontdesk.js','studio-workflow-views.js','studio-shell-nav.js'])w.eval(read(file)+(file==='frontdesk.js'?'\nwindow.configureFrontDesk=rows=>{frontDeskRequests=rows;renderFrontDesk();};':''));
  w.eval(fs.readFileSync(path.resolve(root,'../../Aegis.Studio.PublicSite/public/roster-editor.js'),'utf8'));
@@ -42,7 +43,7 @@ test('guided import maps, merges stable references, blocks invalid rows and comm
  assert.equal(w.genericView.querySelector('[data-session-commit]').disabled,false);
  w.genericView.querySelector('[data-session-commit]').click();await settle();await settle();
  const saved=calls.find(c=>c.options?.method==='PUT');assert.ok(saved);
- const payload=JSON.parse(saved.options.body);assert.equal(payload.revision,7);assert.equal(payload.rows.length,1);assert.equal(payload.rows[0].subjectId,'a');assert.equal(payload.rows[0].name,'Alicia Updated');assert.equal(payload.resolveConflict,false);
+ const payload=JSON.parse(saved.options.body);assert.equal(payload.revision,7);assert.equal(payload.rows.length,3);assert.equal(payload.rows[0].subjectId,'a');assert.equal(payload.rows[0].name,'Alicia Updated');assert.equal(payload.resolveConflict,false);
  assert.equal(calls.filter(c=>/workflow|upload/.test(c.url)).length,0);
 });
 test('read-only Session Plan cannot open import',async t=>{
@@ -135,4 +136,71 @@ test('Session Plan actions live on the page and retain import and return navigat
  assert.ok(w.genericView.querySelector('[data-session-file]'));
  w.genericView.querySelector('[data-workflow-action="job"]').click();await settle();
  assert.deepEqual(JSON.parse(JSON.stringify(navigation.at(-1))),{view:'workspaces',options:{jobId:'j'}});
+});
+
+
+test('Session Plan opens a job without intake and filters subjects by name, group and outcome',async t=>{
+ const {w,jobs,roster}=setup(t,'session-plan');jobs[0].conversationId=null;roster.rows[1].collection='Other';
+ await w.StudioWorkflowViews.showSessionPlan('j');
+ const search=w.genericView.querySelector('[data-session-search]');search.value='David';search.dispatchEvent(new w.Event('input'));
+ assert.match(w.genericView.querySelector('tbody').textContent,/David/);assert.doesNotMatch(w.genericView.querySelector('tbody').textContent,/Alicia/);
+ const fresh=w.genericView.querySelector('[data-session-search]');fresh.value='';fresh.dispatchEvent(new w.Event('input'));
+ const group=w.genericView.querySelector('[data-session-group]');group.value='2026';group.dispatchEvent(new w.Event('change'));
+ assert.doesNotMatch(w.genericView.querySelector('tbody').textContent,/David/);
+ const status=w.genericView.querySelector('[data-session-outcome]');status.value='Reshoot';status.dispatchEvent(new w.Event('change'));
+ assert.match(w.genericView.querySelector('tbody').textContent,/Maya/);assert.doesNotMatch(w.genericView.querySelector('tbody').textContent,/Alicia/);
+});
+test('direct subject editing preserves identity and untouched subjects and retains the form after conflict',async t=>{
+ const {w,calls}=setup(t,'session-plan');await w.StudioWorkflowViews.showSessionPlan('j');
+ w.genericView.querySelector('[data-session-edit="A1"]').click();await settle();
+ const form=w.document.querySelector('dialog form');assert.equal(form.elements.reference.readOnly,true);form.elements.name.value='Alicia Corrected';
+ const original=w.json;w.json=async(url,options)=>{if(options?.method==='PUT')throw Error('Session Plan changed. Reload before saving.');return original(url,options);};
+ form.dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();assert.match(form.textContent,/Session Plan changed/);assert.equal(form.elements.name.value,'Alicia Corrected');
+ w.json=original;form.dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();await settle();
+ const payload=JSON.parse(calls.find(c=>c.options?.method==='PUT').options.body);
+ assert.equal(payload.rows.length,3);assert.equal(payload.rows.find(r=>r.reference==='A1').subjectId,'a');assert.equal(payload.rows.find(r=>r.reference==='A1').name,'Alicia Corrected');assert.equal(w.document.querySelector('dialog'),null);
+});
+test('manual entry accepts an explicit stable reference and saves through the job endpoint',async t=>{
+ const {w,calls}=setup(t,'session-plan');await w.StudioWorkflowViews.showSessionPlan('j');await w.StudioWorkflowViews.run('add-subject');
+ const form=w.document.querySelector('dialog form');form.elements.name.value='New Student';form.elements.reference.value='N42';
+ form.dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();await settle();
+ const save=calls.find(c=>c.options?.method==='PUT');assert.equal(save.url,'/api/jobs/j/session-plan/roster');assert.equal(JSON.parse(save.options.body).rows.at(-1).reference,'N42');
+});
+test('ambiguous people are blocked until the import explicitly selects the existing identity',async t=>{
+ const {w,roster,calls}=setup(t,'session-plan');roster.rows.push({subjectId:'twin',reference:'A2',name:'Alicia',collection:'2026',pickupNotification:'None'});
+ await w.StudioWorkflowViews.showSessionPlan('j');await w.StudioWorkflowViews.run('import');
+ w.genericView.querySelector('[data-session-paste]').value='name,collection,contactEmail\nAlicia,2026,updated@example.com';w.genericView.querySelector('[data-session-pasted]').click();w.genericView.querySelector('[data-session-preview]').click();
+ assert.equal(w.genericView.querySelector('[data-session-commit]').disabled,true);
+ const match=w.genericView.querySelector('[data-session-match]');match.value='A2';match.dispatchEvent(new w.Event('change'));
+ assert.equal(w.genericView.querySelector('[data-session-commit]').disabled,false);w.genericView.querySelector('[data-session-commit]').click();await settle();await settle();
+ const rows=JSON.parse(calls.find(c=>c.options?.method==='PUT').options.body).rows;
+ assert.equal(rows.length,4);assert.equal(rows.find(r=>r.reference==='A2').contactEmail,'updated@example.com');assert.equal(rows.find(r=>r.reference==='A1').contactEmail,undefined);
+});
+test('planned arrivals preview and save only selected people without altering outcomes',async t=>{
+ const {w,calls}=setup(t,'session-plan');await w.StudioWorkflowViews.showSessionPlan('j');
+ w.genericView.querySelector('[data-session-all]').click();w.genericView.querySelector('[data-session-plan]').click();await settle();
+ const form=w.document.querySelector('dialog form');form.elements.start.value='2026-11-03T09:00';form.elements.location.value='Main Hall';form.elements.interval.value='10';
+ assert.equal(form.querySelector('[type=submit]').disabled,true);form.querySelector('[data-preview]').click();assert.match(form.querySelector('[data-plan-preview]').textContent,/Alicia.*David.*Maya/s);
+ form.dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();await settle();
+ const rows=JSON.parse(calls.find(c=>c.options?.method==='PUT').options.body).rows;
+ assert.equal(rows.length,3);assert.equal(+new Date(rows[1].scheduledAtUtc)-+new Date(rows[0].scheduledAtUtc),600000);assert.equal(rows[0].scheduleLocation,'Main Hall');assert.ok(rows.every(r=>r.status===undefined));
+});
+test('paging keeps selections across pages without rendering thousands of subject rows',async t=>{
+ const {w,roster}=setup(t,'session-plan');roster.rows=Array.from({length:250},(_,i)=>({subjectId:String(i),reference:'P'+i,name:'Person '+String(i).padStart(3,'0'),collection:'Group'}));
+ await w.StudioWorkflowViews.showSessionPlan('j');assert.equal(w.genericView.querySelectorAll('tbody tr').length,100);
+ w.genericView.querySelector('[data-session-all]').click();w.genericView.querySelector('[data-session-next]').click();
+ assert.equal(w.genericView.querySelector('[data-session-all]').checked,false);assert.match(w.genericView.querySelector('[data-session-plan]').textContent,/100/);
+ w.genericView.querySelector('[data-session-all]').click();w.genericView.querySelector('[data-session-prev]').click();assert.equal(w.genericView.querySelector('[data-session-all]').checked,true);assert.match(w.genericView.querySelector('[data-session-plan]').textContent,/200/);
+});
+test('website review accepts only the selected conflict and includes the reviewed revision',async t=>{
+ const {w,roster,calls}=setup(t,'session-plan');roster.incomingRows=[{conversationId:'cv-review',rows:[{reference:'A1',name:'Alicia Website'}]}];
+ await w.StudioWorkflowViews.showSessionPlan('j');w.genericView.querySelector('[data-session-conflict]').click();w.genericView.querySelector('[data-session-preview]').click();
+ w.genericView.querySelector('[data-session-commit]').click();await settle();await settle();const payload=JSON.parse(calls.find(c=>c.options?.method==='PUT').options.body);
+ assert.equal(payload.resolveConflict,true);assert.equal(payload.conflictConversationId,'cv-review');assert.equal(payload.revision,7);assert.equal(payload.rows.length,3);
+});
+test('assignment and remainder actions use the existing workflow editor and scheduling permissions',async t=>{
+ const {w,roster}=setup(t,'session-plan'),opened=[];w.StudioWorkflow={open:async(...args)=>{opened.push(args);return w.document.createElement('dialog');}};
+ await w.StudioWorkflowViews.showSessionPlan('j');await w.StudioWorkflowViews.run('assign-session');await w.StudioWorkflowViews.run('remainder');
+ assert.deepEqual(opened.map(x=>x[1]),['[data-wf-session]:not([data-wf-remainder])','[data-wf-remainder]']);
+ roster.canSchedule=false;await w.StudioWorkflowViews.showSessionPlan('j');assert.equal(w.genericView.querySelector('[data-session-plan]').disabled,true);await assert.rejects(()=>w.StudioWorkflowViews.run('assign-session'),/permission/);
 });
