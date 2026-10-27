@@ -14,6 +14,7 @@
     let currentView = document.body.dataset.studioView || 'today';
     const shellOverviews = new Map();
     const shellContexts = new Map();
+    const shellAttention = new Map();
     const overviewKey = () => document.body.dataset.studioView === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page') ? 'job-detail' : (document.body.dataset.studioView || 'today');
     const defaultOverview = () => `<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><p>${escText(labelFor(document.body.dataset.studioView || 'today'))}</p><p>Use this page to ${escText((pageTaglines[document.body.dataset.studioView || 'today'] || 'manage Studio work').replace(/\.$/, '').toLowerCase())}.</p></section>`;
     let renderingTools = false;
@@ -336,13 +337,17 @@
         });
     };
 
+    window.studioShellMountAttention = (content, view = overviewKey()) => {
+        shellAttention.set(view, content || null);
+        refreshPageDrawers();
+    };
+
     // Production supplies its workspace filter data to the shared Workspaces card.
     // Other views continue to use the permission-scoped workspace cache.
     window.studioShellMountContext = (nodes, view = overviewKey()) => {
         const cards = Array.from(nodes || []);
         for (const card of cards) {
             card.classList.add('studio-context-card');
-            if (card.querySelector('header h2')?.textContent.includes('Needs Attention')) card.classList.add('st-attention');
             card.dataset.railCard = 'context';
         }
         shellContexts.set(view, cards);
@@ -466,7 +471,7 @@
         drawer.setAttribute('aria-modal', 'true');
         drawer.setAttribute('aria-label', 'Needs Attention');
         drawer.hidden = true;
-        drawer.innerHTML = '<header><h2>Needs Attention</h2><button type="button" data-attention-close aria-label="Close Needs Attention">×</button></header><div id="studioAttentionDetails" class="studio-attention-details"><p>Open Today to refresh attention items.</p></div>';
+        drawer.innerHTML = '<header><h2>Needs Attention</h2><button type="button" data-attention-close aria-label="Close Needs Attention">×</button></header><div id="studioAttentionDetails" class="studio-attention-details"><div id="studioAttentionSummary"></div><div id="studioPageAttention"></div></div>';
         const sessionsDrawer = document.createElement('aside');
         sessionsDrawer.id = 'studioSessionsDrawer';
         sessionsDrawer.className = 'studio-attention-drawer';
@@ -479,11 +484,15 @@
         // Page-specific attention details are hosted exclusively by this shell drawer.
         const jobAttentionSlot=document.createElement('div');
         jobAttentionSlot.id='studioShellJobAttention';
-        drawer.querySelector('#studioAttentionDetails').after(jobAttentionSlot);
+        drawer.querySelector('#studioAttentionDetails').append(jobAttentionSlot);
         window.studioShellMountJobAttention=(content)=>{
             jobAttentionSlot.replaceChildren();
             if(content)jobAttentionSlot.append(content);
+            refreshPageDrawers();
         };
+        const attentionObserver=new MutationObserver(refreshPageDrawers);
+        attentionObserver.observe(document.getElementById('studioPageAttention'),{childList:true,subtree:true,characterData:true,attributes:true});
+        attentionObserver.observe(jobAttentionSlot,{childList:true,subtree:true,characterData:true,attributes:true});
 
         const close = () => {
             drawer.hidden = true;
@@ -553,12 +562,24 @@
             ['Awaiting upload', data.uploadJobs || 0, 'production'],
             ['Job exceptions', data.exceptionJobs || 0, 'jobs']
         ];
-        const total = rows.reduce((sum, row) => sum + Number(row[1] || 0), 0);
+        const pageSlot=document.getElementById('studioPageAttention');
+        const content=shellAttention.get(key);
+        if(pageSlot&&pageSlot.firstElementChild!==(content||null))pageSlot.replaceChildren(...(content?[content]:[]));
+        const jobSlot=document.getElementById('studioShellJobAttention');
+        const jobContent=key==='job-detail'?jobSlot?.firstElementChild:null;
+        if(jobSlot&&jobSlot.hidden!==(key!=='job-detail'))jobSlot.hidden=key!=='job-detail';
+        const countContent=node=>{
+            if(node.dataset.attentionCount!==undefined)return Number(node.dataset.attentionCount)||0;
+            const numbers=[...node.querySelectorAll('strong,b')].map(el=>el.textContent.trim()).filter(text=>/^\d+$/.test(text));
+            return numbers.length?numbers.reduce((sum,n)=>sum+Number(n),0):node.querySelectorAll('button,[role=alert]').length;
+        };
+        const total = content?countContent(content):jobContent?countContent(jobContent):rows.reduce((sum, row) => sum + Number(row[1] || 0), 0);
         const count = document.getElementById('studioAttentionCount');
         if (count) count.textContent = String(total);
         document.getElementById('studioAttentionTrigger')?.classList.toggle('has-attention', total > 0);
-        const details = document.getElementById('studioAttentionDetails');
-        if (details) {
+        const details = document.getElementById('studioAttentionSummary');
+        if(details)details.hidden=!!content||!!jobContent;
+        if (details && !details.hidden) {
             details.replaceChildren();
             if (!total) {
                 const p = document.createElement('p');

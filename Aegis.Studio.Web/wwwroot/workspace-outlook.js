@@ -214,7 +214,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
             messageCard.querySelector('.smc-content').append(composer);
             StudioMessageCard.bind(messageCard);
             const attention=document.createElement('div');attention.className='studio-job-attention-details';
-            attention.innerHTML='<header class="jd-card-heading"><h2>⚠ Needs Attention</h2></header><div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
+            attention.innerHTML='<div class="jd-attention-items"><p role="status">Loading workflow…</p></div><button type="button" class="jd-link" data-view-workflow>View workflow →</button>';
             // The shared bell owns the conversation; Job Details owns only functional job content.
             window.studioShellMountJobConversation?.(messageCard);
             window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Status</span><strong>${esc(job.status || 'Not set')}</strong></div><div class="workspace-summary-row"><span>Days in Stage</span><strong data-job-overview-age>Loading…</strong></div><div class="workspace-summary-row"><span>Next Action</span><strong data-job-overview-action>Loading…</strong></div></section>`,'job-detail');
@@ -349,6 +349,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     const blocked=action?.status==='Blocked'?task?.reason||'A workflow prerequisite is blocking this task.':'';
                     header.querySelector('[data-job-blocked]').textContent=blocked?'Blocked: '+blocked:'';
                     header.querySelector('.jd-workflow-caption').hidden=!blocked;
+                    attention.dataset.attentionCount=task?'1':'0';
                     const attentionItems=attention.querySelector('.jd-attention-items');
                     attentionItems.replaceChildren();
                     if(task){const item=document.createElement('p');item.textContent=task.title+(task.reason?' · '+task.reason:'');attentionItems.append(item);}
@@ -367,6 +368,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                         if(age)age.textContent='Timing unavailable';
                         const next=overview?.querySelector('[data-job-overview-action]');
                         if(next)next.textContent='Workflow unavailable';
+                        attention.dataset.attentionCount='1';
                         const attentionItems=attention.querySelector('.jd-attention-items');
                         attentionItems.replaceChildren();
                         const status=document.createElement('p');

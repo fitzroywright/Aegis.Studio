@@ -44,7 +44,11 @@ test('Jobs Overview owns interactive status counts and recent changes without a 
  assert.equal(rail.querySelector('[data-rail-card="overview"]'),overview);
  overview.querySelector('[data-sj-stage="Scheduled"]').click();
  assert.equal(host.querySelectorAll('tr[data-sj-job]').length,13);
- assert.equal(rail.querySelectorAll('[data-rail-card="context"]').length,2);
+ assert.equal(rail.querySelectorAll('[data-rail-card="context"]').length,1);
+ assert.equal(rail.querySelector('[data-sj-attention]'),null);
+ assert.ok(w.document.querySelector('#studioAttentionDrawer [data-sj-attention]'));
+ const need=w.document.querySelector('#studioAttentionDrawer [data-sj-need="owner"]');
+ need.click();assert.equal(w.document.querySelector('#studioAttentionDrawer [data-sj-need="owner"]').getAttribute('aria-pressed'),'true');
  assert.equal(w.document.querySelector('.sj-right,.st-right,.job-detail-right'),null);
 });
 test('Job Details Overview shows status instead of repeating job and client identity',async t=>{
@@ -83,4 +87,32 @@ test('page renderers and styles no longer define right rails',()=>{
  function files(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(d=>d.isDirectory()?files(path.join(dir,d.name)):[path.join(dir,d.name)]);}
  for(const file of files(root).filter(f=>/\.(?:js|css|html)$/.test(f)&&!f.endsWith('dagre.min.js')))
   assert.doesNotMatch(fs.readFileSync(file,'utf8'),retired,file);
+});
+
+test('attention entries live only in the shared drawer and retain actions, counts and route context',async t=>{
+ const w=shell(t),host=w.document.getElementById('genericView');w.document.body.dataset.studioView='jobs';
+ host.innerHTML='<section data-studio-context><div data-studio-attention><button data-attention-test>Review blocked jobs <b>2</b></button></div><section><header><h2>Other context</h2></header></section></section>';
+ const button=host.querySelector('[data-attention-test]');let clicks=0;button.onclick=()=>clicks++;
+ w.StudioPage.mountContext(host,'jobs');await settle();
+ const drawer=w.document.getElementById('studioAttentionDrawer'),rail=w.document.getElementById('studioContextRail');
+ assert.equal(drawer.querySelector('[data-attention-test]'),button);
+ assert.equal(rail.querySelector('[data-studio-attention]'),null);assert.equal(host.querySelector('[data-studio-attention]'),null);
+ assert.equal(w.document.getElementById('studioAttentionCount').textContent,'2');
+ assert.equal(w.document.getElementById('studioAttentionSummary').hidden,true);
+ w.document.getElementById('studioAttentionTrigger').click();button.click();assert.equal(clicks,1);
+ button.querySelector('b').textContent='7';await settle();assert.equal(w.document.getElementById('studioAttentionCount').textContent,'7');
+ w.document.body.dataset.studioView='clients';w.StudioShell.sync('clients');await settle();
+ assert.equal(drawer.querySelector('[data-attention-test]'),null);assert.equal(w.document.getElementById('studioAttentionCount').textContent,'0');
+ w.document.body.dataset.studioView='jobs';w.StudioShell.sync('jobs');await settle();
+ assert.equal(drawer.querySelector('[data-attention-test]'),button);button.click();assert.equal(clicks,2);
+ assert.equal(w.document.querySelectorAll('[data-attention-test]').length,1);
+ assert.equal([...w.document.querySelectorAll('h2')].filter(h=>h.textContent==='Needs Attention').length,1);
+});
+
+test('page renderers no longer create Needs Attention cards',()=>{
+ for(const name of ['studio-page.js','jobs-page.js','clients.js','photographer-schedule.js','production-planning.js','tasks-page.js','workspace-outlook.js']){
+  assert.doesNotMatch(read(name),/Needs Attention|sj-attention-card|st-task-attention/,name);
+ }
+ assert.equal(fs.existsSync(path.join(root,'css/components/needs-attention.css')),false);
+ assert.doesNotMatch(read('index.html'),/needs-attention\.css/);
 });

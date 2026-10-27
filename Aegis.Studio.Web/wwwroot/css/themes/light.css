@@ -83,8 +83,6 @@ body[data-theme="office-light"] #studioContextRail>[data-rail-card]>header {
 body[data-theme="office-light"] #studioContextRail>[data-rail-card]>header h2 {color:var(--theme-text)!important;}
 body[data-theme="office-light"] :is([data-rail-card="actions"],[data-mw-region="actions"]) {--light-card-border:#a078ff;--light-card-title:#f4f0fc;}
 body[data-theme="office-light"] :is([data-rail-card="workspaces"],[data-mw-region="quick-links"],[data-mw-region="tasks"]) {--light-card-border:#58be91;--light-card-title:#eef8f3;}
-body[data-theme="office-light"] :is([data-mw-region="attention"],.st-attention) {--light-card-border:var(--attention-border);--light-card-title:var(--attention-title-bg);}
-body[data-theme="office-light"] :is([data-mw-region="attention"],.st-attention) :is(.st-card-body,.mw-attention-list) {background:var(--theme-surface)!important;color:var(--theme-text);}
 
 /* Match the reference's pink Messages card, including its reply and notes surfaces. */
 body[data-theme="office-light"] .smc-card {background:#fff;color:var(--theme-text);border-color:#f16c9b;}
