@@ -9747,14 +9747,27 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 .studio-attention-trigger strong {
   display: inline-grid;
   place-items: center;
-  min-width: 19px;
-  height: 19px;
-  padding: 0 4px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
   border-radius: 4px;
   background: #365571;
   color: #edf8ff;
   font-variant-numeric: tabular-nums;
+  font-size: 9px;
+  line-height: 12px;
 }
+.studio-status-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.studio-attention-icon,.studio-session-clock { color: #ffd275; }
 .studio-attention-trigger.has-attention strong { background: #5e502e; color: #ffd275; }
 .studio-attention-backdrop:not([hidden]) {
   position: fixed;
@@ -9904,3 +9917,4 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 }
 #studioShellFooter #studioBreadcrumb .breadcrumb-separator { color: #f0d2a2; }
 #studioShellFooter #studioBreadcrumb .breadcrumb-label { color: #f0c779; }
+
