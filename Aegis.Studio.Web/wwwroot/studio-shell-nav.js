@@ -471,7 +471,7 @@
         drawer.setAttribute('aria-modal', 'true');
         drawer.setAttribute('aria-label', 'Needs Attention');
         drawer.hidden = true;
-        drawer.innerHTML = '<header><h2>Needs Attention</h2><button type="button" data-attention-close aria-label="Close Needs Attention">×</button></header><div id="studioAttentionDetails" class="studio-attention-details"><div id="studioAttentionSummary"></div><div id="studioPageAttention"></div></div>';
+        drawer.innerHTML = '<header><h2>Needs Attention</h2><button type="button" data-attention-close aria-label="Close Needs Attention">×</button></header><div id="studioAttentionDetails" class="studio-attention-details"><div id="studioAttentionItems"></div><div id="studioPageAttention"></div></div>';
         const sessionsDrawer = document.createElement('aside');
         sessionsDrawer.id = 'studioSessionsDrawer';
         sessionsDrawer.className = 'studio-attention-drawer';
@@ -538,10 +538,11 @@
             if (event.key === 'Escape' && (!drawer.hidden || !sessionsDrawer.hidden)) close();
         });
         drawer.addEventListener('click', event => {
-            const link = event.target.closest('[data-attention-route]');
+            const link = event.target.closest('[data-attention-job],[data-attention-route]');
             if (!link) return;
             close();
-            window.studioNavigate?.(link.dataset.attentionRoute);
+            if(link.dataset.attentionJob)window.studioNavigate?.('workspaces',{jobId:link.dataset.attentionJob});
+            else window.studioNavigate?.(link.dataset.attentionRoute);
         });
         window.addEventListener('studio-attention-updated', event => {
             const data = event.detail || {};
@@ -555,13 +556,7 @@
     function refreshPageDrawers() {
         const key = currentPage();
         const data = pageAttention.get(key) || {};
-        const rows = [
-            ['Overdue tasks', data.overdueTasks || 0, 'tasks'],
-            ['Blocked tasks', data.blockedTasks || 0, 'tasks'],
-            ['Needs scheduling', data.schedulingJobs || 0, 'schedule'],
-            ['Awaiting upload', data.uploadJobs || 0, 'production'],
-            ['Job exceptions', data.exceptionJobs || 0, 'jobs']
-        ];
+        const items=Array.isArray(data.items)?data.items:[];
         const pageSlot=document.getElementById('studioPageAttention');
         const content=shellAttention.get(key);
         if(pageSlot&&pageSlot.firstElementChild!==(content||null))pageSlot.replaceChildren(...(content?[content]:[]));
@@ -570,33 +565,31 @@
         if(jobSlot&&jobSlot.hidden!==(key!=='job-detail'))jobSlot.hidden=key!=='job-detail';
         const countContent=node=>{
             if(node.dataset.attentionCount!==undefined)return Number(node.dataset.attentionCount)||0;
-            const numbers=[...node.querySelectorAll('strong,b')].map(el=>el.textContent.trim()).filter(text=>/^\d+$/.test(text));
-            return numbers.length?numbers.reduce((sum,n)=>sum+Number(n),0):node.querySelectorAll('button,[role=alert]').length;
+            return node.querySelectorAll('[data-attention-item],button,[role=alert]').length;
         };
-        const total = content?countContent(content):jobContent?countContent(jobContent):rows.reduce((sum, row) => sum + Number(row[1] || 0), 0);
+        const total = content?countContent(content):jobContent?countContent(jobContent):items.length;
         const count = document.getElementById('studioAttentionCount');
         if (count) count.textContent = String(total);
         document.getElementById('studioAttentionTrigger')?.classList.toggle('has-attention', total > 0);
-        const details = document.getElementById('studioAttentionSummary');
+        const details = document.getElementById('studioAttentionItems');
         if(details)details.hidden=!!content||!!jobContent;
         if (details && !details.hidden) {
             details.replaceChildren();
-            if (!total) {
+            if(data.error){const error=document.createElement('p');error.setAttribute('role','alert');error.textContent='Unable to load some attention items. Refresh Today to retry.';details.append(error);}
+            if (!total&&!data.error) {
                 const p = document.createElement('p');
-                p.textContent = data.loaded ? 'Nothing currently needs attention.' : 'No attention data available for this page.';
+                p.textContent = data.loaded?'Nothing currently needs attention.':'Attention items have not loaded for this page.';
                 details.append(p);
             }
-            rows.forEach(([label, amount, route]) => {
-                if (!amount) return;
+            items.forEach(item => {
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.dataset.attentionRoute = route;
-                const name = document.createElement('span');
-                name.textContent = label;
-                const badge = document.createElement('strong');
-                badge.textContent = String(amount);
-                button.append(name, badge);
-                details.append(button);
+                button.dataset.attentionItem = item.id;
+                if(item.jobId)button.dataset.attentionJob = item.jobId;
+                else button.dataset.attentionRoute = 'tasks';
+                const name = document.createElement('strong');name.textContent = item.title;
+                const context = document.createElement('span');context.textContent = item.context || '';
+                button.append(name, context);details.append(button);
             });
         }
         const sessions = sharedSessions;

@@ -301,16 +301,20 @@
                 
             </button>`;
         }).join('')||'<div class="mw-today-jobs-empty" role="status">'+esc(emptyJobText)+'</div>';
-        const overdueTasks=myTasks.filter(t=>t.dueAtUtc&&new Date(t.dueAtUtc)<now).length;
-        const blockedTasks=myTasks.filter(t=>/blocked|rework|required|failed/i.test(String(t.status||''))).length;
-        const schedulingJobs=leadJobs.filter(j=>['confirmed','needs scheduling','awaiting scheduling','needs assignment','unassigned','needs photographer assignment'].includes(normalized(j.status))).length;
-        const uploadJobs=leadJobs.filter(j=>/awaiting upload/i.test(String(j.status||''))).length;
-        const exceptionJobs=leadJobs.filter(j=>/blocked|overdue|exception/i.test(String(j.status||''))).length;
-        const attentionJobs=schedulingJobs+uploadJobs+exceptionJobs;
-        const productionTasks=myTasks.filter(t=>/edit|retouch|qc|print|deliver|production|gallery|select|design|color|review|upload|schedule/i.test(String(t.activityType||'')+' '+String(t.title||'')));
-        const attentionItems=[...productionTasks,...myTasks.filter(t=>!productionTasks.includes(t))].slice(0,5);
-        const attentionTotal=overdueTasks+blockedTasks+attentionJobs;
-        window.dispatchEvent(new CustomEvent('studio-attention-updated', {detail: {view:'today',loaded:true,overdueTasks,blockedTasks,schedulingJobs,uploadJobs,exceptionJobs}}));
+        const taskAttention=myTasks.flatMap(task=>{
+            const reasons=[];
+            if(task.dueAtUtc&&new Date(task.dueAtUtc)<now)reasons.push('Overdue');
+            if(/blocked|rework|required|failed/i.test(String(task.status||'')))reasons.push(task.blockedReason||task.status);
+            if(!reasons.length)return [];
+            const job=jobs.find(job=>String(job.id)===String(task.jobId));
+            return [{id:'task:'+task.id,jobId:task.jobId,title:task.title||task.activityType||'Studio task',context:[job?.title,...reasons].filter(Boolean).join(' · ')}];
+        });
+        const jobAttention=leadJobs.flatMap(job=>{
+            const status=normalized(job.status);
+            if(!['confirmed','needs scheduling','awaiting scheduling','needs assignment','unassigned','needs job owner','needs photographer','needs photographer assignment'].includes(status)&&!/awaiting upload|blocked|overdue|exception|changes requested/i.test(status))return [];
+            return [{id:'job:'+job.id,jobId:job.id,title:job.title||'Untitled job',context:[job.clientName,job.status,job.blockedReason].filter(Boolean).join(' · ')}];
+        });
+        window.dispatchEvent(new CustomEvent('studio-attention-updated', {detail: {view:'today',loaded:state.status.jobs==='ready'&&state.status.tasks==='ready',items:[...taskAttention,...jobAttention],error:state.errors.jobs||state.errors.tasks||''}}));
 
         const availableWorkspaces=(typeof workspaceCache!=='undefined'&&Array.isArray(workspaceCache)?workspaceCache:[])
             .filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view);
@@ -810,7 +814,6 @@
 
         genericView.innerHTML=StudioPage.html({title:'Studio Management',scroll:true,
             summary:StudioPage.metrics([['Managed workspaces',manageable.length],['Active roles',studioRolesCache.filter(x=>x.isActive).length]]),
-            attention:'<p>Workspace access is controlled by memberships and reusable roles.</p>',
             content:`<div class="st-admin-grid">${studioManagementCatalogCards()}<section class="admin-card" id="publicBookingCatalog">
                             <header class="admin-card-header"><div><h2>Public booking sessions</h2><p>Studio owns session descriptions, duration, JMD price, deposit, locations and resource rules. Published changes sync to the API site when external publishing is enabled.</p></div></header>
                             <div class="admin-form-stack"><input type="hidden" data-catalog-id><label>Session name<input data-catalog-name maxlength="160"></label><label>Public description<textarea data-catalog-description maxlength="1000" rows="2"></textarea></label>
