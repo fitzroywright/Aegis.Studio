@@ -174,3 +174,40 @@ test('Client Management has a visible New Client action that saves through the e
  assert.equal(fixture.created.displayName,'New Client');assert.equal(fixture.navigation.options.clientId,'new');
  const css=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/css/pages/clients.css'),'utf8');assert.match(css,/client-directory-table th:nth-child\(3\),\.clients-page \.client-directory-table td:nth-child\(3\)\{width:26%\}/);
 });
+
+function galleryLinksFixture(w,fixture){
+ const json=w.json,dialog=w.studioDialog;
+ w.studioDialog=(title,html)=>{const d=dialog(title,html);d.open=true;return d;};
+ fixture.isAdmin=true;fixture.links=[{id:'pa',clientId:'a',status:'Pending',expiresAt:'2026-11-01'},{id:'pb',clientId:'b',status:'Pending',expiresAt:'2026-11-02'}];
+ w.json=async(url,options)=>{
+  if(url==='/api/auth/me')return {user:{isAdministrator:fixture.isAdmin}};
+  if(url.startsWith('/api/admin/gallery-client-links/')){
+   fixture.calls.push({url,options});
+   if(options?.method==='POST'){if(fixture.linkDelay)await fixture.linkDelay;if(fixture.failLink)throw Error('API Site unavailable');return {code:'one-time-test-code',expiresAt:'2026-11-01'};}
+   if(options?.method==='DELETE'){if(fixture.failRevoke)throw Error('Revoke rejected');fixture.links=fixture.links.filter(item=>!url.endsWith('/'+item.id));return{};}
+   return {items:fixture.links};
+  }
+  return json(url,options);
+ };
+}
+test('client gallery account linking uses the selected stored client and scoped link status',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());galleryLinksFixture(w,fixture);
+ await w.StudioClients.render({clientId:'a',tab:'galleries'});await settle();w.document.querySelector('[data-c-link-gallery]').click();await settle();
+ const dialog=w.document.querySelector('dialog');assert.match(dialog.textContent,/Andrea Campbell.*andrea@example.test/s);assert.equal(dialog.querySelector('select'),null);
+ assert.ok(fixture.calls.some(call=>call.url==='/api/admin/gallery-client-links/?clientId=a'));assert.equal(dialog.querySelectorAll('[data-link-revoke]').length,1);assert.equal(dialog.querySelector('[data-link-revoke]').dataset.linkRevoke,'pa');assert.doesNotMatch(dialog.textContent,/2026-11-02/);
+ dialog.querySelector('[data-link-create]').click();await settle();const post=fixture.calls.find(call=>call.options?.method==='POST');assert.equal(JSON.parse(post.options.body).clientId,'a');assert.equal(dialog.querySelector('[data-link-code]').value,'one-time-test-code');assert.equal(dialog.querySelector('[data-link-code-wrap]').hidden,false);
+ const copied=[];Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async value=>copied.push(value)}});dialog.querySelector('[data-link-copy]').click();await settle();assert.deepEqual(copied,['one-time-test-code']);
+ dialog.querySelector('[data-link-revoke]').click();await settle();assert.ok(fixture.calls.some(call=>call.url.endsWith('/pa')&&call.options?.method==='DELETE'));assert.equal(dialog.querySelector('[data-link-code-wrap]').hidden,true);assert.equal(dialog.querySelector('[data-link-code]').value,'');assert.equal(fixture.links.length,1);
+ assert.equal(fixture.calls.some(call=>call.url==='/api/admin/gallery-client-links/clients'),false);
+});
+test('gallery linking retains admin permission and never loads proofs for other staff',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());galleryLinksFixture(w,fixture);fixture.isAdmin=false;
+ await w.StudioClients.render({clientId:'a',tab:'galleries'});await settle();assert.equal(w.document.querySelector('[data-c-link-gallery]'),null);assert.equal(fixture.calls.some(call=>call.url.startsWith('/api/admin/gallery-client-links')),false);assert.ok(w.document.querySelector('[data-c-media]'));
+});
+test('link errors remain visible and retryable; client navigation closes the dialog and discards late codes',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());galleryLinksFixture(w,fixture);fixture.failLink=true;
+ await w.StudioClients.render({clientId:'a',tab:'galleries'});await settle();w.document.querySelector('[data-c-link-gallery]').click();await settle();let dialog=w.document.querySelector('dialog');dialog.querySelector('[data-link-create]').click();await settle();assert.match(dialog.querySelector('[data-link-status]').textContent,/API Site unavailable/);assert.equal(dialog.querySelector('[data-link-create]').disabled,false);assert.equal(dialog.querySelector('[data-link-code-wrap]').hidden,true);
+ fixture.failRevoke=true;dialog.querySelector('[data-link-revoke]').click();await settle();assert.match(dialog.querySelector('[data-link-status]').textContent,/Revoke rejected/);assert.equal(dialog.querySelector('[data-link-revoke]').disabled,false);
+ fixture.failLink=false;let release;fixture.linkDelay=new Promise(resolve=>release=resolve);dialog.querySelector('[data-link-create]').click();dialog.querySelector('[data-link-create]').click();assert.equal(fixture.calls.filter(call=>call.options?.method==='POST').length,2);
+ await w.StudioClients.render({clientId:'b',tab:'jobs'});release();await settle();assert.equal(w.document.querySelector('dialog'),null);assert.equal(dialog.querySelector('[data-link-code]').value,'');assert.match(w.document.querySelector('[data-c-content]').textContent,/Other client job/);
+});
