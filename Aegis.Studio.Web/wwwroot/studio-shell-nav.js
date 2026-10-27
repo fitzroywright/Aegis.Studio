@@ -474,7 +474,7 @@
         sessionsDrawer.setAttribute('aria-modal', 'true');
         sessionsDrawer.setAttribute('aria-label', "Upcoming Sessions");
         sessionsDrawer.hidden = true;
-        sessionsDrawer.innerHTML = '<header><h2>Upcoming Sessions</h2><button type="button" data-sessions-close aria-label="Close sessions">×</button></header><p class="studio-attention-scope">Next 30 days · Local time</p><div id="studioSessionsDetails" class="studio-attention-details"></div><button type="button" data-sessions-calendar>View Calendar →</button>';
+        sessionsDrawer.innerHTML = '<header><h2>Upcoming Sessions</h2><button type="button" data-sessions-close aria-label="Close sessions">×</button></header><p class="studio-sessions-range">Next 30 days · Local time</p><div id="studioSessionsDetails" class="studio-attention-details"></div><button type="button" data-sessions-calendar>View Calendar →</button>';
         document.body.append(backdrop, drawer, sessionsDrawer);
         // Page-specific attention details are hosted exclusively by this shell drawer.
         const jobAttentionSlot=document.createElement('div');
