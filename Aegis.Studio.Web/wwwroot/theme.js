@@ -22,7 +22,7 @@
         if (normalized === 'comfort') return 'studio-comfort';
         if (normalized === 'light') return 'office-light';
         if (normalized === 'dark') return 'fluent-dark';
-        return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'fluent-dark' : 'studio-default';
+        return 'studio-default';
     }
 
     function applyTheme(themeName) {
@@ -82,13 +82,10 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
         applyTheme(localStorage.getItem(storageKey) || 'standard');
-        const systemTheme = window.matchMedia?.('(prefers-color-scheme: dark)');
-        systemTheme?.addEventListener?.('change', () => {
-            if (normalizeTheme(localStorage.getItem(storageKey)) === 'standard') applyTheme('standard');
-        });
         wireSelectors();
         await loadProfileTheme();
 
         // Theme selection persists immediately; the profile form saves other preferences.
     });
 })();
+
