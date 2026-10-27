@@ -70,7 +70,14 @@ for(const view of ['tasks','schedule'])test(`${view} keeps sessions in the share
  assert.match(drawer.textContent,/Upcoming Sessions/);
  assert.match(drawer.textContent,/Next 30 days/);
  assert.equal(drawer.getAttribute('aria-label'),'Upcoming Sessions');
- assert.match(w.document.getElementById('studioSessionsTrigger').getAttribute('aria-label'),/Upcoming Sessions/);
+ for(const [id,label] of [['studioSessionsTrigger','Upcoming Sessions'],['studioAttentionTrigger','Needs Attention']]){
+  const button=w.document.getElementById(id);
+  assert.equal(button.getAttribute('aria-label'),label);
+  assert.equal(button.title,label);
+  assert.ok(button.querySelector('svg[aria-hidden="true"]'));
+  assert.ok(button.querySelector('strong'));
+  assert.ok(!button.textContent.includes(label));
+ }
  assert.doesNotMatch(drawer.textContent,/Cancelled session/);
  assert.equal(requests.filter(url=>url.startsWith('/api/today/schedule')).length,2);
 });
