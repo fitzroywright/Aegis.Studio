@@ -13,8 +13,9 @@ test('login announcements use one horizontal banner, persist dismissals and do n
  await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});
  const host=w.document.getElementById('studioLoginAnnouncements');assert.ok(host);assert.equal(host.children.length,2);assert.equal(host.parentElement,w.document.querySelector('.shell>main'));assert.match(host.textContent,/First <notice>/);assert.equal(host.querySelector('notice'),null);assert.equal(calls.some(x=>x.includes('denied')),false);
  await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});assert.equal(w.document.querySelectorAll('#studioLoginAnnouncements').length,1);
+ assert.ok(host.querySelector('.workspace-announcement-symbol svg'));assert.equal(host.querySelector('.workspace-announcement-kicker').textContent,'Staff announcement');assert.equal(host.querySelector('h2').textContent,'First <notice>');assert.match(host.querySelector('.workspace-announcement-position').textContent,/1 of 2.*Scroll for more/);
  const button=host.querySelector('button');setFail(true);await button.onclick();assert.equal(host.children.length,2);assert.equal(button.disabled,false);assert.match(host.textContent,/Could not dismiss/);
- setFail(false);await button.onclick();assert.ok(dismissed.has('a'));assert.equal(host.children.length,1);
+ setFail(false);await button.onclick();assert.ok(dismissed.has('a'));assert.equal(host.children.length,1);assert.equal(host.querySelector('.workspace-announcement-position').textContent,'1 of 1');
  host.remove();w.eval(read('announcements.js'));await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});assert.equal(w.document.getElementById('studioLoginAnnouncements'),null);
  w.sessionStorage.removeItem('studio-announcements-login');w.eval(read('announcements.js'));await w.StudioAnnouncements.showAtLogin({userName:'Lisa'});
  const next=w.document.getElementById('studioLoginAnnouncements');assert.equal(next.children.length,1);assert.match(next.textContent,/Second/);assert.doesNotMatch(next.textContent,/First/);
