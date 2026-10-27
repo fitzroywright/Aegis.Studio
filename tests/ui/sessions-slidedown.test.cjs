@@ -27,7 +27,7 @@ async function setup(t,view,options={}){
  };
  w.fetch=async url=>{requests.push(url);return options.fetch ? options.fetch(url,sessions) : {ok:true,json:async()=>sessions};};
  w.loadWorkspaces=async()=>[];
- for(const file of ['studio-message-card.js','studio-page.js','scheduling.js','tasks-page.js','photographer-schedule.js','studio-shell-nav.js'])w.eval(read(file));
+ for(const file of ['calendar-layouts.js','studio-message-card.js','studio-page.js','scheduling.js','tasks-page.js','photographer-schedule.js','studio-shell-nav.js'])w.eval(read(file));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  await settle();
  return {w,requests};

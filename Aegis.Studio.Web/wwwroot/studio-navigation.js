@@ -33,7 +33,7 @@
 
     function renderToday(){
         const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',jobStatusFilter:'',jobRoleFilter:'',includeClosedJobs:false,selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',workspaceName:''};
+        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',jobStatusFilter:'',jobRoleFilter:'',includeClosedJobs:false,selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',layout:'jobs',workspaceName:''};
         state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['today','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
         todayLoad=controller;
         conversationView.classList.add('hidden');genericView.classList.remove('hidden');
@@ -301,6 +301,7 @@
                 
             </button>`;
         }).join('')||'<div class="mw-today-jobs-empty" role="status">'+esc(emptyJobText)+'</div>';
+        const jobLayout=state.layout==='jobs'?mainJobRows:StudioCalendarLayouts.render({layout:state.layout,anchor:selectedDate,period:state.calendarView,attribute:'data-open-job',items:sortedJobs.map(job=>({id:job.id,title:job.title||'Untitled job',context:job.clientName||'',start:job.eventDate,allDay:true,status:job.status}))});
         const taskAttention=myTasks.flatMap(task=>{
             const reasons=[];
             if(task.dueAtUtc&&new Date(task.dueAtUtc)<now)reasons.push('Overdue');
@@ -336,7 +337,7 @@
                             </div>
                             
                             <div class="mw-today-job-columns"><label class="mw-job-column-search"><span>Job / Client</span><label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label></label><label class="mw-job-column-filter"><span>Status</span><select data-mw-job-status aria-label="Filter jobs by status"><option value="">All Open Jobs</option>${statusOptions.map(value=>`<option value="${esc(value)}" ${state.jobStatusFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span>Progress</span><span>Event Date</span><label class="mw-job-column-filter"><span>My Role</span><select data-mw-job-role aria-label="Filter jobs by role"><option value="">All roles</option>${roleOptions.map(value=>`<option value="${esc(value)}" ${state.jobRoleFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span></span></div>
-                            <div class="mw-today-job-list">${phase('jobs',mainJobRows)}</div>
+                            <div class="mw-today-job-list" data-layout="${state.layout}">${phase('jobs',jobLayout)}</div>
                         </section>
                     </main>
 
@@ -358,6 +359,9 @@
             const list=existing.querySelector('.mw-today-job-list');
             const nextList=region.querySelector('.mw-today-job-list');
             const top=list.scrollTop,left=list.scrollLeft;
+            if(list.dataset.layout!=='jobs'||nextList.dataset.layout!=='jobs'){
+                if(list.innerHTML!==nextList.innerHTML)list.innerHTML=nextList.innerHTML;
+            }else{
             const rows=new Map([...list.querySelectorAll('[data-open-job]')].map(row=>[row.dataset.openJob,row]));
             let cursor=list.firstChild;
             for(const nextRow of [...nextList.children]){
@@ -367,6 +371,8 @@
                 cursor=row.nextSibling;
             }
             while(cursor){const removed=cursor;cursor=cursor.nextSibling;removed.remove();}
+            }
+            list.dataset.layout=nextList.dataset.layout;
             [...region.children].forEach((child,index)=>{
                 if(child!==nextList&&existing.children[index].innerHTML!==child.innerHTML)existing.children[index].replaceWith(child);
             });
@@ -389,7 +395,7 @@
                     ? range.from.toLocaleDateString([],{month:'short',day:'numeric'})+' – '+inclusiveEnd.toLocaleDateString([],{month:'short',day:'numeric'})
                     : isToday?'Today':selectedDate.toLocaleDateString([],{month:'short',day:'numeric'});
             const viewLabel=calendarView[0].toUpperCase()+calendarView.slice(1);
-            studioPageTools.innerHTML=`
+            studioPageTools.innerHTML=`${StudioCalendarLayouts.switcher(state.layout)}
                 <div class="mw-calendar-view-switch" role="group" aria-label="Calendar view">
                     ${['month','week','day'].map(view=>'<button type="button" data-mw-calendar-view="'+view+'" class="'+(calendarView===view?'active':'')+'" aria-pressed="'+String(calendarView===view)+'">'+view[0].toUpperCase()+view.slice(1)+'</button>').join('')}
                 </div>
@@ -410,6 +416,7 @@
         if(calendarHost && studioPageTools){
             calendarHost.replaceChildren(...Array.from(studioPageTools.children));
         }
+        StudioCalendarLayouts.bind(genericView,{onLayout:value=>{state.layout=value;paintToday(state);}});
         const shellScope=calendarHost||genericView;
         shellScope.querySelectorAll('[data-mw-calendar-view]').forEach(button=>button.onclick=()=>state.setCalendarView(button.dataset.mwCalendarView));
         shellScope.querySelectorAll('[data-mw-day]').forEach(button=>button.onclick=()=>{

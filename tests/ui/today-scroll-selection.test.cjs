@@ -20,6 +20,7 @@ async function setup(t){
    return [];
   },openWorkspaceJob:async id=>{opened.push(id);w.studioBeginJobNavigation(id);w.document.body.dataset.studioView='workspaces';}
  });
+ w.eval(fs.readFileSync(path.join(root,'calendar-layouts.js'),'utf8'));
  w.eval(fs.readFileSync(path.join(root,'studio-message-card.js'),'utf8'));
  w.eval(fs.readFileSync(path.join(root,'studio-navigation.js'),'utf8'));
  for(let i=0;i<8;i++)await flush();
@@ -53,4 +54,15 @@ test('retained rows still filter correctly and keyboard activation opens their j
  assert.equal(list.querySelector('[data-open-job]'),row);
  row.focus();row.dispatchEvent(new w.MouseEvent('click',{bubbles:true,detail:0}));await flush();
  assert.deepEqual(opened,['job-7']);
+});
+
+test('Today layout options retain date filters and return to a stable Jobs grid',async t=>{
+ const {w,releaseMedia}=await setup(t),d=w.document;
+ const layout=d.querySelector('.mw-today-calendar-tools .studio-layout-switch');assert.equal(layout.nextElementSibling.className,'mw-calendar-view-switch');
+ layout.querySelector('[data-calendar-layout="calendar"]').click();assert.ok(d.querySelector('.studio-calendar-month'));
+ assert.equal(d.querySelectorAll('.studio-calendar-item[data-open-job]').length,10);
+ d.querySelector('[data-calendar-layout="timeline"]').click();assert.ok(d.querySelector('.studio-calendar-timeline'));
+ d.querySelector('[data-calendar-layout="jobs"]').click();const list=d.querySelector('.mw-today-job-list'),row=list.querySelector('[data-open-job="job-7"]');
+ row.focus();list.scrollTop=240;releaseMedia();await w.studioTodayReady;
+ assert.equal(list.querySelector('[data-open-job="job-7"]'),row);assert.equal(d.activeElement,row);assert.equal(list.scrollTop,240);
 });
