@@ -75,7 +75,7 @@
 .jd-footer-drawer > .jd-footer-drawer-content { flex:1; min-height:0; overflow:auto; padding:10px 14px; }
 @media(prefers-reduced-motion:reduce) { .jd-footer-drawer,.jd-footer-drawer.is-open { transition:none; } }
 .job-detail-board { display:contents; }
-.job-detail-center { grid-column:1; grid-row:2; display:flex; min-width:0; min-height:0; overflow:hidden; }
+.job-detail-center { grid-column:1; grid-row:2; display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
 .jd-panel { display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); overflow:hidden; }
 .job-detail-center > .jd-panel { flex:1; }
 .jd-card-heading { flex:none; display:flex; align-items:center; justify-content:space-between; gap:6px; padding:9px 11px; border-bottom:1px solid var(--theme-border,#e3e0da); }
@@ -200,3 +200,12 @@
 @media(max-width:1200px) { .jd-drop-hint { display:none; } .jd-contact-sheet { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } }
 @media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); } .job-detail-heading { padding:7px; gap:0 5px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
+
+.jd-job-brief{flex:0 0 auto;max-height:30vh;overflow:auto;border-bottom:1px solid var(--studio-control-border,#dce4ec);padding:8px 12px;background:var(--studio-card-surface,#fff)}
+.jd-job-brief>header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.jd-job-brief h2{font-size:13px;margin:0 0 5px}.jd-job-brief h3{font-size:12px;margin:0 0 4px}
+.jd-brief-columns{display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,1fr);gap:16px}
+.jd-brief-columns p{white-space:pre-wrap;overflow-wrap:anywhere;margin:3px 0 7px;font-size:12px}
+.jd-brief-columns textarea{display:block;min-height:45px;width:100%;box-sizing:border-box}
+.jd-brief-file{display:block;overflow-wrap:anywhere;margin:4px 0;font-size:12px}
+@media(max-width:650px){.jd-brief-columns{grid-template-columns:minmax(0,1fr)}}

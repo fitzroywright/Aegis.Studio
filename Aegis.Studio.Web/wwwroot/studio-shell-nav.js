@@ -23,6 +23,8 @@
     let workspaceLoadAttempted = false;
     let productionWorkspaceFilter = null;
     const pageAttention = new Map();
+    let sharedAttention={items:[],loaded:false,error:''};
+    async function loadSharedAttention(){if(!window.StudioAttention)return;try{sharedAttention=await window.StudioAttention.load();}catch{sharedAttention={items:[],loaded:false,error:'Needs Attention could not be loaded. Reopen to retry.'};}refreshPageDrawers();}
     let sharedSessions = [];
     let sessionsState = 'loading';
     let sessionsRequest = null;
@@ -510,7 +512,7 @@
             drawer.hidden = !opening;
             backdrop.hidden = !opening;
             trigger.setAttribute('aria-expanded', String(opening));
-            if (opening) drawer.querySelector('[data-attention-close]').focus();
+            if (opening) {drawer.querySelector('[data-attention-close]').focus();void loadSharedAttention();}
         };
         sessionsTrigger.onclick = () => {
             const opening = sessionsDrawer.hidden;
@@ -557,7 +559,8 @@
     function refreshPageDrawers() {
         const key = currentPage();
         const data = pageAttention.get(key) || {};
-        const items=Array.isArray(data.items)?data.items:[];
+        const merged=new Map([...(Array.isArray(data.items)?data.items:[]),...sharedAttention.items].map(item=>[item.id,item]));
+        let items=[...merged.values()];
         const pageSlot=document.getElementById('studioPageAttention');
         const content=shellAttention.get(key);
         if(pageSlot&&pageSlot.firstElementChild!==(content||null))pageSlot.replaceChildren(...(content?[content]:[]));
@@ -568,25 +571,31 @@
             if(node.dataset.attentionCount!==undefined)return Number(node.dataset.attentionCount)||0;
             return node.querySelectorAll('[data-attention-item],button,[role=alert]').length;
         };
-        const total = content?countContent(content):jobContent?countContent(jobContent):items.length;
+        const mountedIds=new Set();
+        for(const node of [content,jobContent].filter(Boolean))for(const row of node.querySelectorAll('[data-attention-item]')){
+            const id=row.dataset.attentionItem;mountedIds.add(id);if(row.dataset.sjJob&&id===row.dataset.sjJob)mountedIds.add('job:'+id);
+        }
+        items=items.filter(item=>!mountedIds.has(item.id));
+        const total = (content?countContent(content):jobContent?countContent(jobContent):0)+items.length;
         const count = document.getElementById('studioAttentionCount');
         if (count) count.textContent = String(total);
         document.getElementById('studioAttentionTrigger')?.classList.toggle('has-attention', total > 0);
         const details = document.getElementById('studioAttentionItems');
-        if(details)details.hidden=!!content||!!jobContent;
+        if(details)details.hidden=false;
         if (details && !details.hidden) {
             details.replaceChildren();
-            if(data.error){const error=document.createElement('p');error.setAttribute('role','alert');error.textContent='Unable to load some attention items. Refresh Today to retry.';details.append(error);}
-            if (!total&&!data.error) {
+            if(data.error||sharedAttention.error){const error=document.createElement('p');error.setAttribute('role','alert');error.textContent=sharedAttention.error||'Unable to load some attention items. Refresh Today to retry.';details.append(error);}
+            if (!total&&!data.error&&!sharedAttention.error) {
                 const p = document.createElement('p');
-                p.textContent = data.loaded?'Nothing currently needs attention.':'Attention items have not loaded for this page.';
+                p.textContent = sharedAttention.loaded||data.loaded?'Nothing currently needs attention.':'Loading attention items…';
                 details.append(p);
             }
             items.forEach(item => {
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.dataset.attentionItem = item.id;
-                if(item.jobId)button.dataset.attentionJob = item.jobId;
+                if(item.route)button.dataset.attentionRoute=item.route;
+                else if(item.jobId)button.dataset.attentionJob = item.jobId;
                 else button.dataset.attentionRoute = 'tasks';
                 const name = document.createElement('strong');name.textContent = item.title;
                 const context = document.createElement('span');context.textContent = item.context || '';
@@ -671,9 +680,11 @@
         initializeAttentionDrawer();
         refreshPageDrawers();
         loadSharedSessions();
+        void loadSharedAttention();
         syncGridFooterCount();
         window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
         window.addEventListener('studio-workflow-capabilities',renderLeftRail);
+        document.addEventListener('studio-workflow-changed',()=>{void loadSharedAttention();});
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
         document.querySelector('[data-studio-avatar-activity]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');

@@ -92,14 +92,14 @@ test('page renderers and styles no longer define right rails',()=>{
 
 test('attention entries live only in the shared drawer and retain actions, counts and route context',async t=>{
  const w=shell(t),host=w.document.getElementById('genericView');w.document.body.dataset.studioView='jobs';
- host.innerHTML='<section data-studio-context><div data-studio-attention><button data-attention-test>Review blocked jobs <b>2</b></button></div><section><header><h2>Other context</h2></header></section></section>';
+ host.innerHTML='<section data-studio-context><div data-studio-attention><button data-attention-test>Review blocked job</button></div><section><header><h2>Other context</h2></header></section></section>';
  const button=host.querySelector('[data-attention-test]');let clicks=0;button.onclick=()=>clicks++;
  w.StudioPage.mountContext(host,'jobs');await settle();
  const drawer=w.document.getElementById('studioAttentionDrawer'),rail=w.document.getElementById('studioContextRail');
  assert.equal(drawer.querySelector('[data-attention-test]'),button);
  assert.equal(rail.querySelector('[data-studio-attention]'),null);assert.equal(host.querySelector('[data-studio-attention]'),null);
  assert.equal(w.document.getElementById('studioAttentionCount').textContent,'1');
- assert.equal(w.document.getElementById('studioAttentionItems').hidden,true);
+ assert.equal(w.document.getElementById('studioAttentionItems').hidden,false);
  w.document.getElementById('studioAttentionTrigger').click();button.click();assert.equal(clicks,1);
  button.after(button.cloneNode(true));await settle();assert.equal(w.document.getElementById('studioAttentionCount').textContent,'2');button.nextElementSibling.remove();await settle();
  w.document.body.dataset.studioView='clients';w.StudioShell.sync('clients');await settle();

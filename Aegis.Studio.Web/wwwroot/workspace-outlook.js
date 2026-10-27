@@ -226,7 +226,9 @@ function mergeJobMessages(teamMessages, clientMessages) {
             };
             window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Status</span><strong>${esc(job.status || 'Not set')}</strong></div><div class="workspace-summary-row"><span>Days in Stage</span><strong data-job-overview-age>Loading…</strong></div><div class="workspace-summary-row"><span>Next Action</span><strong data-job-overview-action>Loading…</strong></div></section>`,'job-detail');
             window.studioShellMountJobAttention?.(attention);
+            const brief=document.createElement('section');brief.className='jd-job-brief';center.prepend(brief);
             board.append(center);detailPane.append(board);
+            void window.StudioJobBrief?.mount(job,brief,current);
             const makeDrawer=(key,title)=>{
                 const toggle=document.querySelector('[data-studio-avatar-activity]');toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','job'+key+'Drawer');
                 const drawer=document.createElement('aside');drawer.id='job'+key+'Drawer';drawer.className='jd-footer-drawer';drawer.setAttribute('aria-labelledby','job'+key+'Title');drawer.setAttribute('aria-hidden','true');drawer.setAttribute('inert','');
@@ -356,10 +358,11 @@ function mergeJobMessages(teamMessages, clientMessages) {
                     const blocked=action?.status==='Blocked'?task?.reason||'A workflow prerequisite is blocking this task.':'';
                     header.querySelector('[data-job-blocked]').textContent=blocked?'Blocked: '+blocked:'';
                     header.querySelector('.jd-workflow-caption').hidden=!blocked;
-                    attention.dataset.attentionCount=task?'1':'0';
                     const attentionItems=attention.querySelector('.jd-attention-items');
                     attentionItems.replaceChildren();
-                    if(task){const item=document.createElement('p');item.textContent=task.title+(task.reason?' · '+task.reason:'');attentionItems.append(item);}
+                    const pendingTasks=(graphView.tasks||[]).filter(item=>!['Completed','Cancelled','Archived','Skipped'].includes(item.status)&&!['Inactive','Skipped'].includes(item.eligibility));
+                    attention.dataset.attentionCount=String(pendingTasks.length);
+                    for(const pendingTask of pendingTasks){const item=document.createElement('button');item.type='button';item.dataset.attentionItem='task:'+pendingTask.id;item.textContent=pendingTask.title+(pendingTask.reason?' · '+pendingTask.reason:'');item.onclick=()=>openGraphAction(pendingTask.nodeId);attentionItems.append(item);}
                     const button=attention.querySelector('[data-view-workflow]');
                     button.textContent=task?'Open '+task.title+' →':'Open workflow →';
                     button.onclick=()=>openGraphAction(action?.nodeId);

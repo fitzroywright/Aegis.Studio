@@ -301,7 +301,7 @@
             </button>`;
         }).join('')||'<div class="mw-today-jobs-empty" role="status">'+esc(emptyJobText)+'</div>';
         const jobLayout=state.layout==='jobs'?mainJobRows:StudioCalendarLayouts.render({layout:state.layout,anchor:selectedDate,period:state.calendarView,attribute:'data-open-job',items:sortedJobs.map(job=>({id:job.id,title:job.title||'Untitled job',context:job.clientName||'',start:job.eventDate,allDay:true,status:job.status}))});
-        const taskAttention=myTasks.flatMap(task=>{
+        const taskAttention=tasks.filter(task=>!/[Cc]ompleted|[Cc]ancelled|[Aa]rchived/.test(task.status||'')).flatMap(task=>{
             const reasons=[];
             if(task.dueAtUtc&&new Date(task.dueAtUtc)<now)reasons.push('Overdue');
             if(/blocked|rework|required|failed/i.test(String(task.status||'')))reasons.push(task.blockedReason||task.status);
@@ -309,7 +309,7 @@
             const job=jobs.find(job=>String(job.id)===String(task.jobId));
             return [{id:'task:'+task.id,jobId:task.jobId,title:task.title||task.activityType||'Studio task',context:[job?.title,...reasons].filter(Boolean).join(' · ')}];
         });
-        const jobAttention=leadJobs.flatMap(job=>{
+        const jobAttention=jobs.flatMap(job=>{
             const status=normalized(job.status);
             if(!['confirmed','needs scheduling','awaiting scheduling','needs assignment','unassigned','needs job owner','needs photographer','needs photographer assignment'].includes(status)&&!/awaiting upload|blocked|overdue|exception|changes requested/i.test(status))return [];
             return [{id:'job:'+job.id,jobId:job.id,title:job.title||'Untitled job',context:[job.clientName,job.status,job.blockedReason].filter(Boolean).join(' · ')}];
