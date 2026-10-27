@@ -6,7 +6,7 @@ function setup(t,administrator=true){
  w.json=async url=>url==='/api/auth/me'?{user:{isAdministrator:administrator}}:url==='/api/admin/studio-status'?{database:'Ready',storage:{provider:'Local',available:true,writable:true},previews:{},messaging:{}}:[];
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  w.ResizeObserver=class{observe(){} disconnect(){}};w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
- for(const file of ['studio-message-card.js','studio-page.js','studio-admin.js','commercial.js','studio-navigation.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));
+ for(const file of ['studio-message-card.js','studio-page.js','studio-admin.js','booking-sessions.js','commercial.js','studio-navigation.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));
  return {w,dom};
 }
 test('Admin routes mount their own content without retaining unrelated cards',async t=>{
@@ -15,7 +15,7 @@ test('Admin routes mount their own content without retaining unrelated cards',as
  assert.equal(w.StudioAdmin.entries.some(entry=>entry.view==='gallery-access-admin'),false);
  assert.ok(w.document.querySelector('[data-service-status]'));
  assert.equal(w.document.querySelector('#studioDemoLoader,#publicBookingCatalog,#galleryClientLinkAdmin'),null);
- for(const [view,text] of [['demo-data','Demo Data'],['staff-admin','Staff directory'],['roles-admin','Roles'],['workflows-admin','Workflows'],['booking-sessions','Public booking sessions'],['api-site-key','API Site key']]){
+ for(const [view,text] of [['demo-data','Demo Data'],['staff-admin','Staff directory'],['roles-admin','Roles'],['workflows-admin','Workflows'],['booking-sessions','Session Types'],['api-site-key','API Site key']]){
    await w.studioNavigate(view);assert.ok(w.document.getElementById('genericView').textContent.includes(text),view);
    assert.equal(w.document.querySelector('[data-service-status]'),null);
    assert.equal(w.location.hash.includes('studio='+view),true);
