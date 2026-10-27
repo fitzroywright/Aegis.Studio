@@ -788,7 +788,7 @@
             isCurrent,openJob:id=>openWorkspaceJob(id),navigate:view=>window.studioNavigate(view),
             sendMessage:async()=>{await window.studioNavigate('messages');if(document.body.dataset.studioView==='messages')document.getElementById('newDirectMessage')?.click();},
             openWorkspace:id=>selectWorkspace(id,(workspaceCache||[]).find(w=>String(w.id)===String(id))?.name||'Workspace'),
-            openWorkspaceSettings:id=>openWorkspaceSettings(id),
+            openWorkspaceSettings:id=>window.studioNavigate('workspace-management'),
             retry:()=>renderJobs()
         });
     }
@@ -815,10 +815,10 @@
         workspaceAccessCache=await json('/api/workspace-access').catch(()=>[]);
         studioRolesCache=await json('/api/security/roles').catch(()=>[]);
         if(!current())return;
-        const manageable=workspaceAccessCache.filter(item=>item.permissions?.editWorkspace||item.permissions?.manageMembers||item.permissions?.adminWorkspace);
+
 
         genericView.innerHTML=StudioPage.html({title:'Studio Management',scroll:true,
-            summary:StudioPage.metrics([['Managed workspaces',manageable.length],['Active roles',studioRolesCache.filter(x=>x.isActive).length]]),
+            summary:StudioPage.metrics([['Active roles',studioRolesCache.filter(x=>x.isActive).length]]),
             content:`<div class="st-admin-grid">${studioManagementCatalogCards()}<section class="admin-card" id="publicBookingCatalog">
                             <header class="admin-card-header"><div><h2>Public booking sessions</h2><p>Studio owns session descriptions, duration, JMD price, deposit, locations and resource rules. Published changes sync to the API site when external publishing is enabled.</p></div></header>
                             <div class="admin-form-stack"><input type="hidden" data-catalog-id><label>Session name<input data-catalog-name maxlength="160"></label><label>Public description<textarea data-catalog-description maxlength="1000" rows="2"></textarea></label>
@@ -846,38 +846,16 @@
                             <small data-demo-elapsed hidden></small>
                         </section>
 
-                        <section class="admin-card">
-                            <header class="admin-card-header"><div><h2>Workspaces</h2><p>Manage workspace routing, membership and permissions.</p></div></header>
-                            <div class="admin-workspace-list">
-                                ${manageable.length?manageable.map(item=>renderWorkspaceAdminRow(item.workspace,item.permissions,true)).join(''):'<p class="muted">No manageable workspaces are available.</p>'}
-                            </div>
-                        </section>
-
-                        <section id="workspaceMemberPanel" class="admin-card job-section hidden"></section>
-                        <section id="workspaceImportPanel" class="admin-card job-section hidden"></section>
-
                         <div class="admin-generated-sections">
                             ${renderEmployeeDirectorySection()}
-                            ${renderSecurityRolesSection()}
+                            ${renderSecurityRolesSection('Job')}
                             ${renderWorkflowSection()}
                         </div>
-                                            <section class="admin-card">
-                            <header class="admin-card-header"><div><h2>Create Workspace</h2><p>Add a new operational workspace and its manager.</p></div></header>
-                            <div class="admin-form-stack">
-                                <label>Name<input id="workspaceName"></label>
-                                <label>Email address<input id="workspaceEmail" type="email"></label>
-                                <label>Manager user name<input id="workspaceManagerUser" placeholder="domain user name"></label>
-                                <label>Manager display name<input id="workspaceManagerDisplay"></label><label>Default Job Lead<select id="workspaceDefaultLead"><option value="">Use Workspace Manager</option></select></label>
-                                <details><summary>Advanced / Integration Settings</summary><label>Route key<input id="workspaceRouteKey" placeholder="Generated automatically"></label><small>Used by website booking and incoming-message integrations. Leave blank to generate automatically.</small></details>
-                                <button class="primary" type="button" onclick="createWorkspace()">Create Workspace</button>
-                            </div>
-                        </section>
-
                         <section class="admin-card" data-service-status><header class="admin-card-header"><h2>Service health</h2><button class="action" data-refresh-service-status>Refresh</button></header><div data-service-status-body>Loading…</div><button class="action" onclick="showPosCatalogManager()">Manage products</button><button class="action" data-service-audit>Recent audit</button></section>
                         <section class="admin-card admin-help-card">
                             <header class="admin-card-header"><div><h2>Studio settings and access</h2></div></header>
                             <p>Workspace access remains membership-based. Use reusable roles where possible and one-off permissions only when required.</p>
-                            <p>Every operational workspace requires a Workspace Manager. Integration routing is configured under Advanced / Integration Settings.</p>
+                            <p>Manage workspace membership, managers and routing on the Workspaces page.</p>
                         </section>
 </div>`});
         StudioPage.bind(genericView,current);
@@ -913,7 +891,6 @@
             statusPanel.querySelector('[data-service-audit]').onclick=async()=>{const dialog=studioDialog('Recent operational audit','<p>Loading…</p>');try{const rows=await json('/api/admin/operations/audit?count=100');dialog.querySelector('.studio-dialog-body').textContent=JSON.stringify(rows,null,2);}catch(e){dialog.querySelector('.studio-dialog-body').textContent=e.message;}};
             readStatus();
         }
-        await hydrateWorkspaceManagers(manageable);
         await refreshStudioEmployees();
         await refreshWorkflowList();
         await renderGlobalRoleAdministration();
@@ -994,6 +971,7 @@
         schedule:()=>window.history.state?.studioSchedulePanel==='pipeline'?showPipeline():window.history.state?.studioSchedulePanel==='production'?window.StudioProductionPlanning.render():window.StudioPhotographerSchedule.render({photographer:window.history.state?.studioPhotographer||'',date:window.history.state?.studioScheduleDate||'',view:window.history.state?.studioScheduleView||'',resourceId:window.history.state?.studioScheduleResource||''}),
         tasks:()=>window.StudioTasks.render(),
         workspaces:renderWorkspaces,
+        'workspace-management':()=>window.StudioWorkspaceManagement.render(),
         jobs:renderJobs,
         pipeline:()=>showPipeline(),
         production:()=>showCatalogProduction(),
@@ -1004,6 +982,7 @@
         media:()=>showMediaReview(),
         frontdesk:()=>showFrontDesk(),
         'session-plan':()=>StudioWorkflowViews.showSessionPlan(window.history.state?.studioJobId),
+        'session-plan-import':()=>StudioWorkflowViews.showSessionPlan(window.history.state?.studioJobId),
         delivery:()=>StudioWorkflowViews.showDelivery(),
         finance:()=>showAccounts(),
         reports:()=>showManagement(),
@@ -1012,10 +991,10 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={'session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Clients',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
+    const navigationLabels={'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management',catalog:'Product & Services Catalog','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',admin:'Studio Management',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
-        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioJobId:['workspaces','session-plan'].includes(view)&&options.jobId?String(options.jobId):null};
+        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
     }
     function recordNavigation(view,options={}){
         const next=navigationContext(view,options),previous=window.history.state;

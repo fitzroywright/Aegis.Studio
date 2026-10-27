@@ -12,7 +12,8 @@ function setup(t,administrator=true){
 test('Studio Management contains catalog, templates, administration and the full demo controls',async t=>{
  const {w}=setup(t);await new Promise(resolve=>w.setTimeout(resolve,0));await w.studioNavigate('studio-management');
  assert.equal(w.document.querySelector('.st-toolbar h1').textContent,'Studio Management');
- for(const text of ['Job Templates','Work Order Templates','Staff directory','Roles','Workflows','Demo Data','Create Workspace'])assert.ok(w.document.getElementById('genericView').textContent.includes(text),text);
+ for(const text of ['Job Templates','Work Order Templates','Staff directory','Roles','Workflows','Demo Data'])assert.ok(w.document.getElementById('genericView').textContent.includes(text),text);
+ assert.equal(w.document.querySelector('#workspaceName,#workspaceMemberPanel,#workspaceImportPanel'),null);
  assert.ok(w.document.querySelector('[data-demo-reset]'));assert.ok(w.document.querySelector('[data-load-demo]'));
  await w.studioNavigate('admin');assert.equal(w.document.body.dataset.studioView,'studio-management');
 });
@@ -22,5 +23,6 @@ test('the consolidated management page retains its administrator access check',a
 });
 test('the avatar menu contains one Preferences action and no separate Administration entry',t=>{
  const {w}=setup(t);const labels=[...w.document.querySelectorAll('.user-menu-popover button')].map(b=>b.textContent);
- assert.deepEqual(labels,['Preferences','Studio Management','Sign Out']);assert.equal(w.document.querySelector('#profileDialog h2').textContent,'Preferences');
+ assert.deepEqual(labels,['Preferences','Notifications','Workspaces','Studio Management','Activity','Sign Out']);assert.equal(w.document.querySelector('#profileDialog h2').textContent,'Preferences');
 });
+

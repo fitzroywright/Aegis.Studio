@@ -63,22 +63,17 @@ body[data-studio-view="workspaces"] .workspace-list-layout{gap:8px}
 .production-workload-details .studio-workload-summary{padding:6px;overflow:auto}
 .production-workload-details .workload-indicators{gap:4px}
 .production-kanban{display:flex;align-items:stretch;gap:8px;flex:1 1 auto;min-height:120px;min-width:0;overflow:auto;overscroll-behavior:contain;padding:1px 1px 6px}
-.production-lane{display:flex;flex:1 0 200px;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--studio-production-lane-surface,var(--studio-card-surface));border:1px solid color-mix(in srgb,var(--studio-grid-border) 78%,#536a80);border-radius:5px}
-.production-lane>header{background:var(--studio-production-lane-surface,var(--studio-card-surface));display:flex;align-items:center;justify-content:space-between;gap:6px;flex:0 0 auto;padding:7px 9px;border-bottom:1px solid var(--studio-grid-border)}
-.production-lane>header h2{margin:0;color:var(--theme-text);font-size:12px}
+.production-lane{display:flex;flex:1 0 230px;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--studio-production-lane-surface,var(--studio-card-surface));border:1px solid color-mix(in srgb,var(--studio-grid-border) 78%,#536a80);border-radius:5px}
+.production-lane>header{background:var(--studio-production-lane-header,#427da9);display:flex;align-items:center;justify-content:space-between;gap:6px;flex:0 0 auto;padding:7px 9px;border-bottom:1px solid var(--studio-grid-border)}
+.production-lane>header h2{margin:0;color:#fff;font-size:12px}
 .production-lane>header>span{border:1px solid var(--studio-grid-border);box-shadow:0 1px 2px #26334418;display:grid;place-items:center;min-width:22px;height:22px;border-radius:50%;background:var(--studio-card-surface);color:var(--theme-text);font-size:11px;font-weight:700}
-.production-lane-attention{--studio-production-lane-surface:#fde8e7;border-top:3px solid #b44b42}
-.production-lane-ready{--studio-production-lane-surface:#e7f0fd;border-top:3px solid #4b83b4}
-.production-lane-progress{--studio-production-lane-surface:#e4f4ed;border-top:3px solid #d59025}
-.production-lane-qc{--studio-production-lane-surface:#fff4d6;border-top:3px solid #8065b2}
-.production-lane-complete{--studio-production-lane-surface:var(--studio-production-complete-surface,var(--studio-card-surface));border-top:3px solid #39835e}
+.production-lane-attention{--studio-production-lane-surface:#f4f6f8;--studio-production-lane-header:#b44b42}
+.production-lane-ready{--studio-production-lane-surface:#f4f6f8;--studio-production-lane-header:#427da9}
+.production-lane-progress{--studio-production-lane-surface:#f4f6f8;--studio-production-lane-header:#5e8984}
+.production-lane-qc{--studio-production-lane-surface:#f4f6f8;--studio-production-lane-header:#4c8c6d}
+.production-lane-complete{--studio-production-lane-surface:#f4f6f8;--studio-production-lane-header:#686b86}
 .production-lane-list{display:flex;flex-direction:column;gap:6px;min-height:0;overflow:auto;padding:6px;overscroll-behavior:contain}
-.production-job-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px}
-.production-job-table th{padding:6px;text-align:left;color:var(--theme-muted);font-size:10px;border-bottom:1px solid var(--studio-grid-border)}
-.production-job-table td{padding:8px 6px;vertical-align:top;border-bottom:1px solid var(--studio-grid-border);overflow-wrap:anywhere}
-.production-job-table small{display:block;color:var(--theme-muted);margin-top:3px}
-.production-job-table [data-production-job]{cursor:pointer}
-.production-job-stage{display:block;margin-top:4px;color:var(--theme-muted);font-size:10px}
+.production-job-stage{display:inline-block;margin:6px 0;padding:4px 8px;border-radius:7px;background:var(--studio-production-lane-surface,#edf2f6);color:var(--studio-production-lane-header,#427da9);font-size:10px;font-weight:700}
 
 .production-lane-empty{margin:auto;color:var(--theme-muted);font-size:11px}
 .production-board-pager{flex:0 0 auto}
@@ -165,12 +160,12 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 .workflow-facts dt{font-size:11px;color:var(--theme-muted);margin-bottom:5px}
 .workflow-facts dd{margin:0;font-size:14px;font-weight:600}
 .workflow-detail-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px}
-.workflow-import-steps{display:flex;justify-content:space-between;gap:16px;list-style:none;margin:12px 0;padding:0}
-.workflow-import-steps li{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--theme-muted);font-size:12px;text-align:center}
+.workflow-import-steps{display:flex;flex-direction:column;gap:26px;list-style:none;margin:20px 0 36px;padding:0}
+.workflow-import-steps li{display:flex;align-items:center;gap:16px;color:var(--theme-muted);font-size:12px;text-align:left}
 .workflow-import-steps span{display:grid;place-items:center;width:28px;height:28px;border:1px solid #91add0;border-radius:50%;color:#28568c;background:#fff}
 .workflow-import-steps li[aria-current=step]{color:#154a85;font-weight:600}
 .workflow-import-steps li[aria-current=step] span{background:#15559b;color:#fff}
-.workflow-validation{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px;border:1px solid #cddfee;border-radius:6px;background:#f0f7fc}
+.workflow-validation{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px;border:1px solid var(--workflow-validation-border,#cddfee);border-radius:6px;background:var(--workflow-validation-surface,#f0f7fc)}
 .workflow-validation span{color:var(--theme-muted);font-size:12px}
 .workflow-validation button{margin-left:auto}
 .workflow-column-map{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}
@@ -204,3 +199,31 @@ body .shell:has(> #studioContextRail.studio-rail-collapsed-left) > #studioContex
 .studio-calendar-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
 .studio-calendar-undated{margin-top:12px}
 .studio-calendar-undated h3{font-size:12px;margin-bottom:8px}
+
+/* Workspace accountability content; the shared shell continues to own the frame. */
+.workspace-management-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
+.workspace-management-heading h1{font-size:22px;margin:0 0 5px}.workspace-management-heading p{margin:0;color:var(--theme-muted);font-size:12px}
+.workspace-accountability-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.workspace-accountability-card{min-width:0;padding:22px 24px;border:1px solid var(--studio-control-border,#cdd8e2);border-inline-start:7px solid #427da9;border-radius:10px;background:var(--studio-card-surface,#fff)}
+.workspace-accountability-card:nth-child(3n+2){border-inline-start-color:#8062a6}.workspace-accountability-card:nth-child(3n){border-inline-start-color:#5e8984}
+.workspace-accountability-card h2{margin:2px 0 26px;font-size:16px}.workspace-accountability-card>small{display:block;color:var(--theme-muted);font-size:12px}
+.workspace-accountability-card>strong{display:block;margin:10px 0;font-size:13px}.workspace-accountability-card>p{overflow-wrap:anywhere;font-size:11px;color:var(--theme-muted)}
+.workspace-accountability-photo{float:right;width:80px;height:80px;display:grid;place-items:center;margin-left:14px;background:#edf1f4;color:#8796a3;border-radius:8px;overflow:hidden;font-size:30px}.workspace-accountability-photo img{width:100%;height:100%;object-fit:cover}
+.workspace-accountability-card footer{display:flex;align-items:center;justify-content:space-between;gap:12px;clear:both;margin-top:18px;font-size:12px}.workspace-active-jobs{background:#e7f1f8;border-radius:10px;padding:7px 14px;color:#427da9;font-weight:600}
+.workspace-admin-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}.workspace-admin-actions button{font-size:11px}.workspace-admin-details>.job-section{margin-top:18px}
+/* Dedicated import content mirrors the reference's steps, mapping, preview and review. */
+.session-import-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;margin-top:18px}
+.session-import-sidebar{color:#29445e;padding:22px;background:#f3f6f8;border:1px solid #cdd8e2;border-radius:10px}.session-import-sidebar h2,.session-import-content h2,.session-import-review h2{font-size:14px;margin:0 0 15px}
+.session-import-sidebar>small{font-size:12px;color:#427da9}.session-import-content{display:flex;flex-direction:column;min-width:0;gap:16px}
+.session-import-mapping-summary,.session-import-preview{min-width:0;padding:20px;border:1px solid #cdd8e2;border-radius:10px;background:var(--studio-card-surface,#fff)}
+.session-import-mapping-summary dl{margin:0;display:grid;gap:6px;font-size:12px}.session-import-mapping-summary dl>div{display:grid;grid-template-columns:1fr 1fr;gap:15px}.session-import-mapping-summary dd{margin:0;color:#427da9;font-weight:600}
+.session-import-review{--workflow-validation-surface:transparent;--workflow-validation-border:transparent;margin:20px 0 10px;padding:20px;border:1px solid #ead079;border-radius:10px;background:#fff8df;color:#765231}
+.production-job-card{padding:10px;border:1px solid var(--studio-control-border,#cdd8e2);border-radius:10px;background:var(--studio-card-surface,#fff);cursor:pointer;min-width:0}
+.production-job-card:focus-visible{outline:2px solid var(--theme-accent,#a36b17);outline-offset:-2px}
+.production-job-image{display:grid;place-items:center;aspect-ratio:2.1;background:#e9eef2;border-radius:6px;overflow:hidden;color:#718393}.production-job-image img{width:100%;height:100%;object-fit:cover}
+.production-image-placeholder{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;text-align:center;padding:10px}.production-image-placeholder>span{font-size:28px}
+.production-job-card-body{padding:10px 4px 2px}.production-job-card-body h3{font-size:13px;margin:0 0 4px}.production-job-card-body p{font-size:12px;color:var(--theme-muted);margin:12px 0 6px}.production-job-card-body>small{display:block;color:var(--theme-muted);font-size:10px}
+@media(max-width:800px){.workspace-accountability-grid{grid-template-columns:minmax(0,1fr)}.session-import-layout{grid-template-columns:170px minmax(0,1fr)}.session-import-sidebar{padding:15px}}
+@media(max-width:600px){.session-import-layout{grid-template-columns:minmax(0,1fr)}.workspace-management-heading{align-items:flex-start;flex-direction:column}}
+
+.workflow-import-steps li small{display:block;margin-top:7px;font-size:11px;font-weight:400}.workflow-import-steps li.is-complete span{background:#427da9;color:#fff}.workflow-import-steps li.is-ready span{background:#4c8c6d;color:#fff;border-color:#4c8c6d}

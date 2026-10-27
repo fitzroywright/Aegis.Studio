@@ -35,7 +35,7 @@
     })[character]);
 
     function labelFor(view) {
-        return ({'session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
+        return ({clients:'Client Management','workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery','studio-management':'Studio Management','job-templates':'Job Templates','work-order-templates':'Work Order Templates'})[view] || quickLinks.find(([key]) => key === view)?.[1]
             || String(view || 'Studio').replace(/(^|\s)\S/g, match => match.toUpperCase());
     }
 
@@ -692,6 +692,7 @@
                 window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:'activity'}}));
             } else window.studioNavigate?.('notifications');
         });
+        document.querySelector('[data-studio-avatar-workspaces]')?.addEventListener('click',()=>{document.querySelector('.user-menu')?.removeAttribute('open');window.studioNavigate?.('workspace-management');});
         document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
             window.studioNavigate?.('notifications');
