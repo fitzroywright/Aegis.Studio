@@ -19,6 +19,7 @@ window.StudioClients=(()=>{
         if(!live())return;
         const client=clients.find(c=>c.id===options.clientId);
         const state=views.get(client?.id||'directory')||{tab:'jobs',search:'',jobSearch:'',status:'',gallery:null,finance:null,activity:null};
+        if(['jobs','finance','reminders','galleries','activity'].includes(options.tab))state.tab=options.tab;
         views.set(client?.id||'directory',state);
         // Refresh invalidates derived data; switching tabs does not refetch it.
         state.gallery=null;state.finance=null;state.activity=null;

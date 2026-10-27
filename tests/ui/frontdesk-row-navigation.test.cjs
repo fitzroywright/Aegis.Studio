@@ -16,11 +16,14 @@ function setup(){
  w.eval(fs.readFileSync(path.join(root,'frontdesk.js'),'utf8')+"loadFrontDeskCommunications=()=>{};frontDeskJobs=[{id:'job-one',clientName:'A',title:'First job',status:'In Progress'},{id:'job-two',clientName:'B',title:'Second job',status:'Completed'}];frontDeskRequests=[{id:'booking-one',jobId:'job-one',status:'AwaitingDeposit',request:{clientName:'A',title:'Booking',requiredDeposit:10}}];window.setFrontDeskTestState=()=>{recordFrontDeskFulfillment=async()=>{};frontDeskJobs=[{id:'ready',title:'Ready',clientName:'A',status:'Ready for Delivery'}];frontDeskColumnFilters.status='Pickup / Delivery';renderFrontDesk();};renderFrontDesk();");
  return {w,opened,navigations,errors};
 }
-test('booking and completed queue rows open the correct job by mouse and keyboard',async()=>{
+test('booking selection shows review details and opens the selected job explicitly',async()=>{
  const {w,opened,navigations,errors}=setup();try{
  w.document.querySelector('[data-fd-row-open="booking-one"] strong').click();
+ assert.deepEqual(opened,[]);assert.match(w.document.querySelector('.fd-selected-request').textContent,/Deposit received/);
+ w.document.querySelector('[data-fd-open-selected]').click();
  const status=w.document.querySelector('[data-fd-filter="status"]');status.value='Completed';status.dispatchEvent(new w.Event('change'));
  w.document.querySelector('[data-fd-row-open="job-two"]').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+ w.document.querySelector('[data-fd-open-selected]').click();
  await Promise.resolve();await Promise.resolve();
  assert.deepEqual(opened,['job-one','job-two']);assert.deepEqual(navigations,[{view:'workspaces',jobId:'job-one'},{view:'workspaces',jobId:'job-two'}]);assert.deepEqual(errors,[]);
  }finally{w.close();}
@@ -48,3 +51,4 @@ test('row actions do not also open the job and Front Desk keeps the shared rail/
  assert.equal(w.document.querySelectorAll('#frontDeskMessageCard [data-smc-notes-toggle]').length,1);
  }finally{w.close();}
 });
+

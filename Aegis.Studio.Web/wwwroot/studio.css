@@ -3651,9 +3651,6 @@ body[data-studio-view="frontdesk"] .fd-queue>header.fd-queue-header {
   background: linear-gradient(180deg,#fffefa 0%,#f7f9fb 100%);
   border-bottom: 2px solid #c9a35d;
 }
-body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody tr:nth-child(even) {
-  background: #fafbfd;
-}
 body[data-studio-view="frontdesk"] .fd-queue .fd-table tbody td {
   border-top-color: #e3e9ef;
 }
@@ -8755,9 +8752,9 @@ body[data-studio-view="workspaces"] .workspace-list-layout {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 16px 20px 12px;
-  gap: 14px;
-  background: #f7f4ef;
+  padding: 0;
+  gap: 8px;
+  background: transparent;
   color: #25201c;
 }
 .fd-heading {
@@ -8883,9 +8880,9 @@ body[data-studio-view="workspaces"] .workspace-list-layout {
 .fd-table th {
   position: sticky;
   top: 0;
-  background:var(--studio-grid-header-bg);
+  background:#edf4fb;
   z-index: 1;
-  color:var(--studio-grid-header-text);
+  color:#173552;
   padding: 10px 12px;
   border-bottom: 1px solid #eee9e3;
 }
@@ -8987,9 +8984,7 @@ flex:1;}
   .fd-metrics {
     grid-template-columns: 1fr 1fr;
   }
-  .fd-page {
-    padding: 12px;
-  }
+
   .fd-table {
     min-width: 680px;
   }
@@ -9218,10 +9213,9 @@ body:not([data-studio-view="today"]) .shell>main>#genericView {
   max-height: 100%;
   overflow: auto;
   box-sizing: border-box;
-  padding: 7px 12px 6px 5px;
+  padding: var(--studio-page-inset,7px 12px 6px 5px);
 }
-
-
+body:is([data-studio-view="jobs"],[data-studio-view="workspaces"],[data-studio-view="frontdesk"]){--studio-page-inset:6px 8px}
 
 body:not([data-studio-view="today"]) :is(.mw-list-page,.production-page,.fd-page) {
   display: flex;
@@ -9341,12 +9335,6 @@ body[data-studio-view="frontdesk"] .fd-queue>.fd-table-scroll {
 .fd-table .fd-column-head {
   white-space: nowrap;
 }
-.fd-table .fd-column-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-}
 .fd-table .fd-column-controls button {
   border: 0;
   background: transparent;
@@ -9359,18 +9347,6 @@ body[data-studio-view="frontdesk"] .fd-queue>.fd-table-scroll {
 }
 .fd-table .fd-column-controls button:hover {
   text-decoration: underline;
-}
-.fd-table .fd-column-controls select {
-  width: 22px;
-  min-width: 22px;
-  max-width: 22px;
-  height: 23px;
-  padding: 0;
-  border:1px solid #658bad;
-  border-radius: 5px;
-  background:#2c537c;
-  color:#fff;
-  cursor: pointer;
 }
 .fd-data-pill {
   display: inline-flex;
@@ -9564,12 +9540,7 @@ body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls butto
   font-size: .72rem;
   font-weight: 700;
 }
-body[data-studio-view="frontdesk"] .fd-queue .fd-table .fd-column-controls select {
-  background:#2c537c;
-  color:#fff;
-  border-color:#658bad;
-}
-body[data-studio-view="frontdesk"] .fd-queue .fd-table .action[data-fd-open] {
+body[data-studio-view="frontdesk"] .fd-queue body[data-studio-view="frontdesk"] .fd-queue .fd-table .action[data-fd-open] {
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -9736,7 +9707,6 @@ body .topbar .studio-script-brand + .studio-today-brand-title { margin-left: 0; 
 body[data-studio-view="frontdesk"] .fd-table-frame{display:flex;flex:1 1 auto;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
 body[data-studio-view="frontdesk"] .fd-table-head-clip{flex:0 0 auto;min-width:0;width:100%;overflow-y:scroll;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
 body[data-studio-view="frontdesk"] .fd-table-scroll{flex:1 1 auto;min-width:0;width:100%;min-height:0;overflow-x:hidden;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:#8da0b4 #edf2f7}
-body[data-studio-view="frontdesk"] .fd-table-frame .fd-table{width:100%;min-width:0;table-layout:fixed}
 body[data-studio-view="frontdesk"] .fd-table-head-clip .fd-table th{position:static}
 
 

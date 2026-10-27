@@ -1,7 +1,9 @@
 (function(root){
  'use strict';
  root.openIntakeRoster=async function(cv){
-  const data=await json(`/api/intake/${cv}/roster`),dialog=studioDialog('Subjects and roster','<div data-intake-roster></div>');
+  const data=await json(`/api/intake/${cv}/roster`);
+  if(data.jobId)return studioNavigate('session-plan',{jobId:data.jobId});
+  const dialog=studioDialog('Subjects and roster','<div data-intake-roster></div>');
   let resolveConflict=false;const rosterHost=dialog.querySelector('[data-intake-roster]');
   const render=(rows)=>StudioRosterEditor.open(rosterHost,{...data,rows,readOnly:!data.canEdit,existingReferences:data.rows.map(x=>x.reference),readFile:async file=>{const f=new FormData();f.append('file',file);return (await json(`/api/intake/${cv}/roster-file`,{method:'POST',body:f})).cells;},save:async value=>json(`/api/intake/${cv}/roster`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...value,resolveConflict})})});
   render(data.rows);
@@ -23,3 +25,4 @@
   for(const d of s.deliveries){const p=document.createElement('p');p.textContent=`${d.status} · ${d.providerAcceptedAtUtc?'Provider accepted '+new Date(d.providerAcceptedAtUtc).toLocaleString():'No provider acceptance recorded'} · Attempts ${d.attempts} · Delivery ${d.id}${d.error?' · '+d.error:''}`;host.append(p);}
  };
 })(window);
+
