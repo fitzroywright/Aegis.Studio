@@ -5,15 +5,40 @@ function commercialPage(title,body,tools='',summary='',attention='') {
     StudioPage.bind(genericView);
     window.studioSetBreadcrumb?.([{label:title}]);
 }
-async function showCommercialCatalog(){
+async function showCommercialCatalog(options={}){
     const current=StudioPage.begin('catalog');
-    [commercialItems,commercialTemplates]=await Promise.all([json('/api/admin/pos/catalog/'),json('/api/admin/commercial/templates/WorkOrder')]);
-    if(!current())return;
-    const rows=commercialItems.map(p=>`<tr data-item="${p.id}" tabindex="0"><td><b>${esc(p.code)}</b></td><td>${esc(p.name)}</td><td>${esc(p.category)}</td><td>${money(p.unitPrice)}</td><td>${money(p.estimatedCost)}</td><td>${p.taxRate}%</td><td>${p.requiresProduction?'Production':'Direct'}</td><td><span class="status-pill">${p.isActive?'Active':'Inactive'}</span></td></tr>`).join('');
-    commercialPage('Product & Services Catalog',`<input class="commercial-search" placeholder="Search products and services" aria-label="Search catalog"><div class="commercial-grid"><table class="pos-grid"><thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Price before tax</th><th>Estimated cost</th><th>Tax</th><th>Fulfillment</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`,`<button class="primary" data-add>Add item</button>`);
-    StudioPage.query(genericView,'[data-add]').onclick=()=>editCommercialItem();
-    StudioPage.queryAll(genericView,'[data-item]').forEach(row=>{row.onclick=()=>editCommercialItem(commercialItems.find(p=>p.id===row.dataset.item));row.onkeydown=e=>{if(e.key==='Enter')row.click();};});
-    const filter=()=>{const term=StudioPage.query(genericView,'.commercial-search').value.toLowerCase();let count=0;StudioPage.queryAll(genericView,'[data-item]').forEach(row=>{row.hidden=!row.textContent.toLowerCase().includes(term);if(!row.hidden)count++;});StudioPage.setCount(count+' catalog items');};StudioPage.query(genericView,'.commercial-search').oninput=filter;filter();
+    let active=options.tab==='booking-sessions'?'booking-sessions':'products',productsRequest,bookingRequest;
+    commercialPage('Products and Services',`<nav class="booking-tabs" aria-label="Products and services sections"><button type="button" data-catalog-tab="products">Products and Services</button><button type="button" data-catalog-tab="booking-sessions">Booking Sessions</button></nav><section class="catalog-panel" data-catalog-panel="products" aria-label="Product catalog" hidden></section><section class="catalog-panel" data-catalog-panel="booking-sessions" aria-label="Booking sessions" hidden></section>`,`<button class="primary" data-add>Add item</button>`,'<p>Manage products, services and public booking session types, prices and opening hours.</p>');
+    const page=genericView.querySelector('.st-page'),live=()=>current()&&page.isConnected;
+    const products=page.querySelector('[data-catalog-panel="products"]'),bookings=page.querySelector('[data-catalog-panel="booking-sessions"]'),add=page.querySelector('[data-add]');
+    add.onclick=()=>editCommercialItem();
+    async function loadProducts(){
+        products.innerHTML='<p role="status">Loading catalog…</p>';
+        try{
+            const [items,templates]=await Promise.all([json('/api/admin/pos/catalog/'),json('/api/admin/commercial/templates/WorkOrder')]);if(!live())return;
+            commercialItems=items;commercialTemplates=templates;
+            const rows=commercialItems.map(p=>`<tr data-item="${esc(p.id)}" tabindex="0"><td><b>${esc(p.code)}</b></td><td>${esc(p.name)}</td><td>${esc(p.category)}</td><td>${money(p.unitPrice)}</td><td>${money(p.estimatedCost)}</td><td>${p.taxRate}%</td><td>${p.requiresProduction?'Production':'Direct'}</td><td><span class="status-pill">${p.isActive?'Active':'Inactive'}</span></td></tr>`).join('');
+            products.innerHTML=`<input class="commercial-search" placeholder="Search products and services" aria-label="Search catalog"><div class="commercial-grid"><table class="pos-grid"><thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Price before tax</th><th>Estimated cost</th><th>Tax</th><th>Fulfillment</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+            products.querySelectorAll('[data-item]').forEach(row=>{row.onclick=()=>editCommercialItem(commercialItems.find(p=>p.id===row.dataset.item));row.onkeydown=e=>{if(e.key==='Enter')row.click();};});
+            const filter=()=>{const term=products.querySelector('.commercial-search').value.toLowerCase();let count=0;products.querySelectorAll('[data-item]').forEach(row=>{row.hidden=!row.textContent.toLowerCase().includes(term);if(!row.hidden)count++;});if(active==='products')StudioPage.setCount(count+' catalog items');};products.querySelector('.commercial-search').oninput=filter;filter();
+        }catch(error){if(live()){products.innerHTML='<p role="alert">'+esc(error.message)+'</p><button type="button" class="action" data-catalog-retry>Retry</button>';products.querySelector('[data-catalog-retry]').onclick=()=>{productsRequest=loadProducts();};}}
+    }
+    async function loadBookings(){
+        bookings.innerHTML='<p role="status">Checking access…</p>';
+        try{
+            const me=await json('/api/auth/me');if(!live())return;
+            if((me?.user||me)?.isAdministrator!==true){bookings.innerHTML='<p>Administrator access required to manage booking sessions.</p>';return;}
+            bookings.innerHTML=window.StudioBookingSessions.html();await window.StudioBookingSessions.mount(bookings,live);
+        }catch(error){if(live()){bookings.innerHTML='<p role="alert">'+esc(error.message)+'</p><button type="button" class="action" data-bookings-retry>Retry</button>';bookings.querySelector('[data-bookings-retry]').onclick=()=>{bookingRequest=loadBookings();};}}
+    }
+    async function selectTab(tab){
+        if(!live())return;active=tab;products.hidden=tab!=='products';bookings.hidden=tab!=='booking-sessions';add.hidden=tab!=='products';
+        page.querySelectorAll('[data-catalog-tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.catalogTab===tab)));
+        const state={...window.history.state,studioView:'catalog',studioCatalogTab:tab},params=new URLSearchParams(window.location.hash.slice(1));params.set('studio','catalog');params.set('tab',tab);window.history.replaceState(state,'','#'+params);
+        if(tab==='booking-sessions'){StudioPage.setCount('Booking Sessions');await (bookingRequest ||= loadBookings());}else{await (productsRequest ||= loadProducts());if(live()&&active==='products')products.querySelector('.commercial-search')?.dispatchEvent(new Event('input'));}
+    }
+    page.querySelectorAll('[data-catalog-tab]').forEach(button=>button.onclick=()=>selectTab(button.dataset.catalogTab));
+    await selectTab(active);
 }
 function editCommercialItem(item){
     const p=item||{code:'',name:'',category:'Photography',unitPrice:0,estimatedCost:0,taxRate:0,isActive:true,options:{},bundle:[]};
@@ -26,12 +51,18 @@ function editCommercialItem(item){
         await json(p.id?`/api/admin/pos/catalog/${p.id}`:'/api/admin/pos/catalog/',{method:p.id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:f.elements.code.value,name:f.elements.name.value,category:f.elements.category.value,description:f.elements.description.value,unitPrice:Number(f.elements.price.value),estimatedCost:Number(f.elements.cost.value),taxRate:Number(f.elements.tax.value),isActive:f.elements.active.checked,requiresProduction:f.elements.production.checked,workOrderTemplateId:f.elements.template.value||null,options:opts,bundle})});d.close();await showCommercialCatalog();
     }catch(error){f.querySelector('[role=alert]').textContent=error.message;}};
 }
+function commercialTemplatePage(kind,body,tools){
+    const tabs=`<nav class="booking-tabs" aria-label="Template types"><button type="button" data-template-kind="Job" aria-pressed="${kind==='Job'}">Job Templates</button><button type="button" data-template-kind="WorkOrder" aria-pressed="${kind==='WorkOrder'}">Work Order Templates</button></nav>`;
+    commercialPage('Templates',tabs+body,tools,'<p>Manage reusable job workflows and work order production templates.</p>');
+    genericView.querySelectorAll('[data-template-kind]').forEach(button=>button.onclick=()=>studioNavigate('templates',{kind:button.dataset.templateKind}));
+    const params=new URLSearchParams({studio:'templates',kind});window.history.replaceState({...window.history.state,studioView:'templates',studioTemplateKind:kind},'','#'+params);
+}
 async function showCommercialTemplates(kind='WorkOrder'){
     if(kind==='Job')return StudioGraphTemplates.list();
-    const current=StudioPage.begin(kind==='Job'?'job-templates':'work-order-templates');
+    const current=StudioPage.begin('templates');
     commercialKind=kind;[commercialTemplates,commercialItems]=await Promise.all([json(`/api/admin/commercial/templates/${kind}`),json('/api/admin/pos/catalog/')]);
     if(!current())return;
-    commercialPage(kind==='Job'?'Job Templates':'Work Order Templates',`<div class="commercial-grid"><table class="pos-grid"><thead><tr><th>Name</th><th>Version</th><th>Steps</th><th>Status</th><th></th></tr></thead><tbody>${commercialTemplates.map(t=>`<tr tabindex="0" data-template-row="${t.id}"><td><button class="fd-card-link" data-edit="${t.id}">${esc(t.definition.name)}</button><small>${esc(t.definition.description)}</small></td><td>v${t.version}</td><td>${t.definition.steps.length}</td><td><span class="status-pill">${t.active?'Active':'Retired'}</span></td><td><button class="fd-card-link" data-copy="${t.id}">Duplicate</button></td></tr>`).join('')}</tbody></table></div>`,`<button class="primary" data-add>Create ${kind==='Job'?'Job Template':'Work Order Template'}</button>`);
+    commercialTemplatePage(kind,`<div class="commercial-grid"><table class="pos-grid"><thead><tr><th>Name</th><th>Version</th><th>Steps</th><th>Status</th><th></th></tr></thead><tbody>${commercialTemplates.map(t=>`<tr tabindex="0" data-template-row="${t.id}"><td><button class="fd-card-link" data-edit="${t.id}">${esc(t.definition.name)}</button><small>${esc(t.definition.description)}</small></td><td>v${t.version}</td><td>${t.definition.steps.length}</td><td><span class="status-pill">${t.active?'Active':'Retired'}</span></td><td><button class="fd-card-link" data-copy="${t.id}">Duplicate</button></td></tr>`).join('')}</tbody></table></div>`,`<button class="primary" data-add>Create ${kind==='Job'?'Job Template':'Work Order Template'}</button>`);
     StudioPage.query(genericView,'[data-add]').onclick=()=>editCommercialTemplate(null,kind);
     StudioPage.setCount(commercialTemplates.length+' templates');
     StudioPage.queryAll(genericView,'[data-edit]').forEach(b=>b.onclick=()=>editCommercialTemplate(commercialTemplates.find(t=>t.id===b.dataset.edit),kind));

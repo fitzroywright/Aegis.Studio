@@ -14,9 +14,14 @@ test('About contains product, support, service health and demo tools; Staff and 
  assert.equal(w.document.querySelector('.st-toolbar h1').textContent,'About');
  assert.ok(w.document.querySelector('[data-service-status]'));assert.ok(w.document.querySelector('[data-demo-reset]'));assert.ok(w.document.querySelector('[data-load-demo]'));
  assert.equal(w.document.querySelector('.studio-about-logo').getAttribute('src'),'/thinking-machines-letterhead.png');
- assert.match(w.document.querySelector('.studio-about').textContent,/Thinking Machines.*it@thinkingmachines.ltd.*America\/Jamaica/s);
- assert.equal(w.StudioAdmin.entries.at(-1).view,'about');assert.equal(w.StudioAdmin.entries.some(entry=>['studio-management','demo-data','staff-admin','roles-admin'].includes(entry.view)),false);
- for(const [view,text] of [['staff-roles','Staff directory'],['workflows-admin','Workflows'],['booking-sessions','Session Types'],['api-site-key','API Site key']]){
+ assert.match(w.document.querySelector('.studio-about').textContent,/it@thinkingmachines.ltd.*America\/Jamaica/s);
+ assert.equal(w.document.querySelector('.studio-about h2'),null);
+ assert.equal(w.document.querySelectorAll('.studio-about-grid > .studio-about-card').length,3);
+ assert.equal(w.document.querySelector('.st-content.st-card-scroll'),null);
+ assert.ok(w.document.querySelector('[data-service-status] .studio-health-details'));
+ assert.equal(w.document.querySelector('[data-service-status]').closest('.studio-about'),null);
+ assert.equal(w.StudioAdmin.entries.map(entry=>entry.view).join(','),'catalog,templates,workflows-admin,staff-roles,workspace-management,about');assert.equal(w.StudioAdmin.entries.some(entry=>['studio-management','demo-data','staff-admin','roles-admin','api-site-key','booking-sessions'].includes(entry.view)),false);
+ for(const [view,text] of [['staff-roles','Staff directory'],['workflows-admin','Workflows']]){
   await w.studioNavigate(view);assert.ok(w.document.getElementById('genericView').textContent.includes(text),view);assert.equal(w.document.querySelector('[data-service-status],#studioDemoLoader'),null);assert.equal(w.location.hash.includes('studio='+view),true);
   if(view==='staff-roles')assert.match(w.document.getElementById('genericView').textContent,/Staff directory.*Roles/s);
  }
@@ -33,17 +38,20 @@ test('the avatar menu contains one Preferences action and no separate Administra
 
 
 test('every extracted admin route denies non-administrators before rendering controls',async t=>{
- const {w}=setup(t,false);for(const view of ['booking-sessions','demo-data','staff-admin','roles-admin','workflows-admin','api-site-key']){
-  await w.studioNavigate(view);assert.match(w.document.getElementById('genericView').textContent,/Administrator access required/);assert.equal(w.document.querySelector('[data-api-key-generate],[data-demo-reset],#publicBookingCatalog'),null);
+ const {w}=setup(t,false);for(const view of ['demo-data','staff-admin','roles-admin','workflows-admin','api-site-key']){
+  await w.studioNavigate(view);assert.match(w.document.getElementById('genericView').textContent,/Administrator access required/);assert.equal(w.document.querySelector('[data-about-api-key],[data-api-key-generate],[data-demo-reset],#publicBookingCatalog'),null);
  }
 });
-test('key generation produces independent scoped credentials without network or persistence',async t=>{
- const {w}=setup(t);await new Promise(resolve=>w.setTimeout(resolve,0));await w.studioNavigate('api-site-key');const button=w.document.querySelector('[data-api-key-generate]');button.click();
- const credential=JSON.parse(w.document.querySelector('[data-api-key-credential]').value);assert.equal(credential.id,'studio');assert.match(credential.secret,/^[a-f0-9]{64}$/);assert.ok(credential.scopes.includes('gallery:publish'));assert.ok(!credential.scopes.includes('payment:verified'));assert.equal(w.document.querySelector('[data-api-key-setting]').value,'PublicSite__IntegrationToken='+credential.secret);
- button.click();assert.notEqual(JSON.parse(w.document.querySelector('[data-api-key-credential]').value).secret,credential.secret);assert.equal(w.localStorage.length,0);
- await w.studioNavigate('studio-management');assert.equal(w.document.querySelector('[data-api-key-credential]'),null);
+test('About support card opens the existing key generator in a dialog without changing the page',async t=>{
+ const {w}=setup(t);await new Promise(resolve=>w.setTimeout(resolve,0));
+ w.studioDialog=(title,body)=>{const dialog=w.document.createElement('dialog');dialog.innerHTML=body;dialog.close=()=>{dialog.open=false;dialog.remove();dialog.dispatchEvent(new w.Event('close'));};w.document.body.append(dialog);dialog.showModal();return dialog;};
+ await w.studioNavigate('about');assert.ok(w.document.querySelector('.studio-about [data-about-api-key]'));assert.equal(w.document.querySelector('[data-api-key-generate]'),null);
+ w.document.querySelector('[data-about-api-key]').click();const button=w.document.querySelector('[data-api-key-generate]');const dialog=button.closest('dialog');button.click();
+ const credential=JSON.parse(dialog.querySelector('[data-api-key-credential]').value);assert.equal(credential.id,'studio');assert.match(credential.secret,/^[a-f0-9]{64}$/);assert.ok(credential.scopes.includes('gallery:publish'));assert.ok(!credential.scopes.includes('payment:verified'));assert.equal(dialog.querySelector('[data-api-key-setting]').value,'PublicSite__IntegrationToken='+credential.secret);
+ button.click();assert.notEqual(JSON.parse(dialog.querySelector('[data-api-key-credential]').value).secret,credential.secret);assert.equal(w.localStorage.length,0);assert.equal(w.document.body.dataset.studioView,'about');
+ await w.studioNavigate('staff-roles');await new Promise(resolve=>w.setTimeout(resolve,0));assert.equal(w.document.querySelector('dialog [data-api-key-credential]'),null);
+ await w.studioNavigate('api-site-key');assert.equal(w.document.body.dataset.studioView,'about');assert.ok(w.document.querySelector('.studio-about [data-about-api-key]'));
 });
-
 test('About retains demo removal confirmation and does not mutate data on cancellation',async t=>{
  const {w}=setup(t);await new Promise(resolve=>w.setTimeout(resolve,0));await w.studioNavigate('about');const read=w.json,writes=[];
  w.json=async(url,options)=>{if(options?.method==='POST'){writes.push({url,options});return{message:'Demo removed.'};}return read(url,options);};
