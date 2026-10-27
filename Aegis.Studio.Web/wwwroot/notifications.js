@@ -53,6 +53,10 @@ if(notificationButton){
     notificationButton.setAttribute('aria-label','Show recent messages');
     notificationButton.setAttribute('aria-haspopup','dialog');
     notificationButton.setAttribute('aria-expanded','false');
+    const unreadBadge=document.createElement('span');
+    unreadBadge.id='messageUnreadBadge';unreadBadge.className='studio-message-bell-count';
+    unreadBadge.textContent='…';unreadBadge.setAttribute('aria-hidden','true');
+    notificationButton.append(unreadBadge);
     const panel=document.createElement('section');
     panel.id='studioMessageBellPanel';
     panel.className='studio-message-bell-panel';

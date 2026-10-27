@@ -22,6 +22,7 @@ test('message slide-down keeps the feed and job conversation in one scroll regio
  const panel=w.document.getElementById('studioMessageBellPanel'),conversation=w.document.createElement('form');
  w.studioShellMountJobConversation(conversation);
  assert.equal(panel.querySelector('header h2').textContent,'Messages & Announcements');
+ assert.ok(w.document.querySelector('#notificationButton #messageUnreadBadge.studio-message-bell-count'));
  assert.equal(conversation.closest('.studio-message-bell-content'),panel.querySelector('.studio-message-bell-content'));
  await w.document.getElementById('notificationButton').onclick();
  assert.equal(panel.hidden,false);assert.match(panel.querySelector('.studio-message-bell-list').textContent,/Proofs ready/);

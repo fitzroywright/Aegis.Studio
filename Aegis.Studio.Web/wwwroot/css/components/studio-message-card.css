@@ -22,7 +22,7 @@
 .smc-footer>button{font-size:11px}
 .smc-feed>.messages{padding:0;overflow:visible}
 .smc-feed .message{margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid #e6d17c}
-.smc-feed .message-content{background:transparent}
+.smc-feed .message-content{min-width:0;max-width:100%;overflow-wrap:anywhere;background:transparent}
 .smc-feed .message-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:9px}
 .smc-feed .message-content p{font-size:11px;margin:3px 0}
 .smc-content>.composer{background:#fff1b2;border-top:1px solid #e6d17c;padding:5px 8px;flex:none}
@@ -59,4 +59,5 @@
 .smc-note-slide[data-open=true]>.smc-note-form{padding-top:8px}
 .smc-note-open{margin-top:8px}
 @media(prefers-reduced-motion:reduce){.smc-note-slide{transition:none}}
+
 

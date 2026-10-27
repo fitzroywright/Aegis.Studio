@@ -94,3 +94,15 @@ test('scrolled inbox selection and the following read refresh preserve the seven
  assert.equal(list.querySelectorAll('.selected').length,1);
  }finally{dom.window.close();}
 });
+
+test('bell count uses all thread unread totals and updates to zero and 99+',async t=>{
+ const dom=new JSDOM('<button id="notificationButton"><span id="messageUnreadBadge"></span></button>',{url:'https://studio.test',runScripts:'outside-only'}),w=dom.window;t.after(()=>w.close());
+ let poll,threads=[{id:'one',unreadCount:2},{id:'two',unreadCount:5}];
+ w.setInterval=fn=>{poll=fn;return 1;};w.clearInterval=()=>{};w.setTimeout=()=>0;
+ w.fetch=async()=>({ok:false});w.json=async url=>url==='/api/messages/threads'?threads:[];
+ w.eval(source);await new Promise(resolve=>setImmediate(resolve));
+ const badge=w.document.getElementById('messageUnreadBadge'),bell=w.document.getElementById('notificationButton');
+ assert.equal(badge.textContent,'7');assert.equal(bell.getAttribute('aria-label'),'Messages, 7 unread');
+ threads=[];await poll();assert.equal(badge.textContent,'0');assert.equal(badge.hidden,false);
+ threads=[{id:'many',unreadCount:120}];await poll();assert.equal(badge.textContent,'99+');assert.match(bell.title,/120 unread/);
+});
