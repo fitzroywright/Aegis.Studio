@@ -54,7 +54,8 @@ test('Today, Front Desk and Job Detail use the one shared sessions drawer', () =
     assert.doesNotMatch(source, /Today[’']s Sessions|ps-todays-sessions|data-mw-region="schedule"/);
   }
   assert.match(shell, /sessionsDrawer.id = 'studioSessionsDrawer'/);
-  assert.match(shell, /const jobRoot = key === 'job-detail'/);
+  assert.match(shell, /const sessions = sharedSessions;/);
+  assert.doesNotMatch(shell, /sharedSessions\.filter\(item => String\(item\.jobId\)/);
   assert.match(shell, /loadSharedSessions\(\)/);
 });
 test('shared shell and Front Desk scripts are syntactically valid', () => {

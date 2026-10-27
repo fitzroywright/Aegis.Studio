@@ -23,6 +23,7 @@
     const pageAttention = new Map();
     let sharedSessions = [];
     let sessionsState = 'loading';
+    let sessionsRequest = null;
     const currentPage = () => overviewKey();
 
     const escText = value => String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -508,7 +509,10 @@
             sessionsDrawer.hidden = !opening;
             backdrop.hidden = !opening;
             sessionsTrigger.setAttribute('aria-expanded', String(opening));
-            if (opening) sessionsDrawer.querySelector('[data-sessions-close]').focus();
+            if (opening) {
+                sessionsDrawer.querySelector('[data-sessions-close]').focus();
+                loadSharedSessions();
+            }
         };
         sessionsDrawer.querySelector('[data-sessions-close]').onclick = close;
         sessionsDrawer.querySelector('[data-sessions-calendar]').onclick = () => { close(); window.studioNavigate?.('schedule'); };
@@ -574,9 +578,7 @@
                 details.append(button);
             });
         }
-        const jobRoot = key === 'job-detail' ? document.querySelector('#conversationView.has-open-job .job-detail-page') : null;
-        const jobId = jobRoot?.dataset.jobId || jobRoot?.closest('[data-job-id]')?.dataset.jobId;
-        const sessions = jobRoot && jobId ? sharedSessions.filter(item => String(item.jobId) === String(jobId)) : sharedSessions;
+        const sessions = sharedSessions;
         const sessionCount = document.getElementById('studioSessionsCount');
         if (sessionCount) sessionCount.textContent = sessionsState === 'ready' ? String(sessions.length) : '…';
         const sessionDetails = document.getElementById('studioSessionsDetails');
@@ -584,7 +586,7 @@
             sessionDetails.replaceChildren();
             if (sessionsState !== 'ready' || !sessions.length) {
                 const empty = document.createElement('p');
-                empty.textContent = sessionsState === 'loading' ? 'Loading sessions…' : sessionsState === 'error' ? 'Unable to load sessions. Open Today to retry.' : 'No sessions scheduled today.';
+                empty.textContent = sessionsState === 'loading' ? 'Loading sessions…' : sessionsState === 'error' ? 'Unable to load sessions. Close and reopen to retry.' : 'No sessions scheduled today.';
                 sessionDetails.append(empty);
             }
             for (const item of sessions) {
@@ -604,7 +606,15 @@
         }
     }
 
-    async function loadSharedSessions() {
+    function loadSharedSessions() {
+        if (sessionsRequest) return sessionsRequest;
+        sessionsState = 'loading';
+        refreshPageDrawers();
+        sessionsRequest = readSharedSessions().finally(() => { sessionsRequest = null; });
+        return sessionsRequest;
+    }
+
+    async function readSharedSessions() {
         const now = new Date();
         const from = new Date(now.getFullYear(),now.getMonth(),now.getDate());
         const to = new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
@@ -612,7 +622,12 @@
             const response = await fetch('/api/today/schedule?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString()),{credentials:'same-origin'});
             if (!response.ok) throw Error('Schedule request failed');
             const data = await response.json();
-            sharedSessions = (Array.isArray(data) ? data : []).filter(item => item.status !== 'Cancelled' && new Date(item.startsAtUtc || item.start || item.startsAt) >= from && new Date(item.startsAtUtc || item.start || item.startsAt) < to);
+            if (!Array.isArray(data)) throw Error('Unexpected schedule response');
+            sharedSessions = data.filter(item => {
+                const start = new Date(item.startsAtUtc || item.start || item.startsAt);
+                const end = new Date(item.endsAtUtc || item.end || item.endsAt);
+                return item.status !== 'Cancelled' && start < to && end > from;
+            });
             sharedSessions.sort((a,b) => new Date(a.startsAtUtc || a.start) - new Date(b.startsAtUtc || b.start));
             sessionsState = 'ready';
         } catch (error) {
