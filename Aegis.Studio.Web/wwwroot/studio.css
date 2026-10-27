@@ -1872,9 +1872,6 @@ color:var(--studio-grid-header-text);}
   .studio-sidebar-footer {
     display: none;
   }
-  .studio-storage-card {
-    display: none;
-  }
   .brand-button {
     justify-content: center;
     padding: 8px;
@@ -6163,12 +6160,6 @@ body[data-studio-view] .user-menu-popover button:hover {
 }
 .studio-quick-links-menu button:hover {
   background: #eef5fb;
-}
-body[data-studio-view="today"] .studio-context-rail {
-  display: none;
-}
-body[data-studio-view="tasks"] .studio-context-rail {
-  display: none;
 }
 .studio-context-rail {
   position: relative;

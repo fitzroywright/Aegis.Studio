@@ -11,7 +11,7 @@
         const matches = () => !document.body.dataset.studioView || document.body.dataset.studioView === view || (view === 'management' && document.body.dataset.studioView === 'reports') || (view === 'pipeline' && document.body.dataset.studioView === 'schedule');
         return () => version === revision && matches();
     }
-    function html({title, tools = '', content = '', summary = '', attention = '', className = '', scroll = false, showMessagesCard = true, showHeader = true, summaryTitle = 'Overview'}) {
+    function html({title, tools = '', content = '', summary = '', attention = '', className = '', scroll = false, showHeader = true, summaryTitle = 'Overview'}) {
         return `<section class="st-page ${className}" aria-label="${escape(title)}"><template data-studio-overview>${card(summaryTitle,summary || '<p>No summary available.</p>')}</template><section class="st-board">${showHeader ? `<header class="st-toolbar"><h1>${escape(title)}</h1><div class="st-tools">${tools}</div></header>` : ''}<div class="st-content${scroll ? ' st-card-scroll' : ''}">${content}</div></section>${attention ? `<div data-studio-context><div data-studio-attention>${attention}</div></div>` : ''}</section>`;
     }
     function metrics(items) {
