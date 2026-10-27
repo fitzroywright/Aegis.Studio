@@ -73,6 +73,20 @@ public sealed class WorkspaceJobStore(StudioDatabase database)
         command.ExecuteNonQuery(); return id;
     }
 
+    public IReadOnlyList<object> BookingInstructions(Guid jobId)
+    {
+        using var connection=database.OpenConnection();
+        using var command=new NpgsqlCommand("""
+            select 'Booking instructions',payload->>'notes' from studio_frontdesk_requests where job_id=$1 and nullif(trim(payload->>'notes'),'') is not null
+            union
+            select 'Session booking instructions',notes from studio_bookings where job_id=$1 and nullif(trim(notes),'') is not null
+            """,connection);
+        command.Parameters.AddWithValue(jobId);
+        using var reader=command.ExecuteReader();List<object> result=[];
+        while(reader.Read())result.Add(new{source=reader.GetString(0),body=reader.GetString(1)});
+        return result;
+    }
+
     public IReadOnlyList<JobNote> Notes(Guid jobId)
     {
         using var connection = database.OpenConnection();
@@ -216,6 +230,7 @@ public static class WorkspaceJobEndpoints
             if(!access.HasPermission(user,workspaceId,"AccessWorkspace") || !access.HasPermission(user,workspaceId,"NotifyMembers")) return Results.Forbid();
             return Validated(()=>Results.Ok(new {id=new WorkspaceJobStore(db).AddAnnouncement(workspaceId,request,UserName(user))}));
         }).RequireAuthorization();
+        app.MapGet("/api/jobs/{jobId:guid}/booking-instructions", (Guid jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db) => access.HasPermission(user,jobId,"ViewJob") ? Results.Ok(new WorkspaceJobStore(db).BookingInstructions(jobId)) : Results.Forbid()).RequireAuthorization();
         app.MapGet("/api/jobs/{jobId:guid}/notes", (Guid jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db) => access.HasPermission(user,jobId,"ViewJob") ? Results.Ok(new WorkspaceJobStore(db).Notes(jobId)) : Results.Forbid()).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/notes", (Guid jobId,JobNoteRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db) =>
         {
@@ -255,4 +270,3 @@ public static class WorkspaceJobEndpoints
         try {return action();} catch(ArgumentException ex){return Results.BadRequest(new{error=ex.Message});}
     }
 }
-
