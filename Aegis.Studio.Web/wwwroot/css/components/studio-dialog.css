@@ -1,13 +1,14 @@
 /* Sole owner of shared popup title bars and close controls. */
 .studio-work-dialog{padding:0;border-radius:7px;border:1px solid var(--theme-border,#dedbd4);background:var(--theme-surface,#fff);color:var(--theme-text,#162b50);max-height:90vh;overflow:hidden}
-.studio-work-dialog[open]{display:block;box-sizing:border-box;width:min(760px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:min(88dvh,900px);margin:auto;overflow:hidden}
+.studio-work-dialog[open]{display:var(--studio-dialog-display,block);flex-direction:column;height:var(--studio-dialog-height,auto);box-sizing:border-box;width:var(--studio-dialog-width,min(760px,calc(100vw - 32px)));max-width:calc(100vw - 32px);max-height:var(--studio-dialog-max-height,min(88dvh,900px));margin:auto;overflow:hidden}
 .studio-dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;padding:10px 14px;border-bottom:2px solid #ed7010}
 .studio-dialog-heading>h2{flex:1;min-width:0;margin:0;font-size:16px;overflow-wrap:anywhere}
 .studio-dialog-heading>.studio-dialog-close{flex:none;margin-left:auto;width:32px;height:32px;padding:0;border:1px solid var(--theme-border,#dedbd4);border-radius:5px;background:var(--theme-surface,#fff);color:var(--theme-text,#162b50);font-size:20px;line-height:1;cursor:pointer}
 .studio-dialog-close:focus-visible{outline:2px solid #1677ff;outline-offset:2px}
-.studio-work-dialog>.studio-dialog-body{display:block;box-sizing:border-box;min-height:0;max-height:calc(88dvh - 68px);overflow-y:auto;overflow-x:hidden;padding:14px;overscroll-behavior:contain}
+.studio-work-dialog>.studio-dialog-body{display:var(--studio-dialog-body-display,block);flex:var(--studio-dialog-body-flex,0 1 auto);box-sizing:border-box;min-height:0;max-height:var(--studio-dialog-body-max-height,calc(88dvh - 68px));overflow-y:var(--studio-dialog-body-overflow,auto);overflow-x:hidden;padding:var(--studio-dialog-body-padding,14px);overscroll-behavior:contain}
 .studio-work-dialog>.studio-dialog-body>.subject-form{padding:0;min-width:0}
 .studio-work-dialog .dialog-actions{position:sticky;bottom:0;z-index:1;padding:10px 0 0;background:var(--theme-surface,#fff)}
 .studio-work-dialog .studio-dialog-heading{position:relative;min-height:52px;box-sizing:border-box}
 .studio-work-dialog .studio-dialog-close{display:grid;place-items:center;align-self:center}
-@media(max-width:640px){.studio-work-dialog[open]{width:calc(100vw - 20px);max-width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}.studio-work-dialog>.studio-dialog-body{max-height:calc(100dvh - 88px)}}
+@media(max-width:640px){.studio-work-dialog[open]{width:var(--studio-dialog-width,calc(100vw - 20px));max-width:calc(100vw - 20px);max-height:var(--studio-dialog-max-height,calc(100dvh - 20px))}.studio-work-dialog>.studio-dialog-body{max-height:var(--studio-dialog-body-max-height,calc(100dvh - 88px))}}
+

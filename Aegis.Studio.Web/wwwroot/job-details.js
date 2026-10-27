@@ -19,7 +19,7 @@
  }
  async function media(job,host,selectedHost,isCurrent,onCounts){
   let disposed=false,request=0,selectedId='',data=null,canEdit=false,uploading=false,search='',list=false;
-  let pendingBatch=null;
+  let pendingBatch=null,photoDialog=null;
   let collection='',subject='',assetId='',after='',page=1;const previous=[];
   const focus=root.studioMediaFocus?.jobId===job.id?root.studioMediaFocus:root.studioMediaPage?.[job.id];
   if(focus){subject=focus.subjectId||'';assetId=focus.assetId||'';root.studioMediaFocus=null;}
@@ -33,9 +33,65 @@
   const picture=(asset,large=false)=>isPreviewable(asset)?`<img ${large?'':'loading="lazy"'} src="${preview(asset)}${large?'':'?size=thumbnail'}" alt="${escape(asset.fileName)}"><span class="jd-preview-fallback" hidden>Preview ${escape(asset.previewStatus||'unavailable')}<br>Original file is retained</span>`:'<span class="jd-preview-fallback">▤ Document</span>';
   function openPreview(asset){
    if(!isPreviewable(asset))return;
+   photoDialog?.close();
    const dialog=studioDialog(asset.fileName,'<section class="job-detail-selected-file jd-photo-dialog"><header class="jd-card-heading"></header><div class="job-detail-selected-content"></div></section>');
-   select(asset,dialog.querySelector('.job-detail-selected-content'));
-   bindImages(dialog);
+   photoDialog=dialog;dialog.classList.add('jd-photo-viewer');
+   const content=dialog.querySelector('.job-detail-selected-content'),abort=new AbortController();
+   let items=[],cursor='',more=true,index=-1,busy=true,shown=asset,error='';
+   const live=()=>current()&&dialog.isConnected;
+   const update=()=>{
+    if(!live())return;
+    content.querySelector('.jd-photo-inspector').inert=busy;
+    content.querySelector('[data-photo-previous]').disabled=busy||index<=0;
+    content.querySelector('[data-photo-next]').disabled=busy||index<0||(!more&&index>=items.length-1);
+    content.querySelector('[data-photo-position]').textContent=error||(busy?'Loading photos…':index<0?'Photo unavailable in this job':`Photo ${index+1}${more?'':' of '+items.length}`);
+    content.querySelector('[data-photo-retry]').hidden=!error;
+   };
+   const show=photo=>{
+    shown=photo;select(photo,content);
+    dialog.querySelector('.studio-dialog-heading h2').textContent=photo.fileName;
+    update();
+   };
+   async function readPage(){
+    const q=new URLSearchParams({limit:'100'});if(cursor)q.set('after',cursor);
+    const snapshot=await json(`/api/jobs/${job.id}/media?${q}`,{signal:abort.signal});
+    if(!live())return;
+    const batch=snapshot.assets||[],next=batch.at(-1)?.id;
+    if(snapshot.hasMore&&(!next||next===cursor))throw Error('Photo navigation could not advance. Please retry.');
+    const known=new Set(items.map(photo=>photo.id));items.push(...batch.filter(photo=>isPreviewable(photo)&&!known.has(photo.id)));
+    cursor=next||cursor;more=!!snapshot.hasMore;
+   }
+   async function initialize(){
+    if(!live())return;
+    busy=true;error='';update();
+    try{
+     while(live()&&index<0&&more){await readPage();index=items.findIndex(photo=>photo.id===shown.id);}
+     if(index>=0)items[index]=shown;
+    }catch(e){if(live())error='Unable to load photos: '+e.message;}
+    finally{busy=false;update();}
+   }
+   async function move(direction){
+    if(busy||index<0||(direction<0&&index===0)||(direction>0&&!more&&index===items.length-1))return;
+    if(content.dataset.dirty==='true'&&!confirm('Discard unsaved file details and view another photo?'))return;
+    busy=true;error='';update();
+    try{
+     let next=index+direction;
+     while(live()&&next>=items.length&&more)await readPage();
+     if(live()&&items[next]){index=next;show(items[index]);}
+    }catch(e){if(live())error='Unable to load photos: '+e.message;}
+    finally{busy=false;update();if(live()){const button=content.querySelector(direction<0?'[data-photo-previous]':'[data-photo-next]');(button.disabled?content.querySelector('.jd-selected-preview'):button).focus();}}
+   }
+   dialog.addEventListener('click',event=>{
+    if(event.target.closest('[data-photo-previous]'))void move(-1);
+    if(event.target.closest('[data-photo-next]'))void move(1);
+    if(event.target.closest('[data-photo-retry]')){if(index<0)void initialize();else void move(1);}
+   });
+   dialog.addEventListener('keydown',event=>{
+    if(event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
+    if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();void move(event.key==='ArrowLeft'?-1:1);}
+   });
+   dialog.addEventListener('close',()=>{abort.abort();if(photoDialog===dialog)photoDialog=null;},{once:true});
+   show(asset);void initialize();
   }
   async function versions(asset){
    const dialog=studioDialog('Versions & history','<p role="status">Loading versions…</p>'),body=dialog.querySelector('.studio-dialog-body');
@@ -44,23 +100,23 @@
   }
   function select(asset,target){
    if(!target){selectedId=asset.id;host.querySelectorAll('[data-jd-asset]').forEach(tile=>{const active=tile.dataset.jdAsset===asset.id;tile.classList.toggle('selected',active);tile.setAttribute('aria-pressed',String(active));});return;}
-   const selectedHost=target;
+   const selectedHost=target;selectedHost.dataset.dirty='false';
    selectedId=asset.id;
    host.querySelectorAll('[data-jd-asset]').forEach(tile=>{const active=tile.dataset.jdAsset===asset.id;tile.classList.toggle('selected',active);tile.setAttribute('aria-pressed',String(active));});
    const collections=[...new Set(['Unclassified',...(data.collections||[]),asset.collection||'Unclassified'])];
    const heading=selectedHost.closest('.job-detail-selected-file').querySelector('.jd-card-heading');
-   heading.innerHTML=`<h2 title="${escape(asset.fileName)}">${escape(asset.fileName)}</h2><small class="jd-selected-file-meta">${escape((asset.contentType||'File').replace('image/','').toUpperCase())} · ${escape(formatBytes(asset.sizeBytes||0))} · v${escape(asset.version||1)}</small>`;
+   heading.innerHTML=`<p class="jd-selected-file-meta">${escape((asset.contentType||'File').replace('image/','').toUpperCase())} · ${escape(formatBytes(asset.sizeBytes||0))} · v${escape(asset.version||1)}</p><span class="jd-preview-mode">Full image · Fit to window</span>`;
    let tags=[...new Set(asset.tags||[])];
    const tagInputId='jd-photo-tags-'+asset.id;
-   selectedHost.innerHTML=`<div class="jd-selected-preview" tabindex="0" role="button" aria-label="Open selected photo preview">${picture(asset,true)}</div><form class="jd-file-form"><div class="jd-file-fields"><label>Collection<select name="collection" ${canEdit?'':'disabled'}>${collections.map(name=>`<option ${name===(asset.collection||'Unclassified')?'selected':''}>${escape(name)}</option>`).join('')}</select></label><label>Subjects<select data-subject-picker name="subjects" multiple size="2" ${canEdit?'':'disabled'} aria-label="File subjects">${StudioSubjectPicker.options(data.subjects,asset.subjects||[])}</select></label></div><label for="${escape(tagInputId)}">Tags</label><div class="jd-tag-editor"><div class="jd-tag-tokens" role="list" aria-label="Photo tags"></div><input id="${escape(tagInputId)}" type="text" data-tag-input placeholder="Add tags; Enter or comma" aria-label="Add photo tags" ${canEdit?'':'disabled'}></div>${canEdit?'<button type="submit" class="jd-save">Save file details</button>':''}<p role="alert"></p></form><div class="jd-file-links"><a href="/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content" download="${escape(asset.fileName)}">Download original</a><button type="button" data-versions>Versions</button>${canEdit?'<button type="button" data-retry-preview>Regenerate preview</button>':''}</div>`;
+   selectedHost.innerHTML=`<figure class="jd-selected-preview" tabindex="0" aria-label="Full photograph"><button type="button" class="jd-photo-arrow" data-photo-previous aria-label="Previous photo" title="Previous photo (Left arrow)">‹</button><div class="jd-preview-image">${picture(asset,true)}</div><button type="button" class="jd-photo-arrow" data-photo-next aria-label="Next photo" title="Next photo (Right arrow)">›</button><figcaption class="jd-photo-navigation"><span data-photo-position role="status" aria-live="polite"></span><button type="button" data-photo-retry hidden>Retry</button></figcaption></figure><div class="jd-photo-inspector"><form class="jd-file-form"><h3>File details</h3><div class="jd-file-fields"><label>Collection<select name="collection" ${canEdit?'':'disabled'}>${collections.map(name=>`<option ${name===(asset.collection||'Unclassified')?'selected':''}>${escape(name)}</option>`).join('')}</select></label><label>Subjects<select data-subject-picker name="subjects" multiple size="5" ${canEdit?'':'disabled'} aria-label="File subjects">${StudioSubjectPicker.options(data.subjects,asset.subjects||[])}</select></label></div><label for="${escape(tagInputId)}">Tags</label><div class="jd-tag-editor"><div class="jd-tag-tokens" role="list" aria-label="Photo tags"></div><input id="${escape(tagInputId)}" type="text" data-tag-input placeholder="Add tags; Enter or comma" aria-label="Add photo tags" ${canEdit?'':'disabled'}></div>${canEdit?'<button type="submit" class="jd-save">Save file details</button>':''}<p role="alert"></p></form><div class="jd-file-links"><a href="/api/jobs/${job.id}/versions/by-id/${asset.versionId}/content" download="${escape(asset.fileName)}">Download original</a><button type="button" data-versions>Version history</button>${canEdit?'<button type="button" data-retry-preview>Regenerate preview</button>':''}</div></div>`;
    bindImages(selectedHost);
-   const previewButton=selectedHost.querySelector('.jd-selected-preview');previewButton.removeAttribute('role');previewButton.removeAttribute('tabindex');previewButton.removeAttribute('aria-label');
    selectedHost.querySelector('[data-versions]').onclick=()=>versions(asset);
    const form=selectedHost.querySelector('form');
+   form.addEventListener('input',()=>selectedHost.dataset.dirty='true');form.addEventListener('change',()=>selectedHost.dataset.dirty='true');
    const tokens=form.querySelector('.jd-tag-tokens'),tagInput=form.querySelector('[data-tag-input]');
    const renderTags=()=>{
     tokens.innerHTML=tags.map((tag,index)=>`<span class="jd-tag-token" role="listitem">${escape(tag)}${canEdit?`<button type="button" data-remove-tag="${index}" aria-label="Remove tag ${escape(tag)}">×</button>`:''}</span>`).join('');
-    tokens.querySelectorAll('[data-remove-tag]').forEach(button=>button.onclick=()=>{tags.splice(Number(button.dataset.removeTag),1);renderTags();tagInput.focus();});
+    tokens.querySelectorAll('[data-remove-tag]').forEach(button=>button.onclick=()=>{tags.splice(Number(button.dataset.removeTag),1);selectedHost.dataset.dirty='true';renderTags();tagInput.focus();});
    };
    const addTags=()=>{
     if(!canEdit)return;
@@ -68,13 +124,13 @@
     const additions=tagInput.value.split(/[,\n]/).map(value=>value.trim()).filter(Boolean),next=[...tags];
     for(const tag of additions)if(!next.some(value=>value.toLowerCase()===tag.toLowerCase()))next.push(tag);
     if(next.length>50||next.some(value=>value.length>80)){form.querySelector('[role=alert]').textContent='Use at most 50 tags, with up to 80 characters per tag.';return false;}
-    tags=next;tagInput.value='';form.querySelector('[role=alert]').textContent='';renderTags();return true;
+    tags=next;selectedHost.dataset.dirty='true';tagInput.value='';form.querySelector('[role=alert]').textContent='';renderTags();return true;
    };
    renderTags();tagInput.onkeydown=event=>{if(event.key==='Enter'||event.key===','){event.preventDefault();addTags();}};
 
    form.onsubmit=async event=>{
     event.preventDefault();if(!canEdit||addTags()===false)return;const button=form.querySelector('[type=submit]');button.disabled=true;
-    try{await put(`/api/jobs/${job.id}/media/assets/${asset.id}`,{status:asset.status,collection:form.elements.collection.value,subjects:Array.from(form.elements.subjects.selectedOptions,o=>o.value),assignedTo:asset.assignedTo||null,captureAtUtc:asset.captureAtUtc||null,tags});await load();}
+    try{const changes={status:asset.status,collection:form.elements.collection.value,subjects:Array.from(form.elements.subjects.selectedOptions,o=>o.value),assignedTo:asset.assignedTo||null,captureAtUtc:asset.captureAtUtc||null,tags};await put(`/api/jobs/${job.id}/media/assets/${asset.id}`,changes);Object.assign(asset,changes);selectedHost.dataset.dirty='false';await load();}
     catch(error){if(form.isConnected)form.querySelector('[role=alert]').textContent=error.message;}
     finally{if(button.isConnected)button.disabled=false;}
    };
@@ -85,7 +141,7 @@
    const grid=host.querySelector('.jd-contact-sheet');grid.classList.toggle('list',list);
    grid.innerHTML=assets.map(asset=>`<button type="button" class="jd-photo ${selectedId===asset.id?'selected':''}" data-jd-asset="${escape(asset.id)}" aria-pressed="${selectedId===asset.id}"><span class="jd-photo-image">${picture(asset)}</span><strong>${escape(asset.fileName)}</strong><small>${escape(asset.collection||'Unclassified')} · ${escape(asset.status)}</small></button>`).join('')||'<p class="jd-empty">'+(search?'No matching files on this page.':'No media here. Drop photos or use Upload to add them.')+'</p>';
    bindImages(grid);
-   grid.querySelectorAll('[data-jd-asset]').forEach(tile=>{const asset=data.assets.find(a=>a.id===tile.dataset.jdAsset);tile.onclick=()=>select(asset);tile.ondblclick=()=>openPreview(asset);});
+   grid.querySelectorAll('[data-jd-asset]').forEach(tile=>{const asset=data.assets.find(a=>a.id===tile.dataset.jdAsset);tile.onclick=()=>select(asset);tile.ondblclick=()=>openPreview(asset);tile.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();openPreview(asset);}};});
   }
   async function change(changes){
    if('collection' in changes){collection=changes.collection;if(collection&&data.subjects.find(s=>s.id===subject)?.collection!==collection)subject='';}
@@ -164,10 +220,11 @@
    await root.openIntakeRoster(job.conversationId);
   }
 
-  const controller={reload:()=>{const focus=root.studioMediaFocus?.jobId===job.id?root.studioMediaFocus:root.studioMediaPage?.[job.id];if(focus?.subjectId!==undefined){subject=focus.subjectId||'';root.studioMediaFocus=null;after='';page=1;previous.length=0;}return load();},upload:()=>host.querySelector('[data-add]')?.click(),importRoster,dispose:()=>{disposed=true;request++;host.ondrop=null;host.ondragover=null;}};
+  const controller={reload:()=>{const focus=root.studioMediaFocus?.jobId===job.id?root.studioMediaFocus:root.studioMediaPage?.[job.id];if(focus?.subjectId!==undefined){subject=focus.subjectId||'';root.studioMediaFocus=null;after='';page=1;previous.length=0;}return load();},upload:()=>host.querySelector('[data-add]')?.click(),importRoster,dispose:()=>{disposed=true;request++;photoDialog?.close();host.ondrop=null;host.ondragover=null;}};
   host.studioJobMedia?.dispose();host.studioJobMedia=controller;
   await load();return controller;
  }
  root.StudioJobDetails={media,nextActionLink,workflowAction};
 })(window);
+
 
