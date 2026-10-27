@@ -1,0 +1,20 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const {JSDOM}=require('jsdom');
+const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
+test('Tasks renders and filters without a Messages card or message-card dependency',async t=>{
+ const dom=new JSDOM('<body><div id="genericView"></div><div id="conversationView"></div></body>',{url:'https://studio.test',runScripts:'outside-only'});t.after(()=>dom.window.close());
+ const w=dom.window,calls=[];
+ w.json=async url=>{calls.push(url);if(url==='/api/auth/me')return {userName:'owner'};if(url.includes('/activities'))return [{id:'t',title:'Review portraits',assignedTo:'owner',status:'NotStarted',jobId:'j'}];return [{id:'j',title:'Portraits'}];};
+ w.eval(fs.readFileSync(path.join(root,'studio-page.js'),'utf8'));
+ w.eval(fs.readFileSync(path.join(root,'tasks-page.js'),'utf8'));
+ await w.StudioTasks.render();
+ assert.ok(w.document.querySelector('[data-task-rows]'));
+ assert.match(w.document.querySelector('[data-task-rows]').textContent,/Review portraits/);
+ assert.equal(w.document.querySelector('.smc-card,#tasksMessageCard'),null);
+ assert.equal(calls.some(url=>/notifications|announcements|messages/.test(url)),false);
+ w.document.querySelector('[data-task-filter="completed"]').click();
+ assert.match(w.document.querySelector('[data-task-rows]').textContent,/No completed tasks/);
+});
