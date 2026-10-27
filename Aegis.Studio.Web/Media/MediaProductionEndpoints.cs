@@ -66,6 +66,7 @@ public static class MediaProductionEndpoints
                 return Results.Ok(new{count=Store(db,storage).ImportSubjects(jobId,new RosterImport(csv,form["nameColumn"].ToString(),form["idColumn"].ToString()),Name(user))});
             });
         }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6_000_000)).DisableAntiforgery().RequireAuthorization();
+        app.MapGet("/api/jobs/{jobId:guid}/session-plan",(Guid jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>access.HasPermission(user,jobId,"ViewJob")?Results.Ok(Store(db,storage).SessionPlan(jobId)):Results.Forbid()).RequireAuthorization();
         app.MapPut("/api/jobs/{jobId:guid}/media/subjects/{subjectId:guid}/status",(Guid jobId,Guid subjectId,SubjectStateRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>{Store(db,storage).SubjectStatus(jobId,subjectId,request.Status,Name(user));return Results.NoContent();})).RequireAuthorization();
         app.MapPost("/api/jobs/{jobId:guid}/media/export",(Guid jobId,MediaExportRequest request,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>Write(jobId,user,access,()=>Results.File(Store(db,storage).ExportFile(jobId,request.Assets??[],Name(user)),"application/zip","studio-editing-batch.zip"))).RequireAuthorization();
         app.MapGet("/api/jobs/{jobId:guid}/media/upload-batches",(Guid jobId,ClaimsPrincipal user,JobAccessService access,StudioDatabase db,IFileStorage storage)=>
@@ -119,4 +120,5 @@ public sealed record MediaGallerySettings(string Name,string DefaultLens);
 public sealed record MediaCollectionRequest(string Name);
 
 public sealed record CancelUploadBatch(string Reason);
+
 

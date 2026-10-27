@@ -223,6 +223,22 @@ public sealed class MediaProductionStore(StudioDatabase database, StudioVersionS
         }
         Audit(c,tx,job,"RosterImported",user,$"Imported or updated {data.Count} subjects.");tx.Commit();return data.Count;
     }
+    public JsonElement SessionPlan(Guid job)
+    {
+        using var c=database.OpenConnection();
+        using var cmd=new NpgsqlCommand("""
+            select coalesce(jsonb_agg(jsonb_build_object(
+              'id',s.id,'name',s.name,'reference',s.reference,'collection',s.collection_name,
+              'status',coalesce(p.status,s.production_status),'imageCount',coalesce(m.photos,0))
+              order by s.collection_name,s.name,s.id),'[]'::jsonb)::text
+            from studio_job_subjects s
+            left join studio_workday_roster_progress p on p.id=s.id
+            left join (select x.subject_id,count(*) as photos from studio_media_asset_subjects x join studio_media_assets a on a.id=x.asset_id where a.job_id=$1 and a.deleted_at_utc is null group by x.subject_id) m on m.subject_id=s.id
+            where s.job_id=$1 and not s.is_system
+            """,c);
+        cmd.Parameters.AddWithValue(job);
+        return JsonSerializer.Deserialize<JsonElement>((string)cmd.ExecuteScalar()!);
+    }
     public void SubjectStatus(Guid job,Guid subject,string status,string user)
     {
         if(status!="Not Photographed")MediaProductionRules.ValidateState(status);
@@ -365,4 +381,5 @@ public sealed record MediaPageQuery(string? Collection=null,Guid? SubjectId=null
         if(Status is not null)MediaProductionRules.ValidateState(Status);
     }
 }
+
 

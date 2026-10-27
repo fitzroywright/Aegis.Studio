@@ -25,8 +25,11 @@ async function pickFrontDeskSale(action,jobId){
     d.querySelectorAll('[data-sale]').forEach(b=>b.onclick=async()=>{await launchFrontDeskPos(action,{jobId,saleId:b.dataset.sale});d.close();});
 }
 window.addEventListener('message',async event=>{
-    if(event.origin!==location.origin||!frontDeskPosWindows.has(event.source)||event.data?.type!=='studio-pos-completed'||document.body.dataset.studioView!=='frontdesk')return;
+    if(event.origin!==location.origin||!frontDeskPosWindows.has(event.source)||event.data?.type!=='studio-pos-completed')return;
+    if(document.body.dataset.studioView==='delivery'){await StudioWorkflowViews.showDelivery();return;}
+    if(document.body.dataset.studioView!=='frontdesk')return;
     const positions=[...genericView.querySelectorAll('*')].filter(el=>el.scrollTop||el.scrollLeft).map(el=>({id:el.id,cls:el.className,top:el.scrollTop,left:el.scrollLeft}));
     try{const [jobs,requests]=await Promise.all([json('/api/jobs'),json('/api/frontdesk/booking-requests')]);frontDeskJobs=jobs;frontDeskRequests=requests;renderFrontDesk();for(const p of positions){const el=p.id?document.getElementById(p.id):[...genericView.querySelectorAll('*')].find(e=>e.className===p.cls);if(el){el.scrollTop=p.top;el.scrollLeft=p.left;}}}catch(error){console.error('Front Desk update failed',error);}
 });
+
 
