@@ -59,12 +59,12 @@ if(notificationButton){
     panel.setAttribute('role','dialog');
     panel.setAttribute('aria-label','Recent messages');
     panel.hidden=true;
-    panel.innerHTML='<header><strong>Messages &amp; Announcements</strong><button type="button" data-bell-close aria-label="Close messages">×</button></header><div class="studio-message-bell-list" role="status">Open to load recent messages and announcements.</div><footer><button type="button" data-bell-all>Open Messages →</button></footer>';
+    panel.innerHTML='<header><h2>Messages &amp; Announcements</h2><button type="button" data-bell-close aria-label="Close messages">×</button></header><div class="studio-message-bell-content"><div class="studio-message-bell-list" role="status">Open to load recent messages and announcements.</div></div><footer><button type="button" data-bell-all>Open Messages →</button></footer>';
     notificationButton.insertAdjacentElement('afterend',panel);
     // The bell owns all message presentation, including the active job conversation.
     const jobConversationSlot=document.createElement('div');
     jobConversationSlot.id='studioShellJobConversation';
-    panel.insertBefore(jobConversationSlot,panel.querySelector('footer'));
+    panel.querySelector('.studio-message-bell-content').append(jobConversationSlot);
     window.studioShellMountJobConversation=(conversation)=>{
         jobConversationSlot.replaceChildren();
         if(conversation)jobConversationSlot.append(conversation);

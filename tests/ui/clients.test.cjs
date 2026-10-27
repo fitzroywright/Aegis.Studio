@@ -12,7 +12,7 @@ function setup(){
  w.StudioPage={escape,setCount:c=>fixture.count=c};w.conversationView=w.document.querySelector('#conversationView');w.genericView=w.document.querySelector('#genericView');w.alert=message=>fixture.alert=message;
  fixture.clients=[{id:'a',displayName:'Andrea Campbell',email:'andrea@example.test',phone:'876-555-0123'},{id:'b',displayName:'Andrea Campbell',email:'other@example.test'}];
  fixture.jobs=[{id:'j1',clientId:'a',title:'Graduation',workspaceId:'w1',status:'Ready for Delivery',financialEvents:[{kind:'Charge',amount:100,createdAt:'2026-10-17'},{kind:'Refund',amount:-10,createdAt:'2026-10-17'}]},{id:'j2',clientId:'b',title:'Other client job',workspaceId:'w1',status:'Completed'},{id:'j3',clientName:'Andrea Campbell',title:'Unlinked snapshot',status:'Pending'}];
- w.studioMediaIsPreviewable=()=>true;w.renderProductionMedia=async(job,host)=>{host.textContent='Gallery for '+job.title;};w.openWorkspaceJob=async id=>fixture.opened.push(id);
+ w.studioMediaIsPreviewable=()=>true;w.StudioJobDetails={openGallery:async(job,options)=>{fixture.galleryJob=job;fixture.galleryOptions=options;return w.studioDialog(job.title,'Gallery for '+job.title);}};w.openWorkspaceJob=async id=>fixture.opened.push(id);
  w.studioNavigate=async(view,options={})=>{fixture.navigation={view,options};if(view==='clients')await w.StudioClients.render(options);};
  w.studioDialog=(title,html)=>{const d=w.document.createElement('dialog');d.innerHTML='<div class="studio-dialog-body">'+html+'</div>';d.close=()=>d.remove();w.document.body.append(d);return d;};
  w.json=async(url,options)=>{fixture.calls.push({url,options});if(fixture.delay&&url.includes('/media?'))await fixture.delay;
@@ -89,4 +89,37 @@ test('client directory keeps scroll on selection and late messages do not replac
  assert.equal(w.genericView.querySelector('.client-directory-rows'),directory);assert.equal(directory.scrollTop,300);
  assert.equal(directory.querySelector('[data-c-id="c4"]'),row);assert.equal(w.document.activeElement,row);
  assert.equal(w.genericView.querySelector('.client-jobs-scroll'),jobs);assert.equal(jobs.scrollTop,200);
+});
+
+test('financial cards retain exact job balances, invoice currencies and job links',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());
+ await w.StudioClients.render({clientId:'a'});tab(w,'finance');await settle();
+ const statement=w.document.querySelector('[data-c-statement]'),balances=statement.querySelector('[aria-label="Job balances"]');
+ assert.equal(balances.querySelectorAll('.client-finance-card').length,1);
+ assert.match(balances.querySelector('[data-client-balance]').textContent,/30/);
+ const invoice=statement.querySelector('.client-invoice-card');assert.match(invoice.textContent,/USD/);assert.match(invoice.textContent,/INV-1/);
+ assert.equal(statement.querySelectorAll('.client-statement-ledger tbody tr').length,2);
+ balances.querySelector('[data-c-job]').click();assert.deepEqual(fixture.opened,['j1']);
+});
+
+test('financial cards distinguish zero, credit and unavailable balances without combining currencies',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());
+ fixture.jobs.push({id:'zero',clientId:'a',title:'Settled job',status:'Completed'},{id:'credit',clientId:'a',title:'Credit job',status:'Completed'});
+ const original=w.json;
+ w.json=async(url,options)=>url.endsWith('/finance-release')?{decision:{balance:url.includes('/zero/')?0:url.includes('/credit/')?-25:null}}:original(url,options);
+ await w.StudioClients.render({clientId:'a'});tab(w,'finance');await settle();
+ const amounts=[...w.document.querySelectorAll('[data-client-balance]')].map(el=>el.textContent);
+ assert.equal(amounts[0],'Unavailable');assert.match(amounts[1],/0\.00/);assert.match(amounts[2],/-.*25\.00/);
+ assert.match(w.document.querySelector('.client-finance-warning').textContent,/not zero/);
+});
+
+test('printing clones the card statement and preserves signed ledger values',async t=>{
+ const {dom,w}=setup();t.after(()=>dom.window.close());
+ const paper=new JSDOM('<html><head></head><body></body></html>');t.after(()=>paper.window.close());let printed=false;
+ w.open=()=>({document:paper.window.document,focus(){},print(){printed=true;},opener:w});
+ await w.StudioClients.render({clientId:'a'});tab(w,'finance');await settle();
+ w.document.querySelector('[data-c-print]').click();
+ assert.equal(printed,true);assert.equal(paper.window.document.querySelectorAll('.client-finance-card').length,2);
+ assert.match(paper.window.document.querySelector('.client-statement-ledger').textContent,/-.*10/);
+ assert.ok(w.document.querySelector('[data-c-statement]'));
 });
