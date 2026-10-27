@@ -603,17 +603,19 @@
                 empty.textContent = sessionsState === 'loading' ? 'Loading sessions…' : sessionsState === 'error' ? 'Unable to load sessions. Close and reopen to retry.' : 'No upcoming sessions in the next 30 days.';
                 sessionDetails.append(empty);
             }
-            for (const item of sessions) {
-                const row = document.createElement('div');
-                row.className = 'studio-shared-session-row';
-                const start = new Date(item.startsAtUtc || item.start || item.startsAt);
-                const time = Number.isNaN(start.getTime()) ? 'Time not set' : start.toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-                const name = document.createElement('strong');
-                name.textContent = item.jobTitle || item.title || 'Photography session';
-                const meta = document.createElement('span');
-                meta.textContent = [time,item.clientName,item.photographerName || item.photographer,item.location].filter(Boolean).join(' · ');
-                row.append(name,meta);
-                sessionDetails.append(row);
+            if(sessionsState==='ready'&&sessions.length){
+                const table=document.createElement('table');table.className='studio-sessions-grid';table.setAttribute('aria-label','Upcoming sessions');
+                table.innerHTML='<thead><tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Session</th><th scope="col">Location</th></tr></thead><tbody></tbody>';
+                const body=table.querySelector('tbody');
+                for(const item of sessions){
+                    const row=document.createElement('tr');row.dataset.sessionId=item.id;
+                    const start=new Date(item.startsAtUtc||item.start||item.startsAt);
+                    for(const value of [start.toLocaleDateString([],{month:'short',day:'numeric'}),start.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),item.jobTitle||item.title||'Photography session',item.location||'Not set']){
+                        const cell=document.createElement('td');cell.textContent=value;row.append(cell);
+                    }
+                    body.append(row);
+                }
+                sessionDetails.append(table);
             }
         }
     }

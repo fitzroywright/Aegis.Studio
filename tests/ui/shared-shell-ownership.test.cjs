@@ -65,3 +65,12 @@ test('shared shell and Front Desk scripts are syntactically valid', () => {
   }
 });
 
+
+test('shell height has one owner and reserves the full footer below every page',()=>{
+ const rules=[...css.replace(/\/\*[\s\S]*?\*\//g,'').matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([,selector,body])=>({selector:selector.trim(),properties:Object.fromEntries([...body.matchAll(/([\w-]+)\s*:\s*([^;]+);/g)].map(([,property,value])=>[property,value.trim()]))}));
+ const heights=rules.filter(rule=>/(?:^| )\.shell$/.test(rule.selector)).flatMap(({selector,properties})=>Object.entries(properties).filter(([name])=>['height','min-height','max-height'].includes(name)).map(([property,value])=>({selector,property,value})));
+ assert.deepEqual(heights,[{selector:'body .shell',property:'height',value:'calc(100dvh - var(--studio-banner-height))'},{selector:'body .shell',property:'min-height',value:'0'}]);
+ const properties=rules.find(rule=>rule.selector==='body .shell'&&rule.properties.height).properties;
+ assert.equal(properties['grid-template-rows'],'minmax(0,1fr) var(--studio-footer-height)');
+ assert.equal(properties['box-sizing'],'border-box');assert.equal(properties.overflow,'hidden');
+});

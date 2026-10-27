@@ -19,7 +19,7 @@ async function setup(t,view,options={}){
  const sessions=[session,{...session,id:'cancelled',title:'Cancelled session',status:'Cancelled'},{...session,id:'tomorrow',title:'Tomorrow session',startsAtUtc:at(1,10),endsAtUtc:at(1,11)}];
  w.json=async url=>{
   requests.push(url);
-  if(url.startsWith('/api/schedule/photographer-data'))return {photographers:[{userName:'alice',displayName:'Alice',scheduleResourceId:'resource',isActive:true}],entries:[session],jobs:[{id:'job',title:'School portraits',workspaceId:'workspace'}]};
+  if(url.startsWith('/api/schedule/worker-data'))return {roles:[{code:'PHOTOGRAPHER',displayName:'Photographer'}],workers:[{userName:'alice',displayName:'Alice',scheduleResourceId:'resource',isActive:true}],entries:[session],jobs:[{id:'job',title:'School portraits',workspaceId:'workspace'}]};
   if(url==='/api/auth/me')return {user:{userName:'alice'}};
   if(url==='/api/today/jobs')return [{id:'job',title:'School portraits'}];
   if(url.startsWith('/api/operations/activities'))return [{id:'task',jobId:'job',title:'Prepare portraits',assignedTo:'alice',status:'Blocked',blockedReason:'Awaiting client approval'}];
@@ -36,7 +36,7 @@ async function setup(t,view,options={}){
 for(const view of ['tasks','schedule'])test(`${view} keeps sessions in the shared slide-down without rendering a card`,async t=>{
  const {w,requests}=await setup(t,view);
  if(view==='tasks')await w.StudioTasks.render();
- else await w.StudioPhotographerSchedule.render({view:'day'});
+ else {await w.StudioPhotographerSchedule.render({view:'day'});assert.equal(w.document.querySelector('#pageMessageCard,[data-page-messages]'),null);}
  await settle();
  if(view==='tasks'){const attention=w.document.querySelector('#studioAttentionDrawer [data-studio-attention]');assert.match(attention.textContent,/Prepare portraits/);assert.doesNotMatch(attention.textContent,/Overdue tasks|Due today|Blocked tasks/);}
  assert.equal(w.document.querySelector('.ps-todays-sessions,[data-mw-region="schedule"]'),null);
@@ -92,14 +92,17 @@ test('upcoming sessions use the next 30 days, exclude past/cancelled/completed, 
  await settle();assert.equal(w.document.getElementById('studioSessionsCount').textContent,'2');
  w.document.getElementById('studioSessionsTrigger').click();await settle();
  const drawer=w.document.getElementById('studioSessionsDrawer');
- assert.deepEqual([...drawer.querySelectorAll('.studio-shared-session-row strong')].map(el=>el.textContent),['At start','Newly scheduled shoot','Next week']);
+ assert.deepEqual([...drawer.querySelectorAll('.studio-sessions-grid tbody td:nth-child(3)')].map(el=>el.textContent),['At start','Newly scheduled shoot','Next week']);
  assert.doesNotMatch(drawer.textContent,/Overnight already started|At horizon|Cancelled shoot|Completed shoot|Finished/);
  assert.equal(w.document.getElementById('studioSessionsCount').textContent,'3');
  const range=new URL(requests.find(u=>u.startsWith('/api/today/schedule')),'https://studio.test');
  const from=new Date(range.searchParams.get('from')),to=new Date(range.searchParams.get('to')),expected=new Date(from);expected.setDate(expected.getDate()+30);
  assert.equal(+to,+expected);assert.ok(Math.abs(Date.now()-from)<10000);
- const meta=drawer.querySelector('.studio-shared-session-row span').textContent;
- assert.ok(meta.startsWith(from.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})));
+ const row=drawer.querySelector('.studio-sessions-grid tbody tr');
+ assert.equal(row.children[0].textContent,from.toLocaleDateString([],{month:'short',day:'numeric'}));
+ assert.equal(row.children[1].textContent,from.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));
+ assert.deepEqual([...drawer.querySelectorAll('th')].map(el=>el.textContent),['Date','Time','Session','Location']);
+ assert.equal(drawer.querySelector('.studio-shared-session-row'),null);
 });
 
 test('failed or malformed session responses show an error and reopening retries',async t=>{
