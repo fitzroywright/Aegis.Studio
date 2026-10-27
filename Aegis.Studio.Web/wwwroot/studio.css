@@ -8750,7 +8750,10 @@ body .topbar {
   box-shadow: 0 14px 32px rgba(12,30,50,.25);
 }
 .studio-admin-popover button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
   width: 100%;
   padding: 7px 10px;
   border: 0;
@@ -8761,8 +8764,6 @@ body .topbar {
   font-size: 12px;
 }
 .studio-admin-popover button[hidden] { display: none; }
-.studio-admin-popover button:hover,
-.studio-admin-popover button:focus-visible { background: #eaf3ff; }
 .studio-navigation-account {
   position: relative;
   display: flex;

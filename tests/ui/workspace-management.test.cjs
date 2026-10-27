@@ -47,3 +47,12 @@ test('job role create and delete return to Staff and Roles, preserving workspace
  await w.createStudioRole();assert.equal(navigation.at(-1).view,'staff-roles');w.document.body.dataset.studioView='staff-roles';await w.deleteStudioRole('jr');assert.equal(navigation.at(-1).view,'staff-roles');
  w.document.body.dataset.studioView='workspace-management';await w.deleteStudioRole('wr');assert.equal(navigation.at(-1).view,'workspace-management');
 });
+
+test('Admin entries use shared restrained icons and speed-bump rows while icon clicks retain navigation',async t=>{
+ const {w,navigation}=setup(t);w.studioSignedInUserReady=Promise.resolve({isAdministrator:true});w.eval(read('studio-admin.js'));const host=w.document.createElement('div');w.document.body.append(host);w.StudioAdmin.mountMenu(host);await settle();
+ const buttons=[...host.querySelectorAll('[data-studio-admin-view]')];assert.equal(buttons.length,6);
+ for(const button of buttons){assert.ok(button.classList.contains('studio-admin-item'));const svg=button.querySelector('svg');assert.equal(svg.getAttribute('aria-hidden'),'true');assert.equal(svg.getAttribute('focusable'),'false');assert.ok(w.document.querySelector(svg.querySelector('use').getAttribute('href')));}
+ const workspace=buttons.find(button=>button.dataset.studioAdminView==='workspace-management');workspace.querySelector('svg').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));assert.equal(navigation.at(-1).view,'workspace-management');
+ assert.deepEqual(buttons.map(button=>button.textContent),['Products and Services','Templates','Workflow Automation','Staff and Roles','Workspaces','About']);
+ const shared=read('css/components/studio-rows.css');assert.match(shared,/studio-admin-item.*transition:/);assert.match(shared,/@media\(prefers-reduced-motion:reduce\).*studio-admin-item/);
+});

@@ -1,11 +1,11 @@
 (() => {
     const entries = [
-        {view:'catalog',label:'Products and Services'},
-        {view:'templates',label:'Templates'},
-        {view:'workflows-admin',label:'Workflow Automation'},
-        {view:'staff-roles',label:'Staff and Roles'},
-        {view:'workspace-management',label:'Workspaces',staff:true},
-        {view:'about',label:'About'}
+        {view:'catalog',icon:'i-pos',label:'Products and Services'},
+        {view:'templates',icon:'i-jobs',label:'Templates'},
+        {view:'workflows-admin',icon:'i-production',label:'Workflow Automation'},
+        {view:'staff-roles',icon:'i-people',label:'Staff and Roles'},
+        {view:'workspace-management',icon:'i-grid',label:'Workspaces',staff:true},
+        {view:'about',icon:'i-info',label:'About'}
     ];
     function mountMenu(host){
         const menu=document.createElement('details');
@@ -13,7 +13,7 @@
         menu.innerHTML='<summary aria-label="Administration menu"><svg class="studio-navigation-icon" aria-hidden="true"><use href="#i-settings"></use></svg>Admin <span aria-hidden="true">⌄</span></summary><div class="studio-admin-popover" aria-label="Administration"></div>';
         const body=menu.querySelector('div');
         for(const entry of entries){
-            const button=document.createElement('button');button.type='button';button.textContent=entry.label;button.dataset.studioAdminView=entry.view;button.hidden=!entry.staff;
+            const button=document.createElement('button');button.type='button';button.className='studio-admin-item';const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('class','studio-navigation-icon');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('fill','none');icon.setAttribute('stroke','currentColor');icon.setAttribute('stroke-width','1.6');icon.setAttribute('stroke-linecap','round');icon.setAttribute('stroke-linejoin','round');icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#'+entry.icon);icon.append(use);const label=document.createElement('span');label.textContent=entry.label;button.append(icon,label);button.dataset.studioAdminView=entry.view;button.hidden=!entry.staff;
             button.onclick=()=>{menu.open=false;window.studioNavigate?.(entry.view);};body.append(button);
         }
         const authorize=payload=>{const admin=(payload?.user||payload)?.isAdministrator===true;for(const button of body.children)button.hidden=!admin&&!entries.find(entry=>entry.view===button.dataset.studioAdminView).staff;};
