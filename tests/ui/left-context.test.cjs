@@ -57,6 +57,27 @@ test('Job Details Overview shows status instead of repeating job and client iden
  assert.doesNotMatch(overview.textContent,/Williams & Clarke|Wedding selects review/);
  assert.equal(w.document.querySelector('.job-detail-right,[data-rail-toggle="right"]'),null);
 });
+test('Activity stays out of every footer and job history opens from the avatar',async t=>{
+ const {w}=require('./job-detail-fixture.cjs').environment(t);
+ for(const file of ['studio-page.js','notifications.js','job-workflow-display.js','job-workflow-graph.js'])w.eval(read(file));
+ await w.openWorkspaceJob('job');await settle();await settle();
+ const footer=w.document.getElementById('studioShellFooter');
+ const activity=w.document.querySelector('[data-studio-avatar-activity]');
+ assert.equal(footer.querySelector('[data-job-activity],.jd-footer-link,#studioFooterJobTools'),null);
+ assert.doesNotMatch(footer.textContent,/Activity/);
+ activity.click();await settle();
+ const drawer=w.document.getElementById('jobActivityDrawer');
+ assert.equal(drawer.getAttribute('aria-hidden'),'false');
+ drawer.querySelector('[data-close-drawer]').click();
+ assert.equal(drawer.getAttribute('aria-hidden'),'true');
+ assert.equal(w.document.activeElement,w.document.querySelector('.user-menu-trigger'));
+ for(const view of ['today','frontdesk','jobs','media','schedule','production','clients','session-plan','delivery']){
+  w.document.body.dataset.studioView=view;w.StudioShell.sync(view);await settle();
+  assert.equal(w.document.querySelector('[data-studio-avatar-activity]'),activity);
+  assert.equal(footer.querySelector('[data-job-activity],.jd-footer-link,#studioFooterJobTools'),null);
+  assert.doesNotMatch(footer.textContent,/Activity/);
+ }
+});
 test('page renderers and styles no longer define right rails',()=>{
  const retired=/\b(?:st-right|sj-right|job-detail-right|mw-today-right|mw-list-right|workspace-right-rail|studio-rail-collapsed-right)\b/;
  function files(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(d=>d.isDirectory()?files(path.join(dir,d.name)):[path.join(dir,d.name)]);}
