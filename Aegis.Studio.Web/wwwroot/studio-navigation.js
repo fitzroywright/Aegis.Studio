@@ -1040,6 +1040,7 @@
         if(!route) throw new Error('Unknown Studio navigation view: '+view);
         const {context,revision}=beginNavigation(view,options);
         setActive(view);
+        window.studioShellMountContext?.([],context.studioJobId?'job-detail':view);
         if(view!=='today'){
             if(studioPageTools)studioPageTools.innerHTML='';
             window.studioSetBreadcrumb?.([{label:navigationLabels[view]||view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);

@@ -15,9 +15,9 @@ async function showCommercialCatalog(){
     if(!current())return;
     const rows=commercialItems.map(p=>`<tr data-item="${p.id}" tabindex="0"><td><b>${esc(p.code)}</b></td><td>${esc(p.name)}</td><td>${esc(p.category)}</td><td>${money(p.unitPrice)}</td><td>${money(p.estimatedCost)}</td><td>${p.taxRate}%</td><td>${p.requiresProduction?'Production':'Direct'}</td><td><span class="status-pill">${p.isActive?'Active':'Inactive'}</span></td></tr>`).join('');
     commercialPage('Product & Services Catalog',`<input class="commercial-search" placeholder="Search products and services" aria-label="Search catalog"><div class="commercial-grid"><table class="pos-grid"><thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Price before tax</th><th>Estimated cost</th><th>Tax</th><th>Fulfillment</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`,`<button class="primary" data-add>Add item</button>`);
-    genericView.querySelector('[data-add]').onclick=()=>editCommercialItem();
-    genericView.querySelectorAll('[data-item]').forEach(row=>{row.onclick=()=>editCommercialItem(commercialItems.find(p=>p.id===row.dataset.item));row.onkeydown=e=>{if(e.key==='Enter')row.click();};});
-    const filter=()=>{const term=genericView.querySelector('.commercial-search').value.toLowerCase();let count=0;genericView.querySelectorAll('[data-item]').forEach(row=>{row.hidden=!row.textContent.toLowerCase().includes(term);if(!row.hidden)count++;});StudioPage.setCount(count+' catalog items');};genericView.querySelector('.commercial-search').oninput=filter;filter();
+    StudioPage.query(genericView,'[data-add]').onclick=()=>editCommercialItem();
+    StudioPage.queryAll(genericView,'[data-item]').forEach(row=>{row.onclick=()=>editCommercialItem(commercialItems.find(p=>p.id===row.dataset.item));row.onkeydown=e=>{if(e.key==='Enter')row.click();};});
+    const filter=()=>{const term=StudioPage.query(genericView,'.commercial-search').value.toLowerCase();let count=0;StudioPage.queryAll(genericView,'[data-item]').forEach(row=>{row.hidden=!row.textContent.toLowerCase().includes(term);if(!row.hidden)count++;});StudioPage.setCount(count+' catalog items');};StudioPage.query(genericView,'.commercial-search').oninput=filter;filter();
 }
 function editCommercialItem(item){
     const p=item||{code:'',name:'',category:'Photography',unitPrice:0,estimatedCost:0,taxRate:0,isActive:true,options:{},bundle:[]};
@@ -36,11 +36,11 @@ async function showCommercialTemplates(kind='WorkOrder'){
     commercialKind=kind;[commercialTemplates,commercialItems]=await Promise.all([json(`/api/admin/commercial/templates/${kind}`),json('/api/admin/pos/catalog/')]);
     if(!current())return;
     commercialPage(kind==='Job'?'Job Templates':'Work Order Templates',`<div class="commercial-grid"><table class="pos-grid"><thead><tr><th>Name</th><th>Version</th><th>Steps</th><th>Status</th><th></th></tr></thead><tbody>${commercialTemplates.map(t=>`<tr tabindex="0" data-template-row="${t.id}"><td><button class="fd-card-link" data-edit="${t.id}">${esc(t.definition.name)}</button><small>${esc(t.definition.description)}</small></td><td>v${t.version}</td><td>${t.definition.steps.length}</td><td><span class="status-pill">${t.active?'Active':'Retired'}</span></td><td><button class="fd-card-link" data-copy="${t.id}">Duplicate</button></td></tr>`).join('')}</tbody></table></div>`,`<button class="primary" data-add>Create ${kind==='Job'?'Job Template':'Work Order Template'}</button>`);
-    genericView.querySelector('[data-add]').onclick=()=>editCommercialTemplate(null,kind);
+    StudioPage.query(genericView,'[data-add]').onclick=()=>editCommercialTemplate(null,kind);
     StudioPage.setCount(commercialTemplates.length+' templates');
-    genericView.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editCommercialTemplate(commercialTemplates.find(t=>t.id===b.dataset.edit),kind));
-    genericView.querySelectorAll('[data-template-row]').forEach(row=>{const open=()=>editCommercialTemplate(commercialTemplates.find(t=>t.id===row.dataset.templateRow),kind);row.onclick=e=>{if(!e.target.closest('button,input,select,a'))open();};row.onkeydown=e=>{if(e.target===row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();open();}};});
-    genericView.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{await json(`/api/admin/commercial/templates/${b.dataset.copy}/duplicate`,{method:'POST'});await showCommercialTemplates(kind);});
+    StudioPage.queryAll(genericView,'[data-edit]').forEach(b=>b.onclick=()=>editCommercialTemplate(commercialTemplates.find(t=>t.id===b.dataset.edit),kind));
+    StudioPage.queryAll(genericView,'[data-template-row]').forEach(row=>{const open=()=>editCommercialTemplate(commercialTemplates.find(t=>t.id===row.dataset.templateRow),kind);row.onclick=e=>{if(!e.target.closest('button,input,select,a'))open();};row.onkeydown=e=>{if(e.target===row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();open();}};});
+    StudioPage.queryAll(genericView,'[data-copy]').forEach(b=>b.onclick=async()=>{await json(`/api/admin/commercial/templates/${b.dataset.copy}/duplicate`,{method:'POST'});await showCommercialTemplates(kind);});
 }
 function editCommercialTemplate(current,kind){
     if(kind==='Job')return StudioGraphTemplates.edit(current);
@@ -175,9 +175,9 @@ async function showCatalogProduction(){
     const filters='<div class="production-board-filters"><input type="search" data-production-search value="'+esc(selection.search||'')+'" placeholder="Search jobs, clients or work orders" aria-label="Search jobs, clients or work orders"><select aria-label="Workload filter" data-workload-filter-select>'+options([['','All Workloads'],['ready','Ready to execute'],['progress','In production'],['waiting','Blocked / waiting'],['overdue','Overdue'],['rework','Rework'],['qc','Recorded items awaiting QC'],['item-rework','Recorded QC rework'],['refunds','Produced units refunded'],['unassigned','Unassigned'],['handoffs','Handoffs'],['unknown','Due date unknown']],selection.filter)+'</select><select aria-label="Assignee filter" data-workload-assignee>'+options([['','All Assignees'],['__unassigned','Unassigned'],...[...new Set(workload.activities.map(a=>a.assignedTo).filter(Boolean))].map(id=>[id,studioFirstName(id)])],selection.assignee)+'</select><select aria-label="Activity filter" data-workload-stage>'+options([['','All Activities'],...[...new Set(workload.activities.map(a=>a.activityType))].map(id=>[id,id])],selection.stage)+'</select><select aria-label="Production area filter" data-area><option value="">All Areas</option>'+['Editing','Printing','Framing','Album Production','Assembly','Quality Control'].map(a=>'<option value="'+esc(a)+'" '+(a===commercialQueueArea?'selected':'')+'>'+esc(a)+'</option>').join('')+'</select><label class="production-completed-filter" title="Include completed production tasks"><input type="checkbox" data-completed '+(commercialIncludeCompleted?'checked':'')+'><span>Completed</span></label><button type="button" data-workload-reset>Reset</button></div>';
     if(!current())return;
     commercialPage('Production','<div class="production-board-view">'+filters+'<div class="production-kanban" aria-label="Production work order board">'+lanes+'</div><footer class="commercial-pager production-board-pager"><button type="button" data-prev '+(commercialQueueOffset?'':'disabled')+'>Previous</button><span>'+(workItems.length?commercialQueueOffset+1:0)+'–'+(commercialQueueOffset+pageItems.length)+' of '+workItems.length+' production items</span><button type="button" data-next '+(commercialQueueOffset+50<workItems.length?'':'disabled')+'>Next</button><p role="alert"></p></footer></div>','',summary,attention);
-    genericView.querySelector('.st-board')?.classList.add('production-main-board');
-    // Production actions belong to the active board toolbar, not retired right-rail cards.
-    const productionFilters=genericView.querySelector('.production-board-filters');
+    StudioPage.query(genericView,'.st-board')?.classList.add('production-main-board');
+    // Production actions belong to the active board toolbar.
+    const productionFilters=StudioPage.query(genericView,'.production-board-filters');
     if(productionFilters){
         const pipelineLink=document.createElement('button');
         pipelineLink.type='button';pipelineLink.className='fd-card-link';pipelineLink.dataset.openProductionPlan='';
@@ -188,20 +188,20 @@ async function showCatalogProduction(){
         productionFilters.append(pipelineLink,tasksLink);
     }
     const reload=()=>showCatalogProduction().catch(e=>alert(e.message));
-    genericView.querySelectorAll('[data-workload-filter]').forEach(b=>b.onclick=()=>{selection.filter=b.dataset.workloadFilter==='all'?'':b.dataset.workloadFilter;commercialQueueOffset=0;reload();});
-    for(const [selector,key] of [['filter-select','filter'],['assignee','assignee'],['stage','stage']])genericView.querySelector('[data-workload-'+selector+']').onchange=e=>{selection[key]=e.target.value;commercialQueueOffset=0;reload();};
-    genericView.querySelector('[data-production-search]').oninput=e=>{selection.search=e.target.value;commercialQueueOffset=0;clearTimeout(window.productionBoardSearchTimer);window.productionBoardSearchTimer=setTimeout(reload,180);};
-    genericView.querySelector('[data-workload-reset]').onclick=()=>{window.studioWorkloadSelection={filter:'',workspace:'',assignee:'',stage:'',search:''};commercialQueueArea='';commercialQueueOffset=0;reload();};
-    genericView.querySelector('[data-open-production-plan]').onclick=()=>{window.StudioProductionPlanning?.setContext({workspace:selection.workspace,assignee:selection.assignee,area:commercialQueueArea});return window.studioNavigate('schedule',{panel:'production'});};
-    genericView.querySelector('[data-completed]').onchange=e=>{commercialIncludeCompleted=e.target.checked;commercialQueueOffset=0;showCatalogProduction();};
-    genericView.querySelector('[data-area]').onchange=e=>{commercialQueueArea=e.target.value;commercialQueueOffset=0;showCatalogProduction();};
-    genericView.querySelector('[data-prev]').onclick=()=>{commercialQueueOffset=Math.max(0,commercialQueueOffset-50);showCatalogProduction();};
-    genericView.querySelector('[data-next]').onclick=()=>{commercialQueueOffset+=50;showCatalogProduction();};
-    genericView.querySelector('[data-graph-tasks]').onclick=()=>StudioJobGraph.production();
-    genericView.querySelectorAll('.production-job-thumbnail').forEach(image=>image.onerror=()=>image.remove());
-    genericView.querySelectorAll('[data-order-row]').forEach(row=>{const open=()=>openCommercialWorkOrder(rows.find(w=>w.id===row.dataset.orderRow));row.onclick=e=>{if(!e.target.closest('button,input,select,a'))open();};row.onkeydown=e=>{if(e.target===row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();open();}};});
-    genericView.querySelectorAll('[data-order]').forEach(b=>b.onclick=()=>openCommercialWorkOrder(rows.find(w=>w.id===b.dataset.order)));
-    genericView.querySelectorAll('[data-open-job]').forEach(b=>b.onclick=e=>{e.stopPropagation();openWorkspaceJob(b.dataset.openJob);});
+    StudioPage.queryAll(genericView,'[data-workload-filter]').forEach(b=>b.onclick=()=>{selection.filter=b.dataset.workloadFilter==='all'?'':b.dataset.workloadFilter;commercialQueueOffset=0;reload();});
+    for(const [selector,key] of [['filter-select','filter'],['assignee','assignee'],['stage','stage']])StudioPage.query(genericView,'[data-workload-'+selector+']').onchange=e=>{selection[key]=e.target.value;commercialQueueOffset=0;reload();};
+    StudioPage.query(genericView,'[data-production-search]').oninput=e=>{selection.search=e.target.value;commercialQueueOffset=0;clearTimeout(window.productionBoardSearchTimer);window.productionBoardSearchTimer=setTimeout(reload,180);};
+    StudioPage.query(genericView,'[data-workload-reset]').onclick=()=>{window.studioWorkloadSelection={filter:'',workspace:'',assignee:'',stage:'',search:''};commercialQueueArea='';commercialQueueOffset=0;reload();};
+    StudioPage.query(genericView,'[data-open-production-plan]').onclick=()=>{window.StudioProductionPlanning?.setContext({workspace:selection.workspace,assignee:selection.assignee,area:commercialQueueArea});return window.studioNavigate('schedule',{panel:'production'});};
+    StudioPage.query(genericView,'[data-completed]').onchange=e=>{commercialIncludeCompleted=e.target.checked;commercialQueueOffset=0;showCatalogProduction();};
+    StudioPage.query(genericView,'[data-area]').onchange=e=>{commercialQueueArea=e.target.value;commercialQueueOffset=0;showCatalogProduction();};
+    StudioPage.query(genericView,'[data-prev]').onclick=()=>{commercialQueueOffset=Math.max(0,commercialQueueOffset-50);showCatalogProduction();};
+    StudioPage.query(genericView,'[data-next]').onclick=()=>{commercialQueueOffset+=50;showCatalogProduction();};
+    StudioPage.query(genericView,'[data-graph-tasks]').onclick=()=>StudioJobGraph.production();
+    StudioPage.queryAll(genericView,'.production-job-thumbnail').forEach(image=>image.onerror=()=>image.remove());
+    StudioPage.queryAll(genericView,'[data-order-row]').forEach(row=>{const open=()=>openCommercialWorkOrder(rows.find(w=>w.id===row.dataset.orderRow));row.onclick=e=>{if(!e.target.closest('button,input,select,a'))open();};row.onkeydown=e=>{if(e.target===row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();open();}};});
+    StudioPage.queryAll(genericView,'[data-order]').forEach(b=>b.onclick=()=>openCommercialWorkOrder(rows.find(w=>w.id===b.dataset.order)));
+    StudioPage.queryAll(genericView,'[data-open-job]').forEach(b=>b.onclick=e=>{e.stopPropagation();openWorkspaceJob(b.dataset.openJob);});
     const count=document.getElementById('studioFooterRate');if(count)count.textContent=filteredOrders.length+' matching work orders';
 }
 async function openCommercialWorkOrder(order){
@@ -222,6 +222,7 @@ async function openCommercialWorkOrder(order){
     });
     d.querySelector('[data-resolve]')?.addEventListener('click',async()=>{try{await json(`/api/production/work-orders/${order.id}/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:d.querySelector('[data-note]').value})});d.close();await showCatalogProduction();}catch(err){error(err);}});
 }
+
 
 
 

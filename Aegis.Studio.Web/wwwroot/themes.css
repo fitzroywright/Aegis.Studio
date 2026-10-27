@@ -15,7 +15,7 @@ body[data-theme="fluent-dark"] {
   --studio-rail-title:#eaf3fa;
   background:var(--theme-bg);color:var(--theme-text);color-scheme:dark;
 }
-body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.shell,.st-page,.st-board,.st-right,.mw-today-right,.mw-today-main) { color:var(--theme-text); }
+body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.shell,.st-page,.st-board,.mw-today-main) { color:var(--theme-text); }
 body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.mw-list-panel,.studio-context-card,.st-card,.op-card,.workspace-wow-list-card,.workspace-wow-side-card,.mw-card,.job-row,.job-section,.conversation-card,.detail-pane,.list-pane,.studio-dialog,dialog) { background:var(--theme-surface);color:var(--theme-text);border-color:var(--theme-border); }
 body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.mw-list-panel,.studio-context-card,.st-card,.op-card,.mw-card) > header { background:var(--theme-surface-2);border-bottom-color:var(--theme-border);color:var(--theme-text); }
 body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.mw-list-panel,.studio-context-card,.st-card,.op-card,.mw-card) > header h2 { color:var(--theme-text); }

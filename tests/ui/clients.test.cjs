@@ -27,7 +27,7 @@ function setup(){
  throw Error('Unexpected URL '+url);};
  w.requestAnimationFrame=fn=>w.setTimeout(fn,0);
  w.eval(fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/studio-message-card.js'),'utf8'));
- w.eval(code);return{dom,w,fixture};
+require('./studio-page-fixture.cjs')(w); w.eval(code);return{dom,w,fixture};
 }
 function tab(w,key){w.document.querySelector('[data-c-tab="'+key+'"]').click();}
 test('client jobs join by stored identity and directory search works',async t=>{const {dom,w,fixture}=setup();t.after(()=>dom.window.close());await w.StudioClients.render({clientId:'a'});assert.match(w.document.querySelector('[data-c-content]').textContent,/Graduation/);assert.doesNotMatch(w.document.querySelector('[data-c-content]').textContent,/Other client job|Unlinked snapshot/);w.document.querySelector('[data-c-job]').click();assert.deepEqual(fixture.opened,['j1']);const search=w.document.querySelector('[data-c-search]');search.value='other@example';search.dispatchEvent(new w.Event('input'));assert.equal(w.document.querySelectorAll('[data-c-id]').length,1);assert.equal(w.document.querySelector('[data-c-id]').dataset.cId,'b');});
@@ -72,3 +72,4 @@ test('Client Reminders tab passes only jobs associated with the selected client'
  assert.deepEqual(Array.from(loaded,j=>j.id),['j1']);assert.match(w.genericView.textContent,/Client reminders/);
  }finally{w.close();}
 });
+

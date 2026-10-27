@@ -1,5 +1,5 @@
 
-body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.shell,.st-page,.st-board,.st-right,.mw-today-right,.mw-today-main) { color:var(--theme-text); }
+body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.shell,.st-page,.st-board,.mw-today-main) { color:var(--theme-text); }
 
 
 body:is([data-theme="office-light"],[data-theme="fluent-dark"]) :is(.mw-list-panel,.studio-context-card,.st-card,.op-card,.workspace-wow-list-card,.workspace-wow-side-card,.mw-card,.job-row,.job-section,.conversation-card,.detail-pane,.list-pane,.studio-dialog,dialog) { background:var(--theme-surface);color:var(--theme-text);border-color:var(--theme-border); }

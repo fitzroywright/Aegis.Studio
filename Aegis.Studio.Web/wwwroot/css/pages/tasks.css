@@ -1,6 +1,6 @@
 .st-tasks-page{height:100%;min-height:0;overflow:hidden}
-.st-tasks-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;height:100%;min-height:0}
-.st-tasks-main,.st-tasks-rail{min-width:0;min-height:0}
+.st-tasks-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;height:100%;min-height:0}
+.st-tasks-main{min-width:0;min-height:0}
 .st-tasks-panel{height:100%;min-height:0;display:flex;flex-direction:column}
 .st-tasks-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px;border-bottom:1px solid var(--studio-border,#d9dde3)}
 .st-tasks-heading h1{margin:0;font-size:1.35rem;display:flex;align-items:center;gap:10px}
@@ -27,12 +27,12 @@
 .mw-task-due.is-overdue strong{color:#b42318}
 .st-task-count{padding:8px 14px;border-top:1px solid var(--studio-border,#d9dde3);font-size:.82rem;color:var(--studio-muted,#697582)}
 .st-task-empty{text-align:center;padding:28px!important;color:var(--studio-muted,#697582)}
-.st-tasks-rail{display:flex;flex-direction:column;gap:12px;overflow:auto}
-.st-tasks-rail>.mw-list-panel{flex:0 0 auto}
-.st-tasks-rail .mw-session-row{display:grid;width:100%;min-width:0;height:auto;min-height:46px;grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:8px;padding:6px 8px;text-align:left}
-.st-tasks-rail .mw-session-time{white-space:nowrap;font-size:.72rem;font-weight:400}
-.st-tasks-rail .mw-session-main{min-width:0;overflow:hidden}
-.st-tasks-rail .mw-session-main strong,.st-tasks-rail .mw-session-main span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+
+
+
+
+
 .st-task-attention .mw-status-row{display:flex;justify-content:space-between;padding:8px 12px}
 .st-task-messages footer{padding:8px 12px;border-top:1px solid var(--studio-border,#d9dde3)}
 .st-task-messages footer button{font-weight:650}
@@ -46,9 +46,9 @@
 .st-task-form input,.st-task-form select{min-height:38px;border:1px solid #cbd2d9;border-radius:6px;padding:7px 9px;font:inherit}
 .st-task-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .st-task-form [role=alert]{color:#b42318;margin:0;min-height:1.2em}
-@media(max-width:1100px){.st-tasks-grid{grid-template-columns:minmax(0,1fr) 280px;gap:10px}.st-task-table th,.st-task-table td{padding:8px}}
-@media(max-width:820px){.st-tasks-page{height:auto;overflow:visible}.st-tasks-grid{display:flex;flex-direction:column;height:auto}.st-tasks-panel{min-height:60vh}.st-tasks-rail{display:grid;grid-template-columns:1fr 1fr;overflow:visible}.st-task-messages{grid-column:1/-1}}
-@media(max-width:560px){.st-tasks-tools{align-items:stretch;flex-direction:column}.st-task-search{width:100%}.st-tasks-rail{display:flex}.st-task-table{min-width:760px}}
+@media(max-width:1100px){.st-tasks-grid{grid-template-columns:minmax(0,1fr);gap:10px}.st-task-table th,.st-task-table td{padding:8px}}
+@media(max-width:820px){.st-tasks-page{height:auto;overflow:visible}.st-tasks-grid{display:flex;flex-direction:column;height:auto}.st-tasks-panel{min-height:60vh}.st-task-messages{grid-column:1/-1}}
+@media(max-width:560px){.st-tasks-tools{align-items:stretch;flex-direction:column}.st-task-search{width:100%}.st-task-table{min-width:760px}}
 
 /* Tasks uses the same board, tabs, table header filters and context rail as Jobs. */
 .st-tasks-page{height:100%;min-height:0;overflow:hidden}
@@ -66,16 +66,16 @@
 .st-tasks-page .st-task-table td small{margin-top:3px;color:#707c89;font-size:11px}
 .st-tasks-page .st-task-row:hover,.st-tasks-page .st-task-row:focus-visible{background:var(--theme-surface-alt,#edf3f8);box-shadow:inset 3px 0 var(--theme-accent,#d97722)}
 .st-tasks-page .st-task-count{flex:0 0 auto}
-.st-tasks-rail .sj-card{flex:1 1 0}
-.st-tasks-rail .sj-card header{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.st-tasks-rail .sj-card header button{color:#98701c;font-weight:700;background:none;border:0;cursor:pointer}
-.st-tasks-rail .sj-card .mw-section-rows,.st-tasks-rail .sj-card .mw-status-list,.st-tasks-rail .sj-card .smc-feed{padding:8px 12px;overflow:auto;min-height:0;flex:1}
-.st-tasks-rail .mw-status-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;white-space:nowrap;min-height:28px;padding:3px 5px;gap:5px;border-bottom:1px solid #e8ebee}
-.st-tasks-rail .st-task-messages footer{padding:8px 12px;border-top:1px solid #e8ebee}
-@media(max-width:900px){.st-tasks-page.sj-page{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 170px}.st-tasks-page .st-task-table{min-width:900px}}
+
+
+
+
+
+
+@media(max-width:900px){.st-tasks-page.sj-page{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}.st-tasks-page .st-task-table{min-width:900px}}
 
 /* Keep the Tasks board inside the same available width as the Jobs board. */
-.st-tasks-page.sj-page{width:100%;box-sizing:border-box;grid-template-columns:minmax(0,1fr) 270px}
+.st-tasks-page.sj-page{width:100%;box-sizing:border-box;grid-template-columns:minmax(0,1fr)}
 .st-tasks-page .sj-summary .sj-view-tabs button{background:#fff;color:#596676}
 .st-tasks-page .sj-summary .sj-view-tabs button.active{background:#986c55;border-color:#986c55;color:#fff}
 .st-tasks-page .sj-table thead th{background:var(--studio-grid-header-bg,#536d86);color:var(--studio-grid-header-text,#fff)}
@@ -105,25 +105,3 @@
 .st-tasks-page .sj-job-header input[data-task-search],.st-tasks-page .sj-job-header input[data-task-job-search]{min-height:24px;padding-top:0;padding-bottom:0;min-width:0}
 .st-tasks-page .sj-table thead th{white-space:nowrap}
 .st-tasks-page .sj-job-header,.st-tasks-page .sj-column-filter-inline{gap:5px}
-
-/* Tasks right rail uses compact attention and message cards. */
-.st-tasks-rail{gap:7px}
-.st-tasks-rail>.mw-list-panel,.st-tasks-rail>.smc-card{box-sizing:border-box;display:flex;flex:1 1 0;flex-direction:column;min-height:0;overflow:hidden;border-radius:7px}
-.st-tasks-rail>.mw-list-panel>header{box-sizing:border-box;display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:6px;height:auto;min-height:30px;padding:3px 8px}
-.st-tasks-rail>.mw-list-panel>header h2{display:flex;align-items:center;gap:6px;margin:0;font-size:.81rem;font-weight:600;line-height:1.2}
-.st-tasks-rail>.mw-list-panel>header button{border:0;background:transparent;box-shadow:none;padding:3px 0;color:#244b71;font-size:.75rem;font-weight:750;text-decoration:none}
-.st-tasks-rail>.mw-list-panel>header button:hover{text-decoration:underline;transform:none}
-.st-tasks-rail>.mw-list-panel>:not(header){flex:1 1 auto;min-height:0;overflow-y:auto}
-.st-tasks-rail>.mw-list-panel[data-mw-region="attention"]{border-color:#e6c29c;background:#fffaf4}
-.st-tasks-rail>.mw-list-panel[data-mw-region="attention"]>header{background:#fff0de;border-bottom-color:#f0d4b4}
-.st-tasks-rail>.mw-list-panel[data-mw-region="attention"]>header h2{color:#945b23}
-.st-tasks-rail>.mw-list-panel[data-mw-region="attention"] .studio-card-icon{background:#f9e3c8;color:#955923}
-.st-tasks-rail .mw-section-rows{padding-top:1px;padding-bottom:1px}
-.st-tasks-rail .mw-status-list{padding:2px 5px}
-
-.st-tasks-rail .mw-status-row>strong{margin-left:auto;flex:0 0 auto}
-.st-tasks-rail .studio-attention-label{display:flex;align-items:center;gap:5px}
-.st-tasks-rail .studio-attention-label>span{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;background:#fce0df;color:#ad3535}
-.st-tasks-rail .mw-status-row:nth-child(2) .studio-attention-label>span{background:#fff0cf;color:#9a651c}
-.st-tasks-rail .mw-status-row:nth-child(3) .studio-attention-label>span{background:#e0eee7;color:#38775e}
-

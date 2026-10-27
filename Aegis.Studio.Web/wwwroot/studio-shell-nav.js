@@ -13,6 +13,7 @@
     ];
     let currentView = document.body.dataset.studioView || 'today';
     const shellOverviews = new Map();
+    const shellContexts = new Map();
     const overviewKey = () => document.body.dataset.studioView === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page') ? 'job-detail' : (document.body.dataset.studioView || 'today');
     const defaultOverview = () => `<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><p>${escText(labelFor(document.body.dataset.studioView || 'today'))}</p><p>Use this page to ${escText((pageTaglines[document.body.dataset.studioView || 'today'] || 'manage Studio work').replace(/\.$/, '').toLowerCase())}.</p></section>`;
     let renderingTools = false;
@@ -205,8 +206,15 @@
         const financialActions=document.body.dataset.studioView==='frontdesk'?[['TakePayment','Take Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['NewSale','New Sale']].map(([action,label])=>'<button type="button" data-studio-financial-action="'+action+'"><span>$</span><span>'+label+'</span></button>').join(''):'';
         const pipelineScheduleAction=document.body.dataset.studioView==='schedule'&&window.history.state?.studioSchedulePanel==='pipeline'?'<button type="button" data-studio-schedule-item><span>▦</span><span>Schedule item</span></button>':'';
         ensureNavigationToolstrip();
+        let overview = shellOverviews.get(overviewKey());
+        if (!overview) {
+            const template = document.createElement('template');
+            template.innerHTML = defaultOverview();
+            overview = template.content.firstElementChild;
+            shellOverviews.set(overviewKey(), overview);
+        }
+        const context = shellContexts.get(overviewKey()) || [];
         rail.innerHTML = `
-            ${shellOverviews.get(overviewKey()) || defaultOverview()}
             <section class="mw-list-panel studio-context-card" data-rail-card="actions">
                 <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
                 <div class="mw-today-rail-links">
@@ -215,6 +223,8 @@
             </section>
 
 `;
+        rail.prepend(overview);
+        rail.append(...context);
         if(document.body.dataset.studioView === 'frontdesk') window.studioBindFrontDeskOverview?.();
         renderFooterWorkspaceMenu(workspaces);
         if(document.body.dataset.studioView==='schedule')window.StudioScheduleWorkspaceCard?.bindRail(rail);
@@ -282,7 +292,7 @@
         try { return JSON.parse(localStorage.getItem(railStorage) || '{}'); } catch { return {}; }
     }
     function setRailState(side, collapsed) {
-        const state = railState(); state[side] = collapsed;
+        const state = railState(); state.left = collapsed; delete state.right;
         try { localStorage.setItem(railStorage, JSON.stringify(state)); } catch {}
         applyRailState();
     }
@@ -294,9 +304,7 @@
         button.setAttribute('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + side + ' rail');
         button.title = button.getAttribute('aria-label');
         button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>';
-        button.dataset.chevronDirection = side === 'left'
-            ? (collapsed ? 'right' : 'left')
-            : (collapsed ? 'left' : 'right');
+        button.dataset.chevronDirection = collapsed ? 'right' : 'left';
         button.onclick = () => setRailState(side, !railState()[side]);
         return button;
     }
@@ -307,10 +315,6 @@
         if (toggle.parentElement !== shell) shell.append(toggle);
         return toggle;
     }
-    function syncRightRailLayout(rail, collapsed) {
-        rail.classList.toggle('studio-rail-collapsed-right', collapsed);
-    }
-
     function applyRailState() {
         const state = railState();
         const leftTargets = [document.getElementById('studioContextRail'), document.querySelector('.mw-today-left')].filter(Boolean);
@@ -323,33 +327,15 @@
             toggle.title = toggle.getAttribute('aria-label');
             toggle.dataset.chevronDirection = state.left ? 'right' : 'left';
         });
-        const rightTargets = document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail, .job-detail-right, .studio-media-detail');
-        rightTargets.forEach(rail => {
-            rail.classList.toggle('studio-rail-collapsed-right', !!state.right);
-            syncRightRailLayout(rail, !!state.right);
-            rail.dataset.shellRailReadyRight = 'true';
-            const toggle = placeRailToggle(rail, 'right', !!state.right);
-            toggle.setAttribute('aria-expanded', String(!state.right));
-            toggle.setAttribute('aria-label', (state.right ? 'Expand' : 'Collapse') + ' right rail');
-            toggle.title = toggle.getAttribute('aria-label');
-            toggle.dataset.chevronDirection = state.right ? 'left' : 'right';
-        });
     }
 
     const railObserver = new MutationObserver(() => {
         const leftSelector = '#studioContextRail, .mw-today-left';
-        const rightSelector = '.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail, .job-detail-right, .studio-media-detail';
         const missingLeft = Array.from(document.querySelectorAll(leftSelector))
             .some(rail => rail.dataset.shellRailReadyLeft !== 'true');
-        const missingRight = Array.from(document.querySelectorAll(rightSelector))
-            .some(rail => rail.dataset.shellRailReadyRight !== 'true');
-        if (missingLeft || missingRight) applyRailState();
+        if (missingLeft) applyRailState();
     });
     railObserver.observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('resize', () => {
-        if (railState().right) document.querySelectorAll('.mw-today-right, .mw-list-right, .st-right, .sj-right, .fd-secondary, .workspace-right-rail, .job-detail-right, .studio-media-detail').forEach(rail => syncRightRailLayout(rail, true));
-    });
-
     function ensureBreadcrumb() {
         if (!breadcrumb || breadcrumb.children.length) return;
         window.studioSetBreadcrumb?.([{ label: labelFor(currentView), view: currentView }]);
@@ -383,6 +369,17 @@
 
     // Production supplies its workspace filter data to the shared Workspaces card.
     // Other views continue to use the permission-scoped workspace cache.
+    window.studioShellMountContext = (nodes, view = overviewKey()) => {
+        const cards = Array.from(nodes || []);
+        for (const card of cards) {
+            card.classList.add('studio-context-card');
+            if (card.querySelector('header h2')?.textContent.includes('Needs Attention')) card.classList.add('st-attention');
+            card.dataset.railCard = 'context';
+        }
+        shellContexts.set(view, cards);
+        if (view === overviewKey()) renderLeftRail();
+    };
+
     window.StudioShell={
         setProductionWorkspaceFilter(workspaces, selected, onSelect) {
             productionWorkspaceFilter = { workspaces: Array.isArray(workspaces) ? workspaces : [], selected: selected || '', onSelect };
@@ -688,7 +685,12 @@
         });
         // One shell contract for Overview on every route.
         window.studioShellSetOverview = (markup, view = document.body.dataset.studioView) => {
-            shellOverviews.set(view, markup || defaultOverview());
+            const template = document.createElement('template');
+            if (!markup || typeof markup === 'string') template.innerHTML = markup || defaultOverview();
+            const overview = markup?.nodeType === 1 ? markup : template.content.firstElementChild;
+            overview.classList.add('studio-context-card');
+            overview.dataset.railCard = 'overview';
+            shellOverviews.set(view, overview);
             if (view === overviewKey()) renderLeftRail();
         };
         window.addEventListener('studio-shell-overview', event => {

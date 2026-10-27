@@ -13,7 +13,7 @@
 #conversationView.has-open-job > .list-pane,
 #conversationView.has-open-job > .workspace-tabs,
 #conversationView.has-open-job > .workspace-announcement-banners { display:none; }
-#conversationView > .job-detail-page { display:grid; grid-template-columns:minmax(0,1fr) clamp(245px,20vw,300px); grid-template-rows:auto minmax(0,1fr); flex:1; min-width:0; min-height:0; padding:0; gap:8px; overflow:hidden; color:var(--theme-text,#162b50); background:var(--theme-surface,#faf9f6); }
+#conversationView > .job-detail-page { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); flex:1; min-width:0; min-height:0; padding:0; gap:8px; overflow:hidden; color:var(--theme-text,#162b50); background:var(--theme-surface,#faf9f6); }
 .job-detail-page [hidden] { display:none; }
 .job-detail-heading { grid-column:1; max-height:min(38vh,320px); min-height:0; overflow:visible; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:0 12px; padding:11px 14px 8px; border:1px solid var(--theme-border,#dedbd4); border-radius:7px; background:var(--theme-surface,#fff); position:relative; isolation:isolate; z-index:5; }
 .job-detail-title { grid-column:1; grid-row:1; display:flex; align-items:flex-start; justify-content:flex-start; gap:clamp(8px,1.2vw,18px); width:100%; min-width:0; overflow:visible; }
@@ -121,7 +121,7 @@
 .jd-drag-over { outline:2px dashed #ed700d; outline-offset:-4px; }
 .jd-empty { font-size:12px; padding:10px; grid-column:1/-1; color:var(--theme-muted,#7d8591); }
 .jd-preview-fallback { display:grid; place-items:center; width:100%; height:100%; text-align:center; font-size:10px; color:var(--theme-muted,#7d8591); }
-.job-detail-right { grid-column:2; grid-row:1/3;   gap:8px; min-height:0; min-width:0; overflow:hidden; display:flex;flex-direction:column;}
+
 .job-detail-selected-file { flex:0 0 auto; min-height:min-content; border:2px solid #45698f; }
 .job-detail-selected-file > .jd-card-heading { padding:4px 8px; border-bottom:1px solid #45698f; background:#24476c; }
 .job-detail-selected-file > .jd-card-heading h2 { min-width:0; font-size:11px; color:#fff; font-weight:750; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -160,9 +160,5 @@
 .job-detail-workflow-dialog { width:min(1000px,95vw); max-height:85vh; overflow:auto; }
 .job-detail-workflow-dialog .workflow-panel { margin:0; overflow:visible; }
 @media(max-width:1200px) { .jd-drop-hint { display:none; } .jd-contact-sheet { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-@media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr) 230px; } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } }
-@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) minmax(180px,35%); } .job-detail-right { grid-column:1; grid-row:3;  display:flex;flex-direction:column;} .job-detail-selected-file { display:none; } .job-detail-heading { padding:7px; gap:0 5px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
-
-
-
-
+@media(max-width:900px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); } .jd-contact-sheet { grid-template-columns:repeat(2,minmax(0,1fr)); } .job-detail-title h1 { font-size:16px; } .jd-gallery-toolbar { gap:4px; } .jd-gallery-toolbar h2 { font-size:12px; } }
+@media(max-width:650px) { #conversationView > .job-detail-page { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }  .job-detail-selected-file { display:none; } .job-detail-heading { padding:7px; gap:0 5px; } .jd-workflow-caption { font-size:9px; } .jd-gallery-toolbar select { max-width:110px; } .jd-contact-sheet { padding:6px; gap:6px; } }
