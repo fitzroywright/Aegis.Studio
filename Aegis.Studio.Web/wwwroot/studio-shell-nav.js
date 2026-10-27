@@ -405,8 +405,6 @@
     function syncPageFrame() {
         const view = document.body.dataset.studioView || currentView;
         const isToday = view === 'today';
-        const jobTools = document.getElementById('studioFooterJobTools');
-        if (jobTools) jobTools.hidden = !(view === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page'));
 
         const main = shell?.querySelector('main');
         const masthead = document.querySelector('.topbar');
@@ -644,7 +642,9 @@
         window.addEventListener('studio-workspaces-loaded',renderLeftRail);
         document.querySelector('[data-studio-avatar-activity]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
-            window.studioNavigate?.('notifications');
+            if (document.body.dataset.studioView==='workspaces' && document.querySelector('#conversationView:not(.hidden).has-open-job .job-detail-page')) {
+                window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:'activity'}}));
+            } else window.studioNavigate?.('notifications');
         });
         document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');

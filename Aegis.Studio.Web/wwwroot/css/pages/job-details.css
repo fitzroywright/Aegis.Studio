@@ -70,8 +70,6 @@
 .jd-link { border:0; background:transparent; color:#9c631c; padding:3px; font-size:11px; font-weight:750; cursor:pointer; }
 .jd-tasks-dialog { width:min(900px,92vw); max-height:85vh; overflow:auto; }
 .jd-tasks-dialog .job-tasks-content { padding:4px; }
-.jd-footer-link { padding:2px 8px; border:0; background:transparent; color:#ffe0a6; font:inherit; font-weight:750; text-decoration:underline; cursor:pointer; }
-.jd-footer-link:focus-visible { outline:2px solid #ffe0a6; outline-offset:2px; }
 .jd-footer-drawer { position:fixed; z-index:80; left:12px; right:12px; bottom:var(--jd-drawer-bottom,32px); height:min(340px,50vh); display:flex; flex-direction:column; border:1px solid var(--theme-border,#dedbd4); border-radius:8px 8px 0 0; background:var(--theme-surface,#fff); color:var(--theme-text,#162b50); box-shadow:0 -8px 28px #0002; overflow:hidden; transform:translateY(calc(100% + var(--jd-drawer-bottom,32px))); opacity:0; visibility:hidden; transition:transform .24s ease,opacity .24s ease,visibility 0s .24s; }
 .jd-footer-drawer.is-open { transform:translateY(0); opacity:1; visibility:visible; transition:transform .24s ease,opacity .24s ease,visibility 0s; }
 .jd-footer-drawer > .jd-footer-drawer-content { flex:1; min-height:0; overflow:auto; padding:10px 14px; }
