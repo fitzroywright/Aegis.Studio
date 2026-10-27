@@ -20,26 +20,34 @@
             const host = document.createElement('section');
             host.id = 'studioLoginAnnouncements';host.className = 'workspace-announcement-banners';
             host.setAttribute('aria-label','Announcements — scroll horizontally for more');host.tabIndex = 0;
+            const updatePositions=()=>{[...host.children].forEach((article,index)=>{article.querySelector('.workspace-announcement-position').textContent=(index+1)+' of '+host.children.length+(host.children.length>1?' · Scroll for more':'');});};
             for (const item of items) {
                 const article=document.createElement('article');article.className='workspace-announcement';
-                const copy=document.createElement('div'),title=document.createElement('strong'),body=document.createElement('p'),error=document.createElement('small');
+                article.setAttribute('aria-label',item.title);
+                const symbol=document.createElement('div');symbol.className='workspace-announcement-symbol';symbol.setAttribute('aria-hidden','true');
+                symbol.innerHTML='<svg viewBox="0 0 64 64" fill="none" focusable="false"><path d="m19 36 6 18h9l-7-18" fill="#efbd42"/><path d="M11 26h13l24-13v36L24 37H11z" fill="#fff8df" stroke="#efbd42" stroke-width="3" stroke-linejoin="round"/><path d="M10 28H6v7h4M24 26v11M48 13v36" stroke="#efbd42" stroke-width="3" stroke-linecap="round"/><path d="m54 17 5-4m-4 15h7m-8 12 5 4" stroke="#efbd42" stroke-width="3" stroke-linecap="round"/></svg>';
+                const copy=document.createElement('div');copy.className='workspace-announcement-copy';
+                const kicker=document.createElement('span');kicker.className='workspace-announcement-kicker';kicker.textContent='Staff announcement';
+                const title=document.createElement('h2'),body=document.createElement('p'),error=document.createElement('small');
                 title.textContent=item.title;body.textContent=item.body;error.className='dismiss-error';error.setAttribute('role','alert');
-                const context=document.createElement('small');context.textContent=item.workspaceName;
-                copy.append(title,body,context,error);
+                const context=document.createElement('small');context.className='workspace-announcement-context';context.textContent=item.workspaceName;
+                copy.append(kicker,title,body,context,error);
+                const controls=document.createElement('div');controls.className='workspace-announcement-controls';
+                const position=document.createElement('small');position.className='workspace-announcement-position';
                 const button=document.createElement('button');button.type='button';button.className='action';button.textContent='Dismiss';button.setAttribute('aria-label','Dismiss announcement: '+item.title);
                 button.onclick=async()=>{
                     button.disabled=true;error.textContent='';
                     try {
                         await json('/api/workspaces/'+encodeURIComponent(item.workspaceId)+'/announcements/'+encodeURIComponent(item.id)+'/dismiss',{method:'POST'});
                         const next=article.nextElementSibling||article.previousElementSibling;
-                        article.remove();
+                        article.remove();updatePositions();
                         if (!host.children.length) host.remove();
                         else next?.querySelector('button')?.focus();
                     } catch {error.textContent='Could not dismiss. Please try again.';button.disabled=false;}
                 };
-                article.append(copy,button);host.append(article);
+                controls.append(position,button);article.append(symbol,copy,controls);host.append(article);
             }
-            main.prepend(host);
+            updatePositions();main.prepend(host);
         } catch(error) { console.error('Announcements could not be loaded.', error); }
     }
     async function attachComposer(toolbar,current) {
