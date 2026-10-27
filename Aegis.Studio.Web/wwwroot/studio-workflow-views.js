@@ -10,7 +10,7 @@ window.StudioWorkflowViews=(()=>{
   if(view==='frontdesk')return [['booking','New Booking'],['inquiry','New Inquiry'],['quote','Create Quote'],['calendar','View Calendar'],['delivery','Delivery']];
   if(view==='session-plan')return [];
   if(view==='delivery')return [['notice','Send Pickup Notice'],['payment','Record Payment'],['statement','View Statement'],['export','Export Report']];
-  if(view==='production')return [['work-order','Open Work Order'],['assign-work','Assign Work']];
+  if(view==='production')return [];
   return null;
  }
  function bind(host=document){host.querySelectorAll('[data-workflow-action]').forEach(b=>{if(document.body.dataset.studioView==='session-plan'&&session){const key=b.dataset.workflowAction;b.disabled=session.busy||(['import','add-subject'].includes(key)&&!session.roster.canEdit)||(['assign-session','remainder'].includes(key)&&!session.roster.canSchedule);}b.onclick=()=>run(b.dataset.workflowAction,b).catch(e=>alert(e.message));});}
@@ -32,13 +32,6 @@ window.StudioWorkflowViews=(()=>{
    if(key==='assign-session')return openPlanAssignments();
    if(key==='remainder')return openPlanAssignments(true);
    if(key==='import'){if(!session.roster.canEdit)throw Error('You do not have permission to import subjects.');session.step=1;session.conflictId=null;session.page=1;paintSession();return;}
-  }
-  if(view==='production'&&(key==='work-order'||key==='assign-work')){
-   const cards=[...document.querySelectorAll('[data-order]')];
-   if(!cards.length)throw Error('No work orders match the current filters.');
-   if(cards.length===1)return cards[0].click();
-   const d=studioDialog(key==='assign-work'?'Assign Work':'Open Work Order',cards.map((c,i)=>`<button type="button" class="action" data-pick-order="${i}">${esc(c.closest('article').textContent)}</button>`).join(''));
-   d.querySelectorAll('[data-pick-order]').forEach(b=>b.onclick=()=>{d.close();cards[Number(b.dataset.pickOrder)].click();});return;
   }
   if(view==='delivery'&&delivery){
    if(key==='export')return download('delivery-report.csv','Job,Client,Delivery,Payments,Balance\n'+delivery.rows.map(r=>[r.job.title,r.job.clientName,r.job.status,r.payment,r.balance??'Unavailable'].map(csvCell).join(',')).join('\n'));

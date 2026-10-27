@@ -72,18 +72,18 @@ test('Front Desk tabs retain request review, safe confirmation and deposits',asy
  w.eval('showFrontDesk=async()=>{};');w.genericView.querySelector('[data-fd-confirm]').click();await settle();
  const command=calls.find(c=>c.url.endsWith('/workflow-graph/actions'));assert.equal(JSON.parse(command.options.body).expectedRevision,12);
 });
-test('production keeps the four approved lanes and opens existing work-order editors',async t=>{
- const {w}=setup(t,'production');
+test('Production lists jobs by stage and opens Job Details',async t=>{
+ const {w,navigation}=setup(t,'production');
  w.eval(read('workflow-graph.js'));w.eval(read('workload-overview.js'));w.eval(read('commercial.js'));
  const data={jobs:[{id:'j',title:'Campion',status:'Active Production'}],activities:[{id:'a',jobId:'j',workOrderId:'o',title:'Retouch portraits',activityType:'Retouch',status:'InProgress',assignedTo:'Tamara'}],orders:[{id:'o',jobId:'j',activityIds:['a']}],eligibility:[{activityId:'a',status:'InProgress'}]};
  const order={id:'o',jobId:'j',jobTitle:'Campion',product:'Portraits',quantity:1,tasks:[{id:'a',status:'InProgress',title:'Retouch portraits',assignedTo:'Tamara',step:{activityType:'Retouch'}}]};
  w.loadWorkspaces=async()=>[];w.json=async url=>url==='/api/production/workload'?data:url.startsWith('/api/production/work-orders?')?[order]:[];
  w.eval('openCommercialWorkOrder=async order=>{window.openedOrder=order;};');
  await w.showCatalogProduction();
- assert.deepEqual([...w.genericView.querySelectorAll('[data-production-lane] h2')].map(e=>e.textContent),['Ready to Start','In Production','Quality Control','Rework']);
- assert.ok(w.genericView.querySelector('[data-production-lane="progress"] [data-order-row="o"]'));
+ assert.deepEqual([...w.genericView.querySelectorAll('[data-production-lane] h2')].map(e=>e.textContent),['Ready to Start','In Production','Quality Control','Rework','Complete']);
+ assert.ok(w.genericView.querySelector('[data-production-lane="progress"] [data-production-job="j"]'));
  assert.ok(w.genericView.querySelector('[data-production-due]'));
- w.genericView.querySelector('[data-order]').click();assert.equal(w.openedOrder.id,'o');
+ w.genericView.querySelector('[data-production-job="j"]').click();await settle();assert.equal(navigation.at(-1).options.jobId,'j');
  assert.equal(w.document.querySelector('#studioContextRail .st-attention'),null);
 });
 
