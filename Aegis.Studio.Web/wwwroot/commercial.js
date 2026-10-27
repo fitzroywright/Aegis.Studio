@@ -71,6 +71,9 @@ async function showCatalogProduction({preserveFilters=false}={}){
     catch(error){if(current()){genericView.innerHTML='<p role="alert">Production could not load: '+esc(error.message)+'</p><button class="action" data-production-retry>Retry</button>';genericView.querySelector('button').onclick=()=>showCatalogProduction({preserveFilters:true});}return;}
     if(!current())return;
     const laneLimits=new Map();
+    const jobPhotos=new Map();
+    const imagePlaceholder=()=>'<span class="production-image-placeholder"><span aria-hidden="true">▧</span>No image ready yet</span>';
+    const paintPhotos=()=>{if(!current())return;genericView.querySelectorAll('[data-production-photo]').forEach(slot=>{const version=jobPhotos.get(slot.dataset.productionPhoto);if(!version)return;const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';image.src='/api/jobs/'+encodeURIComponent(slot.dataset.productionPhoto)+'/versions/by-id/'+encodeURIComponent(version)+'/preview?size=thumbnail';image.onerror=()=>{jobPhotos.delete(slot.dataset.productionPhoto);slot.innerHTML=imagePlaceholder();};slot.replaceChildren(image);});};
     const workload=StudioWorkload.model(workloadData,workloadData.jobs||[]);
     const tasksByJob=new Map(),ordersByJob=new Map();
     for(const task of workload.activities){if(!tasksByJob.has(task.jobId))tasksByJob.set(task.jobId,[]);tasksByJob.get(task.jobId).push(task);}
@@ -103,11 +106,11 @@ async function showCatalogProduction({preserveFilters=false}={}){
         const finished=a=>['Completed','Cancelled','Archived','Skipped'].includes(a.status);
         const task=tasks.find(a=>!finished(a)&&['InProgress','Partial'].includes(a.status))||tasks.find(a=>!finished(a)&&!workload.waiting(a))||tasks.find(a=>!finished(a));
         const next=task?.title||task?.activityType||'No next task recorded';
-        return '<tr tabindex="0" data-production-job="'+esc(job.id)+'"><td><strong>'+esc(job.title||'Untitled job')+'</strong><small>'+esc(job.clientName||'')+'</small><span class="production-job-stage">'+esc(job.status||'Stage not recorded')+'</span></td><td>'+esc(next)+'<small>'+esc(task?.assignedTo?studioFirstName(task.assignedTo):'Unassigned')+' · '+esc(dueLabel(task))+'</small></td></tr>';
+        return '<article class="production-job-card" tabindex="0" data-production-job="'+esc(job.id)+'"><div class="production-job-image" data-production-photo="'+esc(job.id)+'">'+imagePlaceholder()+'</div><div class="production-job-card-body"><h3>'+esc(job.title||'Untitled job')+'</h3><small>'+esc(job.clientName||'')+'</small><p>'+esc(next)+'</p><span class="production-job-stage">'+esc(job.status||'Stage not recorded')+'</span><small>'+esc(task?.assignedTo?studioFirstName(task.assignedTo):'Unassigned')+' · '+esc(dueLabel(task))+'</small></div></article>';
     };
     const lanes=laneNames.map(([key,label])=>{
         const all=jobsByLane.get(key),limit=laneLimits.get(key)||20;
-        return '<section class="production-lane production-lane-'+key+'" data-production-lane="'+key+'" aria-label="'+esc(label)+'"><header><h2>'+esc(label)+'</h2><span>'+all.length+'</span></header><div class="production-lane-list">'+'<table class="production-job-table"><thead><tr><th>Job / Client</th><th>Next Step</th></tr></thead><tbody>'+(all.slice(0,limit).map(jobRow).join('')||'<tr><td colspan="2">No jobs in this stage</td></tr>')+'</tbody></table>'+(all.length>limit?'<button type="button" class="action" data-production-more="'+key+'">Show more · '+(all.length-limit)+' remaining</button>':'')+'</div></section>';
+        return '<section class="production-lane production-lane-'+key+'" data-production-lane="'+key+'" aria-label="'+esc(label)+'"><header><h2>'+esc(label)+'</h2><span>'+all.length+'</span></header><div class="production-lane-list">'+(all.slice(0,limit).map(jobRow).join('')||'<p class="production-lane-empty">No jobs in this stage</p>')+(all.length>limit?'<button type="button" class="action" data-production-more="'+key+'">Show more · '+(all.length-limit)+' remaining</button>':'')+'</div></section>';
     }).join('');
     const totalItems=jobs.length,shownItems=laneNames.reduce((sum,[key])=>sum+Math.min(laneLimits.get(key)||20,jobsByLane.get(key).length),0);
     const summary=laneNames.map(([key,label])=>'<div class="workspace-summary-row"><span>'+esc(label)+'</span><strong>'+jobsByLane.get(key).length+'</strong></div>').join('');
@@ -140,9 +143,11 @@ async function showCatalogProduction({preserveFilters=false}={}){
     StudioPage.query(genericView,'[data-graph-tasks]').onclick=()=>StudioJobGraph.production();
     const openJob=id=>window.studioNavigate('workspaces',{jobId:id});
     StudioPage.queryAll(genericView,'[data-production-job]').forEach(card=>{card.onclick=e=>{if(!e.target.closest('button,input,select,a,details'))openJob(card.dataset.productionJob);};card.onkeydown=e=>{if(e.target===card&&['Enter',' '].includes(e.key)){e.preventDefault();openJob(card.dataset.productionJob);}};});
+    paintPhotos();
     const count=document.getElementById('studioFooterRate');if(count)count.textContent=totalItems+' jobs';
     }
     paint();
+    void json('/api/production/media-summary').then(rows=>{if(!current())return;for(const row of rows){if(!jobPhotos.has(row.jobId)&&row.thumbnailVersionIds?.length)jobPhotos.set(row.jobId,row.thumbnailVersionIds[Math.floor(Math.random()*row.thumbnailVersionIds.length)]);}paintPhotos();}).catch(()=>{});
 
 }
 async function openCommercialWorkOrder(order){

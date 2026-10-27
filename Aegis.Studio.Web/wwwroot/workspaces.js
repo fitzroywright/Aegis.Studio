@@ -1,13 +1,8 @@
+function workspaceAdminPanel(id){let panel=document.getElementById(id);if(!panel){panel=document.createElement('section');panel.id=id;panel.className='job-section';(document.querySelector('.workspace-admin-details')||genericView).append(panel);}return panel;}
 let workspaceAccessCache = [];
 let studioRolesCache = [];
 
-async function showWorkspaces(){return window.studioNavigate('admin');}
-
-function renderWorkspaceAdminRow(workspace, permissions, isAdministrator) {
-    const canEdit = isAdministrator || permissions.editWorkspace || permissions.adminWorkspace;
-    const canMembers = isAdministrator || permissions.manageMembers || permissions.adminWorkspace;
-    return `<div class="job-row"><div><b>${esc(workspace.name)}</b><div class="meta">${esc(workspace.emailAddress || 'No email')} · ${workspace.isEnabled ? 'Enabled' : 'Disabled'}</div><div class="meta" data-workspace-managers="${workspace.id}">Manager: loading…</div></div><div>${canMembers ? `<button class="action" onclick="manageWorkspaceMembers('${workspace.id}','${esc(workspace.name)}')">Members & permissions</button>` : ''}${canEdit ? `<button class="action" onclick="showMailboxImport('${workspace.id}','${esc(workspace.name)}')">Import old email</button><button class="action" onclick="editWorkspace('${workspace.id}')">Edit</button>` : ''}</div></div>`;
-}
+async function showWorkspaces(){return window.studioNavigate('workspace-management');}
 
 async function createWorkspace() {
     const name = document.getElementById('workspaceName').value.trim();
@@ -64,7 +59,7 @@ function permissionsForPreset(preset) {
 }
 
 async function manageWorkspaceMembers(workspaceId, workspaceName) {
-    const panel = document.getElementById('workspaceMemberPanel');
+    const panel = workspaceAdminPanel('workspaceMemberPanel');
     const members = await json(`/api/workspaces/${workspaceId}/members`);
     const roleOptions = studioRolesCache.filter(x => x.scope === 'Workspace' && x.isActive).map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
     panel.classList.remove('hidden');
@@ -119,7 +114,7 @@ async function notifyWorkspaceMember(workspaceId,userName,displayName) {
 }
 
 function showMailboxImport(workspaceId, workspaceName) {
-    const panel = document.getElementById('workspaceImportPanel'); panel.classList.remove('hidden');
+    const panel = workspaceAdminPanel('workspaceImportPanel');
     panel.innerHTML = `<h2>${esc(workspaceName)} — Import historical mailbox</h2><p class="muted">Imports messages and attachments directly into this workspace. Gmail, Yahoo and Hotmail/Outlook normally require an app password or provider token rather than the user's normal password.</p><div class="pos-entry"><label>Provider<select id="importProvider"><option>Gmail</option><option>Hotmail</option><option>Yahoo</option></select></label><label>Mailbox address<input id="importUser" type="email"></label><label>App password / token<input id="importSecret" type="password"></label><label>Folder<input id="importFolder" value="INBOX"></label><label>From date<input id="importFrom" type="date"></label><label>Maximum messages<input id="importMax" type="number" value="5000" min="1" max="50000"></label><button class="primary" onclick="runMailboxImport('${workspaceId}')">Import mailbox</button></div><div id="importResult" class="meta"></div>`;
     panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -175,8 +170,8 @@ async function saveStudioEmployee(){
     await refreshStudioEmployees();
 }
 
-function renderSecurityRolesSection() {
-    return `<section class="job-section"><h2>Reusable security roles</h2><p class="muted">Roles can be reused across Workspaces and Jobs. Updating a role propagates its permissions to members assigned that role.</p><div id="securityRoleList">${studioRolesCache.map(x=>`<div class="job-row"><div><b>${esc(x.name)}</b><div class="meta">${esc(x.scope)} · ${esc(x.description||'')}</div></div><button class="action" onclick="deleteStudioRole('${x.id}')">Delete</button></div>`).join('')||'<p class="muted">No reusable roles yet.</p>'}</div><h3>Create role</h3><div class="pos-entry"><label>Name<input id="roleName"></label><label>Scope<select id="roleScope"><option>Workspace</option><option>Job</option></select></label><label>Description<input id="roleDescription"></label><label>Template<select id="roleTemplate"><option value="viewer">Viewer</option><option value="worker">Worker</option><option value="manager">Manager</option><option value="admin">Administrator</option></select></label><button class="primary" onclick="createStudioRole()">Create role</button></div></section>`;
+function renderSecurityRolesSection(scope='Job') {
+    return `<section class="job-section"><h2>Reusable security roles</h2><p class="muted">Roles can be reused across Workspaces and Jobs. Updating a role propagates its permissions to members assigned that role.</p><div id="securityRoleList">${studioRolesCache.filter(x=>x.scope===scope).map(x=>`<div class="job-row"><div><b>${esc(x.name)}</b><div class="meta">${esc(x.scope)} · ${esc(x.description||'')}</div></div><button class="action" onclick="deleteStudioRole('${x.id}')">Delete</button></div>`).join('')||'<p class="muted">No reusable roles yet.</p>'}</div><h3>Create role</h3><div class="pos-entry"><label>Name<input id="roleName"></label><label>Scope<select id="roleScope"><option>${esc(scope)}</option></select></label><label>Description<input id="roleDescription"></label><label>Template<select id="roleTemplate"><option value="viewer">Viewer</option><option value="worker">Worker</option><option value="manager">Manager</option><option value="admin">Administrator</option></select></label><button class="primary" onclick="createStudioRole()">Create role</button></div></section>`;
 }
 
 function roleTemplate(scope, template) {
@@ -192,9 +187,9 @@ function roleTemplate(scope, template) {
 
 async function createStudioRole() {
     const name=document.getElementById('roleName').value.trim(); if(!name)return alert('Role name is required.'); const scope=document.getElementById('roleScope').value; const permissions=roleTemplate(scope,document.getElementById('roleTemplate').value);
-    await json('/api/security/roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,scope,description:document.getElementById('roleDescription').value.trim()||null,permissionsJson:JSON.stringify(permissions),isActive:true})}); await showWorkspaces();
+    await json('/api/security/roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,scope,description:document.getElementById('roleDescription').value.trim()||null,permissionsJson:JSON.stringify(permissions),isActive:true})}); await (scope==='Workspace'?showWorkspaces():studioNavigate('studio-management'));
 }
-async function deleteStudioRole(id){if(!confirm('Delete this reusable role? Existing members keep their copied permissions but lose the role link.'))return;const r=await fetch('/api/security/roles/'+id,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());await showWorkspaces();}
+async function deleteStudioRole(id){if(!confirm('Delete this reusable role? Existing members keep their copied permissions but lose the role link.'))return;const r=await fetch('/api/security/roles/'+id,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());await (document.body.dataset.studioView==='workspace-management'?showWorkspaces():studioNavigate('studio-management'));}
 
 function renderWorkflowSection() {
     return `<section class="job-section"><h2>Workflow automation</h2><p class="muted">Database-backed event/condition/action workflows. Supported triggers include JobStatusChanged, ScheduleChanged, ProductionChanged and DeliveryChanged. Actions: coordination CreateActivity, NotifyJob, NotifyRequester and WaitMinutes. Job status, ownership, production dispatch and scheduling require authorized Job workflow decisions.</p><div id="workflowList"><p class="muted">Loading…</p></div><h3>Create workflow</h3><div class="pos-entry"><label>Name<input id="workflowName"></label><label>Trigger<select id="workflowTrigger"><option>JobStatusChanged</option><option>ScheduleChanged</option><option>ProductionChanged</option><option>DeliveryChanged</option></select></label><label>Job status condition<input id="workflowStatusCondition" placeholder="optional, e.g. Shoot Complete"></label></div><label style="display:block;margin-top:10px">Actions JSON<textarea id="workflowActions" rows="8" style="width:100%">[{"type":"CreateActivity","activityType":"Other","title":"Review backup verification","dueMinutes":120},{"type":"NotifyJob","subject":"Workflow started","body":"Automated production workflow started."}]</textarea></label><button class="primary" onclick="createWorkflowDefinition()">Create workflow</button><h3>Authorization audit</h3><button class="action" onclick="runAuthorizationAudit()">Run endpoint audit</button><div id="authorizationAuditResult" class="meta"></div></section>`;
@@ -222,4 +217,5 @@ async function seedStudioDemoData(button) {
         button.disabled = false;
     }
 }
+
 

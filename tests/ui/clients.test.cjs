@@ -51,7 +51,7 @@ test('client navigation records selection and restores it on browser back',async
 
 test('client directory uses the canonical route and stored client identity',async t=>{
  const {dom,w,fixture}=setup();t.after(()=>dom.window.close());await w.StudioClients.render({clientId:'a'});await settle();
- assert.equal(w.document.querySelector('.clients-page').getAttribute('aria-label'),'Clients');
+ assert.equal(w.document.querySelector('.clients-page').getAttribute('aria-label'),'Client Management');
  assert.equal(w.document.querySelector('.client-directory-table th').textContent.trim(),'Client');
  assert.match(w.document.querySelector('[data-c-search]').getAttribute('aria-label'),/clients/);
  w.document.querySelector('[data-c-id="b"]').click();await settle();
@@ -165,4 +165,12 @@ test('client job listing chooses a real job photo once and preserves it while fi
  assert.equal(w.document.querySelector('[data-c-photo] img').src,photo.src);assert.equal(fixture.calls.filter(c=>c.url==='/api/production/media-summary').length,1);
  w.document.querySelector('[data-c-photo] img').dispatchEvent(new w.Event('error'));assert.equal(w.document.querySelector('[data-c-photo] img'),null);assert.match(w.document.querySelector('[data-c-photo]').getAttribute('aria-label'),/unavailable/);
  w.document.querySelector('[data-c-job]').click();assert.deepEqual(fixture.opened,['j1']);
+});
+test('Client Management has a visible New Client action that saves through the existing client service',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());const original=w.json;
+ w.json=async(url,options)=>{if(url==='/api/frontdesk/clients'&&options?.method==='POST'){fixture.created=JSON.parse(options.body);fixture.clients.push({id:'new',...fixture.created});return {id:'new'};}return original(url,options);};
+ await w.StudioClients.render();w.document.querySelector('[data-c-new]').click();const form=w.document.querySelector('dialog form');assert.ok(form);
+ form.elements.displayName.value='New Client';form.elements.email.value='client@example.test';form.elements.phone.value='8765550199';await form.onsubmit({preventDefault(){}});
+ assert.equal(fixture.created.displayName,'New Client');assert.equal(fixture.navigation.options.clientId,'new');
+ const css=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/css/pages/clients.css'),'utf8');assert.match(css,/client-directory-table th:nth-child\(3\),\.clients-page \.client-directory-table td:nth-child\(3\)\{width:26%\}/);
 });

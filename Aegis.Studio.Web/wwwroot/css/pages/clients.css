@@ -62,9 +62,9 @@
 
 /* Use the canonical Jobs grid and rail components within the client frame. */
 .clients-page .client-directory-table{min-width:480px}
-.clients-page .client-directory-table th:first-child{width:34%}
-.clients-page .client-directory-table th:nth-child(2){width:40%}
-.clients-page .client-directory-table th:nth-child(3){width:26%}
+.clients-page .client-directory-table th:first-child,.clients-page .client-directory-table td:first-child{width:34%}
+.clients-page .client-directory-table th:nth-child(2),.clients-page .client-directory-table td:nth-child(2){width:40%}
+.clients-page .client-directory-table th:nth-child(3),.clients-page .client-directory-table td:nth-child(3){width:26%}
 .client-directory-table tr[data-c-id]{cursor:pointer}
 .client-directory-table tr[data-c-id]:hover,.client-directory-table tr[data-c-id]:focus-visible{background:var(--theme-surface-alt,#edf3f8);box-shadow:inset 3px 0 var(--theme-accent,#d97722);outline:0}
 .client-job-identity{display:flex;align-items:center;gap:8px;min-width:0}
@@ -114,3 +114,6 @@
 .clients-page .client-directory-head-clip .client-directory-table,
 .clients-page .client-directory-rows .client-directory-table{display:table;width:100%;min-width:0;table-layout:fixed}
 .clients-page .client-directory-head-clip .client-directory-table thead th{position:static}
+
+.client-directory-toolbar{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;padding:5px 9px;gap:8px;font-size:12px;font-weight:600}
+.client-directory-toolbar button{font-size:11px;min-height:24px}

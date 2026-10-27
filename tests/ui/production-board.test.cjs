@@ -13,11 +13,11 @@ function fixture(){const data={jobs:[{id:'j',workspaceId:'w',status:'Active Prod
 function order(data,id,status='NotStarted',extra={}){data.orders.push({id,jobId:'j',quantity:1,product:'Portraits',activityIds:[id+'-task']});data.activities.push({id:id+'-task',jobId:'j',workOrderId:id,title:'Retouch',activityType:'Retouch',status,stepOrder:1,...extra});return data.activities.at(-1);}
 const lane=(w,key)=>w.genericView.querySelector('[data-production-lane="'+key+'"]');
 function addJob(data,id,status,taskStatus=null){data.jobs.push({id,title:'Job '+id,clientName:'Client '+id,status,workspaceId:'w'});if(taskStatus)data.activities.push({id:id+'-task',jobId:id,title:'Retouch '+id,activityType:'Retouch',status:taskStatus});}
-test('default stage lists include all jobs and use compact rows without job cards',async t=>{
+test('default stage lists include all jobs as photo-topped cards',async t=>{
  const data=fixture();data.jobs=[];for(const [id,status] of [['ready','Awaiting Upload'],['progress','Active Production'],['qc','Awaiting Production Review'],['redo','Changes Requested'],['finished','Completed']])addJob(data,id,status);
  const {w,calls}=setup(t,data);await w.showCatalogProduction();
- for(const [key,id] of [['ready','ready'],['progress','progress'],['qc','qc'],['attention','redo'],['complete','finished']])assert.ok(lane(w,key).querySelector('tr[data-production-job="'+id+'"]'));
- assert.equal(w.genericView.querySelectorAll('[data-production-job]').length,5);assert.equal(w.genericView.querySelectorAll('.production-order-card').length,0);assert.match(w.genericView.textContent,/Client qc/);assert.equal(calls.filter(u=>u.includes('media')||u.includes('work-orders')).length,0);
+ for(const [key,id] of [['ready','ready'],['progress','progress'],['qc','qc'],['attention','redo'],['complete','finished']])assert.ok(lane(w,key).querySelector('article[data-production-job="'+id+'"]'));
+ assert.equal(w.genericView.querySelectorAll('[data-production-job]').length,5);assert.equal(w.genericView.querySelectorAll('.production-order-card').length,0);assert.match(w.genericView.textContent,/Client qc/);assert.equal(calls.filter(u=>u.includes('work-orders')).length,0);assert.equal(calls.filter(u=>u==='/api/production/media-summary').length,1);assert.equal(w.genericView.querySelectorAll('.production-job-card').length,5);assert.match(w.genericView.textContent,/No image ready yet/);
 });
 test('a large Ready list cannot hide jobs in other stages and each column pages locally',async t=>{
  const data=fixture();data.jobs=[];for(let i=0;i<65;i++)addJob(data,'r'+i,'Pending');addJob(data,'p','Active Production');addJob(data,'q','Awaiting Approval');addJob(data,'x','Changes Requested');const {w,calls}=setup(t,data);await w.showCatalogProduction();
@@ -51,4 +51,9 @@ test('current job stage wins over overdue or blocked future work',async t=>{
 test('load failures show Retry and stale responses cannot replace a newer list',async t=>{
  const data=fixture(),{w}=setup(t,data),base=w.json;let release;w.json=url=>url==='/api/production/workload'?new Promise(r=>release=r):base(url);const old=w.showCatalogProduction();await settle();w.json=base;await w.showCatalogProduction();release({...fixture(),jobs:[]});await old;assert.ok(w.genericView.querySelector('[data-production-job="j"]'));
  w.json=async()=>{throw Error('Database unavailable');};await w.showCatalogProduction();assert.match(w.genericView.textContent,/Database unavailable/);assert.ok(w.genericView.querySelector('[data-production-retry]'));
+});
+test('production photo updates preserve the job card and fall back to a labelled placeholder on failure',async t=>{
+ const data=fixture(),{w}=setup(t,data);const json=w.json;w.json=async url=>url==='/api/production/media-summary'?[{jobId:'j',thumbnailVersionIds:['photo']}]:json(url);
+ await w.showCatalogProduction();await settle();const card=w.genericView.querySelector('[data-production-job="j"]');const image=card.querySelector('.production-job-image img');assert.ok(image);assert.match(image.src,/jobs\/j\/versions\/by-id\/photo\/preview/);
+ image.dispatchEvent(new w.Event('error'));assert.equal(w.genericView.querySelector('[data-production-job="j"]'),card);assert.match(card.querySelector('.production-job-image').textContent,/No image ready yet/);card.click();assert.equal(w.navigation.at(-1).options.jobId,'j');
 });

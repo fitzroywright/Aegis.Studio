@@ -132,7 +132,10 @@ test('Session Plan actions live on the page and retain import and return navigat
  const {w,navigation}=setup(t,'session-plan');await w.StudioWorkflowViews.showSessionPlan('j');
  const toolbar=w.genericView.querySelector('[aria-label="Session Plan actions"]');
  assert.equal(w.document.querySelector('#studioContextRail [data-workflow-action]'),null);
- toolbar.querySelector('[data-workflow-action="import"]').click();
+ toolbar.querySelector('[data-workflow-action="import"]').click();await settle();
+ assert.deepEqual(JSON.parse(JSON.stringify(navigation.at(-1))),{view:'session-plan-import',options:{jobId:'j'}});
+ w.document.body.dataset.studioView='session-plan-import';await w.StudioWorkflowViews.showSessionPlan('j');
+ assert.ok(w.genericView.querySelector('.session-import-sidebar [aria-current=step]'));
  assert.ok(w.genericView.querySelector('[data-session-file]'));
  w.genericView.querySelector('[data-workflow-action="job"]').click();await settle();
  assert.deepEqual(JSON.parse(JSON.stringify(navigation.at(-1))),{view:'workspaces',options:{jobId:'j'}});

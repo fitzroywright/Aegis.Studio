@@ -8,12 +8,12 @@ window.StudioWorkflowViews=(()=>{
  const button=(key,label,primary=false)=>`<button type="button" class="${primary?'primary':'action'}" data-workflow-action="${key}">${esc(label)}</button>`;
  function actions(view){
   if(view==='frontdesk')return [['booking','New Booking'],['inquiry','New Inquiry'],['quote','Create Quote'],['calendar','View Calendar'],['delivery','Delivery']];
-  if(view==='session-plan')return [];
+  if(['session-plan','session-plan-import'].includes(view))return [];
   if(view==='delivery')return [['notice','Send Pickup Notice'],['payment','Record Payment'],['statement','View Statement'],['export','Export Report']];
   if(view==='production')return [];
   return null;
  }
- function bind(host=document){host.querySelectorAll('[data-workflow-action]').forEach(b=>{if(document.body.dataset.studioView==='session-plan'&&session){const key=b.dataset.workflowAction;b.disabled=session.busy||(['import','add-subject'].includes(key)&&!session.roster.canEdit)||(['assign-session','remainder'].includes(key)&&!session.roster.canSchedule);}b.onclick=()=>run(b.dataset.workflowAction,b).catch(e=>alert(e.message));});}
+ function bind(host=document){host.querySelectorAll('[data-workflow-action]').forEach(b=>{if(['session-plan','session-plan-import'].includes(document.body.dataset.studioView)&&session){const key=b.dataset.workflowAction;b.disabled=session.busy||(['import','add-subject'].includes(key)&&!session.roster.canEdit)||(['assign-session','remainder'].includes(key)&&!session.roster.canSchedule);}b.onclick=()=>{if(b.dataset.workflowAction==='import'&&document.body.dataset.studioView==='session-plan')return studioNavigate('session-plan-import',{jobId:session.job.id});return run(b.dataset.workflowAction,b).catch(e=>alert(e.message));};});}
  async function run(key,control){
   const view=document.body.dataset.studioView;
   if(key==='booking')return openPendingBookingForm(null,null);
@@ -25,7 +25,8 @@ window.StudioWorkflowViews=(()=>{
    const d=studioDialog('Create Quote','<form class="subject-form"><label>Client<select name="client" required><option value="">Choose a client…</option>'+clients.map(c=>`<option value="${esc(c.id)}">${esc(c.displayName)}</option>`).join('')+'</select></label><button class="primary">Continue</button></form>');
    d.querySelector('form').onsubmit=async e=>{e.preventDefault();d.close();await showClientQuotes(e.target.elements.client.value);};return;
   }
-  if(view==='session-plan'&&session){
+  if(['session-plan','session-plan-import'].includes(view)&&session){
+   if(key==='plan')return studioNavigate('session-plan',{jobId:session.job.id});
    if(key==='job')return studioNavigate('workspaces',{jobId:session.job.id});
    if(key==='template')return download('session-plan-template.csv','name,reference,collection,contactName,contactEmail,contactPhone,scheduleDate,scheduleTime,scheduleLocation,notes,pickupNotification\n');
    if(key==='add-subject')return editSubject();
@@ -59,11 +60,13 @@ window.StudioWorkflowViews=(()=>{
  function planRows(s){const ids=new Map(s.subjects.map(r=>[r.id,r])),refs=new Map(s.subjects.map(r=>[r.reference,r]));return s.roster.rows.map(r=>({...ids.get(r.subjectId)||refs.get(r.reference),...r})).sort((a,b)=>String(a.collection||'General').localeCompare(String(b.collection||'General'))||String(a.name).localeCompare(String(b.name))||String(a.reference).localeCompare(String(b.reference)));}
  function visibleSubjects(s){return planRows(s).filter(r=>(!s.group||(r.collection||'General')===s.group)&&(!s.outcome||outcome(r)===s.outcome)&&[r.name,r.reference,r.contactName,r.contactEmail,r.contactPhone].join(' ').toLowerCase().includes(s.term.toLowerCase()));}
  async function showSessionPlan(jobId,retained){
-  const current=StudioPage.begin('session-plan');
+  const importPage=document.body.dataset.studioView==='session-plan-import';
+  const current=StudioPage.begin(importPage?'session-plan-import':'session-plan');
   if(!jobId)throw Error('Open Session Plan from Job Details.');
   genericView.innerHTML='<p role="status">Loading Session Plan…</p>';
   const [job,subjects,roster]=await Promise.all([json('/api/jobs/'+jobId),json('/api/jobs/'+jobId+'/session-plan'),json('/api/jobs/'+jobId+'/session-plan/roster')]);if(!current())return;
-  session={job,subjects:subjects.filter(s=>!s.isSystem),roster,step:0,cells:[],mapping:{},preview:[],changes:[],choices:{},errors:[],message:'',busy:false,term:retained?.term||'',group:retained?.group||'',outcome:retained?.outcome||'',selected:new Set(),dateOrder:'DMY',conflictId:null};
+  if(importPage&&!roster.canEdit)throw Error('You do not have permission to import this Session Plan.');
+  session={job,subjects:subjects.filter(s=>!s.isSystem),roster,importPage,step:importPage?1:0,cells:[],mapping:{},preview:[],changes:[],choices:{},errors:[],message:'',busy:false,term:retained?.term||'',group:retained?.group||'',outcome:retained?.outcome||'',selected:new Set(),dateOrder:'DMY',conflictId:null};
   paintSession();
  }
  function planPayload(rows){return rows.map(row=>Object.fromEntries(['subjectId',...StudioRosterEditor.fields].filter(k=>row[k]!==undefined).map(k=>[k,row[k]])));}
@@ -76,7 +79,8 @@ window.StudioWorkflowViews=(()=>{
   }catch(e){s.busy=false;throw e;}
   // A successful write remains successful even if the following refresh fails.
   s.busy=false;s.step=0;s.conflictId=null;s.message=message;
-  if(session!==s||document.body.dataset.studioView!=='session-plan')return;
+  if(session!==s||!['session-plan','session-plan-import'].includes(document.body.dataset.studioView))return;
+  if(s.importPage){await studioNavigate('session-plan',{jobId:s.job.id});return;}
   try{await showSessionPlan(s.job.id,s);session.message=message;paintSession();}
   catch(e){genericView.innerHTML='<p role="status">'+esc(message)+'</p><p role="alert">Refresh failed: '+esc(e.message)+'</p><button type="button" class="action" data-session-reload>Reload Session Plan</button>';genericView.querySelector('button').onclick=()=>showSessionPlan(s.job.id,s).catch(error=>alert(error.message));}
  }
@@ -101,7 +105,7 @@ window.StudioWorkflowViews=(()=>{
  async function openPlanAssignments(remainder=false){
   const s=session;if(!s.roster.canSchedule)throw Error('Scheduling permission is required.');
   const dialog=await StudioWorkflow.open(s.job.id,remainder?'[data-wf-remainder]':'[data-wf-session]:not([data-wf-remainder])');
-  dialog?.addEventListener('close',()=>{if(document.body.dataset.studioView==='session-plan'&&session===s)showSessionPlan(s.job.id,s).catch(e=>alert(e.message));},{once:true});
+  dialog?.addEventListener('close',()=>{if(['session-plan','session-plan-import'].includes(document.body.dataset.studioView)&&session===s)showSessionPlan(s.job.id,s).catch(e=>alert(e.message));},{once:true});
  }
  function buildPlanPreview(s){
   const result=StudioRosterEditor.planImport(s.cells,s.mapping,s.roster.rows,s.choices,s.dateOrder);s.preview=result.rows;s.changes=result.changes;s.errors=result.errors;
@@ -111,7 +115,7 @@ window.StudioWorkflowViews=(()=>{
   const s=session,subjects=planRows(s),preview=s.step===3,importing=s.step>0;
   const overview=[['Subjects',subjects.length],['Photographed',subjects.filter(r=>outcome(r)==='Photographed').length],['Absent',subjects.filter(r=>outcome(r)==='Absent').length],['Reshoots',subjects.filter(r=>/reshoot|retake/i.test(outcome(r))).length]];
   const steps=['Choose file','Map columns','Preview & validate','Import'];
-  const stepper=importing?'<ol class="workflow-import-steps">'+steps.map((label,i)=>`<li ${s.step===i+1?'aria-current="step"':''}><span>${i+1}</span>${label}</li>`).join('')+'</ol>':'';
+  const stepper=importing?'<ol class="workflow-import-steps">'+steps.map((label,i)=>`<li class="${i+1<s.step?'is-complete':i===3&&preview&&!s.errors.length?'is-ready':''}" ${s.step===i+1?'aria-current="step"':''}><span>${i+1}</span><div><strong>${label}</strong><small>${esc(i===0?s.fileName||'CSV or XLSX':i===1?Object.values(s.mapping).filter(v=>v!==''&&v!==undefined).length+' mapped':i===2&&preview?s.changes.length+' rows · '+s.errors.length+' issues':i===3&&preview&&!s.errors.length?'Ready to import':'')}</small></div></li>`).join('')+'</ol>':'';
   const savedByReference=new Map(subjects.map(r=>[r.reference,r])),previewByReference=new Map(s.preview.map(r=>[r.reference,r]));
   const visible=preview?s.changes.map(c=>({...savedByReference.get(c.row.reference),...previewByReference.get(c.row.reference),change:c})):visibleSubjects(s);
   const pageSize=100,pageCount=Math.max(1,Math.ceil(visible.length/pageSize));s.page=Math.min(s.page||1,pageCount);const rows=visible.slice((s.page-1)*pageSize,s.page*pageSize);
@@ -127,18 +131,20 @@ window.StudioWorkflowViews=(()=>{
   const conflicts=s.roster.incomingRows||[];
   const conflictPanel=!importing&&conflicts.length?'<section class="workflow-validation"><strong>Website changes need review</strong><span>Current Studio details remain in use until you review and accept a change.</span>'+conflicts.map((c,i)=>`<button type="button" class="action" data-session-conflict="${i}" ${!s.roster.canEdit?'disabled':''}>Review change ${i+1}</button>`).join('')+'</section>':'';
   const cancel=importing?'<button type="button" class="action" data-session-cancel '+(s.busy?'disabled':'')+'>Cancel Import</button>':'';
-  shellPage('session-plan','Session Plan',`<header class="workflow-page-title"><h1>${esc(s.job.title)}</h1><p>Subjects, planned arrivals and field outcomes.</p></header><div class="workflow-detail-actions" role="toolbar" aria-label="Session Plan actions">${button('import','Import Subjects',true)}${button('template','Download Template')}${button('assign-session','Assignments & Schedule')}${button('remainder','Reschedule Remainder')}${button('job','Back to Job')}</div>${toolbar}${conflictPanel}${stepper}${controls}${s.step!==1&&s.step!==2?table+paging:''}${commit}${cancel}<p role="status" data-session-feedback>${esc(s.message)}</p><p class="workflow-note">Planned arrivals do not reserve staff or resources. Use Assignments & Schedule for bookings. Subject outcomes come from field reporting; uploading photographs does not complete a session.</p>`,overview);
+  const mappingSummary=preview?'<section class="session-import-mapping-summary"><h2>Column mapping</h2><dl>'+planFields().filter(field=>s.mapping[field]!==undefined&&s.mapping[field]!=='').map(field=>'<div><dt>'+esc(s.cells[0][Number(s.mapping[field])])+'</dt><dd>'+esc(planLabels()[planFields().indexOf(field)])+'</dd></div>').join('')+'</dl></section>':'';
+  const importContent=importing?`<div class="session-import-layout"><aside class="session-import-sidebar"><h2>Import steps</h2>${stepper}<small>CSV or XLSX</small></aside><div class="session-import-content">${mappingSummary}${preview?`<section class="session-import-preview"><h2>Preview · ${s.changes.length} rows</h2>${table}${paging}</section>`:controls}</div></div>${preview?`<section class="session-import-review"><h2>Review before import</h2>${controls}${commit}</section>`:''}${cancel}`:toolbar+conflictPanel+table+paging;
+  shellPage(s.importPage?'session-plan-import':'session-plan',s.importPage?'Session Plan Import':'Session Plan',`<div class="${importing?'workflow-session-import':'workflow-session-plan'}"><header class="workflow-page-title">${importing?'<small>Session Plan Import</small>':''}<h1>${esc(s.job.title)}</h1><p>${importing?'Import a class or group once, review the mapping and preserve existing photo associations.':'Subjects, planned arrivals and field outcomes.'}</p></header><div class="workflow-detail-actions" role="toolbar" aria-label="Session Plan actions">${button('import','Import Subjects',true)}${button('template','Download Template')}${s.importPage?button('plan','Back to Session Plan'):button('assign-session','Assignments & Schedule')+button('remainder','Reschedule Remainder')}${button('job','Back to Job')}</div>${importContent}<p role="status" data-session-feedback>${esc(s.message)}</p><p class="workflow-note">Planned arrivals do not reserve staff or resources. Use Assignments & Schedule for bookings. Subject outcomes come from field reporting; uploading photographs does not complete a session.</p></div>`,overview);
   StudioPage.setCount(subjects.length+' subjects');const host=genericView;
-  const fail=e=>{s.message=e.message;if(session===s&&document.body.dataset.studioView==='session-plan')host.querySelector('[data-session-feedback]')?.replaceChildren(document.createTextNode(e.message));};
+  const fail=e=>{s.message=e.message;if(session===s&&['session-plan','session-plan-import'].includes(document.body.dataset.studioView))host.querySelector('[data-session-feedback]')?.replaceChildren(document.createTextNode(e.message));};
   const prepare=cells=>{if(cells.length<2)throw Error('Supply a header and at least one row.');s.cells=cells;s.mapping={};s.choices={};s.page=1;const norm=x=>String(x).replace(/[^a-z]/gi,'').toLowerCase();const aliases={reference:['studentid','subjectid'],name:['studentname','subjectname'],collection:['class','group'],contactEmail:['parentemail'],scheduleDate:['date','sessiondate','eventdate'],scheduleTime:['time','sessiontime','arrivaltime']};planFields().forEach((field,i)=>{const index=cells[0].findIndex(h=>norm(h)===norm(field)||norm(h)===norm(planLabels()[i])||aliases[field]?.includes(norm(h)));if(index>=0)s.mapping[field]=index;});s.step=2;paintSession();};
-  host.querySelector('[data-session-file]')?.addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>5_000_000)throw Error('Choose a file of at most 5 MB.');const form=new FormData();form.append('file',file);const data=await json(planUrl(s)+'/file',{method:'POST',body:form});if(session===s&&document.body.dataset.studioView==='session-plan')prepare(data.cells);}catch(e){fail(e);}});
+  host.querySelector('[data-session-file]')?.addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;s.fileName=file.name;try{if(file.size>5_000_000)throw Error('Choose a file of at most 5 MB.');const form=new FormData();form.append('file',file);const data=await json(planUrl(s)+'/file',{method:'POST',body:form});if(session===s&&['session-plan','session-plan-import'].includes(document.body.dataset.studioView))prepare(data.cells);}catch(e){fail(e);}});
   host.querySelector('[data-session-pasted]')?.addEventListener('click',()=>{try{prepare(StudioRosterEditor.csv(host.querySelector('[data-session-paste]').value));}catch(e){fail(e);}});
   host.querySelector('[data-session-preview]')?.addEventListener('click',()=>{s.mapping=Object.fromEntries([...host.querySelectorAll('[data-session-map]')].map(el=>[el.dataset.sessionMap,el.value]));s.dateOrder=host.querySelector('[data-session-date-order]').value;buildPlanPreview(s);s.step=3;paintSession();});
   host.querySelectorAll('[data-session-match]').forEach(el=>el.onchange=()=>{s.choices[el.dataset.sessionMatch]=el.value;buildPlanPreview(s);paintSession();});
   host.querySelector('[data-session-back]')?.addEventListener('click',()=>{s.step=2;paintSession();});
   host.querySelector('[data-session-warnings]')?.addEventListener('click',()=>{const el=host.querySelector('[data-session-errors]');el.hidden=!el.hidden;});
-  host.querySelector('[data-session-cancel]')?.addEventListener('click',()=>{s.step=0;s.conflictId=null;s.page=1;paintSession();});
-  host.querySelector('[data-session-commit]')?.addEventListener('click',async()=>{if(s.busy||s.errors.length)return;const control=host.querySelector('[data-session-commit]');control.disabled=true;try{await savePlan(s,s.preview,'Subjects saved. Existing photograph associations are retained.');}catch(e){s.message=e.message;if(session===s&&document.body.dataset.studioView==='session-plan')paintSession();}});
+  host.querySelector('[data-session-cancel]')?.addEventListener('click',()=>{if(s.importPage)return studioNavigate('session-plan',{jobId:s.job.id});s.step=0;s.conflictId=null;s.page=1;paintSession();});
+  host.querySelector('[data-session-commit]')?.addEventListener('click',async()=>{if(s.busy||s.errors.length)return;const control=host.querySelector('[data-session-commit]');control.disabled=true;try{await savePlan(s,s.preview,'Subjects saved. Existing photograph associations are retained.');}catch(e){s.message=e.message;if(session===s&&['session-plan','session-plan-import'].includes(document.body.dataset.studioView))paintSession();}});
   host.querySelector('[data-session-search]')?.addEventListener('input',e=>{s.term=e.target.value;s.page=1;const pos=e.target.selectionStart;paintSession();const input=host.querySelector('[data-session-search]');input.focus();input.setSelectionRange(pos,pos);});
   for(const key of ['group','outcome'])host.querySelector('[data-session-'+key+']')?.addEventListener('change',e=>{s[key]=e.target.value;s.page=1;paintSession();});
   host.querySelectorAll('[data-session-select]').forEach(el=>el.onchange=()=>{el.checked?s.selected.add(el.dataset.sessionSelect):s.selected.delete(el.dataset.sessionSelect);const scroll=host.querySelector('.workflow-table-scroll');const top=scroll.scrollTop;paintSession();host.querySelector('.workflow-table-scroll').scrollTop=top;});
@@ -185,4 +191,3 @@ window.StudioWorkflowViews=(()=>{
  }
  return {actions,bind,run,showSessionPlan,showDelivery};
 })();
-
