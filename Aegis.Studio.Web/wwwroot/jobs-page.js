@@ -38,7 +38,7 @@
    const isInvolved=job=>isLead(job)||Boolean(user)&&[job.assignedTo,job.jobOwner,job.photographerUserName,owner(job)].some(value=>normalized(value)===user)||job.isCrewMember===true||tasks.some(task=>String(task.jobId)===String(job.id)&&normalized(task.assignedTo)===user)||(array(job.crew).some(member=>normalized(member.userName||member)===user));
    let saved={};try{saved=JSON.parse(sessionStorage.getItem('studio-jobs-view')||'{}');}catch{}
    let view=['led','involved','all'].includes(saved.view)?saved.view:'involved';
-   let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',calendarView=['day','week','month'].includes(saved.calendarView)?saved.calendarView:'day',calendarDate=date(saved.calendarDate)||new Date(),calendarEnabled=saved.calendarEnabled!==false,attention='',includeClosed=false,page=1;
+   let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',calendarView=['day','week','month'].includes(saved.calendarView)?saved.calendarView:'day',calendarDate=date(saved.calendarDate)||new Date(),calendarEnabled=saved.calendarEnabled!==false,includeClosed=false,page=1;
    const stages=StudioStatusOrder.sort(jobs.map(status));if(!stages.includes(stage))stage='';
    const card=(title,body,cls='')=>`<section class="sj-card ${cls}"><header><h2>${title}</h2></header>${body}</section>`;
    host.innerHTML=`<section class="sj-page" aria-label="Jobs"><section class="sj-board">
@@ -74,7 +74,7 @@
     find('[data-sj-calendar-today]').textContent=selectedDateLabel;
     find('[data-sj-calendar-today]').title=+selectedDate===+today?'Today':'Return to today';
     const inCalendar=job=>{if(!calendarEnabled)return true;const event=date(job.eventDate);if(!event)return false;const start=new Date(calendarDate.getFullYear(),calendarDate.getMonth(),calendarDate.getDate());const end=new Date(start);if(calendarView==='month'){start.setDate(1);end.setMonth(end.getMonth()+1,1);}else if(calendarView==='week'){start.setDate(start.getDate()-((start.getDay()+6)%7));end.setTime(start.getTime());end.setDate(end.getDate()+7);}else end.setDate(end.getDate()+1);return event>=start&&event<end;};
-    const filtered=base.filter(j=>inCalendar(j)&&(!stage||status(j)===stage)&&(!attention||need(j,attention))&&[j.title,j.clientName,j.reference,j.jobNumber,workspacesById.get(String(j.workspaceId))?.name,ownerLabel(j)].join(' ').toLowerCase().includes(term.toLowerCase().trim()));
+    const filtered=base.filter(j=>inCalendar(j)&&(!stage||status(j)===stage)&&[j.title,j.clientName,j.reference,j.jobNumber,workspacesById.get(String(j.workspaceId))?.name,ownerLabel(j)].join(' ').toLowerCase().includes(term.toLowerCase().trim()));
     filtered.sort((a,b)=>{const ad=date(a.eventDate),bd=date(b.eventDate);return !ad&&!bd?String(a.id).localeCompare(String(b.id)):!ad?1:!bd?-1:(+ad-+bd)*(sort==='date-asc'?1:-1)||String(a.id).localeCompare(String(b.id));});
     const pages=Math.max(1,Math.ceil(filtered.length/13));page=Math.min(page,pages);
     const visible=filtered.slice((page-1)*13,page*13);
@@ -87,7 +87,10 @@
     const counts=StudioStatusOrder.sort(base.map(status)).map(s=>[s,base.filter(j=>status(j)===s).length]);
     const changes=notificationResult.value.filter(n=>/status|workflow/i.test(n.eventType||n.type||n.title||'')&&base.some(j=>String(j.id)===String(n.referenceId))).sort((a,b)=>+(date(b.createdAtUtc||b.createdAt)||0)-+(date(a.createdAtUtc||a.createdAt)||0)).slice(0,3);
     find('[data-sj-statuses]').innerHTML=(workflowResult.error?'<p>Workflow unavailable. Showing recorded job statuses.</p>':'')+counts.map(([s,n])=>`<button type="button" class="sj-status-count sj-${tone(s)}" data-sj-stage="${esc(s)}" aria-pressed="${stage===s}"><span>${esc(s)}</span><b>${n}</b><meter min="0" max="${Math.max(1,base.length)}" value="${n}" aria-label="${esc(s)} jobs">${n}</meter></button>`).join('')+'<h3>Recent Status Changes</h3>'+(changes.map(n=>`<button type="button" class="sj-note" data-sj-job="${esc(n.referenceId)}"><strong>${esc(n.title||n.subject||n.eventType)}</strong><small>${esc(n.body||'')} · ${esc(dateLabel(n.createdAtUtc||n.createdAt))}</small></button>`).join('')||'<p>No recent status changes.</p>');
-    find('[data-sj-attention]').innerHTML=[['owner','Owner needed'],['changes','Changes requested'],['photographers','Photographers needed']].map(([key,label])=>`<button type="button" class="sj-attention" data-sj-need="${key}" aria-pressed="${attention===key}"><span>${label}</span><b>${base.filter(j=>need(j,key)).length}</b></button>`).join('');
+    find('[data-sj-attention]').innerHTML=base.flatMap(job=>{
+     const reasons=[['owner','Job owner needed'],['changes','Changes requested'],['photographers','Photographer needed']].filter(([key])=>need(job,key)).map(([,label])=>label);
+     return reasons.length?[`<button type="button" class="sj-attention" data-attention-item="${esc(job.id)}" data-sj-job="${esc(job.id)}"><span><strong>${esc(job.title||'Untitled job')}</strong><small>${esc([job.clientName,...reasons].filter(Boolean).join(' · '))}</small></span></button>`]:[];
+    }).join('')||'<p>No jobs currently need attention.</p>';
     try{sessionStorage.setItem('studio-jobs-view',JSON.stringify({term,stage,sort,view,calendarView,calendarDate:isoDate(calendarDate),calendarEnabled}));}catch{}
    }
    StudioPage.queryAll(host,'[data-sj-calendar-view]').forEach(button=>button.onclick=()=>{calendarView=button.dataset.sjCalendarView;calendarEnabled=true;apply();});
@@ -99,9 +102,9 @@
    find('[data-sj-status]').onchange=e=>{stage=e.target.value;apply();};
    
    find('[data-sj-sort]').onchange=e=>{sort=e.target.value;apply();};
-   StudioPage.queryAll(host,'[data-sj-view]').forEach(button=>button.onclick=()=>{view=button.dataset.sjView;attention='';apply();});
+   StudioPage.queryAll(host,'[data-sj-view]').forEach(button=>button.onclick=()=>{view=button.dataset.sjView;apply();});
    find('[data-sj-prev]').onclick=()=>{page--;apply(false);find('.sj-table-scroll').scrollTop=0;};find('[data-sj-next]').onclick=()=>{page++;apply(false);find('.sj-table-scroll').scrollTop=0;};
-   const handleJobClick=e=>{if(!current())return;const number=e.target.closest('[data-sj-page-number]');if(number){page=Number(number.dataset.sjPageNumber);apply(false);find('.sj-table-scroll').scrollTop=0;return;}const row=e.target.closest('[data-sj-job]');if(row){void open(row.dataset.sjJob);return;}const s=e.target.closest('[data-sj-stage]');if(s){stage=stage===s.dataset.sjStage?'':s.dataset.sjStage;find('[data-sj-status]').value=stage;apply();}const n=e.target.closest('[data-sj-need]');if(n){attention=attention===n.dataset.sjNeed?'':n.dataset.sjNeed;apply();}};
+   const handleJobClick=e=>{if(!current())return;const number=e.target.closest('[data-sj-page-number]');if(number){page=Number(number.dataset.sjPageNumber);apply(false);find('.sj-table-scroll').scrollTop=0;return;}const row=e.target.closest('[data-sj-job]');if(row){void open(row.dataset.sjJob);return;}const s=e.target.closest('[data-sj-stage]');if(s){stage=stage===s.dataset.sjStage?'':s.dataset.sjStage;find('[data-sj-status]').value=stage;apply();}};
    host.onclick=handleJobClick;
    find('[data-sj-statuses]').onclick=handleJobClick;
    find('[data-sj-attention]').onclick=handleJobClick;

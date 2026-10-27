@@ -47,8 +47,8 @@ test('Jobs Overview owns interactive status counts and recent changes without a 
  assert.equal(rail.querySelectorAll('[data-rail-card="context"]').length,1);
  assert.equal(rail.querySelector('[data-sj-attention]'),null);
  assert.ok(w.document.querySelector('#studioAttentionDrawer [data-sj-attention]'));
- const need=w.document.querySelector('#studioAttentionDrawer [data-sj-need="owner"]');
- need.click();assert.equal(w.document.querySelector('#studioAttentionDrawer [data-sj-need="owner"]').getAttribute('aria-pressed'),'true');
+ const need=w.document.querySelector('#studioAttentionDrawer [data-sj-job="job-0"]');
+ assert.match(need.textContent,/Portrait 0.*Job owner needed/s);need.click();await settle();assert.equal(fixture.opened.at(-1),'job-0');
  assert.equal(w.document.querySelector('.sj-right,.st-right,.job-detail-right'),null);
 });
 test('Job Details Overview shows status instead of repeating job and client identity',async t=>{
@@ -97,10 +97,10 @@ test('attention entries live only in the shared drawer and retain actions, count
  const drawer=w.document.getElementById('studioAttentionDrawer'),rail=w.document.getElementById('studioContextRail');
  assert.equal(drawer.querySelector('[data-attention-test]'),button);
  assert.equal(rail.querySelector('[data-studio-attention]'),null);assert.equal(host.querySelector('[data-studio-attention]'),null);
- assert.equal(w.document.getElementById('studioAttentionCount').textContent,'2');
- assert.equal(w.document.getElementById('studioAttentionSummary').hidden,true);
+ assert.equal(w.document.getElementById('studioAttentionCount').textContent,'1');
+ assert.equal(w.document.getElementById('studioAttentionItems').hidden,true);
  w.document.getElementById('studioAttentionTrigger').click();button.click();assert.equal(clicks,1);
- button.querySelector('b').textContent='7';await settle();assert.equal(w.document.getElementById('studioAttentionCount').textContent,'7');
+ button.after(button.cloneNode(true));await settle();assert.equal(w.document.getElementById('studioAttentionCount').textContent,'2');button.nextElementSibling.remove();await settle();
  w.document.body.dataset.studioView='clients';w.StudioShell.sync('clients');await settle();
  assert.equal(drawer.querySelector('[data-attention-test]'),null);assert.equal(w.document.getElementById('studioAttentionCount').textContent,'0');
  w.document.body.dataset.studioView='jobs';w.StudioShell.sync('jobs');await settle();

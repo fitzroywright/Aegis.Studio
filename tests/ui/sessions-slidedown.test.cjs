@@ -22,7 +22,7 @@ async function setup(t,view,options={}){
   if(url.startsWith('/api/schedule/photographer-data'))return {photographers:[{userName:'alice',displayName:'Alice',scheduleResourceId:'resource',isActive:true}],entries:[session],jobs:[{id:'job',title:'School portraits',workspaceId:'workspace'}]};
   if(url==='/api/auth/me')return {user:{userName:'alice'}};
   if(url==='/api/today/jobs')return [{id:'job',title:'School portraits'}];
-  if(url.startsWith('/api/operations/activities'))return [{id:'task',jobId:'job',title:'Prepare portraits',assignedTo:'alice',status:'NotStarted'}];
+  if(url.startsWith('/api/operations/activities'))return [{id:'task',jobId:'job',title:'Prepare portraits',assignedTo:'alice',status:'Blocked',blockedReason:'Awaiting client approval'}];
   return [];
  };
  w.fetch=async url=>{requests.push(url);return options.fetch ? options.fetch(url,sessions) : {ok:true,json:async()=>sessions};};
@@ -38,6 +38,7 @@ for(const view of ['tasks','schedule'])test(`${view} keeps sessions in the share
  if(view==='tasks')await w.StudioTasks.render();
  else await w.StudioPhotographerSchedule.render({view:'day'});
  await settle();
+ if(view==='tasks'){const attention=w.document.querySelector('#studioAttentionDrawer [data-studio-attention]');assert.match(attention.textContent,/Prepare portraits/);assert.doesNotMatch(attention.textContent,/Overdue tasks|Due today|Blocked tasks/);}
  assert.equal(w.document.querySelector('.ps-todays-sessions,[data-mw-region="schedule"]'),null);
  assert.equal(w.genericView.querySelector('[data-studio-attention]'),null);
  assert.equal(w.document.querySelector('#studioContextRail [data-studio-attention]'),null);
