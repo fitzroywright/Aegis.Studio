@@ -73,3 +73,20 @@ test('Client Reminders tab passes only jobs associated with the selected client'
  }finally{w.close();}
 });
 
+
+test('client directory keeps scroll on selection and late messages do not replace either grid',async t=>{
+ const {dom,w,fixture}=setup();t.after(()=>dom.window.close());
+ fixture.clients.push(...Array.from({length:8},(_,i)=>({id:'c'+i,displayName:'Client '+i})));
+ const base=w.json;let release;const pending=new Promise(r=>release=r);
+ w.json=async(url,options)=>url==='/api/notifications?count=200'?(await pending,[]):base(url,options);
+ await w.StudioClients.render();
+ let directory=w.genericView.querySelector('.client-directory-rows');directory.scrollTop=300;
+ directory.querySelector('[data-c-id="c4"]').click();await settle();
+ directory=w.genericView.querySelector('.client-directory-rows');
+ assert.equal(directory.scrollTop,300);assert.equal(directory.querySelector('[aria-selected="true"]').dataset.cId,'c4');
+ const row=directory.querySelector('[data-c-id="c4"]'),jobs=w.genericView.querySelector('.client-jobs-scroll');jobs.scrollTop=200;row.focus();
+ release();await settle();await settle();
+ assert.equal(w.genericView.querySelector('.client-directory-rows'),directory);assert.equal(directory.scrollTop,300);
+ assert.equal(directory.querySelector('[data-c-id="c4"]'),row);assert.equal(w.document.activeElement,row);
+ assert.equal(w.genericView.querySelector('.client-jobs-scroll'),jobs);assert.equal(jobs.scrollTop,200);
+});
