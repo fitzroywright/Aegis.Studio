@@ -130,8 +130,9 @@
         select.innerHTML='<option value="">All jobs</option>'+StudioSubjectPicker.jobOptions(pickerJobs,inboxFilter);
         select.value=inboxFilter;
     }
-    function renderInbox(){
+    function renderInbox(selectionOnly=false){
         const body=document.getElementById('studioInboxRows');if(!body)return;
+        if(selectionOnly){body.querySelectorAll('[data-inbox-message]').forEach(row=>{const selected=row.dataset.inboxMessage===inboxSelection;row.classList.toggle('selected',selected);row.setAttribute('aria-selected',String(selected));});return;}
         const rows=inboxRows;
         StudioPage.setCount(rows.length+' messages');
         document.getElementById('studioInboxCount').textContent=inboxTotal+' messages'+(inboxFilter?' in selected job':'');
@@ -139,10 +140,25 @@
         document.getElementById('studioInboxPrevious').disabled=inboxOffset===0;
         document.getElementById('studioInboxNext').disabled=inboxOffset+rows.length>=inboxTotal;
         const groups=[{title:'Messages',items:rows}];
-        body.innerHTML=groups.map(group=>'<section class="studio-inbox-group"><div class="studio-inbox-group-heading"><span>⌄</span> '+esc(group.title)+': '+group.items.length+' item(s)</div>'+group.items.map(({thread,message,isUnread})=>'<div role="listitem" tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="studio-inbox-message-row '+(isUnread?'is-unread ':'')+(inboxSelection===message.id?'selected':'')+'"><div class="studio-inbox-message-top"><strong class="studio-inbox-message-sender">'+esc(message.senderUserName||'Unknown')+'</strong><strong class="studio-inbox-message-subject">'+esc(inboxSubject(message))+'</strong><time>'+esc(inboxDate(message.createdAtUtc))+'</time></div><div class="studio-inbox-message-bottom"><span class="studio-inbox-message-job">'+esc(inboxJob(thread))+'</span><span class="studio-inbox-message-preview">'+esc(inboxMessagePreview(message))+'</span><span class="studio-inbox-message-recipient">To: '+esc(inboxRecipient(message,thread))+'</span></div></div>').join('')+'</section>').join('') || '<div class="studio-inbox-loading">No messages.</div>';
-        if(!rows.length)body.innerHTML='<div class="studio-inbox-loading">No messages match the selected filters.</div>';
+        const markup=groups.map(group=>'<section class="studio-inbox-group"><div class="studio-inbox-group-heading"><span>⌄</span> '+esc(group.title)+': '+group.items.length+' item(s)</div>'+group.items.map(({thread,message,isUnread})=>'<div role="listitem" tabindex="0" data-inbox-thread="'+esc(thread.id)+'" data-inbox-message="'+esc(message.id)+'" class="studio-inbox-message-row '+(isUnread?'is-unread ':'')+(inboxSelection===message.id?'selected':'')+'"><div class="studio-inbox-message-top"><strong class="studio-inbox-message-sender">'+esc(message.senderUserName||'Unknown')+'</strong><strong class="studio-inbox-message-subject">'+esc(inboxSubject(message))+'</strong><time>'+esc(inboxDate(message.createdAtUtc))+'</time></div><div class="studio-inbox-message-bottom"><span class="studio-inbox-message-job">'+esc(inboxJob(thread))+'</span><span class="studio-inbox-message-preview">'+esc(inboxMessagePreview(message))+'</span><span class="studio-inbox-message-recipient">To: '+esc(inboxRecipient(message,thread))+'</span></div></div>').join('')+'</section>').join('') || '<div class="studio-inbox-loading">No messages.</div>';
+        const group=body.querySelector('.studio-inbox-group');
+        if(group&&rows.length){
+            const top=body.scrollTop,left=body.scrollLeft,template=document.createElement('template');template.innerHTML=markup;
+            const next=template.content.querySelector('.studio-inbox-group');
+            group.firstElementChild.innerHTML=next.firstElementChild.innerHTML;
+            const existing=new Map([...group.querySelectorAll('[data-inbox-message]')].map(row=>[row.dataset.inboxMessage,row]));
+            let cursor=group.firstElementChild.nextSibling;
+            for(const value of [...next.querySelectorAll('[data-inbox-message]')]){
+                const row=existing.get(value.dataset.inboxMessage)||value;
+                row.className=value.className;row.dataset.inboxThread=value.dataset.inboxThread;
+                if(row.innerHTML!==value.innerHTML)row.innerHTML=value.innerHTML;
+                if(row!==cursor)group.insertBefore(row,cursor);cursor=row.nextSibling;
+            }
+            while(cursor){const old=cursor;cursor=cursor.nextSibling;old.remove();}
+            body.scrollTop=top;body.scrollLeft=left;
+        }else body.innerHTML=rows.length?markup:'<div class="studio-inbox-loading">No messages match the selected filters.</div>';
         body.querySelectorAll('[data-inbox-message]').forEach(row=>{
-            const open=async()=>{inboxSelection=row.dataset.inboxMessage;renderInbox();const selected=inboxRows.find(item=>item.message.id===inboxSelection);
+            const open=async()=>{inboxSelection=row.dataset.inboxMessage;renderInbox(true);const selected=inboxRows.find(item=>item.message.id===inboxSelection);
                 if(selected?.thread.kind==='Conversation'){
                     const opened=await openLegacyConversation(selected.thread.id);
                     if(opened)void loadInbox(true);
@@ -682,6 +698,7 @@
     // Give authentication and the initial shell a moment to settle, then show the digest once.
     setTimeout(() => showAwayDigestOnce(), 450);
 })();
+
 
 
 

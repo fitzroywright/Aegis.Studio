@@ -99,3 +99,29 @@ test('production keeps the four approved lanes and opens existing work-order edi
   const method=source.slice(source.indexOf('public JsonElement SessionPlan'),source.indexOf('public void SubjectStatus'));
   assert.doesNotMatch(method,/limit 500\b/i);assert.match(method,/where s.job_id=\$1 and not s.is_system/);assert.match(method,/studio_workday_roster_progress/);assert.match(method,/cmd.Parameters.AddWithValue\(job\)/);
  });
+
+test('Front Desk retains the scrolled seventh row, radio and double-click target on selection',async t=>{
+ const {w,navigation}=setup(t,'frontdesk');w.StudioStatusOrder={sort:v=>v};
+ w.configureFrontDesk(Array.from({length:10},(_,i)=>({id:'r'+i,jobId:'j'+i,status:'AwaitingDeposit',request:{clientName:'Client '+i,title:'Portrait '+i,requiredDeposit:100,eventDate:'2026-10-30'}})));
+ const list=w.genericView.querySelector('.fd-table-scroll'),row=list.querySelector('[data-fd-row-open="r6"]');
+ list.scrollTop=300;row.focus();row.click();
+ assert.equal(w.genericView.querySelector('.fd-table-scroll'),list);
+ assert.equal(list.querySelector('[data-fd-row-open="r6"]'),row);assert.equal(list.scrollTop,300);
+ assert.equal(w.document.activeElement,row);assert.equal(row.getAttribute('aria-selected'),'true');assert.equal(row.querySelector('input').checked,true);
+ assert.match(w.genericView.querySelector('.fd-selected-request').textContent,/Client 6/);
+ row.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));await settle();
+ assert.equal(navigation.at(-1).options.jobId,'j6');
+});
+test('Delivery retains the scrolled row through selection and delayed photo responses',async t=>{
+ const {w,jobs}=setup(t,'delivery');jobs.splice(0,jobs.length,...Array.from({length:10},(_,i)=>({id:'j'+i,title:'Delivery '+i,status:'Ready for Delivery'})));
+ const base=w.json;let release;const pending=new Promise(r=>release=r);
+ w.json=async(url,options)=>url.includes('/media?')?(await pending,{assets:[],totalAssets:40}):base(url,options);
+ await w.StudioWorkflowViews.showDelivery();
+ const list=w.genericView.querySelector('.workflow-table-scroll'),row=list.querySelector('[data-delivery-row="j6"]');
+ list.scrollTop=300;row.focus();row.querySelector('input').click();
+ assert.equal(list.querySelector('[data-delivery-row="j6"]'),row);assert.equal(row.getAttribute('aria-selected'),'true');
+ release();await settle();await settle();
+ assert.equal(w.genericView.querySelector('.workflow-table-scroll'),list);assert.equal(list.scrollTop,300);
+ assert.match(w.genericView.querySelector('.workflow-detail').textContent,/Delivery 6/);
+ assert.equal(list.querySelectorAll('[aria-selected="true"]').length,1);
+});

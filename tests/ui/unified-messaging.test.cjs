@@ -80,3 +80,17 @@ test('Inbound history renders the reply with recoverable collapsed original',asy
   assert.ok(details.textContent.includes(body));
  }finally{f.dom.window.close();}
 });
+
+
+test('scrolled inbox selection and the following read refresh preserve the seventh message row',async()=>{
+ const {dom,w}=fixture();try{
+ const base=w.json;
+ w.json=async url=>{if(url.startsWith('/api/messages/inbox'))return {total:10,items:Array.from({length:10},(_,i)=>({thread:{id:'thread-1',kind:'Thread',title:'Portrait'},message:{id:'message-'+(i+1),senderUserName:'paul',subject:'Photo '+(i+1),body:'Hello',createdAtUtc:'2026-10-11T16:00:00Z'}}))};return base(url);};
+ await w.showStudioMessages();
+ const list=w.document.getElementById('studioInboxRows'),row=list.querySelector('[data-inbox-message="message-7"]');
+ list.scrollTop=300;row.focus();row.click();await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));
+ assert.equal(w.document.getElementById('studioInboxRows'),list);assert.equal(list.querySelector('[data-inbox-message="message-7"]'),row);
+ assert.equal(list.scrollTop,300);assert.equal(w.document.activeElement,row);assert.equal(row.classList.contains('selected'),true);
+ assert.equal(list.querySelectorAll('.selected').length,1);
+ }finally{dom.window.close();}
+});

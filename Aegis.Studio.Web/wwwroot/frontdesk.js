@@ -111,7 +111,7 @@ function openFrontDeskJob(jobId){
     return Promise.reject(new Error('Job navigation is unavailable.'));
 }
 
-function renderFrontDesk(){
+function renderFrontDesk(selectionOnly=false){
     const searchNode=genericView.querySelector('#frontDeskSearch');
     const searchFocused=searchNode===document.activeElement;
     const searchSelection=searchNode?[searchNode.selectionStart,searchNode.selectionEnd]:null;
@@ -172,6 +172,15 @@ function renderFrontDesk(){
     const activeTab=frontDeskTab==='sales'?'sales':frontDeskMetricView==='confirmation'?'confirmation':frontDeskMetricView==='deposits'?'deposits':'today';
     const tabsMarkup='<nav class="fd-work-tabs" aria-label="Front Desk tasks">'+tabs.map(([key,label])=>`<button type="button" data-fd-tab="${key}" aria-current="${activeTab===key?'page':'false'}">${label}</button>`).join('')+'</nav>';
     const detail=selected?frontDeskSelectedMarkup(selected):'<section class="fd-selected-request"><p>Select a request to review it.</p></section>';
+    if(selectionOnly){
+        genericView.querySelectorAll('[data-fd-row-open]').forEach(row=>{
+            const active=row.dataset.fdRowOpen===String(frontDeskSelectedEntry);
+            row.setAttribute('aria-selected',String(active));row.querySelector('input[type="radio"]').checked=active;
+        });
+        genericView.querySelector('.fd-selected-request').outerHTML=detail;
+        bindFrontDeskSelection(selected);
+        return;
+    }
     const sales='<section class="fd-selected-request"><h2>Front Desk · Point of Sale</h2><p>Sales, deposits, payments and receipts remain linked to the client and job.</p><div class="workflow-detail-actions">'+[['NewSale','New Sale'],['TakePayment','Record Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['ViewReceipt','View Receipt'],['CloseRegister','Close Register']].map(([key,label])=>`<button type="button" class="action" data-fd-sale-action="${key}">${label}</button>`).join('')+'</div></section>';
     const metric=(key,label,count,note)=>`<div class="workspace-summary-row"><span aria-hidden="true">${({enquiries:'✉',deposits:'$',confirmation:'✓',unassigned:'▣'})[key]}</span><button type="button" class="fd-overview-link" data-fd-metric="${key}" aria-pressed="${frontDeskMetricView===key}" title="${esc(note)}">${esc(label)}</button><strong>${count}</strong></div>`;
     genericView.innerHTML=`<div class="fd-page">
@@ -247,13 +256,13 @@ function renderFrontDesk(){
         };
         row.addEventListener('click',event=>{
             if(event.target.closest('button,a,select'))return;
-            frontDeskSelectedEntry=row.dataset.fdRowOpen;renderFrontDesk();
+            frontDeskSelectedEntry=row.dataset.fdRowOpen;renderFrontDesk(true);
         });
         row.addEventListener('dblclick',open);
         row.addEventListener('keydown',event=>{
             if(event.target!==row||!['Enter',' '].includes(event.key))return;
             event.preventDefault();
-            frontDeskSelectedEntry=row.dataset.fdRowOpen;renderFrontDesk();
+            frontDeskSelectedEntry=row.dataset.fdRowOpen;renderFrontDesk(true);
         });
     });
     genericView.querySelectorAll('[data-fd-enquiry]').forEach(b=>b.onclick=()=>openPendingBookingForm(frontDeskEnquiries.find(e=>e.id===b.dataset.fdEnquiry)));
