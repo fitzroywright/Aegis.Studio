@@ -97,8 +97,9 @@ function editCommercialTemplate(current,kind){
 let commercialQueueArea='',commercialDue='';
 const productionJobGroups=[['','All Job Groups'],['waiting','Tasks blocked / waiting'],['overdue','Jobs with overdue tasks'],['item-rework','Recorded QC rework'],['refunds','Produced units refunded'],['unassigned','Unassigned'],['handoffs','Handoffs'],['unknown','Due date unknown']];
 let productionBoardController=null;
-async function showCatalogProduction({preserveFilters=false}={}){
+async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
     if(!preserveFilters&&!window.studioProductionScopeRequested){window.studioWorkloadSelection={filter:'',workspace:'',assignee:'',stage:'',search:''};commercialQueueArea='';commercialDue='';commercialIncludeCompleted=true;}
+    if(workspaceId!==undefined){window.studioWorkloadSelection||={};window.studioWorkloadSelection.workspace=String(workspaceId||'');}
     window.studioProductionScopeRequested=false;
     clearTimeout(window.productionBoardSearchTimer);
     productionBoardController?.abort();productionBoardController=new AbortController();const signal=productionBoardController.signal;
@@ -206,6 +207,7 @@ async function openCommercialWorkOrder(order){
     });
     d.querySelector('[data-resolve]')?.addEventListener('click',async()=>{try{await json(`/api/production/work-orders/${order.id}/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:d.querySelector('[data-note]').value})});d.close();await showCatalogProduction({preserveFilters:true});}catch(err){error(err);}});
 }
+
 
 
 

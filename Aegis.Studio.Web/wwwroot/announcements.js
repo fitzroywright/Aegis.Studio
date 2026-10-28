@@ -18,6 +18,7 @@
             if (results.every(result=>result.status==='fulfilled')) sessionStorage.setItem('studio-announcements-login', identity);
             if (!items.length) return;
             const host = document.createElement('section');
+            host.hidden = document.body.dataset.studioView === 'dashboard';
             host.id = 'studioLoginAnnouncements';host.className = 'workspace-announcement-banners';
             host.setAttribute('aria-label','Staff announcements. Click an announcement or use arrow keys to move between announcements.');host.tabIndex = 0;
             const updatePositions=()=>{host.dataset.multiple=String(host.children.length>1);[...host.children].forEach((article,index)=>{article.querySelector('.workspace-announcement-position').textContent=(index+1)+' of '+host.children.length+(host.children.length>1?' · Click for next':'');});};
@@ -96,3 +97,4 @@
     window.StudioAnnouncements = {showAtLogin,attachComposer};
     window.studioSignedInUserReady?.then(showAtLogin).catch(error=>console.error('Announcement sign-in check failed.',error));
 })();
+

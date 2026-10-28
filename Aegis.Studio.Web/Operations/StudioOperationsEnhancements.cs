@@ -34,11 +34,13 @@ public static class StudioOperationsEnhancements
             command.ExecuteNonQuery();
         }
 
-        if (workspaces.FindByRouteKey(FinanceRouteKey) is null)
-        {
-            int nextSort = workspaces.GetAll(true).Select(x => x.SortOrder).DefaultIfEmpty(0).Max() + 10;
-            workspaces.Create(new SaveWorkspaceRequest("Accounts / Finance", null, FinanceRouteKey, true, nextSort));
-        }
+        // Retire the former system workspace while retaining every historical ID and record.
+        using NpgsqlConnection retirementConnection = database.OpenConnection();
+        using NpgsqlCommand retirement = retirementConnection.CreateCommand();
+        retirement.CommandText = "update studio_workspaces set is_enabled=false, updated_at_utc=now() where lower(route_key)=$1 and is_enabled";
+        retirement.Parameters.AddWithValue(FinanceRouteKey);
+        retirement.ExecuteNonQuery();
+
     }
 
     public static void MapStudioOperationsEnhancements(this WebApplication app)
@@ -130,11 +132,9 @@ public static class StudioOperationsEnhancements
 
             if (kind == "finance")
             {
-                StudioWorkspaceDefinition? finance = workspaces.FindByRouteKey(FinanceRouteKey);
-                if (finance is null) return Results.Problem("Accounts / Finance workspace is unavailable.");
-                recipients = workspaceAccess.GetMembers(finance.Id)
-                    .Where(x => x.IsActive && IsWorkspaceManager(x.Permissions))
-                    .Select(x => (x.UserName,x.DisplayName)).ToList();
+                GlobalOperationalRole? financeRole = roles.GetRoles().FirstOrDefault(x => x.IsActive && x.Name == StudioRoleNames.FinanceManager);
+                recipients = financeRole is null ? [] : roles.GetMembers(financeRole.Id)
+                    .Where(x => x.IsActive).Select(x => (x.UserName,x.DisplayName)).ToList();
                 targetLabel = "Accounts / Finance";
             }
             else if (kind == "escalate" && string.Equals(request.EscalationTarget, "Operations Manager", StringComparison.OrdinalIgnoreCase))
@@ -297,4 +297,5 @@ public static class StudioOperationsEnhancements
 public sealed record FrontDeskCreateJobRequest(Guid WorkspaceId,string Title,DateOnly? EventDate);
 public sealed record FrontDeskCommunicationRequest(string? Kind,string Body,string? EscalationTarget=null);
 public sealed record MessageAttachmentLinkRequest(Guid MessageId,string? MessageKind,Guid? JobId);
+
 

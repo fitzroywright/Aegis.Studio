@@ -4,7 +4,7 @@
     const shell = document.querySelector('.shell');
     const navigationIcon = artwork => '<svg class="studio-navigation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+artwork+'</svg>';
     const quickLinks = [
-        ['today', 'Today', navigationIcon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/><path class="studio-navigation-accent" d="m8 15 3 3 5-5"/>')],
+        ['dashboard', 'Dashboard', navigationIcon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/><path class="studio-navigation-accent" d="m8 15 3 3 5-5"/>')],
         ['frontdesk', 'Front Desk', navigationIcon('<path d="M3 12h18v9H3zM2 12h20M8 12V9a4 4 0 0 1 8 0v3"/><path class="studio-navigation-accent" d="M12 3v2M7 17h4"/>')],
         ['clients', 'Clients', navigationIcon('<circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3"/><path class="studio-navigation-accent" d="M16 4a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5v2"/>')],
         ['jobs', 'Jobs', navigationIcon('<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V4h8v3M3 12a24 24 0 0 0 18 0"/><path class="studio-navigation-accent" d="M10 13h4v3h-4z"/>')],
@@ -12,12 +12,12 @@
         ['schedule', 'Schedule', navigationIcon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/><path class="studio-navigation-accent" d="M7 14h3m4 0h3M7 18h3"/>')],
         ['media', 'Media', navigationIcon('<rect x="5" y="6" width="16" height="15" rx="2"/><path d="M17 3H5a2 2 0 0 0-2 2v12m2 1 5-5 4 4 3-3 4 4"/><circle class="studio-navigation-accent" cx="16.5" cy="10.5" r="1.5"/>')]
     ];
-    let currentView = document.body.dataset.studioView || 'today';
+    let currentView = document.body.dataset.studioView || 'dashboard';
     const shellOverviews = new Map();
     const shellContexts = new Map();
     const shellAttention = new Map();
-    const overviewKey = () => document.body.dataset.studioView === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page') ? 'job-detail' : (document.body.dataset.studioView || 'today');
-    const defaultOverview = () => `<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><p>${escText(labelFor(document.body.dataset.studioView || 'today'))}</p><p>Use this page to ${escText((pageTaglines[document.body.dataset.studioView || 'today'] || 'manage Studio work').replace(/\.$/, '').toLowerCase())}.</p></section>`;
+    const overviewKey = () => document.body.dataset.studioView === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page') ? 'job-detail' : (document.body.dataset.studioView || 'dashboard');
+    const defaultOverview = () => `<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><p>${escText(labelFor(document.body.dataset.studioView || 'dashboard'))}</p><p>Use this page to ${escText((pageTaglines[document.body.dataset.studioView || 'dashboard'] || 'manage Studio work').replace(/\.$/, '').toLowerCase())}.</p></section>`;
     let renderingTools = false;
     let workspaceLoadPromise = null;
     let workspaceLoadAttempted = false;
@@ -41,7 +41,7 @@
 
     // One purpose-driven tagline per page; keep all masthead descriptions here.
     const pageTaglines = {
-        today: 'Review your jobs, upcoming sessions and items needing attention.',
+        dashboard: 'Company-wide sessions, intake, production and delivery.',
         jobs: 'Find, filter and manage jobs across Studio workspaces.',
         tasks: 'Review assignments, deadlines and completed work across Studio.',
         workspaces: 'Manage workspace jobs, messaging, media and activity.',
@@ -173,7 +173,7 @@
         const jobPage=document.body.dataset.studioView==='workspaces'?document.querySelector('#conversationView.has-open-job .job-detail-page'):null;
         const jobActions=[['activity','Activity','◷','ready'],['messages','Messages & Notes','✉','ready'],['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready'],['template-workflow','Template Workflow','◇','ready'],['reminders','Client Reminders','◷','ready']];
         const workflowActions=window.StudioWorkflowViews?.actions(document.body.dataset.studioView);
-        const actionItems=workflowActions?workflowActions.map(([key,label])=>'<button type="button" data-workflow-action="'+key+'"><span>'+escText(label)+'</span></button>').join(''):jobPage?jobActions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''):'<button type="button" data-studio-new-booking><span>＋</span><span>New Booking</span></button>'+(document.body.dataset.studioView==='today'?'<button type="button" data-studio-assign-job-lead><span>▣</span><span>Assign Job Lead</span></button>':'');
+        const actionItems=workflowActions?workflowActions.map(([key,label])=>'<button type="button" data-workflow-action="'+key+'"><span>'+escText(label)+'</span></button>').join(''):jobPage?jobActions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''):'<button type="button" data-studio-new-booking><span>＋</span><span>New Booking</span></button>';
         const financialActions=!workflowActions&&document.body.dataset.studioView==='frontdesk'?[['TakePayment','Take Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['NewSale','New Sale']].map(([action,label])=>'<button type="button" data-studio-financial-action="'+action+'"><span>$</span><span>'+label+'</span></button>').join(''):'';
         const pipelineScheduleAction=document.body.dataset.studioView==='schedule'&&window.history.state?.studioSchedulePanel==='pipeline'?'<button type="button" data-studio-schedule-item><span>▦</span><span>Schedule item</span></button>':'';
         ensureNavigationToolstrip();
@@ -246,6 +246,11 @@
         control.value = workspaces.some(workspace => String(workspace.id) === selectedId) ? selectedId : '';
         control.onchange = () => {
             const id = control.value;
+            if(document.body.dataset.studioView === 'dashboard'){
+                window.sessionStorage.setItem('studio.footer.workspace.selection',id);
+                window.StudioDashboard?.render();
+                return;
+            }
             if (!isProduction) window.sessionStorage.setItem('studio.footer.workspace.selection', id);
             if (isProduction) {
                 productionWorkspaceFilter.onSelect?.(id);
@@ -288,12 +293,16 @@
         return toggle;
     }
     function applyRailState() {
+        const dashboard = document.body.dataset.studioView === 'dashboard';
+        if(shell) shell.dataset.context = dashboard ? 'none' : 'page';
         const state = railState();
         const leftTargets = [document.getElementById('studioContextRail'), document.querySelector('.mw-today-left')].filter(Boolean);
         leftTargets.forEach(rail => {
+            rail.hidden = dashboard;
             rail.classList.toggle('studio-rail-collapsed-left', !!state.left);
             rail.dataset.shellRailReadyLeft = 'true';
             const toggle = placeRailToggle(rail, 'left', !!state.left);
+            toggle.hidden = dashboard;
             toggle.setAttribute('aria-expanded', String(!state.left));
             toggle.setAttribute('aria-label', (state.left ? 'Expand' : 'Collapse') + ' left rail');
             toggle.title = toggle.getAttribute('aria-label');
@@ -316,9 +325,9 @@
     window.studioSetBreadcrumb = items => {
         if (!breadcrumb) return;
         const supplied = Array.isArray(items) ? items.filter(Boolean) : [];
-        const crumbs = supplied[0]?.view === 'today'
+        const crumbs = supplied[0]?.view === 'dashboard'
             ? supplied
-            : [{ label: 'Today', view: 'today' }, ...supplied];
+            : [{ label: 'Dashboard', view: 'dashboard' }, ...supplied];
         breadcrumb.innerHTML = '<span class="breadcrumb-label">Navigation History</span>' + crumbs.map((item, index) => {
             const separator = index ? '<span class="breadcrumb-separator" aria-hidden="true">›</span>' : '';
             const last = index === crumbs.length - 1;
@@ -371,7 +380,7 @@
         syncPageFrame();
         applyRailState();
         syncGridFooterCount();
-        if(view!=='today'&&!breadcrumb?.querySelector('[data-studio-crumb="today"]')&&!breadcrumb?.querySelector('[data-shell-nav="today"]')){
+        if(view!=='dashboard'&&!breadcrumb?.querySelector('[data-studio-crumb="today"]')&&!breadcrumb?.querySelector('[data-shell-nav="today"]')){
             window.studioSetBreadcrumb([{label:labelFor(view),view}]);
         }
     }};
@@ -381,7 +390,7 @@
         if (view === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page')) {
             const count=document.getElementById('studioFooterRate'),page=document.querySelector('.job-detail-page');if(count)count.textContent=page.dataset.mediaCount!==undefined?page.dataset.mediaCount+' files · '+page.dataset.subjectCount+(page.dataset.subjectCount==='1'?' subject':' subjects'):'1 Job';return;
         }
-        if (view === 'today' || view === 'jobs' || view === 'frontdesk') return;
+        if (view === 'dashboard' || view === 'jobs' || view === 'frontdesk') return;
         const footer = document.getElementById('studioFooterRate');
         const root = document.getElementById('genericView');
         if (!footer || !root || root.classList.contains('hidden')) return;
@@ -412,7 +421,9 @@
     // The Today route is deliberately excluded from these structural changes.
     function syncPageFrame() {
         const view = document.body.dataset.studioView || currentView;
-        const isToday = view === 'today';
+        const isToday = view === 'dashboard';
+        const announcement = document.getElementById('studioLoginAnnouncements');
+        if(announcement) announcement.hidden = isToday;
 
         const main = shell?.querySelector('main');
         const masthead = document.querySelector('.topbar');
@@ -429,14 +440,14 @@
             const pageLabel = jobOpen ? 'Job Details' : labelFor(view);
             const heading = title.querySelector('strong');
             if (heading) {
-                if (isToday) heading.innerHTML = 'Today <em>Your focus</em>';
+                if (isToday) heading.innerHTML = 'Dashboard <em>Company overview</em>';
                 else heading.replaceChildren(document.createTextNode(pageLabel));
             }
             title.setAttribute('aria-label', pageLabel);
             const icon = title.querySelector('.mw-today-focus-icon');
             if (icon) icon.innerHTML = view === 'jobs' ? '<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16v14H4zM8 6V3h8v3M4 11h16M10 11v3h4v-3"/></svg>' : jobOpen ? '<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="13" r="4"/></svg>' : '✦';
             const tagline = title.querySelector('small');
-            if (tagline) tagline.textContent = isToday ? taglineFor('today') : jobOpen ? 'Review job details, assignments, workflow, media and conversations.' : taglineFor(view);
+            if (tagline) tagline.textContent = isToday ? taglineFor('dashboard') : jobOpen ? 'Review job details, assignments, workflow, media and conversations.' : taglineFor(view);
         }
         main.classList.add('studio-standard-main');
     }
@@ -668,7 +679,7 @@
         document.querySelector('[data-studio-home]')?.addEventListener('click', event => {
             if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
             event.preventDefault();
-            window.studioNavigate?.('today');
+            window.studioNavigate?.('dashboard');
         });
         currentView = document.body.dataset.studioView || currentView;
         ensureTools();
@@ -736,5 +747,6 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })()
+
 
 

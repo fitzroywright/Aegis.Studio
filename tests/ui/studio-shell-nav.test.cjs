@@ -17,27 +17,27 @@ function setup(){
  return {w,dom,calls};
 }
 
-test('breadcrumbs return to Today without leaving Studio',async t=>{
+test('breadcrumbs return to Dashboard without leaving Studio',async t=>{
  const {w,dom,calls}=setup();t.after(()=>dom.window.close());
  await w.studioNavigate('workspaces');w.StudioShell.sync('workspaces');
- w.document.querySelector('[data-studio-crumb="today"]').click();
+ w.document.querySelector('[data-studio-crumb="dashboard"]').click();
  await new Promise(r=>setTimeout(r,0));
- assert.deepEqual(calls,['workspaces','today']);assert.equal(w.location.href,'https://studio.test/');
+ assert.deepEqual(calls,['workspaces','dashboard']);assert.equal(w.location.href,'https://studio.test/');
 });
-test('Studio logo returns every page to Today through shared navigation',async t=>{
+test('Studio logo returns every page to Dashboard through shared navigation',async t=>{
  const html=fs.readFileSync(path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot/index.html'),'utf8');
  const dom=new JSDOM(html,{url:'https://studio.test/',runScripts:'outside-only'});t.after(()=>dom.window.close());
  const w=dom.window,calls=[];
  w.studioNavigate=async view=>{calls.push(view);};w.fetch=async()=>({ok:true,json:async()=>[]});
  w.eval(code);w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  const logo=w.document.querySelector('a[data-studio-home]');
- assert.ok(logo);assert.equal(logo.getAttribute('href'),'#studio=today');assert.match(logo.getAttribute('aria-label'),/Today/);
+ assert.ok(logo);assert.equal(logo.getAttribute('href'),'#studio=dashboard');assert.match(logo.getAttribute('aria-label'),/Dashboard/);
  for(const view of ['jobs','workspaces','frontdesk','schedule','production','clients','media']){
   w.document.body.dataset.studioView=view;w.StudioShell.sync(view);
   const event=new w.MouseEvent('click',{bubbles:true,cancelable:true,button:0});
   logo.querySelector('img').dispatchEvent(event);assert.equal(event.defaultPrevented,true);
  }
- assert.deepEqual(calls,Array(7).fill('today'));
+ assert.deepEqual(calls,Array(7).fill('dashboard'));
  const modified=new w.MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:true});
  logo.dispatchEvent(modified);assert.equal(modified.defaultPrevented,false);assert.equal(calls.length,7);
 });
@@ -45,9 +45,9 @@ test('shared shell keeps contextual cards and one navigation toolstrip',async t=
  const {w,dom}=setup();t.after(()=>dom.window.close());await w.studioNavigate('production');w.StudioShell.sync('production');
  const rail=w.document.getElementById('studioContextRail');
  assert.deepEqual([...rail.querySelectorAll('h2')].map(e=>e.textContent.trim().replace(/^[^A-Za-z]+/,'')),['Overview','Actions']);
- for(const view of ['today','jobs','frontdesk'])assert.ok(w.document.querySelector('#studioNavigationTools [data-studio-side="'+view+'"]'));
+ for(const view of ['dashboard','jobs','frontdesk'])assert.ok(w.document.querySelector('#studioNavigationTools [data-studio-side="'+view+'"]'));
  assert.equal(rail.querySelector('[data-rail-card="navigation"]'),null);
- assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*Production/);
+ assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Dashboard.*Production/);
 });
 
 test('navigation stays available without a reveal control or pointer interaction',t=>{
@@ -151,7 +151,7 @@ test('shared footer restores count and keeps history and workspace selection acr
  assert.ok(workspace);assert.equal(count.nextElementSibling,workspace);
  workspace.value='studio-b';workspace.dispatchEvent(new w.Event('change'));
  assert.deepEqual(selected,[{id:'studio-b',name:'Studio B'}]);
- for(const view of ['jobs','frontdesk','today']){
+ for(const view of ['jobs','frontdesk','dashboard']){
   w.document.body.dataset.studioView=view;w.StudioShell.sync(view);
   assert.equal(w.document.getElementById('studioShellFooter'),footer);
   assert.equal(footer.querySelector('#studioFooterWorkspaces').value,'studio-b');
@@ -160,11 +160,12 @@ test('shared footer restores count and keeps history and workspace selection acr
 });
 
 
-test('Today through Media use restrained line icons without changing routes or labels',t=>{
+test('Dashboard through Media use restrained line icons without changing routes or labels',t=>{
  const {w,dom,calls}=setup();t.after(()=>dom.window.close());
- const expected=[['today','Today'],['frontdesk','Front Desk'],['clients','Clients'],['jobs','Jobs'],['production','Production'],['schedule','Schedule'],['media','Media']];
+ const expected=[['dashboard','Dashboard'],['frontdesk','Front Desk'],['clients','Clients'],['jobs','Jobs'],['production','Production'],['schedule','Schedule'],['media','Media']];
  const buttons=[...w.document.querySelectorAll('#studioNavigationTools [data-studio-side]')];
  assert.deepEqual(buttons.map(b=>[b.dataset.studioSide,b.textContent]),expected);
  for(const button of buttons){const icon=button.querySelector('svg.studio-navigation-icon');assert.ok(icon);assert.equal(icon.getAttribute('viewBox'),'0 0 24 24');assert.equal(icon.getAttribute('aria-hidden'),'true');assert.equal(icon.getAttribute('fill'),'none');assert.equal(icon.getAttribute('stroke'),'currentColor');assert.ok(icon.querySelector('.studio-navigation-accent'));assert.equal(icon.querySelector('[fill]'),null);button.click();}
  assert.deepEqual(calls,expected.map(([key])=>key));
 });
+
