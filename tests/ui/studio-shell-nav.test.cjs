@@ -41,9 +41,11 @@ test('Studio logo returns every page to Dashboard through shared navigation',asy
  const modified=new w.MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:true});
  logo.dispatchEvent(modified);assert.equal(modified.defaultPrevented,false);assert.equal(calls.length,7);
 });
-test('shared shell keeps contextual cards and one navigation toolstrip',async t=>{
+test('shared shell exposes contextual commands in a page menu with one navigation toolstrip',async t=>{
  const {w,dom}=setup();t.after(()=>dom.window.close());await w.studioNavigate('production');w.StudioShell.sync('production');
- const rail=w.document.getElementById('studioContextRail');
+ const rail=w.document.getElementById('studioPageContext');
+ assert.equal(w.document.querySelector('.shell>aside'),null);assert.equal(w.document.querySelector('[data-rail-toggle]'),null);
+ assert.ok(rail.closest('#studioPageMenu'));
  assert.deepEqual([...rail.querySelectorAll('h2')].map(e=>e.textContent.trim().replace(/^[^A-Za-z]+/,'')),['Overview','Actions']);
  for(const view of ['dashboard','jobs','frontdesk'])assert.ok(w.document.querySelector('#studioNavigationTools [data-studio-side="'+view+'"]'));
  assert.equal(rail.querySelector('[data-rail-card="navigation"]'),null);
@@ -88,17 +90,22 @@ test('navigation buttons accept keyboard focus and direct activation',t=>{
  assert.equal(w.document.activeElement,button);
 });
 
-test('collapsed side rail persists while navigation stays accessible',async t=>{
+test('all pages omit the rail even with a stored collapse preference; page actions remain usable',async t=>{
  const {w,dom}=setup();t.after(()=>dom.window.close());
- const toggle=w.document.querySelector('[data-rail-toggle="left"]');
- toggle.click();
- assert.equal(w.document.getElementById('studioContextRail').classList.contains('studio-rail-collapsed-left'),true);
- assert.equal(JSON.parse(w.localStorage.getItem('aegis.studio.rail-collapse.v1')).left,true);
+ w.localStorage.setItem('aegis.studio.rail-collapse.v1',JSON.stringify({left:false}));
+ let bookings=0;w.studioLaunchNewBooking=()=>bookings++;
+ for(const view of ['frontdesk','jobs','schedule','media','workspaces','clients','production','about','staff-roles','templates','workspace-management','dashboard']){
+  await w.studioNavigate(view);w.StudioShell.sync(view);
+  assert.equal(w.document.getElementById('studioContextRail'),null);
+  assert.equal(w.document.querySelector('[data-rail-toggle]'),null);
+  const menu=w.document.getElementById('studioPageMenu');assert.equal(menu.hidden,view==='dashboard');
+  assert.notEqual(w.document.getElementById('studioNavigationTools').inert,true);
+ }
  await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
- assert.equal(toggle.getAttribute('aria-expanded'),'false');
- assert.equal(toggle.getAttribute('aria-label'),'Expand left rail');
- assert.notEqual(w.document.getElementById('studioNavigationTools').inert,true);
- toggle.click();assert.equal(toggle.getAttribute('aria-expanded'),'true');
+ const menu=w.document.getElementById('studioPageMenu');menu.open=true;
+ menu.querySelector('[data-studio-new-booking]').click();assert.equal(bookings,1);assert.equal(menu.open,false);
+ menu.open=true;menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.open,false);
+ menu.open=true;await w.studioNavigate('jobs');w.StudioShell.sync('jobs');assert.equal(menu.open,false);
 });
 
 test('toolstrip ends with the existing bell and avatar while their menus remain usable',async t=>{

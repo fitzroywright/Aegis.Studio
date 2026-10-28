@@ -66,21 +66,6 @@ body[data-theme="fluent-dark"] :is(.mw-list-panel,.studio-context-card,.st-card,
 body[data-theme="fluent-dark"] :is(.mw-list-panel,.studio-context-card,.st-card,.op-card,.mw-card,.sj-card,.sj-rail-card)>header :is(h2,h3) {
   color:var(--theme-text)!important;
 }
-
-/* Explicit ID scope overrides the canonical rail's stronger role rules. */
-body[data-theme="fluent-dark"] #studioContextRail>[data-rail-card] {
-  --studio-rail-title:var(--theme-text);
-  --studio-card-header-text:var(--theme-text);
-  --studio-rail-accent:var(--dark-card-border);
-  background:var(--theme-surface)!important;
-  border-color:var(--dark-card-border)!important;
-}
-body[data-theme="fluent-dark"] #studioContextRail>[data-rail-card]>header {
-  background:var(--dark-card-title)!important;
-  color:var(--theme-text)!important;
-  border-bottom-color:var(--dark-card-border)!important;
-}
-body[data-theme="fluent-dark"] #studioContextRail>[data-rail-card]>header h2 {color:var(--theme-text)!important;}
 body[data-theme="fluent-dark"] :is([data-rail-card="actions"],[data-mw-region="actions"]) {--dark-card-border:#9375c8;--dark-card-title:#332b48;}
 body[data-theme="fluent-dark"] :is([data-rail-card="workspaces"],[data-mw-region="quick-links"],[data-mw-region="tasks"]) {--dark-card-border:#579f83;--dark-card-title:#233c35;}
 
@@ -103,9 +88,6 @@ body[data-theme="fluent-dark"] :is(.st-card-body,.message-content) {background:v
 body[data-theme="fluent-dark"] :is(.mw-today-job-row,.mw-status-row,.job-row):not(:hover):not(:focus-visible) {background:var(--theme-surface);color:var(--theme-text);border-color:var(--studio-grid-border);}
 body[data-theme="fluent-dark"] :is(.mw-today-rail-links button,.studio-media-tree-node):hover {background:var(--theme-accent-soft);}
 body[data-theme="fluent-dark"] :is(.mw-today-rail-links button,.mw-action-list button,.mw-quick-link-list button) {color:var(--theme-text);}
-body[data-theme="fluent-dark"] #studioContextRail .mw-today-rail-links button>span:first-child {background:#294257;color:#82bfff;}
-body[data-theme="fluent-dark"] #studioContextRail [data-rail-card="actions"] .mw-today-rail-links button>span:first-child {background:#49385e;color:#ceb4f5;}
-body[data-theme="fluent-dark"] #studioContextRail [data-rail-card="workspaces"] .mw-today-rail-links button>span:first-child {background:#2f5446;color:#95dab8;}
 
 /* Controls stay dark and readable, including focused grid searches. */
 body[data-theme="fluent-dark"] :is(input,select,textarea,.theme-picker) {background:#1a2836;color:var(--theme-text);border-color:var(--studio-control-border)!important;accent-color:var(--theme-accent);}
@@ -147,3 +129,4 @@ body[data-theme="fluent-dark"] :is(.sj-pill.sj-purple) {background:#392d4d;color
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-teal,.sj-pill.sj-green,.jd-status-pill) {background:#254338;color:#a0e0bd;border-color:#579f83;}
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-amber,.jd-compact-exception.current) {background:#483b26;color:#f5d395;border-color:#aa874e;}
 body[data-theme="fluent-dark"] :is(.sj-pill.sj-red,.jd-flow-terminal) {background:#482d37;color:#ffb9c7;border-color:#bb6f83;}
+

@@ -129,18 +129,27 @@
         target.title = 'Logged in User: ' + identity;
     }
 
-    function ensureLeftRail() {
-        if (!shell) return;
-        let rail = document.getElementById('studioContextRail');
-        if (!rail) {
-            rail = document.createElement('aside');
-            rail.id = 'studioContextRail';
-            rail.className = 'studio-context-rail';
-            rail.setAttribute('aria-label', 'Page navigation');
-            shell.prepend(rail);
+    function ensurePageMenu() {
+        if (!pageTools) return;
+        let menu = document.getElementById('studioPageMenu');
+        if (!menu) {
+            menu = document.createElement('details');
+            menu.id = 'studioPageMenu';
+            menu.className = 'studio-page-menu';
+            menu.innerHTML = '<summary>Page actions <span aria-hidden="true">⌄</span></summary><div id="studioPageContext" class="studio-page-menu-content"></div>';
+            pageTools.append(menu);
+            menu.addEventListener('click', event => {
+                if (event.target.closest('button:not(:disabled)')) menu.open = false;
+            });
+            document.addEventListener('click', event => {
+                if (!menu.contains(event.target)) menu.open = false;
+            });
+            menu.addEventListener('keydown', event => {
+                if (event.key === 'Escape') { menu.open = false; menu.querySelector('summary').focus(); }
+            });
         }
-        renderLeftRail();
-        applyRailState();
+        menu.hidden = currentView === 'dashboard' || currentView === 'today';
+        renderPageMenu();
     }
 
     function ensureWorkspaceListLoaded() {
@@ -152,24 +161,19 @@
             workspaceLoadAttempted = false;
         }).finally(() => {
             workspaceLoadPromise = null;
-            renderLeftRail();
+            renderPageMenu();
         });
         return workspaceLoadPromise;
     }
 
-    function renderLeftRail() {
-        const rail = document.getElementById('studioContextRail');
+    function renderPageMenu() {
+        const rail = document.getElementById('studioPageContext');
         if (!rail) return;
         const cache=typeof workspaceCache!=='undefined'?workspaceCache:window.workspaceCache;
         const workspaces = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
             ? productionWorkspaceFilter.workspaces
             : (Array.isArray(cache) ? cache : []).filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false);
-        const workspaceItems = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
-            ? '<button type="button" data-production-workspace="" class="' + (!productionWorkspaceFilter.selected ? 'active' : '') + '" aria-pressed="' + String(!productionWorkspaceFilter.selected) + '"><span>▣</span><span>All Workspaces</span></button>' + workspaces.map(workspace => '<button type="button" data-production-workspace="' + escText(workspace.id) + '" class="' + (String(productionWorkspaceFilter.selected) === String(workspace.id) ? 'active' : '') + '" aria-pressed="' + String(String(productionWorkspaceFilter.selected) === String(workspace.id)) + '"><span>▣</span><span>' + escText(workspace.name || workspace.title || workspace.displayName || 'Workspace') + '</span></button>').join('')
-            : workspaces.map(workspace => '<button type="button" data-studio-workspace-id="' + escText(workspace.id) + '"><span>▣</span><span>' + escText(workspace.name) + '</span></button>').join('');
-        const scheduleWorkspaceItems=document.body.dataset.studioView==='schedule'?window.StudioScheduleWorkspaceCard?.markup():null;
-        // All views share the exact Today rail markup and presentation.
-        // Job Detail retains its contextual actions in the shared Actions card.
+        // Contextual commands share one menu on every page.
         const jobPage=document.body.dataset.studioView==='workspaces'?document.querySelector('#conversationView.has-open-job .job-detail-page'):null;
         const jobActions=[['activity','Activity','◷','ready'],['messages','Messages & Notes','✉','ready'],['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready'],['template-workflow','Template Workflow','◇','ready'],['reminders','Client Reminders','◷','ready']];
         const workflowActions=window.StudioWorkflowViews?.actions(document.body.dataset.studioView);
@@ -264,59 +268,6 @@
         };
     }
 
-    const railStorage = 'aegis.studio.rail-collapse.v1';
-    function railState() {
-        try { return JSON.parse(localStorage.getItem(railStorage) || '{}'); } catch { return {}; }
-    }
-    function setRailState(side, collapsed) {
-        const state = railState(); state.left = collapsed; delete state.right;
-        try { localStorage.setItem(railStorage, JSON.stringify(state)); } catch {}
-        applyRailState();
-    }
-    function railButton(side, collapsed) {
-        const button = document.createElement('button');
-        button.type = 'button'; button.className = 'studio-rail-toggle';
-        button.dataset.railToggle = side;
-        button.setAttribute('aria-expanded', String(!collapsed));
-        button.setAttribute('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + side + ' rail');
-        button.title = button.getAttribute('aria-label');
-        button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>';
-        button.dataset.chevronDirection = collapsed ? 'right' : 'left';
-        button.onclick = () => setRailState(side, !railState()[side]);
-        return button;
-    }
-    function placeRailToggle(rail, side, collapsed) {
-        let toggle = shell.querySelector('[data-rail-toggle="' + side + '"]');
-        if (!toggle) toggle = railButton(side, collapsed);
-        toggle.classList.add('studio-shell-rail-toggle');
-        if (toggle.parentElement !== shell) shell.append(toggle);
-        return toggle;
-    }
-    function applyRailState() {
-        const dashboard = document.body.dataset.studioView === 'dashboard';
-        if(shell) shell.dataset.context = dashboard ? 'none' : 'page';
-        const state = railState();
-        const leftTargets = [document.getElementById('studioContextRail'), document.querySelector('.mw-today-left')].filter(Boolean);
-        leftTargets.forEach(rail => {
-            rail.hidden = dashboard;
-            rail.classList.toggle('studio-rail-collapsed-left', !!state.left);
-            rail.dataset.shellRailReadyLeft = 'true';
-            const toggle = placeRailToggle(rail, 'left', !!state.left);
-            toggle.hidden = dashboard;
-            toggle.setAttribute('aria-expanded', String(!state.left));
-            toggle.setAttribute('aria-label', (state.left ? 'Expand' : 'Collapse') + ' left rail');
-            toggle.title = toggle.getAttribute('aria-label');
-            toggle.dataset.chevronDirection = state.left ? 'right' : 'left';
-        });
-    }
-
-    const railObserver = new MutationObserver(() => {
-        const leftSelector = '#studioContextRail, .mw-today-left';
-        const missingLeft = Array.from(document.querySelectorAll(leftSelector))
-            .some(rail => rail.dataset.shellRailReadyLeft !== 'true');
-        if (missingLeft) applyRailState();
-    });
-    railObserver.observe(document.body, { childList: true, subtree: true });
     function ensureBreadcrumb() {
         if (!breadcrumb || breadcrumb.children.length) return;
         window.studioSetBreadcrumb?.([{ label: labelFor(currentView), view: currentView }]);
@@ -362,23 +313,23 @@
             card.dataset.railCard = 'context';
         }
         shellContexts.set(view, cards);
-        if (view === overviewKey()) renderLeftRail();
+        if (view === overviewKey()) renderPageMenu();
     };
 
     window.StudioShell={
         setProductionWorkspaceFilter(workspaces, selected, onSelect) {
             productionWorkspaceFilter = { workspaces: Array.isArray(workspaces) ? workspaces : [], selected: selected || '', onSelect };
-            if (document.body.dataset.studioView === 'production') renderLeftRail();
+            if (document.body.dataset.studioView === 'production') renderPageMenu();
         },
         sync(view=document.body.dataset.studioView||currentView){
+        if (currentView !== view) { const menu = document.getElementById('studioPageMenu'); if (menu) menu.open = false; }
         currentView=view;
         ensureTools();
         initializeAttentionDrawer();
         refreshPageDrawers();
-        ensureLeftRail();
+        ensurePageMenu();
         ensureWorkspaceListLoaded();
         syncPageFrame();
-        applyRailState();
         syncGridFooterCount();
         if(view!=='dashboard'&&!breadcrumb?.querySelector('[data-studio-crumb="today"]')&&!breadcrumb?.querySelector('[data-shell-nav="today"]')){
             window.studioSetBreadcrumb([{label:labelFor(view),view}]);
@@ -684,7 +635,7 @@
         currentView = document.body.dataset.studioView || currentView;
         ensureTools();
         ensureFooter();
-        ensureLeftRail();
+        ensurePageMenu();
         ensureWorkspaceListLoaded();
         syncFooterIdentity();
         const identityNode = document.getElementById('signedInUser');
@@ -696,10 +647,10 @@
         loadSharedSessions();
         void loadSharedAttention();
         syncGridFooterCount();
-        window.addEventListener('studio-jobs-view-changed',()=>{renderLeftRail();syncPageFrame();});
-        window.addEventListener('studio-workflow-capabilities',renderLeftRail);
+        window.addEventListener('studio-jobs-view-changed',()=>{renderPageMenu();syncPageFrame();});
+        window.addEventListener('studio-workflow-capabilities',renderPageMenu);
         document.addEventListener('studio-workflow-changed',()=>{void loadSharedAttention();});
-        window.addEventListener('studio-workspaces-loaded',renderLeftRail);
+        window.addEventListener('studio-workspaces-loaded',renderPageMenu);
         document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
             window.studioNavigate?.('notifications');
@@ -712,13 +663,13 @@
             overview.classList.add('studio-context-card');
             overview.dataset.railCard = 'overview';
             shellOverviews.set(view, overview);
-            if (view === overviewKey()) renderLeftRail();
+            if (view === overviewKey()) renderPageMenu();
         };
         window.addEventListener('studio-shell-overview', event => {
             const detail = event.detail || {};
             window.studioShellSetOverview(detail.markup, detail.view);
         });
-        window.addEventListener('studio-job-view-changed',()=>{renderLeftRail();syncPageFrame();syncGridFooterCount();refreshPageDrawers();});
+        window.addEventListener('studio-job-view-changed',()=>{renderPageMenu();syncPageFrame();syncGridFooterCount();refreshPageDrawers();});
         // Job details and the workspace list share a route. Refresh the masthead
         // when the visible panel changes, not only when the route changes.
         const conversation=document.getElementById('conversationView');
@@ -737,7 +688,9 @@
             const next = document.body.dataset.studioView || currentView;
             if (next !== currentView) {
                 currentView = next;
-                renderLeftRail();
+                const menu = document.getElementById('studioPageMenu');
+                if (menu) { menu.open = false; menu.hidden = next === 'dashboard' || next === 'today'; }
+                renderPageMenu();
                 syncPageFrame();
                 refreshPageDrawers();
             }

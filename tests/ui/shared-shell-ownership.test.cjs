@@ -18,7 +18,7 @@ test('Today and other pages do not fork breadcrumb styles', () => {
   assert.match(css, /body \.topbar #studioBreadcrumb \.breadcrumb-label::after/);
 });
 test('shared shell owns the workspace selector', () => {
-  assert.match(shell, /function renderLeftRail\(/);
+  assert.match(shell, /function renderPageMenu\(/);
   assert.match(shell, /function renderFooterWorkspaceMenu\(/);
   const footer = css.match(/#studioShellFooter #studioFooterWorkspaces \{([^}]+)\}/);
   assert.ok(footer);
@@ -72,6 +72,7 @@ test('shell height has one owner and reserves the full footer below every page',
  assert.deepEqual(heights,[{selector:'body .shell',property:'height',value:'calc(100dvh - var(--studio-banner-height))'},{selector:'body .shell',property:'min-height',value:'0'}]);
  const properties=rules.find(rule=>rule.selector==='body .shell'&&rule.properties.height).properties;
  assert.equal(properties['grid-template-rows'],'minmax(0,1fr) var(--studio-footer-height)');
+ assert.equal(properties['grid-template-columns'],'minmax(0,1fr)');
  assert.equal(properties['box-sizing'],'border-box');assert.equal(properties.overflow,'hidden');
 });
 
@@ -84,3 +85,4 @@ test('footer participates in the reserved shell row instead of covering page con
  assert.match(footer,/height: var\(--studio-footer-height\);/);
  assert.doesNotMatch(footer,/position: fixed|(?:^|;)\s*(?:bottom|inset-inline):/);
 });
+

@@ -331,9 +331,9 @@ function mergeJobMessages(teamMessages, clientMessages) {
                 const action=window.StudioJobDetails.workflowAction(workflow);
                 const started=Date.parse(action?.task?.startedAtUtc||action?.task?.startedAt||'');
                 header.querySelector('[data-stage-age]').textContent=Number.isFinite(started)?'In workflow: '+Math.floor(Math.max(0,Date.now()-started)/86400000)+' days':'Timing unavailable';
-                const age=document.querySelector('#studioContextRail [data-job-overview-age]');
+                const age=document.querySelector('#studioPageContext [data-job-overview-age]');
                 if(age)age.textContent=header.querySelector('[data-stage-age]').textContent;
-                const next=document.querySelector('#studioContextRail [data-job-overview-action]');
+                const next=document.querySelector('#studioPageContext [data-job-overview-action]');
                 if(next)next.textContent=action?.task?.title || 'No outstanding action';
             };
             const openGraphAction=nodeId=>{const task=workflow?.tasks?.find(item=>item.nodeId===nodeId);window.StudioJobGraph.launchTask(job.id,task?.id).catch(error=>console.error('[Studio Job Details] Could not launch next action',error));};
@@ -372,7 +372,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
                         console.error('[Studio Job Details] Failed to load workflow graph for job '+job.id,error);
                         header.querySelector('.jd-next-action').replaceChildren();
                         header.querySelector('[data-stage-age]').textContent='Workflow unavailable';
-                        const overview=document.getElementById('studioContextRail');
+                        const overview=document.getElementById('studioPageContext');
                         const age=overview?.querySelector('[data-job-overview-age]');
                         if(age)age.textContent='Timing unavailable';
                         const next=overview?.querySelector('[data-job-overview-action]');
@@ -440,6 +440,7 @@ function mergeJobMessages(teamMessages, clientMessages) {
 
     }
 })();
+
 
 
 

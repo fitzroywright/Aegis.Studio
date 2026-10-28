@@ -10,9 +10,9 @@
   <link rel="stylesheet" href="/css/pages/pos.css?v=20261011-today-v1">
   <link rel="stylesheet" href="/css/components/profile.css?v=20261028-preferences-v2">
   <link rel="stylesheet" href="/css/pages/training.css?v=20260929-namefix">
-  <link rel="stylesheet" href="/css/components/studio-page.css?v=20261028-admin-grids-v1">
+  <link rel="stylesheet" href="/css/components/studio-page.css?v=20261028-no-left-rail-v1">
   <link rel="stylesheet" href="/css/components/studio-rows.css?v=20261027-admin-icons-speedbump-v1">
-  <link rel="stylesheet" href="/studio.css?v=20261028-today-no-status-cards-v1">
+  <link rel="stylesheet" href="/studio.css?v=20261028-no-left-rail-v1">
   <link rel="stylesheet" href="/css/pages/connected-workflow.css?v=20261011-compact-v1">
   <link rel="stylesheet" href="/css/components/job-workflow-display.css?v=20261022-job-details-flow-v7"><link rel="stylesheet" href="/css/pages/jobs-page.css?v=20261027-attention-items-v1">
 <link rel="stylesheet" href="/css/pages/frontdesk-filters.css?v=20261026-approved-views-v1">
@@ -30,12 +30,12 @@
   <link rel="stylesheet" href="/css/themes/standard.css?v=20261019-reverted-205-v1">
   <link rel="stylesheet" href="/css/themes/comfort.css?v=20261019-comfort-theme-v1">
   <link rel="stylesheet" href="/css/components/theme-surfaces.css?v=20261027-left-context-only-v1">
-  <link rel="stylesheet" href="/css/themes/light.css?v=20261027-white-background-v1">
-  <link rel="stylesheet" href="/css/themes/dark.css?v=20261027-attention-drawer-only-v1">
+  <link rel="stylesheet" href="/css/themes/light.css?v=20261028-no-left-rail-v1">
+  <link rel="stylesheet" href="/css/themes/dark.css?v=20261028-no-left-rail-v1">
 <link rel="stylesheet" href="/css/components/workflow-graph.css?v=20261027-left-context-only-v1">
   <link rel="stylesheet" href="/css/pages/clients.css?v=20261028-single-title-v1">
   <link rel="stylesheet" href="/css/pages/notifications.css?v=20261017-inbox-v1">
-  <link rel="stylesheet" href="/css/pages/photographer-schedule.css?v=20261028-single-title-v1">
+  <link rel="stylesheet" href="/css/pages/photographer-schedule.css?v=20261028-no-left-rail-v1">
   <link rel="stylesheet" href="/css/pages/production-planning.css?v=20261027-attention-drawer-only-v1">
   <link rel="stylesheet" href="/css/pages/workload-overview.css?v=20261026-remove-operations-v1">
   <link rel="stylesheet" href="/css/pages/tasks.css?v=20261027-attention-drawer-only-v1">
@@ -69,7 +69,6 @@
     <button id="topNewButton" class="primary top-new-button" type="button" hidden>＋ New</button>
   </header>
   <div class="shell">
-    <aside id="studioContextRail" class="studio-context-rail" aria-label="Page navigation"></aside>
     <main>
       <div class="studio-content-search" id="studioContentSearch"><form class="studio-global-search" id="studioSearchForm" role="search"><span class="studio-search-icon" aria-hidden="true">⌕</span><input id="studioSearch" type="search" placeholder="Search Studio" aria-label="Search Studio"><span class="studio-search-hint" aria-hidden="true">Jobs · clients · subjects</span></form></div>
       <section id="conversationView" class="three-pane">
@@ -114,19 +113,19 @@
   <script src="/subject-picker.js?v=20261012-combined-ui-v1"></script>
   <script src="/studio-email-body.js?v=20261021-reply-cleanup-v1"></script>
   <script src="/studio-message-card.js?v=20261012-shared-escape-fix-v1"></script>
-  <script src="/studio-page.js?v=20261027-obsolete-card-cleanup-v1"></script>
+  <script src="/studio-page.js?v=20261028-no-left-rail-v1"></script>
   <script src="/studio-attention.js?v=20261027-job-brief-attention-v1"></script>
   <script src="/job-brief.js?v=20261027-job-brief-attention-v1"></script>
-  <script src="/theme.js?v=20261027-stable-standard-theme-v1"></script><script src="/auth.js?v=20261027-admin-menu-v1"></script><script src="/profile.js?v=20261028-preferences-v2"></script><script src="/app.js?v=20261021-reply-cleanup-v1"></script><script src="/workspace-access.js?v=20261010-canonical-v1"></script><script src="/job-access.js?v=20261010-canonical-v1"></script><script src="/workspace-management.js?v=20261028-single-heading-v1"></script><script src="/workspaces.js?v=20261028-admin-grids-v1"></script><script src="/gallery.js?v=20261004-storage-recovery-v10"></script><script src="/gallery-security.js?v=20261004-storage-recovery-v10"></script><script src="/global-roles.js?v=20261028-admin-grids-v1"></script><script src="/calendar-layouts.js?v=20261027-layouts-v1"></script><script src="/scheduling.js?v=20261027-job-brief-attention-v1"></script><script src="/production.js?v=20261022-canonical-workflow-v1"></script><script src="/notifications.js?v=20261027-client-photos-staff-announcements-v1"></script><script src="/messages.js?v=20261027-client-photos-staff-announcements-v1"></script><script src="/pos.js?v=20261011-today-v1"></script><script src="/roster-editor.js?v=20261027-session-plan-workflow-v1"></script><script src="/intake-roster.js?v=20261027-session-plan-workflow-v1"></script><script src="/frontdesk.js?v=20261027-company-dashboard-v1"></script><script src="/attachments.js?v=20261010-canonical-v1"></script><script src="/management.js?v=20261027-job-brief-attention-v1"></script><script src="/training.js?v=20261004-storage-recovery-v10"></script>
+  <script src="/theme.js?v=20261027-stable-standard-theme-v1"></script><script src="/auth.js?v=20261027-admin-menu-v1"></script><script src="/profile.js?v=20261028-preferences-v2"></script><script src="/app.js?v=20261021-reply-cleanup-v1"></script><script src="/workspace-access.js?v=20261010-canonical-v1"></script><script src="/job-access.js?v=20261010-canonical-v1"></script><script src="/workspace-management.js?v=20261028-single-heading-v1"></script><script src="/workspaces.js?v=20261028-admin-grids-v1"></script><script src="/gallery.js?v=20261004-storage-recovery-v10"></script><script src="/gallery-security.js?v=20261004-storage-recovery-v10"></script><script src="/global-roles.js?v=20261028-admin-grids-v1"></script><script src="/calendar-layouts.js?v=20261027-layouts-v1"></script><script src="/scheduling.js?v=20261028-no-left-rail-v1"></script><script src="/production.js?v=20261022-canonical-workflow-v1"></script><script src="/notifications.js?v=20261027-client-photos-staff-announcements-v1"></script><script src="/messages.js?v=20261027-client-photos-staff-announcements-v1"></script><script src="/pos.js?v=20261011-today-v1"></script><script src="/roster-editor.js?v=20261027-session-plan-workflow-v1"></script><script src="/intake-roster.js?v=20261027-session-plan-workflow-v1"></script><script src="/frontdesk.js?v=20261028-no-left-rail-v1"></script><script src="/attachments.js?v=20261010-canonical-v1"></script><script src="/management.js?v=20261027-job-brief-attention-v1"></script><script src="/training.js?v=20261004-storage-recovery-v10"></script>
   <script src="/client-reminders.js?v=20261018-contextual-reminders-v1"></script>
   <script src="/connected-workflow.js?v=20261018-next-stage-v1"></script>
-  <script src="/job-handoff.js?v=20261004-storage-recovery-v10"></script><script src="/job-workspace.js?v=20261027-client-photos-staff-announcements-v1"></script><script src="/media-production.js?v=20261018-client-terminology-v1"></script><script src="/studio-workspace-actions.js?v=20261004-storage-recovery-v10"></script><script src="/job-details.js?v=20261027-session-plan-workflow-v1"></script><script src="/job-workflow-display.js?v=20261022-one-word-stages-v1"></script><script src="/workspace-outlook.js?v=20261027-about-staff-roles-v1"></script><script src="/media-fallback.js?v=20261010-canonical-v1"></script><script src="/demo-loader.js?v=20261012-full-demo-management-v1"></script><script src="/media-review.js?v=20261027-left-context-only-v1"></script><script src="/dagre.min.js"></script><script src="/workflow-graph.js?v=20261022-job-summary-v1"></script><script src="/workflow-template-editor.js?v=20261027-about-catalog-v1"></script><script src="/job-workflow-graph.js?v=20261022-next-action-v1"></script><script src="/commercial.js?v=20261028-admin-grids-v1"></script><script src="/frontdesk-pos.js?v=20261026-approved-views-v1"></script><script src="/jobs-page.js?v=20261027-company-dashboard-v1"></script><script src="/tasks-page.js?v=20261027-delete-page-messages-v1"></script><script src="/booking-sessions.js?v=20261027-booking-grids-v1"></script><script src="/studio-admin.js?v=20261027-templates-automation-v1"></script><script src="/company-dashboard.js?v=20261028-today-no-status-cards-v1"></script><script src="/studio-navigation.js?v=20261028-admin-grids-v1"></script>
+  <script src="/job-handoff.js?v=20261004-storage-recovery-v10"></script><script src="/job-workspace.js?v=20261027-client-photos-staff-announcements-v1"></script><script src="/media-production.js?v=20261018-client-terminology-v1"></script><script src="/studio-workspace-actions.js?v=20261004-storage-recovery-v10"></script><script src="/job-details.js?v=20261027-session-plan-workflow-v1"></script><script src="/job-workflow-display.js?v=20261022-one-word-stages-v1"></script><script src="/workspace-outlook.js?v=20261028-no-left-rail-v1"></script><script src="/media-fallback.js?v=20261010-canonical-v1"></script><script src="/demo-loader.js?v=20261012-full-demo-management-v1"></script><script src="/media-review.js?v=20261027-left-context-only-v1"></script><script src="/dagre.min.js"></script><script src="/workflow-graph.js?v=20261022-job-summary-v1"></script><script src="/workflow-template-editor.js?v=20261027-about-catalog-v1"></script><script src="/job-workflow-graph.js?v=20261022-next-action-v1"></script><script src="/commercial.js?v=20261028-admin-grids-v1"></script><script src="/frontdesk-pos.js?v=20261026-approved-views-v1"></script><script src="/jobs-page.js?v=20261027-company-dashboard-v1"></script><script src="/tasks-page.js?v=20261027-delete-page-messages-v1"></script><script src="/booking-sessions.js?v=20261027-booking-grids-v1"></script><script src="/studio-admin.js?v=20261027-templates-automation-v1"></script><script src="/company-dashboard.js?v=20261028-today-no-status-cards-v1"></script><script src="/studio-navigation.js?v=20261028-admin-grids-v1"></script>
   <script src="/clients.js?v=20261028-single-title-v1"></script>
   <script src="/photographer-schedule.js?v=20261028-single-title-v1"></script>
   <script src="/production-planning.js?v=20261027-calendar-layouts-v1"></script>
   <script src="/studio-workflow-views.js?v=20261027-company-dashboard-v1"></script>
   <script src="/announcements.js?v=20261027-company-dashboard-v1"></script>
-  <script src="/studio-shell-nav.js?v=20261028-today-no-status-cards-v1"></script>
+  <script src="/studio-shell-nav.js?v=20261028-no-left-rail-v1"></script>
   <script src="/studio-search.js?v=20261004-storage-recovery-v10"></script>
 <script>
     document.addEventListener('click',event=>{
