@@ -18,7 +18,7 @@ test('Today and other pages do not fork breadcrumb styles', () => {
   assert.match(css, /body \.topbar #studioBreadcrumb \.breadcrumb-label::after/);
 });
 test('shared shell owns the workspace selector', () => {
-  assert.match(shell, /function renderPageMenu\(/);
+  assert.match(shell, /function refreshWorkspaceMenu\(/);
   assert.match(shell, /function renderFooterWorkspaceMenu\(/);
   const footer = css.match(/#studioShellFooter #studioFooterWorkspaces \{([^}]+)\}/);
   assert.ok(footer);

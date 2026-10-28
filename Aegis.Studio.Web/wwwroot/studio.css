@@ -9212,16 +9212,6 @@ body:not([data-studio-view="today"]) :is(.fd-table-scroll,.mw-list-grid) {
   }
 }
 /* The shell header is identical on Today and every other Studio page. */
-/* Shared page actions replace the retired side rail. */
-.studio-page-menu { flex:0 0 auto; color:var(--theme-text,#213951); }
-.studio-page-menu>summary { cursor:pointer; list-style:none; white-space:nowrap; color:var(--studio-banner-text,#fff); padding:6px; font-size:12px; border-radius:4px; }
-.studio-page-menu>summary::-webkit-details-marker { display:none; }
-.studio-page-menu>summary:focus-visible { outline:2px solid #df8a32; outline-offset:2px; }
-.studio-page-menu-content { position:fixed; top:calc(var(--studio-banner-height) + 4px); right:12px; width:320px; max-width:calc(100vw - 24px); max-height:calc(100dvh - var(--studio-banner-height) - 20px); overflow:auto; padding:10px; box-sizing:border-box; background:var(--theme-surface,#fff); border:1px solid var(--theme-border,#d7dee7); border-radius:8px; box-shadow:0 8px 24px #172b4033; z-index:1200; }
-.studio-page-menu-content>.studio-context-card { margin:0 0 8px; min-width:0; }
-.studio-page-menu-content>.studio-context-card:last-child { margin-bottom:0; }
-.studio-page-menu-content .mw-today-rail-links { display:grid; gap:3px; }
-.studio-page-menu-content button { text-align:left; }
 body .topbar #studioPageTools {
   flex: 0 1 auto;
   min-width: 0;

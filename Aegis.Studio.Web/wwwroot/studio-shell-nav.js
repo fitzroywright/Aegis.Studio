@@ -13,12 +13,8 @@
         ['media', 'Media', navigationIcon('<rect x="5" y="6" width="16" height="15" rx="2"/><path d="M17 3H5a2 2 0 0 0-2 2v12m2 1 5-5 4 4 3-3 4 4"/><circle class="studio-navigation-accent" cx="16.5" cy="10.5" r="1.5"/>')]
     ];
     let currentView = document.body.dataset.studioView || 'dashboard';
-    const shellOverviews = new Map();
-    const shellContexts = new Map();
     const shellAttention = new Map();
-    const overviewKey = () => document.body.dataset.studioView === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page') ? 'job-detail' : (document.body.dataset.studioView || 'dashboard');
-    const defaultOverview = () => `<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><p>${escText(labelFor(document.body.dataset.studioView || 'dashboard'))}</p><p>Use this page to ${escText((pageTaglines[document.body.dataset.studioView || 'dashboard'] || 'manage Studio work').replace(/\.$/, '').toLowerCase())}.</p></section>`;
-    let renderingTools = false;
+    const pageKey = () => document.body.dataset.studioView === 'workspaces' && document.querySelector('#conversationView.has-open-job .job-detail-page') ? 'job-detail' : (document.body.dataset.studioView || 'dashboard');
     let workspaceLoadPromise = null;
     let workspaceLoadAttempted = false;
     let productionWorkspaceFilter = null;
@@ -28,7 +24,7 @@
     let sharedSessions = [];
     let sessionsState = 'loading';
     let sessionsRequest = null;
-    const currentPage = () => overviewKey();
+    const currentPage = () => pageKey();
 
     const escText = value => String(value ?? '').replace(/[&<>"']/g, character => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -129,33 +125,6 @@
         target.title = 'Logged in User: ' + identity;
     }
 
-    const pageMenuEnabled = view => !['dashboard', 'today', 'media', 'schedule', 'jobs', 'production', 'clients', 'frontdesk'].includes(view);
-
-    function ensurePageMenu() {
-        ensureNavigationToolstrip();
-        const host = document.getElementById('studioNavigationToolstrip');
-        if (!host) return;
-        let menu = document.getElementById('studioPageMenu');
-        if (!menu) {
-            menu = document.createElement('details');
-            menu.id = 'studioPageMenu';
-            menu.className = 'studio-page-menu';
-            menu.innerHTML = '<summary>Page actions <span aria-hidden="true">⌄</span></summary><div id="studioPageContext" class="studio-page-menu-content"></div>';
-            host.insertBefore(menu, host.querySelector('.studio-navigation-status') || host.querySelector('.studio-navigation-account'));
-            menu.addEventListener('click', event => {
-                if (event.target.closest('button:not(:disabled)')) menu.open = false;
-            });
-            document.addEventListener('click', event => {
-                if (!menu.contains(event.target)) menu.open = false;
-            });
-            menu.addEventListener('keydown', event => {
-                if (event.key === 'Escape') { menu.open = false; menu.querySelector('summary').focus(); }
-            });
-        }
-        menu.hidden = !pageMenuEnabled(currentView);
-        renderPageMenu();
-    }
-
     function ensureWorkspaceListLoaded() {
         const cache = typeof workspaceCache !== 'undefined' ? workspaceCache : window.workspaceCache;
         if (Array.isArray(cache) && cache.length) return Promise.resolve();
@@ -165,72 +134,18 @@
             workspaceLoadAttempted = false;
         }).finally(() => {
             workspaceLoadPromise = null;
-            renderPageMenu();
+            refreshWorkspaceMenu();
         });
         return workspaceLoadPromise;
     }
 
-    function renderPageMenu() {
-        const rail = document.getElementById('studioPageContext');
-        if (!rail) return;
-        const cache=typeof workspaceCache!=='undefined'?workspaceCache:window.workspaceCache;
+    function refreshWorkspaceMenu() {
+        const cache = typeof workspaceCache !== 'undefined' ? workspaceCache : window.workspaceCache;
         const workspaces = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
             ? productionWorkspaceFilter.workspaces
             : (Array.isArray(cache) ? cache : []).filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false);
-        if (!pageMenuEnabled(document.body.dataset.studioView)) {
-            rail.replaceChildren();
-            renderFooterWorkspaceMenu(workspaces);
-            return;
-        }
-        // Contextual commands share one menu on supported pages.
-        const jobPage=document.body.dataset.studioView==='workspaces'?document.querySelector('#conversationView.has-open-job .job-detail-page'):null;
-        const jobActions=[['activity','Activity','◷','ready'],['messages','Messages & Notes','✉','ready'],['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready'],['template-workflow','Template Workflow','◇','ready'],['reminders','Client Reminders','◷','ready']];
-        const workflowActions=window.StudioWorkflowViews?.actions(document.body.dataset.studioView);
-        const actionItems=workflowActions?workflowActions.map(([key,label])=>'<button type="button" data-workflow-action="'+key+'"><span>'+escText(label)+'</span></button>').join(''):jobPage?jobActions.map(([action,title,icon,permission])=>'<button type="button" data-job-action="'+action+'" '+(jobPage.dataset[permission+'Enabled']==='true'?'':'disabled')+'><span>'+icon+'</span><span>'+title+'</span></button>').join(''):'<button type="button" data-studio-new-booking><span>＋</span><span>New Booking</span></button>';
-        const pipelineScheduleAction=document.body.dataset.studioView==='schedule'&&window.history.state?.studioSchedulePanel==='pipeline'?'<button type="button" data-studio-schedule-item><span>▦</span><span>Schedule item</span></button>':'';
-        ensureNavigationToolstrip();
-        let overview = shellOverviews.get(overviewKey());
-        if (!overview) {
-            const template = document.createElement('template');
-            template.innerHTML = defaultOverview();
-            overview = template.content.firstElementChild;
-            shellOverviews.set(overviewKey(), overview);
-        }
-        const context = shellContexts.get(overviewKey()) || [];
-        rail.innerHTML = (actionItems||pipelineScheduleAction)?`
-            <section class="mw-list-panel studio-context-card" data-rail-card="actions">
-                <header><h2><span class="studio-card-icon" aria-hidden="true">✦</span> Actions</h2></header>
-                <div class="mw-today-rail-links">
-                    ${actionItems}${pipelineScheduleAction}${document.body.dataset.studioView==='clients'?'<button type="button" data-clients-new><span>＋</span><span>New Client</span></button>':''}
-                </div>
-            </section>
-
-`:'';
-        rail.prepend(overview);
-        window.StudioWorkflowViews?.bind(rail);
-        rail.append(...context);
         renderFooterWorkspaceMenu(workspaces);
-        if(document.body.dataset.studioView==='schedule')window.StudioScheduleWorkspaceCard?.bindRail(rail);
-        rail.querySelector('[data-studio-view-all-workspaces]')?.addEventListener('click',()=>window.studioNavigate?.('workspaces'));
-        rail.querySelector('[data-studio-new-booking]')?.addEventListener('click',()=>document.body.dataset.studioView==='clients'?window.StudioClients?.newBooking():window.studioLaunchNewBooking?.());
-        rail.querySelector('[data-studio-schedule-item]')?.addEventListener('click',()=>window.dispatchEvent(new CustomEvent('studio-schedule-item')));
-        rail.querySelector('[data-clients-new]')?.addEventListener('click',()=>window.StudioClients?.newClient());
-        rail.querySelector('[data-studio-assign-job-lead]')?.addEventListener('click',()=>document.getElementById('genericView')?.dispatchEvent(new CustomEvent('studio-assign-job-lead')));
-        rail.querySelectorAll('[data-job-action]').forEach(button => button.onclick=()=>window.dispatchEvent(new CustomEvent('studio-job-action',{detail:{action:button.dataset.jobAction}})));
-        rail.querySelectorAll('[data-production-workspace]').forEach(button => {
-            button.onclick = () => productionWorkspaceFilter?.onSelect?.(button.dataset.productionWorkspace || '');
-        });
-        rail.querySelectorAll('[data-studio-workspace-id]').forEach(button => {
-            button.onclick = () => {
-                const id = button.dataset.studioWorkspaceId;
-                const workspace = workspaces.find(item => String(item.id) === id);
-                if (typeof window.selectWorkspace === 'function') window.selectWorkspace(id, workspace?.name || '');
-                else window.studioNavigate?.('workspaces');
-            };
-        });
-
     }
-
 
     function renderFooterWorkspaceMenu(workspaces) {
         const footer = document.getElementById('studioShellFooter');
@@ -303,35 +218,22 @@
         });
     };
 
-    window.studioShellMountAttention = (content, view = overviewKey()) => {
+    window.studioShellMountAttention = (content, view = pageKey()) => {
         shellAttention.set(view, content || null);
         refreshPageDrawers();
-    };
-
-    // Production supplies its workspace filter data to the shared Workspaces card.
-    // Other views continue to use the permission-scoped workspace cache.
-    window.studioShellMountContext = (nodes, view = overviewKey()) => {
-        const cards = Array.from(nodes || []);
-        for (const card of cards) {
-            card.classList.add('studio-context-card');
-            card.dataset.railCard = 'context';
-        }
-        shellContexts.set(view, cards);
-        if (view === overviewKey()) renderPageMenu();
     };
 
     window.StudioShell={
         setProductionWorkspaceFilter(workspaces, selected, onSelect) {
             productionWorkspaceFilter = { workspaces: Array.isArray(workspaces) ? workspaces : [], selected: selected || '', onSelect };
-            if (document.body.dataset.studioView === 'production') renderPageMenu();
+            if (document.body.dataset.studioView === 'production') refreshWorkspaceMenu();
         },
         sync(view=document.body.dataset.studioView||currentView){
-        if (currentView !== view) { const menu = document.getElementById('studioPageMenu'); if (menu) menu.open = false; }
         currentView=view;
         ensureTools();
         initializeAttentionDrawer();
         refreshPageDrawers();
-        ensurePageMenu();
+        refreshWorkspaceMenu();
         ensureWorkspaceListLoaded();
         syncPageFrame();
         syncGridFooterCount();
@@ -639,7 +541,7 @@
         currentView = document.body.dataset.studioView || currentView;
         ensureTools();
         ensureFooter();
-        ensurePageMenu();
+        refreshWorkspaceMenu();
         ensureWorkspaceListLoaded();
         syncFooterIdentity();
         const identityNode = document.getElementById('signedInUser');
@@ -651,29 +553,14 @@
         loadSharedSessions();
         void loadSharedAttention();
         syncGridFooterCount();
-        window.addEventListener('studio-jobs-view-changed',()=>{renderPageMenu();syncPageFrame();});
-        window.addEventListener('studio-workflow-capabilities',renderPageMenu);
+        window.addEventListener('studio-jobs-view-changed',()=>{refreshWorkspaceMenu();syncPageFrame();});
         document.addEventListener('studio-workflow-changed',()=>{void loadSharedAttention();});
-        window.addEventListener('studio-workspaces-loaded',renderPageMenu);
+        window.addEventListener('studio-workspaces-loaded',refreshWorkspaceMenu);
         document.querySelector('[data-studio-avatar-notifications]')?.addEventListener('click', () => {
             document.querySelector('.user-menu')?.removeAttribute('open');
             window.studioNavigate?.('notifications');
         });
-        // One shell contract for Overview on every route.
-        window.studioShellSetOverview = (markup, view = document.body.dataset.studioView) => {
-            const template = document.createElement('template');
-            if (!markup || typeof markup === 'string') template.innerHTML = markup || defaultOverview();
-            const overview = markup?.nodeType === 1 ? markup : template.content.firstElementChild;
-            overview.classList.add('studio-context-card');
-            overview.dataset.railCard = 'overview';
-            shellOverviews.set(view, overview);
-            if (view === overviewKey()) renderPageMenu();
-        };
-        window.addEventListener('studio-shell-overview', event => {
-            const detail = event.detail || {};
-            window.studioShellSetOverview(detail.markup, detail.view);
-        });
-        window.addEventListener('studio-job-view-changed',()=>{renderPageMenu();syncPageFrame();syncGridFooterCount();refreshPageDrawers();});
+        window.addEventListener('studio-job-view-changed',()=>{refreshWorkspaceMenu();syncPageFrame();syncGridFooterCount();refreshPageDrawers();});
         // Job details and the workspace list share a route. Refresh the masthead
         // when the visible panel changes, not only when the route changes.
         const conversation=document.getElementById('conversationView');
@@ -692,9 +579,7 @@
             const next = document.body.dataset.studioView || currentView;
             if (next !== currentView) {
                 currentView = next;
-                const menu = document.getElementById('studioPageMenu');
-                if (menu) { menu.open = false; menu.hidden = !pageMenuEnabled(next); }
-                renderPageMenu();
+                refreshWorkspaceMenu();
                 syncPageFrame();
                 refreshPageDrawers();
             }
