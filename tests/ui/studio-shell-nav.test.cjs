@@ -98,7 +98,7 @@ test('all pages omit the rail even with a stored collapse preference; page actio
   await w.studioNavigate(view);w.StudioShell.sync(view);
   assert.equal(w.document.getElementById('studioContextRail'),null);
   assert.equal(w.document.querySelector('[data-rail-toggle]'),null);
-  const menu=w.document.getElementById('studioPageMenu');assert.equal(menu.hidden,view==='dashboard');
+  const menu=w.document.getElementById('studioPageMenu');assert.equal(menu.hidden,['dashboard','media'].includes(view));
   assert.notEqual(w.document.getElementById('studioNavigationTools').inert,true);
  }
  await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
@@ -203,4 +203,22 @@ test('Jobs renders through real navigation while the shell context survives tran
   await w.studioNavigate('dashboard');
  }
  assert.deepEqual(opened,['job1','job1']);
+});
+
+test('Media omits Page actions and its cards while workspace selection and other pages retain their controls',async t=>{
+ const {w,dom}=setup();t.after(()=>dom.window.close());
+ w.workspaceCache=[{id:'one',name:'Portraits',permissions:{view:true,accessWorkspace:true}}];
+ await w.studioNavigate('jobs');w.StudioShell.sync('jobs');
+ const menu=w.document.getElementById('studioPageMenu');menu.open=true;
+ await w.studioNavigate('media');w.StudioShell.sync('media');
+ assert.equal(menu.hidden,true);assert.equal(menu.open,false);
+ w.studioShellSetOverview('<section><h2>Media overview</h2></section>','media');
+ w.studioShellMountContext([w.document.createElement('section')],'media');
+ w.dispatchEvent(new w.Event('studio-workspaces-loaded'));
+ assert.equal(menu.querySelector('#studioPageContext').childElementCount,0);
+ assert.equal(menu.hidden,true);
+ assert.equal(w.document.querySelectorAll('#studioFooterWorkspaces option').length,2);
+ await w.studioNavigate('jobs');w.StudioShell.sync('jobs');
+ assert.equal(menu.hidden,false);assert.ok(menu.querySelector('[data-rail-card="actions"]'));
+ assert.equal(menu.querySelector('[data-rail-card="overview"]').textContent.includes('Media overview'),false);
 });
