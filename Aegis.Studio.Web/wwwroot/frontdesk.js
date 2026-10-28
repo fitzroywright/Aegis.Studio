@@ -121,6 +121,7 @@ function openFrontDeskJob(jobId){
 }
 
 function renderFrontDesk(selectionOnly=false){
+    if(frontDeskTab==='sales'){frontDeskTab='today';selectionOnly=false;}
     const searchNode=genericView.querySelector('#frontDeskSearch');
     const searchFocused=searchNode===document.activeElement;
     const searchSelection=searchNode?[searchNode.selectionStart,searchNode.selectionEnd]:null;
@@ -172,8 +173,8 @@ function renderFrontDesk(selectionOnly=false){
     if(!filtered.some(e=>e.id===frontDeskSelectedEntry))frontDeskSelectedEntry=filtered[0]?.id||'';
     const selected=filtered.find(e=>e.id===frontDeskSelectedEntry);
     const rows=filtered.map(e=>`<tr class="fd-speedbump-row" tabindex="0" aria-selected="${e.id===frontDeskSelectedEntry}" data-fd-row-open="${esc(e.id)}"><td><input type="radio" name="booking-selection" aria-label="Select ${esc(e.name)}" ${e.id===frontDeskSelectedEntry?'checked':''}></td><td><strong>${esc(e.name)}</strong><small>${esc(e.title)}</small><small class="fd-intake-reference">${esc(e.reference||'')}</small></td><td>${pill(entryType(e),'type')}</td><td>${esc(e.date||'—')}</td><td>${e.request?esc(money(e.request.recordedDeposit||0)):'—'}</td><td>${pill(e.status,'status')}${jobQueue&&e.status!=='Completed'?` <button type="button" class="action" data-frontdesk-fulfill="${esc(e.jobId)}">Record collection / delivery</button>`:''}</td><td>${pill(e.source,'source')}</td></tr>`).join('');
-    const tabs=[['today','Bookings & Inquiries'],['confirmation','Needs Confirmation'],['deposits','Deposits'],['sales','Sales']];
-    const activeTab=frontDeskTab==='sales'?'sales':frontDeskMetricView==='confirmation'?'confirmation':frontDeskMetricView==='deposits'?'deposits':'today';
+    const tabs=[['today','Bookings & Inquiries'],['confirmation','Needs Confirmation'],['deposits','Deposits']];
+    const activeTab=frontDeskMetricView==='confirmation'?'confirmation':frontDeskMetricView==='deposits'?'deposits':'today';
     const tabsMarkup='<nav class="fd-work-tabs" aria-label="Front Desk tasks">'+tabs.map(([key,label])=>`<button type="button" data-fd-tab="${key}" aria-current="${activeTab===key?'page':'false'}">${label}</button>`).join('')+'</nav>';
     const detail=selected?frontDeskSelectedMarkup(selected):'<section class="fd-selected-request"><p>Select a request to review it.</p></section>';
     if(selectionOnly){
@@ -185,14 +186,13 @@ function renderFrontDesk(selectionOnly=false){
         bindFrontDeskSelection(selected);
         return;
     }
-    const sales='<section class="fd-selected-request"><h2>Front Desk · Point of Sale</h2><p>Sales, deposits, payments and receipts remain linked to the client and job.</p><div class="workflow-detail-actions">'+[['NewSale','New Sale'],['TakePayment','Record Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['ViewReceipt','View Receipt'],['CloseRegister','Close Register']].map(([key,label])=>`<button type="button" class="action" data-fd-sale-action="${key}">${label}</button>`).join('')+'</div></section>';
-    const actions='<div class="fd-grid-actions" role="toolbar" aria-label="Front Desk actions"><button type="button" class="action" data-fd-new-booking>New Booking</button>'+[['TakePayment','Take Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['NewSale','New Sale']].map(([key,label])=>`<button type="button" class="action" data-fd-financial-action="${key}">${label}</button>`).join('')+'<button type="button" class="action" data-fd-new-client>New Client</button><button type="button" class="action" data-fd-close-register>Close Register</button></div>';
+    const actions='<div class="fd-grid-actions" role="toolbar" aria-label="Front Desk actions"><button type="button" class="action" data-fd-new-booking>New Booking</button>'+[['TakePayment','Take Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['NewSale','New Sale'],['ViewReceipt','View Receipt']].map(([key,label])=>`<button type="button" class="action" data-fd-financial-action="${key}">${label}</button>`).join('')+'<button type="button" class="action" data-fd-new-client>New Client</button><button type="button" class="action" data-fd-close-register>Close Register</button></div>';
     genericView.innerHTML=`<div class="fd-page">
       
       <div class="fd-layout"><div class="fd-main">
         
         <section class="op-card fd-queue">${actions}${tabsMarkup}
-          <div class="fd-table-frame" id="frontDeskTableArea">${frontDeskTab==='sales'?sales:['today','requests','enquiries'].includes(frontDeskTab)?`<div class="fd-table-head-clip"><table class="fd-table"><thead><tr><th></th><th><div class="fd-client-header"><span>Client / Request</span><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search clients…" value="${esc(frontDeskTerm)}"></div></th>${columnHead('type','Service / Type')}<th>Event Date</th><th>Deposit</th>${columnHead('status','Status')}${columnHead('source','Source')}</tr></thead></table></div><div class="fd-table-scroll"><table class="fd-table"><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table></div>`:'<div id="frontDeskJobList"></div>'}</div>
+          <div class="fd-table-frame" id="frontDeskTableArea">${['today','requests','enquiries'].includes(frontDeskTab)?`<div class="fd-table-head-clip"><table class="fd-table"><thead><tr><th></th><th><div class="fd-client-header"><span>Client / Request</span><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search clients…" value="${esc(frontDeskTerm)}"></div></th>${columnHead('type','Service / Type')}<th>Event Date</th><th>Deposit</th>${columnHead('status','Status')}${columnHead('source','Source')}</tr></thead></table></div><div class="fd-table-scroll"><table class="fd-table"><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table></div>`:'<div id="frontDeskJobList"></div>'}</div>
           </section>
           ${['today','requests','enquiries'].includes(frontDeskTab)?detail:''}
         
@@ -247,10 +247,9 @@ function renderFrontDesk(selectionOnly=false){
         });
     });
     genericView.querySelectorAll('[data-fd-enquiry]').forEach(b=>b.onclick=()=>openPendingBookingForm(frontDeskEnquiries.find(e=>e.id===b.dataset.fdEnquiry)));
-    if(!['today','requests','enquiries','sales'].includes(frontDeskTab))renderFrontDeskRows();
+    if(!['today','requests','enquiries'].includes(frontDeskTab))renderFrontDeskRows();
     bindFrontDeskSelection(selected);
-    genericView.querySelectorAll('[data-fd-tab]').forEach(b=>b.onclick=()=>{frontDeskTab=b.dataset.fdTab==='sales'?'sales':'today';frontDeskMetricView=['confirmation','deposits'].includes(b.dataset.fdTab)?b.dataset.fdTab:'';frontDeskColumnFilters={type:'',status:'',source:''};renderFrontDesk();});
-    genericView.querySelectorAll('[data-fd-sale-action]').forEach(b=>b.onclick=()=>pickFrontDeskFinancialAction(b.dataset.fdSaleAction).catch(e=>alert(e.message)));
+    genericView.querySelectorAll('[data-fd-tab]').forEach(b=>b.onclick=()=>{frontDeskTab='today';frontDeskMetricView=['confirmation','deposits'].includes(b.dataset.fdTab)?b.dataset.fdTab:'';frontDeskColumnFilters={type:'',status:'',source:''};renderFrontDesk();});
 }
 function frontDeskSelectedMarkup(entry){
     const booking=entry.request,request=booking?.request||{};

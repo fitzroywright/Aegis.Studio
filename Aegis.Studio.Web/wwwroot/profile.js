@@ -4,7 +4,6 @@
     const form = document.getElementById('profileForm');
     const close = document.getElementById('closeProfile');
     const cancel = document.getElementById('cancelProfile');
-    const identity = document.getElementById('profileIdentity');
     const status = document.getElementById('profileStatus');
 
     if (!dialog || !button || !form) return;
@@ -24,8 +23,6 @@
     };
 
     function apply(profile) {
-        const details = [profile.email, [profile.title, profile.department].filter(Boolean).join(' · ')].filter(Boolean);
-        identity.innerHTML = `<strong>${escapeHtml(studioFirstName(profile))}</strong>${details.map(value=>`<span>${escapeHtml(value)}</span>`).join('')}`;
         const messaging = profile.messaging || {};
         for (const [key, element] of Object.entries(fields)) element.checked = !!messaging[key];
         document.getElementById('prefWhatsAppMobile').value = messaging.whatsAppMobile || '';
@@ -79,9 +76,6 @@
         setTimeout(() => dialog.close(), 450);
     });
 
-    function escapeHtml(value) {
-        return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-    }
 })();
 
 
