@@ -13,6 +13,7 @@ function assignmentLabel(item){
 let currentAssignments=[],currentUser='',busy=false,authVersion=0,sessionVersion=0;
 let galleryController=null,activeUpload=null,nextCursor=null;
 const selectedPhotos=new Map(),savedPhotos=new Map();
+let shootSummary=null,completionController=null;
 const assignmentId=()=>el('workday-assignment').value;
 const assigned=id=>currentAssignments.some(x=>String(x.id||x.Id)===id);
 const uploadPath=id=>'/api/v1/workday/assignments/'+encodeURIComponent(id)+'/uploads';
@@ -20,7 +21,8 @@ const stateLabel=item=>({Ready:'Ready to upload',Uploading:'Uploading · '+(item
   Pending:'Queued for Studio',Acknowledged:'Acknowledged by Studio',Conflict:'Needs review',Failed:'Upload not confirmed'})[item.state]||'Queued for Studio';
 function releasePhoto(item){if(item.objectUrl)URL.revokeObjectURL(item.objectUrl);item.objectUrl=null;item.file=null;}
 function resetUploads(){
-  sessionVersion++;galleryController?.abort();activeUpload?.abort();activeUpload=null;
+  sessionVersion++;galleryController?.abort();completionController?.abort();activeUpload?.abort();activeUpload=null;
+  shootSummary=null;el('workday-finish-confirm').checked=false;el('workday-finish-status').textContent='';
   for(const item of selectedPhotos.values())releasePhoto(item);
   selectedPhotos.clear();savedPhotos.clear();nextCursor=null;busy=false;
   el('workday-gallery-message').textContent='';el('workday-dropzone').classList.remove('is-dragging');
@@ -28,14 +30,56 @@ function resetUploads(){
 }
 function setControls(){
   const valid=assigned(assignmentId());
+  const waiting=shootSummary?.completion?.state==='Pending',locked=busy||waiting;
   el('workday-assignment').disabled=busy;
-  el('workday-browse').disabled=busy||!valid;el('workday-photos').disabled=busy||!valid;
+  el('workday-browse').disabled=locked||!valid;el('workday-photos').disabled=locked||!valid;
   const pending=[...selectedPhotos.values()].some(x=>x.assignmentId===assignmentId()&&x.file);
-  el('workday-upload').disabled=busy||!valid||!pending;
+  el('workday-upload').disabled=locked||!valid||!pending;
   el('workday-clear').disabled=busy||!pending;
   el('workday-gallery-refresh').disabled=busy||!valid;
   el('workday-gallery-more').disabled=busy||!nextCursor;
-  el('workday-dropzone').setAttribute('aria-disabled',String(busy||!valid));
+  el('workday-dropzone').setAttribute('aria-disabled',String(locked||!valid));
+  const done=shootSummary?.completion?.state==='Acknowledged';
+  el('workday-finish-confirm').disabled=busy||!valid||waiting||done;
+  el('workday-finish').disabled=busy||!valid||pending||waiting||done||!el('workday-finish-confirm').checked||
+    !shootSummary?.total||shootSummary.ready!==shootSummary.total;
+}
+async function refreshShoot(){
+  const id=assignmentId(),version=sessionVersion;
+  completionController?.abort();completionController=new AbortController();const controller=completionController;
+  if(!assigned(id)){shootSummary=null;el('workday-finish-status').textContent='Choose an assigned Job.';setControls();return;}
+  try{
+    const summary=await call('/api/v1/workday/assignments/'+encodeURIComponent(id)+'/shoot-completion',{signal:controller.signal});
+    if(controller.signal.aborted||version!==sessionVersion||id!==assignmentId())return;
+    shootSummary=summary;const result=summary.completion;
+    el('workday-finish-status').textContent=result?.state==='Acknowledged'?'Your shoot is done. Studio recorded your confirmation.':
+      result?.state==='Pending'?'Shoot confirmation sent. Waiting for Studio.':
+      result?.state==='Conflict'?'Studio could not finish the shoot: '+(result.message||'Ask the Job Owner to review it.'):
+      summary.total?summary.ready+' of '+summary.total+' photographs imported into Studio.':'Upload your photographs before finishing the shoot.';
+  }catch(error){
+    if(controller.signal.aborted||version!==sessionVersion||id!==assignmentId())return;
+    shootSummary=null;el('workday-finish-status').textContent='Could not check shoot status. Refresh photographs to retry.';
+  }
+  setControls();
+}
+async function finishShoot(){
+  if(el('workday-finish').disabled)return;
+  const id=assignmentId(),version=sessionVersion;busy=true;setControls();
+  try{
+    const snapshot=await call('/api/v1/workday/bootstrap');
+    if(version!==sessionVersion||id!==assignmentId())return;
+    const assignment=[...(snapshot.today||snapshot.Today||[]),...(snapshot.upcoming||snapshot.Upcoming||[])]
+      .find(x=>String(x.id||x.Id)===id);
+    if(!assignment)throw Error('This Job is no longer assigned to you.');
+    await call('/api/v1/workday/assignments/'+encodeURIComponent(id)+'/shoot-completion',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        operationId:crypto.randomUUID(),expectedVersion:assignment.version??assignment.Version??0
+      })});
+    if(version!==sessionVersion)return;
+    el('workday-finish-confirm').checked=false;
+    await refreshShoot();
+  }catch(error){if(version===sessionVersion)el('workday-finish-status').textContent=error.message;}
+  finally{if(version===sessionVersion){busy=false;setControls();}}
 }
 function renderGallery(retryPreviews=false){
   const grid=el('workday-photo-grid'),existing=new Map([...grid.children].map(card=>[card.dataset.uploadId,card]));
@@ -94,14 +138,14 @@ async function refreshGallery(more=false){
       const local=selectedPhotos.get(item.uploadId);
       if(local&&local.state!=='Uploading'){releasePhoto(local);selectedPhotos.delete(item.uploadId);}
     }
-    nextCursor=page.nextCursor;el('workday-gallery-message').textContent='';renderGallery(true);
+    nextCursor=page.nextCursor;el('workday-gallery-message').textContent='';renderGallery(true);await refreshShoot();
   }catch(error){
     if(controller.signal.aborted||version!==sessionVersion)return;
     el('workday-gallery-message').textContent='Could not load photographs. Use Refresh photographs to retry.';renderGallery();
   }
 }
 function addPhotos(files){
-  if(busy)return;
+  if(busy||shootSummary?.completion?.state==='Pending')return;
   const id=assignmentId();
   if(!assigned(id)){status('Choose one of your assigned Jobs first.');el('workday-assignment').focus();return;}
   let added=0,skipped=0;
@@ -140,7 +184,7 @@ function postPhoto(item){
   });
 }
 async function sendPhotos(items){
-  if(busy||!assigned(assignmentId()))return;
+  if(busy||shootSummary?.completion?.state==='Pending'||!assigned(assignmentId()))return;
   items=items.filter(x=>x.file&&x.assignmentId===assignmentId());if(!items.length){status('Choose photographs to upload.');return;}
   const version=sessionVersion;busy=true;let queued=0,failed=0;setControls();
   for(const item of items){
@@ -198,7 +242,7 @@ el('workday-signout').addEventListener('click',async()=>{
     el('workday-panel').hidden=true;el('workday-login').hidden=false;status('Signed out.');
   }catch{status('Sign-out could not be confirmed. Please retry.');}
 });
-el('workday-assignment').addEventListener('change',()=>{savedPhotos.clear();nextCursor=null;el('workday-gallery-message').textContent='';renderGallery();void refreshGallery();});
+el('workday-assignment').addEventListener('change',()=>{savedPhotos.clear();nextCursor=null;shootSummary=null;el('workday-finish-confirm').checked=false;el('workday-finish-status').textContent='';el('workday-gallery-message').textContent='';renderGallery();void refreshGallery();void refreshShoot();});
 el('workday-browse').addEventListener('click',()=>el('workday-photos').click());
 el('workday-photos').addEventListener('change',event=>addPhotos(Array.from(event.target.files||[])));
 const dropzone=el('workday-dropzone');let dragDepth=0;
@@ -216,4 +260,7 @@ el('workday-clear').addEventListener('click',()=>{
 el('workday-gallery-refresh').addEventListener('click',()=>{void refreshGallery();});
 el('workday-gallery-more').addEventListener('click',()=>{void refreshGallery(true);});
 el('workday-upload-form').addEventListener('submit',event=>{event.preventDefault();void sendPhotos([...selectedPhotos.values()]);});
+el('workday-finish-confirm').addEventListener('change',setControls);
+el('workday-finish').addEventListener('click',()=>{void finishShoot();});
+setInterval(()=>{if(!el('workday-panel').hidden&&!busy&&assigned(assignmentId()))void refreshShoot();},10000);
 renderGallery();void loadWorkday();

@@ -4,7 +4,7 @@ const assignment='44444444-4444-4444-8444-444444444444',other='66666666-6666-466
 const wait=async predicate=>{for(let i=0;i<100;i++){if(predicate())return;await new Promise(r=>setTimeout(r,10));}assert.fail('UI did not reach expected state');};
 function setup(t,state={user:'alice',photos:new Map()}){
   const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://web.bryanstudiosltd.com/#workday',runScripts:'outside-only'}),w=dom.window;
-  t.after(()=>w.close());const revoked=[],posts=[],requests=[];
+  t.after(()=>w.close());const revoked=[],posts=[],requests=[],confirmations=[];
   Object.defineProperty(w.crypto,'randomUUID',{value:randomUUID});
   w.URL.createObjectURL=()=> 'blob:'+randomUUID();w.URL.revokeObjectURL=url=>revoked.push(url);
   const reply=body=>({ok:true,headers:{get:()=> 'application/json'},json:async()=>body});
@@ -13,6 +13,12 @@ function setup(t,state={user:'alice',photos:new Map()}){
     if(url.endsWith('/auth/me'))return reply({userName:state.user,displayName:state.user});
     if(url.endsWith('/workday/bootstrap'))return reply({today:[{id:assignment,title:'Portraits'}],upcoming:[{id:other,title:'Wedding'}]});
     if(url.endsWith('/auth/login')||url.endsWith('/auth/logout'))return reply({});
+    if(url.endsWith('/shoot-completion')){
+      const id=String(url).split('/')[5];
+      if(options.method==='POST'){confirmations.push(JSON.parse(options.body));state.completion={state:'Pending'};return reply(state.completion);}
+      const photos=[...state.photos.values()].filter(x=>x.owner===state.user&&x.assignmentId===id);
+      return reply({total:photos.length,ready:photos.filter(x=>x.state==='Acknowledged').length,completion:state.completion||null});
+    }
     const match=String(url).match(/assignments\/([^/]+)\/uploads/);
     if(match)return reply({items:[...state.photos.values()].filter(x=>x.owner===state.user&&x.assignmentId===match[1]),nextCursor:null});
     throw Error('Unexpected fetch '+url);
@@ -38,7 +44,7 @@ function setup(t,state={user:'alice',photos:new Map()}){
   const choose=async id=>{get('workday-assignment').value=id;get('workday-assignment').dispatchEvent(new w.Event('change'));await wait(()=>get('workday-gallery-message').textContent==='');};
   const drop=files=>{const event=new w.Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:{files}});get('workday-dropzone').dispatchEvent(event);assert.equal(event.defaultPrevented,true);};
   const file=(name,type='image/png')=>new w.File(['test photograph'],name,{type,lastModified:1});
-  return {w,get,choose,drop,file,state,revoked,posts,requests};
+  return {w,get,choose,drop,file,state,revoked,posts,requests,confirmations};
 }
 test('drop zone and multi-file picker share one selection and reject invalid or duplicate files',async t=>{
   const f=setup(t);await wait(()=>!f.get('workday-panel').hidden);
@@ -57,6 +63,23 @@ test('drop zone and multi-file picker share one selection and reject invalid or 
   assert.equal(f.get('workday-photo-grid').querySelector('img'),originalImage);
   assert.equal(f.get('workday-upload').disabled,false);
   f.get('workday-clear').click();assert.equal(f.get('workday-photo-grid').children.length,0);assert.equal(f.revoked.length,3);
+});
+test('finishing requires an explicit declaration and every imported photo, then waits for Studio',async t=>{
+  const state={user:'alice',photos:new Map()},f=setup(t,state);await wait(()=>!f.get('workday-panel').hidden);await f.choose(assignment);
+  const confirm=f.get('workday-finish-confirm'),finish=f.get('workday-finish');
+  confirm.checked=true;confirm.dispatchEvent(new f.w.Event('change'));assert.equal(finish.disabled,true);
+  const id=randomUUID();state.photos.set(id,{uploadId:id,assignmentId:assignment,owner:'alice',fileName:'images-2.jpeg',state:'Pending'});
+  f.get('workday-gallery-refresh').click();await wait(()=>f.get('workday-finish-status').textContent.includes('0 of 1'));assert.equal(finish.disabled,true);
+  state.photos.get(id).state='Acknowledged';f.get('workday-gallery-refresh').click();
+  await wait(()=>f.get('workday-finish-status').textContent.includes('1 of 1'));assert.equal(finish.disabled,false);
+  f.drop([f.file('unuploaded.png')]);assert.equal(finish.disabled,true);
+  f.get('workday-clear').click();assert.equal(finish.disabled,false);
+  finish.click();await wait(()=>f.confirmations.length===1&&f.get('workday-finish-status').textContent.includes('Waiting for Studio'));
+  assert.equal(finish.disabled,true);assert.equal(f.get('workday-browse').disabled,true);
+  assert.equal(f.confirmations[0].expectedVersion,0);assert.ok(f.confirmations[0].operationId);
+  state.completion={state:'Acknowledged'};f.get('workday-gallery-refresh').click();
+  await wait(()=>f.get('workday-finish-status').textContent.includes('Your shoot is done'));
+  assert.equal(finish.disabled,true);assert.equal(f.get('workday-browse').disabled,false);
 });
 test('multi-file upload continues after a failure and Retry reuses the same operation',async t=>{
   const state={user:'alice',photos:new Map(),failOnce:true},f=setup(t,state);await wait(()=>!f.get('workday-panel').hidden);await f.choose(assignment);

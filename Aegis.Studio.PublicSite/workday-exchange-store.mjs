@@ -93,6 +93,8 @@ export class WorkDayExchangeStore {
     if(!account)throw Object.assign(new Error('WorkDay account is not provisioned.'),{status:404,code:'account_not_found'});
     const encoded=json(payload),prior=this.db.prepare('SELECT user_key,kind,payload,state,result FROM workday_updates WHERE operation_id=?').get(operationId);
     if(prior){if(prior.user_key!==key||prior.kind!==kind||prior.payload!==encoded)throw Object.assign(new Error('Operation ID was already used for different data.'),{status:409,code:'operation_conflict'});return {operationId,state:prior.state,result:prior.result?JSON.parse(prior.result):null,replayed:true};}
+    if(kind==='AssignmentUpload'&&this.shootCompletion(userName,payload.assignmentId)?.state==='Pending')
+      throw Object.assign(new Error('Shoot confirmation is syncing. Wait before uploading more photographs.'),{status:409,code:'completion_pending'});
     this.db.prepare('INSERT INTO workday_updates(operation_id,user_key,kind,payload,created_at) VALUES(?,?,?,?,?)').run(operationId,key,kind,encoded,this.now().toISOString());
     return {operationId,state:'Pending',result:null,replayed:false};
   }
@@ -109,6 +111,42 @@ export class WorkDayExchangeStore {
   updateStatus(userName,operationId) {
     const row=this.db.prepare('SELECT state,result,created_at FROM workday_updates WHERE user_key=? AND operation_id=?').get(String(userName||'').toLowerCase(),operationId);
     return row?{operationId,state:row.state,result:row.result?JSON.parse(row.result):null,createdAt:row.created_at}:null;
+  }
+  shootCompletion(userName,assignmentId) {
+    const key=String(userName).toLowerCase(),assignment=String(assignmentId).toLowerCase();
+    const row=this.db.prepare(`SELECT sequence,operation_id AS operationId,state,result FROM workday_updates
+      WHERE user_key=? AND kind='Operation' AND json_extract(payload,'$.kind')='ConfirmShootComplete'
+      AND lower(json_extract(payload,'$.assignmentId'))=? ORDER BY sequence DESC LIMIT 1`).get(key,assignment);
+    if(!row)return null;
+    if(row.state==='Acknowledged'&&this.db.prepare(`SELECT 1 FROM workday_updates WHERE user_key=?
+      AND kind='AssignmentUpload' AND lower(json_extract(payload,'$.assignmentId'))=? AND sequence>? LIMIT 1`).get(key,assignment,row.sequence))return null;
+    return {operationId:row.operationId,state:row.state,message:row.result?JSON.parse(row.result).message:null};
+  }
+  shootUploadSummary(userName,assignmentId) {
+    const rows=this.db.prepare(`SELECT operation_id AS uploadId,state,result FROM workday_updates
+      WHERE user_key=? AND kind='AssignmentUpload' AND lower(json_extract(payload,'$.assignmentId'))=?
+      ORDER BY sequence`).all(String(userName).toLowerCase(),String(assignmentId).toLowerCase());
+    const ready=rows.filter(row=>{const receipt=JSON.parse(row.result||'{}').result;
+      return row.state==='Acknowledged'&&receipt?.versionId&&receipt?.assetId&&receipt?.messageId&&receipt?.storageStatus==='Stored';});
+    return {total:rows.length,ready:ready.length,uploadIds:ready.map(row=>row.uploadId)};
+  }
+  confirmShoot(userName,assignmentId,request) {
+    // No asynchronous work inside this transaction: an upload cannot race the declaration.
+    this.db.exec('BEGIN IMMEDIATE');
+    try{
+      const previous=this.shootCompletion(userName,assignmentId);
+      if(previous&&previous.state!=='Conflict'){this.db.exec('COMMIT');return previous;}
+      const summary=this.shootUploadSummary(userName,assignmentId);
+      if(!summary.total||summary.ready!==summary.total)throw Object.assign(new Error('Wait until every photograph is imported into Studio. Resolve any upload errors first.'),{status:409,code:'uploads_not_ready'});
+      if(summary.total>10000)throw Object.assign(new Error('Contact the Job Owner to confirm this large shoot.'),{status:409,code:'shoot_review_required'});
+      const result=this.enqueue(userName,request.operationId,'Operation',{
+        operationId:request.operationId,kind:'ConfirmShootComplete',assignmentId,
+        occurredAtUtc:this.now().toISOString(),deviceId:'workday-web',
+        text:'All photographs uploaded. Shoot done.',category:null,location:null,
+        expectedVersion:request.expectedVersion,uploadIds:summary.uploadIds
+      });
+      this.db.exec('COMMIT');return result;
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
   assignmentUploads(userName,assignmentId,before=Number.MAX_SAFE_INTEGER,limit=40) {
     const rows=this.db.prepare(`SELECT sequence,operation_id AS uploadId,state,created_at AS createdAt,

@@ -161,7 +161,9 @@ export function createIntakeApi(env,readBody,json) {
       json(res,200,snapshot,{'Cache-Control':'private, no-store'});return true;
     }
     if(route==='/api/v1/workday/operations'&&method==='POST'){
-      const user=requireWorkday(req),p=await input(req,65536),result=workdayStore.enqueue(user.user_name,p.operationId,'Operation',p);
+      const user=requireWorkday(req),p=await input(req,65536);
+      if(String(p.kind).trim().toLowerCase()==='confirmshootcomplete'||Number(p.kind)===12)fail(400,'use_shoot_confirmation','Use the assignment shoot confirmation action.');
+      const result=workdayStore.enqueue(user.user_name,p.operationId,'Operation',p);
       json(res,202,result,{'Cache-Control':'no-store'});return true;
     }
     const workdayStatus=route.match(/^\/api\/v1\/workday\/operations\/([0-9a-f-]{36})$/i);
@@ -202,6 +204,20 @@ export function createIntakeApi(env,readBody,json) {
     if(route==='/api/v1/workday/time-summary'&&method==='GET'){
       const user=requireWorkday(req),snapshot=workdayStore.snapshot(user.user_name);
       json(res,200,snapshot?.timeSummary||null,{'Cache-Control':'private, no-store'});return true;
+    }
+    const shootComplete=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/shoot-completion$/i);
+    if(shootComplete&&['GET','POST'].includes(method)){
+      const user=requireWorkday(req),id=shootComplete[1];requireAssignment(user,id);
+      if(method==='POST'){
+        const p=await input(req,8192);
+        if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.operationId||'')||!Number.isSafeInteger(p.expectedVersion)||p.expectedVersion<0)
+          fail(400,'invalid_confirmation','A confirmation ID and assignment version are required.');
+        json(res,202,workdayStore.confirmShoot(user.user_name,id,p),{'Cache-Control':'private, no-store'});
+      }else{
+        const {total,ready}=workdayStore.shootUploadSummary(user.user_name,id);
+        json(res,200,{total,ready,completion:workdayStore.shootCompletion(user.user_name,id)},{'Cache-Control':'private, no-store'});
+      }
+      return true;
     }
     const assignmentPhotos=route.match(/^\/api\/v1\/workday\/assignments\/([0-9a-f-]{36})\/uploads(?:\/([0-9a-f-]{36})\/thumbnail)?$/i);
     if(assignmentPhotos&&method==='GET'){

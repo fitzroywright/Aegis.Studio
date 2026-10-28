@@ -79,6 +79,31 @@ test('uploaded-photo gallery survives restart and restricts lists and thumbnails
   const badId=randomUUID();assert.equal((await upload(badId,Buffer.from([137,80,78,71,13,10,26,10]),'damaged.png')).status,202);
   assert.equal((await fetch(base+path+'/'+badId+'/thumbnail',{headers:alice})).status,422);
   assert.equal((await(await fetch(base+path,{headers:alice})).json()).items.length,2);
+  const completion='/workday/assignments/'+assignment+'/shoot-completion';
+  assert.equal((await fetch(base+completion)).status,401);
+  assert.equal((await post(completion,{operationId:randomUUID(),expectedVersion:0},alice)).status,409);
+  const charlie=await account('charlie'),completePhoto=randomUUID();
+  assert.equal((await upload(completePhoto,photo,'images-2.png',charlie)).status,202);
+  assert.equal((await post(completion,{operationId:randomUUID(),expectedVersion:0},charlie)).status,409);
+  await post('/admin/workday/updates/'+completePhoto+'/result',{state:'Acknowledged',result:{
+    versionId:randomUUID(),assetId:randomUUID(),messageId:randomUUID(),storageStatus:'Stored'
+  }},studio);
+  const ready=await fetch(base+completion,{headers:charlie});assert.equal(ready.status,200);
+  assert.match(ready.headers.get('cache-control'),/private.*no-store/);assert.equal((await ready.json()).ready,1);
+  const operationId=randomUUID();
+  assert.equal((await post(completion,{operationId,expectedVersion:-1},charlie)).status,400);
+  const sent=await post(completion,{operationId,expectedVersion:0},charlie);assert.equal(sent.status,202);
+  assert.equal((await sent.json()).state,'Pending');
+  const replay=await post(completion,{operationId:randomUUID(),expectedVersion:0},charlie);
+  assert.equal((await replay.json()).operationId,operationId);
+  assert.equal((await upload(randomUUID(),photo,'late.png',charlie)).status,409);
+  for(const kind of ['ConfirmShootComplete','confirmshootcomplete',12,'12'])
+    assert.equal((await post('/workday/operations',{operationId:randomUUID(),kind,assignmentId:assignment},charlie)).status,400);
+  await post('/admin/workday/updates/'+operationId+'/result',{state:'Acknowledged',message:'Acknowledged'},studio);
+  assert.equal((await(await fetch(base+completion,{headers:charlie})).json()).completion.state,'Acknowledged');
+  await snapshot('charlie',2,[]);
+  assert.equal((await fetch(base+completion,{headers:charlie})).status,403);
+  assert.equal((await post(completion,{operationId:randomUUID(),expectedVersion:1},charlie)).status,403);
 });
 
 test('upload history pages without photo bytes, duplicate rows or cross-account records',()=>{
