@@ -1,3 +1,4 @@
+using Common.Storage;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -326,13 +327,13 @@ public sealed class WorkDayApiExchangeWorker(
                 {Headers=new HeaderDictionary(),ContentType=contentType};
                 string correlation=uploadId.ToString("D");
                 flows.TryEnqueueWorkDayUpload(correlation,"Upload",assignmentId.ToString("D"));
-                StudioAttachment stored=await attachments.AddAsync(job.ConversationId,file,"Internal",update.UserName,ct,$"workday:{uploadId:D}");
-                flows.TryEnqueueWorkDayUpload(correlation,"Storage",stored.Id.ToString("D"));
-                flows.TryEnqueueWorkDayUpload(correlation,"MetadataAssociation",assignmentId.ToString("D"));
-                flows.TryEnqueueWorkDayUpload(correlation,"Acknowledged",stored.Id.ToString("D"));
-                uploadResult=new WorkDayUploadResult(uploadId,stored.Id,assignmentId,stored.FileName,stored.Size,stored.StorageStatus,DateTimeOffset.UtcNow);
+                WorkDayUploadResult imported=await WorkDayPhotoImport.ImportAsync(database,services.GetRequiredService<IFileStorage>(),attachments,studio,job,assignmentId,uploadId,file,principal,ct);
+                flows.TryEnqueueWorkDayUpload(correlation,"Storage",imported.AttachmentId.ToString("D"));
+                flows.TryEnqueueWorkDayUpload(correlation,"MetadataAssociation",imported.AssetId?.ToString("D"));
+                flows.TryEnqueueWorkDayUpload(correlation,"Acknowledged",imported.AttachmentId.ToString("D"));
+                uploadResult=imported;
             }
-            catch(InvalidOperationException ex){state="Conflict";message=ex.Message;}
+            catch(Exception ex) when(ex is InvalidOperationException or ArgumentException or UnauthorizedAccessException){state="Conflict";message=ex is UnauthorizedAccessException?"The upload identity is not authorized.":ex.Message;}
             catch(FormatException){state="Conflict";message="WorkDay upload payload is invalid.";}
             using var ack=await http.PostAsJsonAsync(
                 $"admin/workday/updates/{update.OperationId:D}/result",
