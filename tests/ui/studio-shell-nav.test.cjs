@@ -177,3 +177,30 @@ test('Dashboard through Media use restrained line icons without changing routes 
 });
 
 
+
+test('Jobs renders through real navigation while the shell context survives transient tool cleanup',async t=>{
+ const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
+ const dom=new JSDOM('<body data-studio-view="dashboard"><header class="topbar"><div id="studioPageTools"></div></header><nav id="studioBreadcrumb"></nav><div class="shell"><main><div id="conversationView" class="hidden"></div><div id="genericView"></div></main></div></body>',{url:'https://studio.test/#studio=dashboard',runScripts:'outside-only'});
+ t.after(()=>dom.window.close());const w=dom.window,opened=[];
+ const job={id:'job1',workspaceId:'w1',title:'Portrait appointment',clientName:'Client One',status:'Scheduled',assignedTo:'staff',jobLead:'staff',eventDate:new Date().toISOString().slice(0,10)};
+ w.workspaceCache=[{id:'w1',name:'Portraits',permissions:{view:true,accessWorkspace:true}}];
+ w.json=async url=>url==='/api/jobs'?[job]:url==='/api/auth/me'?{user:{userName:'staff'}}:url.includes('studio-employees')?[{userName:'staff',displayName:'Studio Staff'}]:[];
+ w.fetch=async()=>({ok:true,json:async()=>[]});w.openWorkspaceJob=async id=>opened.push(id);
+ w.StudioDashboard={render(){},dispose(){}};w.esc=String;
+ for(const name of ['studio-page.js','studio-status-order.js','subject-picker.js','calendar-layouts.js','jobs-page.js','studio-shell-nav.js','studio-navigation.js'])w.eval(fs.readFileSync(path.join(root,name),'utf8'));
+ w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await new Promise(r=>setTimeout(r,0));
+ const menu=w.document.getElementById('studioPageMenu');
+ w.document.getElementById('studioPageTools').append(w.document.createElement('button'));
+ for(let visit=0;visit<2;visit++){
+  await w.studioNavigate('jobs');
+  assert.equal(w.document.querySelector('.sj-loading[role=alert]'),null);
+  assert.ok(w.document.querySelector('.sj-page'));
+  assert.equal(w.document.getElementById('studioPageMenu'),menu);
+  assert.equal(w.document.querySelectorAll('#studioPageMenu').length,1);
+  const status=w.document.querySelector('#studioPageContext [data-sj-stage="Scheduled"]');
+  assert.ok(status);const previous=w.document.querySelector('[data-sj-status]').value;status.click();assert.equal(w.document.querySelector('[data-sj-status]').value,previous==='Scheduled'?'':'Scheduled');
+  const row=w.document.querySelector('tr[data-sj-job="job1"]');assert.ok(row);row.click();
+  await w.studioNavigate('dashboard');
+ }
+ assert.deepEqual(opened,['job1','job1']);
+});
