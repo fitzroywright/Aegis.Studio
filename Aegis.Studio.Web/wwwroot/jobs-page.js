@@ -14,10 +14,9 @@
   const current=()=>!disposed&&options.isCurrent();
   host.innerHTML='<div class="sj-loading" role="status">Loading jobs…</div>';
   try {
-   const [jobData,workflowResult,notificationResult,peopleResult,authResult,taskResult]=await Promise.all([
+   const [jobData,workflowResult,peopleResult,authResult,taskResult]=await Promise.all([
     options.json('/api/jobs'),
     options.json('/api/workflow/jobs').then(value=>({value:array(value)}),()=>({error:true,value:[]})),
-    options.json('/api/notifications?count=100').then(value=>({value:array(value)}),()=>({error:true,value:[]})),
     options.json('/api/studio-employees?assignable=true').catch(()=>[]),
     options.json('/api/auth/me').catch(()=>({})),
     options.json('/api/today/tasks').catch(()=>[])
@@ -42,16 +41,14 @@
    let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',calendarView=['day','week','month'].includes(saved.calendarView)?saved.calendarView:'day',calendarDate=date(saved.calendarDate)||new Date(),calendarEnabled=saved.calendarEnabled!==false,includeClosed=false,page=1;
    if(options.dashboardQueue==='unassigned'){view='all';stage='';term='';calendarEnabled=false;layout='jobs';}
    const stages=StudioStatusOrder.sort(jobs.map(status));if(!stages.includes(stage))stage='';
-   const card=(title,body,cls='')=>`<section class="sj-card ${cls}"><header><h2>${title}</h2></header>${body}</section>`;
    host.innerHTML=`<section class="sj-page" aria-label="Jobs"><section class="sj-board">
     <div class="sj-toolbar" hidden><button type="button" class="sj-gold" data-sj-settings hidden>Workspace settings</button></div>
     <div class="sj-summary"><div class="mw-today-view-tabs sj-view-tabs" role="group" aria-label="Job view"><button type="button" data-sj-view="led">Jobs Led By Me</button><button type="button" data-sj-view="involved">Jobs I’m Involved In</button><button type="button" data-sj-view="all">All Jobs</button></div><div class="sj-calendar mw-today-calendar-tools" aria-label="Filter jobs by event date">${StudioCalendarLayouts.switcher(layout)}<div class="mw-calendar-view-switch" role="group" aria-label="Calendar view"><button type="button" data-sj-calendar-view="month">Month</button><button type="button" data-sj-calendar-view="week">Week</button><button type="button" data-sj-calendar-view="day">Day</button></div><div class="mw-day-nav" aria-label="Jobs date navigator"><button type="button" class="mw-day-step" data-sj-calendar-step="-1" aria-label="Previous date range">‹</button><button type="button" class="mw-day-current" data-sj-calendar-today title="Return to today">Today</button><button type="button" class="mw-day-step" data-sj-calendar-step="1" aria-label="Next date range">›</button><div class="mw-calendar-control"><button type="button" class="mw-calendar-trigger" data-sj-calendar-toggle aria-label="Choose event date" title="Choose event date"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/></svg></button><input type="date" data-sj-calendar-date aria-label="Choose event date"></div></div></div></div>
     <div class="sj-error" role="alert" data-sj-error hidden></div>
     <div class="sj-table-frame"><div class="sj-table-head-clip"><table class="sj-table"><colgroup><col style="width:30%"><col style="width:17%"><col style="width:18%"><col style="width:18%"><col style="width:17%"></colgroup><thead><tr><th><div class="sj-job-header"><span>Job / Client</span><input type="search" data-sj-search aria-label="Search jobs, clients or references" placeholder="Search jobs…" autocomplete="off"></div></th><th><label class="sj-column-filter sj-column-filter-inline"><span>Event date</span><select data-sj-sort aria-label="Sort by event date"><option value="date-desc">Newest first ↓</option><option value="date-asc">Oldest first ↑</option></select></label></th><th>Job Owner</th><th><label class="sj-column-filter sj-column-filter-inline"><span>Status</span><select data-sj-status aria-label="Filter by status"><option value="">All Open Jobs</option>${stages.map(s=>`<option>${esc(s)}</option>`).join('')}</select></label></th><th>Next Action</th></tr></thead></table></div><div class="sj-table-scroll"><table class="sj-table"><colgroup><col style="width:30%"><col style="width:17%"><col style="width:18%"><col style="width:18%"><col style="width:17%"></colgroup><tbody></tbody></table></div></div>
     <footer class="sj-pagination"><span data-sj-range></span><div><button type="button" data-sj-prev aria-label="Previous page">‹</button><span data-sj-page></span><button type="button" data-sj-next aria-label="Next page">›</button></div></footer>
-   </section><div data-studio-context>${card('Overview','<div class="sj-card-body" data-sj-statuses></div>')}<div data-studio-attention><div data-sj-attention></div></div></div></section>`;
+   </section><div data-studio-context><div data-studio-attention><div data-sj-attention></div></div></div></section>`;
    const find=s=>StudioPage.query(host,s);
-   host.querySelector('[data-studio-context] > section').dataset.railCard='overview';
    StudioPage.mountContext(host,'jobs');
    find('[data-sj-search]').value=term;find('[data-sj-status]').value=stage;find('[data-sj-sort]').value=sort;
    host.studioJobsWorkspaceCounts=Object.fromEntries(workspaces.map(w=>[String(w.id),jobs.filter(j=>belongs(j,String(w.id))).length]));
@@ -89,9 +86,6 @@
     find('[data-sj-page]').innerHTML=Array.from({length:Math.min(3,pages)},(_,i)=>Math.min(Math.max(1,page-1),Math.max(1,pages-2))+i).map(n=>`<button type="button" data-sj-page-number="${n}" aria-label="Page ${n}" ${n===page?'aria-current="page"':''}>${n}</button>`).join('');find('[data-sj-prev]').disabled=page===1;find('[data-sj-next]').disabled=page===pages;
     find('[data-sj-settings]').hidden=!workspace||!options.openWorkspaceSettings;
     const footer=document.getElementById('studioFooterRate');if(footer)footer.textContent=filtered.length+' jobs';
-    const counts=StudioStatusOrder.sort(base.map(status)).map(s=>[s,base.filter(j=>status(j)===s).length]);
-    const changes=notificationResult.value.filter(n=>/status|workflow/i.test(n.eventType||n.type||n.title||'')&&base.some(j=>String(j.id)===String(n.referenceId))).sort((a,b)=>+(date(b.createdAtUtc||b.createdAt)||0)-+(date(a.createdAtUtc||a.createdAt)||0)).slice(0,3);
-    find('[data-sj-statuses]').innerHTML=(workflowResult.error?'<p>Workflow unavailable. Showing recorded job statuses.</p>':'')+counts.map(([s,n])=>`<button type="button" class="sj-status-count sj-${tone(s)}" data-sj-stage="${esc(s)}" aria-pressed="${stage===s}"><span>${esc(s)}</span><b>${n}</b><meter min="0" max="${Math.max(1,base.length)}" value="${n}" aria-label="${esc(s)} jobs">${n}</meter></button>`).join('')+'<h3>Recent Status Changes</h3>'+(changes.map(n=>`<button type="button" class="sj-note" data-sj-job="${esc(n.referenceId)}"><strong>${esc(n.title||n.subject||n.eventType)}</strong><small>${esc(n.body||'')} · ${esc(dateLabel(n.createdAtUtc||n.createdAt))}</small></button>`).join('')||'<p>No recent status changes.</p>');
     find('[data-sj-attention]').innerHTML=base.flatMap(job=>{
      const reasons=[['owner','Job owner needed'],['changes','Changes requested'],['photographers','Photographer needed']].filter(([key])=>need(job,key)).map(([,label])=>label);
      return reasons.length?[`<button type="button" class="sj-attention" data-attention-item="${esc(job.id)}" data-sj-job="${esc(job.id)}"><span><strong>${esc(job.title||'Untitled job')}</strong><small>${esc([job.clientName,...reasons].filter(Boolean).join(' · '))}</small></span></button>`]:[];
@@ -109,9 +103,8 @@
    find('[data-sj-sort]').onchange=e=>{sort=e.target.value;apply();};
    StudioPage.queryAll(host,'[data-sj-view]').forEach(button=>button.onclick=()=>{view=button.dataset.sjView;apply();});
    find('[data-sj-prev]').onclick=()=>{page--;apply(false);find('.sj-table-scroll').scrollTop=0;};find('[data-sj-next]').onclick=()=>{page++;apply(false);find('.sj-table-scroll').scrollTop=0;};
-   const handleJobClick=e=>{if(!current())return;const number=e.target.closest('[data-sj-page-number]');if(number){page=Number(number.dataset.sjPageNumber);apply(false);find('.sj-table-scroll').scrollTop=0;return;}const row=e.target.closest('[data-sj-job]');if(row){void open(row.dataset.sjJob);return;}const s=e.target.closest('[data-sj-stage]');if(s){stage=stage===s.dataset.sjStage?'':s.dataset.sjStage;find('[data-sj-status]').value=stage;apply();}};
+   const handleJobClick=e=>{if(!current())return;const number=e.target.closest('[data-sj-page-number]');if(number){page=Number(number.dataset.sjPageNumber);apply(false);find('.sj-table-scroll').scrollTop=0;return;}const row=e.target.closest('[data-sj-job]');if(row){void open(row.dataset.sjJob);return;}};
    host.onclick=handleJobClick;
-   find('[data-sj-statuses]').onclick=handleJobClick;
    find('[data-sj-attention]').onclick=handleJobClick;
    host.onkeydown=e=>{const row=e.target.closest('tr[data-sj-job]');if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void open(row.dataset.sjJob);}};
    find('[data-sj-settings]').onclick=async()=>{try{await options.openWorkspaceSettings(workspace);}catch(error){if(current()){find('[data-sj-error]').textContent=error.message||String(error);find('[data-sj-error]').hidden=false;}}};
@@ -121,6 +114,7 @@
  }
  window.StudioJobsPage={render,dispose(){active?.dispose();active=null;}};
 })();
+
 
 
 
