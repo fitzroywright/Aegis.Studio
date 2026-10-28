@@ -41,14 +41,10 @@ test('Studio logo returns every page to Dashboard through shared navigation',asy
  const modified=new w.MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:true});
  logo.dispatchEvent(modified);assert.equal(modified.defaultPrevented,false);assert.equal(calls.length,7);
 });
-test('shared shell exposes contextual commands in a page menu with one navigation toolstrip',async t=>{
+test('shared shell has one navigation toolstrip and no Page actions or context cards',async t=>{
  const {w,dom}=setup();t.after(()=>dom.window.close());await w.studioNavigate('about');w.StudioShell.sync('about');
- const rail=w.document.getElementById('studioPageContext');
- assert.equal(w.document.querySelector('.shell>aside'),null);assert.equal(w.document.querySelector('[data-rail-toggle]'),null);
- assert.ok(rail.closest('#studioPageMenu'));
- assert.deepEqual([...rail.querySelectorAll('h2')].map(e=>e.textContent.trim().replace(/^[^A-Za-z]+/,'')),['Overview','Actions']);
+ assert.equal(w.document.querySelector('.shell>aside,[data-rail-toggle],#studioPageMenu,#studioPageContext'),null);
  for(const view of ['dashboard','jobs','frontdesk'])assert.ok(w.document.querySelector('#studioNavigationTools [data-studio-side="'+view+'"]'));
- assert.equal(rail.querySelector('[data-rail-card="navigation"]'),null);
  assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*About/);
 });
 
@@ -90,22 +86,14 @@ test('navigation buttons accept keyboard focus and direct activation',t=>{
  assert.equal(w.document.activeElement,button);
 });
 
-test('all pages omit the rail even with a stored collapse preference; page actions remain usable',async t=>{
+test('all pages omit Page actions and the rail even with a stored collapse preference',async t=>{
  const {w,dom}=setup();t.after(()=>dom.window.close());
  w.localStorage.setItem('aegis.studio.rail-collapse.v1',JSON.stringify({left:false}));
- let bookings=0;w.studioLaunchNewBooking=()=>bookings++;
- for(const view of ['frontdesk','jobs','schedule','media','workspaces','clients','production','about','staff-roles','templates','workspace-management','dashboard']){
+ for(const view of ['frontdesk','jobs','schedule','media','workspaces','clients','production','about','staff-roles','templates','workspace-management','tasks','messages','finance','reports','delivery','session-plan','dashboard']){
   await w.studioNavigate(view);w.StudioShell.sync(view);
-  assert.equal(w.document.getElementById('studioContextRail'),null);
-  assert.equal(w.document.querySelector('[data-rail-toggle]'),null);
-  const menu=w.document.getElementById('studioPageMenu');assert.equal(menu.hidden,['dashboard','media','schedule','jobs','production','clients','frontdesk'].includes(view));
+  assert.equal(w.document.querySelector('#studioContextRail,[data-rail-toggle],#studioPageMenu,#studioPageContext,[data-rail-card]'),null);
   assert.notEqual(w.document.getElementById('studioNavigationTools').inert,true);
  }
- await w.studioNavigate('about');w.StudioShell.sync('about');
- const menu=w.document.getElementById('studioPageMenu');menu.open=true;
- menu.querySelector('[data-studio-new-booking]').click();assert.equal(bookings,1);assert.equal(menu.open,false);
- menu.open=true;menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.open,false);
- menu.open=true;await w.studioNavigate('jobs');w.StudioShell.sync('jobs');assert.equal(menu.open,false);
 });
 
 test('toolstrip ends with the existing bell and avatar while their menus remain usable',async t=>{
@@ -178,7 +166,7 @@ test('Dashboard through Media use restrained line icons without changing routes 
 
 
 
-test('Jobs renders through real navigation while the shell context survives transient tool cleanup',async t=>{
+test('Jobs renders through repeated real navigation without Page actions',async t=>{
  const root=path.resolve(__dirname,'../../Aegis.Studio.Web/wwwroot');
  const dom=new JSDOM('<body data-studio-view="dashboard"><header class="topbar"><div id="studioPageTools"></div></header><nav id="studioBreadcrumb"></nav><div class="shell"><main><div id="conversationView" class="hidden"></div><div id="genericView"></div></main></div></body>',{url:'https://studio.test/#studio=dashboard',runScripts:'outside-only'});
  t.after(()=>dom.window.close());const w=dom.window,opened=[];
@@ -189,15 +177,12 @@ test('Jobs renders through real navigation while the shell context survives tran
  w.StudioDashboard={render(){},dispose(){}};w.esc=String;
  for(const name of ['studio-page.js','studio-status-order.js','subject-picker.js','calendar-layouts.js','jobs-page.js','studio-shell-nav.js','studio-navigation.js'])w.eval(fs.readFileSync(path.join(root,name),'utf8'));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await new Promise(r=>setTimeout(r,0));
- const menu=w.document.getElementById('studioPageMenu');
  w.document.getElementById('studioPageTools').append(w.document.createElement('button'));
  for(let visit=0;visit<2;visit++){
   await w.studioNavigate('jobs');
   assert.equal(w.document.querySelector('.sj-loading[role=alert]'),null);
   assert.ok(w.document.querySelector('.sj-page'));
-  assert.equal(w.document.getElementById('studioPageMenu'),menu);
-  assert.equal(w.document.querySelectorAll('#studioPageMenu').length,1);
-  assert.equal(menu.hidden,true);assert.equal(menu.querySelector('#studioPageContext').childElementCount,0);
+  assert.equal(w.document.querySelector('#studioPageMenu,#studioPageContext'),null);
   const status=w.document.querySelector('[data-sj-status]');status.value='Scheduled';status.dispatchEvent(new w.Event('change'));
   assert.equal(status.value,'Scheduled');
   const row=w.document.querySelector('tr[data-sj-job="job1"]');assert.ok(row);row.click();
@@ -206,25 +191,15 @@ test('Jobs renders through real navigation while the shell context survives tran
  assert.deepEqual(opened,['job1','job1']);
 });
 
-test('operational pages omit Page actions and cards while footer filters and other pages retain controls',async t=>{
+test('footer workspace selection and attention mounting work without Page actions',async t=>{
  const {w,dom}=setup();t.after(()=>dom.window.close());
  w.workspaceCache=[{id:'one',name:'Portraits',permissions:{view:true,accessWorkspace:true}}];
- await w.studioNavigate('about');w.StudioShell.sync('about');
- const menu=w.document.getElementById('studioPageMenu');
- for(const view of ['media','schedule','jobs','production','clients','frontdesk']){
-  menu.open=true;await w.studioNavigate(view);w.StudioShell.sync(view);
-  assert.equal(menu.hidden,true);assert.equal(menu.open,false);
-  w.studioShellSetOverview('<section><h2>Excluded overview</h2></section>',view);
-  w.studioShellMountContext([w.document.createElement('section')],view);
-  w.dispatchEvent(new w.Event('studio-workspaces-loaded'));
-  assert.equal(menu.querySelector('#studioPageContext').childElementCount,0);
-  assert.equal(menu.hidden,true);
-  assert.equal(w.document.querySelectorAll('#studioFooterWorkspaces option').length,2);
- }
  let selected;w.StudioShell.setProductionWorkspaceFilter(w.workspaceCache,'',id=>selected=id);
  await w.studioNavigate('production');w.StudioShell.sync('production');
- const filter=w.document.getElementById('studioFooterWorkspaces');filter.value='one';filter.dispatchEvent(new w.Event('change'));assert.equal(selected,'one');
- await w.studioNavigate('about');w.StudioShell.sync('about');
- assert.equal(menu.hidden,false);assert.ok(menu.querySelector('[data-rail-card="actions"]'));
- assert.equal(menu.querySelector('[data-rail-card="overview"]').textContent.includes('Excluded overview'),false);
+ const filter=w.document.getElementById('studioFooterWorkspaces');assert.equal(filter.options.length,2);
+ filter.value='one';filter.dispatchEvent(new w.Event('change'));assert.equal(selected,'one');
+ const attention=w.document.createElement('div');attention.innerHTML='<button data-attention-item="check">Check job</button>';
+ w.studioShellMountAttention(attention,'production');
+ assert.equal(w.document.querySelector('#studioPageAttention button').textContent,'Check job');
+ assert.equal(w.document.querySelector('#studioPageMenu,#studioPageContext'),null);
 });
