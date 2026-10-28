@@ -1,4 +1,4 @@
-let commercialItems=[], commercialTemplates=[], commercialKind='WorkOrder', commercialIncludeCompleted=true;
+let commercialItems=[], commercialTemplates=[], commercialKind='WorkOrder';
 function commercialPage(title,body,tools='',summary='',attention='') {
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
     const sharedTitle=['Products and Services','Templates'].includes(title);
@@ -96,12 +96,15 @@ function editCommercialTemplate(current,kind){
         await json(`/api/admin/commercial/templates/${kind}${current?'/'+current.id:''}`,{method:current?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({definition,expectedVersion:current?.version||0,active:f.elements.active.checked})});d.close();await showCommercialTemplates(kind);
     }catch(error){f.querySelector('[role=alert]').textContent=error.message;}};
 }
-let commercialQueueArea='',commercialDue='';
-const productionJobGroups=[['','All Job Groups'],['waiting','Tasks blocked / waiting'],['overdue','Jobs with overdue tasks'],['item-rework','Recorded QC rework'],['refunds','Produced units refunded'],['unassigned','Unassigned'],['handoffs','Handoffs'],['unknown','Due date unknown']];
 let productionBoardController=null;
 async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
-    if(!preserveFilters&&!window.studioProductionScopeRequested){window.studioWorkloadSelection={filter:'',workspace:'',assignee:'',stage:'',search:''};commercialQueueArea='';commercialDue='';commercialIncludeCompleted=true;}
-    if(workspaceId!==undefined){window.studioWorkloadSelection||={};window.studioWorkloadSelection.workspace=String(workspaceId||'');}
+    const previous=window.studioWorkloadSelection||{};
+    // Only visible job search and workspace selection scope the board.
+    window.studioWorkloadSelection={
+        workspace:workspaceId!==undefined?String(workspaceId||''):
+            preserveFilters||window.studioProductionScopeRequested?String(previous.workspace||''):'',
+        search:preserveFilters?String(previous.search||''):''
+    };
     window.studioProductionScopeRequested=false;
     clearTimeout(window.productionBoardSearchTimer);
     productionBoardController?.abort();productionBoardController=new AbortController();const signal=productionBoardController.signal;
@@ -123,24 +126,17 @@ async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
     function paint(){
     if(!current())return;
     window.StudioShell?.setProductionWorkspaceFilter(workspaces,window.studioWorkloadSelection?.workspace,workspace=>{window.studioWorkloadSelection||={};window.studioWorkloadSelection.workspace=workspace;laneLimits.clear();paint();});
-    const selection=window.studioWorkloadSelection||={filter:'',workspace:'',assignee:'',stage:'',search:''};
-    if(!productionJobGroups.some(([key])=>key===selection.filter))selection.filter='';
-    const term=(selection.search||'').trim().toLowerCase(),now=Date.now();
-    const laneNames=[['ready','Ready to Start'],['progress','In Production'],['qc','Quality Control'],['attention','Rework'],...(commercialIncludeCompleted?[['complete','Complete']]:[])];
+    const selection=window.studioWorkloadSelection||={workspace:'',search:''};
+    const term=(selection.search||'').trim().toLowerCase();
+    const laneNames=[['ready','Ready to Start'],['progress','In Production'],['qc','Quality Control'],['attention','Rework'],['complete','Complete']];
     const jobs=(workloadData.jobs||[]).filter(job=>{
-        const tasks=tasksByJob.get(job.id)||[],lane=workload.jobLane(job,tasks);
-        if(!commercialIncludeCompleted&&lane==='complete')return false;
-        if(selection.jobIds&&!selection.jobIds.includes(job.id))return false;
+        const tasks=tasksByJob.get(job.id)||[];
         if(selection.workspace&&job.workspaceId!==selection.workspace&&!(job.participatingWorkspaceIds||[]).includes(selection.workspace))return false;
-        const scoped=tasks.filter(a=>(!commercialQueueArea||a.productionArea===commercialQueueArea)&&(!selection.assignee||(selection.assignee==='__unassigned'?!a.assignedTo:a.assignedTo===selection.assignee))&&(!selection.stage||a.activityType===selection.stage)&&(!commercialDue||(Number.isFinite(Date.parse(a.dueAtUtc))&&Date.parse(a.dueAtUtc)<now+7*86400000&&Date.parse(a.dueAtUtc)>=new Date().setHours(0,0,0,0))));
-        if((commercialQueueArea||selection.assignee||selection.stage||commercialDue)&&!scoped.length)return false;
-        if(selection.filter&&!scoped.some(a=>workload.matches(a,selection.filter)))return false;
         const orders=ordersByJob.get(job.id)||[];
         return !term||[job.title,job.clientName,job.status,job.workspaceName,...tasks.map(a=>[a.title,a.activityType,a.productionArea,a.assignedTo].join(' ')),...orders.map(o=>[o.id,o.product].join(' '))].join(' ').toLowerCase().includes(term);
     });
     const jobsByLane=new Map(laneNames.map(([key])=>[key,[]]));
     for(const job of jobs)jobsByLane.get(workload.jobLane(job,tasksByJob.get(job.id)||[]))?.push(job);
-    const options=(values,value)=>values.map(([id,label])=>'<option value="'+esc(id)+'"'+(id===value?' selected':'')+'>'+esc(label)+'</option>').join('');
     const dueLabel=task=>task?.dueAtUtc?new Date(task.dueAtUtc).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'No due date';
     const jobRow=(job)=>{
         const tasks=(tasksByJob.get(job.id)||[]).filter(a=>a.eligibility!=='Inactive');
@@ -155,33 +151,15 @@ async function showCatalogProduction({preserveFilters=false,workspaceId}={}){
     }).join('');
     const totalItems=jobs.length,shownItems=laneNames.reduce((sum,[key])=>sum+Math.min(laneLimits.get(key)||20,jobsByLane.get(key).length),0);
     const summary=laneNames.map(([key,label])=>'<div class="workspace-summary-row"><span>'+esc(label)+'</span><strong>'+jobsByLane.get(key).length+'</strong></div>').join('');
-    const filters='<div class="production-board-filters"><input type="search" data-production-search value="'+esc(selection.search||'')+'" placeholder="Search jobs, clients or work orders" aria-label="Search jobs, clients or work orders"><select aria-label="Job group filter" data-workload-filter-select>'+options(productionJobGroups,selection.filter)+'</select><select aria-label="Assignee filter" data-workload-assignee>'+options([['','All Assignees'],['__unassigned','Unassigned'],...[...new Set(workload.activities.map(a=>a.assignedTo).filter(Boolean))].map(id=>[id,studioFirstName(id)])],selection.assignee)+'</select><select aria-label="Activity filter" data-workload-stage>'+options([['','All Activities'],...[...new Set(workload.activities.map(a=>a.activityType))].map(id=>[id,id])],selection.stage)+'</select><select aria-label="Production area filter" data-area><option value="">All Areas</option>'+['Editing','Printing','Framing','Album Production','Assembly','Quality Control'].map(a=>'<option value="'+esc(a)+'" '+(a===commercialQueueArea?'selected':'')+'>'+esc(a)+'</option>').join('')+'</select><label>Due <select data-production-due><option value="">Any time</option><option value="week" '+(commercialDue==='week'?'selected':'')+'>This week</option></select></label><label class="production-completed-filter" title="Include jobs that have completed production"><input type="checkbox" data-completed '+(commercialIncludeCompleted?'checked':'')+'><span>Completed</span></label><button type="button" data-workload-reset>Reset</button></div>';
+    const filters='<div class="production-board-filters"><input type="search" data-production-search value="'+esc(selection.search||'')+'" placeholder="Search jobs, clients or work orders" aria-label="Search jobs, clients or work orders"><button type="button" data-production-clear-search>Clear search</button></div>';
     if(!current())return;
     commercialPage('Production','<div class="production-board-view">'+filters+'<div class="production-kanban" aria-label="Production jobs by current stage">'+lanes+'</div><footer class="commercial-pager production-board-pager"><span>Showing '+shownItems+' of '+totalItems+' jobs · Each column shows its full count</span><button type="button" class="action" data-production-refresh>Refresh</button><p role="alert"></p></footer></div>','',summary,'');
     StudioPage.query(genericView,'.st-board')?.classList.add('production-main-board');
-    // Production actions belong to the active board toolbar.
-    const productionFilters=StudioPage.query(genericView,'.production-board-filters');
-    if(productionFilters){
-        const pipelineLink=document.createElement('button');
-        pipelineLink.type='button';pipelineLink.className='fd-card-link';pipelineLink.dataset.openProductionPlan='';
-        pipelineLink.textContent='View Production Pipeline →';
-        const tasksLink=document.createElement('button');
-        tasksLink.type='button';tasksLink.className='fd-card-link';tasksLink.dataset.graphTasks='';
-        tasksLink.textContent='Workflow Tasks →';
-        productionFilters.append(pipelineLink,tasksLink);
-    }
     const reload=()=>{laneLimits.clear();paint();};
-    StudioPage.queryAll(genericView,'[data-workload-filter]').forEach(b=>b.onclick=()=>{selection.filter=b.dataset.workloadFilter==='all'?'':b.dataset.workloadFilter;reload();});
-    for(const [selector,key] of [['filter-select','filter'],['assignee','assignee'],['stage','stage']])StudioPage.query(genericView,'[data-workload-'+selector+']').onchange=e=>{selection[key]=e.target.value;reload();};
+    StudioPage.query(genericView,'[data-production-clear-search]').onclick=()=>{selection.search='';reload();};
     StudioPage.query(genericView,'[data-production-search]').oninput=e=>{selection.search=e.target.value;clearTimeout(window.productionBoardSearchTimer);window.productionBoardSearchTimer=setTimeout(()=>{if(!current())return;const start=e.target.selectionStart;reload();const input=genericView.querySelector('[data-production-search]');input.focus();input.setSelectionRange(start,start);},180);};
-    StudioPage.query(genericView,'[data-workload-reset]').onclick=()=>{window.studioWorkloadSelection={filter:'',workspace:'',assignee:'',stage:'',search:''};commercialQueueArea='';commercialDue='';commercialIncludeCompleted=true;reload();};
-    StudioPage.query(genericView,'[data-open-production-plan]').onclick=()=>{window.StudioProductionPlanning?.setContext({workspace:selection.workspace,assignee:selection.assignee,area:commercialQueueArea});return window.studioNavigate('schedule',{panel:'production'});};
-    StudioPage.query(genericView,'[data-production-due]').onchange=e=>{commercialDue=e.target.value;reload();};
-    StudioPage.query(genericView,'[data-completed]').onchange=e=>{commercialIncludeCompleted=e.target.checked;reload();};
-    StudioPage.query(genericView,'[data-area]').onchange=e=>{commercialQueueArea=e.target.value;reload();};
     StudioPage.query(genericView,'[data-production-refresh]').onclick=()=>showCatalogProduction({preserveFilters:true});
     StudioPage.queryAll(genericView,'[data-production-more]').forEach(button=>button.onclick=()=>{const scroll=new Map([...genericView.querySelectorAll('[data-production-lane]')].map(lane=>[lane.dataset.productionLane,lane.querySelector('.production-lane-list').scrollTop]));laneLimits.set(button.dataset.productionMore,(laneLimits.get(button.dataset.productionMore)||20)+20);paint();genericView.querySelectorAll('[data-production-lane]').forEach(lane=>{lane.querySelector('.production-lane-list').scrollTop=scroll.get(lane.dataset.productionLane)||0;});});
-    StudioPage.query(genericView,'[data-graph-tasks]').onclick=()=>StudioJobGraph.production();
     const openJob=id=>window.studioNavigate('workspaces',{jobId:id});
     StudioPage.queryAll(genericView,'[data-production-job]').forEach(card=>{card.onclick=e=>{if(!e.target.closest('button,input,select,a,details'))openJob(card.dataset.productionJob);};card.onkeydown=e=>{if(e.target===card&&['Enter',' '].includes(e.key)){e.preventDefault();openJob(card.dataset.productionJob);}};});
     paintPhotos();
@@ -209,9 +187,3 @@ async function openCommercialWorkOrder(order){
     });
     d.querySelector('[data-resolve]')?.addEventListener('click',async()=>{try{await json(`/api/production/work-orders/${order.id}/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:d.querySelector('[data-note]').value})});d.close();await showCatalogProduction({preserveFilters:true});}catch(err){error(err);}});
 }
-
-
-
-
-
-
