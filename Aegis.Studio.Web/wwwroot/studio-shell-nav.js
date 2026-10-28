@@ -129,6 +129,8 @@
         target.title = 'Logged in User: ' + identity;
     }
 
+    const pageMenuEnabled = view => !['dashboard', 'today', 'media'].includes(view);
+
     function ensurePageMenu() {
         ensureNavigationToolstrip();
         const host = document.getElementById('studioNavigationToolstrip');
@@ -150,7 +152,7 @@
                 if (event.key === 'Escape') { menu.open = false; menu.querySelector('summary').focus(); }
             });
         }
-        menu.hidden = currentView === 'dashboard' || currentView === 'today';
+        menu.hidden = !pageMenuEnabled(currentView);
         renderPageMenu();
     }
 
@@ -175,7 +177,12 @@
         const workspaces = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
             ? productionWorkspaceFilter.workspaces
             : (Array.isArray(cache) ? cache : []).filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false);
-        // Contextual commands share one menu on every page.
+        if (document.body.dataset.studioView === 'media') {
+            rail.replaceChildren();
+            renderFooterWorkspaceMenu(workspaces);
+            return;
+        }
+        // Contextual commands share one menu on supported pages.
         const jobPage=document.body.dataset.studioView==='workspaces'?document.querySelector('#conversationView.has-open-job .job-detail-page'):null;
         const jobActions=[['activity','Activity','◷','ready'],['messages','Messages & Notes','✉','ready'],['upload','Upload Photos','⇧','production'],['subject','Add Subject','＋','edit'],['task','Add Task','☑','production'],['edit','Edit Job','✎','edit'],['workflow','Assignments & Workflow','⇥','ready'],['template-workflow','Template Workflow','◇','ready'],['reminders','Client Reminders','◷','ready']];
         const workflowActions=window.StudioWorkflowViews?.actions(document.body.dataset.studioView);
@@ -691,7 +698,7 @@
             if (next !== currentView) {
                 currentView = next;
                 const menu = document.getElementById('studioPageMenu');
-                if (menu) { menu.open = false; menu.hidden = next === 'dashboard' || next === 'today'; }
+                if (menu) { menu.open = false; menu.hidden = !pageMenuEnabled(next); }
                 renderPageMenu();
                 syncPageFrame();
                 refreshPageDrawers();
