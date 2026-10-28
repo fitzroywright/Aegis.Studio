@@ -24,7 +24,8 @@
     };
 
     function apply(profile) {
-        identity.innerHTML = `<strong>${escapeHtml(studioFirstName(profile))}</strong><span>${escapeHtml(profile.email || 'No email in directory')}</span><span>${escapeHtml([profile.title, profile.department].filter(Boolean).join(' · ') || 'No directory role details')}</span>`;
+        const details = [profile.email, [profile.title, profile.department].filter(Boolean).join(' · ')].filter(Boolean);
+        identity.innerHTML = `<strong>${escapeHtml(studioFirstName(profile))}</strong>${details.map(value=>`<span>${escapeHtml(value)}</span>`).join('')}`;
         const messaging = profile.messaging || {};
         for (const [key, element] of Object.entries(fields)) element.checked = !!messaging[key];
         document.getElementById('prefWhatsAppMobile').value = messaging.whatsAppMobile || '';
@@ -82,4 +83,5 @@
         return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
     }
 })();
+
 
