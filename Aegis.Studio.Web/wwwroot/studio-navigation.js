@@ -375,7 +375,7 @@
     };
 
     let currentNavigationView=document.body.dataset.studioView||'dashboard';
-    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',dashboard:'Dashboard',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
+    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',dashboard:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
         return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioDashboardQueue:options.queue||null,studioWorkspaceId:['jobs','frontdesk','production','delivery','schedule'].includes(view)?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioTemplateKind:view==='templates'?(['Job','WorkOrder','Automation'].includes(options.kind)?options.kind:'Job'):null,studioCatalogTab:view==='catalog'?(options.tab==='booking-sessions'?'booking-sessions':'products'):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
@@ -485,6 +485,7 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 
 
 

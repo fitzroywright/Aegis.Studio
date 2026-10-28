@@ -31,7 +31,7 @@ test('Studio logo returns every page to Dashboard through shared navigation',asy
  w.studioNavigate=async view=>{calls.push(view);};w.fetch=async()=>({ok:true,json:async()=>[]});
  w.eval(code);w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  const logo=w.document.querySelector('a[data-studio-home]');
- assert.ok(logo);assert.equal(logo.getAttribute('href'),'#studio=dashboard');assert.match(logo.getAttribute('aria-label'),/Dashboard/);
+ assert.ok(logo);assert.equal(logo.getAttribute('href'),'#studio=dashboard');assert.match(logo.getAttribute('aria-label'),/Today/);
  for(const view of ['jobs','workspaces','frontdesk','schedule','production','clients','media']){
   w.document.body.dataset.studioView=view;w.StudioShell.sync(view);
   const event=new w.MouseEvent('click',{bubbles:true,cancelable:true,button:0});
@@ -47,7 +47,7 @@ test('shared shell keeps contextual cards and one navigation toolstrip',async t=
  assert.deepEqual([...rail.querySelectorAll('h2')].map(e=>e.textContent.trim().replace(/^[^A-Za-z]+/,'')),['Overview','Actions']);
  for(const view of ['dashboard','jobs','frontdesk'])assert.ok(w.document.querySelector('#studioNavigationTools [data-studio-side="'+view+'"]'));
  assert.equal(rail.querySelector('[data-rail-card="navigation"]'),null);
- assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Dashboard.*Production/);
+ assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*Production/);
 });
 
 test('navigation stays available without a reveal control or pointer interaction',t=>{
@@ -162,10 +162,11 @@ test('shared footer restores count and keeps history and workspace selection acr
 
 test('Dashboard through Media use restrained line icons without changing routes or labels',t=>{
  const {w,dom,calls}=setup();t.after(()=>dom.window.close());
- const expected=[['dashboard','Dashboard'],['frontdesk','Front Desk'],['clients','Clients'],['jobs','Jobs'],['production','Production'],['schedule','Schedule'],['media','Media']];
+ const expected=[['dashboard','Today'],['frontdesk','Front Desk'],['clients','Clients'],['jobs','Jobs'],['production','Production'],['schedule','Schedule'],['media','Media']];
  const buttons=[...w.document.querySelectorAll('#studioNavigationTools [data-studio-side]')];
  assert.deepEqual(buttons.map(b=>[b.dataset.studioSide,b.textContent]),expected);
  for(const button of buttons){const icon=button.querySelector('svg.studio-navigation-icon');assert.ok(icon);assert.equal(icon.getAttribute('viewBox'),'0 0 24 24');assert.equal(icon.getAttribute('aria-hidden'),'true');assert.equal(icon.getAttribute('fill'),'none');assert.equal(icon.getAttribute('stroke'),'currentColor');assert.ok(icon.querySelector('.studio-navigation-accent'));assert.equal(icon.querySelector('[fill]'),null);button.click();}
  assert.deepEqual(calls,expected.map(([key])=>key));
 });
+
 
