@@ -42,7 +42,7 @@ test('company projection deduplicates converted inquiries and uses recorded deli
 });
 test('dashboard renders real summaries and links into queues and Job Details',async t=>{
  const w=setup(t,read(fixture()));await w.StudioDashboard.render();await w.studioDashboardReady;
- assert.match(w.document.body.textContent,/Studio at a glance/);assert.equal(w.document.querySelectorAll('.cd-metric').length,6);assert.equal(w.document.querySelector('.mw-today-jobs'),null);
+ assert.match(w.document.body.textContent,/Studio at a glance/);assert.equal(w.document.querySelectorAll('.cd-metrics,.cd-metric').length,0);assert.equal(w.document.querySelectorAll('.cd-card').length,5);assert.equal(w.document.querySelector('.mw-today-jobs'),null);
  w.document.querySelector('[data-dashboard-link="deposits"]').click();assert.equal(w.navigation.at(-1).view,'frontdesk');assert.equal(w.navigation.at(-1).options.queue,'deposits');
  w.document.querySelector('[data-dashboard-job="a"]').click();assert.equal(w.navigation.at(-1).options.jobId,'a');
 });
