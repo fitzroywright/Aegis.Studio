@@ -5,8 +5,8 @@
   <meta name="theme-color" content="#f7f4ed"><title>Bryan’s Studios — More Than Photographs</title>
   <meta name="description" content="Portraits, weddings, families, generations. A Jamaican legacy since 1927. Book a session, revisit your private gallery, or sign in to WorkDay.">
   <link rel="icon" href="/assets/brand.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css"><script src="/roster-editor.js" defer></script>
-<script type="module" src="/app.js"></script><script type="module" src="/workday-web.js"></script>
+  <link rel="stylesheet" href="/styles.css?v=20261028-workday-upload-gallery"><script src="/roster-editor.js" defer></script>
+<script type="module" src="/app.js"></script><script type="module" src="/workday-web.js?v=20261028-upload-gallery"></script>
 </head>
 <body>
   <div class="site-shell">
@@ -93,10 +93,22 @@
             <h4>My assigned Jobs</h4><ul id="workday-jobs"></ul>
             <form id="workday-upload-form" class="track-form">
               <label>Assigned Job<select name="assignmentId" id="workday-assignment" required></select></label>
-              <label>Photographs<input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple required></label>
-              <button type="submit" class="button">Upload photographs</button>
+              <div id="workday-dropzone" class="workday-dropzone" role="group" aria-labelledby="workday-drop-title" aria-describedby="workday-upload-help">
+                <strong id="workday-drop-title">Drop your photographs here</strong>
+                <p id="workday-upload-help">JPEG, PNG or WebP · Up to 25 MB each · Select up to 100 at a time</p>
+                <button type="button" class="button" id="workday-browse">Choose photographs</button>
+                <input type="file" id="workday-photos" name="photos" accept="image/jpeg,image/png,image/webp" multiple hidden>
+              </div>
+              <div class="workday-upload-actions"><button type="submit" class="button" id="workday-upload">Upload photographs</button><button type="button" class="text-button" id="workday-clear">Clear selection</button></div>
             </form>
             <p class="privacy-note">Uploads are queued for Studio processing; uploading does not publish client galleries.</p>
+            <section class="workday-upload-gallery" aria-labelledby="workday-gallery-title">
+              <header><h4 id="workday-gallery-title">Assignment photographs</h4><button type="button" class="text-button" id="workday-gallery-refresh">Refresh photographs</button></header>
+              <p id="workday-gallery-count" class="privacy-note"></p><p id="workday-gallery-message" role="status" aria-live="polite"></p>
+              <p id="workday-gallery-empty">Choose an assigned Job to view and upload photographs.</p>
+              <div id="workday-photo-grid" class="workday-photo-grid"></div>
+              <button type="button" class="text-button" id="workday-gallery-more" hidden>Show older photographs</button>
+            </section>
           </div>
           <p id="workday-status" role="status" aria-live="polite"></p>
         </div>
@@ -106,5 +118,3 @@
   </div>
 </body>
 </html>
-
-

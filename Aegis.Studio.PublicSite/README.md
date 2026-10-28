@@ -33,3 +33,27 @@ A verified payment-provider adapter can submit financial events with its dedicat
 Submitted selections are saved locally and await Studio import. Studio polls `GET /api/v1/gallery-selections` with `gallery:selections:pull`, commits the immutable snapshot and a staff-visible photograph list, then posts `/api/v1/gallery-selections/{reference}/ack` with `gallery:selections:ack`. Enable `PublicSite:SelectionPollingEnabled` in Studio. The site never connects to Studio.
 
 See [deployment readiness](../docs/public-site-v1/DEPLOYMENT.md) for configuration, local verification and remaining blockers. Regression tests are local Mac checks; they do not establish production identity, live operational acceptance or AWS deployment readiness by themselves.
+
+## WorkDay photograph uploads
+
+Choose an assigned Job in the public WorkDay panel, then drop JPEG, PNG or WebP photographs into the drop zone or use **Choose photographs** to select several files. Each photograph may be up to 25 MB, with up to 100 files selected at once. Review thumbnails before choosing **Upload photographs**. Remove/Clear selection affects only files that have not been confirmed by the API.
+
+The per-assignment gallery shows this signed-in photographer's own uploads and persists across page and service restarts through the existing WorkDay exchange database. **Refresh photographs** updates processing status; **Show older photographs** pages through history. Ready, Uploading, Queued for Studio, Acknowledged by Studio and Needs review are distinct states. Acknowledgment does not mean gallery approval or client publication.
+
+Uploads are sent sequentially, with progress and independent failures. Retry retains each photograph's upload ID so a lost response cannot create a duplicate queue operation. Local file previews are released after confirmed upload or sign-out. A new sign-in cannot inherit another account's gallery or selected files.
+
+Authenticated APIs:
+- GET /api/v1/workday/assignments/{assignmentId}/uploads returns up to 40 metadata records and an optional before cursor.
+- GET /api/v1/workday/assignments/{assignmentId}/uploads/{uploadId}/thumbnail serves a resized JPEG without original EXIF metadata.
+- POST on the existing uploads collection continues to queue photographs for Studio.
+
+Both read routes require the assignment in the current account's published schedule; thumbnail access also requires ownership of that upload. Responses use private/no-store caching. No public object URL or original download is exposed. The history reuses the existing exchange upload payloads; no additional original-image store or publication path is created. Thumbnail decoding is pixel-bounded and limited to two concurrent operations.
+
+Run on the Mac with installed Node 24 dependencies before release:
+
+~~~bash
+(cd Aegis.Studio.PublicSite && node --test workday-gallery.test.mjs && npm test)
+node --test tests/ui/workday-web.test.cjs
+~~~
+
+Then verify live with test accounts: drop and multi-select files, upload a mixed batch, retry a connection interruption, reload the gallery, switch assignments, refresh Studio acknowledgment, sign out, and confirm another photographer cannot view the first account's thumbnails. Verify keyboard controls and desktop/mobile layouts. These checks do not run automatically by adding this section.

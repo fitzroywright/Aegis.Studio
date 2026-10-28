@@ -145,6 +145,22 @@ textarea { resize: vertical; }
 #booking-form th, #booking-form td { min-width: 140px; padding: 8px; text-align: left; }
 #workday-jobs { padding-left: 20px; font-size: 12px; }
 #workday-status { margin: 24px 0 0; color: var(--muted); }
+.workday-dropzone { display: grid; justify-items: center; gap: 10px; padding: 28px 16px; border: 2px dashed var(--line); border-radius: 8px; text-align: center; background: var(--paper); }
+.workday-dropzone p { margin: 0; font-size: 12px; color: var(--muted); }
+.workday-dropzone.is-dragging { border-color: var(--gold-dark); background: #f0e7d5; }
+.workday-dropzone[aria-disabled="true"] { opacity: .65; }
+.workday-upload-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.workday-upload-gallery { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 20px; }
+.workday-upload-gallery > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.workday-upload-gallery h4 { margin: 0; }
+.workday-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(145px, 100%), 1fr)); gap: 12px; }
+.workday-photo { margin: 0; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.workday-photo img,.workday-preview-unavailable { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--paper); border-radius: 3px; }
+.workday-preview-unavailable { display: grid; place-items: center; padding: 8px; text-align: center; font-size: 12px; }
+.workday-photo figcaption { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.workday-photo-status { color: var(--muted); }
+.workday-photo progress { width: 100%; accent-color: var(--gold-dark); }
+#workday-panel button:disabled { opacity: .55; cursor: default; }
 dialog { max-width: min(600px, 90vw); max-height: 90vh; overflow: auto; border: 1px solid var(--line); padding: 28px; background: var(--panel); }
 dialog::backdrop { background: rgb(30 28 24 / .5); }
 @media (max-width: 900px) {
