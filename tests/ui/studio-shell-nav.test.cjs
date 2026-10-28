@@ -42,14 +42,14 @@ test('Studio logo returns every page to Dashboard through shared navigation',asy
  logo.dispatchEvent(modified);assert.equal(modified.defaultPrevented,false);assert.equal(calls.length,7);
 });
 test('shared shell exposes contextual commands in a page menu with one navigation toolstrip',async t=>{
- const {w,dom}=setup();t.after(()=>dom.window.close());await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
+ const {w,dom}=setup();t.after(()=>dom.window.close());await w.studioNavigate('about');w.StudioShell.sync('about');
  const rail=w.document.getElementById('studioPageContext');
  assert.equal(w.document.querySelector('.shell>aside'),null);assert.equal(w.document.querySelector('[data-rail-toggle]'),null);
  assert.ok(rail.closest('#studioPageMenu'));
  assert.deepEqual([...rail.querySelectorAll('h2')].map(e=>e.textContent.trim().replace(/^[^A-Za-z]+/,'')),['Overview','Actions']);
  for(const view of ['dashboard','jobs','frontdesk'])assert.ok(w.document.querySelector('#studioNavigationTools [data-studio-side="'+view+'"]'));
  assert.equal(rail.querySelector('[data-rail-card="navigation"]'),null);
- assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*Front Desk/);
+ assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*About/);
 });
 
 test('navigation stays available without a reveal control or pointer interaction',t=>{
@@ -98,10 +98,10 @@ test('all pages omit the rail even with a stored collapse preference; page actio
   await w.studioNavigate(view);w.StudioShell.sync(view);
   assert.equal(w.document.getElementById('studioContextRail'),null);
   assert.equal(w.document.querySelector('[data-rail-toggle]'),null);
-  const menu=w.document.getElementById('studioPageMenu');assert.equal(menu.hidden,['dashboard','media','schedule','jobs','production','clients'].includes(view));
+  const menu=w.document.getElementById('studioPageMenu');assert.equal(menu.hidden,['dashboard','media','schedule','jobs','production','clients','frontdesk'].includes(view));
   assert.notEqual(w.document.getElementById('studioNavigationTools').inert,true);
  }
- await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
+ await w.studioNavigate('about');w.StudioShell.sync('about');
  const menu=w.document.getElementById('studioPageMenu');menu.open=true;
  menu.querySelector('[data-studio-new-booking]').click();assert.equal(bookings,1);assert.equal(menu.open,false);
  menu.open=true;menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.open,false);
@@ -209,9 +209,9 @@ test('Jobs renders through real navigation while the shell context survives tran
 test('operational pages omit Page actions and cards while footer filters and other pages retain controls',async t=>{
  const {w,dom}=setup();t.after(()=>dom.window.close());
  w.workspaceCache=[{id:'one',name:'Portraits',permissions:{view:true,accessWorkspace:true}}];
- await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
+ await w.studioNavigate('about');w.StudioShell.sync('about');
  const menu=w.document.getElementById('studioPageMenu');
- for(const view of ['media','schedule','jobs','production','clients']){
+ for(const view of ['media','schedule','jobs','production','clients','frontdesk']){
   menu.open=true;await w.studioNavigate(view);w.StudioShell.sync(view);
   assert.equal(menu.hidden,true);assert.equal(menu.open,false);
   w.studioShellSetOverview('<section><h2>Excluded overview</h2></section>',view);
@@ -224,7 +224,7 @@ test('operational pages omit Page actions and cards while footer filters and oth
  let selected;w.StudioShell.setProductionWorkspaceFilter(w.workspaceCache,'',id=>selected=id);
  await w.studioNavigate('production');w.StudioShell.sync('production');
  const filter=w.document.getElementById('studioFooterWorkspaces');filter.value='one';filter.dispatchEvent(new w.Event('change'));assert.equal(selected,'one');
- await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
+ await w.studioNavigate('about');w.StudioShell.sync('about');
  assert.equal(menu.hidden,false);assert.ok(menu.querySelector('[data-rail-card="actions"]'));
  assert.equal(menu.querySelector('[data-rail-card="overview"]').textContent.includes('Excluded overview'),false);
 });

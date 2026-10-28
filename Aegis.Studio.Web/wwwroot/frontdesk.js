@@ -73,7 +73,6 @@ async function showFrontDesk(options={}) {
     }
     try{
         renderFrontDesk();
-        const referenceButton=document.createElement('button');referenceButton.type='button';referenceButton.textContent='Find intake reference';referenceButton.onclick=async()=>{const value=prompt('Intake reference, for example 2026-BK-000001');if(!value)return;try{const found=await json('/api/intake/lookup/'+encodeURIComponent(value.trim()));if(found.jobId)await openFrontDeskJob(found.jobId);else await openIntakeDeliveryStatus(found.conversationId);}catch(e){alert(e.message);}};genericView.querySelector('.fd-overview-toolbar')?.append(referenceButton);
 
         if(errors.length){
             const notice=document.createElement('div');
@@ -127,12 +126,7 @@ function renderFrontDesk(selectionOnly=false){
     const searchSelection=searchNode?[searchNode.selectionStart,searchNode.selectionEnd]:null;
     // Follow the Today page's full-width horizontal shell. No navigation sidebar
     // or additional nested side rail; the secondary cards belong to the content grid.
-    const now=new Date(), today=now.toLocaleDateString();
-    const sessions=frontDeskSchedule.filter(s=>new Date(s.startsAtUtc).toLocaleDateString()===today&&s.status!=='Cancelled').sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
-    const pending=frontDeskRequests.filter(x=>x&&!['Confirmed','Cancelled'].includes(x.status));
-    const unassigned=frontDeskJobs.filter(j=>!j.assignedTo&&j.status!=='Completed');
     const enquiries=frontDeskEnquiries.filter(e=>e&&!frontDeskRequests.some(r=>r?.request?.conversationId===e.id));
-    const due=frontDeskRequests.filter(x=>x&&(x.status==='AwaitingDeposit'||(x.request?.requiredDeposit>0&&x.recordedDeposit<x.request.requiredDeposit&&!['Confirmed','Cancelled'].includes(x.status))));
     const jobQueue=['Pickup / Delivery','Completed'].includes(frontDeskColumnFilters.status);
     const queueJobs=frontDeskJobs.filter(j=>frontDeskColumnFilters.status==='Completed'?j.status==='Completed':['Ready for Client','Ready for Delivery','Published'].includes(j.status));
     const intakeEntries=[
@@ -192,30 +186,17 @@ function renderFrontDesk(selectionOnly=false){
         return;
     }
     const sales='<section class="fd-selected-request"><h2>Front Desk · Point of Sale</h2><p>Sales, deposits, payments and receipts remain linked to the client and job.</p><div class="workflow-detail-actions">'+[['NewSale','New Sale'],['TakePayment','Record Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['ViewReceipt','View Receipt'],['CloseRegister','Close Register']].map(([key,label])=>`<button type="button" class="action" data-fd-sale-action="${key}">${label}</button>`).join('')+'</div></section>';
-    const metric=(key,label,count,note)=>`<div class="workspace-summary-row"><span aria-hidden="true">${({enquiries:'✉',deposits:'$',confirmation:'✓',unassigned:'▣'})[key]}</span><button type="button" class="fd-overview-link" data-fd-metric="${key}" aria-pressed="${frontDeskMetricView===key}" title="${esc(note)}">${esc(label)}</button><strong>${count}</strong></div>`;
+    const actions='<div class="fd-grid-actions" role="toolbar" aria-label="Front Desk actions"><button type="button" class="action" data-fd-new-booking>New Booking</button>'+[['TakePayment','Take Payment'],['RecordDeposit','Record Deposit'],['IssueRefund','Issue Refund'],['NewSale','New Sale']].map(([key,label])=>`<button type="button" class="action" data-fd-financial-action="${key}">${label}</button>`).join('')+'<button type="button" class="action" data-fd-new-client>New Client</button><button type="button" class="action" data-fd-close-register>Close Register</button></div>';
     genericView.innerHTML=`<div class="fd-page">
       
       <div class="fd-layout"><div class="fd-main">
         
-        <section class="op-card fd-queue">${tabsMarkup}
+        <section class="op-card fd-queue">${actions}${tabsMarkup}
           <div class="fd-table-frame" id="frontDeskTableArea">${frontDeskTab==='sales'?sales:['today','requests','enquiries'].includes(frontDeskTab)?`<div class="fd-table-head-clip"><table class="fd-table"><thead><tr><th></th><th><div class="fd-client-header"><span>Client / Request</span><input id="frontDeskSearch" type="search" aria-label="Search bookings and inquiries" placeholder="Search clients…" value="${esc(frontDeskTerm)}"></div></th>${columnHead('type','Service / Type')}<th>Event Date</th><th>Deposit</th>${columnHead('status','Status')}${columnHead('source','Source')}</tr></thead></table></div><div class="fd-table-scroll"><table class="fd-table"><tbody>${rows||'<tr><td colspan="7">No bookings or inquiries in this queue.</td></tr>'}</tbody></table></div>`:'<div id="frontDeskJobList"></div>'}</div>
           </section>
           ${['today','requests','enquiries'].includes(frontDeskTab)?detail:''}
         
       </div></div></div>`;
-    window.studioFrontDeskOverviewMarkup = `<section class="mw-list-panel fd-overview">
-            <header><h2><span class="mw-title-icon attention">▤</span> Overview</h2></header>
-            <div class="mw-status-list">
-                ${metric('enquiries','New Inquiries',enquiries.length,'Awaiting response')}
-                ${metric('deposits','Pending Deposits',due.length,'Awaiting payment')}
-                ${metric('confirmation','Needs Confirmation',pending.length,'Review and confirm')}
-                ${metric('unassigned','Unassigned',unassigned.length,'Jobs requiring assignment')}
-            </div>
-            <footer class="smc-footer fd-overview-toolbar" role="toolbar" aria-label="Overview actions">
-                <button type="button" data-new-booking>＋ Create Manual Booking →</button>
-            </footer>
-        </section>`;
-    window.studioShellSetOverview?.(window.studioFrontDeskOverviewMarkup,'frontdesk');
     if(searchNode&&genericView.querySelector('#frontDeskSearch')){genericView.querySelector('#frontDeskSearch').replaceWith(searchNode);searchNode.value=frontDeskTerm;if(searchFocused){searchNode.focus({preventScroll:true});searchNode.setSelectionRange(...searchSelection);}}
     // The shared shell footer owns the visible filtered row count.
     const shellCount=document.getElementById('studioFooterRate');
@@ -226,18 +207,10 @@ function renderFrontDesk(selectionOnly=false){
         const label=jobQueue?(frontDeskColumnFilters.status==='Completed'?'Completed Jobs':'Pickup / Delivery Jobs'):frontDeskTab==='unassigned'?'Unassigned Jobs':frontDeskTab==='completed'?'Completed Jobs':frontDeskTab==='delivery'?'Pickup / Delivery Jobs':frontDeskMetricView==='enquiries'||frontDeskTab==='enquiries'?'New Inquiries':frontDeskMetricView==='deposits'?'Pending Deposits':frontDeskMetricView==='confirmation'?'Needs Confirmation':'Bookings & Inquiries';
         shellCount.textContent=count+' '+label;
     }
-    window.studioBindFrontDeskOverview = () => {
-        document.querySelectorAll('#studioPageContext [data-fd-metric]').forEach(button=>button.onclick=()=>{
-            const key=button.dataset.fdMetric;
-            frontDeskMetricView=frontDeskMetricView===key?'':key;
-            frontDeskTab=frontDeskMetricView==='unassigned'?'unassigned':'today';
-            frontDeskTerm='';
-            frontDeskColumnFilters={type:'',status:'',source:''};
-            renderFrontDesk();
-        });
-        document.querySelectorAll('#studioPageContext [data-new-booking]').forEach(button=>button.onclick=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId)));
-    };
-    window.studioBindFrontDeskOverview();
+    genericView.querySelector('[data-fd-new-booking]').onclick=()=>window.studioLaunchNewBooking();
+    genericView.querySelectorAll('[data-fd-financial-action]').forEach(button=>button.onclick=()=>pickFrontDeskFinancialAction(button.dataset.fdFinancialAction).catch(error=>alert(error.message)));
+    genericView.querySelector('[data-fd-new-client]').onclick=()=>showFrontDeskClients(true).catch(error=>alert(error.message));
+    genericView.querySelector('[data-fd-close-register]').onclick=()=>launchFrontDeskPos('CloseRegister').catch(error=>alert(error.message));
     genericView.querySelectorAll('[data-fd-filter]').forEach(select=>select.onchange=()=>{
         frontDeskColumnFilters[select.dataset.fdFilter]=select.value;
         if(select.dataset.fdFilter==='status'){frontDeskTab='today';frontDeskMetricView='';if(['Pickup / Delivery','Completed'].includes(select.value)){frontDeskColumnFilters.type='';frontDeskColumnFilters.source='';}}
@@ -248,8 +221,6 @@ function renderFrontDesk(selectionOnly=false){
         frontDeskSort=frontDeskSort.column===column?{column,direction:-frontDeskSort.direction}:{column,direction:1};
         renderFrontDesk();
     });
-    const newBooking=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
-    document.querySelectorAll('#studioPageContext [data-new-booking]').forEach(b=>b.onclick=newBooking);
     genericView.querySelectorAll('[data-view-receipt]').forEach(button=>button.addEventListener('click',()=>pickFrontDeskSale('ViewReceipt',button.dataset.viewReceipt).catch(error=>alert(error.message))));
     genericView.querySelector('[data-calendar]')?.addEventListener('click',()=>studioNavigate('pipeline'));
     const search=genericView.querySelector('#frontDeskSearch');
