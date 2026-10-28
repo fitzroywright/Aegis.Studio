@@ -36,3 +36,6 @@
 .booking-resource-row { display:flex;align-items:end;gap:8px;margin-bottom:8px;flex-wrap:wrap; }
 .booking-resource-row label:first-child { flex:1;min-width:140px; }
 .booking-resource-row input[data-resource-count] { width:70px; }
+
+
+.commercial-page-actions { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; margin-bottom:8px; }

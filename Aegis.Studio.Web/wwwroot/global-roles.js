@@ -9,11 +9,12 @@ async function renderGlobalRoleAdministration(current=()=>true) {
         if (!frontDesk && !operationsManager) return;
 
         const section = document.createElement('section');
-        section.className = 'job-section';
-        section.innerHTML = `<h2>Global operational roles</h2>
-        ${frontDesk ? `<h3>Front Desk</h3><p class="muted">Cross-workspace reception and client service.</p><div id="frontDeskRoleMembers"></div><div class="pos-entry"><label>User name<input id="frontDeskRoleUser" placeholder="domain user name"></label><label>Display name<input id="frontDeskRoleDisplay"></label><button class="primary" onclick="saveFrontDeskRoleMember('${frontDesk.id}')">Add Front Desk user</button></div>` : ''}
-        ${operationsManager ? `<h3>Operations Manager</h3><p class="muted">Overall operational escalation role used by Front Desk and cross-workspace escalation.</p><div id="operationsManagerRoleMembers"></div><div class="pos-entry"><label>User name<input id="operationsManagerRoleUser" placeholder="domain user name"></label><label>Display name<input id="operationsManagerRoleDisplay"></label><button class="primary" onclick="saveOperationsManagerRoleMember('${operationsManager.id}')">Assign Operations Manager</button></div>` : ''}`;
-        genericView.appendChild(section);
+        section.className = 'staff-global-role-section';
+        section.innerHTML = `<h2>Global operational roles</h2><div class="staff-global-role-columns">${[
+            frontDesk&&{role:frontDesk,title:'Front Desk',description:'Cross-workspace reception and client service.',user:'frontDeskRoleUser',display:'frontDeskRoleDisplay',target:'frontDeskRoleMembers',save:'saveFrontDeskRoleMember'},
+            operationsManager&&{role:operationsManager,title:'Operations Manager',description:'Cross-workspace escalation and operational oversight.',user:'operationsManagerRoleUser',display:'operationsManagerRoleDisplay',target:'operationsManagerRoleMembers',save:'saveOperationsManagerRoleMember'}
+        ].filter(Boolean).map(x=>`<section class="staff-editor"><h3>${x.title}</h3><p class="muted">${x.description}</p><div class="staff-entry"><label>User name<input id="${x.user}" placeholder="domain user name"></label><label>Display name<input id="${x.display}"></label><button type="button" class="primary" onclick="${x.save}('${x.role.id}')">Assign user</button></div><div class="staff-grid-scroll" id="${x.target}"></div></section>`).join('')}</div>`;
+        const holder=genericView.querySelector('[data-staff-global-roles]');if(!holder)return;holder.replaceChildren(section);
         if(frontDesk) await refreshFrontDeskRoleMembers(frontDesk.id);
         if(operationsManager) await refreshOperationsManagerRoleMembers(operationsManager.id);
     } catch (error) {
@@ -21,12 +22,19 @@ async function renderGlobalRoleAdministration(current=()=>true) {
     }
 };
 
-async function refreshFrontDeskRoleMembers(roleId) {
-    const members = await json(`/api/security/global-roles/${roleId}/members`);
-    const target = document.getElementById('frontDeskRoleMembers');
-    if (!target) return;
-    target.innerHTML = members.length ? members.map(member => `<div class="job-row"><div><b>${esc(studioFirstName(member))}</b><div class="meta">${member.isActive ? 'Active' : 'Inactive'}</div></div><button class="action" onclick="removeFrontDeskRoleMember('${roleId}','${esc(member.userName)}')">Remove</button></div>`).join('') : '<p class="muted">No Front Desk users assigned yet.</p>';
+async function refreshGlobalRoleMembers(roleId,targetId,remove){
+    const members=await json(`/api/security/global-roles/${roleId}/members`),target=document.getElementById(targetId);if(!target)return;
+    target.innerHTML=`<table class="staff-editable-grid"><thead><tr><th>User name</th><th>Display name</th><th>Active</th><th>Actions</th></tr></thead><tbody>${members.map((m,i)=>`<tr data-global-member="${i}"><td>${esc(m.userName)}</td><td><input data-member-name aria-label="Display name for ${esc(m.userName)}" value="${esc(m.displayName||m.userName)}" required></td><td><input data-member-active type="checkbox" aria-label="Active: ${esc(m.userName)}" ${m.isActive?'checked':''}></td><td><div class="staff-row-actions"><button type="button" class="action" data-member-save>Save</button><button type="button" class="action" data-member-remove>Remove</button></div><span data-row-status role="status"></span></td></tr>`).join('')||'<tr><td colspan="4">No users assigned.</td></tr>'}</tbody></table>`;
+    target.querySelectorAll('[data-global-member]').forEach(row=>{
+        const member=members[Number(row.dataset.globalMember)];row.querySelector('[data-member-remove]').onclick=()=>remove(roleId,member.userName);
+        row.querySelector('[data-member-save]').onclick=async()=>{
+            const input=row.querySelector('[data-member-name]'),status=row.querySelector('[data-row-status]');if(!input.reportValidity()||!input.value.trim()){status.textContent='Display name is required.';return;}
+            const payload={userName:member.userName,displayName:input.value.trim(),isActive:row.querySelector('[data-member-active]').checked};row.querySelectorAll('input,button').forEach(el=>el.disabled=true);status.textContent='Saving…';
+            try{await json(`/api/security/global-roles/${roleId}/members/${encodeURIComponent(member.userName)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});Object.assign(member,payload);status.textContent='Saved';}catch(error){status.textContent=error.message||'Could not save. Your edits are retained.';}finally{row.querySelectorAll('input,button').forEach(el=>el.disabled=false);}
+        };
+    });
 }
+async function refreshFrontDeskRoleMembers(roleId){return refreshGlobalRoleMembers(roleId,'frontDeskRoleMembers',removeFrontDeskRoleMember);}
 
 async function saveFrontDeskRoleMember(roleId) {
     const userName = document.getElementById('frontDeskRoleUser').value.trim();
@@ -44,12 +52,7 @@ async function removeFrontDeskRoleMember(roleId, userName) {
 }
 
 
-async function refreshOperationsManagerRoleMembers(roleId) {
-    const members = await json(`/api/security/global-roles/${roleId}/members`);
-    const target = document.getElementById('operationsManagerRoleMembers');
-    if (!target) return;
-    target.innerHTML = members.length ? members.map(member => `<div class="job-row"><div><b>${esc(studioFirstName(member))}</b><div class="meta">${member.isActive ? 'Active' : 'Inactive'} · overall escalation</div></div><button class="action" onclick="removeOperationsManagerRoleMember('${roleId}','${esc(member.userName)}')">Remove</button></div>`).join('') : '<p class="muted">No Operations Manager assigned. Front Desk escalation to Operations Manager will be blocked until one is assigned.</p>';
-}
+async function refreshOperationsManagerRoleMembers(roleId){return refreshGlobalRoleMembers(roleId,'operationsManagerRoleMembers',removeOperationsManagerRoleMember);}
 
 async function saveOperationsManagerRoleMember(roleId) {
     const userName = document.getElementById('operationsManagerRoleUser').value.trim();
@@ -65,5 +68,6 @@ async function removeOperationsManagerRoleMember(roleId, userName) {
     if (!response.ok) throw new Error(await response.text());
     await refreshOperationsManagerRoleMembers(roleId);
 }
+
 
 

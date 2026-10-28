@@ -240,7 +240,7 @@
         if(!current())return;
         const isAdministrator=me?.user?.isAdministrator===true||me?.isAdministrator===true;
         if(!isAdministrator){
-            genericView.innerHTML=StudioPage.html({title,content:'<section class="admin-card"><h2>Administrator access required</h2><p>Your account does not have permission to administer Studio.</p></section>'});StudioPage.bind(genericView,current);
+            genericView.innerHTML=StudioPage.html({title,showHeader:false,content:'<section class="admin-card"><h2>Administrator access required</h2><p>Your account does not have permission to administer Studio.</p></section>'});StudioPage.bind(genericView,current);
             return;
         }
 
@@ -254,9 +254,9 @@
             case 'about': content=`<section class="studio-about-card studio-about" aria-label="Thinking Machines support"><div class="studio-about-card-body"><img class="studio-about-logo" src="/thinking-machines-letterhead.png" alt="Thinking Machines — pixelated thinking man" width="2025" height="375"><dl class="studio-about-details"><div><dt>Support</dt><dd><a href="mailto:it@thinkingmachines.ltd">it@thinkingmachines.ltd</a></dd></div><div><dt>Studio</dt><dd>Bryan’s Photo Studios</dd></div><div><dt>Time zone</dt><dd>America/Jamaica</dd></div><div><dt>Installation</dt><dd>${esc(window.location.origin)}</dd></div></dl><button type="button" class="action studio-about-key" data-about-api-key>Generate API Key</button></div></section>
                 <section class="studio-about-card" data-service-status><header class="studio-about-card-heading"><h2>Service health</h2><div class="studio-about-card-tools"><button class="action" data-refresh-service-status>Refresh</button><button class="action" data-service-audit>Recent audit</button></div></header><div class="studio-about-card-body" data-service-status-body>Loading…</div></section>
                 <section class="studio-about-card studio-about-demo" id="studioDemoLoader"><header class="studio-about-card-heading"><h2>Demo Data</h2></header><div class="studio-about-card-body"><p class="studio-about-demo-warning">Reset clears business records and files. Staff accounts, configuration and Unassigned are preserved.</p><div class="studio-about-demo-actions"><button class="action" type="button" data-demo-remove>Remove demo data</button><button class="primary" type="button" data-load-demo>Clear and recreate</button></div><progress data-demo-progress max="100" value="0" aria-label="Demo data loading progress" hidden></progress><p class="admin-demo-status" data-demo-status role="status" aria-live="polite"></p><small data-demo-elapsed hidden></small></div></section>`;break;
-            case 'staff-roles': content=renderEmployeeDirectorySection()+renderSecurityRolesSection('Job');break;
+            case 'staff-roles': content=renderEmployeeDirectorySection();break;
         }
-        genericView.innerHTML=StudioPage.html({title,scroll:view!=='about',summary:view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':view==='staff-roles'?'<p>Maintain staff identities, reusable job roles and global operational access. Workspace administration stays on Workspaces.</p>':'',content:`<div class="${view==='about'?'studio-about-grid':'admin-generated-sections'}">${content}</div>`});
+        genericView.innerHTML=StudioPage.html({title,showHeader:false,scroll:view!=='about',summary:view==='about'?'<p>Product information, support, service health and administrator demo tools.</p>':view==='staff-roles'?'<p>Maintain staff identities, reusable job roles and global operational access. Workspace administration stays on Workspaces.</p>':'',content:`<div class="${view==='about'?'studio-about-grid':'admin-generated-sections'}">${content}</div>`});
         StudioPage.bind(genericView,current);
 
         if(!current())return;

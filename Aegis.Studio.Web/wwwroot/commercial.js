@@ -1,7 +1,9 @@
 let commercialItems=[], commercialTemplates=[], commercialKind='WorkOrder', commercialIncludeCompleted=true;
 function commercialPage(title,body,tools='',summary='',attention='') {
     conversationView.classList.add('hidden');genericView.classList.remove('hidden');
-    genericView.innerHTML=StudioPage.html({title,tools,showHeader:title!=='Production',content:body,className:'st-commercial',summary:summary||'<p>Manage Studio services, templates and production.</p>',attention});
+    const sharedTitle=['Products and Services','Templates'].includes(title);
+    const content=sharedTitle&&tools?`<div class="commercial-page-actions">${tools}</div>${body}`:body;
+    genericView.innerHTML=StudioPage.html({title,tools,showHeader:title!=='Production'&&!sharedTitle,content,className:'st-commercial',summary:summary||'<p>Manage Studio services, templates and production.</p>',attention});
     StudioPage.bind(genericView);
     window.studioSetBreadcrumb?.([{label:title}]);
 }
@@ -207,6 +209,7 @@ async function openCommercialWorkOrder(order){
     });
     d.querySelector('[data-resolve]')?.addEventListener('click',async()=>{try{await json(`/api/production/work-orders/${order.id}/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:d.querySelector('[data-note]').value})});d.close();await showCatalogProduction({preserveFilters:true});}catch(err){error(err);}});
 }
+
 
 
 

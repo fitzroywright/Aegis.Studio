@@ -13,7 +13,7 @@ test('Workspaces has accountability cards, real managers and counts, photos and 
  const cards=w.document.querySelectorAll('[data-workspace-card]');assert.equal(cards.length,2);const card=cards[0];assert.match(card.textContent,/Portraits.*Lisa Brown.*1 active jobs/s);assert.match(card.querySelector('img').src,/jobs\/j\/versions\/by-id\/v/);
  assert.equal(w.document.querySelector('.studio-right-rail'),null);assert.equal(w.document.querySelector('#workspaceMemberPanel'),null);card.querySelector('[data-workspace-members]').click();await settle();assert.ok(w.document.querySelector('#workspaceMemberPanel'));assert.match(w.document.querySelector('#workspaceMemberPanel').textContent,/Members & permissions/);
  card.querySelector('[data-workspace-settings]').click();assert.ok(calls.some(call=>call.settings==='w'));card.querySelector('[data-workspace-jobs]').click();assert.deepEqual(JSON.parse(JSON.stringify(navigation.at(-1))),{view:'jobs',options:{workspaceId:'w'}});
- assert.equal(w.document.querySelector('#roleScope').value,'Workspace');assert.match(w.document.querySelector('#securityRoleList').textContent,/Workspace Manager/);assert.doesNotMatch(w.document.querySelector('#securityRoleList').textContent,/Job Owner/);
+ assert.equal(w.document.querySelector('#roleScope').value,'Workspace');assert.match([...w.document.querySelectorAll('#securityRoleList [data-role-name]')].map(input=>input.value).join(', '),/Workspace Manager/);assert.doesNotMatch([...w.document.querySelectorAll('#securityRoleList [data-role-name]')].map(input=>input.value).join(', '),/Job Owner/);
  w.document.querySelector('[data-create-workspace]').click();assert.ok(w.document.querySelector('dialog #workspaceManagerUser[required]'));
 });
 test('view-only Workspace cards expose jobs without administration actions',async t=>{
@@ -56,3 +56,4 @@ test('Admin entries use shared restrained icons and speed-bump rows while icon c
  assert.deepEqual(buttons.map(button=>button.textContent),['Products and Services','Templates','Staff and Roles','Workspaces','About']);
  const shared=read('css/components/studio-rows.css');assert.match(shared,/studio-admin-item.*transition:/);assert.match(shared,/@media\(prefers-reduced-motion:reduce\).*studio-admin-item/);
 });
+
