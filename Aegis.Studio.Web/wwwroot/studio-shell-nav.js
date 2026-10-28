@@ -129,7 +129,7 @@
         target.title = 'Logged in User: ' + identity;
     }
 
-    const pageMenuEnabled = view => !['dashboard', 'today', 'media'].includes(view);
+    const pageMenuEnabled = view => !['dashboard', 'today', 'media', 'schedule', 'jobs', 'production', 'clients'].includes(view);
 
     function ensurePageMenu() {
         ensureNavigationToolstrip();
@@ -177,7 +177,7 @@
         const workspaces = document.body.dataset.studioView === 'production' && productionWorkspaceFilter
             ? productionWorkspaceFilter.workspaces
             : (Array.isArray(cache) ? cache : []).filter(workspace => workspace.permissions?.accessWorkspace !== false && workspace.permissions?.view !== false);
-        if (document.body.dataset.studioView === 'media') {
+        if (!pageMenuEnabled(document.body.dataset.studioView)) {
             rail.replaceChildren();
             renderFooterWorkspaceMenu(workspaces);
             return;

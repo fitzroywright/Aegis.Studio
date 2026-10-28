@@ -42,14 +42,14 @@ test('Studio logo returns every page to Dashboard through shared navigation',asy
  logo.dispatchEvent(modified);assert.equal(modified.defaultPrevented,false);assert.equal(calls.length,7);
 });
 test('shared shell exposes contextual commands in a page menu with one navigation toolstrip',async t=>{
- const {w,dom}=setup();t.after(()=>dom.window.close());await w.studioNavigate('production');w.StudioShell.sync('production');
+ const {w,dom}=setup();t.after(()=>dom.window.close());await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
  const rail=w.document.getElementById('studioPageContext');
  assert.equal(w.document.querySelector('.shell>aside'),null);assert.equal(w.document.querySelector('[data-rail-toggle]'),null);
  assert.ok(rail.closest('#studioPageMenu'));
  assert.deepEqual([...rail.querySelectorAll('h2')].map(e=>e.textContent.trim().replace(/^[^A-Za-z]+/,'')),['Overview','Actions']);
  for(const view of ['dashboard','jobs','frontdesk'])assert.ok(w.document.querySelector('#studioNavigationTools [data-studio-side="'+view+'"]'));
  assert.equal(rail.querySelector('[data-rail-card="navigation"]'),null);
- assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*Production/);
+ assert.match(w.document.getElementById('studioBreadcrumb').textContent,/Today.*Front Desk/);
 });
 
 test('navigation stays available without a reveal control or pointer interaction',t=>{
@@ -98,7 +98,7 @@ test('all pages omit the rail even with a stored collapse preference; page actio
   await w.studioNavigate(view);w.StudioShell.sync(view);
   assert.equal(w.document.getElementById('studioContextRail'),null);
   assert.equal(w.document.querySelector('[data-rail-toggle]'),null);
-  const menu=w.document.getElementById('studioPageMenu');assert.equal(menu.hidden,['dashboard','media'].includes(view));
+  const menu=w.document.getElementById('studioPageMenu');assert.equal(menu.hidden,['dashboard','media','schedule','jobs','production','clients'].includes(view));
   assert.notEqual(w.document.getElementById('studioNavigationTools').inert,true);
  }
  await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
@@ -197,28 +197,34 @@ test('Jobs renders through real navigation while the shell context survives tran
   assert.ok(w.document.querySelector('.sj-page'));
   assert.equal(w.document.getElementById('studioPageMenu'),menu);
   assert.equal(w.document.querySelectorAll('#studioPageMenu').length,1);
-  const status=w.document.querySelector('#studioPageContext [data-sj-stage="Scheduled"]');
-  assert.ok(status);const previous=w.document.querySelector('[data-sj-status]').value;status.click();assert.equal(w.document.querySelector('[data-sj-status]').value,previous==='Scheduled'?'':'Scheduled');
+  assert.equal(menu.hidden,true);assert.equal(menu.querySelector('#studioPageContext').childElementCount,0);
+  const status=w.document.querySelector('[data-sj-status]');status.value='Scheduled';status.dispatchEvent(new w.Event('change'));
+  assert.equal(status.value,'Scheduled');
   const row=w.document.querySelector('tr[data-sj-job="job1"]');assert.ok(row);row.click();
   await w.studioNavigate('dashboard');
  }
  assert.deepEqual(opened,['job1','job1']);
 });
 
-test('Media omits Page actions and its cards while workspace selection and other pages retain their controls',async t=>{
+test('operational pages omit Page actions and cards while footer filters and other pages retain controls',async t=>{
  const {w,dom}=setup();t.after(()=>dom.window.close());
  w.workspaceCache=[{id:'one',name:'Portraits',permissions:{view:true,accessWorkspace:true}}];
- await w.studioNavigate('jobs');w.StudioShell.sync('jobs');
- const menu=w.document.getElementById('studioPageMenu');menu.open=true;
- await w.studioNavigate('media');w.StudioShell.sync('media');
- assert.equal(menu.hidden,true);assert.equal(menu.open,false);
- w.studioShellSetOverview('<section><h2>Media overview</h2></section>','media');
- w.studioShellMountContext([w.document.createElement('section')],'media');
- w.dispatchEvent(new w.Event('studio-workspaces-loaded'));
- assert.equal(menu.querySelector('#studioPageContext').childElementCount,0);
- assert.equal(menu.hidden,true);
- assert.equal(w.document.querySelectorAll('#studioFooterWorkspaces option').length,2);
- await w.studioNavigate('jobs');w.StudioShell.sync('jobs');
+ await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
+ const menu=w.document.getElementById('studioPageMenu');
+ for(const view of ['media','schedule','jobs','production','clients']){
+  menu.open=true;await w.studioNavigate(view);w.StudioShell.sync(view);
+  assert.equal(menu.hidden,true);assert.equal(menu.open,false);
+  w.studioShellSetOverview('<section><h2>Excluded overview</h2></section>',view);
+  w.studioShellMountContext([w.document.createElement('section')],view);
+  w.dispatchEvent(new w.Event('studio-workspaces-loaded'));
+  assert.equal(menu.querySelector('#studioPageContext').childElementCount,0);
+  assert.equal(menu.hidden,true);
+  assert.equal(w.document.querySelectorAll('#studioFooterWorkspaces option').length,2);
+ }
+ let selected;w.StudioShell.setProductionWorkspaceFilter(w.workspaceCache,'',id=>selected=id);
+ await w.studioNavigate('production');w.StudioShell.sync('production');
+ const filter=w.document.getElementById('studioFooterWorkspaces');filter.value='one';filter.dispatchEvent(new w.Event('change'));assert.equal(selected,'one');
+ await w.studioNavigate('frontdesk');w.StudioShell.sync('frontdesk');
  assert.equal(menu.hidden,false);assert.ok(menu.querySelector('[data-rail-card="actions"]'));
- assert.equal(menu.querySelector('[data-rail-card="overview"]').textContent.includes('Media overview'),false);
+ assert.equal(menu.querySelector('[data-rail-card="overview"]').textContent.includes('Excluded overview'),false);
 });
