@@ -4,7 +4,7 @@
     const shell = document.querySelector('.shell');
     const navigationIcon = artwork => '<svg class="studio-navigation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+artwork+'</svg>';
     const quickLinks = [
-        ['dashboard', 'Dashboard', navigationIcon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/><path class="studio-navigation-accent" d="m8 15 3 3 5-5"/>')],
+        ['dashboard', 'Today', navigationIcon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/><path class="studio-navigation-accent" d="m8 15 3 3 5-5"/>')],
         ['frontdesk', 'Front Desk', navigationIcon('<path d="M3 12h18v9H3zM2 12h20M8 12V9a4 4 0 0 1 8 0v3"/><path class="studio-navigation-accent" d="M12 3v2M7 17h4"/>')],
         ['clients', 'Clients', navigationIcon('<circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3"/><path class="studio-navigation-accent" d="M16 4a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5v2"/>')],
         ['jobs', 'Jobs', navigationIcon('<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V4h8v3M3 12a24 24 0 0 0 18 0"/><path class="studio-navigation-accent" d="M10 13h4v3h-4z"/>')],
@@ -327,7 +327,7 @@
         const supplied = Array.isArray(items) ? items.filter(Boolean) : [];
         const crumbs = supplied[0]?.view === 'dashboard'
             ? supplied
-            : [{ label: 'Dashboard', view: 'dashboard' }, ...supplied];
+            : [{ label: 'Today', view: 'dashboard' }, ...supplied];
         breadcrumb.innerHTML = '<span class="breadcrumb-label">Navigation History</span>' + crumbs.map((item, index) => {
             const separator = index ? '<span class="breadcrumb-separator" aria-hidden="true">›</span>' : '';
             const last = index === crumbs.length - 1;
@@ -440,7 +440,7 @@
             const pageLabel = jobOpen ? 'Job Details' : labelFor(view);
             const heading = title.querySelector('strong');
             if (heading) {
-                if (isToday) heading.innerHTML = 'Dashboard <em>Company overview</em>';
+                if (isToday) heading.innerHTML = 'Today <em>Company overview</em>';
                 else heading.replaceChildren(document.createTextNode(pageLabel));
             }
             title.setAttribute('aria-label', pageLabel);
@@ -747,6 +747,7 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
     else initialize();
 })()
+
 
 
 
