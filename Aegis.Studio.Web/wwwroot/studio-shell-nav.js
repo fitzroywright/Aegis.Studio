@@ -130,14 +130,16 @@
     }
 
     function ensurePageMenu() {
-        if (!pageTools) return;
+        ensureNavigationToolstrip();
+        const host = document.getElementById('studioNavigationToolstrip');
+        if (!host) return;
         let menu = document.getElementById('studioPageMenu');
         if (!menu) {
             menu = document.createElement('details');
             menu.id = 'studioPageMenu';
             menu.className = 'studio-page-menu';
             menu.innerHTML = '<summary>Page actions <span aria-hidden="true">⌄</span></summary><div id="studioPageContext" class="studio-page-menu-content"></div>';
-            pageTools.append(menu);
+            host.insertBefore(menu, host.querySelector('.studio-navigation-status') || host.querySelector('.studio-navigation-account'));
             menu.addEventListener('click', event => {
                 if (event.target.closest('button:not(:disabled)')) menu.open = false;
             });
