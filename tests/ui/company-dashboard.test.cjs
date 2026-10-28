@@ -17,11 +17,11 @@ test('Today charts use exact scoped counts and preserve operational links',async
  assert.equal(segments.reduce((sum,s)=>sum+Number(s.getAttribute('stroke-dasharray').split(' ')[0]),0),100);
  assert.match(w.document.querySelector('.cd-donut svg').getAttribute('aria-label'),/In Production 1, Quality Control 1/);
  assert.equal(w.document.querySelectorAll('.cd-bar-row').length,5);
- assert.equal(w.document.querySelectorAll('.cd-timeline li').length,1);assert.equal(w.document.querySelector('table'),null);
+ assert.equal(w.document.querySelectorAll('.cd-session-table tbody tr').length,1);assert.equal(w.document.querySelectorAll('table').length,2);
  w.document.querySelector('.cd-chart-legend button').click();assert.equal(w.navigation.at(-1).view,'production');
  w.sessionStorage.setItem('studio.footer.workspace.selection','two');await w.StudioDashboard.render();await w.studioDashboardReady;
  assert.equal(w.document.querySelectorAll('.cd-donut-segment').length,0);assert.match(w.document.querySelector('.cd-production-chart').parentNode.textContent,/No production jobs/);
- assert.equal(w.document.querySelectorAll('.cd-timeline li').length,0);
+ assert.match(w.document.querySelector('.cd-session-table').textContent,/No sessions today/);
 });
 test('zero or failed chart sources never display invalid or misleading proportions',async t=>{
  const w=setup(t,read({jobs:[],requests:[],inquiries:[],schedule:[],workload:{jobs:[],activities:[]}}));
@@ -29,11 +29,11 @@ test('zero or failed chart sources never display invalid or misleading proportio
  assert.equal(w.document.querySelectorAll('.cd-donut-segment').length,0);assert.doesNotMatch(w.document.body.innerHTML,/NaN|Infinity/);
  assert.ok([...w.document.querySelectorAll('.cd-bar-track>span')].every(b=>b.style.width==='0%'));
  w.json=async()=>{throw Error('Forbidden')};await w.StudioDashboard.render();await w.studioDashboardReady;
- assert.equal(w.document.querySelector('.cd-donut'),null);assert.equal(w.document.querySelector('.cd-timeline'),null);
+ assert.equal(w.document.querySelector('.cd-donut'),null);assert.equal(w.document.querySelector('.cd-session-table'),null);
  assert.ok([...w.document.querySelectorAll('.cd-bar-row')].every(b=>b.disabled&&b.textContent.includes('Unavailable')));
 });
 function fixture(){return {jobs:[{id:'a',workspaceId:'one',title:'Wedding',status:'Active Production'},{id:'b',workspaceId:'two',title:'Portrait',status:'Ready for Delivery',jobLead:'lead'}],requests:[{id:'booking',jobId:'a',status:'AwaitingDeposit',request:{workspaceId:'one',requiredDeposit:100,conversationId:'inquiry'},recordedDeposit:20}],inquiries:[{id:'inquiry',workspaceId:'one'},{id:'new',workspaceId:'two'}],schedule:[{id:'s',jobId:'a',startsAtUtc:new Date().toISOString(),status:'Scheduled'}],workload:{jobs:[{id:'a',workspaceId:'one',status:'Active Production'},{id:'b',workspaceId:'two',status:'Ready for Delivery'}],activities:[{id:'delivery',jobId:'b',activityType:'Delivery',dueAtUtc:new Date().toISOString(),status:'NotStarted'}]}};}
-function read(data){return async url=>url==='/api/jobs'?data.jobs:url.includes('booking-requests')?data.requests:url.includes('enquiries')?data.inquiries:url.includes('/schedule')?data.schedule:data.workload;}
+function read(data){return async url=>url==='/api/jobs'?data.jobs:url.includes('booking-requests')?data.requests:url.includes('enquiries')?data.inquiries:url.includes('/media-summary')?(data.media||[]):url.endsWith('/schedule/resources')?(data.resources||[]):url.includes('/schedule')?data.schedule:data.workload;}
 test('company projection deduplicates converted inquiries and uses recorded delivery deadlines',t=>{
  const w=setup(t,read(fixture())),data=fixture(),p=w.StudioDashboard.project(data,'',today);
  assert.equal(p.inquiries.length,1);assert.equal(p.deposits.length,1);assert.equal(p.unassigned.length,1);assert.equal(p.sessions.length,1);assert.equal(p.due.length,1);
@@ -63,3 +63,33 @@ test('old Today URLs resolve to the one Dashboard renderer',async t=>{
  assert.equal(w.document.body.dataset.studioView,'dashboard');assert.equal(w.location.hash,'#studio=dashboard');assert.equal(renders,1);assert.doesNotMatch(source('studio-navigation.js'),/function (renderToday|paintToday)\(/);
 });
 
+
+test('seven-day forecast excludes today and cancelled sessions and applies workspace scope',t=>{
+ const data=fixture(),w=setup(t,read(data));
+ const tomorrow=new Date(today+'T12:00:00');tomorrow.setDate(tomorrow.getDate()+1);
+ const next=tomorrow.toISOString();
+ data.schedule.push({id:'next',jobId:'a',startsAtUtc:next,status:'Scheduled'},{id:'cancelled',jobId:'a',startsAtUtc:next,status:'Cancelled'},{id:'other',jobId:'b',startsAtUtc:next,status:'Scheduled'});
+ data.workload.activities.push({id:'nextDelivery',jobId:'a',activityType:'Delivery',dueAtUtc:next,status:'NotStarted'});
+ let p=w.StudioDashboard.project(data,'one',today);
+ assert.equal(p.week.length,7);assert.equal(p.week[0].sessions,1);assert.equal(p.week[0].deliveries,1);assert.equal(p.sessions.length,1);
+ data.workload.activities.at(-1).dueAtUtc=null;p=w.StudioDashboard.project(data,'one',today);assert.equal(p.week[0].deliveries,0);
+});
+test('forecast day navigation carries the selected date without a new source request',async t=>{
+ const w=setup(t,read(fixture()));await w.StudioDashboard.render();await w.studioDashboardReady;
+ const day=w.document.querySelector('[data-dashboard-day]');assert.ok(day);day.click();
+ assert.equal(w.navigation.at(-1).view,'schedule');assert.equal(w.navigation.at(-1).options.date,day.dataset.dashboardDay);
+});
+
+test('session preview resolves assigned worker and authorized thumbnail summary without per-job media calls',async t=>{
+ const data=fixture();data.resources=[{id:'person',name:'Samantha Lee',resourceType:'Photographer'}];data.media=[{jobId:'a',thumbnailVersionId:'version'}];data.schedule[0].resourceIds=['person'];
+ const urls=[],normal=read(data),w=setup(t,async url=>{urls.push(url);return normal(url)});await w.StudioDashboard.render();await w.studioDashboardReady;
+ assert.match(w.document.querySelector('.cd-session-table').textContent,/Samantha Lee/);
+ assert.equal(w.document.querySelector('.cd-thumbnail img').getAttribute('src'),'/api/jobs/a/versions/by-id/version/preview?size=thumbnail');
+ assert.equal(urls.filter(u=>u.includes('media-summary')).length,1);assert.equal(urls.some(u=>/\/api\/jobs\/.+\/media/.test(u)),false);
+});
+test('optional thumbnail and worker lookup failures keep operational counts available',async t=>{
+ const normal=read(fixture()),w=setup(t,async url=>{if(url.includes('media-summary')||url.endsWith('/resources'))throw Error('Forbidden');return normal(url)});
+ await w.StudioDashboard.render();await w.studioDashboardReady;
+ assert.equal(w.document.querySelector('.cd-warning'),null);assert.equal(w.document.querySelector('[data-dashboard-link="deposits"]').disabled,false);
+ assert.equal(w.document.querySelector('.cd-thumbnail img'),null);
+});
