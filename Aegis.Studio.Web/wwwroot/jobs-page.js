@@ -40,6 +40,7 @@
    let view=['led','involved','all'].includes(saved.view)?saved.view:'involved';
    let layout=['jobs','calendar','timeline'].includes(saved.layout)?saved.layout:'jobs';
    let workspace=String(options.workspaceFilter??''),term=String(saved.term||''),stage=String(saved.stage||''),sort=saved.sort==='date-asc'?'date-asc':'date-desc',calendarView=['day','week','month'].includes(saved.calendarView)?saved.calendarView:'day',calendarDate=date(saved.calendarDate)||new Date(),calendarEnabled=saved.calendarEnabled!==false,includeClosed=false,page=1;
+   if(options.dashboardQueue==='unassigned'){view='all';stage='';term='';calendarEnabled=false;layout='jobs';}
    const stages=StudioStatusOrder.sort(jobs.map(status));if(!stages.includes(stage))stage='';
    const card=(title,body,cls='')=>`<section class="sj-card ${cls}"><header><h2>${title}</h2></header>${body}</section>`;
    host.innerHTML=`<section class="sj-page" aria-label="Jobs"><section class="sj-board">
@@ -59,7 +60,7 @@
    const need=(job,key)=>key==='owner'?!owner(job)&&!/completed|delivered|cancelled/i.test(status(job)):key==='changes'?/changes requested/i.test(status(job)):/needs photographer assignment/i.test(status(job));
    function apply(reset=true){
     if(!current())return;if(reset)page=1;
-    const base=jobs.filter(j=>(view==='all'||(view==='led'?isLead(j):isInvolved(j)))&&belongs(j,workspace)&&(stage ? status(j)===stage : !StudioSubjectPicker.isClosed({...j,stage:status(j)})));
+    const base=jobs.filter(j=>(options.dashboardQueue!=='unassigned'||!owner(j))&&(view==='all'||(view==='led'?isLead(j):isInvolved(j)))&&belongs(j,workspace)&&(stage ? status(j)===stage : !StudioSubjectPicker.isClosed({...j,stage:status(j)})));
     StudioPage.queryAll(host,'[data-sj-view]').forEach(button=>{const selected=button.dataset.sjView===view;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
     StudioCalendarLayouts.bind(host,{onLayout:value=>{layout=value;apply();}});
    StudioPage.queryAll(host,'[data-sj-calendar-view]').forEach(button=>{const selected=calendarEnabled&&button.dataset.sjCalendarView===calendarView;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
@@ -120,5 +121,6 @@
  }
  window.StudioJobsPage={render,dispose(){active?.dispose();active=null;}};
 })();
+
 
 

@@ -9,13 +9,12 @@
             window.studioShellMountJobAttention?.(null);
         }
         document.body.dataset.studioView=view;
-        if(view!=='today' && view!=='jobs'){const count=document.getElementById('studioFooterRate');if(count)count.textContent='';}
+        if(view!=='dashboard' && view!=='jobs'){const count=document.getElementById('studioFooterRate');if(count)count.textContent='';}
         document.querySelectorAll('[data-view]').forEach(button=>{
             button.classList.toggle('active',button.dataset.view===view);
         });
     }
 
-    let todayLoad=null;
     let navigationRevision=0;
     let jobsWorkspaceFilter=null;
 
@@ -29,574 +28,6 @@
             return Number.isNaN(date.getTime())?raw:date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'2-digit',year:'numeric'});
         };
 
-
-    function renderToday(){
-        const controller=new AbortController(),revision=navigationRevision;
-        const state={auth:{},jobs:[],tasks:[],schedule:[],notifications:[],media:[],announcements:[],status:{},errors:{},taskFilter:'all',jobView:'involved',jobSearch:'',jobStatusFilter:'',jobRoleFilter:'',includeClosedJobs:false,selectedDate:new Date(),calendarMonth:new Date(),calendarView:'day',layout:'jobs',workspaceName:''};
-        state.active=()=>{if(state.root&&!state.root.isConnected)controller.abort();return !controller.signal.aborted&&revision===navigationRevision&&['today','tasks'].includes(document.body.dataset.studioView)&&!genericView.classList.contains('hidden');};
-        todayLoad=controller;
-        conversationView.classList.add('hidden');genericView.classList.remove('hidden');
-        const started=performance.now(),run=globalThis.crypto?.randomUUID?.()||String(Date.now());
-        const diagnostics={run,startedAt:new Date().toISOString(),requests:[],shellMs:null,coreMs:null,completeMs:null};
-        window.studioTodayDiagnostics=diagnostics;
-        const now=new Date();
-        const dayRange=date=>{
-            const from=new Date(date.getFullYear(),date.getMonth(),date.getDate());
-            const to=new Date(date.getFullYear(),date.getMonth(),date.getDate()+1);
-            return {from,to};
-        };
-        const scheduleRange=(date,view=state.calendarView)=>{
-            if(view==='month'){
-                return {
-                    from:new Date(date.getFullYear(),date.getMonth(),1),
-                    to:new Date(date.getFullYear(),date.getMonth()+1,1)
-                };
-            }
-            if(view==='week'){
-                const from=new Date(date.getFullYear(),date.getMonth(),date.getDate());
-                from.setDate(from.getDate()-((from.getDay()+6)%7));
-                return {from,to:new Date(from.getFullYear(),from.getMonth(),from.getDate()+7)};
-            }
-            return dayRange(date);
-        };
-        state.scheduleRange=scheduleRange;
-        const scheduleUrl=(date,view=state.calendarView)=>{
-            const {from,to}=scheduleRange(date,view);
-            return '/api/today/schedule?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString());
-        };
-        const urls={tasks:'/api/today/tasks',schedule:scheduleUrl(new Date(),'day'),jobs:'/api/today/jobs',auth:'/api/auth/me',notifications:'/api/notifications?count=80',media:'/api/today/media-summary'};
-        let inFlight=0;const waiting=[];
-        async function load(key){
-            while(inFlight>=2)await new Promise(resolve=>waiting.push(resolve));
-            if(!state.active())return;
-            inFlight++;state.status[key]='loading';delete state.errors[key];
-            try{paintToday(state);}catch(renderError){console.error('[Studio Today] Render failed before '+key+' request',renderError);}
-            const begin=performance.now();let outcome='ok',trace=null;
-            try{
-                const value=await json(urls[key],{signal:controller.signal,headers:{'X-Studio-Startup':run},onResponse:response=>{trace=response.headers?.get('X-Studio-Trace');}});
-                if(!state.active())return;
-                state[key]=value;state.status[key]='ready';
-            }catch(error){
-                if(controller.signal.aborted){outcome='cancelled';return;}
-                outcome='error';state.status[key]='error';state.errors[key]=error.message;
-            }finally{
-                inFlight--;waiting.shift()?.();
-                diagnostics.requests.push({component:key,url:urls[key],outcome,elapsedMs:Math.round(performance.now()-begin),trace});
-                console.debug('[Studio Today]',diagnostics.requests.at(-1));
-                if(state.active()){
-                    try{paintToday(state);}
-                    catch(renderError){console.error('[Studio Today] Render failed after '+key+' request',renderError);}
-                }
-            }
-        }
-        state.retry=key=>load(key);
-        state.resolveWorkspace=async()=>{
-            try{
-                if(typeof loadWorkspaces==='function'&&(!Array.isArray(workspaceCache)||!workspaceCache.length))await loadWorkspaces();
-                const available=(typeof workspaceCache!=='undefined'?workspaceCache:[]).filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view);
-                const workspace=(typeof selectedWorkspace!=='undefined'&&selectedWorkspace)
-                    ? available.find(w=>String(w.id)===String(selectedWorkspace))
-                    : null;
-                state.workspaceName=workspace?.name||'';
-                const announcementWorkspaces=workspace?[workspace]:available.slice(0,6);
-                const results=await Promise.allSettled(announcementWorkspaces.map(async w=>{
-                    const items=await json('/api/workspaces/'+w.id+'/announcements');
-                    return (items||[]).map(a=>({...a,workspaceId:w.id,workspaceName:w.name}));
-                }));
-                state.announcements=results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
-                state.status.announcements='ready';
-                if(state.active())paintToday(state);
-            }catch{
-                state.workspaceName='';
-                state.announcements=[];
-                state.status.announcements='error';
-                if(state.active())paintToday(state);
-            }
-        };
-        state.selectDay=date=>{
-            state.selectedDate=new Date(date.getFullYear(),date.getMonth(),date.getDate());
-            state.calendarMonth=new Date(date.getFullYear(),date.getMonth(),1);
-            paintToday(state);
-        };
-        state.setCalendarView=view=>{
-            if(!['month','week','day'].includes(view)||view===state.calendarView)return;
-            state.calendarView=view;
-            state.calendarMonth=new Date(state.selectedDate.getFullYear(),state.selectedDate.getMonth(),1);
-            paintToday(state);
-        };
-        state.stepCalendar=direction=>{
-            const current=new Date(state.selectedDate||new Date());
-            if(state.calendarView==='month'){
-                const desiredDay=current.getDate();
-                const target=new Date(current.getFullYear(),current.getMonth()+direction,1);
-                const lastDay=new Date(target.getFullYear(),target.getMonth()+1,0).getDate();
-                target.setDate(Math.min(desiredDay,lastDay));
-                state.selectDay(target);
-                return;
-            }
-            current.setDate(current.getDate()+direction*(state.calendarView==='week'?7:1));
-            state.selectDay(current);
-        };
-        try{paintToday(state);}catch(error){
-            console.error('[Studio Today] Initial render failed',error);
-            genericView.innerHTML='<section class="mw-empty" role="alert">Today could not render. Check the browser console for the error and reload.</section>';
-        }
-        state.resolveWorkspace();
-        diagnostics.shellMs=Math.round(performance.now()-started);
-        // Two reads at a time: operational essentials first, enrichment afterwards.
-        const pending=['jobs','tasks','schedule','auth','notifications','media'];
-        async function worker(){
-            while(pending.length&&state.active()){
-                await load(pending.shift());
-                if(diagnostics.coreMs===null&&['tasks','schedule'].every(k=>['ready','error'].includes(state.status[k])))diagnostics.coreMs=Math.round(performance.now()-started);
-            }
-        }
-        window.studioTodayReady=Promise.all([worker(),worker()]).then(()=>{
-            diagnostics.completeMs=Math.round(performance.now()-started);
-            diagnostics.cancelled=controller.signal.aborted;
-            console.info('[Studio Today startup]',diagnostics);
-        });
-        return Promise.resolve();
-    }
-
-    function paintToday(state){
-        if(!state.active())return;
-        const {auth}=state;
-        const jobs=Array.isArray(state.jobs)?state.jobs:[];
-        const tasks=Array.isArray(state.tasks)?state.tasks:[];
-        const schedule=Array.isArray(state.schedule)?state.schedule:[];
-        const notifications=Array.isArray(state.notifications)?state.notifications:[];
-        const workspaceCrumb=state.workspaceName
-            ? '<span aria-hidden="true">›</span><button type="button" class="workspace-current" data-current-workspace>'+esc(state.workspaceName)+'</button>'
-            : '';
-        const now=new Date(),selectedDate=state.selectedDate||now;
-        const activeJobRange=state.scheduleRange?state.scheduleRange(selectedDate,state.calendarView):{from:new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()),to:new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+1)};
-        const startOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-        const endOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
-        const phase=(key,content)=>state.status[key]==='ready'?content:state.status[key]==='error'?'<div class="mw-empty" role="alert">'+esc(state.errors[key])+' <button data-mw-retry="'+key+'">Retry</button></div>':'<div class="mw-empty" role="status">Loading…</div>';
-        const metric=(key,value)=>state.status[key]==='ready'?value:'…';
-        const me=auth.user||auth,user=String(me.userName||me.loginName||'').toLowerCase();
-        const displayName=String(me.displayName||me.name||me.userName||'Jordan').trim();
-        const firstName=(displayName.split(/[\s\\@.]+/).filter(Boolean)[0]||'Jordan');
-        const hour=now.getHours(),greeting=hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
-        const roles=[...(Array.isArray(me.roles)?me.roles:[]),...(Array.isArray(auth.roles)?auth.roles:[])].map(x=>String(x).toLowerCase());
-        const isAdmin=me.isAdministrator===true||auth.isAdministrator===true||roles.some(r=>/administrator/.test(r));
-        const isManager=isAdmin||roles.some(r=>/manager|owner|finance/.test(r));
-        const myTasks=tasks.filter(t=>!['Completed','Cancelled'].includes(t.status)&&(!user||String(t.assignedTo||'').toLowerCase()===user));
-        const todaySchedule=schedule.filter(entry=>entry.status!=='Cancelled'&&new Date(entry.startsAtUtc)>=startOfDay&&new Date(entry.startsAtUtc)<endOfDay).sort((a,b)=>new Date(a.startsAtUtc)-new Date(b.startsAtUtc));
-        const leadJobs=jobs.filter(j=>!['Completed','Closed','Cancelled','Published'].includes(String(j.status||''))&&user&&String(j.jobLead||'').toLowerCase()===user);
-        const recentJobs=[...leadJobs].sort((a,b)=>new Date(b.createdAtUtc||b.createdAt||0)-new Date(a.createdAtUtc||a.createdAt||0)).slice(0,4);
-        const normalized=value=>String(value||'').trim().toLowerCase();
-        const isLead=job=>Boolean(user)&&normalized(job.jobLead)===user;
-        const isInvolved=job=>isLead(job)
-            ||Boolean(user)&&[job.assignedTo,job.jobOwner,job.photographerUserName].some(value=>normalized(value)===user)
-            ||job.isCrewMember===true
-            ||myTasks.some(task=>String(task.jobId)===String(job.id))
-            ||(Array.isArray(job.crew)&&job.crew.some(member=>normalized(member.userName||member)===user));
-        const jobViews={led:'Jobs Led By Me',involved:"Jobs I'm Involved In",all:'All Jobs'};
-        const viewJobs=state.jobView==='led'?jobs.filter(isLead):state.jobView==='all'?jobs:jobs.filter(isInvolved);
-        const searchedJobs=viewJobs.filter(job=>state.jobStatusFilter ? String(job.status||'Unknown')===state.jobStatusFilter : !StudioSubjectPicker.isClosed(job)).filter(job=>[job.title,job.clientName,job.clientDisplayName,job.status,job.jobLead,job.id].some(value=>normalized(value).includes(normalized(state.jobSearch))));
-        const roleForJob=job=>isLead(job)?'Job Lead':normalized(job.assignedTo)===user?'Assigned':myTasks.some(t=>String(t.jobId)===String(job.id))?'Task Owner':'Team';
-        const statusOptions=StudioStatusOrder.sort(viewJobs.map(job=>String(job.status||'Unknown')));
-        const roleOptions=[...new Set(viewJobs.map(roleForJob))].sort((a,b)=>a.localeCompare(b));
-        // EventDate is a calendar date: do not parse YYYY-MM-DD as UTC midnight.
-        const eventDate=job=>{
-            const match=/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(String(job.eventDate||''));
-            return match?new Date(Number(match[1]),Number(match[2])-1,Number(match[3])):null;
-        };
-        const datedJobs=searchedJobs.filter(job=>{
-            const date=eventDate(job);
-            return date&&date>=activeJobRange.from&&date<activeJobRange.to;
-        });
-        const filteredJobs=datedJobs.filter(job=>(!state.jobStatusFilter||String(job.status||'Unknown')===state.jobStatusFilter)&&(!state.jobRoleFilter||roleForJob(job)===state.jobRoleFilter));
-        const sortedJobs=[...filteredJobs].sort((a,b)=>eventDate(a)-eventDate(b)||String(a.title||'').localeCompare(String(b.title||''))||String(a.id).localeCompare(String(b.id)));
-        const footerCount=document.getElementById('studioFooterRate');
-        if(footerCount)footerCount.textContent=sortedJobs.length+' Jobs';
-        const emptyJobText=!viewJobs.length?(state.jobView==='led'?'You are not the lead on any jobs.':state.jobView==='involved'?'You are not involved in any jobs.':'No jobs found.'):'No jobs match the selected date range and filters.';
-        const media=Array.isArray(state.media)?state.media:[];
-        const announcements=Array.isArray(state.announcements)?state.announcements:[];
-        const mediaByJob=new Map(media.map(row=>[String(row.jobId),row]));
-        const mediaSnapshots=recentJobs.map(job=>({job,media:mediaByJob.get(String(job.id))||{assetCount:0}}));
-        const totalPhotos=media.reduce((sum,row)=>sum+Number(row.assetCount||0),0);
-        const messageNotifications=notifications.filter(n=>/message|conversation|reply/i.test(String(n.eventType||n.title||n.type||'')));
-        const combinedCommunicationFeed=[
-            ...messageNotifications.map(n=>({kind:'message',at:n.createdAtUtc||n.createdAt||0,item:n})),
-            ...announcements.map(a=>({kind:'announcement',at:a.createdAtUtc||a.createdAt||0,item:a}))
-        ].sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6);
-        const activityNotifications=notifications.slice(0,8);
-
-        const jobById=id=>jobs.find(j=>String(j.id)===String(id));
-        const scheduleJob=entry=>jobById(entry.jobId)||{title:entry.title||'Scheduled session',clientName:entry.title||''};
-        const formatTime=value=>new Date(value).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
-        const formatDay=value=>new Date(value).toLocaleDateString([],{month:'short',day:'numeric'});
-        const imageForJob=jobId=>{
-            const version=mediaByJob.get(String(jobId))?.thumbnailVersionId;
-            return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/preview?size=thumbnail':'';
-        };
-        const fallbackImageForJob=jobId=>{
-            const version=mediaByJob.get(String(jobId))?.thumbnailVersionId;
-            return version?'/api/jobs/'+jobId+'/versions/by-id/'+version+'/preview/fallback':'';
-        };
-
-        const taskRows=myTasks.slice(0,8).map(task=>{
-            const job=jobById(task.jobId)||{};
-            const context=[job.title,job.clientName].filter(Boolean).join(' · ')||task.activityType||'Studio task';
-            const due=task.dueAtUtc?new Date(task.dueAtUtc):null;
-            const dueDay=due?new Date(due.getFullYear(),due.getMonth(),due.getDate()):null;
-            const todayDay=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-            const dueState=!dueDay?'none':dueDay<todayDay?'overdue':dueDay.getTime()===todayDay.getTime()?'today':'upcoming';
-            const priority=String(task.priority||'Normal').toLowerCase();
-            return `<button class="mw-task-row due-${dueState}" data-open-job="${task.jobId}" data-task-type="${esc(task.activityType||'')}">
-                <span class="mw-task-bullet priority-${esc(priority)}" aria-hidden="true"></span>
-                <span class="mw-two-line"><strong>${esc(task.title)}</strong><small>${esc(context)}</small></span>
-                <span class="mw-due">${due?'<b>'+esc(dueState==='overdue'?'Overdue':dueState==='today'?'Today':'Due')+'</b><small>'+esc(formatDay(task.dueAtUtc))+'</small>':'<b>Open</b>'}</span>
-                
-            </button>`;
-        }).join('')||'<div class="mw-empty">No open tasks assigned to you.</div>';
-
-        const messageRows=combinedCommunicationFeed.map(entry=>{
-            if(entry.kind==='announcement'){
-                const a=entry.item;
-                return `<button class="smc-row" data-announcement-workspace="${a.workspaceId||''}">
-                    <span class="smc-type" title="Announcement" aria-label="Announcement">📣</span>
-                    <span class="smc-copy"><strong>${esc(a.title||'Announcement')}</strong><small>${esc((a.workspaceName?a.workspaceName+' · ':'')+(a.body||''))}</small></span>
-                    <span class="smc-time">${a.createdAtUtc?formatDay(a.createdAtUtc):''}</span>
-                    
-                </button>`;
-            }
-            const n=entry.item;
-            return `<button class="smc-row" data-notification="${n.id}" data-message-job="${n.referenceType==='Job'?n.referenceId||'':''}">
-                <span class="smc-type" title="Message" aria-label="Message">✉</span>
-                <span class="smc-copy"><strong>${esc(n.subject||n.title||'Message')}</strong><small>${esc(n.body||n.eventType||'Studio message')}</small></span>
-                <span class="smc-time">${n.createdAtUtc?formatDay(n.createdAtUtc):''}</span>
-                
-            </button>`;
-        }).join('')||'<div class="mw-empty">No messages or announcements.</div>';
-
-        const recentRows=mediaSnapshots.slice(0,5).map(({job,media})=>{
-            const image=imageForJob(job.id);
-            const count=state.status.media==='ready'?media.assetCount:'…';
-            const status=job.status||'Active';
-            return `<button class="mw-pipeline-row" data-open-job="${job.id}">
-                <span class="mw-pipeline-thumb">${image?`<img loading="lazy" src="${image}" alt="">`:'<span>📷</span>'}</span>
-                <span class="mw-two-line"><strong>${esc(job.title)}</strong><small>${esc(job.clientName||job.jobType||'Photography')} · ${count} photos</small></span>
-                <span class="mw-pipeline-status">${esc(status)}</span>
-                <span class="mw-pipeline-due">${job.dueAtUtc?'Due '+formatDay(job.dueAtUtc):''}</span>
-                
-            </button>`;
-        }).join('')||'<div class="mw-empty">No active jobs currently led by you.</div>';
-
-        const mainJobRows=sortedJobs.map(job=>{
-            const image=imageForJob(job.id);
-            const total=Number(job.taskCount||0),completed=Number(job.completedTaskCount||0);
-            const percent=total?Math.round(100*completed/total):0;
-            const role=roleForJob(job);
-            return `<button class="mw-today-job-row" data-open-job="${esc(job.id)}">
-                <span class="mw-today-job-title">${image?'<img src="'+image+'" alt="" loading="lazy">':'<span class="mw-today-job-placeholder">▣</span>'}<span><strong>${esc(job.title||'Untitled Job')}</strong><small>${esc(job.clientName||job.clientDisplayName||'Client')}</small></span></span>
-                <span class="mw-today-job-stage"><span class="studio-status-pill" data-status="${esc(String(job.status||'Pending').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}"><span class="studio-status-dot" aria-hidden="true"></span>${esc(job.status||'Pending')}</span></span>
-                <span class="mw-today-job-progress"><span class="mw-today-job-meter"><i style="width:${percent}%"></i></span>${percent}%</span>
-                <span class="mw-today-job-date">${esc(formatJobDate(job.eventDate))}</span>
-                <span class="mw-today-job-role"><span class="studio-role-pill" data-role="${esc(role.toLowerCase().replace(/[^a-z0-9]+/g,'-'))}"><span class="studio-role-dot" aria-hidden="true"></span>${esc(role)}</span></span>
-                
-            </button>`;
-        }).join('')||'<div class="mw-today-jobs-empty" role="status">'+esc(emptyJobText)+'</div>';
-        const jobLayout=state.layout==='jobs'?mainJobRows:StudioCalendarLayouts.render({layout:state.layout,anchor:selectedDate,period:state.calendarView,attribute:'data-open-job',items:sortedJobs.map(job=>({id:job.id,title:job.title||'Untitled job',context:job.clientName||'',start:job.eventDate,allDay:true,status:job.status}))});
-        const taskAttention=tasks.filter(task=>!/[Cc]ompleted|[Cc]ancelled|[Aa]rchived/.test(task.status||'')).flatMap(task=>{
-            const reasons=[];
-            if(task.dueAtUtc&&new Date(task.dueAtUtc)<now)reasons.push('Overdue');
-            if(/blocked|rework|required|failed/i.test(String(task.status||'')))reasons.push(task.blockedReason||task.status);
-            if(!reasons.length)return [];
-            const job=jobs.find(job=>String(job.id)===String(task.jobId));
-            return [{id:'task:'+task.id,jobId:task.jobId,title:task.title||task.activityType||'Studio task',context:[job?.title,...reasons].filter(Boolean).join(' · ')}];
-        });
-        const jobAttention=jobs.flatMap(job=>{
-            const status=normalized(job.status);
-            if(!['confirmed','needs scheduling','awaiting scheduling','needs assignment','unassigned','needs job owner','needs photographer','needs photographer assignment'].includes(status)&&!/awaiting upload|blocked|overdue|exception|changes requested/i.test(status))return [];
-            return [{id:'job:'+job.id,jobId:job.id,title:job.title||'Untitled job',context:[job.clientName,job.status,job.blockedReason].filter(Boolean).join(' · ')}];
-        });
-        window.dispatchEvent(new CustomEvent('studio-attention-updated', {detail: {view:'today',loaded:state.status.jobs==='ready'&&state.status.tasks==='ready',items:[...taskAttention,...jobAttention],error:state.errors.jobs||state.errors.tasks||''}}));
-
-        const availableWorkspaces=(typeof workspaceCache!=='undefined'&&Array.isArray(workspaceCache)?workspaceCache:[])
-            .filter(w=>w.permissions?.accessWorkspace&&w.permissions?.view);
-        const workspaceRows=availableWorkspaces.map(w=>`<button type="button" data-mw-workspace="${esc(w.id)}">▣ <span>${esc(w.name)}</span></button>`).join('')
-            ||'<div class="mw-empty">No accessible workspaces.</div>';
-        const markup=`
-            <section class="mw-page mw-today-page studio-dashboard-template">
-                
-                
-                <div class="mw-today-layout studio-dashboard-template__columns">
-                    <main class="mw-today-center studio-dashboard-template__primary">
-                        <section class="mw-list-panel mw-today-jobs" data-mw-region="jobs">
-                            <div class="mw-today-job-toolbar">
-                                <div class="mw-today-view-tabs" role="group" aria-label="Job view">
-                                    ${Object.entries(jobViews).map(([key,label])=>`<button type="button" data-mw-job-view="${key}" class="${state.jobView===key?'active':''}" aria-pressed="${state.jobView===key}">${label}</button>`).join('')}
-                                </div>
-                                <div class="mw-today-calendar-tools" aria-label="Calendar navigation"></div><div class="mw-today-toolbar-actions">${state.status.media==='error'?'<button type="button" data-mw-retry="media">Retry previews</button>':''}</div>
-                                
-                            </div>
-                            
-                            <div class="mw-today-job-columns"><label class="mw-job-column-search"><span>Job / Client</span><label class="mw-today-search"><span class="sr-only">Search jobs</span><input type="search" data-mw-job-search placeholder="Search jobs, clients or status…" value="${esc(state.jobSearch)}"></label></label><label class="mw-job-column-filter"><span>Status</span><select data-mw-job-status aria-label="Filter jobs by status"><option value="">All Open Jobs</option>${statusOptions.map(value=>`<option value="${esc(value)}" ${state.jobStatusFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span>Progress</span><span>Event Date</span><label class="mw-job-column-filter"><span>My Role</span><select data-mw-job-role aria-label="Filter jobs by role"><option value="">All roles</option>${roleOptions.map(value=>`<option value="${esc(value)}" ${state.jobRoleFilter===value?'selected':''}>${esc(value)}</option>`).join('')}</select></label><span></span></div>
-                            <div class="mw-today-job-list" data-layout="${state.layout}">${phase('jobs',jobLayout)}</div>
-                        </section>
-                    </main>
-
-                </div>
-            </section>`;
-        const next=document.createElement('div');next.innerHTML=markup;
-        if(!genericView.querySelector('.mw-page')){genericView.replaceChildren(next.firstElementChild);state.root=genericView.querySelector('.mw-page');}
-        else if([...next.querySelectorAll('[data-mw-region]')].some(region=>!genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]'))){
-            console.warn('[Studio Today] Missing grid region; rebuilding Today');
-            genericView.replaceChildren(next.firstElementChild);
-            state.root=genericView.querySelector('.mw-page');
-        }
-        else next.querySelectorAll('[data-mw-region]').forEach(region=>{
-            const existing=genericView.querySelector('[data-mw-region="'+region.dataset.mwRegion+'"]');
-            if(existing.innerHTML===region.innerHTML)return;
-            // Keep the scroll container and each job button alive during enrichment.
-            // Replacing the region resets browser focus/scroll anchoring while a
-            // pointer gesture may still be targeting one of its rows.
-            const list=existing.querySelector('.mw-today-job-list');
-            const nextList=region.querySelector('.mw-today-job-list');
-            const top=list.scrollTop,left=list.scrollLeft;
-            if(list.dataset.layout!=='jobs'||nextList.dataset.layout!=='jobs'){
-                if(list.innerHTML!==nextList.innerHTML)list.innerHTML=nextList.innerHTML;
-            }else{
-            const rows=new Map([...list.querySelectorAll('[data-open-job]')].map(row=>[row.dataset.openJob,row]));
-            let cursor=list.firstChild;
-            for(const nextRow of [...nextList.children]){
-                const row=rows.get(nextRow.dataset.openJob)||nextRow;
-                if(row!==nextRow&&row.innerHTML!==nextRow.innerHTML)row.innerHTML=nextRow.innerHTML;
-                if(row!==cursor)list.insertBefore(row,cursor);
-                cursor=row.nextSibling;
-            }
-            while(cursor){const removed=cursor;cursor=cursor.nextSibling;removed.remove();}
-            }
-            list.dataset.layout=nextList.dataset.layout;
-            [...region.children].forEach((child,index)=>{
-                if(child!==nextList&&existing.children[index].innerHTML!==child.innerHTML)existing.children[index].replaceWith(child);
-            });
-            list.scrollTop=top;list.scrollLeft=left;
-        });
-        state.root=genericView.querySelector('.mw-page');
-        window.studioShellSetOverview?.(`<section class="mw-list-panel studio-context-card studio-overview-rail" data-rail-card="overview"><header><h2>Overview</h2></header><div class="workspace-summary-row"><span>Jobs</span><strong>${jobs.length}</strong></div><div class="workspace-summary-row"><span>Tasks</span><strong>${tasks.length}</strong></div><div class="workspace-summary-row"><span>Sessions</span><strong>${schedule.length}</strong></div></section>`,'today');
-        window.studioSetBreadcrumb?.([{label:'Today',view:'today'}]);
-        if(studioPageTools){
-            const today=new Date();
-            const isToday=selectedDate.getFullYear()===today.getFullYear()
-                && selectedDate.getMonth()===today.getMonth()
-                && selectedDate.getDate()===today.getDate();
-            const calendarView=state.calendarView||'day';
-            const range=state.scheduleRange?state.scheduleRange(selectedDate,calendarView):{from:selectedDate,to:selectedDate};
-            const inclusiveEnd=new Date(range.to);inclusiveEnd.setDate(inclusiveEnd.getDate()-1);
-            const selectedDateLabel=calendarView==='month'
-                ? selectedDate.toLocaleDateString([],{month:'long',year:'numeric'})
-                : calendarView==='week'
-                    ? range.from.toLocaleDateString([],{month:'short',day:'numeric'})+' – '+inclusiveEnd.toLocaleDateString([],{month:'short',day:'numeric'})
-                    : isToday?'Today':selectedDate.toLocaleDateString([],{month:'short',day:'numeric'});
-            const viewLabel=calendarView[0].toUpperCase()+calendarView.slice(1);
-            studioPageTools.innerHTML=`${StudioCalendarLayouts.switcher(state.layout)}
-                <div class="mw-calendar-view-switch" role="group" aria-label="Calendar view">
-                    ${['month','week','day'].map(view=>'<button type="button" data-mw-calendar-view="'+view+'" class="'+(calendarView===view?'active':'')+'" aria-pressed="'+String(calendarView===view)+'">'+view[0].toUpperCase()+view.slice(1)+'</button>').join('')}
-                </div>
-                <div class="mw-day-nav" aria-label="Today ${viewLabel.toLowerCase()} navigator">
-                    <button type="button" class="mw-day-step" data-mw-day="-1" aria-label="Previous ${calendarView}">‹</button>
-                    <button type="button" class="mw-day-current" data-mw-day="today" title="${isToday?'Today':'Return to today'}">${selectedDateLabel}</button>
-                    <button type="button" class="mw-day-step" data-mw-day="1" aria-label="Next ${calendarView}">›</button>
-                    <div class="mw-calendar-control">
-                        <button type="button" class="mw-calendar-trigger" data-mw-calendar-toggle aria-label="Choose date" aria-expanded="false" title="Choose date">
-                            <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/></svg>
-                        </button>
-                        <div class="mw-calendar-popover" data-mw-calendar-popover hidden></div>
-                    </div>
-                </div>`;
-        }
-        // Calendar navigation belongs to the Today content area, never the global masthead.
-        const calendarHost=genericView.querySelector('.mw-today-calendar-tools');
-        if(calendarHost && studioPageTools){
-            calendarHost.replaceChildren(...Array.from(studioPageTools.children));
-        }
-        StudioCalendarLayouts.bind(genericView,{onLayout:value=>{state.layout=value;paintToday(state);}});
-        const shellScope=calendarHost||genericView;
-        shellScope.querySelectorAll('[data-mw-calendar-view]').forEach(button=>button.onclick=()=>state.setCalendarView(button.dataset.mwCalendarView));
-        shellScope.querySelectorAll('[data-mw-day]').forEach(button=>button.onclick=()=>{
-            if(button.dataset.mwDay==='today')state.selectDay(new Date());
-            else state.stepCalendar(Number(button.dataset.mwDay||0));
-        });
-        const calendarToggle=shellScope.querySelector('[data-mw-calendar-toggle]');
-        const calendarPopover=shellScope.querySelector('[data-mw-calendar-popover]');
-        const renderCalendar=()=>{
-            if(!calendarPopover)return;
-            const cursor=state.calendarMonth||new Date(state.selectedDate||new Date());
-            const year=cursor.getFullYear(),month=cursor.getMonth();
-            const first=new Date(year,month,1),last=new Date(year,month+1,0);
-            const leading=(first.getDay()+6)%7;
-            const today=new Date();
-            const selected=state.selectedDate||today;
-            const cells=[];
-            for(let i=0;i<leading;i++)cells.push('<span class="mw-calendar-empty" aria-hidden="true"></span>');
-            for(let day=1;day<=last.getDate();day++){
-                const current=new Date(year,month,day);
-                const isSelected=current.getFullYear()===selected.getFullYear()&&current.getMonth()===selected.getMonth()&&current.getDate()===selected.getDate();
-                const isToday=current.getFullYear()===today.getFullYear()&&current.getMonth()===today.getMonth()&&current.getDate()===today.getDate();
-                cells.push('<button type="button" class="mw-calendar-day'+(isSelected?' selected':'')+(isToday?' is-today':'')+'" data-calendar-day="'+day+'" aria-label="'+current.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})+'">'+day+'</button>');
-            }
-            calendarPopover.innerHTML=
-                '<div class="mw-calendar-head"><button type="button" data-calendar-month="-1" aria-label="Previous month">‹</button><strong>'+cursor.toLocaleDateString([],{month:'long',year:'numeric'})+'</strong><button type="button" data-calendar-month="1" aria-label="Next month">›</button></div>'+
-                '<div class="mw-calendar-week"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>'+
-                '<div class="mw-calendar-grid">'+cells.join('')+'</div>'+
-                '<button type="button" class="mw-calendar-today" data-calendar-today>Today</button>';
-            calendarPopover.querySelectorAll('[data-calendar-month]').forEach(button=>button.onclick=()=>{
-                state.calendarMonth=new Date(year,month+Number(button.dataset.calendarMonth||0),1);
-                renderCalendar();
-            });
-            calendarPopover.querySelectorAll('[data-calendar-day]').forEach(button=>button.onclick=()=>{
-                calendarPopover.hidden=true;
-                calendarToggle?.setAttribute('aria-expanded','false');
-                state.selectDay(new Date(year,month,Number(button.dataset.calendarDay)));
-            });
-            calendarPopover.querySelector('[data-calendar-today]')?.addEventListener('click',()=>{
-                calendarPopover.hidden=true;
-                calendarToggle?.setAttribute('aria-expanded','false');
-                state.selectDay(new Date());
-            });
-        };
-        if(calendarToggle&&calendarPopover){
-            calendarToggle.onclick=()=>{
-                const opening=calendarPopover.hidden;
-                calendarPopover.hidden=!opening;
-                calendarToggle.setAttribute('aria-expanded',String(opening));
-                if(opening){
-                    state.calendarMonth=new Date(state.selectedDate.getFullYear(),state.selectedDate.getMonth(),1);
-                    renderCalendar();
-                }
-            };
-        }
-        studioBreadcrumb?.querySelector('[data-shell-nav="today"]')?.addEventListener('click',()=>window.studioNavigate?.('today'));
-        studioBreadcrumb?.querySelector('[data-current-workspace]')?.addEventListener('click',()=>{
-            if(typeof selectedWorkspace!=='undefined'&&selectedWorkspace){
-                const workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===String(selectedWorkspace));
-                if(workspace)selectWorkspace(selectedWorkspace,workspace.name);
-            }
-        });
-        if(typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
-        genericView.querySelectorAll('[data-mw-job-view]').forEach(button=>button.onclick=()=>{
-            state.jobView=button.dataset.mwJobView;
-            state.jobSearch='';
-            paintToday(state);
-        });
-        
-        const statusFilter=genericView.querySelector('[data-mw-job-status]');
-        if(statusFilter)statusFilter.onchange=event=>{state.jobStatusFilter=event.target.value;paintToday(state);};
-        const roleFilter=genericView.querySelector('[data-mw-job-role]');
-        if(roleFilter)roleFilter.onchange=event=>{state.jobRoleFilter=event.target.value;paintToday(state);};
-        const jobSearch=genericView.querySelector('[data-mw-job-search]');
-        if(jobSearch)jobSearch.oninput=event=>{
-            state.jobSearch=event.target.value;
-            const position=event.target.selectionStart;
-            paintToday(state);
-            const replacement=genericView.querySelector('[data-mw-job-search]');
-            replacement?.focus();
-            if(position!==null)replacement?.setSelectionRange(position,position);
-        };
-        genericView.querySelectorAll('[data-mw-workspace]').forEach(button=>button.onclick=()=>{
-            const workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===button.dataset.mwWorkspace);
-            if(workspace)selectWorkspace(workspace.id,workspace.name);
-        });
-        genericView.querySelectorAll('[data-mw-retry]').forEach(b=>b.onclick=()=>{b.disabled=true;state.retry(b.dataset.mwRetry);});
-        genericView._assignJobLeadController?.abort();
-        genericView._assignJobLeadController = new AbortController();
-        genericView.addEventListener('studio-assign-job-lead',async()=>{
-            if(!(state.auth?.user||state.auth)?.isAdministrator)return;
-            const activeJobs=jobs.filter(job=>!['Completed','Closed','Cancelled','Published'].includes(String(job.status||'')))
-                .sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));
-            if(!activeJobs.length){alert('There are no active jobs available to assign.');return;}
-            if(genericView._assignJobLeadOpening)return;
-            genericView._assignJobLeadOpening=true;
-            let employees;
-            try{employees=await json('/api/studio-employees?assignable=true');}
-            catch(error){genericView._assignJobLeadOpening=false;alert(error.message);return;}
-            genericView._assignJobLeadOpening=false;
-            const dialog=studioDialog('Assign Job Lead',`
-                <form class="subject-form" data-job-lead-form>
-                    <label>Job
-                        <select data-job-picker name="jobId" required>
-                            ${StudioSubjectPicker.jobOptions(jobs)}
-                        </select>
-                    </label>
-                    <label>Job Lead
-                        <select name="userName">
-                            <option value="">Unassigned</option>
-                            ${(employees||[]).map(employee=>'<option value="'+esc(employee.userName)+'">'+esc(employee.displayName||employee.userName)+(employee.roles?.length?' · '+esc(employee.roles.join(', ')):'')+'</option>').join('')}
-                        </select>
-                    </label>
-                    <p class="form-help">The selected employee must be an active member of the job or its workspace.</p>
-                    <p role="alert"></p>
-                    <div class="dialog-actions">
-                        <button type="button" data-cancel>Cancel</button>
-                        <button type="submit" class="primary">Assign Lead</button>
-                    </div>
-                </form>`);
-            const form=dialog.querySelector('[data-job-lead-form]');
-            form.querySelector('[data-cancel]').onclick=()=>dialog.close();
-            form.onsubmit=async event=>{
-                event.preventDefault();
-                const submit=form.querySelector('button[type="submit"]');
-                const error=form.querySelector('[role="alert"]');
-                submit.disabled=true;error.textContent='';
-                try{
-                    const jobId=form.elements.jobId.value;
-                    const userName=form.elements.userName.value||null;
-                    const wf=await json('/api/jobs/'+encodeURIComponent(jobId)+'/workflow-graph');
-                    const result=await json('/api/jobs/'+encodeURIComponent(jobId)+'/workflow-graph',{
-                        method:'POST',
-                        headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({action:'assign-owner',userName,reason:'Today owner assignment',expectedRevision:wf.revision,operationId:crypto.randomUUID()})
-                    });
-                    state.jobs=state.jobs.map(job=>String(job.id)===String(jobId)?{...job,jobLead:result.jobLead??userName}:job);
-                    dialog.close();
-                    if(state.active())paintToday(state);
-                }catch(errorValue){error.textContent=errorValue.message||String(errorValue);}
-                finally{submit.disabled=false;}
-            };
-        }, {signal:genericView._assignJobLeadController.signal});
-        genericView.querySelectorAll('.mw-session-thumb img[data-fallback-src]').forEach(img=>{
-            img.dataset.previewOwner='today';
-            img.addEventListener('error',()=>{
-                delete img.dataset.previewOwner;
-                const fallback=img.dataset.fallbackSrc;
-                if(!fallback||img.dataset.fallbackTried==='1')return;
-                img.dataset.fallbackTried='1';
-                const probe=new Image();
-                probe.onload=()=>{img.src=fallback;img.classList.add('fallback-loaded');};
-                probe.onerror=()=>{img.closest('.mw-session-thumb')?.classList.add('preview-missing');};
-                probe.src=fallback;
-            },{once:true});
-        });
-        genericView.querySelectorAll('[data-mw-filter]').forEach(button=>button.onclick=()=>{
-            const filter=button.dataset.mwFilter;state.taskFilter=filter;
-            genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b===button));
-            genericView.querySelectorAll('[data-task-type]').forEach(row=>row.hidden=filter!=='all'&&!row.dataset.taskType.toLowerCase().includes(filter));
-        });
-        genericView.querySelectorAll('[data-notification]').forEach(button=>button.onclick=async()=>{
-            await json('/api/notifications/'+button.dataset.notification+'/read',{method:'POST'});
-            if(button.dataset.messageJob)await openWorkspaceJob(button.dataset.messageJob);
-            else document.getElementById('notificationButton').click();
-        });
-        genericView.querySelectorAll('[data-announcement-workspace]').forEach(button=>button.onclick=async()=>{
-            const id=button.dataset.announcementWorkspace;
-            const workspace=(typeof workspaceCache!=='undefined'?workspaceCache:[]).find(w=>String(w.id)===String(id));
-            if(workspace)await selectWorkspace(workspace.id,workspace.name);
-            else window.studioNavigate?.('workspaces');
-        });
-        genericView.querySelectorAll('[data-open-job]').forEach(button=>button.onclick=()=>{
-            if(state.active()&&button.dataset.openJob)openWorkspaceJob(button.dataset.openJob).catch(error=>alert(error.message));
-        });
-        genericView.querySelectorAll('[data-mw-filter]').forEach(b=>b.classList.toggle('active',b.dataset.mwFilter===state.taskFilter));
-        genericView.querySelectorAll('[data-task-type]').forEach(row=>row.hidden=state.taskFilter!=='all'&&!row.dataset.taskType.toLowerCase().includes(state.taskFilter));
-        genericView.querySelectorAll('[data-nav]').forEach(button=>button.onclick=()=>window.studioNavigate(button.dataset.nav));
-        const openNotifications=genericView.querySelector('#mwOpenNotifications');
-        if(openNotifications)openNotifications.onclick=()=>document.getElementById('notificationButton')?.click();
-    }
 
     async function renderWorkspaces(){
         conversationView.classList.add('hidden');
@@ -782,7 +213,7 @@
         if(typeof loadWorkspaces==='function'&&(!Array.isArray(workspaceCache)||!workspaceCache.length))await loadWorkspaces();
         if(!isCurrent())return;
         return StudioJobsPage.render(genericView,{
-            json,workspaces:workspaceCache||[],
+            json,workspaces:workspaceCache||[],dashboardQueue:window.history.state?.studioDashboardQueue,
             workspaceFilter:jobsWorkspaceFilter===null?(typeof selectedWorkspace!=='undefined'?selectedWorkspace||'':''):jobsWorkspaceFilter,
             setWorkspaceFilter:value=>{jobsWorkspaceFilter=value;recordNavigation('jobs',{workspaceId:value,replaceHistory:true});},
             isCurrent,openJob:id=>openWorkspaceJob(id),navigate:view=>window.studioNavigate(view),
@@ -916,38 +347,38 @@
     }
 
 
-    const routeAliases={admin:'about','studio-management':'about','demo-data':'about','api-site-key':'about','booking-sessions':'catalog','job-templates':'templates','work-order-templates':'templates','workflows-admin':'templates','staff-admin':'staff-roles','roles-admin':'staff-roles'};
+    const routeAliases={today:'dashboard',admin:'about','studio-management':'about','demo-data':'about','api-site-key':'about','booking-sessions':'catalog','job-templates':'templates','work-order-templates':'templates','workflows-admin':'templates','staff-admin':'staff-roles','roles-admin':'staff-roles'};
     const canonicalRoute=view=>routeAliases[view]||view;
     const routes={
-        today:renderToday,
+        dashboard:()=>window.StudioDashboard.render(),
         notifications:()=>showNotifications(),
         clients:()=>window.StudioClients.render({clientId:window.history.state?.studioClientId,tab:window.history.state?.studioClientTab}),
         messages:()=>window.showStudioMessages(),
-        schedule:()=>window.history.state?.studioSchedulePanel==='pipeline'?showPipeline():window.history.state?.studioSchedulePanel==='production'?window.StudioProductionPlanning.render():window.StudioPhotographerSchedule.render({photographer:window.history.state?.studioPhotographer||'',date:window.history.state?.studioScheduleDate||'',view:window.history.state?.studioScheduleView||'',resourceId:window.history.state?.studioScheduleResource||''}),
+        schedule:()=>window.history.state?.studioSchedulePanel==='pipeline'?showPipeline():window.history.state?.studioSchedulePanel==='production'?window.StudioProductionPlanning.render():window.StudioPhotographerSchedule.render({workspaceId:window.history.state?.studioWorkspaceId,photographer:window.history.state?.studioPhotographer||'',date:window.history.state?.studioScheduleDate||'',view:window.history.state?.studioScheduleView||'',resourceId:window.history.state?.studioScheduleResource||''}),
         tasks:()=>window.StudioTasks.render(),
         workspaces:renderWorkspaces,
         'workspace-management':()=>window.StudioWorkspaceManagement.render(),
         jobs:renderJobs,
         pipeline:()=>showPipeline(),
-        production:()=>showCatalogProduction(),
+        production:()=>showCatalogProduction({workspaceId:window.history.state?.studioWorkspaceId}),
         ...Object.fromEntries(['about','staff-roles'].map(view=>[view,()=>renderAdmin(view)])),
         catalog:()=>showCommercialCatalog({tab:window.history.state?.studioCatalogTab}),
         templates:()=>showCommercialTemplates(window.history.state?.studioTemplateKind||'Job'),
         media:()=>showMediaReview(),
-        frontdesk:()=>showFrontDesk(),
+        frontdesk:()=>showFrontDesk({queue:window.history.state?.studioDashboardQueue,workspaceId:window.history.state?.studioWorkspaceId}),
         'session-plan':()=>StudioWorkflowViews.showSessionPlan(window.history.state?.studioJobId),
         'session-plan-import':()=>StudioWorkflowViews.showSessionPlan(window.history.state?.studioJobId),
-        delivery:()=>StudioWorkflowViews.showDelivery(),
+        delivery:()=>StudioWorkflowViews.showDelivery({workspaceId:window.history.state?.studioWorkspaceId}),
         finance:()=>showAccounts(),
         reports:()=>showManagement(),
         management:()=>showManagement()
     };
 
-    let currentNavigationView=document.body.dataset.studioView||'today';
-    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',today:'Today',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
+    let currentNavigationView=document.body.dataset.studioView||'dashboard';
+    const navigationLabels={...Object.fromEntries((window.StudioAdmin?.entries||[]).map(entry=>[entry.view,entry.label])),'workspace-management':'Workspaces','session-plan-import':'Session Plan Import','session-plan':'Session Plan',delivery:'Delivery',catalog:'Products and Services','job-templates':'Job Templates','work-order-templates':'Work Order Templates',clients:'Client Management',dashboard:'Dashboard',workspaces:'Workspaces',jobs:'Jobs',pipeline:'Pipeline',production:'Production',media:'Media',frontdesk:'Front Desk',finance:'Finance',reports:'Reports',management:'Management',messages:'Messages',notifications:'Notifications',tasks:'Tasks',schedule:'Schedule'};
 
     function navigationContext(view,options={}){
-        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioWorkspaceId:view==='jobs'?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioTemplateKind:view==='templates'?(['Job','WorkOrder','Automation'].includes(options.kind)?options.kind:'Job'):null,studioCatalogTab:view==='catalog'?(options.tab==='booking-sessions'?'booking-sessions':'products'):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
+        return {studioView:view,studioSchedulePanel:view==='schedule'?(['pipeline','production'].includes(options.panel)?options.panel:'workers'):null,studioPhotographer:view==='schedule'?String(options.photographer||''):null,studioScheduleResource:view==='schedule'?String(options.resourceId||''):null,studioScheduleDate:view==='schedule'?String(options.date||''):null,studioScheduleView:view==='schedule'?String(options.mode||''):null,studioClientId:view==='clients'?String(options.clientId||''):null,studioDashboardQueue:options.queue||null,studioWorkspaceId:['jobs','frontdesk','production','delivery','schedule'].includes(view)?String(options.workspaceId??jobsWorkspaceFilter??''):null,studioClientTab:view==='clients'?String(options.tab||''):null,studioTemplateKind:view==='templates'?(['Job','WorkOrder','Automation'].includes(options.kind)?options.kind:'Job'):null,studioCatalogTab:view==='catalog'?(options.tab==='booking-sessions'?'booking-sessions':'products'):null,studioJobId:['workspaces','session-plan','session-plan-import'].includes(view)&&options.jobId?String(options.jobId):null};
     }
     function recordNavigation(view,options={}){
         const next=navigationContext(view,options),previous=window.history.state;
@@ -963,7 +394,8 @@
         if(next.studioTemplateKind)params.set('kind',next.studioTemplateKind);
         if(next.studioWorkspaceId)params.set('workspace',next.studioWorkspaceId);
         if(next.studioJobId)params.set('job',next.studioJobId);
-        const same=previous?.studioView===next.studioView&&['studioSchedulePanel','studioPhotographer','studioScheduleResource','studioScheduleDate','studioScheduleView','studioCatalogTab','studioTemplateKind'].every(key=>(previous[key]||'')===(next[key]||''))&&(previous.studioClientId||null)===(next.studioClientId||null)&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId&&(previous.studioClientTab||'')===(next.studioClientTab||'');
+        if(next.studioDashboardQueue)params.set('queue',next.studioDashboardQueue);
+        const same=previous?.studioDashboardQueue===next.studioDashboardQueue&&previous?.studioView===next.studioView&&['studioSchedulePanel','studioPhotographer','studioScheduleResource','studioScheduleDate','studioScheduleView','studioCatalogTab','studioTemplateKind'].every(key=>(previous[key]||'')===(next[key]||''))&&(previous.studioClientId||null)===(next.studioClientId||null)&&(previous.studioWorkspaceId||null)===(next.studioWorkspaceId||null)&&(previous.studioJobId||null)===next.studioJobId&&(previous.studioClientTab||'')===(next.studioClientTab||'');
         if(options.replaceHistory)window.history.replaceState(next,'','#'+params);
         else if(!options.browserHistory&&options.history!==false&&!same)window.history.pushState(next,'','#'+params);
         currentNavigationView=view;
@@ -989,7 +421,7 @@
         window.StudioPage?.invalidate();
         window.StudioMessages?.invalidate();
         window.StudioWorkspace?.invalidate();
-        todayLoad?.abort();
+        window.StudioDashboard?.dispose();
         return {context,revision};
     }
     // Job Details shares the workspace surface, but has its own history destination.
@@ -1005,8 +437,8 @@
         const {context,revision}=beginNavigation(view,options);
         setActive(view);
         window.studioShellMountContext?.([],view==='workspaces'&&context.studioJobId?'job-detail':view);
-        if(view!=='today'){
-            if(studioPageTools)studioPageTools.innerHTML='';
+        if(studioPageTools)studioPageTools.innerHTML='';
+        if(view!=='dashboard'){
             window.studioSetBreadcrumb?.([{label:navigationLabels[view]||view.replace(/(^|\s)\S/g,m=>m.toUpperCase()),view}]);
         }
         try{
@@ -1014,7 +446,7 @@
             else await route();
             if(revision===navigationRevision){
                 setActive(view);
-                if(view!=='today'&&typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
+                if(view!=='dashboard'&&typeof renderWorkspaceMenu==='function')renderWorkspaceMenu();
                 window.StudioShell?.sync(view);
             }
         }catch(error){
@@ -1029,7 +461,7 @@
     function destinationFromLocation(state){
         const params=new URLSearchParams(window.location.hash.replace(/^#/,''));
         const view=canonicalRoute(state?.studioView&&routes[canonicalRoute(state.studioView)]?state.studioView:params.get('studio'));
-        return {view:view&&routes[view]?view:'today',kind:(state?.studioView==='workflows-admin'||(!state?.studioView&&params.get('studio')==='workflows-admin'))?'Automation':(state?.studioView==='work-order-templates'||(!state?.studioView&&params.get('studio')==='work-order-templates'))?'WorkOrder':state?.studioTemplateKind||params.get('kind')||'Job',panel:state?.studioView?(state.studioSchedulePanel||'workers'):(params.get('panel')||'workers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),tab:(state?.studioView==='booking-sessions'||(!state?.studioView&&params.get('studio')==='booking-sessions'))?'booking-sessions':state?.studioView?(state.studioView==='catalog'?(state.studioCatalogTab||'products'):(state.studioClientTab||'')):(params.get('tab')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
+        return {view:view&&routes[view]?view:'dashboard',kind:(state?.studioView==='workflows-admin'||(!state?.studioView&&params.get('studio')==='workflows-admin'))?'Automation':(state?.studioView==='work-order-templates'||(!state?.studioView&&params.get('studio')==='work-order-templates'))?'WorkOrder':state?.studioTemplateKind||params.get('kind')||'Job',panel:state?.studioView?(state.studioSchedulePanel||'workers'):(params.get('panel')||'workers'),photographer:state?.studioView?(state.studioPhotographer||''):(params.get('photographer')||''),resourceId:state?.studioView?(state.studioScheduleResource||''):(params.get('resource')||''),date:state?.studioView?(state.studioScheduleDate||''):(params.get('date')||''),mode:state?.studioView?(state.studioScheduleView||''):(params.get('view')||''),tab:(state?.studioView==='booking-sessions'||(!state?.studioView&&params.get('studio')==='booking-sessions'))?'booking-sessions':state?.studioView?(state.studioView==='catalog'?(state.studioCatalogTab||'products'):(state.studioClientTab||'')):(params.get('tab')||''),clientId:state?.studioView?(state.studioClientId||''):(params.get('client')||''),workspaceId:state?.studioView?(state.studioWorkspaceId||''):(params.get('workspace')||''),queue:state?.studioDashboardQueue||params.get('queue')||'',jobId:state?.studioView?(state.studioJobId||null):(params.get('job')||null)};
     }
     window.addEventListener('popstate',event=>{
         const destination=destinationFromLocation(event.state);
@@ -1053,6 +485,7 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startStudio,{once:true});
     else startStudio();
 })();
+
 
 
 

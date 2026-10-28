@@ -1,4 +1,5 @@
 let frontDeskJobs = [];
+let frontDeskDashboardWorkspace='';
 let frontDeskRole = null;
 let frontDeskMetricView = '';
 let frontDeskColumnFilters = {type:'',status:'',source:''};
@@ -20,7 +21,9 @@ async function loadFrontDeskRole() {
     return frontDeskRole;
 }
 
-async function showFrontDesk() {
+async function showFrontDesk(options={}) {
+    if(options.queue){frontDeskMetricView=({inquiries:'enquiries',deposits:'deposits',confirmation:'confirmation'})[options.queue]||'';frontDeskTab='today';frontDeskColumnFilters={type:'',status:'',source:''};}
+    frontDeskDashboardWorkspace=String(options.workspaceId||'');
     if (!frontDeskRole) await loadFrontDeskRole();
     const me = await json('/api/auth/me');
     if (!frontDeskRole?.frontDesk && !(me.user || me).isAdministrator) {
@@ -61,6 +64,13 @@ async function showFrontDesk() {
         return result.value;
     });
     [frontDeskJobs,frontDeskRequests,frontDeskEnquiries,frontDeskWorkspaces,frontDeskClients,frontDeskSchedule,frontDeskInvoices,frontDeskGalleryRequests]=arrays;
+    if(frontDeskDashboardWorkspace){
+        const id=frontDeskDashboardWorkspace;
+        frontDeskJobs=frontDeskJobs.filter(j=>String(j.workspaceId)===id||(j.participatingWorkspaceIds||[]).map(String).includes(id));
+        const ids=new Set(frontDeskJobs.map(j=>String(j.id)));
+        frontDeskRequests=frontDeskRequests.filter(r=>String(r.request?.workspaceId)===id||ids.has(String(r.jobId)));
+        frontDeskEnquiries=frontDeskEnquiries.filter(e=>String(e.workspaceId)===id);
+    }
     try{
         renderFrontDesk();
         const referenceButton=document.createElement('button');referenceButton.type='button';referenceButton.textContent='Find intake reference';referenceButton.onclick=async()=>{const value=prompt('Intake reference, for example 2026-BK-000001');if(!value)return;try{const found=await json('/api/intake/lookup/'+encodeURIComponent(value.trim()));if(found.jobId)await openFrontDeskJob(found.jobId);else await openIntakeDeliveryStatus(found.conversationId);}catch(e){alert(e.message);}};genericView.querySelector('.fd-overview-toolbar')?.append(referenceButton);
@@ -623,6 +633,7 @@ async function recordFrontDeskFulfillment(jobId,refresh=showFrontDesk){
  const dialog=frontDeskDialog('Confirm collection / delivery',`<p>${esc(job?.title||'Job')} · ${esc(job?.clientName||'')}</p><label>Method<select name="method"><option value="Collected">Client collected</option><option value="Delivered">Delivered to client</option></select></label><label>Received by<input name="recipient" required maxlength="200"></label>`);
  dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{await json(`/api/frontdesk/jobs/${jobId}/fulfillment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId,expectedRevision:workflow.revision,method:form.elements.method.value,recipient:form.elements.recipient.value})});dialog.close();await refresh();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
+
 
 
 

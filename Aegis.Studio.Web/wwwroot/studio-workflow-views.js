@@ -158,13 +158,13 @@ window.StudioWorkflowViews=(()=>{
   host.querySelectorAll('[data-session-export]').forEach(el=>el.onclick=()=>exportPlan(preview?s.preview:visibleSubjects(s)));
   host.querySelectorAll('[data-session-conflict]').forEach(el=>el.onclick=()=>{const c=conflicts[Number(el.dataset.sessionConflict)];s.conflictId=c.conversationId;const keys=StudioRosterEditor.fields.filter(k=>c.rows.some(r=>Object.hasOwn(r,k)));prepare([keys,...c.rows.map(r=>keys.map(k=>r[k]||''))]);});
  }
- async function showDelivery(){
+ async function showDelivery({workspaceId}={}){
   const current=StudioPage.begin('delivery');
   const role=await loadFrontDeskRole();const me=await json('/api/auth/me');
   if(!role?.frontDesk&&!(me.user||me).isAdministrator)throw Error('Front Desk access is required to review delivery and payments.');
   genericView.innerHTML='<p role="status">Loading Delivery…</p>';
   const jobs=await json('/api/jobs');
-  const candidates=jobs.filter(j=>['Ready for Client','Ready for Delivery','Published','Completed','Delivered'].includes(j.status));
+  const candidates=jobs.filter(j=>(!workspaceId||String(j.workspaceId)===String(workspaceId)||(j.participatingWorkspaceIds||[]).map(String).includes(String(workspaceId)))&&['Ready for Client','Ready for Delivery','Published','Completed','Delivered'].includes(j.status));
   const rows=new Array(candidates.length);let next=0;
   async function worker(){while(next<candidates.length){if(!current())return;const i=next++,job=candidates[i];let balance=null,error='';try{const release=await json('/api/jobs/'+job.id+'/finance-release');balance=release.decision?.balance??null;}catch(e){error=e.message;}rows[i]={job,balance,error,payment:balance===null?'Unavailable':balance>0?'Outstanding':'Paid'};}}
   await Promise.all([worker(),worker(),worker()]);if(!current())return;
@@ -191,3 +191,4 @@ window.StudioWorkflowViews=(()=>{
  }
  return {actions,bind,run,showSessionPlan,showDelivery};
 })();
+

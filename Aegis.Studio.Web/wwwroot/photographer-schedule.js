@@ -30,7 +30,7 @@ window.StudioPhotographerSchedule=(()=>{
         try{const [data,spaces]=await Promise.all([read('/api/schedule/worker-data'+range+'&includeInactive='+state.inactive),loadWorkspaces()]);if(!data||!['workers','roles','entries','jobs'].every(k=>Array.isArray(data[k])))throw Error('Unexpected calendar response. Please refresh.');({workers,roles,entries,jobs}=data);workspaces=spaces;}
         catch(e){if(live()){genericView.innerHTML='<section class="mw-list-panel ps-error"><h2>Schedule could not load</h2><p role="alert">'+esc(e.message)+'</p><button class="action" data-ps-retry>Retry</button></section>';StudioPage.query(genericView,'[data-ps-retry]').onclick=()=>render();}return;}
         if(!live())return;
-        state.workspace=window.StudioScheduleWorkspaceCard.initialize(state.workspace);
+        state.workspace=options.workspaceId!=null?window.StudioScheduleWorkspaceCard.select(options.workspaceId):window.StudioScheduleWorkspaceCard.initialize(state.workspace);
         if(state.photographer.startsWith('resource:')){const p=workers.find(p=>p.scheduleResourceId===state.photographer.slice(9));state.photographer=p?.userName||'';}
         const jobMap=new Map(jobs.map(j=>[j.id,j]));
         const rawEntries=entries.filter(e=>valid(e)&&e.status!=='Cancelled'&&new Date(e.startsAtUtc)<to&&new Date(e.endsAtUtc)>from);
@@ -132,6 +132,7 @@ window.StudioPhotographerSchedule=(()=>{
     }
     return {render,options(){return {photographer:state.photographer,date:dayKey(state.date),mode:state.view};},invalidate(){++revision;controller?.abort();},overlap,dayKey,startOfWeek};
 })();
+
 
 
 

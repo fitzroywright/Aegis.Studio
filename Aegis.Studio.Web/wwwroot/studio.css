@@ -9283,6 +9283,9 @@ body .shell::before {
   z-index: 4;
   pointer-events: none;
 }
+body .shell[data-context="none"] {
+  --studio-shell-left-width:0px;
+}
 body .shell>main {
   margin-bottom: 0;
   grid-column: 2;
@@ -9955,3 +9958,39 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 #studioShellFooter #studioBreadcrumb .breadcrumb-separator { color: #f0d2a2; }
 #studioShellFooter #studioBreadcrumb .breadcrumb-label { color: #f0c779; }
 
+
+
+/* Company Dashboard content; shared frame remains owned by the shell section. */
+.company-dashboard { display:flex; flex-direction:column; gap:14px; padding:16px; min-width:0; height:100%; overflow:auto; box-sizing:border-box; color:var(--theme-text,#213951); }
+.cd-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.cd-heading h1 { margin:0 0 4px; font-size:27px; }
+.cd-heading p { margin:0 0 4px; }
+.cd-heading small { opacity:.75; }
+.cd-heading>div:last-child { display:flex; gap:12px; align-items:center; }
+.cd-metrics { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
+.cd-metric { background:var(--studio-card-surface,#fff); color:inherit; border:1px solid var(--studio-grid-border,#d9e2e9); border-radius:8px; display:flex; gap:12px; text-align:left; padding:16px 12px; cursor:pointer; min-width:0; }
+.cd-metric strong { display:block; font-size:28px; margin:6px 0; overflow-wrap:anywhere; }
+.cd-metric small { display:block; text-align:right; color:var(--attention-title-text,#945b23); }
+.cd-icon { font-size:25px; color:var(--theme-header,#173653); }
+.cd-main { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(0,1fr); gap:14px; }
+.cd-bottom { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.cd-card { background:var(--studio-card-surface,#fff); border:1px solid var(--studio-grid-border,#d9e2e9); border-radius:8px; padding:16px; min-width:0; }
+.cd-card>header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+.cd-card h2 { font-size:19px; margin:0; }
+.cd-link { border:0; background:transparent; color:var(--studio-control-text,#233e57); padding:4px 0; text-align:left; cursor:pointer; font:inherit; }
+.cd-link:hover { text-decoration:underline; }
+.cd-table-scroll { overflow:auto; }
+.cd-card table { width:100%; border-collapse:collapse; }
+.cd-card th { background:var(--studio-card-title-surface,#eef2f5); text-align:left; font-weight:600; }
+.cd-card td,.cd-card th { padding:10px 8px; border-bottom:1px solid var(--studio-grid-border,#d9e2e9); }
+.cd-pill { background:var(--studio-card-title-surface,#eef2f5); border-radius:16px; padding:4px 9px; font-size:12px; white-space:nowrap; }
+.cd-attention>button,.cd-deliveries>button,.cd-workload>button { display:flex; align-items:center; gap:12px; width:100%; background:transparent; color:inherit; text-align:left; border:0; border-bottom:1px solid var(--studio-grid-border,#d9e2e9); padding:12px 0; cursor:pointer; font:inherit; }
+.cd-attention strong { background:var(--attention-surface,#fffaf4); color:var(--attention-title-text,#945b23); padding:7px 10px; border-radius:22px; }
+.cd-attention span:first-of-type,.cd-deliveries>button>span:first-child { flex:1; }
+.cd-deliveries small { display:block; opacity:.75; margin-top:4px; }
+.cd-workload>button>span { flex:0 0 120px; }
+.cd-workload meter { flex:1; min-width:0; height:14px; accent-color:#567d9e; }
+.cd-warning { background:var(--attention-surface,#fffaf4); border:1px solid var(--attention-border,#e6c29c); padding:10px; border-radius:6px; }
+.company-dashboard button:focus-visible { outline:2px solid #b18545; outline-offset:3px; }
+@media(max-width:1100px) { .cd-metrics { grid-template-columns:repeat(3,minmax(0,1fr)); } .cd-main { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:650px) { .cd-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .cd-bottom { grid-template-columns:minmax(0,1fr); } .cd-heading { flex-direction:column; align-items:stretch; } .company-dashboard { padding:10px; } }
