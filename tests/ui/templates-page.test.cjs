@@ -10,8 +10,8 @@ function setup(t,url='https://studio.test/#studio=templates'){
 }
 test('Templates lists jobs and work orders in the same page and uses each existing editor',async t=>{
  const {w,calls}=setup(t);w.studioNavigate=async(view,options)=>{assert.equal(view,'templates');return w.showCommercialTemplates(options.kind);};
- await w.showCommercialTemplates('Job');assert.equal(w.document.querySelector('h1').textContent,'Templates');assert.equal(w.document.querySelectorAll('[data-template-kind]').length,3);assert.match(w.document.querySelector('[data-template]').textContent,/School photography/);
- w.document.querySelector('[data-template-kind=WorkOrder]').click();await settle();assert.equal(w.document.querySelector('h1').textContent,'Templates');assert.match(w.document.querySelector('[data-template-row]').textContent,/Photo printing/);assert.equal(w.history.state.studioTemplateKind,'WorkOrder');w.document.querySelector('[data-edit]').click();await settle();assert.ok(w.document.querySelector('dialog .commercial-form'));w.document.querySelector('dialog').close();
+ await w.showCommercialTemplates('Job');assert.equal(w.document.querySelector('h1'),null);assert.equal(w.document.querySelector('.st-page').getAttribute('aria-label'),'Templates');assert.equal(w.document.querySelectorAll('[data-template-kind]').length,3);assert.match(w.document.querySelector('[data-template]').textContent,/School photography/);
+ w.document.querySelector('[data-template-kind=WorkOrder]').click();await settle();assert.equal(w.document.querySelector('h1'),null);assert.equal(w.document.querySelector('.st-page').getAttribute('aria-label'),'Templates');assert.match(w.document.querySelector('[data-template-row]').textContent,/Photo printing/);assert.equal(w.history.state.studioTemplateKind,'WorkOrder');w.document.querySelector('[data-edit]').click();await settle();assert.ok(w.document.querySelector('dialog .commercial-form'));w.document.querySelector('dialog').close();
  w.document.querySelector('[data-template-kind=Job]').click();await settle();assert.equal(w.history.state.studioTemplateKind,'Job');w.document.querySelector('[data-template]').click();await settle();assert.match(w.document.querySelector('h1').textContent,/Job Template Designer/);assert.ok(w.document.querySelector('[data-canvas]'));assert.ok(calls.some(call=>call.url==='/api/admin/workflow-templates/drafts'));
 });
 test('old Work Order Template bookmarks and Job Template links select the correct unified tab',async t=>{
@@ -21,7 +21,7 @@ test('old Work Order Template bookmarks and Job Template links select the correc
 });
 
 test('Workflow Automation is the third Templates tab and retains create, delete and authorization audit',async t=>{
- const {w,calls}=setup(t);await w.showCommercialTemplates('Automation');assert.equal(w.document.querySelector('h1').textContent,'Templates');assert.equal(w.document.querySelector('[data-template-kind=Automation]').getAttribute('aria-pressed'),'true');assert.match(w.document.querySelector('#workflowList').textContent,/Notify on change/);
+ const {w,calls}=setup(t);await w.showCommercialTemplates('Automation');assert.equal(w.document.querySelector('h1'),null);assert.equal(w.document.querySelector('.st-page').getAttribute('aria-label'),'Templates');assert.equal(w.document.querySelector('[data-template-kind=Automation]').getAttribute('aria-pressed'),'true');assert.match(w.document.querySelector('#workflowList').textContent,/Notify on change/);
  w.document.querySelector('#workflowName').value='Schedule follow-up';w.document.querySelector('#workflowStatusCondition').value='Confirmed';await w.createWorkflowDefinition();const write=calls.find(call=>call.url==='/api/workflows/'&&call.options?.method==='POST');assert.ok(write);assert.equal(JSON.parse(write.options.body).name,'Schedule follow-up');assert.match(w.document.querySelector('#workflowList').textContent,/Schedule follow-up/);
  await w.deleteWorkflowDefinition('wf');assert.doesNotMatch(w.document.querySelector('#workflowList').textContent,/Notify on change/);await w.runAuthorizationAudit();assert.match(w.document.querySelector('#authorizationAuditResult').textContent,/12 API endpoints.*none/);
 });
@@ -32,3 +32,4 @@ test('old Workflow Automation bookmarks and browser back restore its Templates t
  const {w}=setup(t,'https://studio.test/#studio=workflows-admin');w.eval(read('studio-navigation.js'));w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await settle();assert.equal(w.document.body.dataset.studioView,'templates');assert.equal(w.history.state.studioTemplateKind,'Automation');assert.ok(w.document.querySelector('#workflowList'));
  await w.studioNavigate('templates',{kind:'Job'});assert.ok(w.document.querySelector('[data-template]'));w.history.back();await new Promise(resolve=>setTimeout(resolve,35));assert.equal(w.history.state.studioTemplateKind,'Automation');assert.ok(w.document.querySelector('#workflowName'));
 });
+
