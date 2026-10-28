@@ -161,10 +161,10 @@ window.StudioScheduleWorkspaceCard=(()=>{
         const visible=allowed(workspaces);
         if(visible.length)visibleWorkspaces=visible;
         if(typeof onSelect==='function')selectionHandler=onSelect;
-        const list=document.querySelector('#studioContextRail [data-rail-card="workspaces"] .mw-today-rail-links');
+        const list=document.querySelector('#studioPageContext [data-rail-card="workspaces"] .mw-today-rail-links');
         if(list&&markup()!==null){list.innerHTML=markup();bindList(list);}
     }
-    function bindRail(rail=document.querySelector('#studioContextRail')){
+    function bindRail(rail=document.querySelector('#studioPageContext')){
         const list=rail?.querySelector('[data-rail-card="workspaces"] .mw-today-rail-links');
         if(list&&markup()!==null){list.innerHTML=markup();bindList(list);}
     }
@@ -348,6 +348,7 @@ window.addEventListener('studio-schedule-item',()=>{
 });
 // Older Schedule calls now open the dedicated photographer calendar.
 async function showSchedule() { return window.studioNavigate('schedule'); }
+
 
 
 

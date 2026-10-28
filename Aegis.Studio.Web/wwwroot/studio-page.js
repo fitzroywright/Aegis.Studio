@@ -33,10 +33,10 @@
         mountContext(host);
     }
     function query(host, selector) {
-        return host.querySelector(selector) || document.getElementById('studioContextRail')?.querySelector(selector) || document.getElementById('studioPageAttention')?.querySelector(selector) || null;
+        return host.querySelector(selector) || document.getElementById('studioPageContext')?.querySelector(selector) || document.getElementById('studioPageAttention')?.querySelector(selector) || null;
     }
     function queryAll(host, selector) {
-        return [...new Set([...host.querySelectorAll(selector), ...(document.getElementById('studioContextRail')?.querySelectorAll(selector) || []), ...(document.getElementById('studioPageAttention')?.querySelectorAll(selector) || [])])];
+        return [...new Set([...host.querySelectorAll(selector), ...(document.getElementById('studioPageContext')?.querySelectorAll(selector) || []), ...(document.getElementById('studioPageAttention')?.querySelectorAll(selector) || [])])];
     }
     function mountContext(host, view) {
         const context = host.querySelector('[data-studio-context]');
@@ -59,6 +59,7 @@
     // Legacy page renderers share this explicit global instead of app.js lexical scope.
     window.esc = escape;
 })();
+
 
 
 

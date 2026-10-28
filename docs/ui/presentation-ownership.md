@@ -3,7 +3,7 @@
 Change the current component or owning rule directly. Do not append a replacement renderer, reassign an existing public function, or add another CSS correction for the same selector and property.
 
 - `studio-navigation.js` owns routes and browser history. After a current navigation completes it calls `StudioShell.sync(view)`; the shell does not wrap the router or register a second history listener.
-- `studio-shell-nav.js` owns the shared frame, breadcrumb and navigation cards.
+- `studio-shell-nav.js` owns the shared frame, breadcrumb, navigation and Page actions menu.
 - `app.js` owns the public workspace and conversation entry points. `StudioWorkspace` in `workspace-outlook.js` supplies workspace selection and list rendering through explicit delegation. Permissions, reply presentation and attachments are invoked directly; their scripts do not replace the entry points.
 - Page-specific image recovery takes precedence. The shared `media-fallback.js` recovery handles unowned images and exhausted fallback attempts, without detaching a page-owned image before its handler runs.
 - `studio.css` is the single canonical shared stylesheet and retains the existing cascade priority and responsive conditions. Superseded declarations and retired layout controls have been removed. Remaining `!important` declarations preserve existing shared/theme behavior; they are not an invitation to append overrides. Jobs and Job Details retain their dedicated component stylesheets.
@@ -19,8 +19,9 @@ Run `node scripts/check-ui-css-ownership.cjs` on a branch with `origin/main` fet
 
 ## Mandatory shared-shell CSS rules
 
-- The header, logo, page identifier, navigation, breadcrumbs, session and attention drawers, left rail, and footer are **one shared shell**. Page styles cannot reposition or resize those elements.
+- The header, logo, page identifier, navigation, breadcrumbs, session and attention drawers, Page actions menu, and footer are **one shared shell**. Page styles cannot reposition or resize those elements.
 - Before changing a shared-shell style, inspect every loaded stylesheet for declarations targeting that component. Edit its existing owning rule, and remove obsolete declarations rather than layering more specific selectors.
 - Never use `!important`, a new body/view qualifier, an ID qualifier, or a responsive duplicate to defeat an existing shell declaration. Responsive differences must be intentional and limited to genuinely responsive properties.
 - Every UI PR must pass `css-ownership` and the shared-shell ownership test. Configure GitHub branch protection to **require** the `css-ownership` check before merging; a workflow by itself is not a merge gate.
 - Do not merge until browser verification covers Today, Front Desk, Job Detail, and at least one other page at desktop and narrow widths. All pages must use the same header alignment, and no page may render a separate Today's Sessions card.
+

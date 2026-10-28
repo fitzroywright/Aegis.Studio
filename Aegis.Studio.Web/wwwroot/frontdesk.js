@@ -227,7 +227,7 @@ function renderFrontDesk(selectionOnly=false){
         shellCount.textContent=count+' '+label;
     }
     window.studioBindFrontDeskOverview = () => {
-        document.querySelectorAll('#studioContextRail [data-fd-metric]').forEach(button=>button.onclick=()=>{
+        document.querySelectorAll('#studioPageContext [data-fd-metric]').forEach(button=>button.onclick=()=>{
             const key=button.dataset.fdMetric;
             frontDeskMetricView=frontDeskMetricView===key?'':key;
             frontDeskTab=frontDeskMetricView==='unassigned'?'unassigned':'today';
@@ -235,7 +235,7 @@ function renderFrontDesk(selectionOnly=false){
             frontDeskColumnFilters={type:'',status:'',source:''};
             renderFrontDesk();
         });
-        document.querySelectorAll('#studioContextRail [data-new-booking]').forEach(button=>button.onclick=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId)));
+        document.querySelectorAll('#studioPageContext [data-new-booking]').forEach(button=>button.onclick=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId)));
     };
     window.studioBindFrontDeskOverview();
     genericView.querySelectorAll('[data-fd-filter]').forEach(select=>select.onchange=()=>{
@@ -249,7 +249,7 @@ function renderFrontDesk(selectionOnly=false){
         renderFrontDesk();
     });
     const newBooking=()=>openPendingBookingForm(null,frontDeskClients.find(c=>c.id===frontDeskSelectedClientId));
-    document.querySelectorAll('#studioContextRail [data-new-booking]').forEach(b=>b.onclick=newBooking);
+    document.querySelectorAll('#studioPageContext [data-new-booking]').forEach(b=>b.onclick=newBooking);
     genericView.querySelectorAll('[data-view-receipt]').forEach(button=>button.addEventListener('click',()=>pickFrontDeskSale('ViewReceipt',button.dataset.viewReceipt).catch(error=>alert(error.message))));
     genericView.querySelector('[data-calendar]')?.addEventListener('click',()=>studioNavigate('pipeline'));
     const search=genericView.querySelector('#frontDeskSearch');
@@ -633,6 +633,7 @@ async function recordFrontDeskFulfillment(jobId,refresh=showFrontDesk){
  const dialog=frontDeskDialog('Confirm collection / delivery',`<p>${esc(job?.title||'Job')} · ${esc(job?.clientName||'')}</p><label>Method<select name="method"><option value="Collected">Client collected</option><option value="Delivered">Delivered to client</option></select></label><label>Received by<input name="recipient" required maxlength="200"></label>`);
  dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{await json(`/api/frontdesk/jobs/${jobId}/fulfillment`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId,expectedRevision:workflow.revision,method:form.elements.method.value,recipient:form.elements.recipient.value})});dialog.close();await refresh();}catch(error){form.querySelector('[role=alert]').textContent=error.message;button.disabled=false;}};
 }
+
 
 
 
