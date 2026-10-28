@@ -1,3 +1,4 @@
+using Common.Storage;
 using System.Security.Claims;
 using Aegis.Studio.Web.Operations;
 using Aegis.Studio.Web.Persistence;
@@ -196,6 +197,7 @@ public static class WorkDayEndpoints
             ScheduleStore schedules,
             StudioStore studio,
             AttachmentStore attachments,
+            IFileStorage storage,
             JobAccessService access,
             StudioOperationsFlowPublisher flows,
             CancellationToken ct)=>
@@ -219,13 +221,14 @@ public static class WorkDayEndpoints
             try
             {
                 flows.TryEnqueueWorkDayUpload(correlation,"Upload",assignmentId.ToString("D"));
-                StudioAttachment stored=await attachments.AddAsync(job.ConversationId,file,"Internal",userName,ct,$"workday:{uploadId:D}");
-                flows.TryEnqueueWorkDayUpload(correlation,"Storage",stored.Id.ToString("D"));
-                flows.TryEnqueueWorkDayUpload(correlation,"MetadataAssociation",assignmentId.ToString("D"));
-                flows.TryEnqueueWorkDayUpload(correlation,"Acknowledged",stored.Id.ToString("D"));
-                return Results.Ok(new WorkDayUploadResult(uploadId,stored.Id,assignmentId,stored.FileName,stored.Size,stored.StorageStatus,DateTimeOffset.UtcNow));
+                WorkDayUploadResult imported=await WorkDayPhotoImport.ImportAsync(db,storage,attachments,studio,job,assignmentId,uploadId,file,user,ct);
+                flows.TryEnqueueWorkDayUpload(correlation,"Storage",imported.AttachmentId.ToString("D"));
+                flows.TryEnqueueWorkDayUpload(correlation,"MetadataAssociation",imported.AssetId?.ToString("D"));
+                flows.TryEnqueueWorkDayUpload(correlation,"Acknowledged",imported.AttachmentId.ToString("D"));
+                return Results.Ok(imported);
             }
-            catch(Exception ex) when(ex is InvalidOperationException or Common.Storage.StorageException)
+            catch(UnauthorizedAccessException){return Results.Forbid();}
+            catch(Exception ex) when(ex is InvalidOperationException or ArgumentException or Common.Storage.StorageException)
             {
                 flows.TryEnqueueWorkDayUpload(correlation,"Storage",assignmentId.ToString("D"),ex.GetType().Name,failed:true);
                 return Results.BadRequest(new{error=ex.Message});
