@@ -9961,17 +9961,11 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 
 
 /* Company Dashboard content; shared frame remains owned by the shell section. */
-.company-dashboard { display:grid; grid-template-rows:auto auto minmax(0,.8fr) minmax(0,1.2fr); gap:8px; padding:10px; min-width:0; min-height:0; height:100%; box-sizing:border-box; color:var(--theme-text,#213951); font-size:12px; }
+.company-dashboard { display:grid; grid-template-rows:auto minmax(0,.8fr) minmax(0,1.2fr); gap:8px; padding:10px; min-width:0; min-height:0; height:100%; box-sizing:border-box; color:var(--theme-text,#213951); font-size:12px; }
 .cd-heading { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px 12px; }
 .cd-heading h1 { margin:0; font-size:20px; }
 .cd-heading p { margin:2px 0 0; }
 .cd-heading>div:nth-child(2) { display:flex; gap:10px; align-items:center; }
-.cd-metrics { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
-.cd-metric { background:var(--studio-card-surface,#fff); color:inherit; border:1px solid var(--studio-grid-border,#d9e2e9); border-radius:6px; display:flex; align-items:center; gap:8px; text-align:left; padding:8px 10px; cursor:pointer; min-width:0; }
-.cd-metric-copy { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; flex:1; min-width:0; }
-.cd-metric strong { font-size:24px; overflow-wrap:anywhere; }
-.cd-metric:disabled strong { font-size:12px; }
-.cd-icon { font-size:20px; color:var(--theme-header,#173653); }
 .cd-main { display:grid; grid-template-columns:.95fr 1.15fr 1fr; gap:8px; min-height:0; }
 .cd-bottom { display:grid; grid-template-columns:1.3fr 1fr; gap:8px; min-height:0; }
 .cd-card { background:var(--studio-card-surface,#fff); border:1px solid var(--studio-grid-border,#d9e2e9); border-radius:6px; padding:10px 12px; min-width:0; min-height:0; display:flex; flex-direction:column; }
@@ -10046,8 +10040,6 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
 @media(min-width:801px) and (max-height:700px) {
   .company-dashboard { font-size:11px; line-height:1.3; gap:6px; padding:8px; }
   .cd-heading h1 { font-size:18px; }
-  .cd-metric { padding:6px 8px; }
-  .cd-icon { display:none; }
   .cd-card { padding:8px 10px; }
   .cd-card>header { margin-bottom:4px; }
   .cd-card h2 { font-size:14px; }
@@ -10059,4 +10051,4 @@ body .shell > footer#studioShellFooter > select#studioFooterWorkspaces option { 
   .cd-chart-legend button { padding:3px 0; }
 }
 @media(max-width:800px) { .company-dashboard { height:auto; grid-template-rows:auto; } .cd-main,.cd-bottom { grid-template-columns:minmax(0,1fr); } .cd-donut { max-height:none; width:140px; } .cd-week-chart { min-height:180px; } .cd-bottom .cd-card { overflow-x:auto; } .cd-card table { min-width:460px; } }
-@media(max-width:650px) { .cd-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .cd-heading { align-items:stretch; } .cd-heading>div:first-child { flex-basis:100%; } .cd-card { padding:8px; } }
+@media(max-width:650px) { .cd-heading { align-items:stretch; } .cd-heading>div:first-child { flex-basis:100%; } .cd-card { padding:8px; } }
