@@ -115,5 +115,6 @@
 .clients-page .client-directory-rows .client-directory-table{display:table;width:100%;min-width:0;table-layout:fixed}
 .clients-page .client-directory-head-clip .client-directory-table thead th{position:static}
 
-.client-directory-toolbar{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;padding:5px 9px;gap:8px;font-size:12px;font-weight:600}
+.client-directory-toolbar{display:flex;flex:0 0 auto;align-items:center;justify-content:flex-end;padding:5px 9px;gap:8px;font-size:12px;font-weight:600}
 .client-directory-toolbar button{font-size:11px;min-height:24px}
+
