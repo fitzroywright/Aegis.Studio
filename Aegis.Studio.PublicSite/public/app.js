@@ -152,7 +152,7 @@ catch { /* Booking and gallery-request forms remain visible if sign-in is unavai
  if(!links)return;
  try{
   const reply=await api('/api/auth/providers');
-  const names={microsoft:'Microsoft (Hotmail / Outlook)',facebook:'Facebook',yahoo:'Yahoo'};
+  const names={microsoft:'Microsoft (Hotmail / Outlook)',facebook:'Facebook',yahoo:'Yahoo',google:'Google'};
   for(const name of reply.providers||[]){
    if(!names[name])continue;
    const link=document.createElement('a');link.className='social-button';
