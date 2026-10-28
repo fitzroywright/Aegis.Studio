@@ -15,25 +15,28 @@ function setup(t){
  w.launchFrontDeskPos=async action=>calls.push(['pos',action]);
  return {w,calls,errors};
 }
-test('Front Desk actions sit above the grid and retain the existing seven command handlers after repaint',async t=>{
+test('Front Desk actions sit above the grid and include all sales commands without a Sales tab after repaint',async t=>{
  const {w,calls,errors}=setup(t);
  for(let pass=0;pass<2;pass++){
   const toolbar=w.document.querySelector('.fd-grid-actions');
   assert.equal(w.document.querySelectorAll('.fd-grid-actions').length,1);
   assert.equal(toolbar.getAttribute('aria-label'),'Front Desk actions');
   assert.ok(toolbar.compareDocumentPosition(w.document.querySelector('.fd-table-frame'))&w.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.equal(w.document.querySelector('[data-fd-tab="sales"],[data-fd-sale-action]'),null);
+  assert.deepEqual([...w.document.querySelectorAll('[data-fd-tab]')].map(b=>b.dataset.fdTab),['today','confirmation','deposits']);
+  assert.ok(w.document.querySelector('#frontDeskSearch'));
   const buttons=[...toolbar.querySelectorAll('button')];
-  assert.deepEqual(buttons.map(b=>b.textContent),['New Booking','Take Payment','Record Deposit','Issue Refund','New Sale','New Client','Close Register']);
+  assert.deepEqual(buttons.map(b=>b.textContent),['New Booking','Take Payment','Record Deposit','Issue Refund','New Sale','View Receipt','New Client','Close Register']);
   for(const button of buttons)await button.onclick();
   w.switchFrontDeskActionsTest();
  }
- const expected=[['booking'],['financial','TakePayment'],['financial','RecordDeposit'],['financial','IssueRefund'],['financial','NewSale'],['clients',true],['pos','CloseRegister']];
+ const expected=[['booking'],['financial','TakePayment'],['financial','RecordDeposit'],['financial','IssueRefund'],['financial','NewSale'],['financial','ViewReceipt'],['clients',true],['pos','CloseRegister']];
  assert.deepEqual(calls,[...expected,...expected]);assert.deepEqual(errors,[]);
  assert.equal(w.document.querySelector('.fd-overview'),null);
 });
 test('relocated financial, client and register actions report existing service errors',async t=>{
  const {w,errors}=setup(t);const fail=async()=>{throw Error('Service unavailable');};
  w.pickFrontDeskFinancialAction=fail;w.showFrontDeskClients=fail;w.launchFrontDeskPos=fail;
- for(const selector of ['[data-fd-financial-action="TakePayment"]','[data-fd-new-client]','[data-fd-close-register]'])await w.document.querySelector(selector).onclick();
- assert.deepEqual(errors,['Service unavailable','Service unavailable','Service unavailable']);
+ for(const selector of ['[data-fd-financial-action="TakePayment"]','[data-fd-financial-action="ViewReceipt"]','[data-fd-new-client]','[data-fd-close-register]'])await w.document.querySelector(selector).onclick();
+ assert.deepEqual(errors,['Service unavailable','Service unavailable','Service unavailable','Service unavailable']);
 });
